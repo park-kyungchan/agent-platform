@@ -1,0 +1,11 @@
+import * as legacy from '../compatibility/codex-harness-engineering/src/workspace/handoff';
+import * as canonical from '@palantirkc/work-continuity/handoff';
+import {realpath,readFile} from 'node:fs/promises';
+import {fileURLToPath} from 'node:url';
+import {createHash} from 'node:crypto';
+const resolved=await realpath(fileURLToPath(import.meta.resolve('@palantirkc/work-continuity/handoff')));
+const expected=fileURLToPath(new URL('../packages/work-continuity/src/handoff.ts',import.meta.url));
+if(resolved!==expected)throw Error('Package resolved outside transported canonical implementation');
+if(JSON.stringify(Object.keys(legacy).sort())!==JSON.stringify(Object.keys(canonical).sort())||Object.keys(canonical).some(key=>(canonical as any)[key]!== (legacy as any)[key]))throw Error('Legacy exports do not forward the single canonical module');
+if(createHash('sha256').update(await readFile(resolved)).digest('hex')!=='7c0e5d0b6575e8e82d94e299c078446270c2c99c997a958da0ea2ea6ea01664d')throw Error('Canonical implementation bytes drift');
+console.log(JSON.stringify({schema:'workspace.full-source-package-import-readback.v1',resolvedCanonicalPath:resolved,legacyAndCanonicalSameModule:true,exports:Object.keys(canonical).sort(),sha256:'7c0e5d0b6575e8e82d94e299c078446270c2c99c997a958da0ea2ea6ea01664d',modelCalls:0,canonicalIssueStateMutation:false}));

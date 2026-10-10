@@ -1,0 +1,19 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "@palantirkc/agent-platform",
+      "dependencies": {
+        "@palantirkc/work-continuity": "workspace:*",
+      },
+    },
+    "packages/work-continuity": {
+      "name": "@palantirkc/work-continuity",
+      "version": "0.0.0",
+    },
+  },
+  "packages": {
+    "@palantirkc/work-continuity": ["@palantirkc/work-continuity@workspace:packages/work-continuity"],
+  }
+}

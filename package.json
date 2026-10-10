@@ -1,0 +1,19 @@
+{
+  "name": "@palantirkc/agent-platform",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "check:handoff": "bun test ./compatibility/codex-harness-engineering/tests/handoff.test.ts",
+    "check:imports": "bun ./verification/package-import-check.ts"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  },
+  "dependencies": {
+    "@palantirkc/work-continuity": "workspace:*"
+  }
+}

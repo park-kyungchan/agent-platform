@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "project",
+  "id": "agent-platform:project:manifest",
+  "projectId": "agent-platform",
+  "domainId": "native-harness",
+  "createdAt": "2026-10-10T12:56:27.615346+00:00",
+  "payload": {
+    "name": "Agent platform",
+    "status": "active",
+    "scope": "First code-only handoff capability migration; existing Issue state, native stores and evidence owners remain external.",
+    "ontologyPackage": {
+      "name": "@palantirkc/ontology",
+      "version": "0.2.0"
+    },
+    "commands": {
+      "check:handoff": "bun run check:handoff"
+    },
+    "details": {
+      "recordClass": "first-code-capability-canonical-owner",
+      "leadChoiceRef": "/home/palantirkc/code/shared/codex-harness-engineering/discovery/workspace-rearchitecture/autonomous-20261010/incremental-canonical-cutover-scope-decision.json",
+      "intendedCanonicalRoot": "/home/palantirkc/code/shared/agent-platform",
+      "canonicalCutoverPerformed": true,
+      "actualUserAdoptionInferred": false,
+      "semanticOwner": "ontology-foundation",
+      "runtimeLoopOwner": "native Codex and Hermes respectively",
+      "existingOwnersAndNativeStoresPreserved": true,
+      "sourceMilestone": "03aea3d3790f7847921c7ce43367d6b8cbdf83df",
+      "canonicalScope": "M1.code-handoff only; full M1 and E2 remain pending.",
+      "sourceOwnerRoot": "/home/palantirkc/code/shared/agent-platform"
+    }
+  }
+}

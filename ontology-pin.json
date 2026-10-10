@@ -1,0 +1,13 @@
+{
+  "schema": "workspace.immutable-contract-pin.v1",
+  "name": "@palantirkc/ontology",
+  "version": "0.2.0",
+  "sourceOwner": "ontology-foundation",
+  "releasePin": {
+    "path": "/home/palantirkc/code/shared/codex-harness-engineering/releases/palantirkc-ontology-0.2.0.tgz",
+    "sha256": "3f9995d0b91d2ad39dfc7cedbb6e35b1cb9d29c2e57223ca0c076d2030319406",
+    "byteLength": 23300
+  },
+  "newRecordPinOnly": true,
+  "existingConsumerPinsUnchanged": true
+}
