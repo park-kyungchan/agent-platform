@@ -5,9 +5,21 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./handoff": "./src/handoff.ts"
+    "./handoff": "./src/handoff.ts",
+    "./context": "./src/context/index.ts",
+    "./context/index": "./src/context/index.ts",
+    "./context/types": "./src/context/types.ts",
+    "./context/source": "./src/context/source.ts",
+    "./context/validation": "./src/context/validation.ts",
+    "./context/context": "./src/context/context.ts",
+    "./context/store": "./src/context/store.ts",
+    "./context/boundary": "./src/context/boundary.ts",
+    "./context/sections": "./src/context/sections.ts"
   },
   "engines": {
     "bun": ">=1.3.14"
+  },
+  "peerDependencies": {
+    "@palantirkc/ontology": "0.2.0"
   }
 }

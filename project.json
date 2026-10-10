@@ -8,7 +8,7 @@
   "payload": {
     "name": "Agent platform",
     "status": "active",
-    "scope": "First code-only handoff capability migration; existing Issue state, native stores and evidence owners remain external.",
+    "scope": "Canonical handoff and selected Codex continuity/context code; Work/data/native/evidence stores retain existing owners.",
     "ontologyPackage": {
       "name": "@palantirkc/ontology",
       "version": "0.2.0"
@@ -26,8 +26,44 @@
       "runtimeLoopOwner": "native Codex and Hermes respectively",
       "existingOwnersAndNativeStoresPreserved": true,
       "sourceMilestone": "03aea3d3790f7847921c7ce43367d6b8cbdf83df",
-      "canonicalScope": "M1.code-handoff only; full M1 and E2 remain pending.",
-      "sourceOwnerRoot": "/home/palantirkc/code/shared/agent-platform"
+      "canonicalScope": "M1.code-handoff and selected8-module context code only; fullM1/E2 remain pending.",
+      "sourceOwnerRoot": "/home/palantirkc/code/shared/agent-platform",
+      "contextSourceInputs": [
+        {
+          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/index.ts",
+          "sha256": "9a649823c0d2647e1a4c2c5f907b571de59ee69199c8e7db10f802e27ddb0166"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/source.ts",
+          "sha256": "11507930a28c30d0fce389c58f6bf29e536ba472dbb26fe4bbffb794f6b2017e"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/store.ts",
+          "sha256": "87ec96ae50b2677a3920377a49de1ec69afa4deb0c514670755f9e22ae5e2307"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/types.ts",
+          "sha256": "545628f6b9af20278f3639709f3ef56f20260de4724d342321ee675836aa9347"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/boundary.ts",
+          "sha256": "801fcca92f0606ec69aea238bbe2b7eaba1e6620fda06e64bde5486ff4588ec4"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/context.ts",
+          "sha256": "88263d64e68ddd972850d29e9b962623b89bf6c9ed1b715e2e26fec885507523"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/validation.ts",
+          "sha256": "27b5417a7b1556239dd4fc505be88a4d8ab71deb00a24a1df91e0ca58c5e057e"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/sections.ts",
+          "sha256": "60df942bffaa8a3129412dbbd17ede9f28f034400048039741afb85f545198c1"
+        }
+      ],
+      "contextDataOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
+      "contextNativePermissionsGranted": false
     }
   }
 }
