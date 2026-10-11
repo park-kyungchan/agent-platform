@@ -14,12 +14,18 @@
     "./context/context": "./src/context/context.ts",
     "./context/store": "./src/context/store.ts",
     "./context/boundary": "./src/context/boundary.ts",
-    "./context/sections": "./src/context/sections.ts"
+    "./context/sections": "./src/context/sections.ts",
+    "./memory/qualification": "./src/workspace/qualification.ts",
+    "./memory/lexical-recall": "./src/workspace/lexical-recall.ts",
+    "./memory/recall-request": "./src/workspace/recall-request.ts",
+    "./originals": "./src/workspace/original-producer.ts",
+    "./recovery": "./src/workspace/recovery.ts",
+    "./memory": "./src/workspace/memory.ts"
   },
   "engines": {
     "bun": ">=1.3.14"
   },
-  "peerDependencies": {
-    "@palantirkc/ontology": "0.2.0"
+  "dependencies": {
+    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz"
   }
 }

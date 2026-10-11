@@ -8,62 +8,103 @@
   "payload": {
     "name": "Agent platform",
     "status": "active",
-    "scope": "Canonical handoff and selected Codex continuity/context code; Work/data/native/evidence stores retain existing owners.",
+    "scope": "Admitted common implementation packages for handoff/context/Memory/original/recovery, Ontology/Evidence, research capture, infrastructure domain, native Codex/Hermes context and remote operational contracts; old native readers/data/runtime paths remain source-owned adapters.",
     "ontologyPackage": {
       "name": "@palantirkc/ontology",
       "version": "0.2.0"
     },
     "commands": {
-      "check:handoff": "bun run check:handoff"
+      "check:handoff": "bun run check:handoff",
+      "check:imports": "bun run check:imports"
     },
     "details": {
-      "recordClass": "first-code-capability-canonical-owner",
-      "leadChoiceRef": "/home/palantirkc/code/shared/codex-harness-engineering/discovery/workspace-rearchitecture/autonomous-20261010/incremental-canonical-cutover-scope-decision.json",
+      "recordClass": "canonical-modular-capability-source-owner",
       "intendedCanonicalRoot": "/home/palantirkc/code/shared/agent-platform",
       "canonicalCutoverPerformed": true,
       "actualUserAdoptionInferred": false,
-      "semanticOwner": "ontology-foundation",
+      "semanticOwner": "Upper Ontology: ontology-foundation; domain meaning: named capability semantic owner.",
       "runtimeLoopOwner": "native Codex and Hermes respectively",
       "existingOwnersAndNativeStoresPreserved": true,
-      "sourceMilestone": "03aea3d3790f7847921c7ce43367d6b8cbdf83df",
-      "canonicalScope": "M1.code-handoff and selected8-module context code only; fullM1/E2 remain pending.",
+      "canonicalScope": "Admitted common implementation packages for handoff/context/Memory/original/recovery, Ontology/Evidence, research capture, infrastructure domain, native Codex/Hermes context and remote operational contracts; old native readers/data/runtime paths remain source-owned adapters.",
       "sourceOwnerRoot": "/home/palantirkc/code/shared/agent-platform",
-      "contextSourceInputs": [
+      "contextDataOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
+      "contextNativePermissionsGranted": false,
+      "historicalSourceMilestones": [
         {
-          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/index.ts",
-          "sha256": "9a649823c0d2647e1a4c2c5f907b571de59ee69199c8e7db10f802e27ddb0166"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/source.ts",
-          "sha256": "11507930a28c30d0fce389c58f6bf29e536ba472dbb26fe4bbffb794f6b2017e"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/store.ts",
-          "sha256": "87ec96ae50b2677a3920377a49de1ec69afa4deb0c514670755f9e22ae5e2307"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/types.ts",
-          "sha256": "545628f6b9af20278f3639709f3ef56f20260de4724d342321ee675836aa9347"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/boundary.ts",
-          "sha256": "801fcca92f0606ec69aea238bbe2b7eaba1e6620fda06e64bde5486ff4588ec4"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/context.ts",
-          "sha256": "88263d64e68ddd972850d29e9b962623b89bf6c9ed1b715e2e26fec885507523"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/validation.ts",
-          "sha256": "27b5417a7b1556239dd4fc505be88a4d8ab71deb00a24a1df91e0ca58c5e057e"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/sections.ts",
-          "sha256": "60df942bffaa8a3129412dbbd17ede9f28f034400048039741afb85f545198c1"
+          "stage": "first-handoff-and-context-source-slice",
+          "recordClass": "first-code-capability-canonical-owner",
+          "sourceMilestone": "03aea3d3790f7847921c7ce43367d6b8cbdf83df",
+          "canonicalScope": "M1.code-handoff and selected8-module context code only; fullM1/E2 remain pending.",
+          "contextSourceInputs": [
+            {
+              "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/index.ts",
+              "sha256": "9a649823c0d2647e1a4c2c5f907b571de59ee69199c8e7db10f802e27ddb0166"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/source.ts",
+              "sha256": "11507930a28c30d0fce389c58f6bf29e536ba472dbb26fe4bbffb794f6b2017e"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/store.ts",
+              "sha256": "87ec96ae50b2677a3920377a49de1ec69afa4deb0c514670755f9e22ae5e2307"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/types.ts",
+              "sha256": "545628f6b9af20278f3639709f3ef56f20260de4724d342321ee675836aa9347"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/boundary.ts",
+              "sha256": "801fcca92f0606ec69aea238bbe2b7eaba1e6620fda06e64bde5486ff4588ec4"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/context.ts",
+              "sha256": "88263d64e68ddd972850d29e9b962623b89bf6c9ed1b715e2e26fec885507523"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/validation.ts",
+              "sha256": "27b5417a7b1556239dd4fc505be88a4d8ab71deb00a24a1df91e0ca58c5e057e"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/continuity/sections.ts",
+              "sha256": "60df942bffaa8a3129412dbbd17ede9f28f034400048039741afb85f545198c1"
+            }
+          ],
+          "leadChoiceRef": "/home/palantirkc/code/shared/codex-harness-engineering/discovery/workspace-rearchitecture/autonomous-20261010/incremental-canonical-cutover-scope-decision.json"
         }
       ],
-      "contextDataOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
-      "contextNativePermissionsGranted": false
+      "capabilitySourceRegistry": "architecture/capability-source-owners.json",
+      "currentSourceProviderRegistrations": [
+        {
+          "id": "codex-context",
+          "registration": "../codex-harness-engineering/architecture/context-provider.json",
+          "ownerGuard": "../codex-harness-engineering/src/legacy/harness/owner-context-loader.ts"
+        },
+        {
+          "id": "codex-native-source",
+          "registration": "../codex-harness-engineering/architecture/native-codex-provider.json",
+          "ownerGuard": "../codex-harness-engineering/src/native/provider-closure.ts"
+        },
+        {
+          "id": "hermes-context-source",
+          "registration": "../hermes-harness-engineering/architecture/hermes-context-provider.json",
+          "ownerGuard": "../hermes-harness-engineering/src/ontology-driven/provider-source.ts"
+        }
+      ],
+      "sourceProjectionRegistrations": [
+        {
+          "id": "hermes-backend-semantic-context",
+          "registration": "architecture/hermes-semantic-projection.json",
+          "generator": "scripts/generate-hermes-semantic-context.ts"
+        }
+      ],
+      "currentAdoptionSources": {
+        "adoptedDesignBaselineRef": "/home/palantirkc/code/shared/codex-harness-engineering/proposals/workspace-rearchitecture/adopted-design-baseline.json",
+        "executionPlanRef": "/home/palantirkc/code/shared/codex-harness-engineering/proposals/workspace-rearchitecture/final-execution-plan.json",
+        "authorityOverlayRef": "/home/palantirkc/code/shared/codex-harness-engineering/discovery/workspace-rearchitecture/orchestration-kickoff-20261010/current-autonomous-authority-overlay.json",
+        "currentWorkRoute": "/home/palantirkc/code/shared/codex-harness-engineering/state/continuity/workspace-rearchitecture.json",
+        "routeSemantics": "Stable plain non-authorizing source route. Read current original decisions and authority; this manifest creates no authority or permission.",
+        "authorityGrantedByManifest": false
+      }
     }
   }
 }

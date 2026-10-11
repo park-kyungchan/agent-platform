@@ -1,0 +1,3 @@
+# Hermes common context source provider
+
+Canonical implementation is exactly nine declared ontology-driven/adoption modules. Common meaning retains ontology-platform; Upper Ontology remains immutable0.2.0. Native CLI, generated package promotion, context maintenance, profiles, sessions/learning, credentials, Work/evidence data and sourceRoot/nativeRoot remain hermes-harness-engineering and native Hermes owners. Old module paths are compatibility forwarders. Native-package source/build closure must cover these exact providers and native owner bindings before and after local packaging. This package adds no CLI/lifecycle/model/scheduler/trust/config operation. Do not edit generated native bundles as a second canonical writer.

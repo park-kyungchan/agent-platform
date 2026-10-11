@@ -1,0 +1,23 @@
+{
+  "name": "@palantirkc/infrastructure-operations",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./domain": "./src/domain/index.ts",
+    "./domain/index": "./src/domain/index.ts",
+    "./domain/types": "./src/domain/types.ts",
+    "./domain/schemas": "./src/domain/schemas.ts",
+    "./domain/registry": "./src/domain/registry.ts",
+    "./domain/validation": "./src/domain/validation.ts",
+    "./domain/evaluate": "./src/domain/evaluate.ts"
+  },
+  "dependencies": {
+    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  }
+}

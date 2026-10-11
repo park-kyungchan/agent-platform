@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "evidence",
+  "terms": [
+    "Project",
+    "SourceCapture",
+    "Claim",
+    "VerificationUnit",
+    "EvalDataset",
+    "EvalSuite",
+    "Evaluator",
+    "EvalRun",
+    "CaseResult",
+    "Decision"
+  ],
+  "relations": [
+    "project-capture",
+    "capture-claim",
+    "capture-unit",
+    "claim-unit",
+    "dataset-unit",
+    "suite-dataset",
+    "suite-evaluator",
+    "run-suite",
+    "run-result",
+    "result-unit",
+    "result-evaluator",
+    "claim-result",
+    "decision-claim",
+    "decision-result"
+  ],
+  "dependencyRule": "Evidence domain depends on operational upper contracts. The upper contracts never import this domain.",
+  "authorityBoundary": "Observed data, source support, verification class, metrics, and acceptance decisions remain distinct."
+}

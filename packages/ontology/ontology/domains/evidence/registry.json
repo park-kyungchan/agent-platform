@@ -1,0 +1,1330 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "evidence",
+  "version": "1.0.0",
+  "objectTypes": [
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "Project",
+      "version": "1.0.0",
+      "name": "Project",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "name",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "domainId",
+          "valueType": "string",
+          "required": true
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/ProjectProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "SourceCapture",
+      "version": "1.0.0",
+      "name": "SourceCapture",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "url",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "retrievedAt",
+          "valueType": "string",
+          "required": true,
+          "format": "date-time"
+        },
+        {
+          "name": "outcome",
+          "valueType": "string",
+          "required": true,
+          "enum": [
+            "success",
+            "failure",
+            "partial"
+          ]
+        },
+        {
+          "name": "artifacts",
+          "valueType": "array",
+          "required": true
+        },
+        {
+          "name": "metadata",
+          "valueType": "object",
+          "required": true
+        },
+        {
+          "name": "originalPath",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "originalRetrievedAt",
+          "valueType": "string",
+          "required": false,
+          "format": "date-time"
+        },
+        {
+          "name": "diagnostics",
+          "valueType": "array",
+          "required": false
+        },
+        {
+          "name": "sourceFingerprint",
+          "valueType": "string",
+          "required": false
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/SourceCaptureProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "Claim",
+      "version": "1.0.0",
+      "name": "Claim",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "statement",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "verificationUnitIds",
+          "valueType": "array",
+          "required": true,
+          "reference": {
+            "objectType": "VerificationUnit",
+            "many": true
+          }
+        },
+        {
+          "name": "temporal",
+          "valueType": "string",
+          "required": true,
+          "enum": [
+            "fixed-revision",
+            "current-state"
+          ]
+        },
+        {
+          "name": "conflictKey",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "sourceRefs",
+          "valueType": "array",
+          "required": false,
+          "reference": {
+            "objectType": "SourceCapture",
+            "many": true
+          }
+        },
+        {
+          "name": "fingerprints",
+          "valueType": "object",
+          "required": false
+        },
+        {
+          "name": "freshnessHours",
+          "valueType": "number",
+          "required": false
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/ClaimProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "VerificationUnit",
+      "version": "1.0.0",
+      "name": "VerificationUnit",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "objective",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "scope",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "inputSnapshot",
+          "valueType": "object",
+          "required": true
+        },
+        {
+          "name": "expectedPredicate",
+          "valueType": "object",
+          "required": true
+        },
+        {
+          "name": "method",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "fingerprints",
+          "valueType": "object",
+          "required": false
+        },
+        {
+          "name": "temporal",
+          "valueType": "string",
+          "required": false,
+          "enum": [
+            "fixed-revision",
+            "current-state"
+          ]
+        },
+        {
+          "name": "freshnessHours",
+          "valueType": "number",
+          "required": false
+        },
+        {
+          "name": "sourceRefs",
+          "valueType": "array",
+          "required": false,
+          "reference": {
+            "objectType": "SourceCapture",
+            "many": true
+          }
+        },
+        {
+          "name": "objectiveVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "thresholdVersion",
+          "valueType": "string",
+          "required": false
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/VerificationUnitProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "EvalDataset",
+      "version": "1.0.0",
+      "name": "EvalDataset",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "caseRefs",
+          "valueType": "array",
+          "required": true,
+          "reference": {
+            "objectType": "VerificationUnit",
+            "many": true
+          }
+        },
+        {
+          "name": "name",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "datasetVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "fingerprints",
+          "valueType": "object",
+          "required": false
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/EvalDatasetProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "EvalSuite",
+      "version": "1.0.0",
+      "name": "EvalSuite",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "datasetRef",
+          "valueType": "string",
+          "required": true,
+          "reference": {
+            "objectType": "EvalDataset",
+            "many": false
+          }
+        },
+        {
+          "name": "target",
+          "valueType": "object",
+          "required": true
+        },
+        {
+          "name": "evaluatorRefs",
+          "valueType": "array",
+          "required": true,
+          "reference": {
+            "objectType": "Evaluator",
+            "many": true
+          }
+        },
+        {
+          "name": "name",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "suiteVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "iterations",
+          "valueType": "integer",
+          "required": false
+        },
+        {
+          "name": "budget",
+          "valueType": "object",
+          "required": false
+        },
+        {
+          "name": "objectiveVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "thresholdVersion",
+          "valueType": "string",
+          "required": false
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/EvalSuiteProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "Evaluator",
+      "version": "1.0.0",
+      "name": "Evaluator",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "method",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "evaluatorVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "objectiveVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "thresholdVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "configuration",
+          "valueType": "object",
+          "required": false
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/EvaluatorProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "EvalRun",
+      "version": "1.0.0",
+      "name": "EvalRun",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "suiteRef",
+          "valueType": "string",
+          "required": true,
+          "reference": {
+            "objectType": "EvalSuite",
+            "many": false
+          }
+        },
+        {
+          "name": "status",
+          "valueType": "string",
+          "required": true,
+          "enum": [
+            "running",
+            "completed",
+            "failed",
+            "budget-exceeded"
+          ]
+        },
+        {
+          "name": "results",
+          "valueType": "array",
+          "required": false,
+          "reference": {
+            "objectType": "CaseResult",
+            "many": true
+          }
+        },
+        {
+          "name": "metrics",
+          "valueType": "object",
+          "required": false
+        },
+        {
+          "name": "startedAt",
+          "valueType": "string",
+          "required": false,
+          "format": "date-time"
+        },
+        {
+          "name": "finishedAt",
+          "valueType": "json",
+          "required": false
+        },
+        {
+          "name": "diagnostics",
+          "valueType": "array",
+          "required": false
+        },
+        {
+          "name": "fingerprints",
+          "valueType": "object",
+          "required": false
+        },
+        {
+          "name": "datasetVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "suiteVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "evaluatorVersions",
+          "valueType": "object",
+          "required": false
+        },
+        {
+          "name": "targetFingerprint",
+          "valueType": "string",
+          "required": false
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/EvalRunProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "CaseResult",
+      "version": "1.0.0",
+      "name": "CaseResult",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "runRef",
+          "valueType": "string",
+          "required": true,
+          "reference": {
+            "objectType": "EvalRun",
+            "many": false
+          }
+        },
+        {
+          "name": "unitRef",
+          "valueType": "string",
+          "required": true,
+          "reference": {
+            "objectType": "VerificationUnit",
+            "many": false
+          }
+        },
+        {
+          "name": "verdict",
+          "valueType": "string",
+          "required": true,
+          "enum": [
+            "supported",
+            "refuted",
+            "insufficient"
+          ]
+        },
+        {
+          "name": "verificationClass",
+          "valueType": "string",
+          "required": true,
+          "enum": [
+            "deterministic-verified",
+            "source-supported",
+            "model-judged",
+            "human-reviewed"
+          ]
+        },
+        {
+          "name": "status",
+          "valueType": "string",
+          "required": false,
+          "enum": [
+            "completed",
+            "error",
+            "budget-exceeded"
+          ]
+        },
+        {
+          "name": "passed",
+          "valueType": "json",
+          "required": false
+        },
+        {
+          "name": "metrics",
+          "valueType": "array",
+          "required": false
+        },
+        {
+          "name": "fingerprints",
+          "valueType": "object",
+          "required": false
+        },
+        {
+          "name": "verifiedAt",
+          "valueType": "string",
+          "required": false,
+          "format": "date-time"
+        },
+        {
+          "name": "diagnostics",
+          "valueType": "array",
+          "required": false
+        },
+        {
+          "name": "iteration",
+          "valueType": "integer",
+          "required": false
+        },
+        {
+          "name": "evaluatorRef",
+          "valueType": "string",
+          "required": false,
+          "reference": {
+            "objectType": "Evaluator",
+            "many": false
+          }
+        },
+        {
+          "name": "evaluatorVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "objectiveVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "thresholdVersion",
+          "valueType": "string",
+          "required": false
+        },
+        {
+          "name": "evidenceRefs",
+          "valueType": "array",
+          "required": false,
+          "reference": {
+            "objectType": "SourceCapture",
+            "many": true
+          }
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/CaseResultProperties"
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "Decision",
+      "version": "1.0.0",
+      "name": "Decision",
+      "domainId": "evidence",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true
+      },
+      "properties": [
+        {
+          "name": "subjectRef",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "status",
+          "valueType": "string",
+          "required": true,
+          "enum": [
+            "accepted",
+            "rejected",
+            "superseded"
+          ]
+        },
+        {
+          "name": "rationale",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "name": "verificationRefs",
+          "valueType": "array",
+          "required": true,
+          "reference": {
+            "objectType": "CaseResult",
+            "many": true
+          }
+        },
+        {
+          "name": "authority",
+          "valueType": "object",
+          "required": true
+        },
+        {
+          "name": "choice",
+          "valueType": "json",
+          "required": true
+        }
+      ],
+      "additionalProperties": true,
+      "propertySchemaRef": "evidence.schema.json#/$defs/DecisionProperties"
+    }
+  ],
+  "linkTypes": [
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "project-capture",
+      "version": "1.0.0",
+      "name": "project-capture",
+      "from": {
+        "objectType": "Project",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "SourceCapture",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "capture-claim",
+      "version": "1.0.0",
+      "name": "capture-claim",
+      "from": {
+        "objectType": "SourceCapture",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "Claim",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "capture-unit",
+      "version": "1.0.0",
+      "name": "capture-unit",
+      "from": {
+        "objectType": "SourceCapture",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "VerificationUnit",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "claim-unit",
+      "version": "1.0.0",
+      "name": "claim-unit",
+      "from": {
+        "objectType": "Claim",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "VerificationUnit",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "dataset-unit",
+      "version": "1.0.0",
+      "name": "dataset-unit",
+      "from": {
+        "objectType": "EvalDataset",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "VerificationUnit",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "suite-dataset",
+      "version": "1.0.0",
+      "name": "suite-dataset",
+      "from": {
+        "objectType": "EvalSuite",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "to": {
+        "objectType": "EvalDataset",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "suite-evaluator",
+      "version": "1.0.0",
+      "name": "suite-evaluator",
+      "from": {
+        "objectType": "EvalSuite",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "Evaluator",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "run-suite",
+      "version": "1.0.0",
+      "name": "run-suite",
+      "from": {
+        "objectType": "EvalRun",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "to": {
+        "objectType": "EvalSuite",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "run-result",
+      "version": "1.0.0",
+      "name": "run-result",
+      "from": {
+        "objectType": "EvalRun",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "CaseResult",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "result-unit",
+      "version": "1.0.0",
+      "name": "result-unit",
+      "from": {
+        "objectType": "CaseResult",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "to": {
+        "objectType": "VerificationUnit",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "result-evaluator",
+      "version": "1.0.0",
+      "name": "result-evaluator",
+      "from": {
+        "objectType": "CaseResult",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "to": {
+        "objectType": "Evaluator",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "claim-result",
+      "version": "1.0.0",
+      "name": "claim-result",
+      "from": {
+        "objectType": "Claim",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "CaseResult",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "decision-claim",
+      "version": "1.0.0",
+      "name": "decision-claim",
+      "from": {
+        "objectType": "Decision",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "to": {
+        "objectType": "Claim",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "decision-result",
+      "version": "1.0.0",
+      "name": "decision-result",
+      "from": {
+        "objectType": "Decision",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "CaseResult",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    }
+  ],
+  "actionTypes": [
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "action-type",
+      "id": "ingestCapture",
+      "version": "1.0.0",
+      "name": "ingestCapture",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "capture": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "capture"
+        ],
+        "additionalProperties": true
+      },
+      "preconditions": [
+        {
+          "kind": "version-match"
+        }
+      ],
+      "handler": {
+        "id": "evidence.ingestCapture",
+        "version": "1.0.0",
+        "scope": "local"
+      },
+      "idempotency": {
+        "required": true,
+        "keyScope": "action-type-and-project"
+      },
+      "effects": {
+        "objectTypes": [
+          "SourceCapture"
+        ],
+        "linkTypes": []
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "action-type",
+      "id": "createClaim",
+      "version": "1.0.0",
+      "name": "createClaim",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "statement"
+        ],
+        "additionalProperties": true
+      },
+      "preconditions": [
+        {
+          "kind": "version-match"
+        }
+      ],
+      "handler": {
+        "id": "evidence.createClaim",
+        "version": "1.0.0",
+        "scope": "local"
+      },
+      "idempotency": {
+        "required": true,
+        "keyScope": "action-type-and-project"
+      },
+      "effects": {
+        "objectTypes": [
+          "Claim",
+          "VerificationUnit"
+        ],
+        "linkTypes": []
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "action-type",
+      "id": "verifyClaim",
+      "version": "1.0.0",
+      "name": "verifyClaim",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "claimId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "claimId"
+        ],
+        "additionalProperties": true
+      },
+      "preconditions": [
+        {
+          "kind": "version-match"
+        }
+      ],
+      "handler": {
+        "id": "evidence.verifyClaim",
+        "version": "1.0.0",
+        "scope": "local"
+      },
+      "idempotency": {
+        "required": true,
+        "keyScope": "action-type-and-project"
+      },
+      "effects": {
+        "objectTypes": [
+          "CaseResult"
+        ],
+        "linkTypes": []
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "action-type",
+      "id": "runSuite",
+      "version": "1.0.0",
+      "name": "runSuite",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "suiteId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "suiteId"
+        ],
+        "additionalProperties": true
+      },
+      "preconditions": [
+        {
+          "kind": "version-match"
+        }
+      ],
+      "handler": {
+        "id": "evidence.runSuite",
+        "version": "1.0.0",
+        "scope": "local"
+      },
+      "idempotency": {
+        "required": true,
+        "keyScope": "action-type-and-project"
+      },
+      "effects": {
+        "objectTypes": [
+          "EvalRun",
+          "CaseResult"
+        ],
+        "linkTypes": []
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "action-type",
+      "id": "recordDecision",
+      "version": "1.0.0",
+      "name": "recordDecision",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subjectRef": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted",
+              "rejected",
+              "superseded"
+            ]
+          }
+        },
+        "required": [
+          "subjectRef",
+          "status"
+        ],
+        "additionalProperties": true
+      },
+      "preconditions": [
+        {
+          "kind": "version-match"
+        }
+      ],
+      "handler": {
+        "id": "evidence.recordDecision",
+        "version": "1.0.0",
+        "scope": "local"
+      },
+      "idempotency": {
+        "required": true,
+        "keyScope": "action-type-and-project"
+      },
+      "effects": {
+        "objectTypes": [
+          "Decision"
+        ],
+        "linkTypes": []
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "action-type",
+      "id": "putObject",
+      "version": "1.0.0",
+      "name": "putObject",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "object": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "object"
+        ],
+        "additionalProperties": true
+      },
+      "preconditions": [
+        {
+          "kind": "version-match"
+        }
+      ],
+      "handler": {
+        "id": "evidence.putObject",
+        "version": "1.0.0",
+        "scope": "local"
+      },
+      "idempotency": {
+        "required": true,
+        "keyScope": "action-type-and-project"
+      },
+      "effects": {
+        "objectTypes": [
+          "Project",
+          "SourceCapture",
+          "Claim",
+          "VerificationUnit",
+          "EvalDataset",
+          "EvalSuite",
+          "Evaluator",
+          "EvalRun",
+          "CaseResult",
+          "Decision"
+        ],
+        "linkTypes": []
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "action-type",
+      "id": "linkObjects",
+      "version": "1.0.0",
+      "name": "linkObjects",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "link"
+        ],
+        "additionalProperties": true
+      },
+      "preconditions": [
+        {
+          "kind": "version-match"
+        }
+      ],
+      "handler": {
+        "id": "evidence.linkObjects",
+        "version": "1.0.0",
+        "scope": "local"
+      },
+      "idempotency": {
+        "required": true,
+        "keyScope": "action-type-and-project"
+      },
+      "effects": {
+        "objectTypes": [],
+        "linkTypes": [
+          "project-capture",
+          "capture-claim",
+          "capture-unit",
+          "claim-unit",
+          "dataset-unit",
+          "suite-dataset",
+          "suite-evaluator",
+          "run-suite",
+          "run-result",
+          "result-unit",
+          "result-evaluator",
+          "claim-result",
+          "decision-claim",
+          "decision-result"
+        ]
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "action-type",
+      "id": "createVerificationUnit",
+      "version": "1.0.0",
+      "name": "createVerificationUnit",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "unit": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "unit"
+        ],
+        "additionalProperties": true
+      },
+      "preconditions": [
+        {
+          "kind": "version-match"
+        }
+      ],
+      "handler": {
+        "id": "evidence.createVerificationUnit",
+        "version": "1.0.0",
+        "scope": "local"
+      },
+      "idempotency": {
+        "required": true,
+        "keyScope": "action-type-and-project"
+      },
+      "effects": {
+        "objectTypes": [
+          "VerificationUnit"
+        ],
+        "linkTypes": []
+      }
+    }
+  ]
+}

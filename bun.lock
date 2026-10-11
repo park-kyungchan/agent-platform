@@ -5,36 +5,166 @@
     "": {
       "name": "@palantirkc/agent-platform",
       "dependencies": {
+        "@palantirkc/infrastructure-operations": "workspace:*",
+        "@palantirkc/native-codex-adapter": "workspace:*",
+        "@palantirkc/native-hermes-adapter": "workspace:*",
         "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+        "@palantirkc/operational-context": "workspace:*",
         "@palantirkc/work-continuity": "workspace:*",
+      },
+    },
+    "packages/evidence-foundry": {
+      "name": "@palantirkc/evidence-foundry-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+        "ajv": "8.20.0",
+        "ajv-formats": "3.0.1",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
+        "json-schema-to-typescript": "16.0.0",
+        "typescript": "5.9.3",
+      },
+    },
+    "packages/infrastructure-operations": {
+      "name": "@palantirkc/infrastructure-operations",
+      "version": "0.0.0",
+      "dependencies": {
+        "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+        "ajv": "8.20.0",
+        "ajv-formats": "3.0.1",
+      },
+    },
+    "packages/native-codex-adapter": {
+      "name": "@palantirkc/native-codex-adapter",
+      "version": "0.0.0",
+      "dependencies": {
+        "@palantirkc/work-continuity": "file:../work-continuity",
+      },
+    },
+    "packages/native-hermes-adapter": {
+      "name": "@palantirkc/native-hermes-adapter",
+      "version": "0.0.0",
+      "dependencies": {
+        "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+      },
+    },
+    "packages/ontology": {
+      "name": "@palantirkc/ontology-source",
+      "version": "0.2.0",
+      "dependencies": {
+        "ajv": "8.20.0",
+        "ajv-formats": "3.0.1",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
+        "json-schema-to-typescript": "16.0.0",
+        "typescript": "5.9.3",
+      },
+    },
+    "packages/operational-context": {
+      "name": "@palantirkc/operational-context",
+      "version": "0.0.0",
+      "dependencies": {
+        "zod": "4.6.5",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
+        "typescript": "5.9.3",
+      },
+    },
+    "packages/research-capture": {
+      "name": "@palantirkc/research-capture-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@palantirkc/ontology-research-v0-1": "file:releases/palantirkc-ontology-0.1.0.tgz",
+        "ajv": "8.20.0",
+      },
+      "devDependencies": {
+        "bun-types": "1.3.14",
+        "typescript": "5.9.3",
       },
     },
     "packages/work-continuity": {
       "name": "@palantirkc/work-continuity",
       "version": "0.0.0",
-      "peerDependencies": {
-        "@palantirkc/ontology": "0.2.0",
+      "dependencies": {
+        "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
       },
     },
   },
-  "overrides": {
-    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
-  },
   "packages": {
+    "@apidevtools/json-schema-ref-parser": ["@apidevtools/json-schema-ref-parser@11.9.3", "", { "dependencies": { "@jsdevtools/ono": "^7.1.3", "@types/json-schema": "^7.0.15", "js-yaml": "^4.1.0" } }, "sha512-60vepv88RwcJtSHrD6MjIL6Ta3SOYbgfnkHb+ppAVK+o9mXprRtulx7VlRl3lN3bbvysAfCS7WMVfhUYemB0IQ=="],
+
+    "@jsdevtools/ono": ["@jsdevtools/ono@7.1.3", "", {}, "sha512-4JQNk+3mVzK3xh2rqd6RB4J46qUR19azEHBneZyTZM+c456qOrbbM/5xcR8huNCCcbVt7+UmizG6GuUvPvKUYg=="],
+
+    "@palantirkc/evidence-foundry-core": ["@palantirkc/evidence-foundry-core@workspace:packages/evidence-foundry"],
+
+    "@palantirkc/infrastructure-operations": ["@palantirkc/infrastructure-operations@workspace:packages/infrastructure-operations"],
+
+    "@palantirkc/native-codex-adapter": ["@palantirkc/native-codex-adapter@workspace:packages/native-codex-adapter"],
+
+    "@palantirkc/native-hermes-adapter": ["@palantirkc/native-hermes-adapter@workspace:packages/native-hermes-adapter"],
+
     "@palantirkc/ontology": ["@palantirkc/ontology@releases/palantirkc-ontology-0.2.0.tgz", { "dependencies": { "ajv": "8.20.0", "ajv-formats": "3.0.1" } }, "sha512-5ast41unYGYtEkGHML7akxvHJ4IWRapA762ghZF42HqRFejZc1p8SJaBbID+Qxg8bqCdo9LZIT0eAzBN/mHKfw=="],
 
+    "@palantirkc/ontology-research-v0-1": ["@palantirkc/ontology@releases/palantirkc-ontology-0.1.0.tgz", { "dependencies": { "ajv": "8.20.0", "ajv-formats": "3.0.1" } }, "sha512-8gryKVA3NH6gGoCnUjyK69PC9joNikcuwnbpLLec3VQ4AfzR13/P67st0f9uJTb07lE1EoghWl0tzefDAgIsTA=="],
+
+    "@palantirkc/ontology-source": ["@palantirkc/ontology-source@workspace:packages/ontology"],
+
+    "@palantirkc/operational-context": ["@palantirkc/operational-context@workspace:packages/operational-context"],
+
+    "@palantirkc/research-capture-core": ["@palantirkc/research-capture-core@workspace:packages/research-capture"],
+
     "@palantirkc/work-continuity": ["@palantirkc/work-continuity@workspace:packages/work-continuity"],
+
+    "@types/json-schema": ["@types/json-schema@7.0.15", "", {}, "sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA=="],
+
+    "@types/lodash": ["@types/lodash@4.17.26", "", {}, "sha512-48NWfiY6oNcKOh47Z4h+sIvwcQR91h6KPhaYKgeMIrkT2jV82Gy90SErj60vW8jQbeMSOSbhIv3bZ7JoqPPVhA=="],
+
+    "@types/node": ["@types/node@26.6.5", "", { "dependencies": { "undici-types": "~8.9.0" } }, "sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg=="],
 
     "ajv": ["ajv@8.20.0", "", { "dependencies": { "fast-deep-equal": "^3.1.3", "fast-uri": "^3.0.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2" } }, "sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA=="],
 
     "ajv-formats": ["ajv-formats@3.0.1", "", { "dependencies": { "ajv": "^8.0.0" } }, "sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ=="],
 
+    "argparse": ["argparse@2.0.1", "", {}, "sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q=="],
+
+    "bun-types": ["bun-types@1.3.14", "", { "dependencies": { "@types/node": "*" } }, "sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ=="],
+
     "fast-deep-equal": ["fast-deep-equal@3.1.3", "", {}, "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q=="],
 
     "fast-uri": ["fast-uri@3.1.8", "", {}, "sha512-GZMtZUTNRpOVIECoXwLNZS5xUGE+mVNbTB8h/7Rwh2TFWcBQiPzTgyZi05BF9UMZKkLJv8XBRJTlU7zg8+ZfMg=="],
 
+    "fdir": ["fdir@6.5.0", "", { "peerDependencies": { "picomatch": "^3 || ^4" }, "optionalPeers": ["picomatch"] }, "sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg=="],
+
+    "js-yaml": ["js-yaml@5.4.3", "", { "dependencies": { "argparse": "^2.0.1" }, "bin": { "js-yaml": "bin/js-yaml.mjs" } }, "sha512-yzzNtgczwgoVHNigCyKTXcQJU4Y8t/ikU4UxXW0BvrLfHTGWZhsNcOT2s/a7vn81/4KqVnNmHjaUEPlvWnNwVw=="],
+
+    "json-schema-to-typescript": ["json-schema-to-typescript@16.0.0", "", { "dependencies": { "@apidevtools/json-schema-ref-parser": "^11.9.3", "@types/json-schema": "^7.0.15", "@types/lodash": "^4.17.25", "js-yaml": "^5.2.3", "lodash": "^4.18.1", "minimist": "^1.2.8", "prettier": "^3.9.6", "tinyglobby": "^0.2.17" }, "bin": { "json2ts": "dist/src/cli.js" } }, "sha512-Ah6kK4q6SjlMzWBH1eNOQkdRh5Qhr5T/RCFwfjQqWZA7UDW+N47A8wfyoiN0L884s4L4bAEI54IjIuN3/u0B/A=="],
+
     "json-schema-traverse": ["json-schema-traverse@1.0.0", "", {}, "sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug=="],
 
+    "lodash": ["lodash@4.18.1", "", {}, "sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q=="],
+
+    "minimist": ["minimist@1.2.8", "", {}, "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="],
+
+    "picomatch": ["picomatch@4.0.7", "", {}, "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA=="],
+
+    "prettier": ["prettier@3.9.10", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-skGHTH1Yb9QvaTC4hWnRTzEYtCpApF0UMBPz+t/0ZPzP8ihefo/btKd+QA7pUE0fEwA1SbS/NmhyEcstdXOIdA=="],
+
     "require-from-string": ["require-from-string@2.0.2", "", {}, "sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw=="],
+
+    "tinyglobby": ["tinyglobby@0.2.17", "", { "dependencies": { "fdir": "^6.5.0", "picomatch": "^4.0.4" } }, "sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g=="],
+
+    "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "undici-types": ["undici-types@8.9.0", "", {}, "sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg=="],
+
+    "zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
+
+    "@apidevtools/json-schema-ref-parser/js-yaml": ["js-yaml@4.3.2", "", { "dependencies": { "argparse": "^2.0.1" }, "bin": { "js-yaml": "bin/js-yaml.js" } }, "sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA=="],
+
+    "@palantirkc/native-codex-adapter/@palantirkc/work-continuity": ["@palantirkc/work-continuity@file:packages/work-continuity", { "dependencies": { "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz" } }],
   }
 }

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "evidence",
+  "id": "ontology-foundation:evidence:authorization",
+  "projectId": "ontology-foundation",
+  "domainId": "native-harness",
+  "createdAt": "2026-10-06T00:00:00Z",
+  "payload": {
+    "claim": "Synthetic fixture authority is scoped to this contract test.",
+    "method": "user-instruction",
+    "sourceUrl": "fixture://ontology-foundation/authorization",
+    "fetchedAt": "2026-10-06T00:00:00Z",
+    "result": {
+      "outcome": "success",
+      "contentMatched": null
+    },
+    "attempts": [],
+    "limitations": [
+      "Synthetic test fixture; it grants no real-world authority."
+    ],
+    "details": {
+      "authority": {
+        "actorType": "user",
+        "actorId": "fixture-user",
+        "scope": "fixture-contract-pilot"
+      }
+    }
+  }
+}

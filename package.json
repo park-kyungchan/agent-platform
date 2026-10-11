@@ -8,16 +8,18 @@
   ],
   "scripts": {
     "check:handoff": "bun test ./compatibility/codex-harness-engineering/tests/handoff.test.ts",
-    "check:imports": "bun ./verification/package-import-check.ts"
+    "check:imports": "bun ./verification/package-import-check.ts",
+    "check:operational-context": "bun test ./packages/operational-context/lead-evaluation.test.ts"
   },
   "engines": {
     "bun": ">=1.3.14"
   },
   "dependencies": {
     "@palantirkc/work-continuity": "workspace:*",
-    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz"
-  },
-  "overrides": {
-    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz"
+    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+    "@palantirkc/infrastructure-operations": "workspace:*",
+    "@palantirkc/native-codex-adapter": "workspace:*",
+    "@palantirkc/native-hermes-adapter": "workspace:*",
+    "@palantirkc/operational-context": "workspace:*"
   }
 }

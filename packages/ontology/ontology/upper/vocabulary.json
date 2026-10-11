@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "upper",
+  "terms": ["artifact", "project", "task", "decision", "evidence", "verification", "run", "reference", "authority", "version", "scope"],
+  "relations": ["parent", "supports", "authorizes", "implements", "verifies", "supersedes", "derivedFrom", "attemptOf", "accepts"],
+  "dependencyRule": "Upper vocabulary does not depend on domain modules."
+}

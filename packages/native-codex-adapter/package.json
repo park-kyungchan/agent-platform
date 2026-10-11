@@ -1,0 +1,17 @@
+{
+  "name": "@palantirkc/native-codex-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./hooks": "./src/native/hooks.ts",
+    "./home-context": "./src/native/home-context.ts",
+    "./evaluation-ledger": "./src/native/evaluation-ledger.ts"
+  },
+  "dependencies": {
+    "@palantirkc/work-continuity": "file:../work-continuity"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  }
+}

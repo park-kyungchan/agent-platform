@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:palantirkc:research:request:1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projectId",
+    "url"
+  ],
+  "properties": {
+    "projectId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "url": {
+      "type": "string",
+      "pattern": "^https?://"
+    },
+    "headers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Authorized request headers; credential values are redacted from persisted metadata and request records."
+    },
+    "mode": {
+      "enum": [
+        "auto",
+        "static",
+        "dynamic"
+      ]
+    },
+    "selector": {
+      "type": "string",
+      "minLength": 1
+    },
+    "waitSelector": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expectedText": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 180000
+    },
+    "maxAttempts": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3
+    }
+  },
+  "title": "ResearchRequest"
+}

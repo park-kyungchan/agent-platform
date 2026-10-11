@@ -1,0 +1,695 @@
+{
+  "schema": "agent-platform.capability-source-owners.v1",
+  "id": "agent-platform:architecture:capability-source-owners",
+  "status": "current-source-owner-registry",
+  "codeOwner": "agent-platform",
+  "upperOntologySemanticOwner": "ontology-foundation",
+  "domainMeaningOwnerRule": "Named domain owner, preserving its accepted schema and immutable pins; common location does not turn native domain schemas into upper Ontology.",
+  "sourceProviders": [
+    {
+      "id": "codex-context",
+      "registration": "../codex-harness-engineering/architecture/context-provider.json",
+      "ownerGuard": "../codex-harness-engineering/src/legacy/harness/owner-context-loader.ts",
+      "meaning": "Context provider exact source resolution and first-import drift refusal."
+    },
+    {
+      "id": "codex-native-source",
+      "registration": "../codex-harness-engineering/architecture/native-codex-provider.json",
+      "ownerGuard": "../codex-harness-engineering/src/native/provider-closure.ts",
+      "meaning": "Exact SOURCE/trust-candidate proof; no native permission or provider first-import guarantee."
+    },
+    {
+      "id": "hermes-context-source",
+      "registration": "../hermes-harness-engineering/architecture/hermes-context-provider.json",
+      "ownerGuard": "../hermes-harness-engineering/src/ontology-driven/provider-source.ts",
+      "meaning": "Exact SOURCE/build provenance before/after native compilation; no native permission attestation."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "work-continuity",
+      "packagePath": "packages/work-continuity",
+      "semanticOwner": "codex-harness-engineering",
+      "canonicalSource": [
+        "src/handoff.ts",
+        "src/context/",
+        "src/workspace/"
+      ],
+      "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
+      "nativeEntrypoints": [
+        "src/cli.ts",
+        "src/native/hooks.ts",
+        "src/native/project-continuity.ts"
+      ],
+      "ownerBoundary": "Common code owns handoff/context/Memory/original/recovery algorithms; Codex owns selected Work, original/evidence/checkpoint data, CLI/hooks and native sessions/permissions.",
+      "nativePermissionGranted": false,
+      "packageName": "@palantirkc/work-continuity",
+      "packageManifest": {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/package.json",
+        "sha256": "8afc36322da31336e770c9cc9812638d5e6d6253f623392df8c90a69dcdc6202"
+      },
+      "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/index.ts",
+          "sha256": "63d91d2c97eb99ff46118dfac25bb456d15ac63eeed37cc85f9bf971c32e94dc",
+          "relativePath": "packages/work-continuity/src/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/handoff.ts",
+          "sha256": "7c0e5d0b6575e8e82d94e299c078446270c2c99c997a958da0ea2ea6ea01664d",
+          "relativePath": "packages/work-continuity/src/handoff.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/index.ts",
+          "sha256": "9a649823c0d2647e1a4c2c5f907b571de59ee69199c8e7db10f802e27ddb0166",
+          "relativePath": "packages/work-continuity/src/context/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/source.ts",
+          "sha256": "11507930a28c30d0fce389c58f6bf29e536ba472dbb26fe4bbffb794f6b2017e",
+          "relativePath": "packages/work-continuity/src/context/source.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/store.ts",
+          "sha256": "87ec96ae50b2677a3920377a49de1ec69afa4deb0c514670755f9e22ae5e2307",
+          "relativePath": "packages/work-continuity/src/context/store.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/types.ts",
+          "sha256": "545628f6b9af20278f3639709f3ef56f20260de4724d342321ee675836aa9347",
+          "relativePath": "packages/work-continuity/src/context/types.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/boundary.ts",
+          "sha256": "801fcca92f0606ec69aea238bbe2b7eaba1e6620fda06e64bde5486ff4588ec4",
+          "relativePath": "packages/work-continuity/src/context/boundary.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/context.ts",
+          "sha256": "88263d64e68ddd972850d29e9b962623b89bf6c9ed1b715e2e26fec885507523",
+          "relativePath": "packages/work-continuity/src/context/context.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/validation.ts",
+          "sha256": "27b5417a7b1556239dd4fc505be88a4d8ab71deb00a24a1df91e0ca58c5e057e",
+          "relativePath": "packages/work-continuity/src/context/validation.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/sections.ts",
+          "sha256": "60df942bffaa8a3129412dbbd17ede9f28f034400048039741afb85f545198c1",
+          "relativePath": "packages/work-continuity/src/context/sections.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/lexical-recall.ts",
+          "sha256": "8588b98c1f17e979bad0d63f0534543feae7ea3f1caf28b010317a2f33a9a94b",
+          "relativePath": "packages/work-continuity/src/workspace/lexical-recall.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/recall-request.ts",
+          "sha256": "cb93f2760fc6c2195a194e80c9887c36adb35fd6a7e2e4d34dc68c1c310e2ffd",
+          "relativePath": "packages/work-continuity/src/workspace/recall-request.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/recovery.ts",
+          "sha256": "a58e0e224ba0ca0cb3dd126949c85d55da1fe0753558e4fd7d918d1dfcd28a45",
+          "relativePath": "packages/work-continuity/src/workspace/recovery.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/memory.ts",
+          "sha256": "832357100fc3dd709e3df754ed293871ffca2f6af7e3ef2289e761544723935e",
+          "relativePath": "packages/work-continuity/src/workspace/memory.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/original-producer.ts",
+          "sha256": "0051eae196617ac05c7787d3b683be1900203c646930312a7393597e9a3cae16",
+          "relativePath": "packages/work-continuity/src/workspace/original-producer.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/qualification.ts",
+          "sha256": "136b7f5eaa10763c7b0e315d2ca0056c6ceee80df396b7ec735238e80cab57c3",
+          "relativePath": "packages/work-continuity/src/workspace/qualification.ts"
+        }
+      ],
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+    },
+    {
+      "id": "ontology-foundation",
+      "packagePath": "packages/ontology",
+      "semanticOwner": "ontology-foundation",
+      "canonicalSource": [
+        "src/",
+        "schemas/",
+        "scripts/generate.ts"
+      ],
+      "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/ontology-foundation",
+      "nativeEntrypoints": [
+        "src/index.ts",
+        "scripts/generate.ts",
+        "scripts/release-local.ts"
+      ],
+      "ownerBoundary": "Canonical schemas/declarations/generator are common source. Existing native release adapter assembles new versions only; published0.1.0/0.2.0 tarballs/receipts remain immutable and existing consumers retain pins.",
+      "nativePermissionGranted": false,
+      "packageName": "@palantirkc/ontology-source",
+      "packageManifest": {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/package.json",
+        "sha256": "a332d1db6045eb1cb6e040f2ff8fd05fc782b5d803bdbd4f102f9ee57eec270a"
+      },
+      "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/index.ts",
+          "sha256": "a7fceba7d976650d7357fe55570d9015c93bc5db629985a9bc5cd44d4bdc43d0",
+          "relativePath": "packages/ontology/src/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/contracts.ts",
+          "sha256": "ce559b05b7a757af85d2b0dda3fb04e1de7683ef45eb2fb3801b1cf28b705ee9",
+          "relativePath": "packages/ontology/src/contracts.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/operational-validation.ts",
+          "sha256": "3f93d64e0f757a9e8a04c16f210af3ca4ae977de079ebd1693e3e1a22908a189",
+          "relativePath": "packages/ontology/src/operational-validation.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/json-validation.ts",
+          "sha256": "46c0edc9a2228d05a5228f963e257ada7b953dcef0b49bead1755975fc91ad9a",
+          "relativePath": "packages/ontology/src/json-validation.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/domains/evidence.ts",
+          "sha256": "f24fb73ad9dcf3004edcf6b339bf4a132f9c1c09c39dfc2d03a893b429398ddf",
+          "relativePath": "packages/ontology/src/domains/evidence.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/domains/research.ts",
+          "sha256": "2e54e9306aa5dc5f562e810e7e19a1427fe0f8bd8da661054e1cc86b0a2ea47f",
+          "relativePath": "packages/ontology/src/domains/research.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/domains/native-harness.ts",
+          "sha256": "2093bc40bb46e9bc345ce0e7c9ce5af7f5aa9651fcebac0997ffaf66f56034bb",
+          "relativePath": "packages/ontology/src/domains/native-harness.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/operational.ts",
+          "sha256": "832da1ef037d99cf638b668e6d2c47e74ecce45bdb62ca781c5f6e8a049538b2",
+          "relativePath": "packages/ontology/src/operational.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/validation.ts",
+          "sha256": "78f777ca9f27c7366e94224a56687435cf7f7ff3aa48834692c562f44c8fd378",
+          "relativePath": "packages/ontology/src/validation.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/schema.ts",
+          "sha256": "58dfd25d0086fd4f5b6c5a436e640f6f51b626998855dc7020aee6dcd09b26eb",
+          "relativePath": "packages/ontology/src/schema.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/generated/contracts.ts",
+          "sha256": "1e62bf51e6572a402e6554201f5741ef1a86742a0e9379e4750324dd18c532d2",
+          "relativePath": "packages/ontology/src/generated/contracts.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/generated/evidence.ts",
+          "sha256": "25d9be0f1bc47fd110c762840d404fc47773e1f0c816492f74e64ea56d166ced",
+          "relativePath": "packages/ontology/src/generated/evidence.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/generated/operational.ts",
+          "sha256": "cb5e6923209e7c226ad20946b4fc18db0dabd5fff5333b36cb36aeb6d7552a49",
+          "relativePath": "packages/ontology/src/generated/operational.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/upper.ts",
+          "sha256": "eca4eca41168ca8fc8f31ee03e8a7a9ba0b1204a364886155617d1a623ec16e7",
+          "relativePath": "packages/ontology/src/upper.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/schemas/evidence.schema.json",
+          "sha256": "c5b3115398c1df5e64f4834569988036003fcdd5c3e74be0a27799056800894c",
+          "relativePath": "packages/ontology/schemas/evidence.schema.json"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/schemas/artifact.schema.json",
+          "sha256": "614f7deb0b9d7717ab8a992f144955e05875c012716001d4aa0a96edbce92ba8",
+          "relativePath": "packages/ontology/schemas/artifact.schema.json"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/schemas/operational.schema.json",
+          "sha256": "6bf05713aff0406ecc51ca08d7bed5c84897909600476eabf083636c1ad928f1",
+          "relativePath": "packages/ontology/schemas/operational.schema.json"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/scripts/generate.ts",
+          "sha256": "125b9287345a5803d86efe5636b9c1011b3cc93c5a6a45e800092d70ea21c5f8",
+          "relativePath": "packages/ontology/scripts/generate.ts"
+        }
+      ],
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+    },
+    {
+      "id": "evidence-foundry",
+      "packagePath": "packages/evidence-foundry",
+      "semanticOwner": "evidence-foundry",
+      "canonicalSource": [
+        "src/",
+        "schemas/",
+        "scripts/generate.ts"
+      ],
+      "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/evidence-foundry",
+      "nativeEntrypoints": [
+        "src/cli.ts",
+        "src/service.ts",
+        "src/index.ts"
+      ],
+      "ownerBoundary": "Core requires explicit per-instance real semantic-owner policy before Store.initialize; old service/index subclass binds its own relative project.json and preserves constructor/open/default or explicit data roots. Native workflows, stores, exclusion policy and credentials stay with owner.",
+      "nativePermissionGranted": false,
+      "packageName": "@palantirkc/evidence-foundry-core",
+      "packageManifest": {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/package.json",
+        "sha256": "403850a137fd224b168ad61b3eb22492ba915f15be8234c552e61213359ec34f"
+      },
+      "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/index.ts",
+          "sha256": "4fe6702eff15d2e589cbaf8a33076f1adf349de6bc8dffef09703ec3e7597001",
+          "relativePath": "packages/evidence-foundry/src/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/service.ts",
+          "sha256": "ab5d9667f352e682c41309a46141e54a2fae91c2b8a9e2daa98fd043f92924cc",
+          "relativePath": "packages/evidence-foundry/src/service.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/api.ts",
+          "sha256": "71f54814e221ab09a4a90a57e163f3b94fb8cec01071a1e5700d311fd0ccdb25",
+          "relativePath": "packages/evidence-foundry/src/api.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/adapters/legacy-receipts.ts",
+          "sha256": "cbf6ba7898009493cfbcf4d2c780f4ca771411aabd71b1a5e1483a57fbd8c07e",
+          "relativePath": "packages/evidence-foundry/src/adapters/legacy-receipts.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/adapters/native-codex.ts",
+          "sha256": "9814107d33f1faf035db1b8036c45fe72f8ae1ccb648fe22b5c80f62806538f4",
+          "relativePath": "packages/evidence-foundry/src/adapters/native-codex.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/adapters/capture-policy.ts",
+          "sha256": "2930602d225574d2ef14bc1fae330517f50f8d20e9556ea26f276ce489d8caea",
+          "relativePath": "packages/evidence-foundry/src/adapters/capture-policy.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/storage/store.ts",
+          "sha256": "d2b8191c701fd8f11244d580af1d1746b1c3e25aaa665f1ba3cb4cc37e326588",
+          "relativePath": "packages/evidence-foundry/src/modules/storage/store.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/index.ts",
+          "sha256": "64427531e1a400de23b7b1c04c674b8b5429c3f185a90cc29651b6a0540bf569",
+          "relativePath": "packages/evidence-foundry/src/modules/evals/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/types.ts",
+          "sha256": "f61338d99da52770bb3c1a5cf9ed98e7d5569b2987f389b7f6d903ce8a910163",
+          "relativePath": "packages/evidence-foundry/src/modules/evals/types.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/runner.ts",
+          "sha256": "914929f3ac3174ac6ddaa5121b0dc186d31904bbad109a1b69716fc5f78416e4",
+          "relativePath": "packages/evidence-foundry/src/modules/evals/runner.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/claims/index.ts",
+          "sha256": "c674f4c3ff98bebd92333c91e89ebe7be2b6ee867a0337cdf740add2f20ebedb",
+          "relativePath": "packages/evidence-foundry/src/modules/claims/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/claims/verification.ts",
+          "sha256": "a68c7e1d8a113c15d79fc5cd34d835747248fc7c625386a8d9956efde7d52814",
+          "relativePath": "packages/evidence-foundry/src/modules/claims/verification.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/ontology/registry.ts",
+          "sha256": "f3b5e12975a2f4cc1c896ba2874d492eac4394e6014bc12aec8808a8f9f26bd9",
+          "relativePath": "packages/evidence-foundry/src/modules/ontology/registry.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/generated/client.ts",
+          "sha256": "dcefd2916e0616f8d2353a19200df439d9826bfe324ac1b297d3cd74f474d4f3",
+          "relativePath": "packages/evidence-foundry/src/generated/client.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/generated/storage.ts",
+          "sha256": "badc8bfc5e7ed266ad62e70e988b23065793b56930b03fe649758e67e784df03",
+          "relativePath": "packages/evidence-foundry/src/generated/storage.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/schemas/storage.schema.json",
+          "sha256": "319e7518f89ff8fd4531f3ed4fc9ac1680cd72ea064b548a2e57be907df9b414",
+          "relativePath": "packages/evidence-foundry/schemas/storage.schema.json"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/scripts/generate.ts",
+          "sha256": "ac6c215f00cc5dcdfc6d88dfd119c77b0cec9406b8253ed60d07403a2a998a39",
+          "relativePath": "packages/evidence-foundry/scripts/generate.ts"
+        }
+      ],
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+    },
+    {
+      "id": "research-capture",
+      "packagePath": "packages/research-capture",
+      "semanticOwner": "scrapling-research",
+      "canonicalSource": [
+        "src/capture.ts",
+        "src/bundle.ts",
+        "src/upstream.ts"
+      ],
+      "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/scrapling-research",
+      "nativeEntrypoints": [
+        "src/cli.ts"
+      ],
+      "ownerBoundary": "Only3implementation modules are canonical here. Schema/generated/index/immutable 0.1.0 files are pinned read-only dependency copies from research owner; CLI/setup/update/smoke/Python/runtime/output roots remain owner. Direct core capture callers must supply an explicit root.",
+      "nativePermissionGranted": false,
+      "packageName": "@palantirkc/research-capture-core",
+      "packageManifest": {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/package.json",
+        "sha256": "1902f056621f384904310188e1c4f9580aacedc2fc32925a9ecd53deeafed9bd"
+      },
+      "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/index.ts",
+          "sha256": "8ec42ec2f6627b90f22f83d80a70b9291632f826662dc5a2f9b096fe7650d9c2",
+          "relativePath": "packages/research-capture/src/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/bundle.ts",
+          "sha256": "4225a8dc6d3f6c582ef75d495b5f14168cab83ad2688f069bac2514089eeaba9",
+          "relativePath": "packages/research-capture/src/bundle.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/upstream.ts",
+          "sha256": "867aac36e4a5e345b13f6570688166c79cd9b4fb04dd41b3fa5c74da45281cfa",
+          "relativePath": "packages/research-capture/src/upstream.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/capture.ts",
+          "sha256": "cc6bb9ac1029c0d823faedc38d084506df5c146d4a75f510118407314225ec84",
+          "relativePath": "packages/research-capture/src/capture.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/generated/capture-bundle.ts",
+          "sha256": "c953613343f96b4e61a2cbbdc5ed2d2d375c266866136de22f21c1d3b5fec018",
+          "relativePath": "packages/research-capture/src/generated/capture-bundle.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/generated/research-request.ts",
+          "sha256": "2719ce8807ce843c080f6ccd37617d01e572be003744c156c2fcb8d00ab76a66",
+          "relativePath": "packages/research-capture/src/generated/research-request.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/schemas/research-request.schema.json",
+          "sha256": "38162a1dcd6caa47b79ac13e4c6ba31e3542703097b4a1829e53e6381f3a7b05",
+          "relativePath": "packages/research-capture/schemas/research-request.schema.json"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/schemas/capture-bundle.schema.json",
+          "sha256": "34ac6ba148c8e9e81b3880a89557a59bb37d934d97394208d4b065f974594158",
+          "relativePath": "packages/research-capture/schemas/capture-bundle.schema.json"
+        }
+      ],
+      "authoritativeGenerationRule": "Only3selected implementation modules canonical here; other listed schema/generated/index files are pinned dependencies with original research owner generation."
+    },
+    {
+      "id": "infrastructure-domain",
+      "packagePath": "packages/infrastructure-operations",
+      "semanticOwner": "vps-operations",
+      "canonicalSource": [
+        "src/domain/"
+      ],
+      "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/vps-operations",
+      "nativeEntrypoints": [
+        "src/cli.ts",
+        "src/adapters/"
+      ],
+      "ownerBoundary": "Six pure domain modules are canonical common code. Nine SSH/container/runtime/native adapter modules and CLI remain owner; no lifecycle or remote permission is implied.",
+      "nativePermissionGranted": false,
+      "packageName": "@palantirkc/infrastructure-operations",
+      "packageManifest": {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/package.json",
+        "sha256": "5ccdd38734cbba1aafff4abcde7954e4ab4541949338faf90d961b7c33fd0c57"
+      },
+      "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/index.ts",
+          "sha256": "1d949448d5834e0db6d1afaa62964cd29091d22452e6ae3e96aea196aa1bf208",
+          "relativePath": "packages/infrastructure-operations/src/domain/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/schemas.ts",
+          "sha256": "85b7edd0e6ffbcb5c78bb17c39e03e3b3760828bd289d14c826858345977c37d",
+          "relativePath": "packages/infrastructure-operations/src/domain/schemas.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/types.ts",
+          "sha256": "7c42d38cff9f785c52f8e91dc1ffcd5cca027642f8d3465fca4e1c7085308753",
+          "relativePath": "packages/infrastructure-operations/src/domain/types.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/evaluate.ts",
+          "sha256": "9ae39787628a36bd9a6df485866f7a68ac0e6bc60c192fd3eaf5281275d57a55",
+          "relativePath": "packages/infrastructure-operations/src/domain/evaluate.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/validation.ts",
+          "sha256": "875699e082d2c4daa31944201bec4e481c229e8f4a376ef52e697695cbe86f64",
+          "relativePath": "packages/infrastructure-operations/src/domain/validation.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/registry.ts",
+          "sha256": "6b73cc40f8f551c77b61de540a2d7043d7d84ec40a4acaabfd319b5e84d39b52",
+          "relativePath": "packages/infrastructure-operations/src/domain/registry.ts"
+        }
+      ],
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+    },
+    {
+      "id": "native-codex-source",
+      "packagePath": "packages/native-codex-adapter",
+      "semanticOwner": "codex-harness-engineering",
+      "canonicalSource": [
+        "src/native/hooks.ts",
+        "src/native/home-context.ts",
+        "src/native/evaluation-ledger.ts"
+      ],
+      "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
+      "nativeEntrypoints": [
+        "src/native/hooks.ts",
+        "src/native/provider-closure.ts",
+        "src/legacy/harness/owner-context-loader.ts"
+      ],
+      "ownerBoundary": "Canonical hooks require injected fixed-owner context loader. Old two-argument wrapper supplies it. Code root is separate from selected binding/data root. Native source proof is SOURCE/trust-candidate evidence; existing context first-import denial remains active, native trust/config/CLI/ledgers stay owner.",
+      "nativePermissionGranted": false,
+      "packageName": "@palantirkc/native-codex-adapter",
+      "packageManifest": {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/package.json",
+        "sha256": "b4d8dddfaa2e4374ca53b057f9a080a6de6712b227fc704db7bd39cbf4501117"
+      },
+      "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/home-context.ts",
+          "sha256": "30a0a8c46c07ce17481addec393746bcfd05051cf15805f15947bb94dd1222be",
+          "relativePath": "packages/native-codex-adapter/src/native/home-context.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/hooks.ts",
+          "sha256": "d281c9aba41eaae819a3168cd0d04b75c5825f26a5356ff613eea01ed07cebea",
+          "relativePath": "packages/native-codex-adapter/src/native/hooks.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/evaluation-ledger.ts",
+          "sha256": "8a64851493734c0262ea760ccc1891c087eb2c8393ee3b2bf36f4ae95f50c457",
+          "relativePath": "packages/native-codex-adapter/src/native/evaluation-ledger.ts"
+        }
+      ],
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+    },
+    {
+      "id": "native-hermes-context",
+      "packagePath": "packages/native-hermes-adapter",
+      "semanticOwner": "ontology-platform and hermes-harness-engineering",
+      "canonicalSource": [
+        "src/ontology-driven/",
+        "src/adoption/"
+      ],
+      "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/hermes-harness-engineering",
+      "nativeEntrypoints": [
+        "src/ontology-driven/cli.ts",
+        "src/ontology-driven/native-package.ts",
+        "src/ontology-driven/native-bundle.ts",
+        "src/ontology-driven/provider-source.ts"
+      ],
+      "ownerBoundary": "Nine context/budget modules are canonical. Old CLI/packager/compiler/source proof bind fixed code owner; nativeRoot remains an explicit separate output/data root. Compiler uses a finite fresh installed Bun process and owned temporary directory, without cache deletion. No native bundle promotion or lifecycle follows.",
+      "nativePermissionGranted": false,
+      "packageName": "@palantirkc/native-hermes-adapter",
+      "packageManifest": {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/package.json",
+        "sha256": "ec0d65c24190af1c9b38140f9621ce12042abcc77b96089f1e12c1dc7a607c6c"
+      },
+      "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/contracts.ts",
+          "sha256": "abcfa1d692b6a0f6d4ec2d6174c1b201de938b819b7db3c53934267d521a1f3f",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/contracts.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/audit-adapter.ts",
+          "sha256": "b15b8097046b2ae43d0ec1606acb3d2278e8b462745dc217521148fb78090c8a",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/audit-adapter.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/role-registry.ts",
+          "sha256": "8c409468878250edd92988ea35dd2cd99a4df3cd70e4ea52b35c03ad0f62c79f",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/role-registry.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/domain-context.ts",
+          "sha256": "52efe3ab246afeffdd47c4865f8bf5debccce468094a89940fb400d53eba71e1",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/domain-context.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/pinned-reader.ts",
+          "sha256": "51a1c05adc14bfb71ad9b1a484ffb1891fd71054010d46fe9628a2ecb3599764",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/pinned-reader.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/current-intent.ts",
+          "sha256": "6851cbc1e90d11255ca9d254340929693b8e72b6a52d33c82b3a8632bc79065a",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/current-intent.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/work-context.ts",
+          "sha256": "0600bf7ed61af06b9995d0c8be3538341ec6f29bd347ae7ca1b80ec34bbb5dc2",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/work-context.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/evaluation-budget.ts",
+          "sha256": "1f0bb1e2829b99d7c7e6faef9ce86a157f37aa81305667e9c9d563999310c1df",
+          "relativePath": "packages/native-hermes-adapter/src/adoption/evaluation-budget.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/semantic-context.ts",
+          "sha256": "e2affef0eac169350f064ee59e66edd5ff5cc48d8eb3b578660e91f5aabd613e",
+          "relativePath": "packages/native-hermes-adapter/src/adoption/semantic-context.ts"
+        }
+      ],
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+    },
+    {
+      "id": "operational-context",
+      "packagePath": "packages/operational-context",
+      "semanticOwner": "backend-ontology and SharedWiki operational-v1 domain owners",
+      "canonicalSource": [
+        "src/backend/",
+        "src/shared-wiki/"
+      ],
+      "nativeEntrypoints": [
+        "/opt/data/workspace/backend-ontology/runtime/query.ts",
+        "/opt/data/workspace/backend-ontology/runtime/intent-context/cli.ts",
+        "/opt/data/shared-llm-wiki/typed/operational-ontology/v1/query.ts"
+      ],
+      "ownerBoundary": "Eight contracts/projections preserve native namespaces and exact Zod4.6.5. Seven pure modules and one callback-injected evaluation module share canonical source. Existing native reader callback, CLI, task/evidence/data stores and policy remain owner. Source-pinned generated native modules/old-path forwarders preserve remote readers; no invented remote common checkout.",
+      "nativePermissionGranted": false,
+      "nativeAdapterOwnerRoots": [
+        "/opt/data/workspace/backend-ontology",
+        "/opt/data/shared-llm-wiki/typed/operational-ontology/v1"
+      ],
+      "localEngineeringOwnerRoot": "/home/palantirkc/code/shared/hermes-harness-engineering",
+      "packageName": "@palantirkc/operational-context",
+      "packageManifest": {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/package.json",
+        "sha256": "a303f4caeb92f989eec42c971fa5fc067e90991bf00d12d7deaad71e7b948ee7"
+      },
+      "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/resolve.ts",
+          "sha256": "3a20251e4d8945aafdc0a6e6b6acf262200e5fb80bf476206bf6d69a35bb1f47",
+          "relativePath": "packages/operational-context/src/backend/intent-context/resolve.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/contract.ts",
+          "sha256": "4965854c5a07d2ad52be7ac37be6d144cc4f4fa790e0f226db377344699a83b4",
+          "relativePath": "packages/operational-context/src/backend/intent-context/contract.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/json-ingress.ts",
+          "sha256": "05d0d915b7e0c3e1b52d36b64161346230bd833c61430e9e7e2473504867ce7d",
+          "relativePath": "packages/operational-context/src/backend/intent-context/json-ingress.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/lead-protocol.ts",
+          "sha256": "623321bac70304c6595c5b553168f81de17c1ec4c92ab21ca1fc14c95b1b5aa0",
+          "relativePath": "packages/operational-context/src/backend/work-artifacts/lead-protocol.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/contract.ts",
+          "sha256": "e62feaf2ee52d334e149a2bb74ea29597894ec65493066a77d37af807e662574",
+          "relativePath": "packages/operational-context/src/backend/work-artifacts/contract.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/lead-evaluation.ts",
+          "sha256": "fc50c40db24ac05a6fdb84d1ee8d2c71e7e7cabc608dde88f48d87bde31ce0f9",
+          "relativePath": "packages/operational-context/src/backend/work-artifacts/lead-evaluation.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/operating-context.ts",
+          "sha256": "fe089442d7843c93421a0afb0b392ec2acdbd7e113dfaca9a62576c7242e0471",
+          "relativePath": "packages/operational-context/src/backend/work-artifacts/operating-context.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/shared-wiki/v1/contract.ts",
+          "sha256": "3d2434201f3bca6e7fd56d390a7fc93b075e1b2782d71346763fa6f9cccb57ee",
+          "relativePath": "packages/operational-context/src/shared-wiki/v1/contract.ts"
+        }
+      ],
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+    }
+  ],
+  "projections": [
+    {
+      "id": "hermes-backend-semantic-context",
+      "registration": "architecture/hermes-semantic-projection.json",
+      "generator": "scripts/generate-hermes-semantic-context.ts",
+      "nativePath": "/opt/data/workspace/backend-ontology/runtime/work-artifacts/semantic-context.ts",
+      "meaning": "Generated metadata header and byte-exact canonical semantic body; original native import path remains."
+    }
+  ],
+  "ownershipInvariants": {
+    "nativeLoops": "Native Codex and native Hermes respectively; no second runtime/scheduler.",
+    "authoritativeData": "Existing Work, original/evidence, session, tasks, learning, credentials and domain data owners; no relocation.",
+    "releaseBytes": "Original immutable Ontology0.1.0 and0.2.0 owners and hashes unchanged.",
+    "publication": "Read-only source proofs do not establish fresh Git clone custody, native trust or remote publication.",
+    "operatingCost": "No additional recurring operating cost."
+  },
+  "registryPinRule": "Project manifest references this registry and source-provider paths/IDs without feeding registry digests into provider-pinned metadata. Source closure/evidence reports separately pin exact bytes.",
+  "consumerSourceGuards": [
+    {
+      "id": "codex-native-context",
+      "path": "../codex-harness-engineering/src/legacy/harness/owner-context-loader.ts",
+      "meaning": "Exact code-owner context source closure and native first-import refusal; selected Work/data root does not choose code."
+    },
+    {
+      "id": "codex-legacy-work",
+      "path": "../codex-harness-engineering/src/legacy/harness/context.ts",
+      "meaning": "Registered Codex source/provider proof plus original first-import refusal; registered Hermes helper20SOURCEpins and old8adapter pins in known imported-closure identity. No new universal Hermes first-import claim."
+    },
+    {
+      "id": "hermes-native-package",
+      "path": "../hermes-harness-engineering/src/ontology-driven/native-package.ts",
+      "meaning": "Canonical provider/source/build proof before and after finite native compilation; output/native roots and source input policy remain owner."
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+# Native Codex adapter library
+
+Canonical source is exactly hooks, home-context and evaluation-ledger. Native Codex keeps turns, tools, sessions, retries, compaction and hook trust. This library creates no loop or runtime. Hooks require an explicit code-owner context loader supplied by the original Codex wrapper; Work/binding data roots never select executable code. Native CLI, global config/profile/trust, credentials, ledger/data/raw prompt roots and original source history stay with codex-harness-engineering. Legacy default caps and separately authorized suite envelopes are unchanged. Source pins are verification evidence, never native permission or model budget.

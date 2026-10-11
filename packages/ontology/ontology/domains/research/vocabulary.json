@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "research",
+  "dependsOn": ["upper"],
+  "terms": ["source", "capture", "claim", "fetch-method", "upstream-revision", "content-match", "attempt", "limitation"],
+  "methods": ["scrapling-static", "scrapling-dynamic", "scrapling-stealth", "user-instruction", "official-documentation", "runtime-measurement"],
+  "verificationBoundary": "Process exit success and expected content matching are separate observations."
+}

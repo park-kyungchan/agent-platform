@@ -1,0 +1,23 @@
+{
+  "name": "@palantirkc/operational-context",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./backend/intent-context/contract": "./src/backend/intent-context/contract.ts",
+    "./backend/intent-context/json-ingress": "./src/backend/intent-context/json-ingress.ts",
+    "./backend/intent-context/resolve": "./src/backend/intent-context/resolve.ts",
+    "./backend/work-artifacts/contract": "./src/backend/work-artifacts/contract.ts",
+    "./backend/work-artifacts/lead-protocol": "./src/backend/work-artifacts/lead-protocol.ts",
+    "./backend/work-artifacts/operating-context": "./src/backend/work-artifacts/operating-context.ts",
+    "./shared-wiki/v1/contract": "./src/shared-wiki/v1/contract.ts",
+    "./backend/work-artifacts/lead-evaluation": "./src/backend/work-artifacts/lead-evaluation.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "bun-types": "1.3.14",
+    "typescript": "5.9.3"
+  }
+}

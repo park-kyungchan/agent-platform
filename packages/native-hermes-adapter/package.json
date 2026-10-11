@@ -1,0 +1,23 @@
+{
+  "name": "@palantirkc/native-hermes-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./ontology-driven/work-context": "./src/ontology-driven/work-context.ts",
+    "./ontology-driven/contracts": "./src/ontology-driven/contracts.ts",
+    "./ontology-driven/current-intent": "./src/ontology-driven/current-intent.ts",
+    "./ontology-driven/domain-context": "./src/ontology-driven/domain-context.ts",
+    "./ontology-driven/role-registry": "./src/ontology-driven/role-registry.ts",
+    "./ontology-driven/audit-adapter": "./src/ontology-driven/audit-adapter.ts",
+    "./ontology-driven/pinned-reader": "./src/ontology-driven/pinned-reader.ts",
+    "./adoption/semantic-context": "./src/adoption/semantic-context.ts",
+    "./adoption/evaluation-budget": "./src/adoption/evaluation-budget.ts"
+  },
+  "dependencies": {
+    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  }
+}
