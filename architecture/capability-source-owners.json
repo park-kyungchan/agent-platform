@@ -524,7 +524,8 @@
       "canonicalSource": [
         "src/ontology-driven/",
         "src/adoption/",
-        "src/platform-governance/"
+        "src/platform-governance/",
+        "native/plugins/"
       ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/hermes-harness-engineering",
       "nativeEntrypoints": [
@@ -533,7 +534,7 @@
         "src/ontology-driven/native-bundle.ts",
         "src/ontology-driven/provider-source.ts"
       ],
-      "ownerBoundary": "Nine existing context/budget providers plus pure platform-governance contracts/validators/reducers. Hermes owns CLI/native promotion, profile/task/session/evidence data and actual execution; no second runtime.",
+      "ownerBoundary": "Nine existing context/budget providers, pure platform-governance contracts/validators/reducers, and six canonical native-required Python/YAML plugin source files. Hermes owns CLI/native promotion, profile/task/session/evidence data and actual execution; no second runtime.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/native-hermes-adapter",
       "packageManifest": {
@@ -541,6 +542,36 @@
         "sha256": "60bce8cb4d5bff33d45307e9f04cfa4cd2ad2e045d5b7e7c3aece2f350baa391"
       },
       "sourcePins": [
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py",
+          "sha256": "373905be599bc79411ab35ce8b97f7932ed8cd3521eb53a5b527e1f5fc599dc7",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml",
+          "sha256": "f190f796e3800741e5bb768b6220fc189cf81af3979f1c46b7295523832d05bc",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/ocp-readonly-review/__init__.py",
+          "sha256": "70ac64ef9d64e469fef1c39647392f844bf5c76d02b53988ad42224370cc1682",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/__init__.py"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/ocp-readonly-review/plugin.yaml",
+          "sha256": "9ddefa25b4cc4db6398080a0b318a71aad2356d6896e888c24edb387a164b225",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/plugin.yaml"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/source-review-readonly/__init__.py",
+          "sha256": "bda3ccf83ed26465d875ab0d19516aa183fa3080bc0c0b3f14eadc7c104bd184",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/source-review-readonly/__init__.py"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/source-review-readonly/plugin.yaml",
+          "sha256": "bd11e33f0d64fcc0a339839791347559619ca913ee4938e51bd404e2f45ab71a",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/source-review-readonly/plugin.yaml"
+        },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/evaluation-budget.ts",
           "sha256": "1f0bb1e2829b99d7c7e6faef9ce86a157f37aa81305667e9c9d563999310c1df",
@@ -622,7 +653,21 @@
           "relativePath": "packages/native-hermes-adapter/src/platform-governance/policy.ts"
         }
       ],
-      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
+      "nativePluginSources": {
+        "recordClass": "native-required-interface-source",
+        "relativePaths": [
+          "packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py",
+          "packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml",
+          "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/__init__.py",
+          "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/plugin.yaml",
+          "packages/native-hermes-adapter/native/plugins/source-review-readonly/__init__.py",
+          "packages/native-hermes-adapter/native/plugins/source-review-readonly/plugin.yaml"
+        ],
+        "nativeRuntimeOwner": "hermes-harness-engineering",
+        "validation": "Exact six source pins and source-only syntax/manifest validation; no native imports or execution admission",
+        "nativePermissionGranted": false
+      }
     },
     {
       "id": "operational-context",

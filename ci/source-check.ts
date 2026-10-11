@@ -31,6 +31,26 @@ const contextPaths = ['project.json', 'ontology-pin.json', 'package.json', 'bun.
 const nativeCodexPaths = ['package.json', 'bun.lock', 'packages/native-codex-adapter/package.json', ...nativeCodexModules.map(name => `packages/native-codex-adapter/src/native/${name}.ts`)];
 const hermesPaths = ['package.json', 'bun.lock', 'releases/palantirkc-ontology-0.2.0.tgz', 'packages/native-hermes-adapter/package.json', 'packages/native-hermes-adapter/releases/palantirkc-ontology-0.2.0.tgz', ...hermesModules.map(name => `packages/native-hermes-adapter/src/ontology-driven/${name}.ts`), 'packages/native-hermes-adapter/src/adoption/semantic-context.ts', 'packages/native-hermes-adapter/src/adoption/evaluation-budget.ts'];
 
+const nativePluginNames = ['native-task-controls', 'source-review-readonly', 'ocp-readonly-review'];
+const nativePluginPaths = nativePluginNames.flatMap(name => ['__init__.py', 'plugin.yaml'].map(file => 'packages/native-hermes-adapter/native/plugins/' + name + '/' + file)).sort();
+/** Source-only native interface closure; never imports a Hermes plugin or invokes its runtime. */
+async function nativePluginSourceCheck(root: string) {
+  const registry = await json(join(root, 'architecture/capability-source-owners.json'));
+  const capability = registry.capabilities.find((entry: any) => entry.id === 'native-hermes-context');
+  if (!capability || capability.packagePath !== 'packages/native-hermes-adapter' || JSON.stringify(capability.nativePluginSources?.relativePaths) !== JSON.stringify(nativePluginPaths) || capability.nativePluginSources?.nativePermissionGranted !== false) throw Error('Canonical native plugin source denominator changed');
+  for (const path of nativePluginPaths) {
+    const pins = capability.sourcePins.filter((pin: any) => pin.relativePath === path);
+    const file = join(root, path), info = await lstat(file);
+    if (pins.length !== 1 || await realpath(file) !== file || !info.isFile() || info.size > 100_000 || sha(await readFile(file)) !== pins[0].sha256) throw Error('Canonical native plugin source pin drift: ' + path);
+    if (path.endsWith('/plugin.yaml')) {
+      const manifest = Bun.YAML.parse(await readFile(file, 'utf8')) as any;
+      if (manifest?.name !== path.split('/').at(-2) || typeof manifest.version !== 'string' || !manifest.settings || typeof manifest.settings !== 'object' || Array.isArray(manifest.settings)) throw Error('Canonical native plugin manifest identity changed');
+    }
+  }
+  await run(root, ['python3', '-c', 'import ast,pathlib,sys; [ast.parse(pathlib.Path(p).read_bytes(), filename=p) for p in sys.argv[1:]]', ...nativePluginPaths.filter(path => path.endsWith('.py')).map(path => join(root, path))]);
+  console.log(JSON.stringify({recordClass:'source-only-native-plugin-source-closure',sourcePins:6,pythonSyntaxOnly:true,nativePluginImports:0,nativeModelCalls:0,nativePermissionGranted:false}));
+}
+
 const finiteOwnerSources = [
   ...['src/legacy/harness/owner-context-loader.ts', 'src/legacy/harness/provider-closure.ts', 'src/native/provider-closure.ts', ...nativeCodexModules.map(name => `src/native/${name}.ts`)].map(path => ({ owner: 'codex-harness-engineering', path })),
   { owner: 'hermes-harness-engineering', path: 'src/ontology-driven/provider-source.ts' },
@@ -117,6 +137,7 @@ async function prepareQaTree() {
 }
 async function sourceChecks() {
   await liveOwnerFixtureCheck();
+  await nativePluginSourceCheck(sourceRoot);
   const { qaBase, common, codex, hermes } = await prepareQaTree();
   const immutable = { '0.1.0': '650385dfebbeb0c78711ac5be0f4762ffd8a19aefc79e06be505c841d4db3add', '0.2.0': '3f9995d0b91d2ad39dfc7cedbb6e35b1cb9d29c2e57223ca0c076d2030319406' };
   for (const path of await files(common)) {
