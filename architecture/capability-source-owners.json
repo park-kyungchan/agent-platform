@@ -523,7 +523,9 @@
       "semanticOwner": "ontology-platform and hermes-harness-engineering",
       "canonicalSource": [
         "src/ontology-driven/",
-        "src/adoption/"
+        "src/adoption/",
+        "src/platform-governance/",
+        "native/plugins/"
       ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/hermes-harness-engineering",
       "nativeEntrypoints": [
@@ -532,18 +534,53 @@
         "src/ontology-driven/native-bundle.ts",
         "src/ontology-driven/provider-source.ts"
       ],
-      "ownerBoundary": "Nine context/budget modules are canonical. Old CLI/packager/compiler/source proof bind fixed code owner; nativeRoot remains an explicit separate output/data root. Compiler uses a finite fresh installed Bun process and owned temporary directory, without cache deletion. No native bundle promotion or lifecycle follows.",
+      "ownerBoundary": "Nine existing context/budget providers, pure platform-governance contracts/validators/reducers, and six canonical native-required Python/YAML plugin source files. Hermes owns CLI/native promotion, profile/task/session/evidence data and actual execution; no second runtime.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/native-hermes-adapter",
       "packageManifest": {
         "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/package.json",
-        "sha256": "ec0d65c24190af1c9b38140f9621ce12042abcc77b96089f1e12c1dc7a607c6c"
+        "sha256": "60bce8cb4d5bff33d45307e9f04cfa4cd2ad2e045d5b7e7c3aece2f350baa391"
       },
       "sourcePins": [
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/contracts.ts",
-          "sha256": "abcfa1d692b6a0f6d4ec2d6174c1b201de938b819b7db3c53934267d521a1f3f",
-          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/contracts.ts"
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py",
+          "sha256": "373905be599bc79411ab35ce8b97f7932ed8cd3521eb53a5b527e1f5fc599dc7",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml",
+          "sha256": "f190f796e3800741e5bb768b6220fc189cf81af3979f1c46b7295523832d05bc",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/ocp-readonly-review/__init__.py",
+          "sha256": "70ac64ef9d64e469fef1c39647392f844bf5c76d02b53988ad42224370cc1682",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/__init__.py"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/ocp-readonly-review/plugin.yaml",
+          "sha256": "9ddefa25b4cc4db6398080a0b318a71aad2356d6896e888c24edb387a164b225",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/plugin.yaml"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/source-review-readonly/__init__.py",
+          "sha256": "bda3ccf83ed26465d875ab0d19516aa183fa3080bc0c0b3f14eadc7c104bd184",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/source-review-readonly/__init__.py"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/native/plugins/source-review-readonly/plugin.yaml",
+          "sha256": "bd11e33f0d64fcc0a339839791347559619ca913ee4938e51bd404e2f45ab71a",
+          "relativePath": "packages/native-hermes-adapter/native/plugins/source-review-readonly/plugin.yaml"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/evaluation-budget.ts",
+          "sha256": "1f0bb1e2829b99d7c7e6faef9ce86a157f37aa81305667e9c9d563999310c1df",
+          "relativePath": "packages/native-hermes-adapter/src/adoption/evaluation-budget.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/semantic-context.ts",
+          "sha256": "e2affef0eac169350f064ee59e66edd5ff5cc48d8eb3b578660e91f5aabd613e",
+          "relativePath": "packages/native-hermes-adapter/src/adoption/semantic-context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/audit-adapter.ts",
@@ -551,9 +588,14 @@
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/audit-adapter.ts"
         },
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/role-registry.ts",
-          "sha256": "8c409468878250edd92988ea35dd2cd99a4df3cd70e4ea52b35c03ad0f62c79f",
-          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/role-registry.ts"
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/contracts.ts",
+          "sha256": "abcfa1d692b6a0f6d4ec2d6174c1b201de938b819b7db3c53934267d521a1f3f",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/contracts.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/current-intent.ts",
+          "sha256": "6851cbc1e90d11255ca9d254340929693b8e72b6a52d33c82b3a8632bc79065a",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/current-intent.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/domain-context.ts",
@@ -566,9 +608,9 @@
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/pinned-reader.ts"
         },
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/current-intent.ts",
-          "sha256": "6851cbc1e90d11255ca9d254340929693b8e72b6a52d33c82b3a8632bc79065a",
-          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/current-intent.ts"
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/role-registry.ts",
+          "sha256": "8c409468878250edd92988ea35dd2cd99a4df3cd70e4ea52b35c03ad0f62c79f",
+          "relativePath": "packages/native-hermes-adapter/src/ontology-driven/role-registry.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/work-context.ts",
@@ -576,17 +618,56 @@
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/work-context.ts"
         },
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/evaluation-budget.ts",
-          "sha256": "1f0bb1e2829b99d7c7e6faef9ce86a157f37aa81305667e9c9d563999310c1df",
-          "relativePath": "packages/native-hermes-adapter/src/adoption/evaluation-budget.ts"
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/bot-correlation.ts",
+          "sha256": "baaf205518173ed999a482628f84b0fb5f0cc6e7761227b3a52376b4b7c1f9f3",
+          "relativePath": "packages/native-hermes-adapter/src/platform-governance/bot-correlation.ts"
         },
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/semantic-context.ts",
-          "sha256": "e2affef0eac169350f064ee59e66edd5ff5cc48d8eb3b578660e91f5aabd613e",
-          "relativePath": "packages/native-hermes-adapter/src/adoption/semantic-context.ts"
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/boundary-custody.ts",
+          "sha256": "dcc386f07b1bab452fc8c7ff2de6bbc07da1f225ffb85915464df06e3443a207",
+          "relativePath": "packages/native-hermes-adapter/src/platform-governance/boundary-custody.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/contracts.ts",
+          "sha256": "70f8e4369fc9845b02bcd23453471c0f6c8c99d348c6b254f7e753dd02ed7114",
+          "relativePath": "packages/native-hermes-adapter/src/platform-governance/contracts.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/evaluation-budget.ts",
+          "sha256": "96786f9b8fa311918b77cbe57b4919da089868a66d5dd102c873ab5190a26d29",
+          "relativePath": "packages/native-hermes-adapter/src/platform-governance/evaluation-budget.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/index.ts",
+          "sha256": "9f850089fca2c68a620c8c72d47c9e97c31dfd9247cc835584b0fe8e25d6d8c1",
+          "relativePath": "packages/native-hermes-adapter/src/platform-governance/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/native-bindings.ts",
+          "sha256": "c2bf6f45fa1ac3eaebdc9e6d6172b115dab9312da50a140b18d548f09ba84901",
+          "relativePath": "packages/native-hermes-adapter/src/platform-governance/native-bindings.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/policy.ts",
+          "sha256": "19807c2dddc9e1727880e12b457796522bff3db5ede2455f2b4df5c07c9d69d9",
+          "relativePath": "packages/native-hermes-adapter/src/platform-governance/policy.ts"
         }
       ],
-      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
+      "nativePluginSources": {
+        "recordClass": "native-required-interface-source",
+        "relativePaths": [
+          "packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py",
+          "packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml",
+          "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/__init__.py",
+          "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/plugin.yaml",
+          "packages/native-hermes-adapter/native/plugins/source-review-readonly/__init__.py",
+          "packages/native-hermes-adapter/native/plugins/source-review-readonly/plugin.yaml"
+        ],
+        "nativeRuntimeOwner": "hermes-harness-engineering",
+        "validation": "Exact six source pins and source-only syntax/manifest validation; no native imports or execution admission",
+        "nativePermissionGranted": false
+      }
     },
     {
       "id": "operational-context",
@@ -611,17 +692,12 @@
       "packageName": "@palantirkc/operational-context",
       "packageManifest": {
         "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/package.json",
-        "sha256": "a303f4caeb92f989eec42c971fa5fc067e90991bf00d12d7deaad71e7b948ee7"
+        "sha256": "a2ba149b05d44dd9bb8526d2a435ef4f2a24262f89e4d09a62a273e95d1d549f"
       },
       "sourcePins": [
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/resolve.ts",
-          "sha256": "3a20251e4d8945aafdc0a6e6b6acf262200e5fb80bf476206bf6d69a35bb1f47",
-          "relativePath": "packages/operational-context/src/backend/intent-context/resolve.ts"
-        },
-        {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/contract.ts",
-          "sha256": "4965854c5a07d2ad52be7ac37be6d144cc4f4fa790e0f226db377344699a83b4",
+          "sha256": "ae06b2abbb79a7b386a3c01b8e002531e8f1ea5bb247407305e1658691915c43",
           "relativePath": "packages/operational-context/src/backend/intent-context/contract.ts"
         },
         {
@@ -630,9 +706,39 @@
           "relativePath": "packages/operational-context/src/backend/intent-context/json-ingress.ts"
         },
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/lead-protocol.ts",
-          "sha256": "623321bac70304c6595c5b553168f81de17c1ec4c92ab21ca1fc14c95b1b5aa0",
-          "relativePath": "packages/operational-context/src/backend/work-artifacts/lead-protocol.ts"
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/resolve.ts",
+          "sha256": "7c91aca8d2b400f056eee75737d04eb92f739f34810a6349002b183face04a43",
+          "relativePath": "packages/operational-context/src/backend/intent-context/resolve.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/data-snapshot.ts",
+          "sha256": "fbeb6f6954487fc5c7ecd2f1b518b1d99fc67fd6c9ce42f234e59e3615321ea7",
+          "relativePath": "packages/operational-context/src/backend/review/data-snapshot.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/handoff-contract.ts",
+          "sha256": "ec03560724f11583512c5bdfeac639279a5d71ea5b5a865d8e8abf32a6ae7272",
+          "relativePath": "packages/operational-context/src/backend/review/handoff-contract.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/native-trace.ts",
+          "sha256": "0d0434bfdcd9acb3a5e1f290dadc941d814e4c1dffb022c144906180da375f96",
+          "relativePath": "packages/operational-context/src/backend/review/native-trace.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/result-contract.ts",
+          "sha256": "bc4da26619b5d8f4e4ce17523d745c9e02f36d41ed94bcd51641c94c3100a4c3",
+          "relativePath": "packages/operational-context/src/backend/review/result-contract.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/review-evidence.ts",
+          "sha256": "87df31676d9e56793e3f7587232c4b33afd55abad8e857a7d225f776f8bdb00a",
+          "relativePath": "packages/operational-context/src/backend/review/review-evidence.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/source-coverage.ts",
+          "sha256": "e591cdfdd3c0c1be29e022d046374c3deaaf8e41045da74bb8b706de6a93c03c",
+          "relativePath": "packages/operational-context/src/backend/review/source-coverage.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/contract.ts",
@@ -643,6 +749,11 @@
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/lead-evaluation.ts",
           "sha256": "fc50c40db24ac05a6fdb84d1ee8d2c71e7e7cabc608dde88f48d87bde31ce0f9",
           "relativePath": "packages/operational-context/src/backend/work-artifacts/lead-evaluation.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/lead-protocol.ts",
+          "sha256": "623321bac70304c6595c5b553168f81de17c1ec4c92ab21ca1fc14c95b1b5aa0",
+          "relativePath": "packages/operational-context/src/backend/work-artifacts/lead-protocol.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/operating-context.ts",

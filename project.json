@@ -104,6 +104,13 @@
         "currentWorkRoute": "/home/palantirkc/code/shared/codex-harness-engineering/state/continuity/workspace-rearchitecture.json",
         "routeSemantics": "Stable plain non-authorizing source route. Read current original decisions and authority; this manifest creates no authority or permission.",
         "authorityGrantedByManifest": false
+      },
+      "currentHermesEngineeringWork": {
+        "owner": "hermes-harness-engineering",
+        "workId": "hermes-platform-rearchitecture",
+        "planRef": "../hermes-harness-engineering/work/hermes-platform-rearchitecture/plan.json",
+        "sourceScope": "Native governance pure adapters and consolidated corrected public intent/review contracts; native stores and semantic owners retained",
+        "implementationAcceptance": "not-inferred-from-source-or-tests"
       }
     }
   }

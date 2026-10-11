@@ -1,0 +1,8 @@
+{
+  "name": "native-task-controls",
+  "version": "0.2.0",
+  "description": "Native-required thin interface to pinned agent-platform governance and native Hermes handlers",
+  "author": "workspace-owner",
+  "settings": {}
+}
+
