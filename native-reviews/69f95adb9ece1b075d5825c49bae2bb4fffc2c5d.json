@@ -1,0 +1,19 @@
+{
+  "schema": "native-independent-review.v1",
+  "headSha": "69f95adb9ece1b075d5825c49bae2bb4fffc2c5d",
+  "reviewedTreeSha": "cba434d323041103fa28c79529ade335eac9b587",
+  "author": {
+    "taskId": "/root"
+  },
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/native_candidate_review"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "provenance": {
+    "owner": "hermes-harness-engineering",
+    "resultRef": "verification/platform-rearchitecture/common-final-publication-independent-review.json",
+    "sha256": "8e6edf159281c2b868e0385532fbba9d246f2a21a1eb19277fc98cc9e38b1a80"
+  }
+}
