@@ -1,0 +1,787 @@
+{
+  "schema": "agent-platform.public-contract-history-custody.v1",
+  "recordClass": "local-source-history-custody-verification",
+  "capturedAtUtc": "2026-10-11T06:03:44.092396+00:00",
+  "scope": "Exact four public contract/example Git repositories only",
+  "canonicalSuccessor": {
+    "projectId": "agent-platform",
+    "remoteRepository": "park-kyungchan/agent-platform",
+    "repositoryId": 1413326539,
+    "localSourceRoot": "/home/palantirkc/code/shared/agent-platform"
+  },
+  "historicalSnapshotsAreMaintainedImplementations": false,
+  "repositories": [
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-context",
+      "head": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+      "advertisedRefs": [
+        "3cb238d352b3ace3f94e653e3f4e1590b194a323 refs/heads/main"
+      ],
+      "bundle": {
+        "privateOwnerPath": ".private/platform-rearchitecture/contracts-history/hermes-profile-dc-context.bundle",
+        "canonicalPath": "history/public-contracts/bundles/hermes-profile-dc-context.bundle",
+        "bytes": 26097,
+        "sha256": "9b9869ebc61fc39c2e2140714f6c003bb67c4271027e2beae782dfe8180c55da",
+        "allRefs": true,
+        "prerequisites": []
+      },
+      "headArchive": {
+        "path": "history/public-contracts/snapshots/hermes-profile-dc-context-3cb238d352b3ace3f94e653e3f4e1590b194a323.tar.gz",
+        "bytes": 19402,
+        "sha256": "0652a2b5c2a5255765883817f6ab22f8f65559def1efc327238be15a2d46c352"
+      },
+      "independentRestore": {
+        "path": ".private/platform-rearchitecture/contracts-history/restore-verified/hermes-profile-dc-context.git",
+        "headMatches": true,
+        "refsMatch": true,
+        "reachableObjectsMatch": true,
+        "reachableObjectCount": 42,
+        "commitCount": 3,
+        "gitFsckExitCode": 0,
+        "gitFsckOutput": "",
+        "restoredBundleVerified": "/home/palantirkc/code/shared/agent-platform/history/public-contracts/bundles/hermes-profile-dc-context.bundle is okay\nThe bundle contains these 2 refs:\n3cb238d352b3ace3f94e653e3f4e1590b194a323 refs/heads/main\n3cb238d352b3ace3f94e653e3f4e1590b194a323 HEAD\nThe bundle records a complete history.\nThe bundle uses this hash algorithm: sha1"
+      },
+      "headFiles": [
+        {
+          "path": ".gitignore",
+          "bytes": 20,
+          "sha256": "790e3169bc19b046fe55ba1da6d13b976c28363c8c00462a2195fe5faf260910"
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 238,
+          "sha256": "1c38e0614dcf53cfa8eba30326e3da798f231ff5cb67c76bbf145d876f919a00"
+        },
+        {
+          "path": "PROVENANCE.json",
+          "bytes": 1612,
+          "sha256": "38dd86feca1705117563dbb52757eac0d4a1fc85435e552004b8ed243dce0793"
+        },
+        {
+          "path": "PUBLICPROVENANCE.json",
+          "bytes": 8601,
+          "sha256": "bd1c50aa5f0d6a417b6590018d2e9300b29e6aaa594dc7a94e674b1108533160"
+        },
+        {
+          "path": "README.md",
+          "bytes": 5076,
+          "sha256": "e67d7bbce80d972e2e650934e8f7bf75c469f3c69168d7efec4e7e296d04361f"
+        },
+        {
+          "path": "bun.lock",
+          "bytes": 8156,
+          "sha256": "0f1e7110ba87e74f2b810398213fd8c56046f9012c20ae4614a88e6bd731667f"
+        },
+        {
+          "path": "examples/consumer.ts",
+          "bytes": 448,
+          "sha256": "be7e742e23ecea928f7ecb77c274e4d3ed2f2687ab6b934d16bfd72677cabe22"
+        },
+        {
+          "path": "package.json",
+          "bytes": 637,
+          "sha256": "01e0865c880ba28c4f1a3c16be384f43baeb0655cc90407fdb2c1ccf2e216cde"
+        },
+        {
+          "path": "role.json",
+          "bytes": 966,
+          "sha256": "cfd94c1531ae457089858147c18c7b245e5788da5fd56aeccfb087251c36ff48"
+        },
+        {
+          "path": "src/index.ts",
+          "bytes": 117,
+          "sha256": "09b82fb3f3cd16b675a01896fc93e0d92d8eb98fb5eac4118f44cd51e6724970"
+        },
+        {
+          "path": "src/intent/contract.ts",
+          "bytes": 10116,
+          "sha256": "9f9a1a50b785627b8531f1abbed9f6a4d8adc16f06caee865a6765af01a9e53b"
+        },
+        {
+          "path": "src/intent/json-ingress.ts",
+          "bytes": 1194,
+          "sha256": "05d0d915b7e0c3e1b52d36b64161346230bd833c61430e9e7e2473504867ce7d"
+        },
+        {
+          "path": "src/intent/resolve.ts",
+          "bytes": 7297,
+          "sha256": "7c91aca8d2b400f056eee75737d04eb92f739f34810a6349002b183face04a43"
+        },
+        {
+          "path": "src/review/data-snapshot.ts",
+          "bytes": 2476,
+          "sha256": "fbeb6f6954487fc5c7ecd2f1b518b1d99fc67fd6c9ce42f234e59e3615321ea7"
+        },
+        {
+          "path": "tests/context-fixture.ts",
+          "bytes": 1178,
+          "sha256": "ab0f208f51f4ca62ba1c81ad9617bbbe8f207d0931bd13eaea6f1c4a9d04df41"
+        },
+        {
+          "path": "tests/intent-r2.test.ts",
+          "bytes": 2407,
+          "sha256": "d9c28ca0780e06579039673f60a4b3fba018dd3f5687552e4f9e95fefabd7c97"
+        },
+        {
+          "path": "tests/intent-r5.test.ts",
+          "bytes": 3204,
+          "sha256": "0f4d62477c12dc785ec5ab6a66c32f659b1f5f8c0b9a3768c101522ffb1da37f"
+        },
+        {
+          "path": "tests/intent-r6.test.ts",
+          "bytes": 5107,
+          "sha256": "3ea7d48d981f1ec12f079cadfb39066cfbd5e8dccc1ec34fe62679b5f047e018"
+        },
+        {
+          "path": "tests/negative.test.ts",
+          "bytes": 2043,
+          "sha256": "8ceb1cffa2153472c74696be132739db85296e1b442935d7d21003479dcb655e"
+        },
+        {
+          "path": "tests/positive.test.ts",
+          "bytes": 1329,
+          "sha256": "695beb87e1d89b63a2d011547c377eed43cbd8e977eee51656dd536e5fe79a88"
+        },
+        {
+          "path": "tools/build.ts",
+          "bytes": 231,
+          "sha256": "026e46b22c5f95067e63875cb7462089b5f6afbc0a1c221a95061af115d7c990"
+        },
+        {
+          "path": "tools/check.ts",
+          "bytes": 372,
+          "sha256": "f39c3639ba6ceb81aaf3ee4fbc576fb9458f8684985ba2575d8a9ef80b95a003"
+        },
+        {
+          "path": "tsconfig.json",
+          "bytes": 380,
+          "sha256": "079368d74880a463d8d6c9e69adfbdfd93aceb8b85c20879c87628a3dea1c784"
+        }
+      ],
+      "publicDerivativeGeneration": "public-contract-slice-r6",
+      "publicProvenanceStatus": "R6_LOCAL_REVIEW_PENDING",
+      "classification": "Already-public contract/example snapshot; not actual profile configuration",
+      "deletePerformed": false,
+      "githubIdentity": {
+        "id": 1411493725,
+        "node_id": "R_kgDOVCGvXQ",
+        "full_name": "park-kyungchan/hermes-profile-dc-context",
+        "private": false,
+        "default_branch": "main",
+        "archived": false,
+        "fork": false,
+        "html_url": "https://github.com/park-kyungchan/hermes-profile-dc-context",
+        "updated_at": "2026-10-09T09:27:14Z",
+        "pushed_at": "2026-10-09T09:27:10Z",
+        "head": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+        "refs": [
+          {
+            "ref": "refs/heads/main",
+            "sha": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+            "type": "commit"
+          }
+        ],
+        "observedAtUtc": "2026-10-11T06:04:12.190575+00:00"
+      }
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-contract-audit",
+      "head": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+      "advertisedRefs": [
+        "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4 refs/heads/main"
+      ],
+      "bundle": {
+        "privateOwnerPath": ".private/platform-rearchitecture/contracts-history/hermes-profile-dc-contract-audit.bundle",
+        "canonicalPath": "history/public-contracts/bundles/hermes-profile-dc-contract-audit.bundle",
+        "bytes": 35927,
+        "sha256": "88a79611a678a7dd4abfc19506a6202dc827cf85e0a50a9c5c3177d3b7a86bc4",
+        "allRefs": true,
+        "prerequisites": []
+      },
+      "headArchive": {
+        "path": "history/public-contracts/snapshots/hermes-profile-dc-contract-audit-3ab5d8d8e4876b2d74b60e39879cec98d810f0a4.tar.gz",
+        "bytes": 26257,
+        "sha256": "37305eca922488a30f3bf2b49734560e1269963f20139f2cf6f35cb13d825c42"
+      },
+      "independentRestore": {
+        "path": ".private/platform-rearchitecture/contracts-history/restore-verified/hermes-profile-dc-contract-audit.git",
+        "headMatches": true,
+        "refsMatch": true,
+        "reachableObjectsMatch": true,
+        "reachableObjectCount": 52,
+        "commitCount": 3,
+        "gitFsckExitCode": 0,
+        "gitFsckOutput": "",
+        "restoredBundleVerified": "/home/palantirkc/code/shared/agent-platform/history/public-contracts/bundles/hermes-profile-dc-contract-audit.bundle is okay\nThe bundle contains these 2 refs:\n3ab5d8d8e4876b2d74b60e39879cec98d810f0a4 refs/heads/main\n3ab5d8d8e4876b2d74b60e39879cec98d810f0a4 HEAD\nThe bundle records a complete history.\nThe bundle uses this hash algorithm: sha1"
+      },
+      "headFiles": [
+        {
+          "path": ".gitignore",
+          "bytes": 20,
+          "sha256": "790e3169bc19b046fe55ba1da6d13b976c28363c8c00462a2195fe5faf260910"
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 238,
+          "sha256": "1c38e0614dcf53cfa8eba30326e3da798f231ff5cb67c76bbf145d876f919a00"
+        },
+        {
+          "path": "PROVENANCE.json",
+          "bytes": 2049,
+          "sha256": "b41344531ec50a11ce4f645a81427716657b6f02cea58751ae14769a9e821a3c"
+        },
+        {
+          "path": "PUBLICPROVENANCE.json",
+          "bytes": 12385,
+          "sha256": "0c3862e1e3855be1061d1dc23774683ae6e9bdcd558dfe9d616da40719867b78"
+        },
+        {
+          "path": "README.md",
+          "bytes": 5274,
+          "sha256": "30282cb8a249facaf991d3021330eaafc55f30937bc5d5777c379197c14d0847"
+        },
+        {
+          "path": "bun.lock",
+          "bytes": 8163,
+          "sha256": "e3b92978c10b3ce4d042664802207f014da3a419eb4e4c779c07629c4c964e18"
+        },
+        {
+          "path": "examples/consumer.ts",
+          "bytes": 448,
+          "sha256": "be7e742e23ecea928f7ecb77c274e4d3ed2f2687ab6b934d16bfd72677cabe22"
+        },
+        {
+          "path": "package.json",
+          "bytes": 644,
+          "sha256": "dda7a3030085922cddccfa366accd97864a157fc720a62732a33e1a196dbf6b6"
+        },
+        {
+          "path": "role.json",
+          "bytes": 1010,
+          "sha256": "8a5d5e35ef3f062fceaa2eba9a0c22704b107cc5922e9abab9646fe24c1a5e41"
+        },
+        {
+          "path": "src/index.ts",
+          "bytes": 208,
+          "sha256": "5c6d805b546a7573a8f1e938ab093adb8405ec6f2ec6a31af855b8360b54172f"
+        },
+        {
+          "path": "src/intent/contract.ts",
+          "bytes": 10116,
+          "sha256": "9f9a1a50b785627b8531f1abbed9f6a4d8adc16f06caee865a6765af01a9e53b"
+        },
+        {
+          "path": "src/intent/json-ingress.ts",
+          "bytes": 1194,
+          "sha256": "05d0d915b7e0c3e1b52d36b64161346230bd833c61430e9e7e2473504867ce7d"
+        },
+        {
+          "path": "src/intent/resolve.ts",
+          "bytes": 7297,
+          "sha256": "7c91aca8d2b400f056eee75737d04eb92f739f34810a6349002b183face04a43"
+        },
+        {
+          "path": "src/review/data-snapshot.ts",
+          "bytes": 2476,
+          "sha256": "fbeb6f6954487fc5c7ecd2f1b518b1d99fc67fd6c9ce42f234e59e3615321ea7"
+        },
+        {
+          "path": "src/review/handoff-contract.ts",
+          "bytes": 2157,
+          "sha256": "443443d690e932d17286f22bc252f2ad919ae774cdd843dabc1e5e0095534cc8"
+        },
+        {
+          "path": "src/review/result-contract.ts",
+          "bytes": 4533,
+          "sha256": "74a216fdbb160d68b5441298eb84997f278cfb1603288fb83d130a5dd2510874"
+        },
+        {
+          "path": "src/review/source-coverage.ts",
+          "bytes": 4699,
+          "sha256": "061eb45aa1b0159da29fe068fec23b44c475c7814e81e7ef950be0179ee992e7"
+        },
+        {
+          "path": "tests/context-fixture.ts",
+          "bytes": 1178,
+          "sha256": "ab0f208f51f4ca62ba1c81ad9617bbbe8f207d0931bd13eaea6f1c4a9d04df41"
+        },
+        {
+          "path": "tests/intent-r2.test.ts",
+          "bytes": 2407,
+          "sha256": "d9c28ca0780e06579039673f60a4b3fba018dd3f5687552e4f9e95fefabd7c97"
+        },
+        {
+          "path": "tests/intent-r5.test.ts",
+          "bytes": 3204,
+          "sha256": "0f4d62477c12dc785ec5ab6a66c32f659b1f5f8c0b9a3768c101522ffb1da37f"
+        },
+        {
+          "path": "tests/intent-r6.test.ts",
+          "bytes": 5107,
+          "sha256": "3ea7d48d981f1ec12f079cadfb39066cfbd5e8dccc1ec34fe62679b5f047e018"
+        },
+        {
+          "path": "tests/negative.test.ts",
+          "bytes": 5831,
+          "sha256": "04f1764caf4db05a51c01267133b6f33233707967071f0d122d4d735a6d3b5e4"
+        },
+        {
+          "path": "tests/positive.test.ts",
+          "bytes": 2259,
+          "sha256": "f3a4e0a1a1b3aa8bd9134e3c73a12944b70b183642b6e52f307cb23ed0ed4931"
+        },
+        {
+          "path": "tests/review-fixture.ts",
+          "bytes": 1655,
+          "sha256": "b8f44f7b32e7b9e307b01d47b493e6f5ff956560bd8dc3e52bd0be79ce39fbfc"
+        },
+        {
+          "path": "tests/review-r5.test.ts",
+          "bytes": 3761,
+          "sha256": "65ba8f488974b56432651028a0b68216f4544f1ec2544d629151f51b55f1c14a"
+        },
+        {
+          "path": "tools/build.ts",
+          "bytes": 231,
+          "sha256": "026e46b22c5f95067e63875cb7462089b5f6afbc0a1c221a95061af115d7c990"
+        },
+        {
+          "path": "tools/check.ts",
+          "bytes": 372,
+          "sha256": "f39c3639ba6ceb81aaf3ee4fbc576fb9458f8684985ba2575d8a9ef80b95a003"
+        },
+        {
+          "path": "tsconfig.json",
+          "bytes": 380,
+          "sha256": "079368d74880a463d8d6c9e69adfbdfd93aceb8b85c20879c87628a3dea1c784"
+        }
+      ],
+      "publicDerivativeGeneration": "public-contract-slice-r6",
+      "publicProvenanceStatus": "R6_LOCAL_REVIEW_PENDING",
+      "classification": "Already-public contract/example snapshot; not actual profile configuration",
+      "deletePerformed": false,
+      "githubIdentity": {
+        "id": 1411506018,
+        "node_id": "R_kgDOVCHfYg",
+        "full_name": "park-kyungchan/hermes-profile-dc-contract-audit",
+        "private": false,
+        "default_branch": "main",
+        "archived": false,
+        "fork": false,
+        "html_url": "https://github.com/park-kyungchan/hermes-profile-dc-contract-audit",
+        "updated_at": "2026-10-09T09:27:43Z",
+        "pushed_at": "2026-10-09T09:27:39Z",
+        "head": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+        "refs": [
+          {
+            "ref": "refs/heads/main",
+            "sha": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+            "type": "commit"
+          }
+        ],
+        "observedAtUtc": "2026-10-11T06:04:13.598584+00:00"
+      }
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-review",
+      "head": "69ed6d9a0266066c83789c322c4b4521810333ec",
+      "advertisedRefs": [
+        "69ed6d9a0266066c83789c322c4b4521810333ec refs/heads/main"
+      ],
+      "bundle": {
+        "privateOwnerPath": ".private/platform-rearchitecture/contracts-history/hermes-profile-dc-review.bundle",
+        "canonicalPath": "history/public-contracts/bundles/hermes-profile-dc-review.bundle",
+        "bytes": 26659,
+        "sha256": "50388b1815bdbea8df8b4f6807353a29d70f19ba17e1dea2172df45046b127cd",
+        "allRefs": true,
+        "prerequisites": []
+      },
+      "headArchive": {
+        "path": "history/public-contracts/snapshots/hermes-profile-dc-review-69ed6d9a0266066c83789c322c4b4521810333ec.tar.gz",
+        "bytes": 20511,
+        "sha256": "c704e2831ef58bbacdebdb0392017dad23be2c93ec163de846325b2280627548"
+      },
+      "independentRestore": {
+        "path": ".private/platform-rearchitecture/contracts-history/restore-verified/hermes-profile-dc-review.git",
+        "headMatches": true,
+        "refsMatch": true,
+        "reachableObjectsMatch": true,
+        "reachableObjectCount": 33,
+        "commitCount": 2,
+        "gitFsckExitCode": 0,
+        "gitFsckOutput": "",
+        "restoredBundleVerified": "/home/palantirkc/code/shared/agent-platform/history/public-contracts/bundles/hermes-profile-dc-review.bundle is okay\nThe bundle contains these 2 refs:\n69ed6d9a0266066c83789c322c4b4521810333ec refs/heads/main\n69ed6d9a0266066c83789c322c4b4521810333ec HEAD\nThe bundle records a complete history.\nThe bundle uses this hash algorithm: sha1"
+      },
+      "headFiles": [
+        {
+          "path": ".gitignore",
+          "bytes": 20,
+          "sha256": "790e3169bc19b046fe55ba1da6d13b976c28363c8c00462a2195fe5faf260910"
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 238,
+          "sha256": "1c38e0614dcf53cfa8eba30326e3da798f231ff5cb67c76bbf145d876f919a00"
+        },
+        {
+          "path": "PROVENANCE.json",
+          "bytes": 1839,
+          "sha256": "f022928cc4d0772110d318914ced2a4a9efd122f9e158028cdabf35bb3f21efb"
+        },
+        {
+          "path": "PUBLICPROVENANCE.json",
+          "bytes": 6881,
+          "sha256": "10cae232c3e5e1c5041d9fb90a368d9dc81a37d835cc5d31774a5b50972f4b9c"
+        },
+        {
+          "path": "README.md",
+          "bytes": 3701,
+          "sha256": "4bf02330f16a2e977aaf646db8d2638f8d5222749af3eafa4ca9b02c9afb7b70"
+        },
+        {
+          "path": "bun.lock",
+          "bytes": 8155,
+          "sha256": "d8592cbc3135885ee7c2c586347db48edc0510184cbd48d47cf5c78e71e327b5"
+        },
+        {
+          "path": "examples/consumer.ts",
+          "bytes": 409,
+          "sha256": "b61b23b0f4c8ca42e10d178904f1722ba1a45b4c42757f8486611da1a1b606b0"
+        },
+        {
+          "path": "package.json",
+          "bytes": 636,
+          "sha256": "eb97d7be20217552024b17d962a905a042f999ceb89cc1fb699e42d13e2d25fb"
+        },
+        {
+          "path": "role.json",
+          "bytes": 972,
+          "sha256": "04bfba384cefbe25bb928bd78eea5e0a76b63e0a78cbf67eb15189ad8c93b27f"
+        },
+        {
+          "path": "src/index.ts",
+          "bytes": 171,
+          "sha256": "ac7d29c1c5630aac9c7df2cb770afc037137dbbf151bce320719666f76a8b659"
+        },
+        {
+          "path": "src/review-evidence.ts",
+          "bytes": 2913,
+          "sha256": "55f50276c63d1898cbdf7396057547848bd80e8d01072e2a510d920f093bc42a"
+        },
+        {
+          "path": "src/review/data-snapshot.ts",
+          "bytes": 2476,
+          "sha256": "fbeb6f6954487fc5c7ecd2f1b518b1d99fc67fd6c9ce42f234e59e3615321ea7"
+        },
+        {
+          "path": "src/review/handoff-contract.ts",
+          "bytes": 2157,
+          "sha256": "443443d690e932d17286f22bc252f2ad919ae774cdd843dabc1e5e0095534cc8"
+        },
+        {
+          "path": "src/review/native-trace.ts",
+          "bytes": 6612,
+          "sha256": "ca7ce4e1c1283efa3b6d2a3cd09b8b887a43e582ba815133e2a13444c96d0091"
+        },
+        {
+          "path": "src/review/result-contract.ts",
+          "bytes": 4533,
+          "sha256": "74a216fdbb160d68b5441298eb84997f278cfb1603288fb83d130a5dd2510874"
+        },
+        {
+          "path": "src/review/source-coverage.ts",
+          "bytes": 4609,
+          "sha256": "9e65ba81614717d8342224d04c7e6ade416051b2bdea6693eec1bd2178ba9962"
+        },
+        {
+          "path": "tests/negative.test.ts",
+          "bytes": 4812,
+          "sha256": "ff70d4f4a6fefc1858d529e0624b70f53c6a35344c73092406f5ebd076c2fc3d"
+        },
+        {
+          "path": "tests/positive.test.ts",
+          "bytes": 1467,
+          "sha256": "815f59b30e79e000654e66813017bf37ebab3cb3e02dee986559d9b70f36f59e"
+        },
+        {
+          "path": "tests/review-fixture.ts",
+          "bytes": 1655,
+          "sha256": "b8f44f7b32e7b9e307b01d47b493e6f5ff956560bd8dc3e52bd0be79ce39fbfc"
+        },
+        {
+          "path": "tests/review-r2.test.ts",
+          "bytes": 5517,
+          "sha256": "a6702f97893d8383d468acfb84ae973b7f09bfa32d8493ab3ed134c47808eb0e"
+        },
+        {
+          "path": "tests/review-r4.test.ts",
+          "bytes": 6459,
+          "sha256": "291832786653278b63a455f1a9ce962e7bcb15b32abb50645212a9f9d5aecf69"
+        },
+        {
+          "path": "tools/build.ts",
+          "bytes": 231,
+          "sha256": "026e46b22c5f95067e63875cb7462089b5f6afbc0a1c221a95061af115d7c990"
+        },
+        {
+          "path": "tools/check.ts",
+          "bytes": 372,
+          "sha256": "f39c3639ba6ceb81aaf3ee4fbc576fb9458f8684985ba2575d8a9ef80b95a003"
+        },
+        {
+          "path": "tsconfig.json",
+          "bytes": 380,
+          "sha256": "079368d74880a463d8d6c9e69adfbdfd93aceb8b85c20879c87628a3dea1c784"
+        }
+      ],
+      "publicDerivativeGeneration": "public-contract-slice-r4",
+      "publicProvenanceStatus": null,
+      "classification": "Already-public contract/example snapshot; not actual profile configuration",
+      "deletePerformed": false,
+      "githubIdentity": {
+        "id": 1411547504,
+        "node_id": "R_kgDOVCKBcA",
+        "full_name": "park-kyungchan/hermes-profile-dc-review",
+        "private": false,
+        "default_branch": "main",
+        "archived": false,
+        "fork": false,
+        "html_url": "https://github.com/park-kyungchan/hermes-profile-dc-review",
+        "updated_at": "2026-10-09T08:46:29Z",
+        "pushed_at": "2026-10-09T08:46:24Z",
+        "head": "69ed6d9a0266066c83789c322c4b4521810333ec",
+        "refs": [
+          {
+            "ref": "refs/heads/main",
+            "sha": "69ed6d9a0266066c83789c322c4b4521810333ec",
+            "type": "commit"
+          }
+        ],
+        "observedAtUtc": "2026-10-11T06:04:14.946246+00:00"
+      }
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-ontology-platform",
+      "head": "796cd709f356344210aa73f02ca2c8407103cc28",
+      "advertisedRefs": [
+        "796cd709f356344210aa73f02ca2c8407103cc28 refs/heads/main"
+      ],
+      "bundle": {
+        "privateOwnerPath": ".private/platform-rearchitecture/contracts-history/hermes-profile-ontology-platform.bundle",
+        "canonicalPath": "history/public-contracts/bundles/hermes-profile-ontology-platform.bundle",
+        "bytes": 41800,
+        "sha256": "e35c463de8c778f8aa0d9f3732a14650533a4c85726f74071cfaf95186361416",
+        "allRefs": true,
+        "prerequisites": []
+      },
+      "headArchive": {
+        "path": "history/public-contracts/snapshots/hermes-profile-ontology-platform-796cd709f356344210aa73f02ca2c8407103cc28.tar.gz",
+        "bytes": 32291,
+        "sha256": "cce74da9fec4b1359d3ea97215f469566e792d36ffeab9299148551d05951622"
+      },
+      "independentRestore": {
+        "path": ".private/platform-rearchitecture/contracts-history/restore-verified/hermes-profile-ontology-platform.git",
+        "headMatches": true,
+        "refsMatch": true,
+        "reachableObjectsMatch": true,
+        "reachableObjectCount": 42,
+        "commitCount": 2,
+        "gitFsckExitCode": 0,
+        "gitFsckOutput": "",
+        "restoredBundleVerified": "/home/palantirkc/code/shared/agent-platform/history/public-contracts/bundles/hermes-profile-ontology-platform.bundle is okay\nThe bundle contains these 2 refs:\n796cd709f356344210aa73f02ca2c8407103cc28 refs/heads/main\n796cd709f356344210aa73f02ca2c8407103cc28 HEAD\nThe bundle records a complete history.\nThe bundle uses this hash algorithm: sha1"
+      },
+      "headFiles": [
+        {
+          "path": ".gitignore",
+          "bytes": 20,
+          "sha256": "790e3169bc19b046fe55ba1da6d13b976c28363c8c00462a2195fe5faf260910"
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 238,
+          "sha256": "1c38e0614dcf53cfa8eba30326e3da798f231ff5cb67c76bbf145d876f919a00"
+        },
+        {
+          "path": "PROVENANCE.json",
+          "bytes": 2458,
+          "sha256": "ef7a6afde8fa70859428fe270458a3a04ee63095f9076aec556a54a6eccad2a5"
+        },
+        {
+          "path": "PUBLICPROVENANCE.json",
+          "bytes": 14289,
+          "sha256": "b46c27462e54c2856ab25f3dc50bc70e3a1196bff7128fe44eaaf9aae233d245"
+        },
+        {
+          "path": "README.md",
+          "bytes": 5169,
+          "sha256": "c31d77b515a787e22a17a804bc671cf04ced76ce19df39ba402bbe995d7adae3"
+        },
+        {
+          "path": "bun.lock",
+          "bytes": 8163,
+          "sha256": "42849b4fc394e5eea5686b504e9d7a04149a0846112800267b30c4422bb398a7"
+        },
+        {
+          "path": "examples/consumer.ts",
+          "bytes": 448,
+          "sha256": "be7e742e23ecea928f7ecb77c274e4d3ed2f2687ab6b934d16bfd72677cabe22"
+        },
+        {
+          "path": "package.json",
+          "bytes": 644,
+          "sha256": "b02294a5ba0f311ba07ad9d0a89de38b20172ce477bc0d328ece181c7285af45"
+        },
+        {
+          "path": "role.json",
+          "bytes": 902,
+          "sha256": "154bd9f2541af95134a4f358bc744c365ce380e5b34b4924abd74101cd051a48"
+        },
+        {
+          "path": "src/index.ts",
+          "bytes": 288,
+          "sha256": "7f80a086ea76924bc67f33c497a92553513203282ee16fe215dab6f3737deae9"
+        },
+        {
+          "path": "src/intent/contract.ts",
+          "bytes": 10116,
+          "sha256": "9f9a1a50b785627b8531f1abbed9f6a4d8adc16f06caee865a6765af01a9e53b"
+        },
+        {
+          "path": "src/intent/json-ingress.ts",
+          "bytes": 1194,
+          "sha256": "05d0d915b7e0c3e1b52d36b64161346230bd833c61430e9e7e2473504867ce7d"
+        },
+        {
+          "path": "src/intent/resolve.ts",
+          "bytes": 7297,
+          "sha256": "7c91aca8d2b400f056eee75737d04eb92f739f34810a6349002b183face04a43"
+        },
+        {
+          "path": "src/review-evidence.ts",
+          "bytes": 2913,
+          "sha256": "55f50276c63d1898cbdf7396057547848bd80e8d01072e2a510d920f093bc42a"
+        },
+        {
+          "path": "src/review/data-snapshot.ts",
+          "bytes": 2476,
+          "sha256": "fbeb6f6954487fc5c7ecd2f1b518b1d99fc67fd6c9ce42f234e59e3615321ea7"
+        },
+        {
+          "path": "src/review/handoff-contract.ts",
+          "bytes": 2157,
+          "sha256": "443443d690e932d17286f22bc252f2ad919ae774cdd843dabc1e5e0095534cc8"
+        },
+        {
+          "path": "src/review/native-trace.ts",
+          "bytes": 6612,
+          "sha256": "ca7ce4e1c1283efa3b6d2a3cd09b8b887a43e582ba815133e2a13444c96d0091"
+        },
+        {
+          "path": "src/review/result-contract.ts",
+          "bytes": 4533,
+          "sha256": "74a216fdbb160d68b5441298eb84997f278cfb1603288fb83d130a5dd2510874"
+        },
+        {
+          "path": "src/review/source-coverage.ts",
+          "bytes": 4699,
+          "sha256": "061eb45aa1b0159da29fe068fec23b44c475c7814e81e7ef950be0179ee992e7"
+        },
+        {
+          "path": "tests/context-fixture.ts",
+          "bytes": 1178,
+          "sha256": "ab0f208f51f4ca62ba1c81ad9617bbbe8f207d0931bd13eaea6f1c4a9d04df41"
+        },
+        {
+          "path": "tests/intent-r2.test.ts",
+          "bytes": 2407,
+          "sha256": "d9c28ca0780e06579039673f60a4b3fba018dd3f5687552e4f9e95fefabd7c97"
+        },
+        {
+          "path": "tests/intent-r5.test.ts",
+          "bytes": 6159,
+          "sha256": "7b54eb53314fdf6019d8bbcde0aff445d8966dfdde97167a2517c5f3d55924be"
+        },
+        {
+          "path": "tests/intent-r6.test.ts",
+          "bytes": 5107,
+          "sha256": "3ea7d48d981f1ec12f079cadfb39066cfbd5e8dccc1ec34fe62679b5f047e018"
+        },
+        {
+          "path": "tests/negative.test.ts",
+          "bytes": 6698,
+          "sha256": "1538a12d06c35c6303bb2a9fb070e4a6e98d8dc7849e60ebe36de1a2e3f8f3fc"
+        },
+        {
+          "path": "tests/positive.test.ts",
+          "bytes": 2639,
+          "sha256": "b50594253f6a3b9aedbdc7b1a0e438db4530bef269c4e38cb1a37ce2137ea708"
+        },
+        {
+          "path": "tests/review-fixture.ts",
+          "bytes": 1655,
+          "sha256": "b8f44f7b32e7b9e307b01d47b493e6f5ff956560bd8dc3e52bd0be79ce39fbfc"
+        },
+        {
+          "path": "tests/review-r2.test.ts",
+          "bytes": 5517,
+          "sha256": "a6702f97893d8383d468acfb84ae973b7f09bfa32d8493ab3ed134c47808eb0e"
+        },
+        {
+          "path": "tests/review-r4.test.ts",
+          "bytes": 6459,
+          "sha256": "291832786653278b63a455f1a9ce962e7bcb15b32abb50645212a9f9d5aecf69"
+        },
+        {
+          "path": "tests/review-r5.test.ts",
+          "bytes": 1059,
+          "sha256": "314b11104aa97d43a412b5eaee2701caf69a96f032acd21cd4de3e4b99a1801f"
+        },
+        {
+          "path": "tools/build.ts",
+          "bytes": 231,
+          "sha256": "026e46b22c5f95067e63875cb7462089b5f6afbc0a1c221a95061af115d7c990"
+        },
+        {
+          "path": "tools/check.ts",
+          "bytes": 372,
+          "sha256": "f39c3639ba6ceb81aaf3ee4fbc576fb9458f8684985ba2575d8a9ef80b95a003"
+        },
+        {
+          "path": "tsconfig.json",
+          "bytes": 380,
+          "sha256": "079368d74880a463d8d6c9e69adfbdfd93aceb8b85c20879c87628a3dea1c784"
+        }
+      ],
+      "publicDerivativeGeneration": "public-contract-slice-r6",
+      "publicProvenanceStatus": "R6_LOCAL_REVIEW_PENDING",
+      "classification": "Already-public contract/example snapshot; not actual profile configuration",
+      "deletePerformed": false,
+      "githubIdentity": {
+        "id": 1411598033,
+        "node_id": "R_kgDOVCNG0Q",
+        "full_name": "park-kyungchan/hermes-profile-ontology-platform",
+        "private": false,
+        "default_branch": "main",
+        "archived": false,
+        "fork": false,
+        "html_url": "https://github.com/park-kyungchan/hermes-profile-ontology-platform",
+        "updated_at": "2026-10-09T09:26:45Z",
+        "pushed_at": "2026-10-09T09:26:41Z",
+        "head": "796cd709f356344210aa73f02ca2c8407103cc28",
+        "refs": [
+          {
+            "ref": "refs/heads/main",
+            "sha": "796cd709f356344210aa73f02ca2c8407103cc28",
+            "type": "commit"
+          }
+        ],
+        "observedAtUtc": "2026-10-11T06:04:16.418052+00:00"
+      }
+    }
+  ],
+  "limits": [
+    "All refs means every ref advertised by the already cloned Git mirrors. Hidden provider refs and unadvertised dangling objects are not asserted.",
+    "Remote source successor publication and independent published clone readback remain parent-owned gates.",
+    "Git history custody is not source semantic acceptance, native profile configuration or runtime application."
+  ]
+}

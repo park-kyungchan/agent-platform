@@ -1,0 +1,50 @@
+{
+  "schema": "agent-platform.finite-native-owner-code-fixture.v1",
+  "scope": "Sanitized source-only native owner guard fixtures. QA identity/hash overlays do not alter production guards or grant authority.",
+  "sources": [
+    {
+      "owner": "codex-harness-engineering",
+      "path": "src/legacy/harness/owner-context-loader.ts",
+      "sha256": "57742bb4332e9bb25039ec9830877bd1cd72bb27e24d2260e9c571814799aa16",
+      "classification": "source-owned-code-only-no-runtime-or-user-data"
+    },
+    {
+      "owner": "codex-harness-engineering",
+      "path": "src/legacy/harness/provider-closure.ts",
+      "sha256": "618aeea8e1f19b01ec1c39248e2ec6121926c26d682874ed8d1223a78e4f7986",
+      "classification": "source-owned-code-only-no-runtime-or-user-data"
+    },
+    {
+      "owner": "codex-harness-engineering",
+      "path": "src/native/provider-closure.ts",
+      "sha256": "01fffd9a7b94711a741c00479c80685984caae45894c61de52e21189d8eac152",
+      "classification": "source-owned-code-only-no-runtime-or-user-data"
+    },
+    {
+      "owner": "codex-harness-engineering",
+      "path": "src/native/hooks.ts",
+      "sha256": "c2d9298543058d2da15c285f803cb695ba7ea7538d36297283d3cc84b5e3330e",
+      "classification": "source-owned-code-only-no-runtime-or-user-data"
+    },
+    {
+      "owner": "codex-harness-engineering",
+      "path": "src/native/home-context.ts",
+      "sha256": "0934f25ffb88d0bf24620afc2ce8dc33e57b11f7e469e68b3fca36ee8887956c",
+      "classification": "source-owned-code-only-no-runtime-or-user-data"
+    },
+    {
+      "owner": "codex-harness-engineering",
+      "path": "src/native/evaluation-ledger.ts",
+      "sha256": "6486bcdbb232250dd34aec32045ba078833a5acca05fd6d390fb9bce6721a984",
+      "classification": "source-owned-code-only-no-runtime-or-user-data"
+    },
+    {
+      "owner": "hermes-harness-engineering",
+      "path": "src/ontology-driven/provider-source.ts",
+      "sha256": "0fa22ed5119f39f8a9a01a15d8d4051eb0c327902af8f80eb5f7f40343648b4e",
+      "classification": "source-owned-code-only-no-runtime-or-user-data"
+    }
+  ],
+  "nativeModelCalls": 0,
+  "remoteEffects": false
+}

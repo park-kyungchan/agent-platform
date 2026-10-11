@@ -11,7 +11,13 @@
     "./backend/work-artifacts/lead-protocol": "./src/backend/work-artifacts/lead-protocol.ts",
     "./backend/work-artifacts/operating-context": "./src/backend/work-artifacts/operating-context.ts",
     "./shared-wiki/v1/contract": "./src/shared-wiki/v1/contract.ts",
-    "./backend/work-artifacts/lead-evaluation": "./src/backend/work-artifacts/lead-evaluation.ts"
+    "./backend/work-artifacts/lead-evaluation": "./src/backend/work-artifacts/lead-evaluation.ts",
+    "./backend/review/data-snapshot": "./src/backend/review/data-snapshot.ts",
+    "./backend/review/result-contract": "./src/backend/review/result-contract.ts",
+    "./backend/review/source-coverage": "./src/backend/review/source-coverage.ts",
+    "./backend/review/handoff-contract": "./src/backend/review/handoff-contract.ts",
+    "./backend/review/native-trace": "./src/backend/review/native-trace.ts",
+    "./backend/review/review-evidence": "./src/backend/review/review-evidence.ts"
   },
   "dependencies": {
     "zod": "4.6.5"

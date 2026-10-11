@@ -12,7 +12,14 @@
     "./ontology-driven/audit-adapter": "./src/ontology-driven/audit-adapter.ts",
     "./ontology-driven/pinned-reader": "./src/ontology-driven/pinned-reader.ts",
     "./adoption/semantic-context": "./src/adoption/semantic-context.ts",
-    "./adoption/evaluation-budget": "./src/adoption/evaluation-budget.ts"
+    "./adoption/evaluation-budget": "./src/adoption/evaluation-budget.ts",
+    "./platform-governance/index": "./src/platform-governance/index.ts",
+    "./platform-governance/contracts": "./src/platform-governance/contracts.ts",
+    "./platform-governance/policy": "./src/platform-governance/policy.ts",
+    "./platform-governance/native-bindings": "./src/platform-governance/native-bindings.ts",
+    "./platform-governance/bot-correlation": "./src/platform-governance/bot-correlation.ts",
+    "./platform-governance/boundary-custody": "./src/platform-governance/boundary-custody.ts",
+    "./platform-governance/evaluation-budget": "./src/platform-governance/evaluation-budget.ts"
   },
   "dependencies": {
     "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz"

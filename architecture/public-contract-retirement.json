@@ -1,0 +1,272 @@
+{
+  "schema": "agent-platform.public-contract-retirement.v1",
+  "id": "agent-platform:retirement:public-contracts:2026-10-11",
+  "recordClass": "exact-retirement-candidate-not-acceptance",
+  "workId": "hermes-platform-rearchitecture",
+  "preparedAtUtc": "2026-10-11T06:07:08.386579+00:00",
+  "authority": {
+    "decisionRef": "../hermes-harness-engineering/work/hermes-platform-rearchitecture/interview.json#D26",
+    "scope": "Review/preserve four public contract/example snapshot deltas/history in private agent-platform, delete eligible old public repositories and fix consumer source links after closure",
+    "nativeProfileEffectsGranted": false
+  },
+  "successor": {
+    "projectId": "agent-platform",
+    "remoteRepository": "park-kyungchan/agent-platform",
+    "repositoryId": 1413326539,
+    "localSourceRoot": "/home/palantirkc/code/shared/agent-platform",
+    "sourcePaths": [
+      "packages/operational-context/src/backend/intent-context",
+      "packages/operational-context/src/backend/review"
+    ],
+    "historyPath": "history/public-contracts",
+    "publishedSuccessorCommit": null,
+    "publishedIndependentReadbackVerified": false
+  },
+  "targets": [
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-context",
+      "repositoryId": 1411493725,
+      "nodeId": "R_kgDOVCGvXQ",
+      "visibility": "public",
+      "defaultBranch": "main",
+      "expectedHead": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+          "type": "commit"
+        }
+      ],
+      "identityObservedAtUtc": "2026-10-11T06:04:12.190575+00:00",
+      "fullHistoryBundle": {
+        "privateOwnerPath": ".private/platform-rearchitecture/contracts-history/hermes-profile-dc-context.bundle",
+        "canonicalPath": "history/public-contracts/bundles/hermes-profile-dc-context.bundle",
+        "bytes": 26097,
+        "sha256": "9b9869ebc61fc39c2e2140714f6c003bb67c4271027e2beae782dfe8180c55da",
+        "allRefs": true,
+        "prerequisites": []
+      },
+      "headArchive": {
+        "path": "history/public-contracts/snapshots/hermes-profile-dc-context-3cb238d352b3ace3f94e653e3f4e1590b194a323.tar.gz",
+        "bytes": 19402,
+        "sha256": "0652a2b5c2a5255765883817f6ab22f8f65559def1efc327238be15a2d46c352"
+      },
+      "canonicalCustodyVerified": true,
+      "exactDeletionCommand": [
+        "gh",
+        "repo",
+        "delete",
+        "park-kyungchan/hermes-profile-dc-context",
+        "--yes"
+      ],
+      "deletePerformed": false
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-contract-audit",
+      "repositoryId": 1411506018,
+      "nodeId": "R_kgDOVCHfYg",
+      "visibility": "public",
+      "defaultBranch": "main",
+      "expectedHead": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+          "type": "commit"
+        }
+      ],
+      "identityObservedAtUtc": "2026-10-11T06:04:13.598584+00:00",
+      "fullHistoryBundle": {
+        "privateOwnerPath": ".private/platform-rearchitecture/contracts-history/hermes-profile-dc-contract-audit.bundle",
+        "canonicalPath": "history/public-contracts/bundles/hermes-profile-dc-contract-audit.bundle",
+        "bytes": 35927,
+        "sha256": "88a79611a678a7dd4abfc19506a6202dc827cf85e0a50a9c5c3177d3b7a86bc4",
+        "allRefs": true,
+        "prerequisites": []
+      },
+      "headArchive": {
+        "path": "history/public-contracts/snapshots/hermes-profile-dc-contract-audit-3ab5d8d8e4876b2d74b60e39879cec98d810f0a4.tar.gz",
+        "bytes": 26257,
+        "sha256": "37305eca922488a30f3bf2b49734560e1269963f20139f2cf6f35cb13d825c42"
+      },
+      "canonicalCustodyVerified": true,
+      "exactDeletionCommand": [
+        "gh",
+        "repo",
+        "delete",
+        "park-kyungchan/hermes-profile-dc-contract-audit",
+        "--yes"
+      ],
+      "deletePerformed": false
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-review",
+      "repositoryId": 1411547504,
+      "nodeId": "R_kgDOVCKBcA",
+      "visibility": "public",
+      "defaultBranch": "main",
+      "expectedHead": "69ed6d9a0266066c83789c322c4b4521810333ec",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "69ed6d9a0266066c83789c322c4b4521810333ec",
+          "type": "commit"
+        }
+      ],
+      "identityObservedAtUtc": "2026-10-11T06:04:14.946246+00:00",
+      "fullHistoryBundle": {
+        "privateOwnerPath": ".private/platform-rearchitecture/contracts-history/hermes-profile-dc-review.bundle",
+        "canonicalPath": "history/public-contracts/bundles/hermes-profile-dc-review.bundle",
+        "bytes": 26659,
+        "sha256": "50388b1815bdbea8df8b4f6807353a29d70f19ba17e1dea2172df45046b127cd",
+        "allRefs": true,
+        "prerequisites": []
+      },
+      "headArchive": {
+        "path": "history/public-contracts/snapshots/hermes-profile-dc-review-69ed6d9a0266066c83789c322c4b4521810333ec.tar.gz",
+        "bytes": 20511,
+        "sha256": "c704e2831ef58bbacdebdb0392017dad23be2c93ec163de846325b2280627548"
+      },
+      "canonicalCustodyVerified": true,
+      "exactDeletionCommand": [
+        "gh",
+        "repo",
+        "delete",
+        "park-kyungchan/hermes-profile-dc-review",
+        "--yes"
+      ],
+      "deletePerformed": false
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-ontology-platform",
+      "repositoryId": 1411598033,
+      "nodeId": "R_kgDOVCNG0Q",
+      "visibility": "public",
+      "defaultBranch": "main",
+      "expectedHead": "796cd709f356344210aa73f02ca2c8407103cc28",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "796cd709f356344210aa73f02ca2c8407103cc28",
+          "type": "commit"
+        }
+      ],
+      "identityObservedAtUtc": "2026-10-11T06:04:16.418052+00:00",
+      "fullHistoryBundle": {
+        "privateOwnerPath": ".private/platform-rearchitecture/contracts-history/hermes-profile-ontology-platform.bundle",
+        "canonicalPath": "history/public-contracts/bundles/hermes-profile-ontology-platform.bundle",
+        "bytes": 41800,
+        "sha256": "e35c463de8c778f8aa0d9f3732a14650533a4c85726f74071cfaf95186361416",
+        "allRefs": true,
+        "prerequisites": []
+      },
+      "headArchive": {
+        "path": "history/public-contracts/snapshots/hermes-profile-ontology-platform-796cd709f356344210aa73f02ca2c8407103cc28.tar.gz",
+        "bytes": 32291,
+        "sha256": "cce74da9fec4b1359d3ea97215f469566e792d36ffeab9299148551d05951622"
+      },
+      "canonicalCustodyVerified": true,
+      "exactDeletionCommand": [
+        "gh",
+        "repo",
+        "delete",
+        "park-kyungchan/hermes-profile-ontology-platform",
+        "--yes"
+      ],
+      "deletePerformed": false
+    }
+  ],
+  "custodyRef": "history/public-contracts/custody.json",
+  "integrationRef": "history/public-contracts/integration.json",
+  "verificationRef": "../hermes-harness-engineering/verification/platform-rearchitecture/contract-integration.json",
+  "consumerClosure": {
+    "scope": "Admitted common canonical source and education-platform mathCrew public product/source navigation; archived historical originals remain immutable",
+    "knownConsumers": [
+      {
+        "id": "canonical-operational-context",
+        "source": "packages/operational-context",
+        "activeOldRepositoryImports": 0,
+        "currentCanonicalSingleWriter": true
+      },
+      {
+        "id": "mathcrew-source-navigation",
+        "source": "../education-platform/apps/mathcrew",
+        "successorMap": "../education-platform/architecture/public-successors.json",
+        "status": "successor-navigation-changes-in-progress-with-owner",
+        "activeFetchOrRuntimeDependencyOnOldRepositories": false,
+        "linkReadbackVerified": false
+      }
+    ],
+    "universalConsumerClosureClaimed": false,
+    "requiresParentBoundedReview": true
+  },
+  "authentication": {
+    "observedAtUtc": "2026-10-11T06:05:49.347437+00:00",
+    "source": "gh api --include user; selected OAuth scope header only",
+    "scopes": [
+      "gist",
+      "read:org",
+      "repo",
+      "workflow"
+    ],
+    "deleteRepoScopePresent": false,
+    "credentialMutationPerformed": false
+  },
+  "gates": [
+    {
+      "id": "local-full-history-custody",
+      "status": "passed",
+      "evidence": "history/public-contracts/custody.json"
+    },
+    {
+      "id": "canonical-corrective-code-and-tests",
+      "status": "passed",
+      "evidence": "../hermes-harness-engineering/verification/platform-rearchitecture/contract-integration.json"
+    },
+    {
+      "id": "package-exports-and-source-provider-successor-pins",
+      "status": "pending-parent-serialization"
+    },
+    {
+      "id": "consumer-source-link-closure",
+      "status": "pending-education-owner-readback"
+    },
+    {
+      "id": "independent-exact-head-source-review-and-PR-merge",
+      "status": "pending-parent"
+    },
+    {
+      "id": "private-successor-publication-and-independent-clone-custody",
+      "status": "pending-parent"
+    },
+    {
+      "id": "delete-repo-authentication",
+      "status": "unavailable-current-token-scope"
+    },
+    {
+      "id": "immediate-pre-delete-ID-HEAD-refs-and-successor-readback",
+      "status": "required-at-effect"
+    }
+  ],
+  "deletionEligibleNow": false,
+  "deletionPerformed": false,
+  "localCheckoutDeletion": {
+    "allowlist": [],
+    "status": "No redundant checkout is selected by this packet; evidence mirrors/restores are retained custody, not deletion candidates."
+  },
+  "effectOrder": [
+    "Finish source/provider and consumer closure",
+    "Independently review and merge exact verified successor source through the authorized PR owner",
+    "Verify published private successor commit and independent restored history custody",
+    "Obtain delete_repo only through explicit native authentication with exact reviewed targets",
+    "Immediately re-read target repository numeric/node identity, full name, HEAD and refs; refuse any changed identity/ref or missing successor receipt",
+    "Delete only each exact listed repository through the parent owner",
+    "Verify target absence independently; retain source/history/consumer/deletion receipts"
+  ],
+  "limits": [
+    "Current snapshots are public contract examples, not actual native profile configurations.",
+    "No whole mixed repository or excluded domain was inspected or selected.",
+    "No GitHub mutation, authentication change, native profile/session modification or deletion was performed by this implementation.",
+    "Stored GitHub identity observations expire for deletion selection and must be rechecked immediately before effects."
+  ]
+}

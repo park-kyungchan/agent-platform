@@ -9,7 +9,8 @@
   "scripts": {
     "check:handoff": "bun test ./compatibility/codex-harness-engineering/tests/handoff.test.ts",
     "check:imports": "bun ./verification/package-import-check.ts",
-    "check:operational-context": "bun test ./packages/operational-context/lead-evaluation.test.ts"
+    "check:operational-context": "bun test ./packages/operational-context/lead-evaluation.test.ts",
+    "check:source": "bun ci/source-check.ts"
   },
   "engines": {
     "bun": ">=1.3.14"

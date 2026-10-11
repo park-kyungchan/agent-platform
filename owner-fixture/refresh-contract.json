@@ -1,0 +1,17 @@
+{
+  "schema": "agent-platform.owner-fixture-refresh-contract.v1",
+  "scope": "Seven explicitly selected source-only native owner guard and adapter files; no native state, original transcripts, credentials or historical private fixture bytes.",
+  "verifyCommand": "bun ci/source-check.ts --verify-owner-fixtures",
+  "refreshCommand": "bun ci/source-check.ts --refresh-owner-fixtures",
+  "fullCheckCommand": "bun ci/source-check.ts",
+  "requiredOrder": [
+    "Run verify before changing common package manifests or owner source registrations.",
+    "On hash drift, inspect the exact finite owner source changes and source-owner decisions.",
+    "Refresh only the listed bounded own-code sources and SHA256 manifest; hosted CI refuses refresh.",
+    "Independently review the source fixture and manifest diff alongside the owner source successor.",
+    "Run the full QA source checks and preserve the result before exact-head native independent review."
+  ],
+  "failureRule": "A partially available live source set, source symlink, oversized source or hash drift fails closed. In the hosted checkout, no live owner set is claimed; the pinned finite source fixtures are checked exactly.",
+  "qaIdentityOverlay": "Only the disposable QA project sourceOwnerRoot, registration roots and registration hash markers are changed. Production source and guards retain their existing owners.",
+  "refreshGrantsNativeAuthority": false
+}
