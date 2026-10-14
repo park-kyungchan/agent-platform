@@ -259,6 +259,9 @@ async function fixture() {
     bindings: [binding],
     contextSelections: [selection],
   };
+  const registryPath = join(owner, "architecture/native-hook-bindings.json");
+  await writeFile(registryPath, JSON.stringify(registry));
+  const boundRegistry = readHookBindings(registryPath);
   const input: HookInput = {
     hook_event_name: "UserPromptSubmit",
     session_id: "parent",
@@ -295,14 +298,20 @@ async function fixture() {
     owner,
     repositoryRoot,
     binding,
-    registry,
+    registry: boundRegistry,
+    registryPath,
     input,
-    selection,
+    selection: boundRegistry.contextSelections![0] as SessionGitWorkSelection,
     commit,
     load,
     provider,
     counters: () => ({ gitReads, checks }),
   };
+}
+async function persistBindings(f: Awaited<ReturnType<typeof fixture>>) {
+  await writeFile(f.registryPath, JSON.stringify(f.registry));
+  f.registry = readHookBindings(f.registryPath);
+  f.selection = f.registry.contextSelections![0] as SessionGitWorkSelection;
 }
 function context(stdout: string) {
   const injected = JSON.parse(stdout).hookSpecificOutput.additionalContext as string;
@@ -369,6 +378,7 @@ test("unselected, foreign and child tuples make no Git reads; explicit child ide
   ).toBeUndefined();
   expect(f.counters().gitReads).toBe(0);
   f.registry.contextSelections!.push({ ...f.selection, nativeAgentId: "child" });
+  await persistBindings(f);
   expect(
     resolveSessionGitWorkSelection({ ...f.input, agent_id: "child" }, f.registry, f.binding)
       ?.nativeAgentId,
@@ -380,27 +390,19 @@ test("unselected, foreign and child tuples make no Git reads; explicit child ide
   );
   expect(context(selected.stdout).value.selectedWork.currentTask.id).toBe("current-task");
   expect(f.counters().gitReads).toBe(2);
-  f.registry.contextSelections = [
-    {
-      schema: "codex.session-context-selection.v1",
-      nativeSessionId: "parent",
-      cwd: f.home,
-      root: f.owner,
-      workId: "old-completed-work",
-    },
-  ];
-  expect(resolveSessionGitWorkSelection(f.input, f.registry, f.binding)).toBeUndefined();
 });
 
 test("unknown currentness and local ref movement remain held rather than fresh or executable", async () => {
   const f = await fixture();
   delete f.selection.latestRelevant;
+  await persistBindings(f);
   const unknown = context((await handleHook(f.input, { bindings: f.registry }, f.load)).stdout)
     .value.selectedWork;
   expect(unknown.status).toBe("held");
   expect(unknown.holdReasons).toContain("REQUIRED_LATEST_CONTEXT_UNKNOWN");
   expect(unknown.purpose.objective).toContain("current Work");
   f.selection.latestRelevant = "current";
+  await persistBindings(f);
   const original = f.provider.gitWork!.resolveGitWorkSelection;
   let reads = 0;
   f.provider.gitWork!.resolveGitWorkSelection = async (value) => {
@@ -434,10 +436,10 @@ test("duplicate tuples, revision expressions, owner mismatch and missing proven 
   }
   const invalid = structuredClone(f.registry);
   (invalid.contextSelections![0] as SessionGitWorkSelection).ownerRoot = f.repositoryRoot;
-  expect((await handleHook(f.input, { bindings: invalid }, f.load)).status).toBe("failed-open");
+  expect((await handleHook(f.input, { bindings: invalid }, f.load)).status).toBe("context-held");
   delete f.provider.gitWork;
   const missing = await handleHook(f.input, { bindings: f.registry }, f.load);
-  expect(missing.status).toBe("failed-open");
+  expect(missing.status).toBe("context-held");
   expect(missing.stdout).not.toContain("PRIVATE-");
 });
 
@@ -446,6 +448,7 @@ test("source closure drift refuses injection and bounded derived overflow stays 
   const large = structuredClone(f.selection);
   // Many relevant originals require a pointer view rather than dropping owner preferences.
   f.registry.contextSelections = [large];
+  await persistBindings(f);
   const originalRead = f.provider.gitWork!.readGitWorkContext;
   f.provider.gitWork!.readGitWorkContext = async (reader, request) => {
     const value = await originalRead(reader, request);
@@ -462,7 +465,7 @@ test("source closure drift refuses injection and bounded derived overflow stays 
     throw Error("Pinned code closure changed");
   };
   const changed = await handleHook(f.input, { bindings: f.registry }, f.load);
-  expect(changed.status).toBe("failed-open");
+  expect(changed.status).toBe("context-held");
   expect(JSON.parse(changed.stdout).hookSpecificOutput).toBeUndefined();
 });
 
@@ -615,7 +618,7 @@ test("malformed selected source cannot leak private source bytes through hook fa
   await command(f.repositoryRoot, "add", ".");
   await command(f.repositoryRoot, "commit", "-qm", "Malformed synthetic source");
   const result = await handleHook(f.input, { bindings: f.registry }, f.load);
-  expect(result.status).toBe("failed-open");
+  expect(result.status).toBe("context-held");
   expect(result.stdout).not.toContain("PRIVATE-MALFORMED-SOURCE");
   expect(result.error).not.toContain("PRIVATE-MALFORMED-SOURCE");
   expect(JSON.parse(result.stdout).hookSpecificOutput).toBeUndefined();
@@ -645,7 +648,12 @@ test("documented fork starts preserve exact parent and child tuples with no infe
     expect(context(result.stdout).value.selectedWork).toBeUndefined();
   }
   expect(f.counters().gitReads).toBe(0);
-  f.registry.contextSelections!.push({ ...f.selection, nativeAgentId: "selected-child" });
+  f.registry.contextSelections!.push({
+    ...f.selection,
+    nativeAgentId: "selected-child",
+    nativeAgentType: "synthetic-worker",
+  });
+  await persistBindings(f);
   const selected = await handleHook(fork, { bindings: f.registry }, f.load);
   const projected = context(selected.stdout);
   expect(projected.value.selectedWork.currentTask.id).toBe("current-task");
@@ -657,7 +665,7 @@ test("documented fork starts preserve exact parent and child tuples with no infe
   // Fork also describes a native forked root. Absence of agent identity still
   // matches only the explicitly selected parent tuple.
   const parent = await handleHook(
-    { ...fork, agent_id: undefined },
+    { ...fork, agent_id: undefined, agent_type: undefined },
     { bindings: f.registry },
     f.load,
   );
@@ -700,4 +708,74 @@ test("fork support retains legacy SessionStart sources and rejects malformed for
     expect((await handleHook(input, { bindings: f.registry }, f.load)).status).toBe("failed-open");
   }
   expect(f.counters().gitReads).toBe(10);
+});
+
+test("Git selection source snapshot cannot be erased or redirected by mutable objects", async () => {
+  for (const mutate of [
+    (f: Awaited<ReturnType<typeof fixture>>) => {
+      delete f.registry.contextSelections;
+    },
+    (f: Awaited<ReturnType<typeof fixture>>) => {
+      f.selection.workId = "foreign-work";
+    },
+    (f: Awaited<ReturnType<typeof fixture>>) => {
+      f.registry.bindings = [];
+    },
+  ]) {
+    const f = await fixture();
+    mutate(f);
+    const result = await handleHook(f.input, { bindings: f.registry }, f.load);
+    expect(result.status).toBe("context-held");
+    expect(f.counters().gitReads).toBe(0);
+    expect(JSON.parse(result.stdout).hookSpecificOutput).toBeUndefined();
+  }
+});
+
+test("Git source registry mutation during async read holds rather than injecting stale selection", async () => {
+  const f = await fixture(),
+    original = f.provider.gitWork!.readGitWorkContext;
+  f.provider.gitWork!.readGitWorkContext = async (reader, request) => {
+    const context = await original(reader, request);
+    await writeFile(f.registryPath, JSON.stringify({ ...f.registry, contextSelections: [] }));
+    return context;
+  };
+  const result = await handleHook(f.input, { bindings: f.registry }, f.load);
+  expect(result.status).toBe("context-held");
+  expect(JSON.parse(result.stdout).hookSpecificOutput).toBeUndefined();
+});
+
+test("Git parent and child agent types match exactly and never borrow another tuple", async () => {
+  const f = await fixture();
+  for (const input of [
+    { ...f.input, agent_type: "worker" },
+    { ...f.input, agent_id: "child", agent_type: "worker" },
+  ]) {
+    expect(
+      context((await handleHook(input, { bindings: f.registry }, f.load)).stdout).value
+        .selectedWork,
+    ).toBeUndefined();
+  }
+  expect(f.counters().gitReads).toBe(0);
+  f.registry.contextSelections!.push({
+    ...f.selection,
+    nativeAgentId: "child",
+    nativeAgentType: "worker",
+  });
+  await persistBindings(f);
+  for (const input of [
+    { ...f.input, agent_id: "child" },
+    { ...f.input, agent_id: "child", agent_type: "foreign-type" },
+  ]) {
+    expect(
+      context((await handleHook(input, { bindings: f.registry }, f.load)).stdout).value
+        .selectedWork,
+    ).toBeUndefined();
+  }
+  expect(f.counters().gitReads).toBe(0);
+  const result = await handleHook(
+    { ...f.input, agent_id: "child", agent_type: "worker" },
+    { bindings: f.registry },
+    f.load,
+  );
+  expect(context(result.stdout).value.selectedWork.currentTask.id).toBe("current-task");
 });
