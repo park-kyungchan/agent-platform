@@ -12,11 +12,15 @@ export function parseLosslessJson(text: string): unknown {
     const next = stack.pop()!;
     if (++nodes > 8192 || next.depth > 16) throw new ContractError("JSON_STRUCTURE_LIMIT");
     if (next.value && typeof next.value === "object") {
-      for (const child of Object.values(next.value)) stack.push({ value: child, depth: next.depth + 1 });
+      for (const child of Object.values(next.value))
+        stack.push({ value: child, depth: next.depth + 1 });
     }
   }
   // Work only on privately parsed JSON; caller objects/getters are not inspected.
-  const compact = text.replace(/"(?:\\[\s\S]|[^"\\])*"|\s+/gu, token => token.startsWith('"') ? token : "");
-  if (compact !== JSON.stringify(value)) throw new ContractError("NON_CANONICAL_JSON_REPRESENTATION");
+  const compact = text.replace(/"(?:\\[\s\S]|[^"\\])*"|\s+/gu, (token) =>
+    token.startsWith('"') ? token : "",
+  );
+  if (compact !== JSON.stringify(value))
+    throw new ContractError("NON_CANONICAL_JSON_REPRESENTATION");
   return value;
 }

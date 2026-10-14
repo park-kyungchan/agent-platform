@@ -8,7 +8,9 @@ export function jsonIssue(value, path = "", parents = new WeakSet()) {
         return { code: "non-json-value", path, message: "Value must be finite, plain JSON." };
     if (parents.has(value))
         return { code: "cyclic-json", path, message: "JSON cannot contain an object cycle." };
-    if (!Array.isArray(value) && Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) {
+    if (!Array.isArray(value) &&
+        Object.getPrototypeOf(value) !== Object.prototype &&
+        Object.getPrototypeOf(value) !== null) {
         return { code: "non-json-object", path, message: "JSON objects must be plain objects." };
     }
     parents.add(value);

@@ -1,0 +1,333 @@
+name: Native review arrival reconciliation
+# Reviewed exception: this default-branch observer never checks out a head or consumes untrusted artifacts.
+# It validates exact creator, receipt, current head, completed jobs and a one-attempt limit before rerun.
+on: # zizmor: ignore[dangerous-triggers]
+  status:
+  workflow_run:
+    workflows: [Source verification]
+    types: [completed]
+permissions:
+  contents: read
+  statuses: read
+  actions: read
+concurrency:
+  group: native-review-arrival-${{ github.event.sha || github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    name: Reconcile delayed native review
+    if: ${{ github.event_name == 'workflow_run' || (github.event.context == 'native-independent-review' && github.event.state == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      statuses: read
+      actions: write
+    steps:
+      # Trusted default-branch workflow only. No checkout, repository-code execution,
+      # model invocation, status fabrication, or credential forwarding to a head.
+      - name: Validate exact head receipt and reconcile only a missed status
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          NATIVE_REVIEW_STATUS_CREATOR_ID: ${{ vars.NATIVE_REVIEW_STATUS_CREATOR_ID }}
+          NATIVE_REVIEW_STATUS_CREATOR_LOGIN: ${{ vars.NATIVE_REVIEW_STATUS_CREATOR_LOGIN }}
+        with:
+          retries: 0
+          script: |
+            const repo = context.repo;
+            const payload = context.payload;
+            const statusWakeup = context.eventName === 'status';
+            const completionWakeup = context.eventName === 'workflow_run';
+            const head = statusWakeup ? payload.sha : payload.workflow_run?.head_sha;
+            const expectedCreator = process.env.NATIVE_REVIEW_STATUS_CREATOR_ID;
+            const expectedLogin = process.env.NATIVE_REVIEW_STATUS_CREATOR_LOGIN;
+            const names = {
+              source: 'Canonical source checks',
+              quality: 'Quality and architecture checks',
+              integration: 'Prospective merge integration',
+              review: 'Exact head native independent review',
+              gate: 'Source and native review gate',
+              probe: 'Probe independent review status availability',
+              missing: 'Native review status not yet available',
+            };
+            const result = (outcome, reason, extra = {}) => {
+              const record = { schema: 'agent-platform.review-arrival.v1', headSha: head, outcome, reason, ...extra };
+              core.info(JSON.stringify(record));
+              return record;
+            };
+            const api = async (route, parameters = {}) => {
+              const response = await github.request(route, {
+                ...repo, ...parameters,
+                headers: { 'X-GitHub-Api-Version': '2022-11-28' },
+              });
+              return response.data;
+            };
+            const boundedArray = (values, label) => {
+              if (!Array.isArray(values) || values.length >= 100) throw new Error(label + ' is unavailable or exceeds the bounded page');
+              return values;
+            };
+            if ((!statusWakeup && !completionWakeup) || !/^[a-f0-9]{40}$/.test(head ?? '') ||
+                !/^[1-9][0-9]*$/.test(expectedCreator ?? '') || payload.repository?.full_name !== repo.owner + '/' + repo.repo) {
+              throw new Error('Exact repository, supported wakeup, head and expected status creator are required');
+            }
+            if (statusWakeup && (payload.context !== 'native-independent-review' || payload.state !== 'success' ||
+                !Number.isSafeInteger(payload.id) || String(payload.sender?.id) !== expectedCreator ||
+                (expectedLogin && payload.sender?.login !== expectedLogin))) {
+              throw new Error('Status event context, state, identity or creator mismatch');
+            }
+            if (completionWakeup && (payload.workflow_run?.name !== 'Source verification' ||
+                payload.workflow_run?.path !== '.github/workflows/source.yml' || payload.workflow_run?.status !== 'completed')) {
+              throw new Error('Completion wakeup is not the admitted source workflow');
+            }
+            const statuses = boundedArray(await api('GET /repos/{owner}/{repo}/commits/{ref}/statuses', {
+              ref: head, per_page: 100,
+            }), 'Exact-head status page');
+            const status = statuses.find(value => value.context === 'native-independent-review');
+            if (!status || status.state !== 'success') return result('no-op', 'Native review is not successful yet');
+            if (String(status.creator?.id) !== expectedCreator || (expectedLogin && status.creator?.login !== expectedLogin)) {
+              throw new Error('Latest exact-head status has an unexpected creator');
+            }
+            if (statusWakeup && (status.id !== payload.id || status.target_url !== payload.target_url)) {
+              return result('no-op', 'Superseded status event');
+            }
+            const target = new URL(status.target_url);
+            const prefix = '/' + repo.owner + '/' + repo.repo + '/blob/';
+            const suffix = '/native-reviews/' + head + '.json';
+            if (target.protocol !== 'https:' || target.hostname !== 'github.com' || target.port ||
+                target.username || target.password || target.search || target.hash ||
+                !target.pathname.startsWith(prefix) || !target.pathname.endsWith(suffix)) {
+              throw new Error('Native review receipt must be immutable and in this repository');
+            }
+            const receiptCommit = target.pathname.slice(prefix.length, -suffix.length);
+            if (!/^[a-f0-9]{40}$/.test(receiptCommit) || receiptCommit === head) throw new Error('Receipt commit is not an independent immutable commit');
+            const receiptPath = 'native-reviews/' + head + '.json';
+            const content = await api('GET /repos/{owner}/{repo}/contents/{path}', { path: receiptPath, ref: receiptCommit });
+            if (content.type !== 'file' || content.path !== receiptPath || content.encoding !== 'base64' ||
+                typeof content.content !== 'string' || !Number.isSafeInteger(content.size) || content.size <= 0 || content.size > 32768) {
+              throw new Error('Native review receipt is not a bounded repository file');
+            }
+            const bytes = Buffer.from(content.content, 'base64');
+            if (bytes.length !== content.size) throw new Error('Native review receipt byte size mismatch');
+            const receipt = JSON.parse(bytes.toString('utf8'));
+            const commit = await api('GET /repos/{owner}/{repo}/git/commits/{commit_sha}', { commit_sha: head });
+            // native-review-validator:start
+            const { createHash } = require("node:crypto");
+            const hash = (value) => createHash("sha256").update(value).digest("hex");
+            const object = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? value : {};
+            const fullSha = (value) => typeof value === "string" && /^[a-f0-9]{40}$/.test(value);
+            const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+            const taskId = (value) => typeof value === "string" && value.length > 0 && value.length <= 256 && value.trim() === value && !/[\s\u0000-\u001f\u007f]/.test(value);
+            function validateLegacyReceipt(receipt, head, tree) {
+              const value = object(receipt);
+              const reviewer = object(value.reviewer);
+              const author = object(value.author);
+              const provenance = object(value.provenance);
+              if (!fullSha(head) || !fullSha(tree) || value.schema !== "native-independent-review.v1" || value.headSha !== head || value.reviewedTreeSha !== tree || reviewer.runtime !== "native-codex" || typeof reviewer.taskId !== "string" || !reviewer.taskId.trim() || typeof author.taskId !== "string" || !author.taskId.trim() || reviewer.taskId === author.taskId || value.conclusion !== "pass" || value.unresolvedFindings !== 0 || provenance.owner !== "hermes-harness-engineering" || typeof provenance.resultRef !== "string" || !provenance.resultRef.trim() || !digest(provenance.sha256)) {
+                throw new Error("Native independent review receipt does not prove the exact reviewed head/tree and independent native reviewer");
+              }
+            }
+            function deriveReviewedSourceManifest(response, tree) {
+              const value = object(response);
+              if (!fullSha(tree) || value.sha !== tree || value.truncated !== false || !Array.isArray(value.tree) || value.tree.length < 1 || value.tree.length > 4096) {
+                throw new Error("Reviewed source tree is unavailable, truncated or outside the manifest bound");
+              }
+              const seen = new Set;
+              const entries = value.tree.map((entry) => {
+                const item = object(entry);
+                if (typeof item.path !== "string" || !item.path || item.path.length > 512 || /[\\\u0000-\u001f\u007f]/.test(item.path) || item.path.split("/").some((segment) => !segment || segment === "." || segment === ".." || segment === ".git") || seen.has(item.path) || !fullSha(item.sha) || !(item.type === "tree" && item.mode === "040000" || item.type === "blob" && ["100644", "100755", "120000"].includes(String(item.mode)))) {
+                  throw new Error("Reviewed source tree contains duplicate, unsafe or unsupported entries");
+                }
+                seen.add(item.path);
+                return {
+                  path: item.path,
+                  mode: String(item.mode),
+                  type: item.type,
+                  sha: item.sha
+                };
+              });
+              entries.sort((left, right) => left.path < right.path ? -1 : left.path > right.path ? 1 : 0);
+              const blobCount = entries.filter((entry) => entry.type === "blob").length;
+              if (!blobCount)
+                throw new Error("Reviewed source manifest contains no source blobs");
+              return {
+                schema: "agent-platform.reviewed-source-manifest.v1",
+                reviewedTreeSha: tree,
+                entryCount: entries.length,
+                blobCount,
+                sha256: hash(`agent-platform.reviewed-source-manifest.v1
+            ` + JSON.stringify(entries))
+              };
+            }
+            function validateV2Binding(receipt, head, tree, manifestSha256) {
+              const binding = object(receipt.binding);
+              const reviewer = object(receipt.reviewer);
+              const author = object(receipt.author);
+              if (!fullSha(head) || !fullSha(tree) || !digest(manifestSha256) || binding.codeOwner !== "agent-platform" || binding.evidenceOwner !== "codex-harness-engineering" || binding.scope !== "canonical-source-ci-quality" || Object.keys(binding).sort().join("|") !== "codeOwner|evidenceOwner|scope" || receipt.headSha !== head || receipt.reviewedTreeSha !== tree || receipt.reviewedSourceManifestSha256 !== manifestSha256 || reviewer.runtime !== "native-codex" || author.runtime !== "native-codex" || !taskId(reviewer.taskId) || !taskId(author.taskId) || reviewer.taskId === author.taskId || receipt.conclusion !== "pass" || receipt.unresolvedFindings !== 0) {
+                throw new Error("Receipt does not prove the exact v2 ownership, scope, head, tree, manifest and independent native identities");
+              }
+            }
+            function validateIndependentReviewReceipt(receipt, head, tree, context) {
+              const value = object(receipt);
+              if (value.schema === "native-independent-review.v1") {
+                validateLegacyReceipt(value, head, tree);
+                return;
+              }
+              if (value.schema !== "native-independent-review.v2" || !context || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(context.repository)) {
+                throw new Error("Unsupported native independent review receipt schema or missing v2 context");
+              }
+              validateV2Binding(value, head, tree, context.sourceManifestSha256);
+              const provenance = object(value.provenance);
+              if (provenance.owner !== "codex-harness-engineering" || typeof provenance.resultRef !== "string" || !digest(provenance.sha256)) {
+                throw new Error("v2 independent review provenance owner or digest mismatch");
+              }
+              const target = new URL(provenance.resultRef);
+              const prefix = `/${context.repository}/blob/`;
+              const path = `native-review-results/${head}.json`;
+              const suffix = "/" + path;
+              if (target.protocol !== "https:" || target.hostname !== "github.com" || target.port || target.username || target.password || target.search || target.hash || !target.pathname.startsWith(prefix) || !target.pathname.endsWith(suffix)) {
+                throw new Error("v2 result provenance must be an immutable same-repository result file");
+              }
+              const commit = target.pathname.slice(prefix.length, -suffix.length);
+              if (!fullSha(commit) || commit === head) {
+                throw new Error("v2 result provenance requires a separate immutable commit");
+              }
+              return { commit, path, sha256: provenance.sha256 };
+            }
+            function decodeBoundedReviewFile(content, path, maximumBytes) {
+              const value = object(content);
+              if (value.type !== "file" || value.path !== path || value.encoding !== "base64" || typeof value.content !== "string" || !Number.isSafeInteger(value.size) || typeof value.size !== "number" || value.size <= 0 || value.size > maximumBytes) {
+                throw new Error("Independent review file is not a bounded repository file");
+              }
+              const base64 = value.content.replace(/\n/g, "");
+              if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)) {
+                throw new Error("Independent review file is not valid base64");
+              }
+              const bytes = Buffer.from(base64, "base64");
+              if (bytes.length !== value.size)
+                throw new Error("Independent review file byte size mismatch");
+              return bytes;
+            }
+            function verifyIndependentReviewResult(receipt, bytes, expected, head, tree, manifestSha256) {
+              if (hash(bytes) !== expected.sha256)
+                throw new Error("Immutable independent review result digest mismatch");
+              const result = object(JSON.parse(Buffer.from(bytes).toString("utf8")));
+              if (result.schema !== "agent-platform.independent-review-result.v1" || result.recordClass !== "verification") {
+                throw new Error("Immutable independent review result schema mismatch");
+              }
+              validateV2Binding(result, head, tree, manifestSha256);
+              const value = object(receipt);
+              if (object(result.reviewer).taskId !== object(value.reviewer).taskId || object(result.author).taskId !== object(value.author).taskId) {
+                throw new Error("Immutable independent review result identities differ from its receipt");
+              }
+            }
+
+            async function validateReceiptWithEvidence(receipt, head, tree, repository, reader) {
+              if (typeof receipt !== "object" || receipt === null || !("schema" in receipt)) {
+                throw new Error("Independent review receipt is unavailable");
+              }
+              if (receipt.schema === "native-independent-review.v1") {
+                validateIndependentReviewReceipt(receipt, head, tree);
+                return { version: 1 };
+              }
+              if (receipt.schema !== "native-independent-review.v2") {
+                throw new Error("Unsupported native independent review receipt schema");
+              }
+              const manifest = deriveReviewedSourceManifest(await reader.readTree(tree), tree);
+              const result = validateIndependentReviewReceipt(receipt, head, tree, {
+                repository,
+                sourceManifestSha256: manifest.sha256
+              });
+              if (!result)
+                throw new Error("v2 receipt did not resolve immutable result provenance");
+              const bytes = decodeBoundedReviewFile(await reader.readFile(result.path, result.commit), result.path, 65536);
+              verifyIndependentReviewResult(receipt, bytes, result, head, tree, manifest.sha256);
+              return { version: 2, manifest };
+            }
+
+            if (commit.sha !== head || !/^[a-f0-9]{40}$/.test(commit.tree?.sha ?? '')) {
+              throw new Error('GitHub API returned another head or invalid tree');
+            }
+            let receiptVerification;
+            try {
+              receiptVerification = await validateReceiptWithEvidence(
+                receipt, head, commit.tree.sha, repo.owner + '/' + repo.repo,
+                {
+                  readTree: async treeSha => api('GET /repos/{owner}/{repo}/git/trees/{tree_sha}', { tree_sha: treeSha, recursive: '1' }),
+                  readFile: async (path, ref) => api('GET /repos/{owner}/{repo}/contents/{path}', { path, ref }),
+                },
+              );
+            } catch (error) {
+              throw new Error('Receipt does not prove independent native review of this exact head and tree', { cause: error });
+            }
+            // native-review-validator:end
+            const workflow = await api('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}', { workflow_id: 'source.yml' });
+            if (workflow.path !== '.github/workflows/source.yml' || !Number.isSafeInteger(workflow.id)) throw new Error('Source workflow identity mismatch');
+            const listed = await api('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs', {
+              workflow_id: workflow.id, head_sha: head, per_page: 100,
+            });
+            if (!Number.isSafeInteger(listed.total_count) || listed.total_count >= 100) throw new Error('Source run list exceeds the bounded page');
+            const runs = boundedArray(listed.workflow_runs, 'Source runs').filter(run =>
+              run.head_sha === head && run.workflow_id === workflow.id && run.path === workflow.path &&
+              run.head_repository?.full_name === repo.owner + '/' + repo.repo &&
+              ['pull_request', 'push', 'workflow_dispatch'].includes(run.event));
+            runs.sort((left, right) => right.run_number - left.run_number || right.id - left.id);
+            if (!runs.length) return result('no-op', 'No matching source run');
+            const run = await api('GET /repos/{owner}/{repo}/actions/runs/{run_id}', { run_id: runs[0].id });
+            if (run.head_sha !== head || run.workflow_id !== workflow.id || run.path !== workflow.path ||
+                run.head_repository?.full_name !== repo.owner + '/' + repo.repo) throw new Error('Source run head or workflow identity changed');
+            if (completionWakeup && payload.workflow_run.id !== run.id) return result('no-op', 'Superseded source run');
+            if (run.status !== 'completed') return result('no-op', 'Source run is still active; its completion is the second wakeup');
+            if (run.run_attempt !== 1 || run.conclusion !== 'failure') return result('no-op', 'Source run is successful or its single reconciliation attempt is exhausted');
+            if (run.event === 'pull_request') {
+              const pulls = boundedArray(run.pull_requests, 'Source run pull requests');
+              if (pulls.length !== 1 || !Number.isSafeInteger(pulls[0].number)) return result('no-op', 'No unique source pull request');
+              const pull = await api('GET /repos/{owner}/{repo}/pulls/{pull_number}', { pull_number: pulls[0].number });
+              if (pull.state !== 'open' || pull.head?.sha !== head || pull.head.repo?.full_name !== repo.owner + '/' + repo.repo) {
+                return result('no-op', 'Source pull request head is no longer current');
+              }
+            } else {
+              if (typeof run.head_branch !== 'string' || !run.head_branch) throw new Error('Source run branch unavailable');
+              const branch = await api('GET /repos/{owner}/{repo}/branches/{branch}', { branch: run.head_branch });
+              if (branch.commit?.sha !== head) return result('no-op', 'Source branch head is no longer current');
+            }
+            const jobPage = await api('GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs', {
+              run_id: run.id, filter: 'latest', per_page: 100,
+            });
+            if (!Number.isSafeInteger(jobPage.total_count) || jobPage.total_count >= 100) throw new Error('Source job list exceeds the bounded page');
+            const jobs = boundedArray(jobPage.jobs, 'Source jobs');
+            const unique = name => {
+              const matches = jobs.filter(job => job.name === name);
+              return matches.length === 1 ? matches[0] : undefined;
+            };
+            const admittedJobs = [names.source, names.quality, names.integration, names.review, names.gate];
+            if (jobs.length !== admittedJobs.length || jobs.some(job => !admittedJobs.includes(job.name))) {
+              return result('no-op', 'Source job denominator has missing or unexpected jobs', { observedJobs: jobs.map(job => job.name) });
+            }
+            const source = unique(names.source), quality = unique(names.quality), integration = unique(names.integration), review = unique(names.review), gate = unique(names.gate);
+            if (!source || !quality || !integration || !review || !gate || source.conclusion !== 'success' || quality.conclusion !== 'success' ||
+                review.conclusion !== 'failure' || gate.conclusion !== 'failure') {
+              return result('no-op', 'Source or quality did not pass, or the failure is not confined to review and gate');
+            }
+            const requiredIntegrationResult = run.event === 'pull_request' ? 'success' : 'skipped';
+            if (integration.conclusion !== requiredIntegrationResult) {
+              return result('no-op', 'Prospective merge integration did not meet the event-specific requirement', {
+                requiredIntegrationResult, observedIntegrationResult: integration.conclusion,
+              });
+            }
+            const steps = boundedArray(review.steps, 'Review steps');
+            const missing = steps.filter(step => step.name === names.missing && step.conclusion === 'failure');
+            const probe = steps.filter(step => step.name === names.probe && step.conclusion === 'success');
+            const statusTime = Date.parse(status.created_at);
+            const probeTime = Date.parse(probe[0]?.started_at);
+            if (missing.length !== 1 || probe.length !== 1 || !Number.isFinite(statusTime) || !Number.isFinite(probeTime) ||
+                statusTime < probeTime || steps.some(step => step.conclusion === 'failure' && step.name !== names.missing)) {
+              return result('no-op', 'Review did not fail specifically because status was not yet available');
+            }
+            // Re-read immediately before the single write. Duplicate events and attempt 2 are no-ops.
+            const beforeWrite = await api('GET /repos/{owner}/{repo}/actions/runs/{run_id}', { run_id: run.id });
+            if (beforeWrite.status !== 'completed' || beforeWrite.run_attempt !== 1 || beforeWrite.head_sha !== head) {
+              return result('no-op', 'Source run advanced before reconciliation');
+            }
+            await api('POST /repos/{owner}/{repo}/actions/jobs/{job_id}/rerun', { job_id: review.id, enable_debug_logging: false });
+            // GitHub reruns this job and dependent jobs (the final gate), preserving prior source/quality success.
+            return result('rerun-requested', 'Delayed status is now verified', { sourceRunId: run.id, reviewJobId: review.id, receiptCommit, maxRunAttempt: 2 });

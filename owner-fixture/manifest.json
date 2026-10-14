@@ -23,7 +23,7 @@
     {
       "owner": "codex-harness-engineering",
       "path": "src/native/hooks.ts",
-      "sha256": "c2d9298543058d2da15c285f803cb695ba7ea7538d36297283d3cc84b5e3330e",
+      "sha256": "56481f3476c1e8624cab1813175f9aabc10d1bb201f236cf9ff2c685ef40fe8e",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {
@@ -41,7 +41,7 @@
     {
       "owner": "hermes-harness-engineering",
       "path": "src/ontology-driven/provider-source.ts",
-      "sha256": "0fa22ed5119f39f8a9a01a15d8d4051eb0c327902af8f80eb5f7f40343648b4e",
+      "sha256": "c1afd8ef0e8544d42e0ec4f81a9f29d52263b23f41afe403f0697680be4dab9a",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     }
   ],

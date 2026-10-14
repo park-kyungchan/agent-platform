@@ -1,0 +1,15 @@
+{
+  "schema": "agent-platform.reviewed-workflow-exceptions.v1",
+  "exceptions": [
+    {
+      "path": ".github/workflows/native-review-arrival.yml",
+      "audit": "dangerous-triggers",
+      "scope": "The workflow_run wakeup of the trusted native-review observer only",
+      "reason": "Both status arrival orders require a trusted completion wakeup. This observer performs no checkout or artifact execution. Exact creator, immutable receipt, current head, source/quality/merge outcomes and an initial-attempt fence precede the one review-job rerun.",
+      "verification": "Offline API-scenario tests reject wrong creators, stale heads, invalid receipts, failed quality, failed PR integration, unexpected jobs and repeated attempts.",
+      "permission": "actions:write is scoped to the reconciliation job; no source or status write permission is granted.",
+      "independentReviewRef": "../codex-harness-engineering/discovery/github-ci-review-20261014/quality/candidates/topology/workflow-independent-review.json",
+      "nativeExecutionInferred": false
+    }
+  ]
+}
