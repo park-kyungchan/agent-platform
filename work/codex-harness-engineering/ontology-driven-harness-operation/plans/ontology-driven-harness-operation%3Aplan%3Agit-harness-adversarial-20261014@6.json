@@ -1,0 +1,12 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+  "kind": "plan",
+  "revision": 6,
+  "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+  "specRevision": 6,
+  "objective": "First preserve the verified Academy PR13 opening delivery as completed history; then reconcile original decisions and contracts, measure topology and custody, implement the evidence-derived common/runtime/portfolio design and Academy backlog in parallel owner-specific lanes, verify recovery and native/end-to-end behavior, privately deliver and explicitly activate exact reviewed source, and record delegated Lead Acceptance only after all criteria pass."
+}

@@ -8,31 +8,41 @@
   "repositoryId": "park-kyungchan/agent-platform",
   "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
   "purpose": {
-    "objective": "Establish one integrated Ontology-driven harness operating model with complete source-owned traceability and purpose-aligned native consumption in WSL2 Codex and VPS Hermes.",
+    "objective": "Complete the integrated private common Harness, native WSL2/VPS adoption, related portfolio reorganization and Academy product/operational backlog. The pinned Spec retains every full acceptance criterion.",
     "successCriteria": [
-      "One integrated Work preserves all source/native identity distinctions and actual user decisions.",
-      "Both WSL2 and VPS demonstrate purpose-aligned native consumption before whole Work completion.",
-      "Common source milestone is independently reviewed, reproducible and explicitly merged; runtime Leads then continue from latest main"
+      "Stable Domain/Project/Work/Task/Run identities, Git/native joins and no duplicate manual registration.",
+      "Addressable original Q/A, choices, rationale and history; preserve completed/uncertain fences without replay.",
+      "Complete related WSL2/VPS topology, justified private reorganization and verified custody/recovery.",
+      "One typed common/Codex/Hermes source repo, distinct domain/native/data/evidence owners, no parallel runtime.",
+      "Both native consumers verified against current common contracts and official docs, then explicitly activated.",
+      "Useful native delegation, handoff/resume, Memory, Kanban/Session, concurrency and local/shared receiver proofs.",
+      "VPS currentness and continuation with the PC off; configuration, behavior and formal completion stay distinct.",
+      "Academy seven gates: actual auth/storage/source import/recovery/hosting/workflow/release verification.",
+      "Teacher workflows, edition/history, parent DailyRecord, exams and concept graph; source Academy read-only.",
+      "Checks, independent exact-head review, private delivery, explicit Lead merge/readback and successor bindings.",
+      "Fresh evaluation only: 48 requests, 2000000 emitted tokens, 8 hours; no new paid infrastructure/recurring cost.",
+      "Lead Acceptance after every full Spec criterion passes; never infer human satisfaction or teacher judgment."
     ],
     "inScope": [
-      "Git-centered typed common Work, actual decisions, relationships, effect fences and verification references",
-      "Shared docs-only Runtime Index, common CLI and finite reproducible source checks",
-      "Explicit common-source commit, push, PR and Lead merge"
+      "Common Harness and both native runtime engineering, verification and activation",
+      "The complete related repository portfolio, justified module boundaries and recovery",
+      "Academy product/operational backlog in an independent private runtime with read-only source access",
+      "Fresh budgeted native evaluation and delegated evidence-based Lead Acceptance"
     ],
     "outOfScope": [
-      "Runtime-specific improvements, active configuration, native activation and session/tool/permission changes",
-      "Paused Hermes Source repair, active VPS Wiki effects and all standing excluded domains",
-      "New native model evaluation suite or whole both-runtime Work Acceptance",
-      "Original/evidence store relocation, full-history/private corpus import"
+      "Academy source-server mutation, denied-source access or unrequested physical/third-party effects",
+      "Unrelated excluded domains, credential disclosure, trust bypass or a parallel agent runtime",
+      "Automatic merge, new paid infrastructure, historical effect replay or reused evaluation budgets",
+      "Invented student data, teacher decisions, human satisfaction or unverified whole completion"
     ]
   },
   "spec": {
     "id": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
-    "revision": 5
+    "revision": 6
   },
   "plan": {
     "id": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
-    "revision": 5
+    "revision": 6
   },
   "governingDecisionIds": [
     "git-canonical-common-records-design-review-20261014",
@@ -44,9 +54,14 @@
     "single-repository-common-runtime-harness-20261014",
     "explicit-lead-native-harness-activation-20261014",
     "common-first-implementation-explicit-publication-20261014",
-    "autonomous-common-goal-20261014"
+    "autonomous-common-goal-20261014",
+    "integrated-purpose-and-success-20261015",
+    "private-by-default-reorganization-20261015",
+    "broad-engineering-authority-20261015",
+    "complete-interviews-before-autonomous-goal-20261015",
+    "academy-product-operational-backlog-included-20261015",
+    "fresh-native-evaluation-suite-budget-20261015",
+    "delegated-evidence-based-lead-acceptance-20261015"
   ],
-  "historicalFenceIds": [
-    "checkpoint-56-historical-effect-fence"
-  ]
+  "historicalFenceIds": ["checkpoint-56-historical-effect-fence"]
 }

@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "complete-interviews-before-autonomous-goal-20261015",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "유저인터뷰 있으면 사전에 모두 진행하고, 유저 인터뷰 끝난 이후부터는 create_goal tool 사용해서 Goal Prompt 작성 후에 모든 작업 완료시까지 유저는 개입하지 않음을 인지해라.",
+  "meaning": "Complete the needed user interviews before creating the native Goal; after that, autonomous engineering proceeds without further user intervention.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-session-original-answer-20261015-1.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

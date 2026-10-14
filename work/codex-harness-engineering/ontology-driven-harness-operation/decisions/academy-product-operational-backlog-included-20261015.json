@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "academy-product-operational-backlog-included-20261015",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "기존 Academy 제품/운영 backlog 완성까지도 포함한다. 나머지는 너의 권고대로 진행해라.",
+  "meaning": "Explicitly include the existing Academy product and operational backlog, beyond the required product changes for Harness/reorganization, in this integrated Goal. The existing Academy server remains absolutely read-only; authorized independent private/local/staging implementation is the product-effect target.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-session-original-answer-20261015-2.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": [],
+  "selectionContext": {
+    "text": "이번 Goal의 완료 범위를 정해 주세요. 권장 범위는 Academy MCP 전달, 전체 관련 repository 재구성, 공통·WSL2·VPS Harness engineering과 실제 적용·검증, 그리고 이에 필요한 제품 코드 수정입니다. Academy의 기존 미완료 운영 게이트와 월말시험 문항 선별·학생 knowledge graph 같은 별도 제품 backlog까지 이번 Goal에서 완성할지도 구분이 필요합니다. Academy server read-only 조건은 유지합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/native-interview-selection-context-20261015.json",
+      "fragment": "#/content/questions/1/title"
+    }
+  }
+}
