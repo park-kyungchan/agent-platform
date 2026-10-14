@@ -25,7 +25,12 @@
     "formalCompletion": "pending"
   },
   "dependsOn": [],
-  "decisionIds": ["U1", "U6", "U13", "U38"],
+  "decisionIds": [
+    "U1",
+    "U6",
+    "U13",
+    "autonomous-common-goal-20261014"
+  ],
   "effectIds": [],
   "verificationEvidenceIds": [],
   "executionClass": "source-only"
