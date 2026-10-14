@@ -149,7 +149,7 @@ export function parseHookInput(value: unknown): HookInput {
     throw new Error("UserPromptSubmit requires the original prompt");
   if (
     value.hook_event_name === "SessionStart" &&
-    !["startup", "resume", "clear", "compact"].includes(String(value.source))
+    !["startup", "resume", "clear", "compact", "fork"].includes(String(value.source))
   )
     throw new Error("Invalid SessionStart source");
   if (

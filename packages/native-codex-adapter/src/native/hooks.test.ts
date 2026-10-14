@@ -7,6 +7,7 @@ import type { GitWorkRecord } from "@palantirkc/work-continuity/git-work";
 import {
   handleHook,
   readHookBindings,
+  parseHookInput,
   resolveSessionGitWorkSelection,
   type HookBinding,
   type HookBindings,
@@ -618,4 +619,85 @@ test("malformed selected source cannot leak private source bytes through hook fa
   expect(result.stdout).not.toContain("PRIVATE-MALFORMED-SOURCE");
   expect(result.error).not.toContain("PRIVATE-MALFORMED-SOURCE");
   expect(JSON.parse(result.stdout).hookSpecificOutput).toBeUndefined();
+});
+
+test("documented fork starts preserve exact parent and child tuples with no inferred Work", async () => {
+  const f = await fixture();
+  const fork: HookInput = {
+    hook_event_name: "SessionStart",
+    source: "fork",
+    session_id: "parent",
+    cwd: f.home,
+    agent_id: "selected-child",
+    agent_type: "synthetic-worker",
+  };
+  expect(parseHookInput(fork)).toEqual(fork);
+  // Official common input uses the parent session id for child hooks. The
+  // existing parent selection must never act as a wildcard for this child.
+  for (const input of [
+    fork,
+    { ...fork, session_id: "foreign" },
+    { ...fork, agent_id: "foreign-child" },
+  ]) {
+    const result = await handleHook(input, { bindings: f.registry }, f.load);
+    expect(result.status).toBe("context-injected");
+    expect(JSON.parse(result.stdout).hookSpecificOutput.hookEventName).toBe("SessionStart");
+    expect(context(result.stdout).value.selectedWork).toBeUndefined();
+  }
+  expect(f.counters().gitReads).toBe(0);
+  f.registry.contextSelections!.push({ ...f.selection, nativeAgentId: "selected-child" });
+  const selected = await handleHook(fork, { bindings: f.registry }, f.load);
+  const projected = context(selected.stdout);
+  expect(projected.value.selectedWork.currentTask.id).toBe("current-task");
+  expect(projected.value.selectedWork.pointer.commit).toBe(f.commit);
+  expect(projected.value.selectedWork.nativePermissionGranted).toBe(false);
+  expect(projected.value.selectedWork.semanticAcceptanceEstablished).toBe(false);
+  expect(projected.text.length).toBeLessThanOrEqual(6000);
+  expect(f.counters().gitReads).toBe(2);
+  // Fork also describes a native forked root. Absence of agent identity still
+  // matches only the explicitly selected parent tuple.
+  const parent = await handleHook(
+    { ...fork, agent_id: undefined },
+    { bindings: f.registry },
+    f.load,
+  );
+  expect(context(parent.stdout).value.selectedWork.currentTask.id).toBe("current-task");
+  expect(f.counters().gitReads).toBe(4);
+});
+
+test("fork support retains legacy SessionStart sources and rejects malformed fork payloads", async () => {
+  const f = await fixture();
+  for (const source of ["startup", "resume", "clear", "compact", "fork"]) {
+    const input: HookInput = {
+      hook_event_name: "SessionStart",
+      source,
+      session_id: "parent",
+      cwd: f.home,
+    };
+    expect(parseHookInput(input).source).toBe(source);
+    const result = await handleHook(input, { bindings: f.registry }, f.load);
+    expect(result.status).toBe("context-injected");
+    expect(context(result.stdout).value.selectedWork.currentTask.id).toBe("current-task");
+  }
+  for (const input of [
+    { hook_event_name: "SessionStart", source: "fork", session_id: 7, cwd: f.home },
+    { hook_event_name: "SessionStart", source: "fork", session_id: "parent", cwd: "relative" },
+    {
+      hook_event_name: "SessionStart",
+      source: "fork",
+      session_id: "parent",
+      cwd: f.home,
+      agent_id: 7,
+    },
+    {
+      hook_event_name: "SessionStart",
+      source: "future-unknown",
+      session_id: "parent",
+      cwd: f.home,
+    },
+  ]) {
+    expect(() => parseHookInput(input)).toThrow();
+    expect((await handleHook(input, { bindings: f.registry }, f.load)).status).toBe("failed-open");
+  }
+  expect(f.counters().gitReads).toBe(10);
 });
