@@ -1,0 +1,291 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "a037f889ad3551199d50d592252d1e5ec12af6e5",
+  "reviewedTreeSha": "fc9f55ed09f529728c2fb4f0a24cf369cbbca060",
+  "reviewedSourceManifestSha256": "ffeb61b34407fdfb59b34c0d3ec121204cde4b14b6cafe4ada8fe3564a13fe36",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/codex_context_independent_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_program_context"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-14T18:57:50.152Z",
+  "resultAuthorship": {
+    "authoredBy": "/root/codex_context_independent_review",
+    "codeAuthor": "/root/integrated_program_context",
+    "earlierMergeAndPinReconciliationAuthor": "/root",
+    "qualification": "Actual native collaboration Task paths are source declarations, not invented UUIDs, runtime authentication or adoption evidence."
+  },
+  "reviewDetail": {
+    "reviewKind": "independent-exact-successor-source-review-and-verified-finding-resolution",
+    "comparisonBase": "d22fdf16abf297175a8dab2fc66fe2b12c1bbbeb",
+    "changedSources": [
+      {
+        "path": "architecture/capability-source-owners.json",
+        "sha256": "6314e6ba4c60cdbf840916f079af4f201b63e25e31cde3f5598fa996fb7fb221"
+      },
+      {
+        "path": "ci/source-check.ts",
+        "sha256": "9d4c49a09ba961d6e594a59ffba79cb16aacd4bd7da97b05825cdcf7744df3db"
+      },
+      {
+        "path": "owner-fixture/codex-harness-engineering/src/legacy/harness/owner-context-loader.ts",
+        "sha256": "cd958118d5a9b6c5d1d23397a16a140ca86ca338446b749aacc79dd1d0cd54e5"
+      },
+      {
+        "path": "owner-fixture/codex-harness-engineering/src/legacy/harness/provider-closure.ts",
+        "sha256": "1f8f07de32863916bc41c1f399f774e8ce8d6603d9d074f0566c40fc622ec628"
+      },
+      {
+        "path": "owner-fixture/manifest.json",
+        "sha256": "e00b28f2e8ab7f184c796443d68ce7f6482d0bcf47c96fffbca8603c9b473206"
+      },
+      {
+        "path": "packages/native-codex-adapter/src/native/home-context.ts",
+        "sha256": "3f078a47923b88534d6352b5130b5b5284e27a232fe53e76b538fda7cbb4931a"
+      },
+      {
+        "path": "packages/native-codex-adapter/src/native/hooks.test.ts",
+        "sha256": "fc39fbc1f4e2997b4c2d3850b54b260a55f53ac87acb15b197d92a4d6d1464cb"
+      },
+      {
+        "path": "packages/native-codex-adapter/src/native/hooks.ts",
+        "sha256": "235f35c94c923ae4619f643e2badf71eb40a5b5d2748efb3bac9e93ccf0d26d8"
+      },
+      {
+        "path": "packages/native-codex-adapter/src/native/legacy-selection.test.ts",
+        "sha256": "02fda5220ac969292bc48c3aea1917b33dfe3e5c7c95dc9605db441a9363e19a"
+      },
+      {
+        "path": "packages/work-continuity/src/git-work/index.ts",
+        "sha256": "8c11a0333c112eee58fab5d8cc2fb9dc6340dfdf8b3891231623826020703f5b"
+      },
+      {
+        "path": "packages/work-continuity/src/git-work/no-lazy-fetch.test.ts",
+        "sha256": "f7c6381918b1d0ea04e423d2323cfabefb7cef01b8da83d70ed5d1ec501a6905"
+      },
+      {
+        "path": "packages/work-continuity/src/git-work/source.ts",
+        "sha256": "63463dd2b134078bb5de4c846780fee3f048e273c5cb0ab40c7b347c1463992b"
+      },
+      {
+        "path": "scripts/harness.ts",
+        "sha256": "5060b6bb347d6f09ce5e6d59918947c196538ebb259a93a6a5f9059829839301"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/CODEX-EXPLICIT-SESSION-WORK-CONTEXT.json",
+        "sha256": "435fef292bac79e7177a1d8b10eddf6f3f18901da6b05bae3a874a8f5f222a04"
+      }
+    ],
+    "materialFindings": [],
+    "sourceReview": [
+      "Read the full changed hooks/home-context/provider-closure/owner-loader/local Git resolver/CLI production source and complete CI source-check delta. Compared the candidate hooks against actual frozen c897 active source rather than only the older Git baseline.",
+      "Legacy source-bound selection retains nativeAgentType matching, provenance and checkpoint digest checks, immutable parsed-registry snapshots, descriptor O_NOFOLLOW/type/inode/size/hash reads, before/after checkpoint currentness and generic selected-context-held output. Late transitive source checks occur after the final provider await.",
+      "Git selection uses schema-discriminated exact session/agent/type/cwd tuples, refuses missing-agent wildcards and duplicate or ambiguous selections, requires owner-contained source-registry proof and exact canonical owner/repository roots. Unselected and foreign children do not perform Git Work reads.",
+      "Git reader resolves explicit local refs without shell/network/checkout/filter operations, bounds process output and time, rereads moving branches and keeps currentness as caller-declared. Existing immutable object identity and dependency/original/effect-fence qualification remain in use.",
+      "Optional provider v3 admits one fixed Git Work export and exact seven-source transitive closure. Legacy v1/v2 keep their immutable Ontology/package rules. Package resolution, first-import refusal and before/after source rechecks are retained.",
+      "Home uses the full qualified closure to derive purpose, selected Task and distinct Work/Task contract revisions plus immutable original question/answer pointers. Optional omission labels fit before additions; grown original histories and indivisible overflow remain explicitly held, with no raw original/profile/prompt payload injection.",
+      "Meaningful tests exercise source byte/deletion/symlink changes before and during await boundaries, parsed row and owner mutation, foreign child/type negatives, late transitive source drift, malformed private source diagnostics, bounded original history and historical contract pins. Context does not modify the existing qualification tool gate or confer permission/budget.",
+      "Independently reviewed the entire successor three-file delta and six owned promisor negative tests, then reran them with all native regressions. Reused the original independently authored local promisor fixture against exact successor under unset and hostile0 ambient values; both now fail without fetch or object writes. The original P2 is closed only by this exact-source evidence."
+    ],
+    "independentVerification": {
+      "focusedRegression": {
+        "command": "bun test packages/work-continuity/src/git-work/no-lazy-fetch.test.ts packages/native-codex-adapter/src/native/hooks.test.ts packages/native-codex-adapter/src/native/legacy-selection.test.ts packages/native-codex-adapter/src/native/home-context.test.ts",
+        "runtime": "Bun1.3.14",
+        "exitCode": 0,
+        "tests": 67,
+        "assertions": 509,
+        "logPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/codex-context-independent-successor-a037f889-tests.log",
+        "logSha256": "050eb80a9b630738c560308527a376e902118429b376c272d70c0b273947c964"
+      },
+      "finiteSourceCheck": {
+        "command": "bun ci/source-check.ts",
+        "exitCode": 0,
+        "sourceOnly": true,
+        "nativeModelCalls": 0,
+        "commands": 25,
+        "canonicalTestFiles": 24,
+        "qualityTestFiles": 5,
+        "logPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/codex-context-independent-source-a037f889.log",
+        "logSha256": "fc8bdd9deefddaa16d5a00e609e7c22080af7ee766bf5844c06ab3bacce63358",
+        "fixedProviderClosureAndLegacySchemasAndFirstImportAndDriftProbes": "pass"
+      },
+      "preservedAuthorQualityReport": {
+        "logPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/codex-no-lazy-fetch-quality.log",
+        "logSha256": "d14c02cd5854182acc91591c3d98d06cf40e53524d38159da93b9053ba750678",
+        "status": "pass",
+        "attribution": "Author executed; independent reviewer read and hashed the preserved source-quality report, without re-running the quality command."
+      },
+      "originalCustody": {
+        "manifestPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/custody/codex-context-reconciliation-20261015/manifest.json",
+        "sha256": "bfd8d315d409e60412cecf357d601227348caa7fdb5e2d074b662cc135f3ee3b",
+        "count": 37,
+        "everyActiveAndPrivateCopyMatchesFrozenDigest": true
+      },
+      "oldHistoricalWorkClosure": {
+        "preexistingDriftCount": 4,
+        "currentRootAbsentFromOldRegistry": true,
+        "observedDrift": [
+          {
+            "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/evaluation-ledger.ts",
+            "oldExpectedSha256": "8a64851493734c0262ea760ccc1891c087eb2c8393ee3b2bf36f4ae95f50c457",
+            "observedSha256": "91eeda01bd8673a251f39381fad2b931ce609af007380cf0eefa7a3703ddba17"
+          },
+          {
+            "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/source.ts",
+            "oldExpectedSha256": "11507930a28c30d0fce389c58f6bf29e536ba472dbb26fe4bbffb794f6b2017e",
+            "observedSha256": "50142da45b2e758ac8aba0524d760e7629340ea6a579a5ea38a3e6a908fa66e4"
+          },
+          {
+            "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/handoff.ts",
+            "oldExpectedSha256": "7c0e5d0b6575e8e82d94e299c078446270c2c99c997a958da0ea2ea6ea01664d",
+            "observedSha256": "8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a"
+          },
+          {
+            "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/qualification.ts",
+            "oldExpectedSha256": "136b7f5eaa10763c7b0e315d2ca0056c6ceee80df396b7ec735238e80cab57c3",
+            "observedSha256": "c7ef10b6633657368b1a390dc44d93a557a647c61f7077e94ca619b82a847e6d"
+          }
+        ],
+        "meaning": "Old selected Work closure is already stale; it is not working-route proof. No old source manifest, selected operation or closed evaluation suite was refreshed."
+      }
+    },
+    "inputs": [
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/codex-git-no-lazy-fetch-receipt.json",
+        "sha256": "2722040b2139a5011790efc0e1aee56a5b47c903296038791c41aa1dc1605f19"
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/codex-native-activation-custody-preflight.json",
+        "sha256": "40b3d4d77caa8e0c8bb7229470960b78a0afed3dd14f4fce0d39efae2fb176cd"
+      }
+    ],
+    "documentation": {
+      "url": "https://learn.chatgpt.com/docs/hooks",
+      "rawPath": "/home/palantirkc/code/shared/scrapling-research/runs/4b1e0395-ef3d-4e3f-857a-f477c70f3cd1/attempt-1-response-content-1.bin",
+      "rawSha256": "57166ef03e7059732dd90925d5c42dd4d187eb2625d66cc154d0fbd2edb65f92",
+      "bytes": 47133,
+      "independentlyReadLines": [
+        [
+          467,
+          493
+        ],
+        [
+          648,
+          683
+        ]
+      ],
+      "claim": "Current official documentation lists additive SessionStart fork and parent session_id for subagent hooks; installed emission, native hook trust and delivered context remain unobserved."
+    },
+    "limits": [
+      "Source-only independent review and finite tests do not prove native activation, installed fork emission, actual context delivery/spilling at the unchanged1500-token limit, new native suite behavior, runtime authorship or whole-Work Acceptance.",
+      "Local recursive Git tree manifest is complete and uses the canonical helper. Root must independently verify the same immutable tree through authenticated remote readback before publication/status and explicit expected-head merge.",
+      "Rollout still requires exact active third-state reconciliation/custody/CAS, missing Git source/export deployment and all required registration/marker successors. Never blindly overwrite dirty work or refresh the old stale Work authority/suite.",
+      "Descriptor/hash checks are bounded observations, not multi-file atomic locks. Native runtime owns hook trust, profile, sessions, tools, model requests and evaluation usage."
+    ],
+    "predecessorReviewBinding": {
+      "headSha": "bfaad2539bd110a12385b95e37e670d7381f684f",
+      "reviewedTreeSha": "8bc7c1ea8322d9cab7b90354da7a441ccce7d86a",
+      "finalFindingPath": "codex-context-independent-review-findings-bfaad253.json",
+      "finalFindingSha256": "85a430fd397d47f221be02977ddb072b23d37faba492240f738388ce7f67f570",
+      "previousUnresolvedFindings": 1,
+      "invalidatedPreliminaryPass": {
+        "path": "codex-context-independent-review-result-bfaad253.json",
+        "sha256": "1e0497db79e0b0c2f06d431a209e632381b10997d0cd9a4d27741124ab6f5353",
+        "status": "remains-invalidated-historical-never-published"
+      },
+      "reuseQualification": "Fresh exact-successor review with the complete new three-file delta read and unchanged prior production observations rechecked by immutable blob diff. This is not unchanged-tree approval reuse or publication of the invalidated preliminary verdict."
+    },
+    "findingResolutions": [
+      {
+        "id": "CODEX-CONTEXT-NO-LAZY-FETCH-1",
+        "priority": "P2",
+        "status": "resolved-independently",
+        "sourcePath": "packages/work-continuity/src/git-work/source.ts",
+        "sourceLine": 106,
+        "resolution": "GIT_NO_LAZY_FETCH=1 is hardcoded after ambient inheritance in the only shared Git read environment, so all resolver/commit/tree/blob reads and the CLI receive the guard.",
+        "ownedRegressionMatrix": {
+          "missingObjects": [
+            "commit",
+            "tree",
+            "blob"
+          ],
+          "ambientValues": [
+            "unset",
+            "0"
+          ],
+          "tests": 6,
+          "assertions": 30,
+          "implicitTransportChildren": 0,
+          "packFilesCreated": 0,
+          "objectStoresUnchanged": true
+        },
+        "independentOriginalProbe": {
+          "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/codex-context-independent-promisor-probe-a037f889.json",
+          "sha256": "993fe5d7fb488aa79209745172a739451bd26b275ed9cfe9a1c7b46986f2cfb8",
+          "ambientValues": [
+            "unset",
+            "0"
+          ],
+          "implicitFetchCount": 0,
+          "packFilesCreated": 0,
+          "error": "GIT_SOURCE_UNAVAILABLE",
+          "transport": "Owned synthetic file:// origin only; no external network or real credentials used."
+        }
+      }
+    ],
+    "successorDelta": {
+      "parentCommit": "bfaad2539bd110a12385b95e37e670d7381f684f",
+      "paths": [
+        "architecture/capability-source-owners.json",
+        "packages/work-continuity/src/git-work/no-lazy-fetch.test.ts",
+        "packages/work-continuity/src/git-work/source.ts"
+      ],
+      "productionChange": "One forced environment field; no production APIs or source-closure path set changed.",
+      "sourcePin": "63463dd2b134078bb5de4c846780fee3f048e273c5cb0ab40c7b347c1463992b",
+      "native61RegressionSourceBytesUnchanged": true,
+      "taskAndSpecPlanBytesUnchanged": true
+    },
+    "authorQualityReadback": {
+      "status": "pass",
+      "logPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/codex-no-lazy-fetch-quality.log",
+      "logSha256": "d14c02cd5854182acc91591c3d98d06cf40e53524d38159da93b9053ba750678",
+      "recordedCheckoutSha": "bfaad2539bd110a12385b95e37e670d7381f684f",
+      "recordedWorkingTreeHasChanges": true,
+      "actualExecution": "Author precommit quality run; checkout identity was the predecessor with dirty successor changes.",
+      "allRecordedInputBlobsMatchExactCommittedSuccessor": true,
+      "verifiedInputCount": 204,
+      "meaning": "Independent hash readback validates every source-quality input against the successor without pretending the precommit invocation ran on the later commit."
+    }
+  },
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "fc9f55ed09f529728c2fb4f0a24cf369cbbca060",
+    "entryCount": 530,
+    "blobCount": 417,
+    "sha256": "ffeb61b34407fdfb59b34c0d3ec121204cde4b14b6cafe4ada8fe3564a13fe36"
+  },
+  "effects": {
+    "maintainedSourceEdits": 0,
+    "gitMutations": 0,
+    "remotePublication": 0,
+    "nativeConfigurationWrites": 0,
+    "nativeLifecycleActions": 0,
+    "modelEvaluationRequests": 0,
+    "newReviewArtifactsAndTemporarySourceQaOnly": true
+  },
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null,
+  "publishedProvenance": null
+}
