@@ -1,0 +1,144 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "0cc96d15a9795fc008286b2dec54cbb7641646e3",
+  "reviewedTreeSha": "550e93d4da0a7b5c8b4699ad2fc82253920fe207",
+  "reviewedSourceManifestSha256": "2a18eb304128af2d51fcbe35908066ffe675561761ddada9bc6ad732afe11eb3",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/final_quality_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "reviewedAt": "2026-10-14T01:14:00.702Z",
+  "verificationClass": "independent-published-source-review-and-local-execution",
+  "sourceObservation": {
+    "repository": "park-kyungchan/agent-platform",
+    "commitUrl": "https://github.com/park-kyungchan/agent-platform/commit/0cc96d15a9795fc008286b2dec54cbb7641646e3",
+    "publishedHeadRead": "Official GitHub MCP get_commit and official GitHub CLI Git commits API",
+    "publishedTreeRead": "Official GitHub CLI recursive Git Trees API for exact immutable tree; provider has no callable equivalent recursive-tree read.",
+    "recursiveTree": {
+      "truncated": false,
+      "entryCount": 354,
+      "blobCount": 257
+    },
+    "localRemoteAllPathModeAndGitObjectIdentityMatch": true,
+    "publicationAllowlist": {
+      "files": 257,
+      "mismatchedContentPins": 0
+    },
+    "cleanReviewedCheckout": true
+  },
+  "reviewScope": [
+    "Canonical owner/source admission and shared upper/domain/native adapter boundaries",
+    "Package hierarchy, dependency topology, export boundaries, staged-source pin custody and protected formatter/test exclusions",
+    "Formatting, typed async correctness, explicit-any debt prevention and complete maintained source secret denominator",
+    "Exact archive and source-owned executable digests, including forged cache binary+receipt rejection",
+    "Immutable exact-head native independent-review v1 compatibility and truthful v2 owner/scope/tree/result binding",
+    "Generated default-branch observer validation, exact source/quality/merge job denominator and single missing-status rerun confinement",
+    "Handoff publication uncertainty, cleanup failure and dual-cause preservation",
+    "Source bytes/currentness fences, command/report metadata redaction, dependency update and Workflow pin configuration"
+  ],
+  "resolvedReviewFindings": [
+    "Missing formatter config test import",
+    "Unadmitted package-root public export bypass",
+    "Incomplete maintained secret denominator and canonical evidence-definition path exception",
+    "Raw explicit-any/native-command report leakage",
+    "Classified test-extension versus execution denominator mismatch",
+    "Staged/unknown architecture currentness gap",
+    "Cache binary plus mutable receipt forgery (root-discovered, independently reviewed fix)",
+    "Padded same-task reviewer/author identity"
+  ],
+  "verification": [
+    {
+      "owner": "independent-reviewer",
+      "command": "Exact published checkout focused tests including real pinned native workflow/secret fixtures, source/receipt/projection and handoff regressions",
+      "exitCode": 0,
+      "passed": 103,
+      "failed": 0,
+      "skipped": 0,
+      "assertions": 475,
+      "durationMs": 3696
+    },
+    {
+      "owner": "root-integrator-independently-readback",
+      "command": "bun run check:quality on isolated publication source",
+      "status": "pass",
+      "phases": 14,
+      "testedSourceInputs": 170,
+      "changedTestedSourceInputs": 0,
+      "durationMs": 40256
+    },
+    {
+      "owner": "root-integrator-independently-readback",
+      "command": "bun ci/source-check.ts on isolated publication source",
+      "status": "pass",
+      "canonicalTestFiles": 17,
+      "commandFailures": 0
+    },
+    {
+      "owner": "independent-reviewer",
+      "observation": "All257 selected file contentSHA256 pins and354 recursive remote Git path/mode/type/SHA identities match reviewed checkout.",
+      "status": "pass"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "independent-final-review.json",
+      "sha256": "5521c02e088e776b6ae29fc5c641763eb0cc645e0aba188034912faeab0bf5b1"
+    },
+    {
+      "path": "independent-native-binary-pin-review.json",
+      "sha256": "d68081698aa686c0cbf9db6e7a3ade4c59ac44a9e18a66a7ce54ff145106e03d"
+    },
+    {
+      "path": "independent-receipt-v2-review.json",
+      "sha256": "2d3ac62ed814194083b28ea250379c85a595a1ba3b463afd2c5d4c88e26a2f26"
+    },
+    {
+      "path": "quality-publication-final.json",
+      "sha256": "5ce5635619f50f495297c8af2554569d4de9136714815736bbd57dcdd7e8b4f6"
+    },
+    {
+      "path": "source-check-publication.json",
+      "sha256": "b5869969b4ec91c5f3c52523218516f9c18a767601f10241403a8b7b843ee2e5"
+    },
+    {
+      "path": "publication-manifest.json",
+      "sha256": "085a234b1f29701880f4d9221e272fd5dff453caa74d18f474f25e255fdf4f8d"
+    },
+    {
+      "path": "published-head-readback.json",
+      "sha256": "4e1f31d7aedb08e7cf640e2077b14b63ebb8a9591ffb9f4db574445e9f1395c4"
+    },
+    {
+      "path": "published-tree-readback.json",
+      "sha256": "33412341e10dcf3d63fb985bc3905c30ab7f06f24758c3185323b02f0ae466ba"
+    },
+    {
+      "path": "published-independent-test-evidence.json",
+      "sha256": "f02db080b1685f7d375739a5464377b5a48edf60bb8261f5a2f253528cc43c95"
+    }
+  ],
+  "limitations": [
+    "This is source verification of the exact published commit. It does not establish production rollout, live VPS adoption, native model behavior, provider authentication beyond the source read used here, or AcceptanceDecision.",
+    "Actual GitHub Actions source/quality/native-review gate and delayed-review observer delivery were not completed by this reviewer; their native execution must be reported separately.",
+    "Trusted observer event behavior requires its reviewed workflow on the trusted default branch; offline VM scenarios and source review do not substitute for that native qualification.",
+    "Excluded unadmitted Work implementations/tests, live sessions, private/evidence stores and immutable release custody were preserved; no broader Work acceptance is inferred."
+  ],
+  "environmentAdoptionEstablished": false,
+  "productionRolloutPerformed": false,
+  "nativeModelBehaviorVerified": false,
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null
+}
