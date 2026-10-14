@@ -1,0 +1,465 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "989d728d5f15f8d1c890ffa56bdc662091ddbb6a",
+  "reviewedTreeSha": "6c8bbc38c897c5eabf35f9fc01d17947d3282fe5",
+  "reviewedSourceManifestSha256": "9412ee33275a73e4cd18408b826dd1e6b4f20bbccb6839ea8263ba797de80a5e",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/topology_interview_preflight"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "reviewedAtUtc": "2026-10-14T17:09:47.890Z",
+  "resultAuthorship": {
+    "authoredBy": "/root/topology_interview_preflight",
+    "codeChangeAuthor": "/root",
+    "identityKind": "actual-native-collaboration-task-path-source-declaration",
+    "qualification": "The reviewer authored this RESULT. Native Task paths are source declarations, not invented UUIDs or cryptographic/provider-authenticated authorship claims."
+  },
+  "rawIndependentReviewSha256": "cdac0d7eb0a4c8a803e56de43e14ef00869370c2715d2d8a86a1ce9ab692a8b7",
+  "sanitizedIndependentReviewDetailSha256": "f9b22eb45445d0d18be33504085a1b8b9d13ab28e11e8f1d885d1788beff735d",
+  "reviewDetail": {
+    "schemaVersion": "integrated-program.independent-review-publication/1",
+    "recordClass": "IndependentExactCommitReviewPublicationReceipt",
+    "reviewKind": "independent-source-contract-review-not-topology-approval",
+    "observedAtUtc": "2026-10-14T17:02:22.959Z",
+    "identity": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-harness-operation",
+      "taskId": "INTEGRATED-SCOPE-RECONCILIATION",
+      "runId": null,
+      "registration": "local-record-only"
+    },
+    "repositoryId": "park-kyungchan/agent-platform",
+    "reviewedCommit": "989d728d5f15f8d1c890ffa56bdc662091ddbb6a",
+    "reviewedTreeSha": "6c8bbc38c897c5eabf35f9fc01d17947d3282fe5",
+    "reviewedParentCommit": "d20d0ae05804eb431d08bd01c711668640d9eb71",
+    "comparisonBase": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+    "reviewer": {
+      "nativeAgentTaskPath": "/root/topology_interview_preflight",
+      "actorLocatorKind": "native_codex_delegation_task_path_not_filesystem_path",
+      "runtime": "native Codex bounded subagent",
+      "relationship": "Independent reviewer delegated by accountable root Lead",
+      "authorshipQualification": "This actor independently reviewed the exact candidate source. Earlier topology work is not reused as an approval or verification of these changes."
+    },
+    "conclusion": "No material or blocking source-contract findings in the exact reviewed tree. Source review passes within the stated boundary; current required checks and authenticated GitHub publication/Lead merge remain separate.",
+    "materialFindingCount": 0,
+    "materialFindings": [],
+    "blockingFindingCount": 0,
+    "nonBlockingObservations": [],
+    "method": [
+      "Read candidate objects by immutable commit ID, independently of current worktree HEAD.",
+      "Compared every new original-answer and question/selection binding to source-owned kickoff/session admission/interview selection receipts; compared exact strings, request IDs and receipt hashes.",
+      "Resolved all seven new Decision answerSource and selectionContext JSON fragments.",
+      "Compared all 115 existing non-Work records by Git blob identity; all 12 existing Task bytes and revision5 pins preserved.",
+      "Read full immutable Spec/Plan revision6 and all three new Task records; assessed full Goal scope and separation of actual decisions, execution, verification and acceptance.",
+      "Compared Academy PR13 source projection to the preserved completed delivery receipt and hash-verified independent readback/merge-review publication receipts.",
+      "Parsed all changed JSON, checked whitespace with git diff --check, and scanned changed source for credential-shaped tokens and absolute/private host locators."
+    ],
+    "sourceOriginalComparisons": {
+      "kickoffSha256": "c72b1b02b905cbda9a3d2309b9a95dcd89435647291ebbe9a1e1eb9899103297",
+      "sessionAdmissionSha256": "2a84b1a8b5e060cfea8117b4ef6a6ba9b3ca246f596598bb13e0974bdedcc1c0",
+      "selectionContextSha256": "39f4965065376995716b231fa77f7b8e30dad0bc559f1271a9ab6fcb01bb674e",
+      "bindings": [
+        {
+          "id": "integrated-program-original-answer-20261015-1",
+          "textExact": true,
+          "questionExact": true,
+          "sourceRequestIdExact": true
+        },
+        {
+          "id": "integrated-program-original-answer-20261015-2",
+          "textExact": true,
+          "questionExact": true,
+          "sourceRequestIdExact": true
+        },
+        {
+          "id": "integrated-program-original-answer-20261015-3",
+          "textExact": true,
+          "questionExact": true,
+          "sourceRequestIdExact": true
+        },
+        {
+          "id": "current-session-original-answer-20261015-1",
+          "textExact": true,
+          "originalReceiptHashExact": true
+        },
+        {
+          "id": "current-session-original-answer-20261015-2",
+          "textExact": true,
+          "originalReceiptHashExact": true
+        },
+        {
+          "id": "native-interview-selection-context-20261015",
+          "questionsExact": true,
+          "questionSourceExact": true,
+          "actualAnswerExact": true,
+          "derivedInterpretationExact": true,
+          "originalReceiptHashExact": true
+        }
+      ],
+      "decisionBindings": [
+        {
+          "id": "academy-product-operational-backlog-included-20261015",
+          "answerMatchesBoundFragment": true,
+          "selectionContextMatchesBoundFragment": true
+        },
+        {
+          "id": "broad-engineering-authority-20261015",
+          "answerMatchesBoundFragment": true,
+          "selectionContextMatchesBoundFragment": true
+        },
+        {
+          "id": "complete-interviews-before-autonomous-goal-20261015",
+          "answerMatchesBoundFragment": true
+        },
+        {
+          "id": "delegated-evidence-based-lead-acceptance-20261015",
+          "answerMatchesBoundFragment": true,
+          "selectionContextMatchesBoundFragment": true
+        },
+        {
+          "id": "fresh-native-evaluation-suite-budget-20261015",
+          "answerMatchesBoundFragment": true,
+          "selectionContextMatchesBoundFragment": true
+        },
+        {
+          "id": "integrated-purpose-and-success-20261015",
+          "answerMatchesBoundFragment": true,
+          "selectionContextMatchesBoundFragment": true
+        },
+        {
+          "id": "private-by-default-reorganization-20261015",
+          "answerMatchesBoundFragment": true,
+          "selectionContextMatchesBoundFragment": true
+        }
+      ]
+    },
+    "historicalPreservation": {
+      "existingNonWorkRecordsCompared": 115,
+      "changedExistingNonWorkRecords": [],
+      "existingTaskCount": 12,
+      "oldTaskPins": [
+        {
+          "taskId": "GHA-22",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-23",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-24",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-25",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-26",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-27",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-28",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-29",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-30",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "GHA-31",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "VPS-LEAD-HANDOFF",
+          "specRevision": 5,
+          "planRevision": 5
+        },
+        {
+          "taskId": "WSL2-LEAD-HANDOFF",
+          "specRevision": 5,
+          "planRevision": 5
+        }
+      ],
+      "specRevision5AndEarlier": "byte-identical",
+      "planRevision5AndEarlier": "byte-identical",
+      "existingEffectsAndFences": "byte-identical",
+      "historicalFenceIdsPreserved": true
+    },
+    "scopeAssessment": {
+      "fullSpecCriterionCount": 12,
+      "fullImmutableSpecPinned": true,
+      "academySevenGatesIncluded": true,
+      "examQuestionSelectionAndStudentKnowledgeGraphIncluded": true,
+      "bothNativeRuntimeVerificationAndExplicitActivationIncluded": true,
+      "pcIndependentVpsCurrentnessIncluded": true,
+      "leadWorkerCrossRuntimeHandoffAndResumeIncluded": true,
+      "commonSourceSingleRepositoryDirectionPreserved": true,
+      "onlyThreeNewImmediatelyUsefulTasks": true,
+      "plannedTasksDoNotClaimGoalCompletion": true,
+      "existingAcademyServerAbsoluteReadOnlyPreserved": true,
+      "freshSuiteOnly": {
+        "requestsMax": 48,
+        "aggregateEmittedTokensMax": 2000000,
+        "wallTimeHoursMax": 8,
+        "ordinaryEngineeringSeparate": true,
+        "historicalSuitesNotRenewed": true
+      },
+      "newRecurringInfrastructureCost": 0,
+      "leadAcceptanceDelegatedNotYetMade": true,
+      "humanSatisfactionOrTeacherJudgmentNotInvented": true,
+      "sourceRecordsGrantNoNativeAuthority": true
+    },
+    "deliveryChecks": {
+      "repositoryExact": true,
+      "pullRequestExact": true,
+      "headExact": true,
+      "mergeExact": true,
+      "mergedAtExact": true,
+      "reviewedTreeExact": true,
+      "mergeTreeEqualExact": true,
+      "mainSyncExact": true,
+      "independentReadbackHashExact": true,
+      "mergeReviewHashExact": true,
+      "openingDeliveryComplete": true,
+      "noRuntimeOrHumanAcceptanceInvented": true
+    },
+    "reviewedFileManifest": [
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/academy-product-operational-backlog-included-20261015.json",
+        "sha256": "98a83bff6e74f2884c971faeb56ef039398f6719c6e9a0b459f277d093395a8c",
+        "byteLength": 1735,
+        "gitBlob": "4ef2133ffa5669c3534006204e4c41146100d58d"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/broad-engineering-authority-20261015.json",
+        "sha256": "488e983c5555e15f69e453d7a05711665e4e72fb74274ea1de115fe2141b94c2",
+        "byteLength": 1514,
+        "gitBlob": "661082cb958aa1b2b2bef90ea8cc18a86b426691"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/complete-interviews-before-autonomous-goal-20261015.json",
+        "sha256": "5f07c7c3358dce36dc0cb6c026a8e63a96ad41413ad8a54e98dd8ab07dea2a80",
+        "byteLength": 917,
+        "gitBlob": "2e0b7ca0853aa103b8d4bd6315618e6695ae9d4f"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/delegated-evidence-based-lead-acceptance-20261015.json",
+        "sha256": "b791880a4a15922ab53743b872d65ef0137db8c35fd75a1a6167eae771971152",
+        "byteLength": 1569,
+        "gitBlob": "b0a92179acc2b5fffa9a49e85fea972a700e3943"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/fresh-native-evaluation-suite-budget-20261015.json",
+        "sha256": "afdd4b0b9f16dec3e400f02c16c9209a7bb11cecb32312010ab10cc11bb90ca4",
+        "byteLength": 1658,
+        "gitBlob": "2ab7db3125346dde93c14e0092cfda91290c0d3b"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/integrated-purpose-and-success-20261015.json",
+        "sha256": "0fb39d2c93ac9b4489d349383ba0121571505f66c0f44e642a5235aec18c9f62",
+        "byteLength": 2074,
+        "gitBlob": "23329a4e2232d2840ea1b3e2c91792d3e1a39ebf"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/private-by-default-reorganization-20261015.json",
+        "sha256": "085946bda66fbdd1eab5fd317f146b4ea4ec7539d1a0834f719481cca558384a",
+        "byteLength": 1295,
+        "gitBlob": "4a364060ec398a24bf6aba6ac8f96bdc613e05ef"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-opening-delivery-receipt-20261015.json",
+        "sha256": "9ec6141b4bd4227328a3750590187a05ce857ad3ccc6381c9e1a3b4e27055257",
+        "byteLength": 1698,
+        "gitBlob": "eef0a65be75c445f2df6a69eada0bc0a9898a986"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-session-original-answer-20261015-1.json",
+        "sha256": "d5800e128914cbb603dc2c5560ffd9501d8350e4d30efbc39dbd88a1b0b668f2",
+        "byteLength": 962,
+        "gitBlob": "964f5b34bf7d5167ca081f8266bc2d9becab8c23"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-session-original-answer-20261015-2.json",
+        "sha256": "7170595f5c55dec67272f3bc5e517714f8b98b02e027b1396a0263a41a4bf05a",
+        "byteLength": 846,
+        "gitBlob": "1ed0c4ac3ae5c512870259dbe479f6be5887a0e5"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/integrated-program-original-answer-20261015-1.json",
+        "sha256": "e6137eedc16d85c4191c9d5e3acbc4fbcccc486426268b0d221f131a15f6e3df",
+        "byteLength": 1579,
+        "gitBlob": "533183ccd0e6009ae4306075e2de98c9de6a86c6"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/integrated-program-original-answer-20261015-2.json",
+        "sha256": "70d1674befc7cafc76518411b94cda48743746447194f26b7734b75d73108358",
+        "byteLength": 946,
+        "gitBlob": "2f793db7746e473dce1d965a1214edf8c47c2a1b"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/integrated-program-original-answer-20261015-3.json",
+        "sha256": "ff79d03ab04126d792d2de318114bfff56249f2cfa389cb6463c163a48c4919e",
+        "byteLength": 1071,
+        "gitBlob": "77da1e2cee241a1e2053ef543c90948ac350f3ef"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/native-interview-selection-context-20261015.json",
+        "sha256": "af51dad28e7e48807746b59f5e6351b47e1cd01c587cceaaeed890dc28b5e778",
+        "byteLength": 3547,
+        "gitBlob": "4133b95a5bdafd6d6a252e55edb7a48285905dbb"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/plans/ontology-driven-harness-operation%3Aplan%3Agit-harness-adversarial-20261014@6.json",
+        "sha256": "faa1123b0a8a923ce173fdc8c604e3a55273b56af5392b968f91c8e22346949b",
+        "byteLength": 862,
+        "gitBlob": "476863861358d3e9115fe1b42edc399d1ff1ffbe"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/specs/ontology-driven-harness-operation%3Aspec%3Agit-harness-adversarial-20261014@6.json",
+        "sha256": "87e89df3215852dec1b5fb757d7ee6bbe52ed5da7ee1d43e11e1bc435fe887be",
+        "byteLength": 4492,
+        "gitBlob": "64150626b764549f06d43fa16ccae93d1289f619"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-RETAINED-OWNER-RUNTIME.json",
+        "sha256": "a515a7e824e419eae02109fea2558e644bfe1556affa4a62c052055646824bf8",
+        "byteLength": 1298,
+        "gitBlob": "32e53b7732696d188a8902ca9140029140105dcc"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/CODEX-HOME-CONTEXT-BUDGET-FIX.json",
+        "sha256": "56dc14c3b8260daff6550e1c1b14a47316257c62371ee6145dd720194e41206a",
+        "byteLength": 1287,
+        "gitBlob": "ee6e5f59a20e9adb8b1508cff30595c47a5f34b8"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/INTEGRATED-SCOPE-RECONCILIATION.json",
+        "sha256": "5e4e7b44fa78a92d716a6e8f976dbbceb2fca3fa854b350996ee78cc0ff32232",
+        "byteLength": 1465,
+        "gitBlob": "a94f2dbbeecc4612c20cd357230ddb71ec403176"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json",
+        "sha256": "aa7f3271c08807509aa1266d629dfb6ff2e218510e6dce88b3423f6da75c7425",
+        "byteLength": 4164,
+        "gitBlob": "b9f4aa7f43258cc8d30e4cb5ff09058454007f8d"
+      }
+    ],
+    "candidatePrivacyScan": {
+      "changedFilesScanned": 20,
+      "findings": [],
+      "credentialPatternFindings": 0,
+      "absoluteHostPathFindings": 0,
+      "privateLocalLocatorFindings": 0,
+      "qualification": "Changed-source scan and source provenance review only; no publication of local original receipts or academic/private inputs is approved."
+    },
+    "validation": {
+      "changedJsonParse": "passed",
+      "bindingAndHistoryComparison": "passed",
+      "gitDiffCheck": "passed",
+      "repositoryChecks": "not-run-by-reviewer; root owns current required checks",
+      "modelEvaluations": "not-run",
+      "runtimeBehavior": "not-run"
+    },
+    "limits": [
+      "This is source-contract review, not a runtime activation, product completeness, native authentication, human acceptance or whole-Goal acceptance verdict.",
+      "The reviewer performed no fresh network requests; Academy delivery evidence is hash-verified preserved independent readback.",
+      "The earlier over-budget check failure is not replaced by this review. Root must pass unchanged current budgets/checks before publication and merge."
+    ],
+    "effects": {
+      "sourceEdits": 0,
+      "gitMutations": 0,
+      "dependencyInstalls": 0,
+      "networkCalls": 0,
+      "runtimeActions": 0,
+      "modelRequests": 0,
+      "writes": "Independent review and publication-safe receipt only under current-session."
+    },
+    "authority": "none",
+    "nativePermissionGranted": false,
+    "acceptanceDecision": null,
+    "preparedAt": "2026-10-14T17:02:22.961Z",
+    "originalReviewObservedAt": "2026-10-14T17:02:22.959Z",
+    "rawOriginalReceiptSha256": "cdac0d7eb0a4c8a803e56de43e14ef00869370c2715d2d8a86a1ce9ab692a8b7",
+    "publicationAllowlist": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "reviewedCommit": "989d728d5f15f8d1c890ffa56bdc662091ddbb6a",
+      "reviewedTreeSha": "6c8bbc38c897c5eabf35f9fc01d17947d3282fe5",
+      "content": "This sanitized independent source review receipt only. No local original receipts, host paths, academic data or runtime state."
+    },
+    "publicationStatus": "prepared-not-published",
+    "authenticatedStatus": "not-submitted-by-reviewer"
+  },
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "entryCount": 525,
+    "blobCount": 412
+  },
+  "validation": {
+    "sharedHelperPath": "ci/quality/receipt-validator.ts",
+    "helperSourceSha256": "d4795b86a387b126face7039f0c6dcdfb5ca6034c05e6233bf2d848d7a208986",
+    "recursiveGitTreeManifest": "passed",
+    "independentManifestDigestRecomputation": "passed",
+    "originalReviewReadback": "passed",
+    "leadReportedCurrentChecks": {
+      "source": "current-native-delegation-task-message",
+      "reportedBy": "/root",
+      "reportedPassed": [
+        "Work validate and transition",
+        "85 Git Work tests",
+        "39 handoff tests",
+        "imports",
+        "full source CI",
+        "quality"
+      ],
+      "executedByThisReviewer": false
+    },
+    "publishedImmutableResultProvenance": "not-created-yet; accountable Lead publishes this exact RESULT first"
+  },
+  "scopeAndLimits": [
+    "This RESULT binds the existing independent source-contract review only to exact head 989d728d and tree 6c8bbc38; it does not approve a changed tree or the separate 7954d23b budget-fix candidate.",
+    "Full recursive tree manifestation binds source identity; semantic review assessed the 20 changed Work/Decision/input/Spec/Plan/Task files and preserved baseline records.",
+    "No runtime activation, model evaluation, Academy product completeness, human acceptance or whole-Goal acceptance is claimed.",
+    "Native actor paths are source declarations; authenticated status and immutable Git publication remain separate Lead-owned steps."
+  ],
+  "effects": {
+    "sourceMutations": 0,
+    "gitMutations": 0,
+    "networkCalls": 0,
+    "runtimeActions": 0,
+    "modelRequests": 0
+  },
+  "acceptanceDecision": null
+}
