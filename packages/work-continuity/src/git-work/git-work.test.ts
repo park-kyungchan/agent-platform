@@ -259,6 +259,364 @@ const open = (root: string, oid: string) =>
 const byTask = (rows: GitWorkRecord[], id: string) =>
   rows.find((row) => row.kind === "task" && row.id === id) as TaskRecord;
 
+function nativeChainRecords(): GitWorkRecord[] {
+  const rows: GitWorkRecord[] = initialRecords().filter((row) => row.kind !== "task");
+  rows.push(...completed("a"), ...completed("b"));
+  for (const [id, runtimeId] of [
+    ["a", "wsl"],
+    ["b", "vps"],
+  ] as const) {
+    const row = byTask(rows, id);
+    row.executionClass = "native-effect";
+    row.runtimeId = runtimeId;
+    row.occurrence = { runtimeId, attemptId: `attempt-${id}`, occurrenceId: `occurrence-${id}` };
+    row.executionEvidenceId = `native-${id}`;
+    rows.push(
+      input(`intent-${id}`, { task: id, phase: "intent" }),
+      input(`result-${id}`, { task: id, phase: "result" }),
+      input(`native-receipt-${id}`, {
+        schema: "common.git-prerequisite-receipt.v1",
+        logical: { ...row.logical },
+        state: { ...row.state },
+        occurrence: { ...row.occurrence },
+        intent: ref(`intent-${id}`),
+        result: ref(`result-${id}`),
+        verification: ref(`verification-${id}`),
+      }),
+      {
+        ...base,
+        kind: "evidence",
+        id: `native-${id}`,
+        evidenceKind: "native-execution",
+        source: ref(`native-receipt-${id}`),
+      },
+    );
+  }
+  byTask(rows, "b").dependsOn = [
+    {
+      taskId: "a",
+      milestone: "execution-and-verification",
+      receiptEvidenceId: "native-a",
+      receiverEvidenceId: "received-a",
+    },
+  ];
+  const occurrence = byTask(rows, "a").occurrence!;
+  rows.push(
+    input("received-a", {
+      schema: "common.git-receiver-receipt.v1",
+      receiverRuntimeId: "vps",
+      prerequisiteTaskId: "a",
+      producer: { ...occurrence },
+      payload: ref("native-receipt-a"),
+    }),
+    {
+      ...base,
+      kind: "evidence",
+      id: "received-a",
+      evidenceKind: "receiver",
+      source: ref("received-a"),
+    },
+  );
+  return rows;
+}
+
+describe("PR3 historical meaning and custody joins", () => {
+  test.each([
+    "execution",
+    "execution-class",
+    "dependencies",
+    "acceptance-criteria",
+    "proof-removal",
+    "verification",
+    "local-durability",
+    "shared-delivery",
+    "formal-completion",
+  ] as const)("completed Task cannot reinterpret or regress %s", async (variant) => {
+    const rows: GitWorkRecord[] = initialRecords().filter((row) => row.kind !== "task");
+    rows.push(...completed("a"), ...completed("b"));
+    for (const id of ["a", "b"]) {
+      const row = byTask(rows, id);
+      row.state.sharedAudit = "delivery-confirmed";
+      row.state.formalCompletion = "complete";
+    }
+    const { root, oid } = await fixture(rows);
+    const before = await open(root, oid);
+    const a = byTask(rows, "a");
+    if (variant === "execution") a.state = { ...state };
+    if (variant === "execution-class") a.executionClass = "native-effect";
+    if (variant === "dependencies")
+      a.dependsOn = [{ taskId: "b", milestone: "execution-and-verification" }];
+    if (variant === "acceptance-criteria" && a.artifact?.kind === "task")
+      a.artifact.payload.acceptanceCriteria = ["A different requirement"];
+    if (variant === "proof-removal") {
+      a.verificationEvidenceIds = [];
+      a.state.verification = "pending";
+      a.state.formalCompletion = "pending";
+    }
+    if (variant === "verification") {
+      a.state.verification = "pending";
+      a.state.formalCompletion = "pending";
+    }
+    if (variant === "local-durability") {
+      a.state.localAudit = "unknown";
+      a.state.formalCompletion = "pending";
+    }
+    if (variant === "shared-delivery") {
+      a.state.sharedAudit = "pending";
+      a.state.formalCompletion = "audit-synchronization-pending";
+    }
+    if (variant === "formal-completion") a.state.formalCompletion = "pending";
+    await put(root, a);
+    const after = await open(root, await commit(root));
+    if (variant !== "execution-class")
+      expect((await validateGitWorkRecords(after)).valid).toBe(true);
+    const result = await validateGitWorkTransition(before, after);
+    expect(result.valid).toBe(false);
+    const expected = ["execution-class", "dependencies", "acceptance-criteria"].includes(variant)
+      ? "COMPLETED_TASK_CONTRACT_HISTORY_CHANGED:a"
+      : variant === "proof-removal"
+        ? "COMPLETED_TASK_VERIFICATION_HISTORY_CHANGED:a"
+        : "COMPLETED_TASK_MILESTONE_REGRESSION:a";
+    expect(result.findings).toContain(expected);
+  });
+  test("completed verification can add current proof while preserving the original contract and proof", async () => {
+    const rows = initialRecords().filter((row) => !(row.kind === "task" && row.id === "a"));
+    rows.push(...completed("a"));
+    const { root, oid } = await fixture(rows);
+    const before = await open(root, oid);
+    const a = byTask(rows, "a");
+    const proof = verification("a", a);
+    proof.id = "fixture:verification:a-current";
+    a.verificationEvidenceIds.push("proof-a-current");
+    if (a.artifact?.kind === "task")
+      a.artifact.payload.verificationRefs = [
+        ...(a.artifact.payload.verificationRefs ?? []),
+        proof.id,
+      ];
+    await put(root, input("verification-a-current", JSON.parse(JSON.stringify(proof))));
+    await put(root, {
+      ...base,
+      kind: "evidence",
+      id: "proof-a-current",
+      evidenceKind: "verification",
+      source: ref("verification-a-current"),
+    });
+    await put(root, a);
+    const after = await open(root, await commit(root));
+    expect((await validateGitWorkRecords(after)).valid).toBe(true);
+    expect((await validateGitWorkTransition(before, after)).valid).toBe(true);
+  });
+  test("native prerequisite audit advances retain an already executed receiver's historical receipt", async () => {
+    const rows = nativeChainRecords();
+    const { root, oid } = await fixture(rows);
+    const before = await open(root, oid);
+    expect((await validateGitWorkRecords(before)).valid).toBe(true);
+    const b = await before.readRecord({ kind: "task", id: "b" });
+    const oldReceipt = await before.readSource(ref("native-receipt-a"));
+    const a = byTask(rows, "a");
+    a.state.sharedAudit = "delivery-confirmed";
+    a.state.formalCompletion = "complete";
+    await put(root, a);
+    const after = await open(root, await commit(root));
+    expect((await validateGitWorkRecords(after)).valid).toBe(true);
+    expect((await validateGitWorkTransition(before, after)).valid).toBe(true);
+    expect(
+      (await readGitWorkContext(after, { taskId: "b", latestRelevant: "current" })).status,
+    ).toBe("source-qualified");
+    expect(await after.readRecord({ kind: "task", id: "b" })).toEqual(b);
+    expect((await after.readSource(ref("native-receipt-a"))).blobOid).toBe(oldReceipt.blobOid);
+    const advanced = after;
+    a.state.sharedAudit = "pending";
+    a.state.formalCompletion = "audit-synchronization-pending";
+    await put(root, a);
+    expect(
+      (await validateGitWorkTransition(advanced, await open(root, await commit(root)))).findings,
+    ).toContain("COMPLETED_TASK_MILESTONE_REGRESSION:a");
+  });
+  test("completed native execution cannot be retrospectively relabeled source-only", async () => {
+    const rows = nativeChainRecords();
+    const { root, oid } = await fixture(rows);
+    const before = await open(root, oid);
+    const a = byTask(rows, "a");
+    a.executionClass = "source-only";
+    delete a.occurrence;
+    delete a.executionEvidenceId;
+    await put(root, a);
+    const after = await open(root, await commit(root));
+    expect((await validateGitWorkRecords(after)).valid).toBe(true);
+    expect((await validateGitWorkTransition(before, after)).findings).toContain(
+      "COMPLETED_TASK_CONTRACT_HISTORY_CHANGED:a",
+    );
+  });
+  test.each(["intent-durable", "result-durable"] as const)(
+    "completed uncertainty may advance to a durable result, not a weaker intent: %s",
+    async (localAudit) => {
+      const rows = initialRecords();
+      const a = byTask(rows, "a");
+      a.state = {
+        execution: "complete",
+        verification: "unverified",
+        localAudit: "uncertainty-durable",
+        sharedAudit: "pending",
+        formalCompletion: "pending",
+      };
+      const { root, oid } = await fixture(rows);
+      const before = await open(root, oid);
+      a.state.localAudit = localAudit;
+      await put(root, a);
+      const after = await open(root, await commit(root));
+      expect((await validateGitWorkRecords(after)).valid).toBe(true);
+      const transition = await validateGitWorkTransition(before, after);
+      expect(transition.valid).toBe(localAudit === "result-durable");
+      if (localAudit === "intent-durable")
+        expect(transition.findings).toContain("COMPLETED_TASK_MILESTONE_REGRESSION:a");
+    },
+  );
+  test.each([
+    "complete",
+    "uncertain",
+    "not-listed",
+    "wrong-runtime",
+    "wrong-attempt",
+    "wrong-occurrence",
+    "source-only-owner",
+  ] as const)("effect status joins its running native Task occurrence: %s", async (variant) => {
+    const rows = initialRecords();
+    const a = byTask(rows, "a"),
+      b = byTask(rows, "b");
+    a.executionClass = "native-effect";
+    a.state.execution = "running";
+    a.runtimeId = "wsl";
+    a.occurrence = { runtimeId: "wsl", attemptId: "attempt", occurrenceId: "occurrence" };
+    a.effectIds = variant === "not-listed" ? [] : ["partial-effect"];
+    const effectOccurrence = { ...a.occurrence };
+    if (variant === "wrong-runtime") effectOccurrence.runtimeId = "vps";
+    if (variant === "wrong-attempt") effectOccurrence.attemptId = "different";
+    if (variant === "wrong-occurrence") effectOccurrence.occurrenceId = "different";
+    if (variant === "source-only-owner") {
+      a.executionClass = "source-only";
+      a.effectIds = [];
+      delete a.occurrence;
+    }
+    const valid = variant === "complete" || variant === "uncertain";
+    if (!valid) {
+      b.executionClass = "native-effect";
+      b.pendingEffectIds = ["partial-effect"];
+    }
+    rows.push(
+      input("effect-observation", { scope: "synthetic source observation" }),
+      {
+        ...base,
+        kind: "evidence",
+        id: "effect-proof",
+        evidenceKind: "observation",
+        source: ref("effect-observation"),
+      },
+      {
+        ...base,
+        kind: "effect",
+        id: "partial-effect",
+        taskId: "a",
+        status: variant === "uncertain" ? "uncertain" : "completed",
+        occurrence: effectOccurrence,
+        evidenceIds: ["effect-proof"],
+      },
+    );
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const checked = await validateGitWorkRecords(reader);
+    expect(checked.valid).toBe(valid);
+    if (valid)
+      expect(
+        (await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" })).status,
+      ).toBe("source-qualified");
+    else {
+      expect(checked.findings).toContain("EFFECT_TASK_OCCURRENCE_BINDING_MISMATCH:partial-effect");
+      expect(checked.findings).not.toContain("EFFECT_REPLAY_OR_UNCERTAIN:partial-effect");
+    }
+  });
+  test.each([
+    "reordered",
+    "omitted-completed",
+    "omitted-uncertain",
+    "duplicate-record",
+    "duplicate-source",
+  ] as const)("historical source fence is an exact set: %s", async (variant) => {
+    const rows = initialRecords();
+    const original = rows.find((row) => row.kind === "input" && row.id === "fences") as InputRecord;
+    original.content = {
+      completedEffectIds: ["already", "earlier"],
+      uncertainEffectIds: ["unknown", "unresolved"],
+    };
+    const fence = rows.find((row) => row.kind === "effect-fence");
+    if (fence?.kind !== "effect-fence") throw Error("fixture");
+    fence.completedEffectIds = ["earlier", "already"];
+    fence.uncertainEffectIds = ["unresolved", "unknown"];
+    if (variant === "omitted-completed") fence.completedEffectIds = ["already"];
+    if (variant === "omitted-uncertain") fence.uncertainEffectIds = ["unknown"];
+    if (variant === "duplicate-record") fence.completedEffectIds.push("already");
+    if (variant === "duplicate-source")
+      original.content = {
+        completedEffectIds: ["already", "earlier", "already"],
+        uncertainEffectIds: ["unknown", "unresolved"],
+      };
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    expect((await validateGitWorkRecords(reader)).valid).toBe(variant === "reordered");
+    expect(
+      (await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" })).status,
+    ).toBe(variant === "reordered" ? "source-qualified" : "held");
+    if (variant === "reordered") {
+      fence.completedEffectIds.reverse();
+      fence.uncertainEffectIds.reverse();
+      await put(root, fence);
+      expect(
+        (await validateGitWorkTransition(reader, await open(root, await commit(root)))).valid,
+      ).toBe(true);
+    }
+  });
+  test.each([
+    "source-owner-question",
+    "non-input",
+    "different-work",
+    "different-project",
+    "different-domain",
+  ] as const)(
+    "selection question must be an appropriately scoped original input: %s",
+    async (variant) => {
+      const rows = initialRecords();
+      const decision = rows.find((row) => row.kind === "decision");
+      if (decision?.kind !== "decision") throw Error("fixture");
+      decision.selectionContext = {
+        text: "Which canonical source?",
+        source: {
+          kind: "snapshot",
+          path: "selected-question.json",
+          fragment: "#/content/question",
+        },
+      };
+      const question = input("question", { question: "Which canonical source?" });
+      if (variant === "different-work") question.workId = "another-work";
+      if (variant === "different-project") question.projectId = "another-project";
+      if (variant === "different-domain") question.domainId = "another-domain";
+      const { root } = await fixture(rows);
+      await writeFile(
+        join(root, "selected-question.json"),
+        JSON.stringify(
+          variant === "non-input" ? { content: { question: "Which canonical source?" } } : question,
+        ),
+      );
+      const reader = await open(root, await commit(root));
+      expect((await validateGitWorkRecords(reader)).valid).toBe(
+        variant === "source-owner-question",
+      );
+      expect(
+        (await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" })).status,
+      ).toBe(variant === "source-owner-question" ? "source-qualified" : "held");
+    },
+  );
+});
+
 async function advancingContractsFixture(): Promise<{
   root: string;
   beforeOid: string;

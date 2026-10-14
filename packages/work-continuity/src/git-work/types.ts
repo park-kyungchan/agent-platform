@@ -184,7 +184,10 @@ export interface GitWorkSelection {
   repositories?: Record<string, string>;
 }
 export interface ResolvedSource {
+  /** Resolved Git receipt address; this proof does not authenticate a native owner. */
   reference: SnapshotSource | ExternalGitSource;
+  /** Original native owner/locator declaration, deeply frozen by the source reader. */
+  declaredNativeSource?: Readonly<NativeSource>;
   repositoryId: string;
   commit: string;
   path: string;
@@ -231,6 +234,8 @@ export interface ContextSourceProjection {
   fragment?: string;
   repositoryId?: string;
   commit?: string;
+  declaredNativeSource?: Readonly<NativeSource>;
+  nativeAuthorshipVerified?: false;
 }
 export interface GitWorkContext {
   status: "source-qualified" | "held";

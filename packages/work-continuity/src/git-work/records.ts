@@ -1,5 +1,6 @@
 import { validateArtifact } from "@palantirkc/ontology";
 import { createHash } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { assertLogicalIdentity } from "../logical-identity.ts";
 import { validateTaskOperationalState } from "../operational-state.ts";
 import type {
@@ -7,7 +8,6 @@ import type {
   EvidenceRecord,
   GitWorkReader,
   GitWorkRecord,
-  JsonValue,
   NativeOccurrence,
   PrerequisiteReceipt,
   RecordReference,
@@ -15,6 +15,7 @@ import type {
   SourceReference,
   TaskDependency,
   TaskRecord,
+  TaskOperationalState,
   ValidationResult,
 } from "./types.ts";
 
@@ -45,15 +46,53 @@ const identityKeys = [
   "planRevision",
   "taskId",
 ] as const;
-const stateKeys = [
-  "execution",
-  "verification",
-  "localAudit",
-  "sharedAudit",
-  "formalCompletion",
-] as const;
 const sameFields = (a: object, b: object, keys: readonly string[]) =>
   keys.every((key) => (a as Record<string, unknown>)[key] === (b as Record<string, unknown>)[key]);
+const sameStringSet = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((id) => b.includes(id));
+const formalMilestone = { pending: 0, "audit-synchronization-pending": 1, complete: 2 } as const;
+function completedMilestonesPreserved(
+  prior: TaskOperationalState,
+  next: TaskOperationalState,
+): boolean {
+  return (
+    next.execution === "complete" &&
+    (prior.verification !== "passed" || next.verification === "passed") &&
+    (prior.localAudit !== "result-durable" || next.localAudit === "result-durable") &&
+    (prior.localAudit !== "uncertainty-durable" ||
+      ["uncertainty-durable", "result-durable"].includes(next.localAudit)) &&
+    (!["intent-durable", "uncertainty-durable"].includes(prior.localAudit) ||
+      ["intent-durable", "uncertainty-durable", "result-durable"].includes(next.localAudit)) &&
+    (prior.sharedAudit !== "delivery-confirmed" || next.sharedAudit === "delivery-confirmed") &&
+    formalMilestone[next.formalCompletion] >= formalMilestone[prior.formalCompletion]
+  );
+}
+function completedTaskContract(task: TaskRecord): object {
+  const artifact =
+    task.artifact?.kind === "task"
+      ? {
+          ...task.artifact,
+          payload: {
+            ...task.artifact.payload,
+            acceptanceCriteria: [...task.artifact.payload.acceptanceCriteria].sort(),
+            verificationRefs: undefined,
+          },
+        }
+      : task.artifact;
+  return {
+    logical: task.logical,
+    title: task.title,
+    executionClass: task.executionClass,
+    dependsOn: [...task.dependsOn].sort((a, b) => a.taskId.localeCompare(b.taskId)),
+    decisionIds: [...task.decisionIds].sort(),
+    effectIds: [...task.effectIds].sort(),
+    pendingEffectIds: [...(task.pendingEffectIds ?? [])].sort(),
+    runtimeId: task.runtimeId,
+    occurrence: task.occurrence,
+    executionEvidenceId: task.executionEvidenceId,
+    artifact,
+  };
+}
 /** A scoped source address; it does not allocate a native occurrence or change the logical Task ID. */
 export function taskVerificationTarget(task: TaskRecord): string {
   return (
@@ -402,6 +441,14 @@ export async function validateRecordSources(
     requireValue(answer.value === record.answer, "ACTUAL_ANSWER_FRAGMENT_MISMATCH");
     if (record.selectionContext) {
       const selected = await read(record.selectionContext.source);
+      const context = assertRecord(selected.document);
+      requireValue(
+        context.kind === "input" &&
+          context.domainId === record.domainId &&
+          context.projectId === record.projectId &&
+          context.workId === record.workId,
+        "SELECTION_CONTEXT_SOURCE_CLASS_OR_SCOPE_MISMATCH",
+      );
       requireValue(
         selected.value === record.selectionContext.text,
         "SELECTION_CONTEXT_FRAGMENT_MISMATCH",
@@ -413,12 +460,8 @@ export async function validateRecordSources(
       object(source.value) &&
         strings(source.value.completedEffectIds) &&
         strings(source.value.uncertainEffectIds) &&
-        record.completedEffectIds.every((id) =>
-          (source.value as { completedEffectIds: string[] }).completedEffectIds.includes(id),
-        ) &&
-        record.uncertainEffectIds.every((id) =>
-          (source.value as { uncertainEffectIds: string[] }).uncertainEffectIds.includes(id),
-        ),
+        sameStringSet(record.completedEffectIds, source.value.completedEffectIds) &&
+        sameStringSet(record.uncertainEffectIds, source.value.uncertainEffectIds),
       "HISTORICAL_FENCE_SOURCE_MISMATCH",
     );
   } else if (record.kind === "evidence") {
@@ -532,7 +575,11 @@ export async function dependencyFindings(
         sameOccurrence(prior.occurrence, receipt.occurrence),
       "PREREQUISITE_OCCURRENCE_MISMATCH",
     );
-    requireValue(sameFields(receipt.state, prior.state, stateKeys), "PREREQUISITE_STATE_MISMATCH");
+    requireValue(
+      sameFields(receipt.state, prior.state, ["execution", "verification", "localAudit"]) &&
+        completedMilestonesPreserved(receipt.state, prior.state),
+      "PREREQUISITE_STATE_MISMATCH",
+    );
     for (const ref of [receipt.intent, receipt.result, receipt.verification]) {
       sourceReference(ref);
       await reader.readSource(ref);
@@ -605,8 +652,22 @@ export async function validateRecordSet(
         record.completedEffectIds.forEach((id) => completed.add(id));
         record.uncertainEffectIds.forEach((id) => uncertain.add(id));
       }
-      if (record.kind === "effect")
+      if (record.kind === "effect") {
+        const owner = records.get(recordKey({ kind: "task", id: record.taskId }));
+        requireValue(
+          owner?.kind === "task" &&
+            owner.executionClass === "native-effect" &&
+            owner.domainId === record.domainId &&
+            owner.projectId === record.projectId &&
+            owner.workId === record.workId &&
+            owner.effectIds.includes(record.id) &&
+            owner.occurrence &&
+            owner.runtimeId === record.occurrence.runtimeId &&
+            sameOccurrence(owner.occurrence, record.occurrence),
+          "EFFECT_TASK_OCCURRENCE_BINDING_MISMATCH",
+        );
         (record.status === "completed" ? completed : uncertain).add(record.id);
+      }
       if (record.kind === "work") {
         const spec = records.get(
             recordKey({ kind: "spec", id: record.spec.id, revision: record.spec.revision }),
@@ -836,9 +897,31 @@ export async function validateGitWorkTransition(
     if (
       record.kind === "task" &&
       record.state.execution === "complete" &&
-      (successor?.kind !== "task" || !sameFields(record.logical, successor.logical, identityKeys))
+      (successor?.kind !== "task" ||
+        !isDeepStrictEqual(completedTaskContract(record), completedTaskContract(successor)))
     ) {
       findings.push(`COMPLETED_TASK_CONTRACT_HISTORY_CHANGED:${record.id}`);
+    }
+    if (
+      record.kind === "task" &&
+      record.state.execution === "complete" &&
+      successor?.kind === "task"
+    ) {
+      if (!completedMilestonesPreserved(record.state, successor.state))
+        findings.push(`COMPLETED_TASK_MILESTONE_REGRESSION:${record.id}`);
+      const oldArtifactRefs =
+        record.artifact?.kind === "task" ? (record.artifact.payload.verificationRefs ?? []) : [];
+      const newArtifactRefs =
+        successor.artifact?.kind === "task"
+          ? (successor.artifact.payload.verificationRefs ?? [])
+          : [];
+      if (
+        record.verificationEvidenceIds.some(
+          (id) => !successor.verificationEvidenceIds.includes(id),
+        ) ||
+        oldArtifactRefs.some((id) => !newArtifactRefs.includes(id))
+      )
+        findings.push(`COMPLETED_TASK_VERIFICATION_HISTORY_CHANGED:${record.id}`);
     }
     if (
       record.kind === "work" &&
@@ -846,10 +929,22 @@ export async function validateGitWorkTransition(
       record.historicalFenceIds.some((id) => !successor.historicalFenceIds.includes(id))
     )
       findings.push("HISTORICAL_FENCE_LINK_REMOVED");
-    if (
-      ["input", "effect", "effect-fence", "spec", "plan"].includes(record.kind) &&
-      JSON.stringify(record) !== JSON.stringify(successor)
-    )
+    const historyChanged =
+      record.kind === "effect-fence" && successor?.kind === "effect-fence"
+        ? !isDeepStrictEqual(
+            {
+              ...record,
+              completedEffectIds: [...record.completedEffectIds].sort(),
+              uncertainEffectIds: [...record.uncertainEffectIds].sort(),
+            },
+            {
+              ...successor,
+              completedEffectIds: [...successor.completedEffectIds].sort(),
+              uncertainEffectIds: [...successor.uncertainEffectIds].sort(),
+            },
+          )
+        : JSON.stringify(record) !== JSON.stringify(successor);
+    if (["input", "effect", "effect-fence", "spec", "plan"].includes(record.kind) && historyChanged)
       findings.push(`IMMUTABLE_ORIGINAL_OR_EFFECT_CHANGED:${key}`);
     if (record.kind === "decision") {
       if (

@@ -175,13 +175,18 @@ export async function openGitWork(input: GitWorkSelection): Promise<GitWorkReade
     reference = freeze(structuredClone(reference));
     if (reference.kind === "native") {
       if (
-        !reference.ownerId ||
-        !reference.locator ||
+        ![reference.ownerId, reference.locator].every(
+          (value) =>
+            typeof value === "string" &&
+            value.trim().length > 0 &&
+            value.length <= 12_000 &&
+            !value.includes("\0"),
+        ) ||
         !reference.receipt ||
         !["snapshot", "git"].includes(reference.receipt.kind)
       )
         throw Error("INVALID_NATIVE_SOURCE_REFERENCE");
-      return source(reference.receipt);
+      return { ...(await source(reference.receipt)), declaredNativeSource: reference };
     }
     if (!["snapshot", "git"].includes(reference.kind)) throw Error("INVALID_SOURCE_REFERENCE");
     assertGitPath(reference.path);

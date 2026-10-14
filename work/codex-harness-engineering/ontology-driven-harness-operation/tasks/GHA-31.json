@@ -1,0 +1,32 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "GHA-31",
+  "kind": "task",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+    "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+    "specRevision": 5,
+    "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "planRevision": 5,
+    "taskId": "GHA-31"
+  },
+  "title": "Retain native ownership declarations beside resolved Git source proof",
+  "state": {
+    "execution": "running",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "dependsOn": [],
+  "decisionIds": ["U1", "U6", "U13", "U38"],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "executionClass": "source-only"
+}

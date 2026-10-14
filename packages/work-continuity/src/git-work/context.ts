@@ -89,33 +89,31 @@ export async function readGitWorkContext(
     selected?.kind === "task"
       ? [selected.id, ...selected.effectIds, ...(selected.pendingEffectIds ?? [])]
       : [];
-  const uniqueSources = [
-    ...new Map(
-      sources.map((source) => [
-        JSON.stringify([
-          source.repositoryId,
-          source.commit,
-          source.path,
-          source.reference.fragment ?? "#",
-        ]),
-        source,
-      ]),
-    ).values(),
-  ];
-  const sourceId = (reference: SourceReference) => {
+  // Blob identity alone cannot represent distinct original owner declarations.
+  const sourceKey = (reference: SourceReference): string => {
     const original = reference.kind === "native" ? reference.receipt : reference;
     const repositoryId =
       original.kind === "git" ? original.repositoryId : reader.selection.repositoryId;
     const commit = original.kind === "git" ? original.commit : reader.commit;
-    const source = uniqueSources.find(
-      (row) =>
-        row.repositoryId === repositoryId &&
-        row.commit === commit &&
-        row.path === original.path &&
-        (row.reference.fragment ?? "#") === (original.fragment ?? "#"),
-    );
-    return source ? `s${uniqueSources.indexOf(source) + 1}` : null;
+    return JSON.stringify([
+      reference.kind,
+      ...(reference.kind === "native" ? [reference.ownerId, reference.locator] : []),
+      original.kind,
+      repositoryId,
+      commit,
+      original.path,
+      original.fragment ?? null,
+      original.sha256 ?? null,
+    ]);
   };
+  const sourceByDeclaration = new Map(
+    sources.map((source) => [sourceKey(source.declaredNativeSource ?? source.reference), source]),
+  );
+  const uniqueSources = [...sourceByDeclaration.values()];
+  const sourceIds = new Map(
+    [...sourceByDeclaration.keys()].map((key, index) => [key, `s${index + 1}`]),
+  );
+  const sourceId = (reference: SourceReference) => sourceIds.get(sourceKey(reference)) ?? null;
   const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as JsonValue;
   const projected: ContextRecordProjection[] = [];
   for (const record of records.values()) {
@@ -193,6 +191,12 @@ export async function readGitWorkContext(
       ...(source.reference.fragment ? { fragment: source.reference.fragment } : {}),
       ...(source.repositoryId !== reader.selection.repositoryId || source.commit !== reader.commit
         ? { repositoryId: source.repositoryId, commit: source.commit }
+        : {}),
+      ...(source.declaredNativeSource
+        ? {
+            declaredNativeSource: source.declaredNativeSource,
+            nativeAuthorshipVerified: false as const,
+          }
         : {}),
     })),
     projection: "verified-semantic-context",
