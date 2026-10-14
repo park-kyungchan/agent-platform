@@ -293,19 +293,24 @@ export function projectHomeContext(options: {
     };
     const prefix =
       "Source-owned Home bootstrap. Preserve actualNativeCwd; enter sourceOwnerProjectRoot for effectful Work. Configured capabilities do not prove callable/authenticated tools. This hook does not capture or accept the prompt.\n";
-    const omitted: string[] = [],
-      render = () => `${prefix}${JSON.stringify({ ...context, omitted })}`;
-    if (render().length > maxChars) throw new Error("Essential Home context exceeds the budget");
-    for (const [key, value] of Object.entries({
+    const optionalContext = Object.entries({
       selectedCapabilities,
       semanticOwners,
       projectEntrypoints,
       canonicalSourcePaths: contract.canonicalSources.map(({ path }) => path),
-    })) {
+    });
+    // Reserve every omission label before fitting optional data so a later
+    // omission cannot push otherwise valid essential context over the cap.
+    const omitted = optionalContext.map(([key]) => key),
+      render = () => `${prefix}${JSON.stringify({ ...context, omitted })}`;
+    if (render().length > maxChars) throw new Error("Essential Home context exceeds the budget");
+    for (const [key, value] of optionalContext) {
+      const omittedIndex = omitted.indexOf(key);
       context[key] = value;
+      omitted.splice(omittedIndex, 1);
       if (render().length > maxChars) {
         delete context[key];
-        omitted.push(key);
+        omitted.splice(omittedIndex, 0, key);
       }
     }
     const result = render();
