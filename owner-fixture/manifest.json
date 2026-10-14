@@ -5,13 +5,13 @@
     {
       "owner": "codex-harness-engineering",
       "path": "src/legacy/harness/owner-context-loader.ts",
-      "sha256": "57742bb4332e9bb25039ec9830877bd1cd72bb27e24d2260e9c571814799aa16",
+      "sha256": "cd958118d5a9b6c5d1d23397a16a140ca86ca338446b749aacc79dd1d0cd54e5",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {
       "owner": "codex-harness-engineering",
       "path": "src/legacy/harness/provider-closure.ts",
-      "sha256": "618aeea8e1f19b01ec1c39248e2ec6121926c26d682874ed8d1223a78e4f7986",
+      "sha256": "1f8f07de32863916bc41c1f399f774e8ce8d6603d9d074f0566c40fc622ec628",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {

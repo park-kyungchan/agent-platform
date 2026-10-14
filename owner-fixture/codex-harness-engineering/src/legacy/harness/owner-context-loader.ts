@@ -32,11 +32,12 @@ async function observe(){
  }
  const pins=[...ownerSources.map(s=>s.pin),...provider.pins].sort((a,b)=>a.path.localeCompare(b.path));
  for(const pin of pins)if((await readExact(pin.path)).pin.sha256!==pin.sha256)throw Error('Context provider changed during observation');
- return {pins,signature:hash(Buffer.from(JSON.stringify(pins)))};
+ return {pins,gitWorkModulePath:provider.gitWorkModulePath,signature:hash(Buffer.from(JSON.stringify(pins)))};
 }
 type IndexApi=typeof import('../../continuity/index');
 type SectionsApi=typeof import('../../continuity/sections');
-export interface LoadedCodexOwnerContext {index:IndexApi;sections:SectionsApi;sourcePins:ProviderPin[];verifyCurrentSourceClosure():Promise<void>}
+type GitWorkApi=typeof import('@palantirkc/work-continuity/git-work');
+export interface LoadedCodexOwnerContext {index:IndexApi;sections:SectionsApi;gitWork?:GitWorkApi;sourcePins:ProviderPin[];verifyCurrentSourceClosure():Promise<void>}
 let loaded:LoadedCodexOwnerContext|undefined,signature:string|undefined,pending:Promise<LoadedCodexOwnerContext>|undefined;
 export async function loadCodexOwnerContext():Promise<LoadedCodexOwnerContext>{
  if(pending){const result=await pending;await result.verifyCurrentSourceClosure();return result;}
@@ -46,9 +47,11 @@ export async function loadCodexOwnerContext():Promise<LoadedCodexOwnerContext>{
   const cache=require.cache;
   if(!cache||typeof cache!=='object'||observation.pins.filter(p=>p.path.endsWith('.ts')).some(p=>Object.hasOwn(cache,p.path)))throw Error('Codex context code was imported before its observed source closure; use a fresh process');
   const index:IndexApi=await import(pathToFileURL(ownerPaths[0]!).href),sections:SectionsApi=await import(pathToFileURL(ownerPaths[7]!).href);
+  const gitWork:GitWorkApi|undefined=observation.gitWorkModulePath?await import(pathToFileURL(observation.gitWorkModulePath).href):undefined;
+  if(gitWork&&['resolveGitWorkSelection','openGitWork','readGitWorkContext'].some(name=>typeof gitWork[name as keyof GitWorkApi]!=='function'))throw Error('Registered Git Work provider API differs');
   if((await observe()).signature!==observation.signature)throw Error('Codex context provider changed during import; use a fresh process');
   signature=observation.signature;
-  loaded={index,sections,sourcePins:observation.pins,verifyCurrentSourceClosure:async()=>{if((await observe()).signature!==signature)throw Error('Codex context code successor requires a fresh process');}};
+  loaded={index,sections,...(gitWork?{gitWork}:{}),sourcePins:observation.pins,verifyCurrentSourceClosure:async()=>{if((await observe()).signature!==signature)throw Error('Codex context code successor requires a fresh process');}};
   return loaded;
  })();
  try{return await pending;}finally{pending=undefined;}

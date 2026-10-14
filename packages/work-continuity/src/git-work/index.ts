@@ -1,5 +1,12 @@
 export type * from "./types.ts";
-export { openGitWork, gitWorkPath, gitRecordPath, encodedId } from "./source.ts";
+export {
+  openGitWork,
+  resolveGitWorkSelection,
+  gitReadEnvironment,
+  gitWorkPath,
+  gitRecordPath,
+  encodedId,
+} from "./source.ts";
 export {
   validateGitWorkRecords,
   validateGitWorkTransition,

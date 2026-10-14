@@ -1,12 +1,12 @@
 import { readFile } from "node:fs/promises";
 import {
   openGitWork,
+  resolveGitWorkSelection,
   qualifyGitWorkStart,
   readGitWorkContext,
   validateGitWorkRecords,
   validateGitWorkTransition,
   type ContextRequest,
-  type GitWorkSelection,
   type StartRequest,
 } from "../packages/work-continuity/src/git-work/index.ts";
 import { readDocumentationRegistry } from "../packages/work-continuity/src/runtime-docs/index.ts";
@@ -24,53 +24,10 @@ function object(value: unknown): Record<string, unknown> {
     throw Error("Request must be a JSON object");
   return value as Record<string, unknown>;
 }
-export function gitReadEnvironment(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    GIT_OPTIONAL_LOCKS: "0",
-    GIT_TERMINAL_PROMPT: "0",
-    GIT_CONFIG_NOSYSTEM: "1",
-    GIT_CONFIG_GLOBAL: "/dev/null",
-  };
-  for (const key of [
-    "GIT_DIR",
-    "GIT_WORK_TREE",
-    "GIT_INDEX_FILE",
-    "GIT_COMMON_DIR",
-    "GIT_CONFIG_COUNT",
-    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
-  ])
-    delete env[key];
-  return env;
-}
-export async function resolveGitWorkSelection(value: unknown): Promise<GitWorkSelection> {
-  const request = object(value);
-  if (
-    typeof request.repositoryRoot !== "string" ||
-    typeof request.commit !== "string" ||
-    !request.commit ||
-    request.commit.length > 256 ||
-    request.commit.includes("\0")
-  )
-    throw Error("Explicit repository root and bounded local commit/ref required");
-  const child = Bun.spawn(
-    [
-      "git",
-      "--no-replace-objects",
-      "-C",
-      request.repositoryRoot,
-      "rev-parse",
-      "--verify",
-      "--end-of-options",
-      request.commit + "^{commit}",
-    ],
-    { stdout: "pipe", stderr: "ignore", env: gitReadEnvironment() },
-  );
-  const commit = (await new Response(child.stdout).text()).trim();
-  if ((await child.exited) !== 0 || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(commit))
-    throw Error("Selected local commit/ref unavailable");
-  return { ...request, commit } as unknown as GitWorkSelection;
-}
+export {
+  gitReadEnvironment,
+  resolveGitWorkSelection,
+} from "../packages/work-continuity/src/git-work/index.ts";
 export async function runHarness(argv: string[]): Promise<unknown> {
   const [command, path, extra] = argv;
   if (argv.length !== (command === "transition" || command === "source" ? 3 : 2))
