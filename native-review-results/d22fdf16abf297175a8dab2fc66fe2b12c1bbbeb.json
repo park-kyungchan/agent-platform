@@ -1,0 +1,115 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "d22fdf16abf297175a8dab2fc66fe2b12c1bbbeb",
+  "reviewedTreeSha": "09d50b693d6fc9183243e2fc438da020884d955b",
+  "reviewedSourceManifestSha256": "f092da05b9b11f5a257c6cfa3366d0977995f927cc69d135faabfe27be7eff58",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/academy_delivery_preflight/owner_lifecycle_contract"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_program_context"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-14T18:14:44.471Z",
+  "resultAuthorship": {
+    "authoredBy": "/root/academy_delivery_preflight/owner_lifecycle_contract",
+    "codeDeltaAuthor": "/root/integrated_program_context",
+    "sourcePinCorrectionAuthor": "/root",
+    "mergeReconciliationAuthor": "/root",
+    "qualification": "Actual native collaboration Task paths are source declarations; no invented runtime actor, UUID, authenticated provider identity or native activation is claimed."
+  },
+  "reviewDetail": {
+    "reviewKind": "independent-exact-main-merge-successor",
+    "comparisonBase": "0c0efe18656fd6ae25b919dcc227afd70b0fd944",
+    "mergeParents": [
+      "b02eb9b57531b3cd7184c888814c3ae61bbe4fef",
+      "0c0efe18656fd6ae25b919dcc227afd70b0fd944"
+    ],
+    "identicalReviewedTree": true,
+    "emptySourceDiff": true,
+    "observationCheckout": {
+      "headSha": "0c0efe18656fd6ae25b919dcc227afd70b0fd944",
+      "treeSha": "09d50b693d6fc9183243e2fc438da020884d955b",
+      "clean": true,
+      "meaning": "Reviewed merge head is an immutable local Git object. The isolated checkout remains on the already reviewed predecessor with exactly the same source tree; it was not switched or mutated by this reviewer."
+    },
+    "materialFindings": [],
+    "predecessorReview": {
+      "path": "codex-home-budget-review-result-0c0efe18.json",
+      "sha256": "4bd26a10f97e2ba7ae4d0b883291095a3395c9b65f654b1dbc39051c3ccad2dc",
+      "headSha": "0c0efe18656fd6ae25b919dcc227afd70b0fd944",
+      "reviewedTreeSha": "09d50b693d6fc9183243e2fc438da020884d955b",
+      "reviewedSourceManifestSha256": "f092da05b9b11f5a257c6cfa3366d0977995f927cc69d135faabfe27be7eff58",
+      "reviewer": {
+        "runtime": "native-codex",
+        "taskId": "/root/academy_delivery_preflight/owner_lifecycle_contract"
+      },
+      "conclusion": "pass",
+      "unresolvedFindings": 0
+    },
+    "explicitReuseBinding": "The full previously reviewed0c0/c73 source tree is identical at main merge d22, with current zero unresolved findings. The original admitted-source-pin finding resolution and exact budget source/test bytes remain preserved. This new immutable head binding does not imply runtime activation.",
+    "method": [
+      "Read exact immutable local merge commit, orderedparentsb02+0c0 and its reviewed source tree.",
+      "Verified empty0c0..d22 source diff, base ancestry and a clean source-equivalent predecessor checkout without switching Git state.",
+      "Read and hashed the original independent0c0 result and preserved code/pin/merge authorship plus validation attribution.",
+      "Derived all recursive Git tree entries with the exact canonical receipt-validator helper, recomputed unchangedf092 manifest and verified helper bytes against d22 Git object."
+    ],
+    "preservedEvidence": {
+      "predecessorFocusedRegression": {
+        "command": "bun test packages/native-codex-adapter/src/native/home-context.test.ts",
+        "runtime": "Bun1.3.14",
+        "exitCode": 0,
+        "testsPassed": 1,
+        "testsFailed": 0,
+        "assertions": 24,
+        "nativeToolChunkId": "579bec"
+      },
+      "predecessorFocusedRegressionAttribution": "Prior independent reviewer result; this successor reviewer did not rerun tests.",
+      "leadQuality": {
+        "path": "common-scope-validation/budget-pin-successor-quality.stdout",
+        "sha256": "1b2e6f2777bca8666abfe7d93134f7cfaac693c5a8f6315778058b22669c3d97",
+        "schema": "agent-platform.quality-report.v1",
+        "status": "pass",
+        "sourceRoot": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/worktrees/codex-home-budget",
+        "startedAt": "2026-10-14T17:32:15.970Z",
+        "finishedAt": "2026-10-14T17:32:32.897Z",
+        "executionAttribution": "Root executed the source-quality check; successor reviewer independently read and hashed its preserved result, without rerunning tests."
+      },
+      "priorRejectedStaleAdmissionPin": "The earlier PR8 quality failure is preserved; this result does not rewrite it as a pass."
+    },
+    "limits": [
+      "This is source-only same-tree merge review reuse. No remote CI/ruleset/thread/publication or native runtime readback was performed.",
+      "No new source-quality/regression tests, build, network, source/Git mutation, native config change, fresh native hook, evaluation or Acceptance was performed.",
+      "Root retains actual user authority for publication/status, native activation and final Acceptance; this result grants no effects."
+    ]
+  },
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "09d50b693d6fc9183243e2fc438da020884d955b",
+    "entryCount": 526,
+    "blobCount": 413,
+    "sha256": "f092da05b9b11f5a257c6cfa3366d0977995f927cc69d135faabfe27be7eff58"
+  },
+  "effects": {
+    "newReviewArtifactsOnly": true,
+    "sourceEdits": 0,
+    "gitMutations": 0,
+    "networkCalls": 0,
+    "nativeConfigWrites": 0,
+    "nativeActivation": 0,
+    "testsRun": 0
+  },
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null,
+  "publishedProvenance": null
+}
