@@ -1,0 +1,466 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "90b8a455d50728f1a2482bc38c6c8db6c0e8de6e",
+  "reviewedTreeSha": "384f8c16f1d9b9fcba5ac5c786c0ca61d790f5ea",
+  "reviewedSourceManifestSha256": "0bb752f964c54f9b7cba823f80afbd2fc912268ff0e22d143b48f5165e73e48f",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/codex_context_independent_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/hermes_privacy_repair"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-14T20:02:02.908Z",
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "384f8c16f1d9b9fcba5ac5c786c0ca61d790f5ea",
+    "entryCount": 553,
+    "blobCount": 438,
+    "sha256": "0bb752f964c54f9b7cba823f80afbd2fc912268ff0e22d143b48f5165e73e48f"
+  },
+  "resultAuthorship": {
+    "authoredBy": "/root/codex_context_independent_review",
+    "canonicalImplementationAuthor": "/root/hermes_privacy_repair",
+    "currentGitWorkAuthor": "/root/hermes_privacy_repair/hermes_current_git_context",
+    "compilerFindingFixAuthor": "/root",
+    "structural992MergeOperator": "/root",
+    "qualification": "Actual collaboration Task paths are source declarations, not invented native UUIDs or authenticated runtime authorship. Reviewer authored no maintained source or fix."
+  },
+  "reviewDetail": {
+    "reviewKind": "whole-candidate-fresh-exact-successor-independent-review",
+    "comparisonBase": "a9f06c51f5b6503b3db80d23aa3ad2a4110d5514",
+    "priorRejectedHead": "99253c5753a892946850114d28e3a8dd03f0134a",
+    "priorRejectedTree": "cd175903fcd7dbb9d753ee3c26bfbc8971039b0e",
+    "priorWholeReview": {
+      "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-whole-independent-review-findings-99253c57.json",
+      "sha256": "7ed96c3720f4723f715d14714d1ee5522373066ce53cac85bc6b19518d669bed",
+      "previousUnresolvedFindings": 1,
+      "preservedUnchanged": true
+    },
+    "successorDelta": {
+      "parent": "99253c5753a892946850114d28e3a8dd03f0134a",
+      "files": [
+        "architecture/capability-source-owners.json",
+        "packages/native-hermes-adapter/src/platform-current-work/build.ts",
+        "packages/native-hermes-adapter/src/platform-current-work/provider.test.ts"
+      ],
+      "reviewedEntireDelta": true,
+      "otherSourceBytesIdentical": true,
+      "interpretation": "Fresh exactsuccessor verdict combining full wholecandidate observations with complete3filedelta and new independent tests. The rejected992verdict is not reused as approval."
+    },
+    "materialFindings": [],
+    "findingResolutions": [
+      {
+        "id": "HERMES-COMPILER-NONREGULAR-OPEN-1",
+        "priority": "P2",
+        "status": "resolved-independently",
+        "productionPath": "packages/native-hermes-adapter/src/platform-current-work/build.ts",
+        "sourceSha256": "6b9017ecfe7f22d76e0ac3609a287b38562828833d2312335260ecf4bcac052a",
+        "resolution": "Both initial compilerPin and held compiler-descriptor opens force O_NONBLOCK; both verify regularfile before hashing or execution. All prior exact inode/size/mtime/ctime/digest and compilerFD checks remain.",
+        "ownedRegression": "New actual FIFO child integration runs complete source guard/full builder, expects fixed bounded refusal without a writer, and reaps only its child on5s regression timeout.",
+        "independentOriginalProbe": {
+          "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-whole-independent-compiler-fifo-probe-90b8a455.json",
+          "sha256": "07b3b3e462ea328b61bc229c245f6b6022446064d5d4dc334ace9f86db4c3624",
+          "sourceClosurePreconditionVerified": true,
+          "nonregularCompilerRefused": true,
+          "fifoWriterStarted": false,
+          "elapsedMs": 2168,
+          "timedOut": false,
+          "exitCode": 0,
+          "sourceEquivalentFixture": true,
+          "metadataAttribution": "Exact production source and dependency bytes/topology copied into an owned fixture with valid link counts. The original unchanged worktree failed the existing installed-metadata guard before compiler invocation; that result is preserved below."
+        }
+      }
+    ],
+    "wholeCandidateSourceCoverage": [
+      "Read every changed production module, including reviewer-authored context.ts, RuntimeIndex, provider/compiler and all migrated legacy owner/CAS/identity/read/review modules. Read complete metadata/package/lock/admission deltas and meaningful positive/negative tests.",
+      "Verified exact Root structural merge parents and empty author-head successor diff; no source move or author statement alone was treated as independent proof.",
+      "Checked fixed33source and624dependency-file denominator, installed package projection checks, before/after source/compiler checks, held compiler FD and actual metafile containment; the FIFO case revealed a missing pre-open bound.",
+      "Checked exact native tuple/revision/RuntimeIndex selection, foreign/unselected negatives, unknown currentness, bounded original question/answer/rationale/supersession locators and direct dependency omissions. Source references explicitly retain nativeAuthorshipVerified:false and grant no permission.",
+      "Checked explicit legacy ownerRoot factories, preserved Workv1 identity and purpose pins, canonical endpoint CAS/idempotency/completed effects/unknown outcomes and existing immutable Ontology pins.",
+      "Verified strict UTF8 and bounded stdin/fixed diagnostics, prior observer metadata/serialized prewrite cap resolution, and no raw native payload storage. Rehashed every one of85currentHermesoriginals and their privatecustodycopies."
+    ],
+    "additionalMethod": [
+      "Read complete exactsuccessor production/test/admission-pin delta, checking both nonblocking opens and retained held-FD regular/identity guards.",
+      "Reran all currentWork/context/provider/RuntimeIndex/privacy tests and the newly owned FIFO regression on exact90b8source. Re-ran independently authored original FIFO reproduction with full source guard reached on a byte-equivalent owned source/dependency copy.",
+      "Rehashed85currentHermesoriginals/privatecopies,63canonicalsourcepins, all223Rootqualityinput Gitblobs and Rootsource/quality artifacts. Corrected earlier narrative denominator counts using actual captured registrations."
+    ],
+    "independentVerification": {
+      "focused": {
+        "command": "bun test packages/native-hermes-adapter/src/platform-current-work packages/native-hermes-adapter/src/platform-rearchitecture/read-context-privacy.test.ts packages/work-continuity/src/runtime-index.test.ts",
+        "runtime": "Bun1.3.14",
+        "exitCode": 0,
+        "testsPassed": 25,
+        "testsSkipped": 1,
+        "assertions": 413,
+        "logPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-whole-independent-90b8a455-focused.log",
+        "logSha256": "abc12fd1580afb4797b2cc48b30839c7bcd964c81155fdee4f15cfc67bcd512e",
+        "skipMeaning": "Only optin predecessor disclosure reproduction was skipped; allcurrentpositive/negativecasesran."
+      },
+      "fifoProbe": {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-whole-independent-compiler-fifo-probe-90b8a455.json",
+        "sha256": "07b3b3e462ea328b61bc229c245f6b6022446064d5d4dc334ace9f86db4c3624"
+      },
+      "originalCustody": {
+        "uniqueHermesFiles": 85,
+        "everyCurrentAndPrivateCopyMatchesFrozenDigest": true,
+        "originalManifests": [
+          {
+            "path": "worktrees/hermes-cli-privacy/source-successor/custody/manifest.json",
+            "sha256": "49d89d32622aeb2610bbef4553bf67cb2bd3e0b62cec822f0d7e79a7f9aec61b"
+          },
+          {
+            "path": "worktrees/hermes-cli-privacy/source-successor/custody-additional/manifest.json",
+            "sha256": "af441ea92377be5d7d27018e611e27e5e673a519c0a7009df95d6e94acabb086"
+          }
+        ]
+      },
+      "sourcePins": {
+        "verifiedCount": 63,
+        "pins": [
+          {
+            "path": "packages/work-continuity/src/context/boundary.ts",
+            "sha256": "cdc026c96b6d6343db1400b7ed6508509713b2ef234518421889202ed5438817"
+          },
+          {
+            "path": "packages/work-continuity/src/context/context.ts",
+            "sha256": "33faafbafe361b8039e5dd65048ee3db0fe615463e26fa588619cd22f28b817a"
+          },
+          {
+            "path": "packages/work-continuity/src/context/index.ts",
+            "sha256": "253266f9a01c9f35312d445490969870654317b4dc87f4893862e92ff0c696f9"
+          },
+          {
+            "path": "packages/work-continuity/src/context/sections.ts",
+            "sha256": "38b69f7a254064b4213a5fcc5d368062ca02e2ce8707366c204c229ef01b0143"
+          },
+          {
+            "path": "packages/work-continuity/src/context/source.ts",
+            "sha256": "50142da45b2e758ac8aba0524d760e7629340ea6a579a5ea38a3e6a908fa66e4"
+          },
+          {
+            "path": "packages/work-continuity/src/context/store.ts",
+            "sha256": "ca42858aacc7e4f916b1b48ca37822ba33b302ef9408aea598e9ece0d050a823"
+          },
+          {
+            "path": "packages/work-continuity/src/context/types.ts",
+            "sha256": "ef931ed0655c6342fd54629b7e2a233e2455d665dbd1e5d4a6cbf3a3131454f7"
+          },
+          {
+            "path": "packages/work-continuity/src/context/validation.ts",
+            "sha256": "adf83d11267a40dad0f447e1481f4149dea6fbcc0fd8ba491be8b6a852e5d8bc"
+          },
+          {
+            "path": "packages/work-continuity/src/git-work/context.ts",
+            "sha256": "519a386432c788e5f82a323fc28f29c7884ce483404802e415a03b93fe0dc5d3"
+          },
+          {
+            "path": "packages/work-continuity/src/git-work/index.ts",
+            "sha256": "8c11a0333c112eee58fab5d8cc2fb9dc6340dfdf8b3891231623826020703f5b"
+          },
+          {
+            "path": "packages/work-continuity/src/git-work/records.ts",
+            "sha256": "5ab086cb44441ad268116996fe2bd01adf8dd432a57d3931fa95747e0c948b99"
+          },
+          {
+            "path": "packages/work-continuity/src/git-work/source.ts",
+            "sha256": "63463dd2b134078bb5de4c846780fee3f048e273c5cb0ab40c7b347c1463992b"
+          },
+          {
+            "path": "packages/work-continuity/src/git-work/types.ts",
+            "sha256": "cb70b46d5680b42f09e1e9d38d8eaa9025873adf0a6f78e75ab5f126ccfb97a8"
+          },
+          {
+            "path": "packages/work-continuity/src/handoff.ts",
+            "sha256": "8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a"
+          },
+          {
+            "path": "packages/work-continuity/src/index.ts",
+            "sha256": "d3d6756be249b4028c73bf7f7c87d53ee1cc4054f0777f6474f07d89405904b8"
+          },
+          {
+            "path": "packages/work-continuity/src/logical-identity.ts",
+            "sha256": "9be1b608f1058fd7a64207110c7e4d06531f96a2060811eb2f32e5619b65f84e"
+          },
+          {
+            "path": "packages/work-continuity/src/operational-state.ts",
+            "sha256": "6bda838562d3f2375e0110d334545afa78fab3cb90649cf9c1e80ae4c9d74c63"
+          },
+          {
+            "path": "packages/work-continuity/src/runtime-docs/index.ts",
+            "sha256": "72b4a6ef5faa84978d1a041e8d0b7f1191365c041f796b737db4ca549931c536"
+          },
+          {
+            "path": "packages/work-continuity/src/runtime-docs/types.ts",
+            "sha256": "dd3a897c221c30ab404323604a7bb56664373ec7d26ccf1682d7bb55c4872846"
+          },
+          {
+            "path": "packages/work-continuity/src/runtime-docs/validation.ts",
+            "sha256": "6072f6095cc4a4f7230181dd3d6f4f9883a128af409163c593c83d1c4babc341"
+          },
+          {
+            "path": "packages/work-continuity/src/runtime-index.ts",
+            "sha256": "e74af3ebb6fa99fd3f48315407254da0bd04657a376c5cbc77c64d5a1921012a"
+          },
+          {
+            "path": "packages/work-continuity/src/workspace/lexical-recall.ts",
+            "sha256": "5fccb346938751e0983abbed716dae5ac98c85c8b85060605d100b0dd0d2974d"
+          },
+          {
+            "path": "packages/work-continuity/src/workspace/memory.ts",
+            "sha256": "d9e0e54962fef476890828626856b657c7bd299c6b818c5fedc7afb7dfbf3661"
+          },
+          {
+            "path": "packages/work-continuity/src/workspace/original-producer.ts",
+            "sha256": "c1c3e1571f1399d10ad41b99934f210623c8ca7cb6034bc6c1a92ea00b28c997"
+          },
+          {
+            "path": "packages/work-continuity/src/workspace/qualification.ts",
+            "sha256": "c7ef10b6633657368b1a390dc44d93a557a647c61f7077e94ca619b82a847e6d"
+          },
+          {
+            "path": "packages/work-continuity/src/workspace/recall-request.ts",
+            "sha256": "854677ea78e44a31015f69bb8869147c7377fbeb7ac7dc6b52ab5916ebe73e5f"
+          },
+          {
+            "path": "packages/work-continuity/src/workspace/recovery.ts",
+            "sha256": "6367efc9c3aa4dea1378d6a883d46e8d32698730c5318091ef3e3e010942c1aa"
+          },
+          {
+            "path": "packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py",
+            "sha256": "373905be599bc79411ab35ce8b97f7932ed8cd3521eb53a5b527e1f5fc599dc7"
+          },
+          {
+            "path": "packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml",
+            "sha256": "f190f796e3800741e5bb768b6220fc189cf81af3979f1c46b7295523832d05bc"
+          },
+          {
+            "path": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/__init__.py",
+            "sha256": "70ac64ef9d64e469fef1c39647392f844bf5c76d02b53988ad42224370cc1682"
+          },
+          {
+            "path": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/plugin.yaml",
+            "sha256": "9ddefa25b4cc4db6398080a0b318a71aad2356d6896e888c24edb387a164b225"
+          },
+          {
+            "path": "packages/native-hermes-adapter/native/plugins/source-review-readonly/__init__.py",
+            "sha256": "bda3ccf83ed26465d875ab0d19516aa183fa3080bc0c0b3f14eadc7c104bd184"
+          },
+          {
+            "path": "packages/native-hermes-adapter/native/plugins/source-review-readonly/plugin.yaml",
+            "sha256": "bd11e33f0d64fcc0a339839791347559619ca913ee4938e51bd404e2f45ab71a"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/adoption/evaluation-budget.ts",
+            "sha256": "de5a46c12c2b688bda2e6db95942671c806979e54622f22bf8ed4959738eb8a5"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/adoption/semantic-context.ts",
+            "sha256": "9947cac51187dd9308e05500e77fe446545a3b2416c07eef20abdd9ddea88ed9"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/ontology-driven/audit-adapter.ts",
+            "sha256": "859c667f564097222eb48dc7d575cc3a01bf13427d9bd7d4e93d11663cf9180f"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/ontology-driven/contracts.ts",
+            "sha256": "3b4e7be2a4a98fd8fc974ddc31cd65b7d65db4244a47f15802b28d13d42efa73"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/ontology-driven/current-intent.ts",
+            "sha256": "144fa1bc35c4ce78cd2f25f7edef060101ccae5605298984c169fed24e0efa9b"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/ontology-driven/domain-context.ts",
+            "sha256": "6389df3f6f8b554022eb0817009e7c9ef2b752ebf11a90a55336227ef17d52d0"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/ontology-driven/pinned-reader.ts",
+            "sha256": "fb2fe3bfce24a3b68d8d98b1962609296a8bfe908d826be914ccd1ae9036a9df"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/ontology-driven/role-registry.ts",
+            "sha256": "0007ad65fced22d8063f2c7620b8599a10fd47bb2ee95770e6edbecb2c10a1d8"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/ontology-driven/work-context.ts",
+            "sha256": "320145d8925af3e8c119ce798e8512661f28de310378810d81a51d4292cf114c"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/build.ts",
+            "sha256": "6b9017ecfe7f22d76e0ac3609a287b38562828833d2312335260ecf4bcac052a"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/context.ts",
+            "sha256": "a713e094319d0f2be4e077a27add53683d54d48cfb94dfad780a69746a3aee21"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/provider.ts",
+            "sha256": "c14a38c25f0fac7b617074ed3a733c481efeffa30f7a2cd6eaf6b12941127b81"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/read-current-work.ts",
+            "sha256": "2d4eff04ce36ea96ff195d1336aa995d67bba4977582c99f0ff521cd094448e9"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-governance/bot-correlation.ts",
+            "sha256": "ce91c0336f2b6d3e3fcb5ef7ae23696ae78e152862bf67670e372563202374ef"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-governance/boundary-custody.ts",
+            "sha256": "77fc1bcf4d15143166992638a67ccd087cab4140b03763eb2d4ff37ec9703a55"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-governance/contracts.ts",
+            "sha256": "9dd9df59c794998691f2badb73e86914c027b5cd28506267146d61ee1719d42a"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-governance/evaluation-budget.ts",
+            "sha256": "a0892a21b155050b810b464691c407e926069db71f5af9c3722d63df6e99c5cb"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-governance/index.ts",
+            "sha256": "fa106c6172e8cc8c119607949b52d6f8fa7df53f08586ebffbbd53d08429c609"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-governance/native-bindings.ts",
+            "sha256": "4060332183e8e65167dedee47caac85706db43e9d79eee827c6adbe8c9b9b73a"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-governance/policy.ts",
+            "sha256": "17a70390932c6195eee78a38606c0a89cce4337413e703b5e2f320b095aedae2"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/input.ts",
+            "sha256": "121148f83ba469d6a05e3c200ece343f0d3c6cc8e1a18b0c15ad1a30231d6c20"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/native-hook.ts",
+            "sha256": "eec168c9c81f1c4a522840bcfe8aa08486ab2253464b5588da2ba9afa96ed559"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/owner-readers.ts",
+            "sha256": "8a02dbeddc73f7244917e5e4f446fa72f27a0f19bc805a99cb51f3e853a45ae4"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/read-context.ts",
+            "sha256": "102fcea8d6a202d5e67ecec18bd2df5765df335ee220103a5c6775d3f66eb5e5"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/review-reader.ts",
+            "sha256": "909117fd717a87d80a5078441a51368c54f9fffc64a465498643f87d5ef8cd9b"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-continuity.ts",
+            "sha256": "081f99583db849c9d202e4b5329558c93b45dd4639730f6ae6082e17e5f4cd27"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity-contracts.ts",
+            "sha256": "d37e82b0137049790491781a81275250a3d90cb2eb67cad5ffa71afd1b44fd6e"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity.ts",
+            "sha256": "343ef79748d064c663af4b131f88aae18b8b41023b31688a3d61555ab5e7ba66"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-reader.ts",
+            "sha256": "ce4088b71e4c98eeac8eb0ad622e627ae2a83ff8fc84738b17413c0ee48d3711"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
+            "sha256": "7b0bbb6b8480b0514fd9f7854e094fc6e77b6c17ff9bb4cbf591f48a5ce3db93"
+          }
+        ]
+      }
+    },
+    "rootVerification": {
+      "quality": {
+        "status": "pass",
+        "checks": 14,
+        "logPath": "hermes-compiler-special-file-quality.log",
+        "sourceIdentity": {
+          "actualCheckoutSha": "99253c5753a892946850114d28e3a8dd03f0134a",
+          "githubEventSha": null,
+          "sourceRegistrySha256": "8b8a82671ebb1b414974d69f3348c3eec6b1558150735b1fb1c817a8ab27d189",
+          "lockSha256": "f5723aae95044787653d1eb76c932c0c1c4ddf734966a782989e7399b7f69ffb",
+          "workingTreeHasChanges": true
+        },
+        "allRecordedInputBlobsMatchExact90b8": true,
+        "verifiedInputCount": 223,
+        "attribution": "Root executed quality beforecommit on992withdirtysuccessorchanges. Independent reviewer checked all223inputhashes against frozen90b8; nofalse claimof invocationonlatercommit."
+      },
+      "finiteSource": {
+        "status": "pass",
+        "commands": 25,
+        "canonicalTestFiles": 28,
+        "qualityTestFiles": 5,
+        "nativeModelCalls": 0,
+        "attribution": "Rootexecuted fullfiniteSourceCI; independent reviewer rehashed/readreceipt and checked allcommands. Independently rerun focused/adversarialtests above."
+      },
+      "receipt": {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-compiler-special-file-successor-receipt.json",
+        "sha256": "740dd53474032eb4af1a7d08e114b2154dce9d8362390a90a9a26c85c1031e94"
+      },
+      "artifacts": [
+        {
+          "path": "hermes-compiler-special-file-quality.log",
+          "sha256": "9e3715153c47339d26bd1bb4123d68fa7655c4b068639cc228722facfcbf5c5f",
+          "bytes": 188852
+        },
+        {
+          "path": "hermes-compiler-special-file-source.log",
+          "sha256": "cb0181f76fbf2a326715792ae63459c491d69740b17c83000fd236c7ce988558",
+          "bytes": 88281
+        },
+        {
+          "path": "hermes-compiler-special-file-committed-work-check.log",
+          "sha256": "2ce89186d85639e2ee619d0226e119109c572d12a9117280c40bd91336f1ab81",
+          "bytes": 662
+        }
+      ]
+    },
+    "installedMetadataPrecondition": {
+      "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-whole-independent-installed-metadata-90b8a455.json",
+      "sha256": "4cd98e3a1322da1a7a1326006f240fb145ccd0c3df5b44ae6c6cc9b6bc8a3101",
+      "directWorktreeCapture": "held-before-compiler:BOUNDED_PLATFORM_SOURCE_REQUIRED",
+      "concreteCause": "Unchanged installed runtime manifests linkcounts190/194 exceed provider fixed8guard. No guard was relaxed and no frozen source/dependency bytes were edited.",
+      "ownedFixture": "Copied exact source/dependency bytes and symlinktopology into private fixture; then fullclosureverified and actualFIFOreadreached/refused.",
+      "adoptionRequirement": "Stage native source/runtime dependency closure with actual admitted types/links/bytes; do not blindly treat an existing sharedcacheinstall as a deployable source provider.",
+      "observedDenominator": {
+        "sourcePins": 33,
+        "dependencyPins": 624
+      },
+      "historicalNarrativeCorrection": "Earlier32/590narrative was inaccurate. Actual preserved992andnew90b8registrations both33/624; oldfindingbytesremainunchanged."
+    },
+    "limits": [
+      "Source compilation and synthetic tests do not prove actual native profile/session/Project/Task/Run authenticity, Lead consumption, persisted RuntimeIndex currentness, VPS native adoption, PC-off operation or whole-Work Acceptance.",
+      "No active original source/config/registration/trust changes, source Academy access, publication, native lifecycle or model evaluation actions were performed.",
+      "Native Hermes remains sole runtime/session/tool/task owner. Native currentWork source mirror, exact registration delivery and explicit runtime Lead activation remain separate Root responsibilities.",
+      "Canonical source PASS does not prove active native owner bootstrap. Active Codex owner hook-cli first-import closure integration and Hermes native hook wiring to this newcurrentWork adapter remain separate pending adoption work.",
+      "Local complete recursiveGitmanifest is derived with exactcanonicalhelper. Root must verify authenticated remote immutable tree equality, publish exactresult/receipt/status and explicitly merge expectedhead before anyseparate nativeactivation.",
+      "Installedmetadata precondition above remains concrete staging work; copied-fixture source proof is not successful directworktreeprovider activation or VPSnative adoption."
+    ]
+  },
+  "effects": {
+    "maintainedSourceEdits": 0,
+    "admittedGitMutations": 0,
+    "nativeSourceConfigRegistrationTrustWrites": 0,
+    "sourceAcademyAccess": 0,
+    "externalNetworkCallsByIndependentProbes": 0,
+    "modelEvaluationRequests": 0,
+    "newReviewArtifactsAndOwnedTemporaryFixturesOnly": true
+  },
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null,
+  "publishedProvenance": null
+}
