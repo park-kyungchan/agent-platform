@@ -1,0 +1,141 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "c73ffb42412ab9b92ea735bc057eb3b5d59e00be",
+  "reviewedTreeSha": "09d50b693d6fc9183243e2fc438da020884d955b",
+  "reviewedSourceManifestSha256": "f092da05b9b11f5a257c6cfa3366d0977995f927cc69d135faabfe27be7eff58",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/academy_delivery_preflight/owner_lifecycle_contract"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_program_context"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-14T17:50:14.272Z",
+  "resultAuthorship": {
+    "authoredBy": "/root/academy_delivery_preflight/owner_lifecycle_contract",
+    "codeDeltaAuthor": "/root/integrated_program_context",
+    "sourcePinCorrectionAuthor": "/root",
+    "qualification": "Actual native collaboration Task paths are source declarations; no invented runtime actor, UUID, authenticated provider identity or native activation is claimed."
+  },
+  "reviewDetail": {
+    "reviewKind": "independent-exact-source-pin-successor-review",
+    "comparisonBase": "7954d23b3dc17a9996d09936c334a5461aadf950",
+    "totalDeltaBase": "b02eb9b57531b3cd7184c888814c3ae61bbe4fef",
+    "materialFindings": [],
+    "predecessorReview": {
+      "path": "codex-home-budget-review-result-7954d23b.json",
+      "sha256": "8ecea705bf8fde1bb1cfb1886103afc6e15d210754fe7bb6f6c0847718a57f4e",
+      "reviewer": {
+        "runtime": "native-codex",
+        "taskId": "/root/topology_interview_preflight"
+      },
+      "headSha": "7954d23b3dc17a9996d09936c334a5461aadf950",
+      "reviewedTreeSha": "7f2593d01a89c0ae7dc93c4b0d6a3f5169455dfb",
+      "reviewedSourceManifestSha256": "edbb957c5a19717fcf053595b244b17a902a7d33764aa1eb54ba183c220c201d",
+      "scope": "Prior production-budget algorithm and meaningful focused regression review remain attributable to their original reviewer."
+    },
+    "successorDelta": {
+      "path": "architecture/capability-source-owners.json",
+      "oldAdmittedSourceSha256": "3c31f5b1776993f9ddafb9d5bc6f2db6b50f648e0a80aaab81098da191b22c3c",
+      "newAdmittedSourceSha256": "042bd9c3c69077321d0212e8693560c9d857a7a1febdd802cb5ece93dd1ad643",
+      "independentWorkingSourceHashMatch": true,
+      "onlyOneJsonValueChanged": true,
+      "productionAndRegressionBytesUnchangedFromReviewed7954": true,
+      "totalChangedPaths": [
+        "architecture/capability-source-owners.json",
+        "packages/native-codex-adapter/src/native/home-context.test.ts",
+        "packages/native-codex-adapter/src/native/home-context.ts"
+      ]
+    },
+    "invariants": [
+      "The admitted native Codex Home source pin now matches the already reviewed budget-fix bytes.",
+      "Other source registry values, capability boundary, first-import policy and nativePermissionGranted:false are unchanged.",
+      "All tracked source outside the exact three-path base delta is unchanged.",
+      "Source admission/pin consistency is distinct from native provider registration, runtime configuration, fresh hook execution, deployment and Acceptance."
+    ],
+    "changedFileManifest": [
+      {
+        "path": "architecture/capability-source-owners.json",
+        "sha256": "fd0bfaeb7ecaf8302cdca0f60121d18a6ebd64b571f754ca40d06e9bd278886f",
+        "byteLength": 51264,
+        "gitBlob": "b78a5b92922af8bb7c33d2188bb530de964a096f"
+      },
+      {
+        "path": "packages/native-codex-adapter/src/native/home-context.test.ts",
+        "sha256": "1d68330701a135dcea99ab78d82e5dea7217c88f2276088bc67b4746ca20a5e7",
+        "byteLength": 6594,
+        "gitBlob": "4ef2b85830421c50d0c0f4c84fc46704e6b9cf62"
+      },
+      {
+        "path": "packages/native-codex-adapter/src/native/home-context.ts",
+        "sha256": "042bd9c3c69077321d0212e8693560c9d857a7a1febdd802cb5ece93dd1ad643",
+        "byteLength": 13119,
+        "gitBlob": "3e70ccd0beb726cbaa002f4e92310d7939849ef4"
+      }
+    ],
+    "existingValidationEvidence": {
+      "predecessorFocusedRegression": {
+        "command": "bun test packages/native-codex-adapter/src/native/home-context.test.ts",
+        "runtime": "Bun1.3.14",
+        "exitCode": 0,
+        "testsPassed": 1,
+        "testsFailed": 0,
+        "assertions": 24,
+        "nativeToolChunkId": "579bec"
+      },
+      "predecessorFocusedRegressionAttribution": "Prior independent reviewer result; this successor reviewer did not rerun tests.",
+      "leadQuality": {
+        "path": "common-scope-validation/budget-pin-successor-quality.stdout",
+        "sha256": "1b2e6f2777bca8666abfe7d93134f7cfaac693c5a8f6315778058b22669c3d97",
+        "schema": "agent-platform.quality-report.v1",
+        "status": "pass",
+        "sourceRoot": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/worktrees/codex-home-budget",
+        "startedAt": "2026-10-14T17:32:15.970Z",
+        "finishedAt": "2026-10-14T17:32:32.897Z",
+        "executionAttribution": "Root executed the source-quality check; successor reviewer independently read and hashed its preserved result, without rerunning tests."
+      },
+      "priorRejectedStaleAdmissionPin": "The earlier PR8 quality failure is preserved; this result does not rewrite it as a pass."
+    },
+    "method": [
+      "Read exact immutable Git head/tree/parent/status and complete one-line registry successor diff.",
+      "Recomputed Home production SHA256, compared production/test Git blobs with reviewed7954 and verified only three paths changed against b02.",
+      "Parsed both registry versions and verified that correcting the one admitted SHA256 makes the complete JSON structures equal.",
+      "Read the preserved prior independent result and current lead quality report with explicit attribution.",
+      "Derived complete recursive Git tree entries using the unchanged canonical receipt-validator helper and independently recomputed the manifest hash."
+    ],
+    "limits": [
+      "Source-only successor review; no regression tests were executed by this reviewer.",
+      "No external owner/profile/config/credential/private-input reads, network requests, source/Git edits, runtime activation, fresh native hook, evaluation or Acceptance occurred.",
+      "Prior meaningful regression and full-quality execution belong to their recorded actors."
+    ]
+  },
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "09d50b693d6fc9183243e2fc438da020884d955b",
+    "entryCount": 526,
+    "blobCount": 413,
+    "sha256": "f092da05b9b11f5a257c6cfa3366d0977995f927cc69d135faabfe27be7eff58"
+  },
+  "effects": {
+    "newReviewArtifactsOnly": true,
+    "sourceEdits": 0,
+    "gitMutations": 0,
+    "networkCalls": 0,
+    "nativeConfigWrites": 0,
+    "nativeActivation": 0,
+    "testsRun": 0
+  },
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null,
+  "publishedProvenance": null
+}
