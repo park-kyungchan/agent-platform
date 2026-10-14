@@ -179,6 +179,7 @@ const finiteOwnerSources = [
     "src/legacy/harness/owner-context-loader.ts",
     "src/legacy/harness/provider-closure.ts",
     "src/native/provider-closure.ts",
+    "src/native/hook-cli.ts",
     ...nativeCodexModules.map((name) => `src/native/${name}.ts`),
   ].map((path) => ({ owner: "codex-harness-engineering", path })),
   { owner: "hermes-harness-engineering", path: "src/ontology-driven/provider-source.ts" },
@@ -273,6 +274,7 @@ async function prepareQaTree() {
       "src/legacy/harness/owner-context-loader.ts",
       "src/legacy/harness/provider-closure.ts",
       "src/native/provider-closure.ts",
+      "src/native/hook-cli.ts",
       ...nativeCodexModules.map((name) => `src/native/${name}.ts`),
     ].map((path) => "codex-harness-engineering/" + path),
     "hermes-harness-engineering/src/ontology-driven/provider-source.ts",
@@ -438,6 +440,7 @@ async function sourceChecks() {
   for (const name of ["ontology", "evidence-foundry"])
     await run(join(common, "packages", name), [process.execPath, "scripts/generate.ts", "--check"]);
   await run(common, [process.execPath, "test", "./owner-fixture/review-gate.test.ts"]);
+  await run(common, [process.execPath, "test", "./owner-fixture/native-hook-bootstrap.test.ts"]);
   const projection = await json(join(common, "architecture/hermes-semantic-projection.json"));
   if (
     sha(await readFile(join(common, projection.canonicalSource.path))) !==

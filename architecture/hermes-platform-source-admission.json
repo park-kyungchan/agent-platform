@@ -1,0 +1,82 @@
+{
+  "schema": "hermes.platform-source-consolidation.v1",
+  "status": "source-only-candidate",
+  "baseRevision": "a037f889ad3551199d50d592252d1e5ec12af6e5",
+  "sourceMigration": [
+    {
+      "originalOwner": "hermes-harness-engineering",
+      "sourcePath": "src/platform-rearchitecture/work-reader.ts",
+      "sourceSha256": "09376ea506a9fe9347d2fed0c85769d9d309fc015897b60f21bb525ecfb321cf",
+      "canonicalPath": "packages/native-hermes-adapter/src/platform-rearchitecture/work-reader.ts",
+      "unchangedLegacyAnyOccurrences": 0
+    },
+    {
+      "originalOwner": "hermes-harness-engineering",
+      "sourcePath": "src/platform-rearchitecture/review-reader.ts",
+      "sourceSha256": "505e11c34a87523d149812fb8c142feca16cbcbe3bc18376f676fb6f0b24f603",
+      "canonicalPath": "packages/native-hermes-adapter/src/platform-rearchitecture/review-reader.ts",
+      "unchangedLegacyAnyOccurrences": 5
+    },
+    {
+      "originalOwner": "hermes-harness-engineering",
+      "sourcePath": "src/platform-rearchitecture/work-continuity.ts",
+      "sourceSha256": "1fc5be51a427bdc5dc3efbfefb3562abf9733e40b97fb8fe008568228475f269",
+      "canonicalPath": "packages/native-hermes-adapter/src/platform-rearchitecture/work-continuity.ts",
+      "unchangedLegacyAnyOccurrences": 3
+    },
+    {
+      "originalOwner": "hermes-harness-engineering",
+      "sourcePath": "src/platform-rearchitecture/work-records.ts",
+      "sourceSha256": "eb44b0de18c0aeb5824fd8a607ff2f20f246ea42a1e7efbfdddb6fed0a871b0c",
+      "canonicalPath": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
+      "unchangedLegacyAnyOccurrences": 6
+    },
+    {
+      "originalOwner": "hermes-harness-engineering",
+      "sourcePath": "src/platform-rearchitecture/work-identity.ts",
+      "sourceSha256": "f4b4065ac26d0352c76f903170ae6c63f44277d4d2941d0a1bd7bc703054b7a3",
+      "canonicalPath": "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity.ts",
+      "unchangedLegacyAnyOccurrences": 3
+    },
+    {
+      "originalOwner": "hermes-harness-engineering",
+      "sourcePath": "src/platform-rearchitecture/native-hook.ts",
+      "sourceSha256": "9a9000efbfb062706918e232f4ee483ee7be648d57a147042b9ef11cd5f5e683",
+      "canonicalPath": "packages/native-hermes-adapter/src/platform-rearchitecture/native-hook.ts",
+      "unchangedLegacyAnyOccurrences": 0
+    }
+  ],
+  "legacyScope": {
+    "workId": "hermes-platform-rearchitecture",
+    "preserveOriginalWorkV1": true,
+    "preserveOriginalPurposeRecords": true,
+    "preserveHistoricalCp15": true,
+    "reopenHistoricalBudget": false
+  },
+  "currentScope": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "specRevision": 6,
+    "planRevision": 6,
+    "newRuntimeIndexIsBoundedAuditReferencesOnly": true,
+    "newTypedBoundariesUseUnknown": true,
+    "newCurrentModulesExplicitAny": 0
+  },
+  "sourceProvider": {
+    "legacy": "hermes.context-source-provider.v1",
+    "platform": "hermes.platform-source-provider.v2",
+    "sourcePinScope": "Every transitive source, identity contract, generator, installed runtime dependency and held-descriptor compiler; actual compiler metafile inputs must be admitted.",
+    "sourceProofGrantsAuthority": false
+  },
+  "requiredOwnerAdoption": [
+    "Root-selected exact native profile/session/agent/Project/Task/Run evidence and RuntimeIndex persistence remain native-owner admission.",
+    "Three existing owner registrations/markers require successor package/lock pins; old v1 nine-module denominator remains compatible.",
+    "V2 registration and complete source/dependency delivery must be generated for the actual native provider root and independently read back before activation.",
+    "Current Git Work mirror/currentness, native Lead consumption, PC-off operation and suite/whole-Work Acceptance are not established by source tests."
+  ],
+  "nativePermissionGranted": false,
+  "activeSourceChanges": 0,
+  "remoteEffects": false,
+  "modelEvalRequests": 0
+}

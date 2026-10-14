@@ -55,6 +55,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+        "@palantirkc/work-continuity": "file:../work-continuity",
       },
     },
     "packages/ontology": {
@@ -343,6 +344,8 @@
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 
     "@palantirkc/native-codex-adapter/@palantirkc/work-continuity": ["@palantirkc/work-continuity@file:packages/work-continuity", { "dependencies": { "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz" } }],
+
+    "@palantirkc/native-hermes-adapter/@palantirkc/work-continuity": ["@palantirkc/work-continuity@file:packages/work-continuity", { "dependencies": { "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz" } }],
 
     "@typescript-eslint/eslint-plugin/ignore": ["ignore@7.0.12", "", {}, "sha512-/8UvqAPU9DGTI9k4mxtf49U37Isfwr8Uts96+SBHIkFxPJnHS0Ew4f00sM4Scd8V8EjM0jUNtVDdv1kPdt35lg=="],
 
