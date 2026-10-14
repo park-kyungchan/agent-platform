@@ -19,10 +19,21 @@
     "./platform-governance/native-bindings": "./src/platform-governance/native-bindings.ts",
     "./platform-governance/bot-correlation": "./src/platform-governance/bot-correlation.ts",
     "./platform-governance/boundary-custody": "./src/platform-governance/boundary-custody.ts",
-    "./platform-governance/evaluation-budget": "./src/platform-governance/evaluation-budget.ts"
+    "./platform-governance/evaluation-budget": "./src/platform-governance/evaluation-budget.ts",
+    "./platform-rearchitecture/work-reader": "./src/platform-rearchitecture/work-reader.ts",
+    "./platform-rearchitecture/review-reader": "./src/platform-rearchitecture/review-reader.ts",
+    "./platform-rearchitecture/work-continuity": "./src/platform-rearchitecture/work-continuity.ts",
+    "./platform-rearchitecture/work-records": "./src/platform-rearchitecture/work-records.ts",
+    "./platform-rearchitecture/work-identity": "./src/platform-rearchitecture/work-identity.ts",
+    "./platform-rearchitecture/work-identity-contracts": "./src/platform-rearchitecture/work-identity-contracts.ts",
+    "./platform-rearchitecture/owner-readers": "./src/platform-rearchitecture/owner-readers.ts",
+    "./platform-current-work/context": "./src/platform-current-work/context.ts",
+    "./platform-current-work/provider": "./src/platform-current-work/provider.ts",
+    "./platform-current-work/build": "./src/platform-current-work/build.ts"
   },
   "dependencies": {
-    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz"
+    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+    "@palantirkc/work-continuity": "file:../work-continuity"
   },
   "engines": {
     "bun": ">=1.3.14"

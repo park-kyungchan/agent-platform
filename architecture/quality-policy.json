@@ -48,7 +48,7 @@
       "path": "packages/native-hermes-adapter",
       "name": "@palantirkc/native-hermes-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": []
+      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
     },
     {
       "capabilityId": "operational-context",

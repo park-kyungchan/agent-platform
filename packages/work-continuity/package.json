@@ -22,7 +22,8 @@
     "./recovery": "./src/workspace/recovery.ts",
     "./memory": "./src/workspace/memory.ts",
     "./git-work": "./src/git-work/index.ts",
-    "./runtime-docs": "./src/runtime-docs/index.ts"
+    "./runtime-docs": "./src/runtime-docs/index.ts",
+    "./runtime-index": "./src/runtime-index.ts"
   },
   "engines": {
     "bun": ">=1.3.14"

@@ -238,6 +238,76 @@
       "example": "a: any"
     },
     {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/review-reader.ts",
+      "contextSha256": "1cd498802ff778c513a96bf407c418482f538d531ec91a570bd091ead87e18f1",
+      "count": 2
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/review-reader.ts",
+      "contextSha256": "23f961a0720c217f73cfe14aecb8f7a83cb1e5938c4052af840beadd05273b23",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/review-reader.ts",
+      "contextSha256": "5cda228ec8e215dea64bd5a6d5297f30783ede1ebe5f194d7127ae76cc41fffa",
+      "count": 2
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-continuity.ts",
+      "contextSha256": "070a634cef4f7c8135417c4228b0e4ff47c711f5b039c017dc46f60732d7ccc7",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-continuity.ts",
+      "contextSha256": "799ba53d5322e96f4f966bc9ada6c4682e82e1c23d66e764fc119d609e9cdd95",
+      "count": 2
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity.ts",
+      "contextSha256": "4bf63d1e73966e884a98a9dcd19d930486460eced6c943e203d02e2a5abcda0c",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity.ts",
+      "contextSha256": "5cda228ec8e215dea64bd5a6d5297f30783ede1ebe5f194d7127ae76cc41fffa",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity.ts",
+      "contextSha256": "799ba53d5322e96f4f966bc9ada6c4682e82e1c23d66e764fc119d609e9cdd95",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
+      "contextSha256": "4a01a601be47dd05f48ec0c79ec3f6a1a8b5e456cb2f297ff3340a804c722e78",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
+      "contextSha256": "4bf63d1e73966e884a98a9dcd19d930486460eced6c943e203d02e2a5abcda0c",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
+      "contextSha256": "799ba53d5322e96f4f966bc9ada6c4682e82e1c23d66e764fc119d609e9cdd95",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
+      "contextSha256": "e2a4c9f964a8aad5231c9bfc7f3793587e9495b8e3583d95a60f79e0024c60c0",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
+      "contextSha256": "ed774fefb8c6b6d6b790f76792f6da309180bd7044c78150a50f75506e0e8858",
+      "count": 1
+    },
+    {
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
+      "contextSha256": "f4e442954b11548d4634efcb8fb058eb8af9f114ebfd9b3652b63b0bf75c3b8a",
+      "count": 1
+    },
+    {
       "path": "packages/operational-context/lead-evaluation.test.ts",
       "contextSha256": "01b2548a36033f58a825e0592fba1787d4edbe66149249f8ba8ef5e7e0408d37",
       "count": 1,
