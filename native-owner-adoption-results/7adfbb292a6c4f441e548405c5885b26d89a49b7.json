@@ -1,0 +1,448 @@
+{
+  "schema": "integrated.native-owner-cas-independent-after-review.v1",
+  "recordClass": "IndependentActualOwnerCascadeReadback",
+  "sealedAt": "2026-10-14T22:40:04.409Z",
+  "observedAt": "2026-10-14T22:34:32.398Z",
+  "reviewer": {
+    "actor": "/root/codex_context_independent_review",
+    "runtime": "Native Codex",
+    "independentOfEffectActor": true,
+    "independentOfCodeAuthor": true
+  },
+  "codeAuthor": "/root/integrated_program_context",
+  "effectOperator": "/root",
+  "conclusion": "PASS_FOR_FINITE_SOURCE_CASCADE_AND_THREE_OWNER_SOURCE_CLOSURES",
+  "findings": [],
+  "exactSource": {
+    "commit": "7adfbb292a6c4f441e548405c5885b26d89a49b7",
+    "tree": "fe0652d18acfdc76d522808497bd1079a0e90509",
+    "reviewedSourceManifestSha256": "7bbcf172cf37c431022de59489459c2665cdb89ce1b8a5142d30911f606879c6",
+    "sourceAndPlanReviewPreserved": true
+  },
+  "observedEffectBoundaries": [
+    {
+      "phase": "finite-v3-source-CAS",
+      "operator": "/root",
+      "participants": 79,
+      "changedFiles": 49,
+      "retainedIdentical": 30,
+      "journalEntries": 158,
+      "appliedRecords": 49,
+      "lastEntry": "promotion-complete",
+      "completedAt": "2026-10-14T22:24:19.391Z",
+      "journalHashChainIndependentlyVerified": true,
+      "stageAndReceiptAndDurableJournalIdentityVerified": true
+    },
+    {
+      "phase": "separate-absent-Codex-export-alias",
+      "operator": "/root",
+      "changedFiles": 0,
+      "newlyCreatedSymlinks": 1,
+      "path": "/home/palantirkc/code/shared/codex-harness-engineering/node_modules/@palantirkc/work-continuity/src/git-work",
+      "target": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work",
+      "absentBeforeEstablishedByPriorReadback": true,
+      "existingSourceBytesOverwritten": false,
+      "exactCreatedInodeAndHeldParentVerified": true,
+      "sourcePinsVerified": 8,
+      "receiptPin": {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/root-codex-git-work-alias-receipt.json",
+        "sha256": "7492802f3757cfda6eea3fa4c3e7628e345b46ab8bd709de709562f8b527bbd1",
+        "bytes": 2550,
+        "mode": 384,
+        "uid": 1000,
+        "gid": 1000,
+        "dev": "2096",
+        "ino": "1514501",
+        "nlink": 1,
+        "mtimeMs": 1792017153772.5845,
+        "ctimeMs": 1792017153772.5845
+      },
+      "admissionPin": {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/root-codex-git-work-alias-admission.json",
+        "sha256": "645ef667fdb40ef5b5648b81dd45e8bd17965039f50f517193bda4640a6f6dca",
+        "bytes": 2506,
+        "mode": 384,
+        "uid": 1000,
+        "gid": 1000,
+        "dev": "2096",
+        "ino": "1514499",
+        "nlink": 1,
+        "mtimeMs": 1792017153756.3772,
+        "ctimeMs": 1792017153756.3772
+      }
+    }
+  ],
+  "independentActualReadback": {
+    "observation": {
+      "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/observed-after-v3.json",
+      "sha256": "16e26941f0711e587b5049652380da1d16e3565de001d92a9402eecff5823510",
+      "bytes": 370362
+    },
+    "participants": {
+      "count": 79,
+      "changed": 49,
+      "identicalRetained": 30,
+      "exactMetadataAndCompleteBytesAgainstStagedAfter": true,
+      "exactDevInoAndFullImageAgainstRootReceipt": true,
+      "changedImageAgainstDurableFileAppliedJournal": true,
+      "unchangedFullImageAgainstOriginalBefore": true
+    },
+    "fixedInputs": {
+      "count": 452,
+      "exactFullHeldImageUnchangedAgainstTransactionBefore": true,
+      "readonlyNonparticipantOriginals": 265,
+      "sourceStageProtectedPinsCovered": true,
+      "recheckedAfterGuardCalls": true
+    },
+    "hardlinks": {
+      "exactGroups": 11,
+      "unchangedGroupsNeverOverwritten": 10,
+      "changedPackageGroupCount": 1,
+      "allOriginalGroupInodesRetained": true,
+      "originalPackageInode": "986677",
+      "originalPackageDev": "2096",
+      "originalPackageNlink": 2,
+      "retainedOriginalPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-runs/actual-owner-cascade-20261015-v3/retained-inode-41",
+      "originalCacheAliasPath": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/@palantirkc+work-continuity@file+packages+work-continuity/node_modules/@palantirkc/work-continuity/package.json",
+      "originalCacheAliasBytesAndInodeUnchanged": true,
+      "originalRenameCtimeComparedAgainstDurableRetainedInodeImage": true,
+      "newCanonicalPackageNlink": 1
+    },
+    "custody": {
+      "originalPrivateCopies": 301,
+      "allCompleteHashesAndLengthsVerified": true,
+      "privateCopyMode": "0600",
+      "privateCopyNlink": 1,
+      "canonicalNonparticipantsUnchanged": 265,
+      "participantOriginalsPreservedPrivately": true,
+      "doesNotClaimAll301CanonicalFilesUnchanged": true
+    },
+    "registrations": [
+      {
+        "owner": "codex",
+        "path": "architecture/context-provider.json",
+        "sha256": "684b75e57dbede92dcd9ff1630cc3714ff998b769bf9558ee2407ba5143862cd",
+        "pinCount": 22,
+        "authority": "none",
+        "nativePermissionGranted": false
+      },
+      {
+        "owner": "codex",
+        "path": "architecture/native-codex-provider.json",
+        "sha256": "09e98dd0b89755fad6e48ad005ad7b14522be53f08e6d0b0fd3cea10e29948df",
+        "pinCount": 6,
+        "authority": "none",
+        "nativePermissionGranted": false
+      },
+      {
+        "owner": "hermes",
+        "path": "architecture/hermes-context-provider.json",
+        "sha256": "7b0ed18c0f9bb5239bf572665017b9b29c3feb35079d5e5b0856321fce889496",
+        "pinCount": 14,
+        "authority": "none",
+        "nativePermissionGranted": false
+      }
+    ],
+    "actualCallableGuards": [
+      {
+        "owner": "codex-context",
+        "status": "pass",
+        "pinCount": 23,
+        "providerRoot": "/home/palantirkc/code/shared/agent-platform",
+        "gitWorkModulePath": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/index.ts",
+        "meaning": "Actual owner builtin closure bridge and resolution checks; no provider implementation/business callback imported."
+      },
+      {
+        "owner": "codex-native",
+        "status": "pass",
+        "pinCount": 16,
+        "providerRoot": "/home/palantirkc/code/shared/agent-platform",
+        "gitWorkModulePath": null,
+        "meaning": "Actual builtin-only first-import guard callable and verify passed; native hook event/consent/consumer not executed."
+      },
+      {
+        "owner": "hermes-context",
+        "status": "pass",
+        "pinCount": 19,
+        "providerRoot": "/home/palantirkc/code/shared/agent-platform",
+        "gitWorkModulePath": null,
+        "meaning": "Actual owner source bridge and installed Ontology/source resolution proof; no native/VPS packaging/compiler/lifecycle executed."
+      }
+    ],
+    "executionMode": "fresh Bun process; builtin-only owner source guards and verify/recheck functions, without provider business callbacks or native lifecycle",
+    "sourceClosureProofIsNativeConsumerAcceptance": false
+  },
+  "historicalGuards": {
+    "oldCodeClosureAndActiveRegistryExactProtectedHashesUnchanged": true,
+    "currentRootNativeSessionAbsentFromOldActiveRegistry": true,
+    "oldRootNativeSessionId": "01a13b2a-2132-76c0-8326-b9e83b7d938b",
+    "oldManifestRefreshed": false,
+    "oldSelectedOperationsIndependentUnchangedClaim": "Only paths explicitly included in the 452 fixed-input full-image observations are claimed unchanged. No broader operations-data hash claim is made.",
+    "oldClosedBudgetLedgerIndependentUnchangedClaim": false,
+    "oldClosedBudgetLedgerScope": "This packet has no separately established immutable BEFORE pin for every closed budget/ledger data file. The exact reviewed operator and admission 49-file write set excludes budget/ledger data. Protected budget implementation source bytes are covered where present in the 452 fixed inputs; this is not a data-ledger parity proof.",
+    "closedBudgetRefreshIssuedByReviewerOrThisCAS": false,
+    "modelOrEvaluationDispatchIssuedByReviewer": false,
+    "historicalRouteStatus": "HELD; no historical authority renewal or selected-session runtime acceptance",
+    "preexistingStaleSourcePins": 4,
+    "additionalPlannedStaleLegacyHelperPins": 2,
+    "exactDrift": [
+      {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/evaluation-ledger.ts",
+        "historicalSha256": "8a64851493734c0262ea760ccc1891c087eb2c8393ee3b2bf36f4ae95f50c457",
+        "actualSha256": "91eeda01bd8673a251f39381fad2b931ce609af007380cf0eefa7a3703ddba17",
+        "preexisting": true,
+        "added": false
+      },
+      {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/source.ts",
+        "historicalSha256": "11507930a28c30d0fce389c58f6bf29e536ba472dbb26fe4bbffb794f6b2017e",
+        "actualSha256": "50142da45b2e758ac8aba0524d760e7629340ea6a579a5ea38a3e6a908fa66e4",
+        "preexisting": true,
+        "added": false
+      },
+      {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/handoff.ts",
+        "historicalSha256": "7c0e5d0b6575e8e82d94e299c078446270c2c99c997a958da0ea2ea6ea01664d",
+        "actualSha256": "8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a",
+        "preexisting": true,
+        "added": false
+      },
+      {
+        "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/qualification.ts",
+        "historicalSha256": "136b7f5eaa10763c7b0e315d2ca0056c6ceee80df396b7ec735238e80cab57c3",
+        "actualSha256": "c7ef10b6633657368b1a390dc44d93a557a647c61f7077e94ca619b82a847e6d",
+        "preexisting": true,
+        "added": false
+      },
+      {
+        "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/legacy/harness/owner-context-loader.ts",
+        "historicalSha256": "57742bb4332e9bb25039ec9830877bd1cd72bb27e24d2260e9c571814799aa16",
+        "actualSha256": "cd958118d5a9b6c5d1d23397a16a140ca86ca338446b749aacc79dd1d0cd54e5",
+        "preexisting": false,
+        "added": true
+      },
+      {
+        "path": "/home/palantirkc/code/shared/codex-harness-engineering/src/legacy/harness/provider-closure.ts",
+        "historicalSha256": "618aeea8e1f19b01ec1c39248e2ec6121926c26d682874ed8d1223a78e4f7986",
+        "actualSha256": "1f8f07de32863916bc41c1f399f774e8ce8d6603d9d074f0566c40fc622ec628",
+        "preexisting": false,
+        "added": true
+      }
+    ]
+  },
+  "preservedNegativeHistory": {
+    "originalV2RollbackFinding": "CAS-ROLLBACK-SAME-BYTE-INODE-1; v2 HOLD and owned reproduction preserved; v3 source review separately closed the finding before admitted apply",
+    "firstActualAfterReadback": "Finite source parity passed but actual Codex context source guard refused the absent installed git-work export. observed-after-v2 remains HELD and immutable.",
+    "ownAliasSameProcessProbe": "Initial owned before/after test observed Bun 1.3.14 negative resolver caching and failed. Original source and log preserved.",
+    "ownAliasFreshProcessProbe": "Distinct before/after child resolver processes passed canonical context/git-work resolution, and a second symlink create refused EEXIST without replacement. Only the owned temporary fixture was mutated and removed.",
+    "finalActualAfterReadback": "After Root separately admitted and created the single absent alias, fresh independent actual owner source guard invocation passed all three guards; initial HELD evidence was not overwritten."
+  },
+  "remainingBoundaries": {
+    "normalCommonNativeCodexCaller": {
+      "status": "PENDING_AND_OBSERVED_UNRESOLVED",
+      "actualResolverObservations": [
+        {
+          "name": "@palantirkc/work-continuity/context",
+          "from": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native",
+          "status": "resolved",
+          "actual": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/@palantirkc+work-continuity@file+packages+work-continuity/node_modules/@palantirkc/work-continuity/src/context/index.ts",
+          "actualRealpath": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/@palantirkc+work-continuity@file+packages+work-continuity/node_modules/@palantirkc/work-continuity/src/context/index.ts"
+        },
+        {
+          "name": "@palantirkc/work-continuity/git-work",
+          "from": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native",
+          "status": "held",
+          "error": "ResolveMessage: Cannot find module '@palantirkc/work-continuity/git-work' from '/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native'"
+        }
+      ],
+      "consequence": "The normal installed common consumer resolves context to the old .bun cache source and cannot resolve git-work. No old cache alias, source bytes, original inode or guard was edited. This source-cascade pass does not qualify that consumer."
+    },
+    "hermesIndependentDependencyRuntime": "Pending; no independent installed dependency compilation/runtime denominator qualification claimed here.",
+    "nativeConfigAndConsentAndConsumerBinding": "Pending; this reviewer made no native configuration/profile/trust/session/consumer changes.",
+    "actual1500TokenConsumerDisplay": "Pending; no model or evaluation requests issued.",
+    "oldClosedBudgetHistory": "Separate before-pin reconciliation required before any claim of full old closed-ledger data parity or fresh-suite admission.",
+    "nativeConsumerActivated": false,
+    "wholeWorkAcceptance": false,
+    "wholeGoalAcceptance": false,
+    "sourcePlatformPromotionScope": "Finite owner source/registration cascade only; not a whole checkout replacement or native activation."
+  },
+  "p1Disposition": {
+    "sourceGate": "PASS: all three actual owner registrations, exact source pins, source guards and currentness rechecks are coherent after the finite CAS plus one separately recorded absent alias.",
+    "threadId": "PRRT_kwDOVD2my86sf-iZ",
+    "reviewerResolvedThread": false,
+    "reviewerMergedSource": false,
+    "decisionOwner": "/root",
+    "consumerAcceptance": false
+  },
+  "reviewerEffects": {
+    "activeSourceWrites": 0,
+    "registrationWrites": 0,
+    "nativeConfigWrites": 0,
+    "budgetLedgerWrites": 0,
+    "gitWrites": 0,
+    "nativeOrVpsCalls": 0,
+    "sourceAcademyAccess": 0,
+    "credentialOrAuthReads": 0,
+    "modelEvaluationRequests": 0,
+    "localOwnedFixtureWritesOnly": true,
+    "ownedTemporaryAliasFixtureRemoved": true,
+    "ownReviewArtifactsWritten": true
+  },
+  "authority": "none",
+  "evidence": {
+    "immutableInputs": [
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/operator-v3.ts",
+        "sha256": "ee3bb13f00dd43fe6a5efb2d284ec15e03b1623a3a23997c4225b39e68e2b39e",
+        "bytes": 62646
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/transaction-plan-v3.json",
+        "sha256": "15287489661e401c0f1c5ec06bef07c23cc8fab6b3be669c728b17d6559b2230",
+        "bytes": 32843
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/topology-policy-v2.json",
+        "sha256": "ccf71dd8ad3910e6042205fa576eee2b8a0e9ad3b5becf35f62987dc8abada2e",
+        "bytes": 9744
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/independent-review-pass-operator-v3-final.json",
+        "sha256": "5cde54ccaa88cff07eb0aaedd3c884543520876742ee84118fcd745ad7a263b5",
+        "bytes": 34164
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/root-apply-v3.ts",
+        "sha256": "e8d48933b3eaf300420b69f268dbab39359b543da7ce6c3372678b3912ea51fc",
+        "bytes": 6150
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/root-exact-v3-apply-admission.json",
+        "sha256": "9de490e8c8285f82cae5804c6f1226c1bbd93bedc7a0e55d60639141ea257127",
+        "bytes": 2543
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/root-exact-v3-apply-receipt.json",
+        "sha256": "a9d699e354ec0871c5f4d9e8aaa5efdad781914e7a728f7cfaed96990f4b511f",
+        "bytes": 302632
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/root-codex-git-work-alias-admission.json",
+        "sha256": "645ef667fdb40ef5b5648b81dd45e8bd17965039f50f517193bda4640a6f6dca",
+        "bytes": 2506
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/root-codex-git-work-alias-receipt.json",
+        "sha256": "7492802f3757cfda6eea3fa4c3e7628e345b46ab8bd709de709562f8b527bbd1",
+        "bytes": 2550
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/adoption-staging/both-native-hook-wiring-7adfbb29/manifest.json",
+        "sha256": "74b8fb2e76d0808041b84807a6f6385bd3955e7aededdbda81c8856f85857d5f",
+        "bytes": 84399
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/both-native-hook-independent-review-result-7adfbb29.json",
+        "sha256": "195fea9dccd23b887f20136738eb72dbe62c2aadbc6a564b45b49a6c97fbb39f",
+        "bytes": 13103
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/both-native-hook-independent-stage-readback-7adfbb29.json",
+        "sha256": "74eb806f8a9c69cd709f8bb44a6ca04c7f36f2a3a6e8b5c7f42f8011c4943199",
+        "bytes": 40106
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-operator/independent-review-hold-operator-v2.json",
+        "sha256": "2c8587aebf5fe60bba58b06764fa25b8be031c69f503908bcfaa0887e1172ec7",
+        "bytes": 16485
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-review-v2/independent-rollback-same-byte-inode-probe.json",
+        "sha256": "30b931b1d0b0d1921145958d349a068ce563d4d4dac9cab45beb6a640144dfe2",
+        "bytes": 1084
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/observed-after-v2.json",
+        "sha256": "5013378f9bbad5a029bf6986f7922240ddb3ae0114702164efb4b14be682ea27",
+        "bytes": 364039
+      }
+    ],
+    "ownReadbackSourcesLogsAndObservations": [
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/alias-concept-cleanup-v2.json",
+        "sha256": "55f1de6f5d9ae810f83574d35714a74d6384bade1b3f3a7a9eb759b0aed1941c",
+        "bytes": 97
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/alias-concept-probe-v2.json",
+        "sha256": "a50f0567b6a7e7c94334efffd4579881641f13ca8187b1670794e782faf88b60",
+        "bytes": 7087
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/alias-concept-probe-v2.log",
+        "sha256": "8f17f778bf9b1073aff2ef434c12d235c304a8b39090f87d74f3b39192aec615",
+        "bytes": 76
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/alias-concept-probe-v2.ts",
+        "sha256": "6da63550140f36a17c7309a14472c488f2e1c124037ea5a84a6633b3478f2bee",
+        "bytes": 5934
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/alias-concept-probe.log",
+        "sha256": "4f7a1e2339b0676468483c824cb3552a2389724b1059a47717bc0842d6233b8e",
+        "bytes": 155
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/alias-concept-probe.ts",
+        "sha256": "de1ef055a1fe18a8bc003d1978650c8467c1082913f8d752427ea0418c82c44b",
+        "bytes": 5036
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/independent-after-readback-v2.log",
+        "sha256": "3e9eca6366faa3d6b9ccba973a6f35c7029fcbc80a434a72dc3a4fa9a2ab6de1",
+        "bytes": 340
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/independent-after-readback-v3.log",
+        "sha256": "64644d084da6a7fed30efdf2e755275f10899cdd016b363fe7918053d2f4b2fb",
+        "bytes": 304
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/independent-after-readback.log",
+        "sha256": "fdc44dd2621fd937c7745c08a8a694ad801da57f4e7fb86b74ffc3fce77a3f8a",
+        "bytes": 167
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/observed-after-v2.json",
+        "sha256": "5013378f9bbad5a029bf6986f7922240ddb3ae0114702164efb4b14be682ea27",
+        "bytes": 364039
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/observed-after-v3.json",
+        "sha256": "16e26941f0711e587b5049652380da1d16e3565de001d92a9402eecff5823510",
+        "bytes": 370362
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/readback-v2.ts",
+        "sha256": "f4aa175c492af451f10b3b1e2d4e646f4bcf8ce307217df40a26a4f21d57bf05",
+        "bytes": 14542
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/readback-v3.ts",
+        "sha256": "dfd1b54e9bef5e7c03ed4a0ee9aae6a55d5ca529a2009f340c8731870002a385",
+        "bytes": 16933
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/readback.ts",
+        "sha256": "fb6c7d9da89eabe65c949d73c7f771da0c93a1deab3eeef5fde74e04b6172ba4",
+        "bytes": 12828
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/native-owner-cas-independent-after-v3/seal-after-result.ts",
+        "sha256": "515920601babc88277acfe42b511ed5054a0a57cbf5b20ba8fda202f6fff1d11",
+        "bytes": 12160
+      }
+    ]
+  }
+}
