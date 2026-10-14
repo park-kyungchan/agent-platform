@@ -17,7 +17,13 @@
     {
       "owner": "codex-harness-engineering",
       "path": "src/native/provider-closure.ts",
-      "sha256": "01fffd9a7b94711a741c00479c80685984caae45894c61de52e21189d8eac152",
+      "sha256": "232f0c32006ba7e665ecbaddfece6de586c12461c586a72094e7287ccc637cf9",
+      "classification": "source-owned-code-only-no-runtime-or-user-data"
+    },
+    {
+      "owner": "codex-harness-engineering",
+      "path": "src/native/hook-cli.ts",
+      "sha256": "e48ef40586779a15cc727bb14f6257fcba208a00a4c38a29df24cfaa00099449",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {

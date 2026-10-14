@@ -11,11 +11,23 @@ import {
 import { buildHermesPlatformSource } from "./build.ts";
 
 const source = resolve(import.meta.dir, "../../../..");
-async function fixture() {
+async function fixture(importMarker = false) {
   const root = await mkdtemp(join(tmpdir(), "hermes-platform-source-"));
   for (const path of platformSourcePaths) {
     await mkdir(dirname(join(root, path)), { recursive: true });
     await cp(join(source, path), join(root, path));
+  }
+  const markerPath = join(root, "synthetic-implementation-imported");
+  if (importMarker) {
+    const implementation = join(
+      root,
+      "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
+    );
+    await writeFile(
+      implementation,
+      (await readFile(implementation, "utf8")) +
+        `\nawait Bun.write(${JSON.stringify(markerPath)}, 'implementation imported');\n`,
+    );
   }
   await cp(join(source, "node_modules"), join(root, "node_modules"), {
     recursive: true,
@@ -36,6 +48,7 @@ async function fixture() {
     registration,
     path,
     sha256: sourceDigest(raw),
+    markerPath,
     cleanup: () => rm(root, { recursive: true, force: true }),
   };
 }
@@ -167,6 +180,13 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
   try {
     const compiler = await realpath(process.execPath),
       compilerSha = sourceDigest(await readFile(compiler));
+    const bindingsPath = join(f.root, "current-work-bindings.json"),
+      bindingsBytes = JSON.stringify({
+        schema: "hermes.current-git-work-hook-bindings.v1",
+        selections: [],
+        runtimeIndex: { schema: "native-harness.runtime-index.v1", entries: [] },
+      });
+    await writeFile(bindingsPath, bindingsBytes);
     const request = {
       registrationPath: f.path,
       registrationSha256: f.sha256,
@@ -175,6 +195,7 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       legacyManifestSha256: "1".repeat(64),
       runtimeProviderRoot: f.root,
       runtimeRegistrationPath: join(f.root, "runtime-registration.json"),
+      currentWorkBindings: { runtimePath: bindingsPath, sha256: sourceDigest(bindingsBytes) },
     };
     await expect(
       buildHermesPlatformSource({
@@ -186,7 +207,7 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       buildHermesPlatformSource({ ...request, runtimeProviderRoot: "/home/synthetic-owner" }),
     ).rejects.toThrow("PC_INDEPENDENT");
     const built = await buildHermesPlatformSource(request);
-    expect(built.bundles).toHaveLength(3);
+    expect(built.bundles).toHaveLength(4);
     expect(built.transitiveCompilerInputsVerified).toBe(true);
     expect(built.sourceClosureVerifiedBeforeAndAfter).toBe(true);
     expect(built.nativeActivation).toBe(false);
@@ -202,7 +223,7 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     }
     await writeFile(request.runtimeRegistrationPath, built.nativeRegistration.bytes);
     const marker = "SYNTHETIC_PRIVATE_NATIVE_HOOK_79213";
-    for (const name of ["native-hook.js", "read-current-work.js"]) {
+    for (const name of ["native-hook.js", "read-current-work.js", "current-work-native-hook.js"]) {
       const p = Bun.spawn([compiler, "--no-env-file", join(f.root, name)], {
         stdin: new Blob([marker]),
         stdout: "pipe",
@@ -218,11 +239,49 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
         expect(code).toBe(0);
         expect(JSON.parse(out)).toEqual({});
         expect(JSON.parse(error).error).toBe("NATIVE_BOUNDARY_INPUT_OR_SOURCE_FAILED");
-      } else {
+      } else if (name === "read-current-work.js") {
         expect(code).toBe(1);
         expect(error).toBe("CURRENT_WORK_INPUT_OR_SOURCE_FAILED\n");
+      } else {
+        expect(code).toBe(0);
+        expect(JSON.parse(out)).toEqual({});
+        expect(error).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
       }
     }
+    const invokeNative = async () => {
+      const p = Bun.spawn(
+        [compiler, "--no-env-file", join(f.root, "current-work-native-hook.js")],
+        {
+          stdin: new Blob([
+            JSON.stringify({
+              hook_event_name: "pre_llm_call",
+              profile: "synthetic-profile",
+              session_id: "synthetic-session",
+              cwd: "/synthetic/cwd",
+              extra: { task_id: "actual-native-task", user_message: marker },
+            }),
+          ]),
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      return {
+        code: await p.exited,
+        stdout: await new Response(p.stdout).text(),
+        stderr: await new Response(p.stderr).text(),
+      };
+    };
+    const unselected = await invokeNative();
+    expect(unselected.code).toBe(0);
+    expect(JSON.parse(unselected.stdout)).toEqual({});
+    expect(unselected.stderr).toBe("");
+    await writeFile(bindingsPath, bindingsBytes + "\n");
+    const mutatedBindings = await invokeNative();
+    expect(mutatedBindings.code).toBe(0);
+    expect(JSON.parse(mutatedBindings.stdout)).toEqual({});
+    expect(mutatedBindings.stderr).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+    expect(mutatedBindings.stdout + mutatedBindings.stderr).not.toContain(marker);
+    await writeFile(bindingsPath, bindingsBytes);
     const held = Bun.spawn([compiler, "--no-env-file", join(f.root, "read-current-work.js")], {
       stdin: new Blob([JSON.stringify({ event: null, selection: null, runtimeIndex: null })]),
       stdout: "pipe",
@@ -254,6 +313,60 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     expect(staleCode).toBe(1);
     expect(staleOut).toBe("");
     expect(staleError).toBe("CURRENT_WORK_INPUT_OR_SOURCE_FAILED\n");
+    const staleNative = await invokeNative();
+    expect(staleNative.code).toBe(0);
+    expect(JSON.parse(staleNative.stdout)).toEqual({});
+    expect(staleNative.stderr).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+  } finally {
+    await f.cleanup();
+  }
+}, 60000);
+
+test("compiled native hook refuses a changed registration before the current Work implementation executes", async () => {
+  const f = await fixture(true);
+  try {
+    const compiler = await realpath(process.execPath),
+      bindingsPath = join(f.root, "native-bindings.json"),
+      bindingsBytes = JSON.stringify({
+        schema: "hermes.current-git-work-hook-bindings.v1",
+        selections: [],
+        runtimeIndex: { schema: "native-harness.runtime-index.v1", entries: [] },
+      });
+    await writeFile(bindingsPath, bindingsBytes);
+    const runtimeRegistrationPath = join(f.root, "native-registration.json");
+    const built = await buildHermesPlatformSource({
+      registrationPath: f.path,
+      registrationSha256: f.sha256,
+      providerRoot: f.root,
+      compiler: { path: compiler, sha256: sourceDigest(await readFile(compiler)) },
+      legacyManifestSha256: "1".repeat(64),
+      runtimeProviderRoot: f.root,
+      runtimeRegistrationPath,
+      currentWorkBindings: { runtimePath: bindingsPath, sha256: sourceDigest(bindingsBytes) },
+    });
+    const native = built.bundles.find((bundle) => bundle.name === "current-work-native-hook.js")!;
+    const path = join(f.root, native.name);
+    await writeFile(path, native.bytes);
+    await writeFile(
+      runtimeRegistrationPath,
+      Buffer.from(built.nativeRegistration.bytes).toString() + "\n",
+    );
+    const p = Bun.spawn([compiler, "--no-env-file", path], {
+      stdin: new Blob([
+        JSON.stringify({
+          hook_event_name: "pre_llm_call",
+          profile: "synthetic",
+          session_id: "synthetic",
+          cwd: "/synthetic",
+        }),
+      ]),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(await p.exited).toBe(0);
+    expect(JSON.parse(await new Response(p.stdout).text())).toEqual({});
+    expect(await new Response(p.stderr).text()).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+    expect(await Bun.file(f.markerPath).exists()).toBe(false);
   } finally {
     await f.cleanup();
   }

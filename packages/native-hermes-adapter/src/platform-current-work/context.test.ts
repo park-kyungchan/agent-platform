@@ -15,6 +15,7 @@ import {
   type HermesCurrentWorkSelection,
   type HermesCurrentWorkOptions,
 } from "./context.ts";
+import { readHermesNativeWorkHook } from "./hook-context.ts";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -468,4 +469,121 @@ test("missing closure verifier, bad budgets and parser errors expose no original
   const value = await f.read();
   expect(value.holdReasons).toEqual(["SELECTED_WORK_SOURCE_UNAVAILABLE_OR_DRIFTED"]);
   expect(JSON.stringify(value)).not.toContain("PRIVATE-PARSER-PAYLOAD-SENTINEL");
+});
+
+function nativePayload(evt: HermesCurrentWorkEvent = event) {
+  return {
+    hook_event_name: "pre_llm_call",
+    profile: evt.profileId,
+    session_id: evt.sessionId,
+    cwd: "/synthetic/native-cwd",
+    tool_name: null,
+    tool_input: null,
+    extra: {
+      agent_id: evt.agentId,
+      project_id: evt.nativeProjectId,
+      task_id: evt.nativeTaskId,
+      run_id: evt.nativeRunId,
+      turn_id: "actual-turn-not-native-run",
+      user_message: "PRIVATE-NATIVE-PROMPT",
+      conversation_history: [{ content: "PRIVATE-NATIVE-HISTORY" }],
+    },
+  };
+}
+function hookBindings(f: Awaited<ReturnType<typeof fixture>>) {
+  return {
+    schema: "hermes.current-git-work-hook-bindings.v1",
+    runtimeIndex: f.index,
+    selections: [{ cwd: "/synthetic/native-cwd", selection: f.selected }],
+  };
+}
+test("native pre_llm_call protocol returns purpose Task revisions and original pointers without native payloads", async () => {
+  const f = await fixture();
+  const response = await readHermesNativeWorkHook(nativePayload(), hookBindings(f), f.provider);
+  const context = JSON.parse(response.context!);
+  expect(Object.keys(response)).toEqual(["context"]);
+  expect(context.status).toBe("source-qualified");
+  expect(context.context.purpose.objective).toBe("Preserve the current integrated purpose");
+  expect(context.context.currentTask.title).toBe("Current integrated Task");
+  expect(context.context.upstream.spec.revision).toBe(6);
+  expect(context.context.decisions[0].answer.fragment).toBe("#/content/answer");
+  expect(response.context!.length).toBeLessThanOrEqual(6000);
+  for (const privateText of [
+    "PRIVATE-NATIVE-PROMPT",
+    "PRIVATE-NATIVE-HISTORY",
+    "PRIVATE-ANSWER-SENTINEL",
+    "PRIVATE-QUESTION-SENTINEL",
+  ])
+    expect(JSON.stringify(response)).not.toContain(privateText);
+  expect(f.counters()).toEqual({ reads: 2, checks: 4 });
+});
+test("installed seam missing agent project and run remain exact nulls; turn and logical Task never fill them", async () => {
+  const f = await fixture();
+  const actual = { ...event, agentId: null, nativeProjectId: null, nativeRunId: null };
+  f.selected.native = actual;
+  f.index.entries[0] = { ...f.index.entries[0]!, ...actual };
+  const payload = nativePayload(actual);
+  const { agent_id: _a, project_id: _p, run_id: _r, ...extra } = payload.extra;
+  const response = await readHermesNativeWorkHook(
+    { ...payload, extra },
+    hookBindings(f),
+    f.provider,
+  );
+  expect(JSON.parse(response.context!).context.native).toEqual(actual);
+  expect(JSON.parse(response.context!).context.native.nativeRunId).not.toBe(extra.turn_id);
+});
+test("foreign native tuples and cwd stay unselected without Git reads or legacy fallback", async () => {
+  const f = await fixture();
+  const original = nativePayload();
+  for (const payload of [
+    { ...original, profile: "foreign-profile" },
+    { ...original, session_id: "foreign-session" },
+    { ...original, cwd: "/foreign/cwd" },
+    ...["agent_id", "project_id", "task_id", "run_id"].map((key) => ({
+      ...original,
+      extra: { ...original.extra, [key]: "foreign-native-id" },
+    })),
+    { ...original, hook_event_name: "on_session_start" },
+  ])
+    expect(await readHermesNativeWorkHook(payload, hookBindings(f), f.provider)).toEqual({});
+  expect(f.counters()).toEqual({ reads: 0, checks: 0 });
+  await expect(
+    readHermesNativeWorkHook(original, { schema: "hermes-platform-work-v1" }, f.provider),
+  ).rejects.toThrow("EXPLICIT_NATIVE_HOOK_BINDINGS_REQUIRED");
+});
+test("child identity requires its own exact selection and cannot inherit an absent-agent parent row", async () => {
+  const f = await fixture(),
+    child = { ...event, agentId: "observed-child-agent", sessionId: "observed-child-session" };
+  expect(await readHermesNativeWorkHook(nativePayload(child), hookBindings(f), f.provider)).toEqual(
+    {},
+  );
+  expect(f.counters().reads).toBe(0);
+  f.selected.native = child;
+  f.index.entries[0] = { ...f.index.entries[0]!, ...child };
+  expect(
+    JSON.parse(
+      (await readHermesNativeWorkHook(nativePayload(child), hookBindings(f), f.provider)).context!,
+    ).context.native,
+  ).toEqual(child);
+  expect(
+    await readHermesNativeWorkHook(
+      nativePayload({ ...child, agentId: null }),
+      hookBindings(f),
+      f.provider,
+    ),
+  ).toEqual({});
+});
+test("native unknown currentness stays visibly held and late async closure drift suppresses protocol output", async () => {
+  const f = await fixture();
+  f.selected.latestRelevant = "unknown";
+  const response = await readHermesNativeWorkHook(nativePayload(), hookBindings(f), f.provider);
+  expect(JSON.parse(response.context!).status).toBe("held");
+  expect(JSON.parse(response.context!).holdReasons).toContain("REQUIRED_LATEST_CONTEXT_UNKNOWN");
+  let checks = 0;
+  f.provider.verifySourceClosure = async () => {
+    if (++checks === 4) throw Error("PRIVATE-LATE-ASYNC-DRIFT");
+  };
+  await expect(
+    readHermesNativeWorkHook(nativePayload(), hookBindings(f), f.provider),
+  ).rejects.toThrow("PRIVATE-LATE-ASYNC-DRIFT");
 });

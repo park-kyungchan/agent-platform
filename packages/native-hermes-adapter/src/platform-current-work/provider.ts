@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 /** Bootstrap guard depends only on builtins, before any current/legacy implementation import. */
-async function readExactFile(path: string, maxBytes: number, expectedSha256?: string) {
+export async function readExactFile(path: string, maxBytes: number, expectedSha256?: string) {
   if (!isAbsolute(path) || resolve(path) !== path)
     throw Error("EXACT_PLATFORM_SOURCE_PATH_REQUIRED");
   const parts = path.split("/").slice(1);
@@ -63,6 +63,8 @@ export const platformEntryPoints = {
   "native-hook.js": "packages/native-hermes-adapter/src/platform-rearchitecture/native-hook.ts",
   "read-current-work.js":
     "packages/native-hermes-adapter/src/platform-current-work/read-current-work.ts",
+  "current-work-native-hook.js":
+    "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
 } as const;
 export const platformSourcePaths = [
   "package.json",
@@ -84,7 +86,7 @@ export const platformSourcePaths = [
     "work-records",
     "owner-readers",
   ].map((name) => "packages/native-hermes-adapter/src/platform-rearchitecture/" + name + ".ts"),
-  ...["context", "read-current-work", "provider", "build"].map(
+  ...["context", "read-current-work", "provider", "build", "hook-context", "native-hook"].map(
     (name) => "packages/native-hermes-adapter/src/platform-current-work/" + name + ".ts",
   ),
   ...["boundary-custody", "contracts", "bot-correlation"].map(

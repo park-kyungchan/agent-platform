@@ -16,7 +16,7 @@
       "id": "codex-native-source",
       "registration": "../codex-harness-engineering/architecture/native-codex-provider.json",
       "ownerGuard": "../codex-harness-engineering/src/native/provider-closure.ts",
-      "meaning": "Exact SOURCE/trust-candidate proof; no native permission or provider first-import guarantee."
+      "meaning": "Reviewed owner hook facade verifies fixed provider source before first common import and before/after every event once adopted; source proof and native definition trust remain distinct."
     },
     {
       "id": "hermes-context-source",
@@ -551,11 +551,12 @@
       ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
       "nativeEntrypoints": [
+        "src/native/hook-cli.ts",
         "src/native/hooks.ts",
         "src/native/provider-closure.ts",
         "src/legacy/harness/owner-context-loader.ts"
       ],
-      "ownerBoundary": "Canonical hooks require injected fixed-owner context loader. Old two-argument wrapper supplies it. Code root is separate from selected binding/data root. Native source proof is SOURCE/trust-candidate evidence; existing context first-import denial remains active, native trust/config/CLI/ledgers stay owner.",
+      "ownerBoundary": "Canonical hooks require the fixed-owner context loader. The reviewed builtin-only owner guard/hook-cli fixture projection verifies source before dynamic common import and before/after every event when separately adopted. Context v1/v2/v3 readers and legacy owner-only mode remain distinct. Code roots never come from Work/binding data. Native trust/config/CLI/ledgers stay owner; historical selected manifests and closed budgets are not renewed.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/native-codex-adapter",
       "packageManifest": {
@@ -600,7 +601,7 @@
         "src/ontology-driven/native-bundle.ts",
         "src/ontology-driven/provider-source.ts"
       ],
-      "ownerBoundary": "Nine v1 ontology/adoption providers remain compatible. Canonical source additionally owns the legacy platform Work reader/CLI contracts, a separate current Git Work context adapter and v2 finite source/compiler closure. Native Hermes owns invocation, activation, profiles, sessions, Task/Run, credentials, mutable Work/evidence/learning data and lifecycle; no second runtime.",
+      "ownerBoundary": "Nine v1 ontology/adoption providers remain compatible. Canonical source owns legacy Work reader contracts, separate current Git Work/RuntimeIndex context and source-guarded pre_llm_call wire integration with exact owner-pinned bindings, plus the finite v2 source/compiler closure. Missing native fields stay null; no legacy fallback is inferred. Native Hermes owns invocation, approval, activation, profiles, sessions, Task/Run, credentials, mutable Work/evidence/learning data and lifecycle; no second runtime.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/native-hermes-adapter",
       "packageManifest": {
@@ -685,7 +686,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/build.ts",
-          "sha256": "6b9017ecfe7f22d76e0ac3609a287b38562828833d2312335260ecf4bcac052a",
+          "sha256": "b587e902bc7211a2c5220c141b5680573acf301ff7e3b8fb28fab8949a0a3cf2",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/build.ts"
         },
         {
@@ -694,8 +695,18 @@
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/context.ts"
         },
         {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
+          "sha256": "46c965629162da2603c5d2812f75db003b03c56a15ec04d10c6a2feb962b93e6"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
+          "sha256": "2d7e13d67492a71a0c2687fa32a263e0e6523d54dfc220184a223fa243ada551"
+        },
+        {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/provider.ts",
-          "sha256": "c14a38c25f0fac7b617074ed3a733c481efeffa30f7a2cd6eaf6b12941127b81",
+          "sha256": "109cf4a0b32fbc631b5626d0ab183303f3f307f785698ebb71950f0a697f6947",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/provider.ts"
         },
         {

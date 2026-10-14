@@ -1,6 +1,6 @@
 {
   "schema": "agent-platform.owner-fixture-refresh-contract.v1",
-  "scope": "Seven explicitly selected source-only native owner guard and adapter files; no native state, original transcripts, credentials or historical private fixture bytes.",
+  "scope": "Eight explicitly selected source-only native owner guard, hook facade and adapter files; no native state, original transcripts, credentials or historical private fixture bytes. The reviewed facade successor is staged here before native-owner CAS; refresh never authorizes active owner changes.",
   "verifyCommand": "bun ci/source-check.ts --verify-owner-fixtures",
   "refreshCommand": "bun ci/source-check.ts --refresh-owner-fixtures",
   "fullCheckCommand": "bun ci/source-check.ts",

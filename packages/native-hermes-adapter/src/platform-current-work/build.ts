@@ -18,6 +18,8 @@ export interface PlatformBuildRequest {
   legacyManifestSha256: string;
   runtimeProviderRoot: string;
   runtimeRegistrationPath: string;
+  /** Exact owner-selected native bindings; absence builds a held current hook, never a legacy fallback. */
+  currentWorkBindings?: { runtimePath: string; sha256: string };
 }
 async function compilerPin(path: string) {
   if (resolve(path) !== path || (await realpath(path)) !== path)
@@ -97,6 +99,11 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
     throw Error("EXACT_COMPILER_AND_LEGACY_MANIFEST_PINS_REQUIRED");
   runtimePath(request.runtimeProviderRoot);
   runtimePath(request.runtimeRegistrationPath);
+  if (request.currentWorkBindings) {
+    runtimePath(request.currentWorkBindings.runtimePath);
+    if (!/^[a-f0-9]{64}$/u.test(request.currentWorkBindings.sha256))
+      throw Error("EXACT_CURRENT_WORK_BINDINGS_PIN_REQUIRED");
+  }
   const source = await observeHermesPlatformSource(request.registrationPath, request),
     before = await compilerPin(request.compiler.path);
   if (before.sha256 !== request.compiler.sha256) throw Error("INSTALLED_COMPILER_PIN_DRIFT");
@@ -148,6 +155,16 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
         "HERMES_PLATFORM_PROVIDER_ROOT=" + JSON.stringify(request.runtimeProviderRoot),
         "--define",
         "HERMES_PLATFORM_REGISTRATION_PATH=" + JSON.stringify(request.runtimeRegistrationPath),
+        "--define",
+        "HERMES_CURRENT_WORK_BINDINGS_PATH=" +
+          (request.currentWorkBindings
+            ? JSON.stringify(request.currentWorkBindings.runtimePath)
+            : "undefined"),
+        "--define",
+        "HERMES_CURRENT_WORK_BINDINGS_SHA256=" +
+          (request.currentWorkBindings
+            ? JSON.stringify(request.currentWorkBindings.sha256)
+            : "undefined"),
       ];
       const child = Bun.spawn(argv, {
         cwd: request.providerRoot,
