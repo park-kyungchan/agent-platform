@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "bun-types": "1.3.14",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "description": "Common implementation provider for legacy-owned research capture; native runtime and schema ownership stay with scrapling-research."
 }
