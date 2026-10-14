@@ -1,0 +1,211 @@
+{
+  "schema": "codex.common-harness-fresh-main-verification.v1",
+  "recordClass": "verification",
+  "observedAtUtc": "2026-10-14T15:16:28.324Z",
+  "repository": "park-kyungchan/agent-platform",
+  "origin": "https://github.com/park-kyungchan/agent-platform.git",
+  "sourceRoot": "/home/palantirkc/code/shared/codex-harness-engineering/.private/common-harness-20261014/postmerge-checkout",
+  "headSha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+  "treeSha": "ab3d906c27cc718ed387c3a47b39302d961b30c3",
+  "workingTreeClean": true,
+  "selectedWork": {
+    "schema": "agent-platform.common-work-verification.v1",
+    "status": "pass",
+    "verificationClass": "committed-common-source-only",
+    "repositoryId": "park-kyungchan/agent-platform",
+    "commit": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+    "records": 116,
+    "actualDecisions": 38,
+    "completedHistoricalEffects": 63,
+    "uncertainHistoricalEffects": 2,
+    "contextRecords": 23,
+    "contextSources": 32,
+    "runtimeDocumentationRoutes": 84,
+    "comparisonBaseCommit": "ffba2462a08b9f8c83c6f87b1043403e5cb748d7",
+    "transitionValidated": false,
+    "runtimeActivationEstablished": false,
+    "wholeWorkAcceptanceEstablished": false,
+    "nativePermissionGranted": false
+  },
+  "validation": {
+    "valid": true,
+    "findings": [],
+    "authority": "none",
+    "nativePermissionGranted": false,
+    "semanticAcceptanceEstablished": false
+  },
+  "context": {
+    "status": "source-qualified",
+    "records": 23,
+    "sources": 32,
+    "characters": 15892,
+    "purposeVisible": true,
+    "nativePermissionGranted": false
+  },
+  "docs": {
+    "status": "SELECTED",
+    "request": {
+      "surface": "codex.cli",
+      "topic": "hooks",
+      "freshness": "general",
+      "executionHost": "local.wsl"
+    },
+    "primary": {
+      "id": "codex.cli.hooks",
+      "surface": "codex.cli",
+      "topic": "hooks",
+      "aliases": [
+        "훅"
+      ],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/hooks",
+      "preferredUrl": "https://learn.chatgpt.com/docs/hooks.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/hooks",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Check installed version before relying on current hooks.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    "secondary": [],
+    "discovery": [],
+    "evidenceGaps": [
+      "route-body-not-fully-reviewed"
+    ],
+    "retrieval": "READ_SELECTED_PAGE",
+    "limits": {
+      "maxPages": 3,
+      "maxExcerptChars": 6000,
+      "maxDiscoveryRequests": 2
+    },
+    "executionAuthority": "none",
+    "nativePermissionGranted": false
+  },
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "--no-replace-objects",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "30feb72f2fd2e8a8fb077f9dc35b029d0fa76c2bd8f135a47e9a1f1a6a3dc679",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "git",
+        "--no-replace-objects",
+        "rev-parse",
+        "HEAD^{tree}"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "77be21ac6879cc059c4f4658bbd8ad6428492a199adfbad961f23472e9c2718c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "git",
+        "--no-replace-objects",
+        "status",
+        "--porcelain"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "git",
+        "--no-replace-objects",
+        "remote",
+        "get-url",
+        "origin"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "a7b08772705854e53322ab1896659e67adbbc880c52c2142aca2953b708beedd",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/home/palantirkc/.bun/bin/bun",
+        "install",
+        "--frozen-lockfile",
+        "--ignore-scripts"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "d05d39c4b6a8bb97ec4dcfa2be1402c3fba96831f2a51d886be3f4b7d580b5d0",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/home/palantirkc/.bun/bin/bun",
+        "scripts/verify-common-work.ts"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "a7f2844c49d162f57691ed2ac092d29c760a5daabdda7ad661e9ddde18755344",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/home/palantirkc/.bun/bin/bun",
+        "scripts/harness.ts",
+        "validate",
+        "/home/palantirkc/code/shared/codex-harness-engineering/.private/common-harness-20261014/fresh-snapshot.json"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/home/palantirkc/.bun/bin/bun",
+        "scripts/harness.ts",
+        "context",
+        "/home/palantirkc/code/shared/codex-harness-engineering/.private/common-harness-20261014/fresh-context.json"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "18a4ef2ac3dcea38fc54e835d73ae5b6b96bddd2f65effae60d0d175a42b8a3e",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "/home/palantirkc/.bun/bin/bun",
+        "scripts/harness.ts",
+        "docs",
+        "/home/palantirkc/code/shared/codex-harness-engineering/.private/common-harness-20261014/fresh-docs.json"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "ec692ca0665cad479b4057d05a66fef92f3d14fa4d5a98e1cf80d855c4395c3b",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "git",
+        "--no-replace-objects",
+        "rev-parse",
+        "HEAD"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "30feb72f2fd2e8a8fb077f9dc35b029d0fa76c2bd8f135a47e9a1f1a6a3dc679",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": [
+        "git",
+        "--no-replace-objects",
+        "status",
+        "--porcelain"
+      ],
+      "exitCode": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "status": "pass",
+  "nativeRuntimeActivated": false,
+  "bothRuntimeBehaviorEstablished": false,
+  "wholeWorkAcceptanceEstablished": false,
+  "acceptanceDecision": null
+}

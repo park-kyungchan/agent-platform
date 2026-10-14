@@ -1,0 +1,422 @@
+{
+  "schema": "codex.common-implementation-main-final-checks.v1",
+  "recordClass": "verification-result",
+  "ownerProject": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "repository": "park-kyungchan/agent-platform",
+  "status": "pass",
+  "verificationClass": "exact-main-source-ci-and-independent-review-outcomes-only",
+  "observationWindow": {
+    "startedAtUtc": "2026-10-14T15:25:09.998151+00:00",
+    "completedAtUtc": "2026-10-14 15:26:06 UTC",
+    "atomic": false
+  },
+  "expectedMainSha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+  "observedMain": {
+    "name": "main",
+    "sha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+    "protected": true
+  },
+  "pullRequest": {
+    "number": 3,
+    "url": "https://github.com/park-kyungchan/agent-platform/pull/3",
+    "state": "closed",
+    "merged": true,
+    "mergedAt": "2026-10-14T15:14:38Z",
+    "mergeCommit": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+    "authoredHead": "fe1df7d62f37480feffdd46f909f3397d2d6ea60",
+    "eventBase": "ffba2462a08b9f8c83c6f87b1043403e5cb748d7",
+    "mergedBy": {
+      "login": "park-kyungchan",
+      "id": 241037670
+    },
+    "autoMerge": null,
+    "graphqlState": "MERGED"
+  },
+  "workflow": {
+    "id": 38587613785,
+    "name": "Source verification",
+    "head_sha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+    "head_branch": "main",
+    "event": "push",
+    "run_attempt": 2,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-14T15:14:41Z",
+    "updated_at": "2026-10-14T15:23:50Z",
+    "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785"
+  },
+  "latestJobs": [
+    {
+      "id": 115938157195,
+      "name": "Exact head native independent review",
+      "head": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "runAttemptProjection": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-10-14T15:23:34Z",
+      "completedAt": "2026-10-14T15:23:44Z",
+      "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938157195",
+      "verificationSteps": [
+        {
+          "name": "Read immutable native review receipt for this exact head",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-14T15:23:39Z",
+          "completedAt": "2026-10-14T15:23:41Z"
+        }
+      ]
+    },
+    {
+      "id": 115938160089,
+      "name": "Canonical source checks",
+      "head": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "runAttemptProjection": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-10-14T15:14:44Z",
+      "completedAt": "2026-10-14T15:15:25Z",
+      "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938160089",
+      "verificationSteps": []
+    },
+    {
+      "id": 115938160717,
+      "name": "Prospective merge integration",
+      "head": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "runAttemptProjection": 2,
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-10-14T15:23:32Z",
+      "completedAt": "2026-10-14T15:14:41Z",
+      "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938160717",
+      "verificationSteps": []
+    },
+    {
+      "id": 115938161780,
+      "name": "Quality and architecture checks",
+      "head": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "runAttemptProjection": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-10-14T15:14:44Z",
+      "completedAt": "2026-10-14T15:15:37Z",
+      "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938161780",
+      "verificationSteps": []
+    },
+    {
+      "id": 115938260244,
+      "name": "Source and native review gate",
+      "head": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "runAttemptProjection": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-10-14T15:23:46Z",
+      "completedAt": "2026-10-14T15:23:49Z",
+      "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938260244",
+      "verificationSteps": [
+        {
+          "name": "Require source quality and exact head native review",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-10-14T15:23:47Z",
+          "completedAt": "2026-10-14T15:23:47Z"
+        }
+      ]
+    }
+  ],
+  "latestCheckRuns": [
+    {
+      "id": 115938260244,
+      "name": "Source and native review gate",
+      "head_sha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-14T15:23:46Z",
+      "completed_at": "2026-10-14T15:23:49Z",
+      "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938260244"
+    },
+    {
+      "id": 115938161780,
+      "name": "Quality and architecture checks",
+      "head_sha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-14T15:14:44Z",
+      "completed_at": "2026-10-14T15:15:37Z",
+      "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938161780"
+    },
+    {
+      "id": 115938160717,
+      "name": "Prospective merge integration",
+      "head_sha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-14T15:23:32Z",
+      "completed_at": "2026-10-14T15:14:41Z",
+      "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938160717"
+    },
+    {
+      "id": 115938160089,
+      "name": "Canonical source checks",
+      "head_sha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-14T15:14:44Z",
+      "completed_at": "2026-10-14T15:15:25Z",
+      "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938160089"
+    },
+    {
+      "id": 115938157195,
+      "name": "Exact head native independent review",
+      "head_sha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-14T15:23:34Z",
+      "completed_at": "2026-10-14T15:23:44Z",
+      "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785/job/115938157195"
+    },
+    {
+      "id": 115937261261,
+      "name": "Dependabot",
+      "head_sha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-14T15:21:48Z",
+      "completed_at": "2026-10-14T15:22:36Z",
+      "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38588629961/job/115937261261"
+    }
+  ],
+  "requiredContexts": {
+    "fromPriorObservedRuleset24871580": [
+      "Canonical source checks",
+      "Exact head native independent review",
+      "Source and native review gate",
+      "native-independent-review"
+    ],
+    "allSucceeded": true,
+    "rulesetNotReReadInThisObservation": true
+  },
+  "trustedIndependentStatus": {
+    "id": 56338712037,
+    "context": "native-independent-review",
+    "state": "success",
+    "target_url": "https://github.com/park-kyungchan/agent-platform/blob/0336d08242bbad2a9d855e5093f05c30c24d0a72/native-reviews/ec355501d1ecf7737d9b20b20da6848156dc8fa0.json",
+    "created_at": "2026-10-14T15:23:28Z",
+    "updated_at": "2026-10-14T15:23:28Z",
+    "creator": {
+      "login": "park-kyungchan",
+      "id": 241037670
+    },
+    "matchesExpectedCreator": true,
+    "matchesExactExpectedReceiptUrl": true,
+    "exactMainReceiptValidationJobSucceeded": true,
+    "receiptBytesRevalidatedByThisObserver": false
+  },
+  "sourceAndQualityReuse": {
+    "status": "previously-successful-outcomes-reused",
+    "source": {
+      "initialJobId": 115933691082,
+      "latestProjectedJobId": 115938160089,
+      "startedAt": "2026-10-14T15:14:44Z",
+      "completedAt": "2026-10-14T15:15:25Z"
+    },
+    "quality": {
+      "initialJobId": 115933691223,
+      "latestProjectedJobId": 115938161780,
+      "startedAt": "2026-10-14T15:14:44Z",
+      "completedAt": "2026-10-14T15:15:37Z"
+    },
+    "evidence": "The latest attempt reports new job IDs/run_attempt=2 while retaining the initial source/quality execution and step timestamps. These are reused successful outcomes; this receipt does not claim those jobs executed again.",
+    "rerunJobsObserved": {
+      "nativeReview": 115938157195,
+      "dependentGate": 115938260244
+    }
+  },
+  "prospectiveIntegration": {
+    "latestJobId": 115938160717,
+    "conclusion": "skipped",
+    "expectedForPush": true,
+    "note": "Prospective merge integration is PR-only; skipped on main push is the required workflow behavior."
+  },
+  "reviewThreads": {
+    "totalCount": 5,
+    "unresolved": 0,
+    "pagination": {
+      "hasNextPage": false
+    },
+    "records": [
+      {
+        "id": "PRRT_kwDOVD2my86sXpp6",
+        "isResolved": true,
+        "isOutdated": true,
+        "comments": {
+          "nodes": [
+            {
+              "databaseId": 4272244695,
+              "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244695"
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false
+          }
+        }
+      },
+      {
+        "id": "PRRT_kwDOVD2my86sXpqA",
+        "isResolved": true,
+        "isOutdated": true,
+        "comments": {
+          "nodes": [
+            {
+              "databaseId": 4272244709,
+              "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244709"
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false
+          }
+        }
+      },
+      {
+        "id": "PRRT_kwDOVD2my86sXpqL",
+        "isResolved": true,
+        "isOutdated": true,
+        "comments": {
+          "nodes": [
+            {
+              "databaseId": 4272244722,
+              "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244722"
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false
+          }
+        }
+      },
+      {
+        "id": "PRRT_kwDOVD2my86sXpqW",
+        "isResolved": true,
+        "isOutdated": true,
+        "comments": {
+          "nodes": [
+            {
+              "databaseId": 4272244741,
+              "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244741"
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false
+          }
+        }
+      },
+      {
+        "id": "PRRT_kwDOVD2my86sXpqe",
+        "isResolved": true,
+        "isOutdated": false,
+        "comments": {
+          "nodes": [
+            {
+              "databaseId": 4272244752,
+              "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244752"
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false
+          }
+        }
+      }
+    ]
+  },
+  "boundedObservation": {
+    "initialDelayMs": 30000,
+    "observations": 1,
+    "reobservations": 0,
+    "persistentPolling": false,
+    "settledAtFirstObservation": true
+  },
+  "sourceReceipts": {
+    "identity": {
+      "transport": "Official gh CLI",
+      "method": "REST GET",
+      "endpoint": "user",
+      "startedAt": "2026-10-14T15:25:09.998151+00:00",
+      "completedAt": "2026-10-14T15:25:11.434606+00:00",
+      "exitCode": 0
+    },
+    "main": {
+      "transport": "Official gh CLI",
+      "method": "REST GET",
+      "endpoint": "repos/park-kyungchan/agent-platform/branches/main",
+      "startedAt": "2026-10-14T15:25:09.998514+00:00",
+      "completedAt": "2026-10-14T15:25:11.491971+00:00",
+      "exitCode": 0
+    },
+    "pr": {
+      "transport": "Official gh CLI",
+      "method": "REST GET",
+      "endpoint": "repos/park-kyungchan/agent-platform/pulls/3",
+      "startedAt": "2026-10-14T15:25:09.998758+00:00",
+      "completedAt": "2026-10-14T15:25:10.780067+00:00",
+      "exitCode": 0
+    },
+    "run": {
+      "transport": "Official gh CLI",
+      "method": "REST GET",
+      "endpoint": "repos/park-kyungchan/agent-platform/actions/runs/38587613785",
+      "startedAt": "2026-10-14T15:25:09.999188+00:00",
+      "completedAt": "2026-10-14T15:25:11.565959+00:00",
+      "exitCode": 0
+    },
+    "jobs": {
+      "transport": "Official gh CLI",
+      "method": "REST GET",
+      "endpoint": "repos/park-kyungchan/agent-platform/actions/runs/38587613785/jobs?filter=latest&per_page=100",
+      "startedAt": "2026-10-14T15:25:09.999703+00:00",
+      "completedAt": "2026-10-14T15:25:10.941904+00:00",
+      "exitCode": 0
+    },
+    "checks": {
+      "transport": "Official gh CLI",
+      "method": "REST GET",
+      "endpoint": "repos/park-kyungchan/agent-platform/commits/ec355501d1ecf7737d9b20b20da6848156dc8fa0/check-runs?filter=latest&per_page=100",
+      "startedAt": "2026-10-14T15:25:09.999977+00:00",
+      "completedAt": "2026-10-14T15:25:10.700832+00:00",
+      "exitCode": 0
+    },
+    "statuses": {
+      "transport": "Official gh CLI",
+      "method": "REST GET",
+      "endpoint": "repos/park-kyungchan/agent-platform/commits/ec355501d1ecf7737d9b20b20da6848156dc8fa0/statuses?per_page=100",
+      "startedAt": "2026-10-14T15:25:10.000462+00:00",
+      "completedAt": "2026-10-14T15:25:10.501978+00:00",
+      "exitCode": 0
+    },
+    "threads": {
+      "transport": "Official gh CLI",
+      "method": "GraphQL read query",
+      "endpoint": "graphql",
+      "startedAt": null,
+      "completedAt": "2026-10-14T15:25:12.212425+00:00",
+      "exitCode": 0
+    }
+  },
+  "previousFailureRecord": "main-initial-checks.json",
+  "limits": [
+    "Remote reads are point-in-time and not atomic.",
+    "Pass applies to the exact delivered main source CI and independent-review outcomes. Native runtime activation, deployment, consumer acceptance and whole-Work Acceptance are not established.",
+    "Independent receipt/result original bytes were verified by the successful exact-main CI gate and separately by Root; this observer checked exact status creator/URL and job outcomes.",
+    "GitHub account identity and merged_by metadata do not independently prove a native Lead identity."
+  ],
+  "effects": {
+    "gitRefWrites": 0,
+    "statusWrites": 0,
+    "workflowReruns": 0,
+    "commentsOrReviewsWritten": 0,
+    "threadsResolved": 0,
+    "merges": 0,
+    "otherGitHubMutations": 0
+  },
+  "nativeRuntimeActivationEstablished": false,
+  "wholeWorkAcceptanceEstablished": false,
+  "acceptanceDecision": null
+}

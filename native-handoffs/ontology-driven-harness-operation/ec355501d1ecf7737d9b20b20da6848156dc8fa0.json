@@ -1,0 +1,101 @@
+{
+  "schema": "codex.common-harness-runtime-lead-handoff.v1",
+  "status": "sealed",
+  "work": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation"
+  },
+  "publication": {
+    "repository": "park-kyungchan/agent-platform",
+    "pullRequest": "https://github.com/park-kyungchan/agent-platform/pull/3",
+    "mainSha": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+    "treeSha": "ab3d906c27cc718ed387c3a47b39302d961b30c3",
+    "sourceManifestSha256": "0bb41c799786bfa49497b428b69c3a2eb1d9bb002639e6db816574a24c011132",
+    "explicitLeadMergeVerified": true,
+    "automaticMergeUsed": false,
+    "mainRequiredChecksPassed": true,
+    "freshCheckoutVerified": true,
+    "mergedAtUtc": "2026-10-14T15:14:38Z",
+    "mergedBy": "park-kyungchan",
+    "mainWorkflow": {
+      "runId": 38587613785,
+      "attempt": 2,
+      "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38587613785",
+      "conclusion": "success",
+      "sourceAndQualityReused": true,
+      "failedReviewAndGateExplicitlyRerun": true
+    },
+    "mainReviewReceiptUrl": "https://github.com/park-kyungchan/agent-platform/blob/0336d08242bbad2a9d855e5093f05c30c24d0a72/native-reviews/ec355501d1ecf7737d9b20b20da6848156dc8fa0.json"
+  },
+  "entrypoints": {
+    "instructions": "AGENTS.md",
+    "commonWorkGuide": "docs/git-work.md",
+    "commonWork": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json",
+    "runtimeIndexGuide": "docs/runtime-documentation-routing.md",
+    "runtimeIndex": "architecture/runtime-documentation-routing/registry.json",
+    "hostPointerRecipe": "architecture/runtime-documentation-routing/host-pointer-recipe.json"
+  },
+  "runtimeLeadTasks": [
+    {
+      "taskId": "WSL2-LEAD-HANDOFF",
+      "runtimeOwner": "WSL2 native Codex Lead",
+      "state": "planned",
+      "nextAction": "Pull completed latest main in the owning checkout, observe the exact revision, select the same Work, and begin the WSL2 runtime harness adversarial evaluation in its own branch/worktree."
+    },
+    {
+      "taskId": "VPS-LEAD-HANDOFF",
+      "runtimeOwner": "VPS native Hermes Lead",
+      "state": "planned",
+      "nextAction": "Pull completed latest main in the owning checkout, observe the exact revision, select the same Work, and begin the VPS runtime harness adversarial evaluation in its own branch/worktree."
+    }
+  ],
+  "continuation": [
+    "Fetch and synchronize current GitHub main through native Git before new Work or independent Task worktree creation; preserve active dirty worktrees.",
+    "Treat mainSha as the completed common-source anchor. Start from the latest current main; confirm the anchor is present and inspect/revalidate intervening source changes before relying on its exact-tree review.",
+    "Retain logical Domain/Project/Work/Issue/Spec/Plan/Task identity; source commits and native occurrences are separate identities.",
+    "Read the selected committed Work context and relevant effect fences; never replay completed effects and observe uncertain effects before retry.",
+    "Use the common Runtime Index to select only relevant official documentation; bind host-local readers and observed installed versions in the runtime-owning Lead session.",
+    "Evaluate duplicated policy, snapshots, checkpoint/CAS ownership, startup routing and review machinery against native Git/GitHub capabilities while preserving semantic records and native owners.",
+    "Run native verification before explicit activation; the same Lead may explicitly merge and then activate, but merge itself does not activate a runtime.",
+    "Use independent Task branches/worktrees/PRs when separately reviewable; group small dependent changes; every merge is explicit."
+  ],
+  "milestoneInterpretation": {
+    "canonicalTaskStates": "Authored preparation states in the reviewed source snapshot; later publication, review and merge are established by external immutable receipts.",
+    "commonSourceDeliveryEstablished": true,
+    "runtimeActivationEstablished": false,
+    "bothRuntimeBehaviorEstablished": false,
+    "wholeWorkAcceptanceEstablished": false,
+    "acceptanceDecision": null
+  },
+  "evidence": [
+    {
+      "kind": "git",
+      "url": "https://github.com/park-kyungchan/agent-platform/blob/0336d08242bbad2a9d855e5093f05c30c24d0a72/native-reviews/ec355501d1ecf7737d9b20b20da6848156dc8fa0.json"
+    },
+    {
+      "kind": "git",
+      "url": "https://github.com/park-kyungchan/agent-platform/blob/241583afc42c8f02eacb327d6b3e4f455961ddd1/native-review-results/ec355501d1ecf7737d9b20b20da6848156dc8fa0.json"
+    },
+    {
+      "kind": "snapshot",
+      "path": "native-handoffs/ontology-driven-harness-operation/evidence/fresh-main-verification.json",
+      "sha256": "4501f674354a736263837f75da60e17f44f76a70972ecb53a13b9c6f3fea53de"
+    },
+    {
+      "kind": "snapshot",
+      "path": "native-handoffs/ontology-driven-harness-operation/evidence/main-final-checks.json",
+      "sha256": "939b193786492e09203c72019130081eab9ec06ac4771796c190f22ebd65fdb2"
+    },
+    {
+      "kind": "snapshot",
+      "path": "native-handoffs/ontology-driven-harness-operation/evidence/runtime-handoff-draft-readback.json",
+      "sha256": "d70eb5bfa42942e83c31c9b98422092bae7695852b157ff68f8e1fe00bf8f8ad"
+    }
+  ],
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "recordClass": "handoff",
+  "sealedAtUtc": "2026-10-14T15:27:07.912Z",
+  "artifactSnapshotMeaning": "Resolve snapshot evidence paths against the Git commit containing this handoff. publication.mainSha identifies the delivered common source; it is not the handoff evidence snapshot."
+}

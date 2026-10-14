@@ -1,0 +1,27 @@
+{
+  "schema": "codex.common-harness-runtime-handoff-draft-readback.v1",
+  "recordClass": "observation",
+  "recordedBy": "GHA-22",
+  "reportedBy": {
+    "runtime": "native-codex",
+    "taskId": "GHA-29",
+    "agent": "local_harness_measurement"
+  },
+  "draftPath": ".private/common-harness-20261014/runtime-lead-handoff-draft.json",
+  "draftSha256": "d3a88b0c1c8fbfe7fc033bd171647a27e86e8a9f486b1eeae740b319b9de3342",
+  "observedMain": "ec355501d1ecf7737d9b20b20da6848156dc8fa0",
+  "observedTree": "ab3d906c27cc718ed387c3a47b39302d961b30c3",
+  "conclusion": "pass",
+  "checks": [
+    "Clean actual main checkout",
+    "All six entrypoint paths exist",
+    "Both planned runtime Lead Task IDs and Spec5/Plan5 match",
+    "Accepted common-first/latest-main/same-Work PR/explicit activation/no-auto decisions match",
+    "Completed anchor and future latest main are distinct",
+    "Host-neutral recipe avoids WSL command reuse on VPS",
+    "No native activation or whole-Work Acceptance claim"
+  ],
+  "limitation": "Draft review only. Exact-main receipt/status, final main checks and final evidence fields must be completed before sealing.",
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null
+}
