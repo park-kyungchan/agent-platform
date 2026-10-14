@@ -1,0 +1,208 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "7adfbb292a6c4f441e548405c5885b26d89a49b7",
+  "reviewedTreeSha": "fe0652d18acfdc76d522808497bd1079a0e90509",
+  "reviewedSourceManifestSha256": "7bbcf172cf37c431022de59489459c2665cdb89ce1b8a5142d30911f606879c6",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/codex_context_independent_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_program_context"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-14T20:40:29.595Z",
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "fe0652d18acfdc76d522808497bd1079a0e90509",
+    "entryCount": 557,
+    "blobCount": 442,
+    "sha256": "7bbcf172cf37c431022de59489459c2665cdb89ce1b8a5142d30911f606879c6"
+  },
+  "resultAuthorship": {
+    "authoredBy": "/root/codex_context_independent_review",
+    "deltaAuthor": "/root/integrated_program_context",
+    "priorWholeSourceAuthors": [
+      "/root/hermes_privacy_repair",
+      "/root/hermes_privacy_repair/hermes_current_git_context",
+      "/root"
+    ],
+    "qualification": "Actual collaboration Task paths are source declarations, not invented runtime UUIDs, authenticated native authorship or consumer Acceptance."
+  },
+  "reviewDetail": {
+    "reviewKind": "fresh-exact-source-and-concrete-owner-cascade-staging-review",
+    "comparisonBase": "90b8a455d50728f1a2482bc38c6c8db6c0e8de6e",
+    "changedFiles": [
+      "architecture/capability-source-owners.json",
+      "ci/source-check.ts",
+      "owner-fixture/codex-harness-engineering/src/native/hook-cli.ts",
+      "owner-fixture/codex-harness-engineering/src/native/provider-closure.ts",
+      "owner-fixture/manifest.json",
+      "owner-fixture/native-hook-bootstrap.test.ts",
+      "owner-fixture/refresh-contract.json",
+      "packages/native-codex-adapter/AGENTS.md",
+      "packages/native-hermes-adapter/AGENTS.md",
+      "packages/native-hermes-adapter/src/platform-current-work/build.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/context.test.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/provider.test.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/provider.ts"
+    ],
+    "priorWholeScopeReview": {
+      "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-whole-independent-review-result-90b8a455.json",
+      "sha256": "88c708d083abec39fb0a2be828efa2b85a1d73dc4da209ad087f5451d44d6c7c",
+      "unchangedSourceObservationsPreserved": true,
+      "qualification": "This fresh15filedelta review and tests supplement prior complete90b8source coverage. No unchanged-tree approval reuse is claimed."
+    },
+    "materialFindings": [],
+    "method": [
+      "Read the complete changed Codex owner facade and builtin-only fixed source guard, complete Hermes native hook/hook-context modules and complete build/provider/source-check/fixture/registry deltas. Reviewed meaningful tests in their real source before running them.",
+      "Codex unchanged command path verifies fixed registration/package/export/source closure before dynamic common implementation import, freezes bounded descriptor observations and rechecks after async event before output. Registered downgrade, symlink/source drift and pre-registration owner-only routes remain separate; generic exit0 errors emit no event/path/source bytes or continuation request.",
+      "Hermes additive native bundle consumes the installed pre_llm_call protocol, requires compile-pinned source/bindings and verifies before implementation import and after async read. Exactprofile/session/agent/project/task/run/cwd tuples match; absent installed identities remain null. Unselected/foreign/child/currentness/omission/privacy cases retain no Git reads or old Work fallback.",
+      "Read installed-source extracted pre_llm protocol evidence and bounded source sections; it establishes a protocol compatibility source fact, not actual native owner approval or delivered model context. turn_id and parent_session_id are not selection keys and are neither inferred nor authenticated by this adapter.",
+      "Read all79concrete staged participants and actual before bytes/mode/uid/gid/existence. Verified all3root-specific22/6/14 source-pin denominators against the staged target byte map and exact registration/marker pairs; verified whole owner wrapper/guard fixture bodies differ only in declared registration digests and the context forwarder body is fixed.",
+      "Rehashed301nonignoredsource originals and301private custody copies; protected old manifest/registry remain exact. Current4old code-pin drifts are preserved;2owner-helper changes are explicitly additional planned drifts, not historical authority/budget renewal.",
+      "Reviewed coherent guard-first/common-source/owner-context/Hermesv1/native-record-last CAS order and exact-after-only rollback policy. Mixed windows hold source imports; actual Root CAS and freshprocess loaded actual-root closure remain required before activation."
+    ],
+    "independentVerification": {
+      "affectedTests": {
+        "command": "bun test owner-fixture/native-hook-bootstrap.test.ts packages/native-hermes-adapter/src/platform-current-work/context.test.ts packages/native-hermes-adapter/src/platform-current-work/provider.test.ts",
+        "runtime": "Bun1.3.14",
+        "exitCode": 0,
+        "tests": 27,
+        "assertions": 206,
+        "logPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/both-native-hook-independent-7adfbb29-focused.log",
+        "logSha256": "21ba793870b75b143ae5f217f37ad34a169a28e4e8b1cad717f90326b175aaee",
+        "coverage": [
+          "first-import implementation sentinel",
+          "registered downgrade refusal",
+          "late async drift privacy",
+          "source symlink refusal",
+          "legacy owner-only parity",
+          "genuine bounded FIFO compiler rejection",
+          "fixed35source closure/compiler metafile proof",
+          "foreign/child/missing nullable native tuple",
+          "bounded originals/currentness/held native response"
+        ]
+      },
+      "finiteSource": {
+        "command": "bun ci/source-check.ts",
+        "exitCode": 0,
+        "status": "pass",
+        "commands": 26,
+        "canonicalTestFiles": 28,
+        "qualityTestFiles": 5,
+        "nativeModelCalls": 0,
+        "logPath": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/both-native-hook-independent-7adfbb29-source.log",
+        "logSha256": "23df27f3afb8e05264661d6616b6a1bd21176be6a31acf2cc58e50238e136f10"
+      },
+      "ownerStaging": {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/both-native-hook-independent-stage-readback-7adfbb29.json",
+        "sha256": "74eb806f8a9c69cd709f8bb44a6ca04c7f36f2a3a6e8b5c7f42f8011c4943199",
+        "status": "pass-source-staging-readback-only",
+        "participants": 79,
+        "changedParticipants": 49,
+        "everyStagedAfterAndActualBeforeMatches": true,
+        "registrations": [
+          {
+            "owner": "codex",
+            "path": "architecture/context-provider.json",
+            "sha256": "684b75e57dbede92dcd9ff1630cc3714ff998b769bf9558ee2407ba5143862cd",
+            "sourcePins": 22,
+            "allPinsMatchStagedParticipants": true,
+            "markerPaired": true
+          },
+          {
+            "owner": "codex",
+            "path": "architecture/native-codex-provider.json",
+            "sha256": "09e98dd0b89755fad6e48ad005ad7b14522be53f08e6d0b0fd3cea10e29948df",
+            "sourcePins": 6,
+            "allPinsMatchStagedParticipants": true,
+            "markerPaired": true
+          },
+          {
+            "owner": "hermes",
+            "path": "architecture/hermes-context-provider.json",
+            "sha256": "7b0ed18c0f9bb5239bf572665017b9b29c3feb35079d5e5b0856321fce889496",
+            "sourcePins": 14,
+            "allPinsMatchStagedParticipants": true,
+            "markerPaired": true
+          }
+        ],
+        "actualSourceCAS": false,
+        "freshLoadedActualRootClosure": false
+      },
+      "stagingSupplement": {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/both-native-hook-independent-stage-supplement-7adfbb29.json",
+        "sha256": "a3b3fa05c872822574e225453fee9fdfaf889b30732bfa89a501977560318c80",
+        "ownerFixtureBodiesVerified": 8,
+        "originalsVerified": 301,
+        "privateCopiesVerified": 301,
+        "protectedOldDrifts": 4
+      }
+    },
+    "authorQualityReadback": {
+      "status": "pass",
+      "checks": 14,
+      "recordedSourceIdentity": {
+        "actualCheckoutSha": "90b8a455d50728f1a2482bc38c6c8db6c0e8de6e",
+        "githubEventSha": null,
+        "sourceRegistrySha256": "1de18f07ff3d26201fadf05905863b05a2a5df7c6719d75e1e5dc57bcbab8d3c",
+        "lockSha256": "f5723aae95044787653d1eb76c932c0c1c4ddf734966a782989e7399b7f69ffb",
+        "workingTreeHasChanges": true
+      },
+      "verifiedInputCount": 225,
+      "allRecordedInputGitBlobsMatchExact7ad": true,
+      "attribution": "Author executed beforecommit on90b8withdirtysuccessorchanges; independent reviewer rehashed all225recorded input Gitblobs. No false latercommit execution attribution."
+    },
+    "authorReceipt": {
+      "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/both-native-hook-wiring-receipt.json",
+      "sha256": "5cfafa8bbd77ba49a1dd889de60d924b0199595735ee559808d5581bc32811b3"
+    },
+    "pr10PackageCascadeFinding": {
+      "thread": "PRRT_kwDOVD2my86sf-iZ",
+      "statusAtReview": "unresolved-as-supplied-by-Root; no remote thread state was changed or independently fetched",
+      "whatThisReviewProves": "Complete concrete root-specific source cascade is staged: every79participantbefore/after observation and all3newregistration/marker/pin sets are consistent; coherent CAS/rollback is reviewable.",
+      "whatItDoesNotProve": "Active3registrations still match old activecommon57and were deliberately unchanged. No package deployment, actual CAS, loaded actual-root closure, native Lead activation or runtime consumer acceptance occurred. Staging PASS alone is not operational P1 resolution, PR thread resolution or native adoption."
+    },
+    "protected": {
+      "oldManifestAndRegistryUnchanged": true,
+      "oldSelectedRouteAlreadyHeldOn4StalePins": true,
+      "plannedAdditionalHelperPinDrifts": 2,
+      "oldManifestOrClosedSuiteNotRefreshed": true,
+      "currentRootOldRegistryUnselectedAsSuppliedByRoot": true,
+      "modelSuiteRequests": 0
+    },
+    "limits": [
+      "Canonical source PASS and finite stage readiness are distinct from explicit Git delivery and actual native owner adoption. Root must reobserve every participant immediately before CAS and stop on thirdstate bytes; restore only exact transactionafter bytes, never reset/stash/clean or mutate unrelated originals.",
+      "Hermes35canonical source paths are fixed by the reviewed code, while runtime dependency count must be regenerated from the actual admissible independent-file package topology. Earlier624dependency files are an observation, not a future fixed count; sharedcache hardlinks above8 remain refused.",
+      "The active Codex SessionStart matcher still excludes fork. Exact native definition consent/trust, fresh fork event,1500token visible/spilled context receipt and both native consumer/Lead acknowledgements remain unverified.",
+      "Native hook entry source wiring does not register commands, approve Hermes hooks, change profiles, own native sessions/tasks/tools, reopen old suites or dispatch models. A new native suite remains separate Root budget/admission work.",
+      "Parent-session/turn information remains native-owned; this selection adapter does not authenticate lineage, translate turn IDs into run/agent IDs, or make original source references native authority.",
+      "Full Goal, A01/A14, runtime adoption, teacher judgment and Acceptance remain separate from this source-only verification."
+    ]
+  },
+  "effects": {
+    "maintainedSourceEdits": 0,
+    "activeSourceOwnerConfigProfileTrustPointerRegistryWrites": 0,
+    "admittedGitMutations": 0,
+    "VPSOrSSHCalls": 0,
+    "sourceAcademyAccess": 0,
+    "privateAuthKeyReadsOrWrites": 0,
+    "modelEvaluationRequests": 0,
+    "newReviewArtifactsAndOwnedTemporarySourceQaOnly": true
+  },
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null,
+  "publishedProvenance": null
+}
