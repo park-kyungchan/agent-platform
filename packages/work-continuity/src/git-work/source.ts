@@ -103,6 +103,7 @@ export function gitReadEnvironment(): NodeJS.ProcessEnv {
     GIT_OPTIONAL_LOCKS: "0",
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_NO_LAZY_FETCH: "1",
   };
   for (const key of [
     "GIT_DIR",
