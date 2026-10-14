@@ -8,32 +8,32 @@
   "repositoryId": "park-kyungchan/agent-platform",
   "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
   "purpose": {
-    "objective": "Apply and verify one Git/GitHub-native Ontology-driven common Harness and native WSL2 Codex/VPS Hermes consumption across the evidence-discovered related portfolio, while completing the existing Academy product and operational backlog in an independent private runtime. Preserve native owners, logical identities, originals, recovery and the absolute read-only Academy source boundary; close only with separate evidence-based Lead Acceptance.",
+    "objective": "Complete the integrated private common Harness, native WSL2/VPS adoption, related portfolio reorganization and Academy product/operational backlog. The pinned Spec retains every full acceptance criterion.",
     "successCriteria": [
-      "Preserve Domain/Project/Work/Task/Run identities across Git revisions and native occurrences without duplicate or manual registration.",
-      "Retain original Q/A, selection context, rationale, histories and completed/uncertain effect fences; never replay historical effects.",
-      "Measure the complete related WSL2/VPS portfolio; justify private integration, separation and retirement with verified custody and recovery.",
-      "Keep one typed common/Codex/Hermes source repository while preserving domain, native, data and evidence ownership; no parallel agent runtime.",
-      "Verify both native consumers against current common contracts and official documentation, then explicitly activate each runtime.",
-      "Prove useful Lead-to-worker work, cross-host handoff/interruption/resume, Memory originals, Kanban/Session fit, concurrency and local/shared receiver receipts.",
-      "Demonstrate PC-independent VPS currentness and continuation; distinguish configured, callable, authenticated, behavioral and formal completion states.",
-      "Complete Academy's seven operational gates: real auth/storage, source reconciliation/import, recovery/rollback, hosting, workflow coverage and release integrity.",
-      "Complete teacher workflows, edition/history/parent DailyRecord semantics, exam/question selection and student concept graph; source Academy stays read-only and mutations stay in the independent private runtime.",
-      "Deliver appropriate checks, independent exact-head review, private GitHub publication, explicit expected-head Lead merge and readback; bind identical-tree review reuse explicitly.",
-      "Limit the fresh evaluation suite to48 requests/2000000 emitted tokens/8hours, separate from engineering/Goal usage; add no paid infrastructure/recurring cost.",
-      "Record evidence-based Lead Acceptance only after all required outcomes; never infer human satisfaction, teacher judgment or whole completion from tests/merge/activation alone."
+      "Stable Domain/Project/Work/Task/Run identities, Git/native joins and no duplicate manual registration.",
+      "Addressable original Q/A, choices, rationale and history; preserve completed/uncertain fences without replay.",
+      "Complete related WSL2/VPS topology, justified private reorganization and verified custody/recovery.",
+      "One typed common/Codex/Hermes source repo, distinct domain/native/data/evidence owners, no parallel runtime.",
+      "Both native consumers verified against current common contracts and official docs, then explicitly activated.",
+      "Useful native delegation, handoff/resume, Memory, Kanban/Session, concurrency and local/shared receiver proofs.",
+      "VPS currentness and continuation with the PC off; configuration, behavior and formal completion stay distinct.",
+      "Academy seven gates: actual auth/storage/source import/recovery/hosting/workflow/release verification.",
+      "Teacher workflows, edition/history, parent DailyRecord, exams and concept graph; source Academy read-only.",
+      "Checks, independent exact-head review, private delivery, explicit Lead merge/readback and successor bindings.",
+      "Fresh evaluation only: 48 requests, 2000000 emitted tokens, 8 hours; no new paid infrastructure/recurring cost.",
+      "Lead Acceptance after every full Spec criterion passes; never infer human satisfaction or teacher judgment."
     ],
     "inScope": [
-      "Existing integrated common Harness Work and its WSL2/VPS native runtime engineering, verification and explicit activation",
-      "Full related portfolio discovery and justified private repository/module integration, separation and retirement; named repositories are a starting point, not a completeness boundary",
-      "Existing Academy product and operational backlog in its independent private runtime, including source-authorized read-only reconciliation and preserved unknowns",
-      "The separately budgeted new native evaluation suite and delegated evidence-based Lead Acceptance"
+      "Common Harness and both native runtime engineering, verification and activation",
+      "The complete related repository portfolio, justified module boundaries and recovery",
+      "Academy product/operational backlog in an independent private runtime with read-only source access",
+      "Fresh budgeted native evaluation and delegated evidence-based Lead Acceptance"
     ],
     "outOfScope": [
-      "Academic source-server mutation, denied-source access, physical/third-party business effects or invented student data/teacher judgments",
-      "Unrelated standing excluded domains, credentials disclosure, native trust or permission bypass and a parallel agent runtime",
-      "Automatic merge, new paid infrastructure/recurring operating cost, historical effect replay or reused evaluation budgets",
-      "Unverified human satisfaction or treating an implementation/test/merge as whole-Work Acceptance"
+      "Academy source-server mutation, denied-source access or unrequested physical/third-party effects",
+      "Unrelated excluded domains, credential disclosure, trust bypass or a parallel agent runtime",
+      "Automatic merge, new paid infrastructure, historical effect replay or reused evaluation budgets",
+      "Invented student data, teacher decisions, human satisfaction or unverified whole completion"
     ]
   },
   "spec": {
