@@ -18,6 +18,10 @@ export type NativeContextLoader = () => Promise<{
     typeof import("@palantirkc/work-continuity/context/sections"),
     "readWorkContextSection"
   >;
+  gitWork?: Pick<
+    typeof import("@palantirkc/work-continuity/git-work"),
+    "resolveGitWorkSelection" | "openGitWork" | "readGitWorkContext"
+  >;
   verifyCurrentSourceClosure(): Promise<void>;
 }>;
 import {
@@ -26,7 +30,8 @@ import {
   reserveEvaluationRequest,
   updateEvaluationLedger,
 } from "./evaluation-ledger.ts";
-import { projectHomeContext } from "./home-context.ts";
+import { projectHomeContext, projectSelectedGitWork } from "./home-context.ts";
+import type { ContextRequest, GitWorkSelection } from "@palantirkc/work-continuity/git-work";
 
 export const nativeEvents = [
   "SessionStart",
@@ -72,9 +77,31 @@ export interface HookBinding {
   qualificationLedgerPath?: string;
   childReservationTokens?: number;
 }
+export interface SessionGitWorkSelection {
+  schema: "codex.session-git-work-selection.v1";
+  nativeSessionId: string;
+  nativeAgentId?: string;
+  cwd: string;
+  ownerRoot: string;
+  projectId: string;
+  workId: string;
+  snapshot: GitWorkSelection;
+  taskId?: string;
+  decisionId?: string;
+  /** Caller-declared currentness; never a remote observation or permission grant. */
+  latestRelevant?: ContextRequest["latestRelevant"];
+}
+export interface LegacySessionContextSelection {
+  schema: "codex.session-context-selection.v1";
+  nativeSessionId: string;
+  nativeAgentId?: string;
+  cwd: string;
+  [key: string]: unknown;
+}
 export interface HookBindings {
   schemaVersion: "1.0.0";
   bindings: HookBinding[];
+  contextSelections?: (SessionGitWorkSelection | LegacySessionContextSelection)[];
 }
 export interface PromptLocator {
   path: string;
@@ -133,6 +160,174 @@ export function parseHookInput(value: unknown): HookInput {
   return value as unknown as HookInput;
 }
 
+function contextSelections(
+  value: unknown,
+): (SessionGitWorkSelection | LegacySessionContextSelection)[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 128)
+    throw Error("Invalid bounded session selections");
+  const seen = new Set<string>();
+  const boundedId = (value: unknown): value is string =>
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 1024 &&
+    !/[\u0000-\u001f]/.test(value);
+  const exactPath = (value: unknown): value is string =>
+    boundedId(value) && isAbsolute(value) && resolve(value) === value;
+  for (const entry of value) {
+    if (
+      !object(entry) ||
+      !boundedId(entry.nativeSessionId) ||
+      !exactPath(entry.cwd) ||
+      (entry.nativeAgentId !== undefined && !boundedId(entry.nativeAgentId))
+    )
+      throw Error("Invalid exact native selection tuple");
+    const tuple = JSON.stringify([entry.nativeSessionId, entry.nativeAgentId ?? null, entry.cwd]);
+    if (seen.has(tuple)) throw Error("Duplicate native session/agent/cwd selection");
+    seen.add(tuple);
+    if (entry.schema === "codex.session-context-selection.v1") continue;
+    if (
+      entry.schema !== "codex.session-git-work-selection.v1" ||
+      Object.keys(entry).some(
+        (key) =>
+          ![
+            "schema",
+            "nativeSessionId",
+            "nativeAgentId",
+            "cwd",
+            "ownerRoot",
+            "projectId",
+            "workId",
+            "snapshot",
+            "taskId",
+            "decisionId",
+            "latestRelevant",
+          ].includes(key),
+      ) ||
+      !exactPath(entry.ownerRoot) ||
+      !boundedId(entry.projectId) ||
+      !boundedId(entry.workId) ||
+      (entry.taskId !== undefined && !boundedId(entry.taskId)) ||
+      (entry.decisionId !== undefined && !boundedId(entry.decisionId)) ||
+      (entry.latestRelevant !== undefined &&
+        !["current", "advanced", "unknown", "unavailable"].includes(
+          String(entry.latestRelevant),
+        )) ||
+      !object(entry.snapshot)
+    )
+      throw Error("Invalid typed Git Work session selection");
+    const snapshot = entry.snapshot;
+    if (
+      Object.keys(snapshot).some(
+        (key) =>
+          ![
+            "repositoryRoot",
+            "repositoryId",
+            "commit",
+            "projectId",
+            "workId",
+            "repositories",
+          ].includes(key),
+      ) ||
+      !exactPath(snapshot.repositoryRoot) ||
+      !boundedId(snapshot.repositoryId) ||
+      snapshot.projectId !== entry.projectId ||
+      snapshot.workId !== entry.workId ||
+      typeof snapshot.commit !== "string" ||
+      !/^(?:[a-f0-9]{40}|[a-f0-9]{64}|refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]{0,240})$/.test(
+        snapshot.commit,
+      ) ||
+      (snapshot.commit.startsWith("refs/heads/") &&
+        (snapshot.commit.includes("..") ||
+          snapshot.commit.includes("//") ||
+          snapshot.commit.endsWith("/") ||
+          snapshot.commit.endsWith("."))) ||
+      (snapshot.repositories !== undefined &&
+        (!object(snapshot.repositories) ||
+          Object.keys(snapshot.repositories).length > 16 ||
+          Object.entries(snapshot.repositories).some(
+            ([id, root]) => !boundedId(id) || !exactPath(root),
+          )))
+    )
+      throw Error(
+        "Git Work selection requires exact local roots and an explicit immutable commit or branch",
+      );
+  }
+  return value as (SessionGitWorkSelection | LegacySessionContextSelection)[];
+}
+
+/** Absence of agent identity is an exact parent tuple, never a child wildcard. */
+export function resolveSessionGitWorkSelection(
+  input: HookInput,
+  registry: HookBindings,
+  binding: HookBinding,
+): SessionGitWorkSelection | undefined {
+  const selected = contextSelections(registry.contextSelections).find(
+    (entry) =>
+      entry.schema === "codex.session-git-work-selection.v1" &&
+      entry.nativeSessionId === input.session_id &&
+      entry.nativeAgentId === input.agent_id &&
+      entry.cwd === input.cwd,
+  );
+  if (!selected || selected.schema !== "codex.session-git-work-selection.v1") return undefined;
+  const selection = selected as SessionGitWorkSelection;
+  if (
+    selection.ownerRoot !== binding.root ||
+    selection.projectId !== binding.projectId ||
+    realpathSync(input.cwd) !== input.cwd ||
+    realpathSync(selection.ownerRoot) !== selection.ownerRoot ||
+    realpathSync(selection.snapshot.repositoryRoot) !== selection.snapshot.repositoryRoot
+  )
+    throw Error("Selected session Work differs from the exact native owner/cwd");
+  return selection;
+}
+
+async function selectedGitWork(
+  input: HookInput,
+  registry: HookBindings,
+  binding: HookBinding,
+  provider: Awaited<ReturnType<NativeContextLoader>>,
+) {
+  const selection = resolveSessionGitWorkSelection(input, registry, binding);
+  if (!selection) return undefined;
+  if (!provider.gitWork)
+    throw Error("Selected Git Work requires the proven code-owner Git context provider");
+  await provider.verifyCurrentSourceClosure();
+  try {
+    const snapshot = await provider.gitWork.resolveGitWorkSelection(selection.snapshot);
+    const reader = await provider.gitWork.openGitWork(snapshot);
+    const context = await provider.gitWork.readGitWorkContext(reader, {
+      ...(selection.taskId ? { taskId: selection.taskId } : {}),
+      ...(selection.decisionId ? { decisionId: selection.decisionId } : {}),
+      latestRelevant: selection.latestRelevant ?? "unknown",
+      maxChars: 24000,
+      maxRecords: 256,
+    });
+    const task = selection.taskId
+      ? await reader.readRecord({ kind: "task", id: selection.taskId }).catch(() => undefined)
+      : undefined;
+    const view = projectSelectedGitWork(context, {
+      taskId: selection.taskId,
+      decisionIds:
+        task?.kind === "task"
+          ? [...task.decisionIds, ...(selection.decisionId ? [selection.decisionId] : [])]
+          : selection.decisionId
+            ? [selection.decisionId]
+            : undefined,
+    });
+    // A moving local branch is observed twice; neither observation proves remote currentness.
+    const after = await provider.gitWork.resolveGitWorkSelection(selection.snapshot);
+    if (after.commit !== snapshot.commit) {
+      view.status = "held";
+      view.holdReasons.push("SELECTED_LOCAL_REF_ADVANCED_DURING_READ");
+    }
+    await provider.verifyCurrentSourceClosure();
+    return view;
+  } catch {
+    throw Error("Selected Git Work source unavailable or invalid; no Work context was inferred");
+  }
+}
+
 export function readHookBindings(path: string): HookBindings {
   const value: unknown = JSON.parse(readFileSync(path, "utf8"));
   if (!object(value) || value.schemaVersion !== "1.0.0" || !Array.isArray(value.bindings))
@@ -189,6 +384,7 @@ export function readHookBindings(path: string): HookBindings {
       throw new Error(`Duplicate exact project/work hook binding: ${binding.projectId}`);
     seen.add(identity);
   }
+  contextSelections(value.contextSelections);
   return value as unknown as HookBindings;
 }
 
@@ -497,6 +693,7 @@ export async function handleHook(
         binding,
         cwd: input.cwd,
         maxChars: options.maxChars,
+        selectedWork: await selectedGitWork(input, options.bindings, binding, provider),
       });
       await provider.verifyCurrentSourceClosure();
       return {
@@ -558,6 +755,50 @@ export async function handleHook(
         projectId: binding.projectId,
         boundary,
       };
+    const selected = await selectedGitWork(input, options.bindings, binding, provider);
+    if (selected) {
+      const text = JSON.stringify({
+        schema: "codex.session-git-work.projection.v1",
+        sourceOwnerProjectRoot: binding.root,
+        actualNativeCwd: input.cwd,
+        selectedWork: selected,
+        authority: "none",
+        nativePermissionGranted: false,
+      });
+      const maxChars = Math.min(Math.max(options.maxChars ?? 6000, 2000), 6000);
+      let additionalContext =
+        text.length <= maxChars
+          ? text
+          : JSON.stringify({
+              schema: "codex.session-git-work.projection.v1",
+              selectedWork: {
+                ...selected.pointer,
+                status: "held",
+                holdReasons: ["NATIVE_CONTEXT_OUTPUT_LIMIT"],
+                authority: "none",
+                nativePermissionGranted: false,
+              },
+            });
+      if (additionalContext.length > maxChars)
+        additionalContext = JSON.stringify({
+          schema: "codex.session-git-work.projection.v1",
+          status: "held",
+          holdReasons: ["NATIVE_CONTEXT_OUTPUT_LIMIT"],
+          readPolicy: "Read the exact typed session binding and immutable Git Work source.",
+          authority: "none",
+          nativePermissionGranted: false,
+          semanticAcceptanceEstablished: false,
+        });
+      return {
+        status: "context-injected",
+        stdout: JSON.stringify({
+          hookSpecificOutput: { hookEventName: input.hook_event_name, additionalContext },
+        }),
+        exitCode: 0,
+        projectId: binding.projectId,
+        boundary,
+      };
+    }
     const envelope = await readCheckpoint(binding.checkpointPath, {
       root: binding.root,
       verifySources: true,

@@ -93,7 +93,7 @@
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/index.ts",
           "relativePath": "packages/work-continuity/src/git-work/index.ts",
-          "sha256": "3086b9b375e0989b34bdcd483577f13e0b58ad8ac9f00cfacf5977573b71158e"
+          "sha256": "8c11a0333c112eee58fab5d8cc2fb9dc6340dfdf8b3891231623826020703f5b"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/records.ts",
@@ -103,7 +103,7 @@
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/source.ts",
           "relativePath": "packages/work-continuity/src/git-work/source.ts",
-          "sha256": "620b9b68b36d6e60b8b2f205df0ac116c27bc89867a9a003afd64a1beb7a60b5"
+          "sha256": "6a20e5a43338849c754d0046a7c8c8fa1ae7720ab3665de41090c73af7cc0c1d"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/types.ts",
@@ -528,12 +528,12 @@
       "sourcePins": [
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/home-context.ts",
-          "sha256": "042bd9c3c69077321d0212e8693560c9d857a7a1febdd802cb5ece93dd1ad643",
+          "sha256": "3f078a47923b88534d6352b5130b5b5284e27a232fe53e76b538fda7cbb4931a",
           "relativePath": "packages/native-codex-adapter/src/native/home-context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/hooks.ts",
-          "sha256": "4af3b85bb340fb7b3c7c0750962624dfb0c0e86b202d82e3d2e8fa6225a00517",
+          "sha256": "0732ccaa72b2618679abe61fff3ec7a57c6089ff3af91b166dda6ac9f9853c9c",
           "relativePath": "packages/native-codex-adapter/src/native/hooks.ts"
         },
         {

@@ -96,9 +96,8 @@ function freeze<T>(value: T): T {
   return value;
 }
 
-/** Object reads never invoke a shell, filters, network, checkout mutation or hooks. */
-async function git(root: string, args: string[], maxBytes: number): Promise<Uint8Array> {
-  const env: Record<string, string | undefined> = {
+export function gitReadEnvironment(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     GIT_TERMINAL_PROMPT: "0",
     GIT_OPTIONAL_LOCKS: "0",
@@ -114,6 +113,12 @@ async function git(root: string, args: string[], maxBytes: number): Promise<Uint
     "GIT_ALTERNATE_OBJECT_DIRECTORIES",
   ])
     delete env[key];
+  return env;
+}
+
+/** Object reads never invoke a shell, filters, network, checkout mutation or hooks. */
+async function git(root: string, args: string[], maxBytes: number): Promise<Uint8Array> {
+  const env = gitReadEnvironment();
   const child = Bun.spawn(
     ["git", "--no-replace-objects", "--no-pager", "--literal-pathspecs", "-C", root, ...args],
     { env, stdout: "pipe", stderr: "ignore" },
@@ -149,6 +154,30 @@ async function git(root: string, args: string[], maxBytes: number): Promise<Uint
   }
 }
 const decode = (bytes: Uint8Array) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+
+/** Resolve one bounded local ref to an immutable snapshot without fetching or changing Git. */
+export async function resolveGitWorkSelection(value: unknown): Promise<GitWorkSelection> {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw Error("Explicit Git Work selection must be an object");
+  const request = value as Record<string, unknown>;
+  if (
+    typeof request.repositoryRoot !== "string" ||
+    typeof request.commit !== "string" ||
+    !request.commit ||
+    request.commit.length > 256 ||
+    request.commit.includes("\0")
+  )
+    throw Error("Explicit repository root and bounded local commit/ref required");
+  const commit = decode(
+    await git(
+      request.repositoryRoot,
+      ["rev-parse", "--verify", "--end-of-options", request.commit + "^{commit}"],
+      256,
+    ),
+  ).trim();
+  assertCommit(commit);
+  return { ...request, commit } as unknown as GitWorkSelection;
+}
 
 export async function openGitWork(input: GitWorkSelection): Promise<GitWorkReader> {
   input = freeze(structuredClone(input));

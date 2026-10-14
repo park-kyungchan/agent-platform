@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import type { HookBinding } from "./hooks.ts";
+import type { GitWorkContext } from "@palantirkc/work-continuity/git-work";
 
 type ObjectValue = Record<string, unknown>;
 interface Pointer {
@@ -250,11 +251,140 @@ function readContract(
   return { contract, sha256: source.sha256 };
 }
 
+export interface SelectedGitWorkView {
+  status: "source-qualified" | "held";
+  holdReasons: string[];
+  pointer: {
+    repositoryId: string;
+    commit: string;
+    projectId: string;
+    workId: string;
+    sourcePathBase: string;
+  };
+  purpose: unknown;
+  currentTask?: unknown;
+  decisionOriginals: unknown;
+  historicalEffects: unknown;
+  projection: "bounded-derived-pointer-view";
+  currentness: "caller-declared-not-remote-verified";
+  authority: "none";
+  nativePermissionGranted: false;
+  semanticAcceptanceEstablished: false;
+}
+
+/** Derive pointers from the full qualified closure, never raw answers/native locators. */
+export function projectSelectedGitWork(
+  context: GitWorkContext,
+  selection: { taskId?: string; decisionIds?: string[] },
+): SelectedGitWorkView {
+  const work = context.records.find((record) => record.kind === "work"),
+    task = context.records.find(
+      (record) => record.kind === "task" && record.id === selection.taskId,
+    ),
+    decisions = context.records.filter((record) => record.kind === "decision"),
+    relevant = selection.decisionIds
+      ? decisions.filter((record) => selection.decisionIds!.includes(record.id))
+      : decisions;
+  const originalSources: {
+    id: string;
+    path: string;
+    blobOid: string;
+    repositoryId?: string;
+    commit?: string;
+  }[] = [];
+  const source = (id: unknown) => {
+    const original = context.sources.find((row) => row.id === id);
+    if (!original) return null;
+    let address = originalSources.find(
+      (row) =>
+        row.path === original.path &&
+        row.blobOid === original.blobOid &&
+        row.repositoryId === original.repositoryId &&
+        row.commit === original.commit,
+    );
+    if (!address) {
+      address = {
+        id: `o${originalSources.length + 1}`,
+        path: original.path,
+        blobOid: original.blobOid,
+        ...(original.repositoryId
+          ? { repositoryId: original.repositoryId, commit: original.commit }
+          : {}),
+      };
+      originalSources.push(address);
+    }
+    return { source: address.id, ...(original.fragment ? { fragment: original.fragment } : {}) };
+  };
+  const purpose = object(work?.purpose) ? work.purpose : undefined;
+  const logical = object(task?.logical) ? task.logical : undefined;
+  return {
+    status: context.status,
+    // Arbitrary parser exception text may contain source bytes; expose safe codes only.
+    holdReasons: context.holdReasons.map((reason) =>
+      /^[A-Z][A-Z0-9_]{0,120}(?::|$)/.test(reason)
+        ? reason.split(":")[0]!
+        : "REQUIRED_SOURCE_UNAVAILABLE",
+    ),
+    pointer: {
+      repositoryId: context.repositoryId,
+      commit: context.commit,
+      projectId: context.projectId,
+      workId: context.workId,
+      sourcePathBase: context.sourcePathBase,
+    },
+    purpose: {
+      objective: purpose?.objective,
+      fullPurpose: "work.json#/purpose",
+      contractsSource: "work.json",
+      specRevision: object(work?.spec) ? work.spec.revision : undefined,
+      planRevision: object(work?.plan) ? work.plan.revision : undefined,
+    },
+    ...(selection.taskId
+      ? {
+          currentTask: {
+            id: selection.taskId,
+            ...(task
+              ? {
+                  title: task.title,
+                  state: task.state,
+                  contractSource: `tasks/${encodeURIComponent(task.id)}.json#/logical`,
+                  specRevision: logical?.specRevision,
+                  planRevision: logical?.planRevision,
+                }
+              : { unavailable: true }),
+          },
+        }
+      : {}),
+    decisionOriginals: {
+      governingIndex: "work.json#/governingDecisionIds",
+      recordPattern: "decisions/<encodeURIComponent(id)>.json",
+      decisionCount: decisions.length,
+      directPointers: relevant.map((record) => ({
+        id: record.id,
+        status: record.status,
+        answer: source(record.answerSource),
+        ...(record.selectionContextSource
+          ? { selectionContext: source(record.selectionContextSource) }
+          : {}),
+      })),
+      sources: originalSources,
+      unexpandedDecisionCount: decisions.length - relevant.length,
+    },
+    historicalEffects: context.historicalEffects,
+    projection: "bounded-derived-pointer-view",
+    currentness: "caller-declared-not-remote-verified",
+    authority: "none",
+    nativePermissionGranted: false,
+    semanticAcceptanceEstablished: false,
+  };
+}
+
 /** Read-only bootstrap: never reads the Home prompt or updates a semantic Work. */
 export function projectHomeContext(options: {
   binding: HookBinding;
   cwd: string;
   maxChars?: number;
+  selectedWork?: SelectedGitWorkView;
 }): HomeContextProjection {
   const maxChars = Math.min(
     6000,
@@ -274,7 +404,7 @@ export function projectHomeContext(options: {
       priorities: contract.priorities,
       ownership: contract.ownership,
       preferences,
-      projectRoute,
+      ...(options.selectedWork ? { selectedWork: options.selectedWork } : { projectRoute }),
       recordPolicy: contract.recordPolicy,
       boundaries: {
         authority: "none",
@@ -298,11 +428,72 @@ export function projectHomeContext(options: {
       semanticOwners,
       projectEntrypoints,
       canonicalSourcePaths: contract.canonicalSources.map(({ path }) => path),
+      ...(options.selectedWork
+        ? {
+            defaultProjectRoute: {
+              ...projectRoute,
+              role: "default-bootstrap-route-not-selected-session-work",
+            },
+          }
+        : {}),
     });
     // Reserve every omission label before fitting optional data so a later
     // omission cannot push otherwise valid essential context over the cap.
     const omitted = optionalContext.map(([key]) => key),
       render = () => `${prefix}${JSON.stringify({ ...context, omitted })}`;
+    if (render().length > maxChars && options.selectedWork) {
+      const selected = structuredClone(options.selectedWork),
+        originals = object(selected.decisionOriginals) ? selected.decisionOriginals : undefined;
+      context.selectedWork = selected;
+      if (
+        originals &&
+        Array.isArray(originals.directPointers) &&
+        Array.isArray(originals.sources)
+      ) {
+        // The full closure is already verified. Keep purpose/Task and at least
+        // one direct original; extra originals remain addressable by the index.
+        const directPointers = originals.directPointers;
+        let sources = originals.sources;
+        while (render().length > maxChars && directPointers.length > 1) {
+          directPointers.pop();
+          originals.unexpandedDecisionCount = Number(originals.unexpandedDecisionCount) + 1;
+          const used = new Set(
+            directPointers.flatMap((row) => {
+              if (!object(row)) return [];
+              return [row.answer, row.selectionContext]
+                .filter(object)
+                .map((pointer) => pointer.source);
+            }),
+          );
+          sources = sources.filter((row) => object(row) && used.has(row.id));
+          originals.sources = sources;
+          selected.status = "held";
+          selected.holdReasons = [
+            ...new Set([...selected.holdReasons, "NATIVE_DECISION_POINTERS_UNEXPANDED"]),
+          ];
+        }
+      }
+    }
+    if (render().length > maxChars && options.selectedWork) {
+      // Keep essential Home purpose/preferences. A too-large derived view is held
+      // with an immutable read pointer, never silently clipped into qualification.
+      context.selectedWork = {
+        ...options.selectedWork.pointer,
+        purposeSource: "work.json#/purpose",
+        currentTaskSource:
+          object(options.selectedWork.currentTask) &&
+          typeof options.selectedWork.currentTask.id === "string"
+            ? `tasks/${encodeURIComponent(options.selectedWork.currentTask.id)}.json`
+            : undefined,
+        decisionOriginalsSource: "work.json#/governingDecisionIds",
+        status: "held",
+        holdReasons: ["NATIVE_CONTEXT_OUTPUT_LIMIT"],
+        projection: "pointer-only",
+        authority: "none",
+        nativePermissionGranted: false,
+        semanticAcceptanceEstablished: false,
+      };
+    }
     if (render().length > maxChars) throw new Error("Essential Home context exceeds the budget");
     for (const [key, value] of optionalContext) {
       const omittedIndex = omitted.indexOf(key);
