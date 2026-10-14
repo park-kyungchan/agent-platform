@@ -22,7 +22,7 @@ export interface PlatformBuildRequest {
 async function compilerPin(path: string) {
   if (resolve(path) !== path || (await realpath(path)) !== path)
     throw Error("EXACT_INSTALLED_COMPILER_REQUIRED");
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const before = await file.stat();
     if (!before.isFile() || before.size > 256 * 1024 * 1024)
@@ -111,10 +111,11 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
   try {
     compilerDescriptor = await open(
       request.compiler.path,
-      constants.O_RDONLY | constants.O_NOFOLLOW,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
     );
     const stat = await compilerDescriptor.stat();
     if (
+      !stat.isFile() ||
       stat.dev !== before.dev ||
       stat.ino !== before.ino ||
       stat.size !== before.bytes ||

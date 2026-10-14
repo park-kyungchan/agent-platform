@@ -82,6 +82,61 @@ test("v2 platform denominator includes transitive contracts, generator, dependen
     await f.cleanup();
   }
 }, 30000);
+test("a real FIFO compiler is refused without waiting for a writer", async () => {
+  const f = await fixture();
+  try {
+    const compiler = join(f.root, "synthetic-compiler.fifo");
+    const created = Bun.spawnSync(["mkfifo", "--", compiler], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(created.exitCode).toBe(0);
+    const request = {
+      registrationPath: f.path,
+      registrationSha256: f.sha256,
+      providerRoot: f.root,
+      compiler: { path: compiler, sha256: "0".repeat(64) },
+      legacyManifestSha256: "1".repeat(64),
+      runtimeProviderRoot: f.root,
+      runtimeRegistrationPath: join(f.root, "runtime-registration.json"),
+    };
+    const driver = join(f.root, "fifo-compiler-probe.ts");
+    await writeFile(
+      driver,
+      `import {buildHermesPlatformSource} from ${JSON.stringify(join(source, "packages/native-hermes-adapter/src/platform-current-work/build.ts"))};\ntry {await buildHermesPlatformSource(${JSON.stringify(request)});process.exitCode=1;} catch(error) {if(!(error instanceof Error)||error.message!=="BOUNDED_INSTALLED_COMPILER_REQUIRED")throw error;console.log("nonregular_compiler_refused");}\n`,
+    );
+    const child = Bun.spawn([process.execPath, "--no-env-file", driver], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, 5000);
+    try {
+      const [exitCode, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect(timedOut).toBe(false);
+      expect(exitCode).toBe(0);
+      expect(stdout).toBe("nonregular_compiler_refused\n");
+      expect(stderr).toBe("");
+    } finally {
+      clearTimeout(timer);
+      if (child.exitCode === null) {
+        child.kill("SIGKILL");
+        await child.exited;
+      }
+    }
+  } finally {
+    await f.cleanup();
+  }
+}, 30000);
 test("first-import loader denies source/dependency drift and a forged reduced denominator", async () => {
   const f = await fixture();
   try {
