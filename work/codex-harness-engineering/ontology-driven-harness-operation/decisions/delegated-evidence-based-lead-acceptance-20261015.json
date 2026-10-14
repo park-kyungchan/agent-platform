@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "delegated-evidence-based-lead-acceptance-20261015",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "기존 Academy 제품/운영 backlog 완성까지도 포함한다. 나머지는 너의 권고대로 진행해라.",
+  "meaning": "Delegate evidence-based AcceptanceDecision and native Goal closure to the accountable Lead after independent review and the agreed native verification criteria are actually satisfied. Human satisfaction is not claimed observed. Required outcomes may not be marked passed or complete merely to close the Goal.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-session-original-answer-20261015-2.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "인터뷰 이후 사용자가 개입하지 않는 동안 완료 판정은 어떻게 할까요? 권장안은 독립 review와 합의된 native 검증 기준 충족 후 accountable Lead가 AcceptanceDecision을 기록하고 Goal을 완료하는 것입니다. 실제 사용자 만족을 관측했다는 주장은 하지 않습니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/native-interview-selection-context-20261015.json",
+      "fragment": "#/content/questions/2/title"
+    }
+  },
+  "supersedes": []
+}

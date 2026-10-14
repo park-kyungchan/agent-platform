@@ -1,0 +1,20 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "integrated-program-original-answer-20261015-1",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "academy-workbench",
+    "locator": "source-owner:reorganization-kickoff/kickoff-prompt-snippet.json#/actualUserAnswers/0",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "공통하네스가 절대적으로 적용되어야하며, 각자의 Runtime에 최적화된 WSL2 하네스와 VPS 하네스들도 Engineering 되어야한다. 현재 Git/GitHub의 기능들을 적극적으로 활용해서, Palantir's AIP/Foundry급의 Ontology를 기반으로, Domain ID부터 Project ID / Work ID / Task ID / Run ID 까지 부여해가면서, WSL2/VPS 각자의 Runtime을 최적으로 활용하는 하네스들이, 이 ID 부여에 복잡성을 추가하지 않고, 오히려 공통하네스를 기반으로 하여 Git/GitHub의 기능들과 통합적으로 모든 작업에 최적화될 수 있어야한다. 유저의 의도와 목적과 맥락들은 최근 대화내용들에서 반복되거나 feedback들 기반으로 더 명확히 알 수 있다.",
+    "question": "What concrete outcomes define success for the expanded reorganization?",
+    "sourceRequestId": "call_85461a1bacf949e39a12512f96c29248",
+    "qualification": "Exact user-answer content retained by the source-owned kickoff packet; not a raw native transcript or new authentication proof."
+  }
+}

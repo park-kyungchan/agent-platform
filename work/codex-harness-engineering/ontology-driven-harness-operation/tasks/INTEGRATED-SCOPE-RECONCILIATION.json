@@ -1,0 +1,46 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "INTEGRATED-SCOPE-RECONCILIATION",
+  "kind": "task",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+    "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+    "specRevision": 6,
+    "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "planRevision": 6,
+    "taskId": "INTEGRATED-SCOPE-RECONCILIATION"
+  },
+  "title": "Reconcile successor scope, actual originals, histories and completed Academy delivery",
+  "state": {
+    "execution": "running",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "dependsOn": [],
+  "decisionIds": [
+    "U1",
+    "U6",
+    "U16",
+    "U20",
+    "U24",
+    "U25",
+    "U26",
+    "U27",
+    "U28",
+    "complete-interviews-before-autonomous-goal-20261015",
+    "academy-product-operational-backlog-included-20261015",
+    "fresh-native-evaluation-suite-budget-20261015",
+    "delegated-evidence-based-lead-acceptance-20261015"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "executionClass": "source-only"
+}

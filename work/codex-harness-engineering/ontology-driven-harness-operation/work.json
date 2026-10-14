@@ -8,31 +8,41 @@
   "repositoryId": "park-kyungchan/agent-platform",
   "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
   "purpose": {
-    "objective": "Establish one integrated Ontology-driven harness operating model with complete source-owned traceability and purpose-aligned native consumption in WSL2 Codex and VPS Hermes.",
+    "objective": "Apply and verify one Git/GitHub-native Ontology-driven common Harness and native WSL2 Codex/VPS Hermes consumption across the evidence-discovered related portfolio, while completing the existing Academy product and operational backlog in an independent private runtime. Preserve native owners, logical identities, originals, recovery and the absolute read-only Academy source boundary; close only with separate evidence-based Lead Acceptance.",
     "successCriteria": [
-      "One integrated Work preserves all source/native identity distinctions and actual user decisions.",
-      "Both WSL2 and VPS demonstrate purpose-aligned native consumption before whole Work completion.",
-      "Common source milestone is independently reviewed, reproducible and explicitly merged; runtime Leads then continue from latest main"
+      "The same logical Domain/Project/Work/Task identities survive source revisions and host/native occurrences; ordinary dependent work reuses suitable Tasks and independently reviewable work has separate Tasks without manual duplicate registration.",
+      "Current original user answers, their actual selection context, original owner provenance and predecessor decisions/effects remain source-addressable; historical source milestones and pending/uncertain runtime effects are not rewritten or replayed.",
+      "A measured source/import/profile/process/service/data-owner topology covers the actual related WSL2/VPS portfolio and all named Academy/math/profile sources; adopted integration, separation and retirement decisions follow code and dependency evidence, with verified recovery and private publication.",
+      "The accepted single common/Codex/Hermes Harness-source repository contains canonical typed modules and related Git Work; domain projects retain domain meaning and native/data/evidence owners. No second agent loop, scheduler, session store, credential bridge or manual identity administration engine is introduced.",
+      "Both native runtimes demonstrably use current common contracts, relevant official Runtime Index routes, bounded purpose/decision/history context, native tools and identity-linked execution. Native verification precedes explicit activation; merge/pull alone never counts as activation.",
+      "One useful small real Harness task proves Lead-to-worker delegation, WSL2/VPS handoff, interruption/resume, topic Memory original Q/A/rationale/revisions, native Kanban/Session fit, compatible concurrent-update reconciliation, durable local/shared audit receipts and actual cross-runtime receiver verification.",
+      "VPS currentness and admitted continuation operate without personal-PC uptime. Configured, callable, authenticated, behaviorally verified, locally durable, shared-delivered and formally complete remain distinct observations.",
+      "Academy private operational auth/storage, approved actual source reconciliation/import, backup/restore/rollback, hosting boundary, workflow coverage and exact release integrity are implemented and independently verified against the existing seven gates. Missing source/currentness/teacher judgments remain visible, not fabricated or silently accepted.",
+      "Academy teacher-centered workflows preserve original assessment/attempt/judgment/clinic/print/distribution/review identities, exact book-edition hierarchy and parent-facing DailyRecord projections. Requested exam/question selection and student knowledge graph behavior is grounded in original accepted requirements and evidence. Source mutation, sending and printing are exercised only in the independent authorized private/local/staging runtime; the existing Academy server remains absolutely read-only.",
+      "Each independently deliverable change has appropriate affected checks, exact-head independent review, private GitHub delivery, explicit expected-head Lead merge and readback. Identical-tree review reuse has an explicit independent successor binding and current material/blocking finding state.",
+      "The fresh native evaluation suite stays within 48 requests, 2000000 emitted tokens and 8 hours, tracked separately from ordinary engineering and the native Goal. New paid infrastructure/recurring cost remains zero. Historical suites are not renewed or replayed.",
+      "Accountable Lead AcceptanceDecision cites the demonstrated integrated/runtime/Academy outcomes independently of source tests, Git delivery and native activation. Human satisfaction and domain teacher judgments remain unobserved unless actually supplied; unresolved required outcomes keep the Goal incomplete."
     ],
     "inScope": [
-      "Git-centered typed common Work, actual decisions, relationships, effect fences and verification references",
-      "Shared docs-only Runtime Index, common CLI and finite reproducible source checks",
-      "Explicit common-source commit, push, PR and Lead merge"
+      "Existing integrated common Harness Work and its WSL2/VPS native runtime engineering, verification and explicit activation",
+      "Full related portfolio discovery and justified private repository/module integration, separation and retirement; named repositories are a starting point, not a completeness boundary",
+      "Existing Academy product and operational backlog in its independent private runtime, including source-authorized read-only reconciliation and preserved unknowns",
+      "The separately budgeted new native evaluation suite and delegated evidence-based Lead Acceptance"
     ],
     "outOfScope": [
-      "Runtime-specific improvements, active configuration, native activation and session/tool/permission changes",
-      "Paused Hermes Source repair, active VPS Wiki effects and all standing excluded domains",
-      "New native model evaluation suite or whole both-runtime Work Acceptance",
-      "Original/evidence store relocation, full-history/private corpus import"
+      "Academic source-server mutation, denied-source access, physical/third-party business effects or invented student data/teacher judgments",
+      "Unrelated standing excluded domains, credentials disclosure, native trust or permission bypass and a parallel agent runtime",
+      "Automatic merge, new paid infrastructure/recurring operating cost, historical effect replay or reused evaluation budgets",
+      "Unverified human satisfaction or treating an implementation/test/merge as whole-Work Acceptance"
     ]
   },
   "spec": {
     "id": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
-    "revision": 5
+    "revision": 6
   },
   "plan": {
     "id": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
-    "revision": 5
+    "revision": 6
   },
   "governingDecisionIds": [
     "git-canonical-common-records-design-review-20261014",
@@ -44,9 +54,14 @@
     "single-repository-common-runtime-harness-20261014",
     "explicit-lead-native-harness-activation-20261014",
     "common-first-implementation-explicit-publication-20261014",
-    "autonomous-common-goal-20261014"
+    "autonomous-common-goal-20261014",
+    "integrated-purpose-and-success-20261015",
+    "private-by-default-reorganization-20261015",
+    "broad-engineering-authority-20261015",
+    "complete-interviews-before-autonomous-goal-20261015",
+    "academy-product-operational-backlog-included-20261015",
+    "fresh-native-evaluation-suite-budget-20261015",
+    "delegated-evidence-based-lead-acceptance-20261015"
   ],
-  "historicalFenceIds": [
-    "checkpoint-56-historical-effect-fence"
-  ]
+  "historicalFenceIds": ["checkpoint-56-historical-effect-fence"]
 }

@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "fresh-native-evaluation-suite-budget-20261015",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "기존 Academy 제품/운영 backlog 완성까지도 포함한다. 나머지는 너의 권고대로 진행해라.",
+  "meaning": "Authorize one new cross-runtime native evaluation suite with maxima of 48 model requests, 2000000 aggregate emitted tokens and 8 hours; these caps apply to the fresh evaluation suite only, separately from ordinary engineering and native Goal token use. No new paid infrastructure/recurring operating cost is introduced. Historical suite budgets are not renewed or reused.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-session-original-answer-20261015-2.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "새 cross-runtime native evaluation suite의 상한을 선택해 주세요. 기존 suite 예산은 종료되어 재사용할 수 없습니다. 권장안은 native model 요청 48회·총 emitted tokens 2,000,000·8시간이며, 일반 engineering Goal과 별도로 평가에만 적용합니다. 새 유료 인프라 도입은 0원 기준으로 진행합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/native-interview-selection-context-20261015.json",
+      "fragment": "#/content/questions/0/title"
+    }
+  },
+  "supersedes": []
+}
