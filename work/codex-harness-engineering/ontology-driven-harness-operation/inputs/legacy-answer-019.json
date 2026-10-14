@@ -1,0 +1,26 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "legacy-answer-019",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "owner:.private/daily-use-interview-20261012/answer-019.json#/text",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "권장: PC가 꺼져도 VPS는 계속 — 최신판 확인 경로가 PC 가동에 의존하지 않게 설계",
+    "question": "PC와 WSL2를 꺼둔 동안에도 VPS의 Lead·worker가 확정된 Memory의 최신 여부를 확인하고, 허용된 작업을 계속할 수 있어야 할까요? Memory 원본·결정의 소유 프로젝트는 유지합니다.",
+    "sourceCapture": {
+      "ownerId": "codex-harness-engineering",
+      "path": ".private/daily-use-interview-20261012/answer-019.json",
+      "sha256": "858099650ed617241cbb9f45f6cdf97d75c5eb88c0304ff93917819b372953d8",
+      "fragment": "#/text",
+      "recordClass": "ActualNativeUserAnswerContent",
+      "qualification": "Selected content copied from source-owned capture; not raw native transcript bytes or new authentication proof"
+    }
+  }
+}

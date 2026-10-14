@@ -1,0 +1,14 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "codex-harness-engineering:verification:ontology-driven-harness-operation:source-preparation-gha-26",
+  "kind": "evidence",
+  "evidenceKind": "verification",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/verification-input-GHA-26.json",
+    "fragment": "#/content"
+  }
+}

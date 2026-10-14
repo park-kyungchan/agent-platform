@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "explicit-lead-native-harness-activation-20261014",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "각 runtime Lead가 native 검증 후 명시적으로 새 버전을 적용한다. 같은 Lead가 merge와 적용을 연속 처리할 수 있다. (권장)",
+  "meaning": "After reviewed explicit source merge, each accountable WSL2/VPS runtime Lead explicitly activates the new Harness revision after native verification. The same Lead may perform merge and activation consecutively. New Work still starts from freshly synchronized main; existing native session/permission/trust boundaries remain.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-8.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "통합 하네스가 main에 merge된 뒤, WSL2/VPS에서 새 버전을 언제 활성화할까요? 두 방식 모두 새 Work는 최신 main을 받아 시작하며, 진행 중인 세션과 native 권한 절차를 유지합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-8.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

@@ -2,7 +2,13 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import schema from "../schemas/operational.schema.json" with { type: "json" };
 import { jsonIssue } from "./json-validation.js";
-const ajv = new Ajv2020({ strict: true, allErrors: true, coerceTypes: false, useDefaults: false, removeAdditional: false });
+const ajv = new Ajv2020({
+    strict: true,
+    allErrors: true,
+    coerceTypes: false,
+    useDefaults: false,
+    removeAdditional: false,
+});
 addFormats(ajv);
 ajv.addSchema(schema);
 const validator = (definition) => ajv.compile({ $ref: `${schema.$id}#/$defs/${definition}` });
@@ -16,7 +22,14 @@ function check(value, validate) {
     if (invalidJson)
         return { valid: false, issues: [invalidJson] };
     if (!validate(value))
-        return { valid: false, issues: (validate.errors ?? []).map(error => ({ code: `schema:${error.keyword}`, path: error.instancePath, message: error.message ?? "Schema validation failed." })) };
+        return {
+            valid: false,
+            issues: (validate.errors ?? []).map((error) => ({
+                code: `schema:${error.keyword}`,
+                path: error.instancePath,
+                message: error.message ?? "Schema validation failed.",
+            })),
+        };
     return { valid: true, value, issues: [] };
 }
 function result(value, issues) {
@@ -24,7 +37,7 @@ function result(value, issues) {
 }
 function assertResult(result) {
     if (!result.valid)
-        throw new Error(result.issues.map(issue => `${issue.path} ${issue.code}: ${issue.message}`).join("; "));
+        throw new Error(result.issues.map((issue) => `${issue.path} ${issue.code}: ${issue.message}`).join("; "));
 }
 export function validateOperationalRecord(value) {
     const checked = check(value, shape);
@@ -40,28 +53,52 @@ export function validateOperationalRecord(value) {
     if (record.kind === "action-execution") {
         const issues = [];
         if (Date.parse(record.finishedAt) < Date.parse(record.startedAt))
-            issues.push({ code: "negative-action-duration", path: "/finishedAt", message: "Finish time cannot precede start time." });
+            issues.push({
+                code: "negative-action-duration",
+                path: "/finishedAt",
+                message: "Finish time cannot precede start time.",
+            });
         if (record.outcome !== "success" && record.committedBatchId)
-            issues.push({ code: "invalid-action-commit", path: "/committedBatchId", message: "Failed or simulated Actions cannot declare a mutation commit." });
+            issues.push({
+                code: "invalid-action-commit",
+                path: "/committedBatchId",
+                message: "Failed or simulated Actions cannot declare a mutation commit.",
+            });
         if (record.outcome === "failure" && !record.diagnostics.length)
-            issues.push({ code: "missing-action-failure", path: "/diagnostics", message: "Failed Actions require observed diagnostics." });
+            issues.push({
+                code: "missing-action-failure",
+                path: "/diagnostics",
+                message: "Failed Actions require observed diagnostics.",
+            });
         return result(record, issues);
     }
     return checked;
 }
-export function assertOperationalRecord(value) { assertResult(validateOperationalRecord(value)); }
+export function assertOperationalRecord(value) {
+    assertResult(validateOperationalRecord(value));
+}
 export function validateObjectRecord(value) {
     const checked = check(value, objectShape);
     if (!checked.valid)
         return checked;
     const issues = [];
     if (Date.parse(checked.value.updatedAt) < Date.parse(checked.value.createdAt))
-        issues.push({ code: "negative-object-duration", path: "/updatedAt", message: "Updated time cannot precede creation time." });
+        issues.push({
+            code: "negative-object-duration",
+            path: "/updatedAt",
+            message: "Updated time cannot precede creation time.",
+        });
     return result(checked.value, issues);
 }
-export function assertObjectRecord(value) { assertResult(validateObjectRecord(value)); }
-export function validateLinkRecord(value) { return check(value, linkShape); }
-export function assertLinkRecord(value) { assertResult(validateLinkRecord(value)); }
+export function assertObjectRecord(value) {
+    assertResult(validateObjectRecord(value));
+}
+export function validateLinkRecord(value) {
+    return check(value, linkShape);
+}
+export function assertLinkRecord(value) {
+    assertResult(validateLinkRecord(value));
+}
 export function validateOntologyRegistry(value) {
     const checked = check(value, registryShape);
     if (!checked.valid)
@@ -69,9 +106,13 @@ export function validateOntologyRegistry(value) {
     const registry = checked.value;
     const issues = [];
     const issue = (code, path, message) => issues.push({ code, path, message });
-    const objectIds = new Set(registry.objectTypes.map(type => type.id));
-    const linkIds = new Set(registry.linkTypes.map(type => type.id));
-    for (const [field, definitions] of [["objectTypes", registry.objectTypes], ["linkTypes", registry.linkTypes], ["actionTypes", registry.actionTypes]]) {
+    const objectIds = new Set(registry.objectTypes.map((type) => type.id));
+    const linkIds = new Set(registry.linkTypes.map((type) => type.id));
+    for (const [field, definitions] of [
+        ["objectTypes", registry.objectTypes],
+        ["linkTypes", registry.linkTypes],
+        ["actionTypes", registry.actionTypes],
+    ]) {
         const keys = new Set();
         definitions.forEach((definition, index) => {
             const key = `${definition.id}@${definition.version}`;
@@ -89,14 +130,15 @@ export function validateOntologyRegistry(value) {
             keys.add(property.name);
             if (property.reference && !objectIds.has(property.reference.objectType))
                 issue("unknown-reference-type", `${path}/reference/objectType`, "A property reference endpoint must be registered.");
-            if (property.reference && property.valueType !== (property.reference.many ? "array" : "string"))
+            if (property.reference &&
+                property.valueType !== (property.reference.many ? "array" : "string"))
                 issue("reference-shape", path, "Reference properties must use string identity or an array of identities.");
         });
         if (type.identity.strategy === "composite") {
             if (!type.identity.components?.length)
                 issue("missing-identity-components", `/objectTypes/${index}/identity`, "Composite identity requires components.");
             for (const name of type.identity.components ?? []) {
-                const property = type.properties.find(property => property.name === name);
+                const property = type.properties.find((property) => property.name === name);
                 if (!property?.required || !property.immutable)
                     issue("unstable-identity-component", `/objectTypes/${index}/identity/components`, "Composite identity components must be declared, required, and immutable.");
             }
@@ -107,7 +149,8 @@ export function validateOntologyRegistry(value) {
             const definition = type[endpoint];
             if (!objectIds.has(definition.objectType))
                 issue("unknown-endpoint-type", `/linkTypes/${index}/${endpoint}`, "Link endpoints must name registered object types.");
-            if (definition.cardinality.max !== null && definition.cardinality.min > definition.cardinality.max)
+            if (definition.cardinality.max !== null &&
+                definition.cardinality.min > definition.cardinality.max)
                 issue("invalid-cardinality", `/linkTypes/${index}/${endpoint}/cardinality`, "Minimum cardinality cannot exceed maximum cardinality.");
         }
     });
@@ -133,7 +176,9 @@ export function validateOntologyRegistry(value) {
     });
     return result(registry, issues);
 }
-export function assertOntologyRegistry(value) { assertResult(validateOntologyRegistry(value)); }
+export function assertOntologyRegistry(value) {
+    assertResult(validateOntologyRegistry(value));
+}
 /** Shape validation for a registered payload; registry callers still own actual authorization and observed truth. */
 export function validateObjectProperties(value, definition) {
     const properties = {};
@@ -150,11 +195,21 @@ export function validateObjectProperties(value, definition) {
         properties[property.name] = field;
     }
     try {
-        const validate = ajv.compile({ type: "object", properties, required: definition.properties.filter(property => property.required).map(property => property.name), additionalProperties: definition.additionalProperties });
+        const validate = ajv.compile({
+            type: "object",
+            properties,
+            required: definition.properties
+                .filter((property) => property.required)
+                .map((property) => property.name),
+            additionalProperties: definition.additionalProperties,
+        });
         return check(value, validate);
     }
     catch (error) {
-        return { valid: false, issues: [{ code: "invalid-object-definition", path: "", message: String(error) }] };
+        return {
+            valid: false,
+            issues: [{ code: "invalid-object-definition", path: "", message: String(error) }],
+        };
     }
 }
 export function validateActionInput(value, definition) {
@@ -162,7 +217,10 @@ export function validateActionInput(value, definition) {
         return check(value, ajv.compile(definition.inputSchema));
     }
     catch (error) {
-        return { valid: false, issues: [{ code: "invalid-action-input-schema", path: "", message: String(error) }] };
+        return {
+            valid: false,
+            issues: [{ code: "invalid-action-input-schema", path: "", message: String(error) }],
+        };
     }
 }
 export function validateActionRequest(value, definition) {
@@ -173,19 +231,30 @@ export function validateActionRequest(value, definition) {
     const keys = new Set();
     checked.value.expectedVersions.forEach((expected, index) => {
         if (keys.has(expected.objectId))
-            issues.push({ code: "duplicate-version-precondition", path: `/expectedVersions/${index}`, message: "Each object has one expected version per Action." });
+            issues.push({
+                code: "duplicate-version-precondition",
+                path: `/expectedVersions/${index}`,
+                message: "Each object has one expected version per Action.",
+            });
         keys.add(expected.objectId);
     });
     if (definition) {
-        if (definition.id !== checked.value.actionType || definition.version !== checked.value.actionTypeVersion)
-            issues.push({ code: "action-definition-version", path: "/actionTypeVersion", message: "Request must target the supplied Action type version." });
+        if (definition.id !== checked.value.actionType ||
+            definition.version !== checked.value.actionTypeVersion)
+            issues.push({
+                code: "action-definition-version",
+                path: "/actionTypeVersion",
+                message: "Request must target the supplied Action type version.",
+            });
         const input = validateActionInput(checked.value.input, definition);
         if (!input.valid)
-            issues.push(...input.issues.map(issue => ({ ...issue, path: `/input${issue.path}` })));
+            issues.push(...input.issues.map((issue) => ({ ...issue, path: `/input${issue.path}` })));
     }
     return result(checked.value, issues);
 }
-export function assertActionRequest(value, definition) { assertResult(validateActionRequest(value, definition)); }
+export function assertActionRequest(value, definition) {
+    assertResult(validateActionRequest(value, definition));
+}
 /** Validate one complete current graph. History revisions belong in a separate immutable store. */
 export function validateOntologyGraph(objects, links, registry) {
     const registryValidation = validateOntologyRegistry(registry);
@@ -198,7 +267,7 @@ export function validateOntologyGraph(objects, links, registry) {
         const checked = validateObjectRecord(unknownObject);
         const path = `/objects/${index}`;
         if (!checked.valid) {
-            issues.push(...checked.issues.map(item => ({ ...item, path: `${path}${item.path}` })));
+            issues.push(...checked.issues.map((item) => ({ ...item, path: `${path}${item.path}` })));
             return;
         }
         const value = checked.value;
@@ -206,13 +275,13 @@ export function validateOntologyGraph(objects, links, registry) {
             issue("duplicate-object-id", `${path}/id`, `Duplicate object ${value.id}.`);
         else
             objectMap.set(value.id, value);
-        const type = registry.objectTypes.find(type => type.id === value.objectType && type.version === value.objectTypeVersion);
+        const type = registry.objectTypes.find((type) => type.id === value.objectType && type.version === value.objectTypeVersion);
         if (!type)
             issue("unknown-object-type-version", `${path}/objectTypeVersion`, `No registered definition for ${value.objectType}@${value.objectTypeVersion}.`);
         else {
             const properties = validateObjectProperties(value.properties, type);
             if (!properties.valid)
-                issues.push(...properties.issues.map(item => ({ ...item, path: `${path}/properties${item.path}` })));
+                issues.push(...properties.issues.map((item) => ({ ...item, path: `${path}/properties${item.path}` })));
         }
     });
     const linkKeys = new Set();
@@ -222,14 +291,14 @@ export function validateOntologyGraph(objects, links, registry) {
         const checked = validateLinkRecord(unknownLink);
         const path = `/links/${index}`;
         if (!checked.valid) {
-            issues.push(...checked.issues.map(item => ({ ...item, path: `${path}${item.path}` })));
+            issues.push(...checked.issues.map((item) => ({ ...item, path: `${path}${item.path}` })));
             return;
         }
         const value = checked.value;
         if (linkIds.has(value.id))
             issue("duplicate-link-id", `${path}/id`, `Duplicate link ${value.id}.`);
         linkIds.add(value.id);
-        const type = registry.linkTypes.find(type => type.id === value.linkType && type.version === value.linkTypeVersion);
+        const type = registry.linkTypes.find((type) => type.id === value.linkType && type.version === value.linkTypeVersion);
         if (!type) {
             issue("unknown-link-type-version", `${path}/linkTypeVersion`, `No registered definition for ${value.linkType}@${value.linkTypeVersion}.`);
             return;
@@ -244,7 +313,9 @@ export function validateOntologyGraph(objects, links, registry) {
                 issue("dangling-reference", `${path}/${endpoint}`, `Missing ${endpoint} object ${value[endpoint]}.`);
             else if (target.objectType !== type[endpoint].objectType)
                 issue("endpoint-type", `${path}/${endpoint}`, `Expected ${type[endpoint].objectType}, found ${target.objectType}.`);
-            else if (value.scope === "project" && target.scope === "project" && value.projectId !== target.projectId)
+            else if (value.scope === "project" &&
+                target.scope === "project" &&
+                value.projectId !== target.projectId)
                 issue("cross-project-link", `${path}/${endpoint}`, "A project-scoped Link cannot reach another project's private object.");
             const countKey = `${value.linkType}@${value.linkTypeVersion}:${endpoint}:${value[endpoint]}`;
             const targets = counts.get(countKey) ?? new Set();
@@ -253,7 +324,7 @@ export function validateOntologyGraph(objects, links, registry) {
         }
     });
     for (const object of objectMap.values()) {
-        const type = registry.objectTypes.find(type => type.id === object.objectType && type.version === object.objectTypeVersion);
+        const type = registry.objectTypes.find((type) => type.id === object.objectType && type.version === object.objectTypeVersion);
         for (const property of type?.properties ?? []) {
             if (!property.reference)
                 continue;
@@ -268,7 +339,9 @@ export function validateOntologyGraph(objects, links, registry) {
                     issue("dangling-reference", path, `Missing referenced object ${String(id)}.`);
                 else if (target.objectType !== property.reference.objectType)
                     issue("reference-type", path, `Expected ${property.reference.objectType}, found ${target.objectType}.`);
-                else if (object.scope === "project" && target.scope === "project" && object.projectId !== target.projectId)
+                else if (object.scope === "project" &&
+                    target.scope === "project" &&
+                    object.projectId !== target.projectId)
                     issue("cross-project-reference", path, "Project-scoped references cannot reach another project's private object.");
             }
         }

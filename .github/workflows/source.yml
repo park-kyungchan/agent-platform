@@ -20,11 +20,78 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.3.14
       - name: Verify canonical source in finite owner QA tree
         run: bun ci/source-check.ts
+        env:
+          COMMON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  quality:
+    name: Quality and architecture checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      artifact-digest: ${{ steps.evidence.outputs.artifact-digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.3.14
+      - name: Install exact source quality dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Verify source quality and architecture contract
+        run: bun run check:quality
+        env:
+          QUALITY_REPORT_PATH: ${{ runner.temp }}/agent-platform-quality.json
+      - name: Preserve bounded source quality evidence
+        id: evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: source-quality-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/agent-platform-quality.json
+          if-no-files-found: error
+          retention-days: 14
+          include-hidden-files: false
+  merge-integration:
+    name: Prospective merge integration
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Default checkout retains this PR event's GitHub synthetic merge commit.
+      # Authored-head source/quality/native-review checks remain separate jobs.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.3.14
+      - name: Install exact prospective merge quality dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Verify prospective merge quality and architecture
+        run: bun run check:quality
+        env:
+          QUALITY_REPORT_PATH: ${{ runner.temp }}/agent-platform-merge-quality.json
+      - name: Preserve bounded prospective merge quality evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: merge-quality-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/agent-platform-merge-quality.json
+          if-no-files-found: error
+          retention-days: 14
+          include-hidden-files: false
+      - name: Verify prospective merge in finite owner QA tree
+        run: bun ci/source-check.ts
+        env:
+          COMMON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
   native-review:
     name: Exact head native independent review
     runs-on: ubuntu-latest
@@ -47,12 +114,24 @@ jobs:
   source-gate:
     name: Source and native review gate
     if: ${{ always() }}
-    needs: [source, native-review]
+    needs: [source, quality, merge-integration, native-review]
     runs-on: ubuntu-latest
     timeout-minutes: 1
     steps:
-      - name: Require both source checks and exact head native review
+      - name: Require source quality and exact head native review
         env:
           SOURCE_RESULT: ${{ needs.source.result }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          INTEGRATION_RESULT: ${{ needs.merge-integration.result }}
           REVIEW_RESULT: ${{ needs.native-review.result }}
-        run: test "$SOURCE_RESULT" = success && test "$REVIEW_RESULT" = success
+          QUALITY_ARTIFACT_DIGEST: ${{ needs.quality.outputs.artifact-digest }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          test "$SOURCE_RESULT" = success
+          test "$QUALITY_RESULT" = success
+          test "$REVIEW_RESULT" = success
+          test -n "$QUALITY_ARTIFACT_DIGEST"
+          case "$EVENT_NAME:$INTEGRATION_RESULT" in
+            pull_request:success|push:skipped|workflow_dispatch:skipped) ;;
+            *) exit 1 ;;
+          esac

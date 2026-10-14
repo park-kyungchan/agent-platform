@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U12",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "권장: 주제별 안정 ID — ‘Task 분해 원칙’ 같은 주제의 현재 결정·당시 질문과 답변·이유·변경 이력을 함께 조회",
+  "meaning": "The primary user-facing Memory ID is stable at topic level and retrieves current decisions, original questions/answers, rationale and revision history. Other hierarchy levels retain their own IDs.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-007.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

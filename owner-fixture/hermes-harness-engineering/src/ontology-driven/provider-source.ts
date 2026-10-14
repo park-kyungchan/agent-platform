@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 
 const codeOwnerRoot = resolve(import.meta.dir, "../..");
 const providerRoot = resolve(codeOwnerRoot, "../agent-platform");
-const expectedRegistrationSha256 = "c75726b1726583183a5dabd43a4f66ef1fb73e23d2060f6b80a3c3e8af7ec8a4";
+const expectedRegistrationSha256 = "d65bf7ad86a898aa7e5d524bab2798a39e65ec57ed3dfa768dcd93d016f3773d";
 const sha = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 export async function observeHermesContextProvider(sourceRoot: string) {
   if (sourceRoot !== codeOwnerRoot || await realpath(codeOwnerRoot) !== codeOwnerRoot || await realpath(providerRoot) !== providerRoot) throw Error("Hermes source provider requires the fixed code owner, not a data or native root");

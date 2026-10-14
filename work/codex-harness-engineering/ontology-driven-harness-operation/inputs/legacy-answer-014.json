@@ -1,0 +1,26 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "legacy-answer-014",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "owner:.private/daily-use-interview-20261012/answer-014.json#/text",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "권장대로",
+    "question": "WSL2·VPS 양쪽에서 합의한 검증 기준을 모두 통과하고 독립 검토까지 마쳤을 때, 이번 통합 Work의 최종 AcceptanceDecision은 누가 내릴까요?",
+    "sourceCapture": {
+      "ownerId": "codex-harness-engineering",
+      "path": ".private/daily-use-interview-20261012/answer-014.json",
+      "sha256": "0b60b3154787451a26e345935edaddceb49693d8652c38cda0df2076548e3c64",
+      "fragment": "#/text",
+      "recordClass": "ActualNativeUserAnswerContent",
+      "qualification": "Selected content copied from source-owned capture; not raw native transcript bytes or new authentication proof"
+    }
+  }
+}

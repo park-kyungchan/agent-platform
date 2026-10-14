@@ -1,26 +1,196 @@
-import {test,expect} from 'bun:test';
-import {createHash} from 'node:crypto';
-import {resolveContext} from '../../src/backend/intent-context/resolve.ts';
-import {parseCandidate,parseRequest} from '../../src/backend/intent-context/contract.ts';
-import {contextFixture} from './context-fixture.ts';
-const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
-function correction(){const f=contextFixture();const content='Synthetic new caller answer: refine the typed contract.';f.rows.push({...f.rows[0]!,id:2,content});f.candidate.sources.push({...f.candidate.sources[0]!,id:'new-source',messageId:2,contentSha256:hash(content)});f.candidate.decisions.push({...f.candidate.decisions[0]!,revision:2,statement:'Use the refined synthetic contract.',sourceIds:['new-source'],supersedes:[1]});return f;}
-test('R5 exact parent contradictory digest cannot counterfeit source novelty',()=>{
- const f=contextFixture(),old=f.candidate.sources[0]!;f.candidate.sources.push({...old,id:'replayed-source'});old.contentSha256='0'.repeat(64);f.candidate.decisions.push({...f.candidate.decisions[0]!,revision:2,statement:'Synthetic correction without a new answer.',sourceIds:['replayed-source'],supersedes:[1]});
- const r=resolveContext(f.candidate,f.request,f.rows);expect(r.status).toBe('REJECTED');expect(r.requestedSelectionComplete).toBe(false);expect(r.decisions).toEqual([]);expect(()=>parseCandidate(f.candidate)).toThrow();
+import { test, expect } from "bun:test";
+import { createHash } from "node:crypto";
+import { resolveContext } from "../../src/backend/intent-context/resolve.ts";
+import { parseCandidate, parseRequest } from "../../src/backend/intent-context/contract.ts";
+import { contextFixture } from "./context-fixture.ts";
+const hash = (s: string) => createHash("sha256").update(s).digest("hex");
+function correction() {
+  const f = contextFixture();
+  const content = "Synthetic new caller answer: refine the typed contract.";
+  f.rows.push({ ...f.rows[0]!, id: 2, content });
+  f.candidate.sources.push({
+    ...f.candidate.sources[0]!,
+    id: "new-source",
+    messageId: 2,
+    contentSha256: hash(content),
+  });
+  f.candidate.decisions.push({
+    ...f.candidate.decisions[0]!,
+    revision: 2,
+    statement: "Use the refined synthetic contract.",
+    sourceIds: ["new-source"],
+    supersedes: [1],
+  });
+  return f;
+}
+test("R5 exact parent contradictory digest cannot counterfeit source novelty", () => {
+  const f = contextFixture(),
+    old = f.candidate.sources[0]!;
+  f.candidate.sources.push({ ...old, id: "replayed-source" });
+  old.contentSha256 = "0".repeat(64);
+  f.candidate.decisions.push({
+    ...f.candidate.decisions[0]!,
+    revision: 2,
+    statement: "Synthetic correction without a new answer.",
+    sourceIds: ["replayed-source"],
+    supersedes: [1],
+  });
+  const r = resolveContext(f.candidate, f.request, f.rows);
+  expect(r.status).toBe("REJECTED");
+  expect(r.requestedSelectionComplete).toBe(false);
+  expect(r.decisions).toEqual([]);
+  expect(() => parseCandidate(f.candidate)).toThrow();
 });
-test('R5 consistent alias remains allowed but same-anchor supersession rejects',()=>{
- const f=contextFixture();f.candidate.sources.push({...f.candidate.sources[0]!,id:'alias'});expect(()=>parseCandidate(f.candidate)).not.toThrow();f.candidate.decisions.push({...f.candidate.decisions[0]!,revision:2,sourceIds:['alias'],supersedes:[1]});expect(resolveContext(f.candidate,f.request,f.rows).status).toBe('REJECTED');
+test("R5 consistent alias remains allowed but same-anchor supersession rejects", () => {
+  const f = contextFixture();
+  f.candidate.sources.push({ ...f.candidate.sources[0]!, id: "alias" });
+  expect(() => parseCandidate(f.candidate)).not.toThrow();
+  f.candidate.decisions.push({
+    ...f.candidate.decisions[0]!,
+    revision: 2,
+    sourceIds: ["alias"],
+    supersedes: [1],
+  });
+  expect(resolveContext(f.candidate, f.request, f.rows).status).toBe("REJECTED");
 });
-test('R5 genuinely new message with valid bytes supersedes',()=>{const f=correction(),r=resolveContext(f.candidate,f.request,f.rows);expect(r.status).toBe('RESOLVED');expect(r.decisions.map(d=>d.revision)).toEqual([2]);expect(r.requestedSelectionComplete).toBe(true);});
-test('R5 copied direct-message content remains conservative replay',()=>{const f=correction();f.rows[1]!.content=f.rows[0]!.content;f.candidate.sources[1]!.contentSha256=f.candidate.sources[0]!.contentSha256;expect(resolveContext(f.candidate,f.request,f.rows).status).toBe('REJECTED');});
-for(const mode of ['missing','changed','role'])test(`R5 predecessor evidence ${mode} cannot authorize supersession`,()=>{
- const f=correction();if(mode==='missing')f.rows.shift();else if(mode==='changed')f.rows[0]!.content+=' altered';else f.rows[0]!.role='assistant';const r=resolveContext(f.candidate,f.request,f.rows);expect(r.status).toBe('NEEDS_EVIDENCE');expect(r.requestedSelectionComplete).toBe(false);expect(r.decisions).toEqual([]);expect(r.gaps.some(g=>g.subject==='synthetic-source')).toBe(true);
+test("R5 genuinely new message with valid bytes supersedes", () => {
+  const f = correction(),
+    r = resolveContext(f.candidate, f.request, f.rows);
+  expect(r.status).toBe("RESOLVED");
+  expect(r.decisions.map((d) => d.revision)).toEqual([2]);
+  expect(r.requestedSelectionComplete).toBe(true);
 });
-test('R5 fabricated predecessor hash in a distinct row is still verified',()=>{const f=correction();f.candidate.sources[0]!.contentSha256='0'.repeat(64);const r=resolveContext(f.candidate,f.request,f.rows);expect(r.status).toBe('NEEDS_EVIDENCE');expect(r.decisions).toEqual([]);});
-test('R5 transitive predecessor gap remains visible',()=>{const f=correction();const content='Synthetic third answer';f.rows.push({...f.rows[0]!,id:3,content});f.candidate.sources.push({...f.candidate.sources[0]!,id:'third',messageId:3,contentSha256:hash(content)});f.candidate.decisions.push({...f.candidate.decisions[0]!,revision:3,sourceIds:['third'],supersedes:[2]});f.rows.shift();const r=resolveContext(f.candidate,f.request,f.rows);expect(r.status).toBe('NEEDS_EVIDENCE');expect(r.decisions).toEqual([]);});
-test('R5 unselected topic evidence gaps remain selective',()=>{const f=correction();f.candidate.sources.push({...f.candidate.sources[0]!,id:'unselected',messageId:99});f.candidate.decisions.push({...f.candidate.decisions[0]!,id:'other',topic:'unrequested',sourceIds:['unselected']});const r=resolveContext(f.candidate,f.request,f.rows);expect(r.status).toBe('RESOLVED');expect(r.sources.some(s=>s.id==='unselected')).toBe(false);});
-test('R5 available unrelated selected direction survives another lineage gap',()=>{const f=correction();f.candidate.decisions.push({...f.candidate.decisions[1]!,id:'independent',revision:1,supersedes:[]});f.rows.shift();const r=resolveContext(f.candidate,f.request,f.rows);expect(r.status).toBe('NEEDS_EVIDENCE');expect(r.decisions.map(d=>d.id)).toEqual(['independent']);});
-test('R5 clarification copies cannot contradict the same occurrence',()=>{const f=contextFixture();const content=JSON.stringify({responses:[{question:'Synthetic?',user_response:'Yes'}]});f.rows[0]={...f.rows[0]!,role:'tool',tool_name:'clarify',tool_call_id:'synthetic-call',content} as any;const s:any={...f.candidate.sources[0],kind:'clarification',toolCallId:'synthetic-call',responseIndex:0,contentSha256:hash(content)};f.candidate.sources=[s,{...s,id:'alias',messageId:2,contentSha256:'0'.repeat(64)}];expect(resolveContext(f.candidate,f.request,f.rows).status).toBe('REJECTED');});
-test('R5 plain request and JSON-compatible inputs preserve selection',()=>{const f=contextFixture();expect(parseRequest(f.request).topics).toEqual(['example-topic']);expect(resolveContext(JSON.parse(JSON.stringify(f.candidate)),f.request,f.rows).status).toBe('RESOLVED');});
-for(const mode of ['own-getter','inherited-getter','iterator','decoration'])test(`R5 bounded topics ${mode} rejects before caller code`,()=>{const f=contextFixture();let reads=0;const topics:any=['placeholder'];if(mode==='own-getter')Object.defineProperty(topics,'0',{get(){reads++;topics.push(...Array.from({length:32},(_,i)=>'topic-'+i));return 'example-topic';}});else if(mode==='inherited-getter'){delete topics[0];const p=Object.create(Array.prototype);Object.defineProperty(p,'0',{get(){reads++;return 'example-topic';}});Object.setPrototypeOf(topics,p);}else if(mode==='iterator')Object.defineProperty(topics,Symbol.iterator,{get(){reads++;throw Error('caller iterator');}});else topics.extra='decoration';f.request.topics=topics;expect(()=>parseRequest(f.request)).toThrow();expect(reads).toBe(0);});
+test("R5 copied direct-message content remains conservative replay", () => {
+  const f = correction();
+  f.rows[1]!.content = f.rows[0]!.content;
+  f.candidate.sources[1]!.contentSha256 = f.candidate.sources[0]!.contentSha256;
+  expect(resolveContext(f.candidate, f.request, f.rows).status).toBe("REJECTED");
+});
+for (const mode of ["missing", "changed", "role"])
+  test(`R5 predecessor evidence ${mode} cannot authorize supersession`, () => {
+    const f = correction();
+    if (mode === "missing") f.rows.shift();
+    else if (mode === "changed") f.rows[0]!.content += " altered";
+    else f.rows[0]!.role = "assistant";
+    const r = resolveContext(f.candidate, f.request, f.rows);
+    expect(r.status).toBe("NEEDS_EVIDENCE");
+    expect(r.requestedSelectionComplete).toBe(false);
+    expect(r.decisions).toEqual([]);
+    expect(r.gaps.some((g) => g.subject === "synthetic-source")).toBe(true);
+  });
+test("R5 fabricated predecessor hash in a distinct row is still verified", () => {
+  const f = correction();
+  f.candidate.sources[0]!.contentSha256 = "0".repeat(64);
+  const r = resolveContext(f.candidate, f.request, f.rows);
+  expect(r.status).toBe("NEEDS_EVIDENCE");
+  expect(r.decisions).toEqual([]);
+});
+test("R5 transitive predecessor gap remains visible", () => {
+  const f = correction();
+  const content = "Synthetic third answer";
+  f.rows.push({ ...f.rows[0]!, id: 3, content });
+  f.candidate.sources.push({
+    ...f.candidate.sources[0]!,
+    id: "third",
+    messageId: 3,
+    contentSha256: hash(content),
+  });
+  f.candidate.decisions.push({
+    ...f.candidate.decisions[0]!,
+    revision: 3,
+    sourceIds: ["third"],
+    supersedes: [2],
+  });
+  f.rows.shift();
+  const r = resolveContext(f.candidate, f.request, f.rows);
+  expect(r.status).toBe("NEEDS_EVIDENCE");
+  expect(r.decisions).toEqual([]);
+});
+test("R5 unselected topic evidence gaps remain selective", () => {
+  const f = correction();
+  f.candidate.sources.push({ ...f.candidate.sources[0]!, id: "unselected", messageId: 99 });
+  f.candidate.decisions.push({
+    ...f.candidate.decisions[0]!,
+    id: "other",
+    topic: "unrequested",
+    sourceIds: ["unselected"],
+  });
+  const r = resolveContext(f.candidate, f.request, f.rows);
+  expect(r.status).toBe("RESOLVED");
+  expect(r.sources.some((s) => s.id === "unselected")).toBe(false);
+});
+test("R5 available unrelated selected direction survives another lineage gap", () => {
+  const f = correction();
+  f.candidate.decisions.push({
+    ...f.candidate.decisions[1]!,
+    id: "independent",
+    revision: 1,
+    supersedes: [],
+  });
+  f.rows.shift();
+  const r = resolveContext(f.candidate, f.request, f.rows);
+  expect(r.status).toBe("NEEDS_EVIDENCE");
+  expect(r.decisions.map((d) => d.id)).toEqual(["independent"]);
+});
+test("R5 clarification copies cannot contradict the same occurrence", () => {
+  const f = contextFixture();
+  const content = JSON.stringify({ responses: [{ question: "Synthetic?", user_response: "Yes" }] });
+  f.rows[0] = {
+    ...f.rows[0]!,
+    role: "tool",
+    tool_name: "clarify",
+    tool_call_id: "synthetic-call",
+    content,
+  } as any;
+  const s: any = {
+    ...f.candidate.sources[0],
+    kind: "clarification",
+    toolCallId: "synthetic-call",
+    responseIndex: 0,
+    contentSha256: hash(content),
+  };
+  f.candidate.sources = [s, { ...s, id: "alias", messageId: 2, contentSha256: "0".repeat(64) }];
+  expect(resolveContext(f.candidate, f.request, f.rows).status).toBe("REJECTED");
+});
+test("R5 plain request and JSON-compatible inputs preserve selection", () => {
+  const f = contextFixture();
+  expect(parseRequest(f.request).topics).toEqual(["example-topic"]);
+  expect(resolveContext(JSON.parse(JSON.stringify(f.candidate)), f.request, f.rows).status).toBe(
+    "RESOLVED",
+  );
+});
+for (const mode of ["own-getter", "inherited-getter", "iterator", "decoration"])
+  test(`R5 bounded topics ${mode} rejects before caller code`, () => {
+    const f = contextFixture();
+    let reads = 0;
+    const topics: any = ["placeholder"];
+    if (mode === "own-getter")
+      Object.defineProperty(topics, "0", {
+        get() {
+          reads++;
+          topics.push(...Array.from({ length: 32 }, (_, i) => "topic-" + i));
+          return "example-topic";
+        },
+      });
+    else if (mode === "inherited-getter") {
+      delete topics[0];
+      const p = Object.create(Array.prototype);
+      Object.defineProperty(p, "0", {
+        get() {
+          reads++;
+          return "example-topic";
+        },
+      });
+      Object.setPrototypeOf(topics, p);
+    } else if (mode === "iterator")
+      Object.defineProperty(topics, Symbol.iterator, {
+        get() {
+          reads++;
+          throw Error("caller iterator");
+        },
+      });
+    else topics.extra = "decoration";
+    f.request.topics = topics;
+    expect(() => parseRequest(f.request)).toThrow();
+    expect(reads).toBe(0);
+  });

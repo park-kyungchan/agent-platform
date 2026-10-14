@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "single-work-branch-recording-no-separate-decision-lane-20261014",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "어차피 새로운 실제 user decision도 WSL2/VPS 어디든지 pull해서, 당시 main 최신으로부터 특정 worktree에서 하나의 Work로서 진행하는 것 아닌가? 왜 현재 세션에 내린 지시를 즉시 적용을해? 복잡도가 너무 심하잖아.",
+  "meaning": "Reject the additional decision-publication lane and excessive current-session/shared-state distinctions. Handle new actual user decisions as changes within the same Work based on latest main in its selected worktree.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-5.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "새로운 실제 user decision이 아직 main에 반영되지 않았을 때, 다른 WSL2/VPS가 같은 Work를 이어가는 기준은 어떻게 할까요? 현재 세션에 내린 지시는 즉시 적용하며, 이 질문은 다른 환경으로 공유하는 기준입니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-5.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

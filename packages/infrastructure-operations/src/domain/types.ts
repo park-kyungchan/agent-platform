@@ -124,7 +124,12 @@ export interface RuntimeObservation {
     nativeOwnerPid?: number | null;
     profileOn: boolean;
     profiles?: GatewayProfileServing[];
-    status: { gateway_state?: string; desired_state?: string; answering_pid?: number; answered_at?: number };
+    status: {
+      gateway_state?: string;
+      desired_state?: string;
+      answering_pid?: number;
+      answered_at?: number;
+    };
     adapters: {
       name: string;
       state?: string;
@@ -137,7 +142,12 @@ export interface RuntimeObservation {
     }[];
     /** Sanitized errors from active configured adapters only. */
     adapterErrors?: SanitizedAdapterError[];
-    http?: { code: number; gateway_running?: boolean; gateway_state?: string | null; gateway_mode?: string };
+    http?: {
+      code: number;
+      gateway_running?: boolean;
+      gateway_state?: string | null;
+      gateway_mode?: string;
+    };
     error?: string;
   };
 }
@@ -278,8 +288,10 @@ export interface DomainProperties {
   OperationRequest: OperationRequestProperties;
 }
 export type DomainObjectType = keyof DomainProperties;
-export type DomainObjectRecord<K extends DomainObjectType = DomainObjectType> =
-  Omit<ObjectRecord, "objectType" | "properties"> & {
-    objectType: `infrastructure:${K}`;
-    properties: DomainProperties[K] & JsonObject;
-  };
+export type DomainObjectRecord<K extends DomainObjectType = DomainObjectType> = Omit<
+  ObjectRecord,
+  "objectType" | "properties"
+> & {
+  objectType: `infrastructure:${K}`;
+  properties: DomainProperties[K] & JsonObject;
+};

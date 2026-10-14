@@ -1,0 +1,18 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "plan-contains-GHA-29",
+  "kind": "relation",
+  "relation": "contains",
+  "from": {
+    "kind": "plan",
+    "id": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "revision": 5
+  },
+  "to": {
+    "kind": "task",
+    "id": "GHA-29"
+  }
+}

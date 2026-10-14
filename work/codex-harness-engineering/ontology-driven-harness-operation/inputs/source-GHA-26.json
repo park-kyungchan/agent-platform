@@ -1,0 +1,85 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "source-GHA-26",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "owner:work/ontology-driven-harness-operation/common-implementation-20261014/final-plan-review-v2.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "codex.common-harness-final-plan-review-successor.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-harness-operation",
+      "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+      "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+      "specRevision": 5,
+      "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+      "planRevision": 5,
+      "taskId": "GHA-26"
+    },
+    "observedAt": "2026-10-14T13:22:02.429144+00:00",
+    "reviewClass": "Independent bounded targeted Plan correction closure",
+    "verdict": "pass",
+    "implementationMayStart": true,
+    "adoptedPlan": {
+      "path": "/home/palantirkc/code/shared/codex-harness-engineering/work/ontology-driven-harness-operation/common-implementation-20261014/final-plan-v2.json",
+      "sha256": "baf628973ecf3c402533d3d4afdffe5bddc5cc5ca7ea576f940c0aa2aa53fc5c",
+      "bytes": 12508
+    },
+    "priorPlan": {
+      "path": "/home/palantirkc/code/shared/codex-harness-engineering/work/ontology-driven-harness-operation/common-implementation-20261014/final-plan.json",
+      "sha256": "54e7995e6986a13910bb85b2b4a3a182e6aa201425e3d699c7f663ff0ec6aeb7",
+      "bytes": 11360
+    },
+    "priorReview": {
+      "path": "/home/palantirkc/code/shared/codex-harness-engineering/work/ontology-driven-harness-operation/common-implementation-20261014/final-plan-review.json",
+      "sha256": "a625e26a4f55c8ca17b481da3b621b4ded15b2138137abde77c7d362b86d858d",
+      "bytes": 15187
+    },
+    "sourcePinsInheritedFromPriorReview": true,
+    "comparedSuccessorChangedPaths": [
+      "/ciAndPublication/beforePr",
+      "/predecessor",
+      "/recordClass",
+      "/reviewCorrections",
+      "/revision",
+      "/sourceBaseline/nativePackages",
+      "/sourceBaseline/qualityFoundation",
+      "/stageOrder",
+      "/status"
+    ],
+    "closedFindings": [
+      {
+        "id": "GHA-26-F1",
+        "result": "closed-at-plan-level",
+        "evidence": "sourceBaseline.nativePackages and reviewCorrections explicitly require restoring exact ffba native-task-controls Python/manifest blobs, two sourcePins, full six-entry nativePluginSources and exact-six CI validation after exact foundation import. No runtime-specific behavior or active mutation is admitted.",
+        "remainingImplementationCheck": "Final candidate must prove the promised exact plugin bytes/pins and source-only six-file validation."
+      },
+      {
+        "id": "GHA-26-C1",
+        "result": "closed-at-plan-level",
+        "evidence": "ciAndPublication.beforePr and stageOrder now commit/freeze before exact commit/tree independent review. Subsequent source changes require renewed review."
+      }
+    ],
+    "retainedConclusions": [
+      "No other material Plan blocker found within GHA-26 scope. Existing8common-API source pins matched when prior review sealed.",
+      "Exact PR2 import remains cherry-pick --no-commit with original commit/tree/diff provenance and no inherited PR2 review. Four PR2 findings remain to be fixed; zero current independent approvals are not rewritten as an approval.",
+      "All20changednativeTypeScriptfiles emitted identical JavaScript to main under the same Bun transformer; source-only evidence, not runtime/type qualification.",
+      "Implementation authorization covers common source/API/docs selector/records/CI/publication and explicit Lead merge only. Native WSL2/VPS improvements and activation remain later Lead duties.",
+      "No automatic merge, separate decision-only lane, runtime/config/session/trust effects, paid native suite or original both-runtime/User Acceptance is authorized or claimed."
+    ],
+    "limits": [
+      "This closes Plan corrections; it does not verify implementation or publish/merge anything.",
+      "Only original Plan vs successor diff and predecessor hash were rechecked. No repeated broad tests, network, refs/index or protected runtime effects.",
+      "Only allocated review artifacts were written."
+    ],
+    "acceptanceDecision": null
+  }
+}

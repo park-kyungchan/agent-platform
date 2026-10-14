@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U27",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "마지막 응답은 너의 권고대로",
+  "meaning": "When native work and its verification are finished but common audit transmission is still unsynchronized, Hermes Kanban may show execution complete while the common logical Task remains pending audit synchronization. Mark the common Task formally complete after shared audit delivery is confirmed. This separates native execution completion from common completion and does not relax U22 latest-Memory checks or U26 local durability.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-022.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "VPS worker가 작업과 검증을 마쳤지만 공통 감사 이력 전송만 미동기화인 경우, 완료 상태를 어떻게 표시할까요? 로컬 이력을 영속 저장하고 독립 작업을 계속할 수 있다는 결정은 유지합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-022.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

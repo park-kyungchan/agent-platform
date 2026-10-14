@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "common-first-direction",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-conversation:common-first-implementation-20261014",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "그럼 일단 공통 하네스부터 end to end로 계획에 대해 final review한 이후에, 실제 변경작업 진행하고 commit-push-PR-merge까지 진행해라. 그다음 각각의 하네스에 대해서는 WSL2/VPS의 각각의 Lead 세션에서, 공통하네스 작업 완료한 main 최신을 pull 해서 작업을 진행하겠다. 이해 안되면 유저인터뷰해라.",
+    "captureQualification": "Actual visible current native user message content; not raw transcript bytes",
+    "nativeMessageId": null
+  }
+}

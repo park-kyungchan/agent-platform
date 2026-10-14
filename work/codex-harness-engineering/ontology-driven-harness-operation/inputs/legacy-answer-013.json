@@ -1,0 +1,26 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "legacy-answer-013",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "owner:.private/daily-use-interview-20261012/answer-013.json#/text",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "권장: native가 지원하는 다음 안전한 취소 경계에서 중단 — 완료·불확실 효과를 확인한 뒤 새 결정으로 재계획하고 독립 작업은 계속",
+    "question": "Lead·worker가 이미 작업 중일 때 그 작업에 영향을 주는 새 결정이 확정되면, 현재 실행을 어떻게 처리할까요? 이미 완료됐거나 결과가 불확실한 변경은 별도로 확인합니다.",
+    "sourceCapture": {
+      "ownerId": "codex-harness-engineering",
+      "path": ".private/daily-use-interview-20261012/answer-013.json",
+      "sha256": "5dddde20aa67010c64ee41bf1ec5532c2e1222881905fcc326182be9cbd7d956",
+      "fragment": "#/text",
+      "recordClass": "ActualNativeUserAnswerContent",
+      "qualification": "Selected content copied from source-owned capture; not raw native transcript bytes or new authentication proof"
+    }
+  }
+}

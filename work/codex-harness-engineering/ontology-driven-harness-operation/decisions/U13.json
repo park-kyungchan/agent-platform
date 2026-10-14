@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U13",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "권장: 그 결정에 의존하는 실제 변경은 보류하고 최신 출처를 복구 — 조회와 독립적인 작업은 계속",
+  "meaning": "If the latest relevant decision is known but its source is unavailable, hold dependent effects, recover the latest source, and continue read-only or independent work. Historical retrieval remains allowed and labelled historical.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-008.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

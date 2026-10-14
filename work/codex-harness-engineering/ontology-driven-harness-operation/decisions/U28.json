@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U28",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "권고: 검증된 로컬 영수증으로 B 진행. 다른 Runtime에서는 그 영수증을 실제 수신·검증한 뒤 진행.",
+  "meaning": "Use verified locally durable prerequisite execution/verification receipts for downstream work; another runtime must receive and verify the receipt first. Latest Memory and shared-delivery completion/acceptance gates remain.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-user-answer-023.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "A Task는 실행·검증·로컬 영구 기록을 완료했지만 공통 audit 전송이 지연되어 정식 완료 대기 중입니다. A에 의존하는 B Task는 언제 시작하도록 할까요? 두 선택 모두 최신 Memory 확인이 필요하며, Work Acceptance는 공통 audit 반영까지 기다립니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-user-answer-023.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

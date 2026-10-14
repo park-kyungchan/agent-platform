@@ -1,8 +1,8 @@
 /** Pure governance contracts. Native Hermes retains dispatch, stores, retry and session ownership. */
 export interface ModelSelection {
-  model: 'gpt-6.1-sol-900k' | 'gpt-6-luna-900k';
-  provider: 'openai-codex';
-  effort: 'high' | 'xhigh';
+  model: "gpt-6.1-sol-900k" | "gpt-6-luna-900k";
+  provider: "openai-codex";
+  effort: "high" | "xhigh";
 }
 export interface LunaExecutionScope {
   destinationIds: string[];
@@ -22,7 +22,7 @@ export interface ActorBinding {
   profileId: string;
   sessionId: string;
   nativeRoot: string;
-  role: 'main' | 'lead' | 'worker';
+  role: "main" | "lead" | "worker";
   userControlled: boolean;
   model: string;
   provider: string;
@@ -36,13 +36,13 @@ export interface ProfileBinding {
   provider: string;
   effort: string;
   delegateTaskEnabled: false;
-  taskBackend: 'native-kanban';
+  taskBackend: "native-kanban";
 }
 export interface GovernancePolicy {
   workId: string;
   mainSessionId: string;
   mainActorId: string;
-  ownerProjectId: 'hermes-harness-engineering';
+  ownerProjectId: "hermes-harness-engineering";
 }
 /** Native field names are intentionally preserved for exact owner readback. */
 export interface NativeTaskRequirements {
@@ -50,15 +50,15 @@ export interface NativeTaskRequirements {
   work_id: string;
   actor_id: string;
   assignee: string;
-  model_override: ModelSelection['model'];
-  provider_override: ModelSelection['provider'];
-  reasoning_effort: ModelSelection['effort'];
+  model_override: ModelSelection["model"];
+  provider_override: ModelSelection["provider"];
+  reasoning_effort: ModelSelection["effort"];
   max_runtime_seconds: number;
   /** Native consecutive failure threshold: 1 blocks on the first failure. */
   max_retries: number;
   idempotency_key: string;
   completion_contract: string;
-  dispatch_backend: 'native-kanban';
+  dispatch_backend: "native-kanban";
 }
 export interface NativeSessionReceipt {
   session_id: string;
@@ -84,22 +84,25 @@ export interface NativeRunReceipt {
   source_ref: string;
 }
 export type EffectiveExecutionVerification =
-  | { status: 'unknown'; reasons: string[] }
-  | { status: 'verified'; runId: string; sessionId: string; sourceRefs: string[] };
+  | { status: "unknown"; reasons: string[] }
+  | { status: "verified"; runId: string; sessionId: string; sourceRefs: string[] };
 
 export function record(value: unknown, name: string): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${name}: object required`);
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error(`${name}: object required`);
   return value as Record<string, unknown>;
 }
 export function exact(value: Record<string, unknown>, keys: readonly string[], name: string): void {
-  const extras = Object.keys(value).filter(key => !keys.includes(key));
-  if (extras.length) throw new Error(`${name}: unrecognized fields: ${extras.join(', ')}`);
+  const extras = Object.keys(value).filter((key) => !keys.includes(key));
+  if (extras.length) throw new Error(`${name}: unrecognized fields: ${extras.join(", ")}`);
 }
 export function text(value: unknown, name: string): asserts value is string {
-  if (typeof value !== 'string' || !value.trim() || value.trim() !== value) throw new Error(`${name}: explicit nonblank string required`);
+  if (typeof value !== "string" || !value.trim() || value.trim() !== value)
+    throw new Error(`${name}: explicit nonblank string required`);
 }
 export function count(value: unknown, name: string, positive = false): asserts value is number {
-  if (!Number.isSafeInteger(value) || (value as number) < (positive ? 1 : 0)) throw new Error(`${name}: ${positive ? 'positive' : 'nonnegative'} safe integer required`);
+  if (!Number.isSafeInteger(value) || (value as number) < (positive ? 1 : 0))
+    throw new Error(`${name}: ${positive ? "positive" : "nonnegative"} safe integer required`);
 }
 export function same(left: unknown, right: unknown, name: string): void {
   if (left !== right) throw new Error(`${name}: binding mismatch`);
@@ -107,6 +110,7 @@ export function same(left: unknown, right: unknown, name: string): void {
 export function utc(value: unknown, name: string): number {
   text(value, name);
   const time = Date.parse(value);
-  if (!Number.isFinite(time) || new Date(time).toISOString() !== value) throw new Error(`${name}: canonical UTC timestamp required`);
+  if (!Number.isFinite(time) || new Date(time).toISOString() !== value)
+    throw new Error(`${name}: canonical UTC timestamp required`);
   return time;
 }

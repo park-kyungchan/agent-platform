@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "single-repository-common-runtime-harness-20261014",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "권장대로 진행",
+  "meaning": "Consolidate our common, Codex-specific and Hermes-specific Harness source and related Work records into modules of one GitHub repository. Preserve logical Project/Runtime ownership, native Codex/Hermes engines, other independent projects, native stores and original evidence owners.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-7.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": [],
+  "selectionContext": {
+    "text": "One GitHub repository containing our common/WSL2/VPS harness source and related Work records in typed modules",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/topology-question-context.json",
+      "fragment": "#/content/recommended"
+    }
+  }
+}

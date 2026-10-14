@@ -1,0 +1,20 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "git-answer-6",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-conversation:git-harness-adversarial-20261014/answer-6",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "독립적으로 검토·완료할 수 있는 Task는 별도 branch/worktree/PR을 허용하고, 작은 종속 변경은 묶는다. Lead가 각 PR을 검토하고 명시적으로 merge한다. (권장)",
+    "question": "같은 repository의 같은 Work에서, 독립적으로 검토할 수 있는 변경의 PR 단위를 어떻게 할까요?",
+    "captureQualification": "Actual visible user reply content; reconciled with accepted v6 records; not raw native transcript bytes",
+    "questionItemId": "[\"request_user_input_async\",\"call_56fe63a44dbd4a8d95191bd9351717c6\",1]"
+  }
+}
