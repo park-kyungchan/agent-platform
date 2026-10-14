@@ -1,0 +1,166 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "7954d23b3dc17a9996d09936c334a5461aadf950",
+  "reviewedTreeSha": "7f2593d01a89c0ae7dc93c4b0d6a3f5169455dfb",
+  "reviewedSourceManifestSha256": "edbb957c5a19717fcf053595b244b17a902a7d33764aa1eb54ba183c220c201d",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/topology_interview_preflight"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_program_context"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "resultAuthorship": {
+    "authoredBy": "/root/topology_interview_preflight",
+    "codeDeltaAuthor": "/root/integrated_program_context",
+    "scopePredecessorAuthor": "/root",
+    "qualification": "Actual native Task paths are source declarations, not UUIDs or cryptographic/provider-authenticated authorship."
+  },
+  "rawIndependentReviewSha256": "74c34937e9e7f324da294d172540715510731a0fc3e248901380d6d111dbf986",
+  "reviewDetail": {
+    "schemaVersion": "integrated-program.independent-exact-head-source-review/1",
+    "recordClass": "IndependentExactCommitReview",
+    "reviewKind": "independent-budget-fix-code-review",
+    "observedAtUtc": "2026-10-14T17:24:16.912Z",
+    "identity": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-harness-operation",
+      "taskId": "CODEX-HOME-CONTEXT-BUDGET-FIX",
+      "specRevision": 6,
+      "planRevision": 6,
+      "runId": null,
+      "registration": "local-record-only"
+    },
+    "repositoryId": "park-kyungchan/agent-platform",
+    "reviewedCommit": "7954d23b3dc17a9996d09936c334a5461aadf950",
+    "reviewedTreeSha": "7f2593d01a89c0ae7dc93c4b0d6a3f5169455dfb",
+    "comparisonBase": "989d728d5f15f8d1c890ffa56bdc662091ddbb6a",
+    "reviewer": {
+      "runtime": "native-codex",
+      "taskId": "/root/topology_interview_preflight"
+    },
+    "author": {
+      "runtime": "native-codex",
+      "taskId": "/root/integrated_program_context"
+    },
+    "codeAuthorship": {
+      "scopePredecessorAuthor": "/root",
+      "budgetDeltaAuthor": "/root/integrated_program_context",
+      "reviewerDidNotAuthorBudgetCode": true,
+      "identityKind": "actual-native-collaboration-task-path-source-declaration"
+    },
+    "conclusion": "pass",
+    "materialFindingCount": 0,
+    "materialFindings": [],
+    "blockingFindingCount": 0,
+    "nonBlockingObservations": [],
+    "method": [
+      "Read exact candidate two-file diff and complete production Home projection implementation.",
+      "Inspected strict source/owner/cwd/path validation, safe-profile projection, fixed authority boundaries, requested context clamp and sanitized repair error path.",
+      "Independently ran the focused exact-budget regression:1pass/0fail/24assertions underBun1.3.14.",
+      "Verified the candidate file digests against the implementation receipt and independently read current profile/hooks/config file hashes without exporting their contents.",
+      "Derived full recursive source tree manifest using the exact canonical shared helper and independently recomputed its digest."
+    ],
+    "semanticAssessment": {
+      "problem": "A later optional omission label could overflow the final serialized budget after earlier optional data had been accepted, replacing valid essential context with the repair notice.",
+      "fix": "Reserve all optional omission labels first. Remove one label only while considering its optional data; restore it at the same index when that data does not fit.",
+      "invariant": "Every optional admission considers all remaining omission metadata in the bounded rendering, so a later omission cannot unexpectedly grow the output over the cap.",
+      "preserved": [
+        "Fixed maximum6000 and existing requested-cap floor2000",
+        "Essential source owner/actualcwd/purpose/priorities/preferences/projectroute/source digests",
+        "Exact Home owner/cwd binding and no descendant admission",
+        "Source/profile size, path and symlink validation",
+        "Safe-profile allowlist and private-sentinel exclusion",
+        "Authority:none, nativePermissionGranted:false, no Home prompt capture",
+        "Generic repair notice without exception text or profile contents",
+        "Source-only candidate; native provider pins/config/trust/activation untouched"
+      ]
+    },
+    "changedFileManifest": [
+      {
+        "path": "packages/native-codex-adapter/src/native/home-context.test.ts",
+        "sha256": "1d68330701a135dcea99ab78d82e5dea7217c88f2276088bc67b4746ca20a5e7",
+        "byteLength": 6594,
+        "gitBlob": "4ef2b85830421c50d0c0f4c84fc46704e6b9cf62"
+      },
+      {
+        "path": "packages/native-codex-adapter/src/native/home-context.ts",
+        "sha256": "042bd9c3c69077321d0212e8693560c9d857a7a1febdd802cb5ece93dd1ad643",
+        "byteLength": 13119,
+        "gitBlob": "3e70ccd0beb726cbaa002f4e92310d7939849ef4"
+      }
+    ],
+    "independentValidation": {
+      "focusedTest": {
+        "command": "bun test packages/native-codex-adapter/src/native/home-context.test.ts",
+        "runtime": "Bun1.3.14",
+        "exitCode": 0,
+        "testsPassed": 1,
+        "testsFailed": 0,
+        "assertions": 24,
+        "nativeToolChunkId": "579bec"
+      },
+      "gitDiffCheck": "passed",
+      "currentNativeConfigHashReadback": [
+        {
+          "fileName": "profile.json",
+          "sha256": "99a14010e0cf0de96b36e8018e2aac7aa93042b4d9ca9983a1ee90d5da556426",
+          "matchesAuthorReportedCurrentHash": true
+        },
+        {
+          "fileName": "hooks.json",
+          "sha256": "669debeb19f30eb4015c2c60ff68d8a33ffc42f404b217b53007481c66f81f3e",
+          "matchesAuthorReportedCurrentHash": true
+        },
+        {
+          "fileName": "config.toml",
+          "sha256": "ccc0b306fc4ed144b0a6eb3d1808ad7f7e443f49658b9c51a6d2050036f68604",
+          "matchesAuthorReportedCurrentHash": true
+        }
+      ],
+      "priorRegressionFailure": "Author-reported expected failure on prior code; not independently rerun by this reviewer.",
+      "broaderSourceChecks": "Implementation receipt reports handoff39/imports/format/lint/full source checks passed. Reviewer independently reran only the focused regression."
+    },
+    "authorEvidence": {
+      "receiptSha256": "f89ec083f6b16278a723185ab5930f6ead28ec916125129fc57313af0e95ad06",
+      "declaredSourceOnly": true,
+      "nativeActivationClaimed": false,
+      "nativeConfigMutationClaimed": false,
+      "newNativeTurnInjectionClaimed": false
+    },
+    "limits": [
+      "This exact code candidate review is separate from scope989 review and does not approve another changed tree.",
+      "Current config hashes matching the author receipt do not independently prove a before/after interval or a native injection/activation event.",
+      "No fresh native hook invocation, trust/config mutation, VPS qualification, Academy behavior, model evaluation or Acceptance was performed.",
+      "Root retains provider/source-pin successor integration, private delivery, explicit native activation and final Acceptance ownership."
+    ],
+    "effects": {
+      "sourceEdits": 0,
+      "gitMutations": 0,
+      "networkCalls": 0,
+      "nativeConfigWrites": 0,
+      "nativeActivation": 0,
+      "modelRequests": 0,
+      "tests": "One deterministic synthetic regression; temporary owned fixture cleaned by the test."
+    },
+    "authority": "none",
+    "nativePermissionGranted": false,
+    "acceptanceDecision": null
+  },
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "entryCount": 526,
+    "blobCount": 413
+  },
+  "publishedProvenance": null
+}
