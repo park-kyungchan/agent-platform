@@ -1,0 +1,236 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "fe1df7d62f37480feffdd46f909f3397d2d6ea60",
+  "reviewedTreeSha": "ab3d906c27cc718ed387c3a47b39302d961b30c3",
+  "reviewedSourceManifestSha256": "0bb41c799786bfa49497b428b69c3a2eb1d9bb002639e6db816574a24c011132",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "GHA-30"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "GHA-22"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-14T15:08:09.919Z",
+  "reviewClass": "Fresh independent exact-source review after actual PR3 findings; not reuse of prior PASS",
+  "independence": {
+    "candidateSourceAuthoredOrEditedByReviewer": false,
+    "githubMutationByReviewer": false,
+    "runtimeActivationByReviewer": false
+  },
+  "reviewedSubject": {
+    "repository": "park-kyungchan/agent-platform",
+    "pullRequestNumber": 3,
+    "baseMainCommit": "ffba2462a08b9f8c83c6f87b1043403e5cb748d7",
+    "parentCommit": "00a190263cd23b966a7999017a2f8fe3b8ed6fd1",
+    "completeEntries": 506,
+    "completeBlobs": 393,
+    "workingTreeClean": true,
+    "fullManifestIndependentlyDerivedFromNativeGit": true,
+    "declaredEntriesExactlyMatched": true
+  },
+  "sourceReview": {
+    "scope": "Production source, typed records, current correction delta and meaningful regression fixtures were reviewed read-only.",
+    "correctionFiles": "Git-work records/source/types/context, semantic and provenance fixtures, source registry pin successors and allocated GHA-31 source-only Task.",
+    "priorReviewState": "Prior 434 PASS remains immutable historical evidence. Five later actual PR comments made it nonreusable until this changed tree received a fresh independent review.",
+    "retainedPriorCoverage": "Original F1-F9 closure, immutable Git addressing, Spec/Plan5+6 coexistence, Work-qualified verification targets, legacy compatibility, restored native plugin bytes, all8 immutable release archives, docs-only84route selector, four PR2 CI findings and observer removal remain covered by source inspection and the unchanged protected delta."
+  },
+  "independentChecks": [
+    {
+      "command": "Native Git exact HEAD, parent, tree, clean status and complete recursive manifest",
+      "status": "pass",
+      "headSha": "fe1df7d62f37480feffdd46f909f3397d2d6ea60",
+      "treeSha": "ab3d906c27cc718ed387c3a47b39302d961b30c3",
+      "manifestSha256": "0bb41c799786bfa49497b428b69c3a2eb1d9bb002639e6db816574a24c011132",
+      "entries": 506,
+      "blobs": 393
+    },
+    {
+      "command": "bun run check:git-work",
+      "status": "pass",
+      "tests": 85,
+      "assertions": 1699,
+      "detail": "Production/test bytes are unchanged between00a1902 and finalfe1df7d; the final correction changes only GHA-31 stable decision references, which was separately checked from the final commit."
+    },
+    {
+      "command": "bun run check:common-work",
+      "status": "pass",
+      "observedCommit": "fe1df7d62f37480feffdd46f909f3397d2d6ea60",
+      "records": 116,
+      "actualDecisions": 38,
+      "completedHistoricalEffects": 63,
+      "uncertainHistoricalEffects": 2,
+      "contextRecords": 23,
+      "contextSources": 32,
+      "runtimeDocumentationRoutes": 84,
+      "transitionValidated": true,
+      "comparisonBaseCommit": "00a190263cd23b966a7999017a2f8fe3b8ed6fd1"
+    },
+    {
+      "command": "bun test packages/work-continuity/src/git-work/provenance.test.ts",
+      "status": "pass",
+      "tests": 4,
+      "assertions": 49,
+      "detail": "Focused independent custody/sourceId readback before final freeze; included again in the85-test frozen-byte suite."
+    },
+    {
+      "command": "Synthetic read-only completed uncertainty milestone counterexample",
+      "status": "confirmed-fixed",
+      "detail": "Before fix both complete/unverified uncertainty-durable and intent-durable snapshots and their transition were accepted. New negative and durable-result positive cases both pass."
+    }
+  ],
+  "aggregateChecks": {
+    "sourceCommandsPassed": 21,
+    "passedTestInvocations": 461,
+    "qualityChecksPassed": 14,
+    "exactQualityCheckoutSha": "fe1df7d62f37480feffdd46f909f3397d2d6ea60",
+    "workingTreeHasChanges": false,
+    "sourceRegistrySha256": "214fa64e64dd1139cd028e0fd7f4f7802f9d92e1f2659025b9f49bfa6775e2cb",
+    "lockSha256": "20fb7d4a18d9bd98897295b66e248f8d339b8c3456bcf5d9b9189d50f39f1099",
+    "provenance": "Author executed the complete finite source/quality commands; reviewer inspected their sealed exact-head reports and independently reran focused source/semantic verification."
+  },
+  "githubFindingsClosure": [
+    {
+      "commentId": 4272244695,
+      "priority": "P1",
+      "subject": "Preserve full completed Task contract and operational milestones",
+      "status": "closed-in-reviewed-source",
+      "evidence": [
+        "Completed execution class, native occurrence and receipt binding, dependencies, decision/effect identity, title and Task artifact meaning/acceptance criteria cannot be reinterpreted.",
+        "Execution, passed verification, durable local result, confirmed shared delivery and formal milestones cannot regress; original proof refs remain while supplemental proof may be added.",
+        "An independently reproduced uncertainty-durable to intent-durable regression is rejected; uncertainty to durable result remains valid.",
+        "Native A may advance common audit/formal state while completed native B retains the unchanged original A/R0 execution and receiver receipt."
+      ],
+      "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244695"
+    },
+    {
+      "commentId": 4272244709,
+      "priority": "P2",
+      "subject": "Retain native source owner and locator declarations separately from Git proof",
+      "status": "closed-in-reviewed-source",
+      "evidence": [
+        "readSource preserves a deeply frozen complete declaredNativeSource beside the resolved Git receipt.",
+        "Context source identity distinguishes snapshot, native ownerA/locatorA and native ownerB/locatorB even when the Git blob is identical, while identical declarations reuse their sourceId.",
+        "Native authorship remains unverified and no native permission is granted."
+      ],
+      "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244709"
+    },
+    {
+      "commentId": 4272244722,
+      "priority": "P1",
+      "subject": "Require exact selected historical fence coverage",
+      "status": "closed-in-reviewed-source",
+      "evidence": [
+        "Completed and uncertain ID collections must each equal the selected source set.",
+        "Reordering is accepted; omitted completed IDs, omitted uncertain IDs and duplicates are rejected.",
+        "No earlier Git fence is required for this initial migration integrity check."
+      ],
+      "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244722"
+    },
+    {
+      "commentId": 4272244741,
+      "priority": "P1",
+      "subject": "Bind effects reciprocally to the owning native Task occurrence",
+      "status": "closed-in-reviewed-source",
+      "evidence": [
+        "Effect owner must be native-effect, list the Effect and match runtime/attempt/occurrence before its status enters replay sets.",
+        "Valid completed or uncertain partial effects of a running native Task remain supported.",
+        "Malformed effects do not poison an independent pending effect replay check."
+      ],
+      "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244741"
+    },
+    {
+      "commentId": 4272244752,
+      "priority": "P2",
+      "subject": "Validate original selection context class and scope",
+      "status": "closed-in-reviewed-source",
+      "evidence": [
+        "Question context must resolve to a valid input in the same Domain/Project/Work and match the selected source fragment.",
+        "A source-owner-record question capture remains valid; the actual user answer retains its separate actual-user-answer class.",
+        "Non-input and different Work, Project or Domain context sources are rejected."
+      ],
+      "url": "https://github.com/park-kyungchan/agent-platform/pull/3#discussion_r4272244752"
+    }
+  ],
+  "externalReviewObservation": {
+    "observedHead": "4344732c7938eba00b27a50d7d37a3d5518c2ca5",
+    "observedAtUtc": "2026-10-14 14:56:49 UTC",
+    "codeReviewCompleted": true,
+    "securityReviewCompleted": true,
+    "originalInlineFindings": 5,
+    "additionalSecurityFindingsObserved": 0,
+    "appliesToFreshHead": false,
+    "detail": "External GitHub security completion was observed for434 only. No external security review of finalfe1 is asserted. The five original reports remain historical; this reviewer verified their technical source closure on finalfe1. GitHub thread resolution/current merge eligibility must be read back by the accountable Lead before merge."
+  },
+  "evidencePins": [
+    {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/review-subject-v4.json",
+      "sha256": "2efe9d017962fd5e3760e253242a2b5d74b68083f103e88515eebd736d988067",
+      "byteLength": 97770
+    },
+    {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/verification-summary-v4.json",
+      "sha256": "4699778bbaa0fc6a2efbb949cb3feae87d516b0f9c26b76cc582923567575c83",
+      "byteLength": 1961
+    },
+    {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/verification-source-v4.json",
+      "sha256": "8d412fc89222c1fb0b3c4392551492f959d3a19b22bd70319379d0138f651f0c",
+      "byteLength": 23058
+    },
+    {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/verification-quality-v4.json",
+      "sha256": "64a53264a93b84d100ad69473b72f81801f06e0ae755908190dbb8dc291323a6",
+      "byteLength": 171709
+    },
+    {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/github-pr-3-review-observation-v2.json",
+      "sha256": "bbdfc480da3b2cee2bc7332f9f9c7cc2c4a21a843585f5e338b78fc3939f4629",
+      "byteLength": 9490
+    },
+    {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/verification-rejection-v3.json",
+      "sha256": "409cb42bd0f13b176454e809048f7f932df4f046fa29d9baa8b063fcc74c233a",
+      "byteLength": 851
+    },
+    {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/review-result.json",
+      "sha256": "679ab539de4709d9fe3e99f69429c982dc97ceb0db396aa7e2f9a948a724a080",
+      "byteLength": 11550
+    }
+  ],
+  "predecessorHandling": {
+    "originalReviewResultPreserved": true,
+    "originalPublishedHead": "4344732c7938eba00b27a50d7d37a3d5518c2ca5",
+    "rejectedCorrectionHead": "00a190263cd23b966a7999017a2f8fe3b8ed6fd1",
+    "rejection": "Full source checks correctly rejected GHA-31 decisionIds containing ordinalU38 instead of an actual stable record ID.",
+    "finalCorrection": "Only GHA-31 decision IDs changed to actual autonomous-common-goal-20261014; final source and semantic transition validation passed.",
+    "earlierPassReused": false
+  },
+  "limitations": [
+    "This is an independent source/CI-quality result for the exact new commit/tree/manifest. It does not assert current remote PR head, hosted GitHub checks, resolved thread state, merge or main publication.",
+    "Native fixture IDs and receipts are synthetic test data. They prove typed joins and monotonicity, not actual deployed native execution, custody authentication or receiver delivery.",
+    "Runtime-specific WSL2/VPS changes, native activation, original/evidence store relocation, paid/native model suites and original whole-Work Acceptance remain excluded.",
+    "Pulling the eventual merged main does not automatically activate any native runtime configuration.",
+    "A changed tree needs renewed review. A same-tree successor commit still requires explicit independent binding and a current zero-unresolved-finding observation."
+  ],
+  "runtimeActivationEstablished": false,
+  "wholeWorkAcceptanceEstablished": false,
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null
+}
