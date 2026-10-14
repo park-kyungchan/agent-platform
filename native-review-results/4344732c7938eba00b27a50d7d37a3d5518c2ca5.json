@@ -1,0 +1,231 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "4344732c7938eba00b27a50d7d37a3d5518c2ca5",
+  "reviewedTreeSha": "f18a8d1da7e12d0ffbe6ef744c86e546dcc2900e",
+  "reviewedSourceManifestSha256": "093d9da886524b97f9eda496208965dc73d48b99e33229fcf017d22c7e59f379",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "GHA-30"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "GHA-22"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-14T14:28:02.825Z",
+  "reviewClass": "Independent exact-commit and complete-tree common Harness source review",
+  "independence": {
+    "candidateSourceAuthoredByReviewer": false,
+    "candidateSourceEditedByReviewer": false,
+    "githubEffectsByReviewer": false,
+    "nativeActivationByReviewer": false
+  },
+  "reviewedSubject": {
+    "repository": "park-kyungchan/agent-platform",
+    "baseCommit": "ffba2462a08b9f8c83c6f87b1043403e5cb748d7",
+    "completeEntries": 504,
+    "completeBlobs": 391,
+    "workingTreeClean": true,
+    "manifestIndependentlyDerivedFromNativeGit": true,
+    "declarationEntriesSemanticallyEqual": true,
+    "subjectReceipt": {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/review-subject-v2.json",
+      "sha256": "6b6c4c9732b800d0252d7470931dc5c43205bfd2a9709785be870fbd72bdcba9"
+    }
+  },
+  "independentChecks": [
+    {
+      "command": "Native Git HEAD, parent, tree, clean status and complete recursive tree manifest",
+      "result": "pass",
+      "headSha": "4344732c7938eba00b27a50d7d37a3d5518c2ca5",
+      "treeSha": "f18a8d1da7e12d0ffbe6ef744c86e546dcc2900e",
+      "manifestSha256": "093d9da886524b97f9eda496208965dc73d48b99e33229fcf017d22c7e59f379"
+    },
+    {
+      "command": "bun run check:git-work",
+      "result": "pass",
+      "tests": 50,
+      "assertions": 1568,
+      "scope": "Disposable Git semantic integration and docs-only selector; exact frozen candidate"
+    },
+    {
+      "command": "bun run check:common-work",
+      "result": "pass",
+      "records": 115,
+      "actualDecisions": 38,
+      "completedHistoricalEffects": 63,
+      "uncertainHistoricalEffects": 2,
+      "contextRecords": 23,
+      "contextSources": 32,
+      "runtimeDocumentationRoutes": 84,
+      "scope": "Actual committed Work; source-only"
+    },
+    {
+      "command": "Actual GHA-22 context at the public default budget",
+      "result": "pass",
+      "characters": 15892,
+      "purposeVisible": true,
+      "acceptedDecisionMeaningVisible": true,
+      "selectedTaskVisible": true,
+      "sourceQualified": true
+    },
+    {
+      "command": "Imported existing package TypeScript comparison with ffba using Bun.Transpiler(loader=ts,minifyWhitespace=true)",
+      "result": "pass",
+      "comparedFiles": 97,
+      "emittedJavascriptIdenticalFiles": 96,
+      "reviewedRuntimeDelta": "Only handoff locked() cleanup differs; preserves action failure and lock-release failure together",
+      "scope": "Foundation package source, unchanged by the final Git-work correction delta"
+    },
+    {
+      "command": "bun run check:handoff",
+      "result": "pass",
+      "tests": 39,
+      "assertions": 223,
+      "scope": "Focused independent legacy compatibility check; code unchanged in successor"
+    },
+    {
+      "command": "Existing release and native-task-controls byte comparison with ffba",
+      "result": "pass",
+      "releaseArchivesUnchanged": 8,
+      "nativeTaskControlsPythonSha256": "373905be599bc79411ab35ce8b97f7932ed8cd3521eb53a5b527e1f5fc599dc7",
+      "nativeTaskControlsManifestSha256": "f190f796e3800741e5bb768b6220fc189cf81af3979f1c46b7295523832d05bc",
+      "scope": "Both plugin blobs and all existing archives identical; no successor delta in these paths"
+    }
+  ],
+  "currentAggregateEvidence": {
+    "sourceCommandsPassed": 21,
+    "passedTestInvocations": 426,
+    "qualityChecksPassed": 14,
+    "qualityActualCheckoutSha": "4344732c7938eba00b27a50d7d37a3d5518c2ca5",
+    "qualityWorkingTreeHasChanges": false,
+    "evidencePins": [
+      {
+        "ownerId": "codex-harness-engineering",
+        "path": "work/ontology-driven-harness-operation/common-implementation-20261014/verification-summary-v2.json",
+        "sha256": "0562f6a0f2e3d6936f3005d7aec51b2fbe65f8b81d98b025763b8fec41ee50b4",
+        "byteLength": 1958
+      },
+      {
+        "ownerId": "codex-harness-engineering",
+        "path": "work/ontology-driven-harness-operation/common-implementation-20261014/verification-source-v2.json",
+        "sha256": "8905349fd83e3f01598849b08dd07a7ec98c52a3efc82c2fc973b6719d083104",
+        "byteLength": 22294
+      },
+      {
+        "ownerId": "codex-harness-engineering",
+        "path": "work/ontology-driven-harness-operation/common-implementation-20261014/verification-quality-v2.json",
+        "sha256": "dd26caa54da47f97dd92781abd7108008e38bbdfe4de20a22b187977a3165029",
+        "byteLength": 171004
+      }
+    ],
+    "limitation": "Aggregate commands were executed by the accountable author; reviewer independently inspected the sealed exact-head reports and reran focused semantic/common-source checks."
+  },
+  "findingsClosure": [
+    {
+      "id": "GHA-30-F1",
+      "status": "closed",
+      "finding": "Mutable selections or read addresses could change snapshot identity during awaits",
+      "correction": "Clone/freeze selected inputs and capture per-read references before asynchronous object reads."
+    },
+    {
+      "id": "GHA-30-F2",
+      "status": "closed",
+      "finding": "Passed verification accepted failed, foreign or incorrectly scoped targets",
+      "correction": "Require scoped passed Ontology Verification joins; preserve native-owner Task artifact identity and use a deterministic full-Work-qualified target for artifact-free Tasks; same-project wrong-Work case rejected."
+    },
+    {
+      "id": "GHA-30-F3",
+      "status": "closed",
+      "finding": "Task graph insertion overwrote relation dependency edges",
+      "correction": "Combine declared edges independent of record listing order; cycle counterexamples rejected."
+    },
+    {
+      "id": "GHA-30-F4",
+      "status": "closed",
+      "finding": "Git replacement refs changed content under an unchanged reported commit",
+      "correction": "Disable replacement objects for native Git object/ref reads; commit/blob replacement fixtures cannot alter selected bytes."
+    },
+    {
+      "id": "GHA-30-F5",
+      "status": "closed",
+      "finding": "Real required Work context exceeded the maximum and became empty",
+      "correction": "Return verified compact semantic projections with original-source bindings and relevant effect summaries; the real default context is useful within 24000 characters."
+    },
+    {
+      "id": "GHA-30-F6",
+      "status": "closed",
+      "finding": "Source-only dependencies required fabricated native occurrences",
+      "correction": "Explicit source-only/native-effect classes; source-only dependencies use verified committed source, while native-effect dependencies retain occurrence and receiver joins."
+    },
+    {
+      "id": "GHA-30-F7",
+      "status": "closed",
+      "finding": "A Task relation could contradict milestone-bearing Task dependencies",
+      "correction": "Task-to-Task dependency relations must match the Task dependency authority."
+    },
+    {
+      "id": "GHA-30-F8",
+      "status": "closed",
+      "finding": "External subdirectory mappings made repository-relative receipts incorrect",
+      "correction": "Admitted mapped repositories must resolve to the exact Git top-level."
+    },
+    {
+      "id": "GHA-30-F9",
+      "status": "closed",
+      "finding": "Same-ID Spec/Plan revision advancement invalidated every historical Task pin",
+      "correction": "Version-qualified Spec/Plan records and references coexist; immutable prior contracts and completed Task logical identities are retained. Tests preserve eleven Task5 records while activating contract6."
+    },
+    {
+      "id": "GHA-30-C1",
+      "status": "closed",
+      "finding": "JSON object member order caused false prerequisite identity/state mismatches",
+      "correction": "Compare explicit semantic fields rather than JSON serialization order."
+    },
+    {
+      "id": "GHA-30-C2",
+      "status": "closed-before-final-freeze",
+      "finding": "A fixed cardinality gate would block ordinary appended decisions or fences",
+      "correction": "The verifier already allows baseline-preserving additions; actual decision38 was appended without editing verifier code."
+    },
+    {
+      "id": "PR2-existing-findings",
+      "status": "closed-in-reviewed-successor",
+      "finding": "Prospective merge quality, compatibility scope, generated build mutation and Markdown secret denominator",
+      "correction": "Both head and merge quality run; compatibility is forwarding-only and governed; Ontology build is isolated and compared without repair; maintained tracked Markdown is scanned."
+    }
+  ],
+  "rejectedPredecessor": {
+    "headSha": "bd6ee8fd9274528bf800951788ede2d97a28b2cb",
+    "reviewedTreeSha": "e54cb1813d5d10d29f24287c2911b9f415c9014c",
+    "conclusion": "not-approved",
+    "reason": "Independent F9 counterexample rejected active contract5-to6 advancement while retaining eleven historical Task5 identities. Successor was separately checked; no predecessor PASS or old review was reused."
+  },
+  "reviewedBoundaries": [
+    "Git objects own source history and concurrency; logical Domain-through-Task identities and semantic Spec/Plan revisions remain distinct.",
+    "Actual answers, interpretations, observations, verification, native execution, delivery, formal completion and Acceptance remain distinct.",
+    "The shared Runtime Index selects bounded official documentation only; it grants no execution, authentication, billing or permission decision.",
+    "No automatic merge or review-arrival observer remains; exact-head independent review and accountable explicit Lead merge remain required.",
+    "Existing native engines, active configuration, sessions, hooks, trust, credentials and original/evidence stores retain their owners.",
+    "Legacy interfaces, native plugin source guards and immutable release archives are preserved."
+  ],
+  "limitations": [
+    "This conclusion verifies common source and CI quality for the exact commit/tree/complete manifest. It is not GitHub integration, deployed runtime behavior, native activation, consumer Acceptance or whole-Work Acceptance.",
+    "Synthetic native occurrence/receiver fixtures verify structural joins only. No actual native occurrence, attempt, authentication or receiver delivery is invented for the real source-only Work Tasks.",
+    "The original both-runtime Work remains unaccepted. WSL2/VPS Leads must separately verify and explicitly activate the completed merged source.",
+    "A changed tree requires renewed independent review. Any same-tree successor commit requires an explicit independent binding and a current zero-unresolved-finding check.",
+    "The reviewer did not publish evidence/status, open or merge a PR, activate a runtime, run a paid/native model evaluation suite, or mutate the candidate."
+  ],
+  "runtimeActivationEstablished": false,
+  "wholeWorkAcceptanceEstablished": false,
+  "nativePermissionGranted": false,
+  "acceptanceDecision": null
+}
