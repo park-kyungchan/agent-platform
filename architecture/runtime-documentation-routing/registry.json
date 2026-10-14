@@ -1,0 +1,1968 @@
+{
+  "schema": "work-continuity.documentation-registry.v1",
+  "generatedOn": "2026-10-14",
+  "provenance": {
+    "sourceOwner": "codex-harness-engineering",
+    "sourceDirectory": "discovery/runtime-documentation-routing/20261014/reviewed",
+    "originalCaptureOwner": "scrapling-research",
+    "immutableBlobOwner": "evidence-foundry",
+    "sourceArtifacts": [
+      {
+        "path": "routing.json",
+        "sha256": "968068af391a6d6948ba047933172fb5030c3fcc430a3a66199a3e4e567ba48a"
+      },
+      {
+        "path": "sources.json",
+        "sha256": "b5b26f80bd90708a1af886a3df9f6841301bb0e7c04501d2621127d9acd6e2ba"
+      },
+      {
+        "path": "src/router.ts",
+        "sha256": "b36678aaecdaf934bec3c71564ccba0bb5124dc4c8ff6498f8866edde17e1ae1"
+      },
+      {
+        "path": "src/types.ts",
+        "sha256": "d11b397bacffb0745bc977507bfc64d72efaa5e1c017f55a7c0e9af563d98d1e"
+      },
+      {
+        "path": "review.json",
+        "sha256": "7dded5c8cb0817ef9e2bb767d8df7a67171c6aab73c598ca3ace768a070f2197"
+      },
+      {
+        "path": "verification.json",
+        "sha256": "66b8f99fd24959dfa83fe16178e66dcc4e9d5236bd659a001e35740915c9d501"
+      }
+    ]
+  },
+  "surfaces": {
+    "muse.code": {
+      "kind": "agent",
+      "index": "https://dev.meta.ai/llms.txt"
+    },
+    "hermes.agent": {
+      "kind": "agent",
+      "index": "https://hermes-agent.nousresearch.com/docs/llms.txt"
+    },
+    "codex.cli": {
+      "kind": "agent",
+      "index": "https://learn.chatgpt.com/docs/llms.txt"
+    },
+    "hostinger.control": {
+      "kind": "provider-control-plane",
+      "index": "https://docs.hostinger.com/llms.txt"
+    },
+    "vps.host": {
+      "kind": "execution-host",
+      "index": "https://www.hostinger.com/support/vps/"
+    },
+    "vps.container": {
+      "kind": "execution-host",
+      "index": "https://hermes-agent.nousresearch.com/docs/llms.txt"
+    },
+    "github.repo": {
+      "kind": "repository-control-plane",
+      "index": "https://docs.github.com/en/get-started/using-github-docs/github-docs-api"
+    },
+    "github.actions": {
+      "kind": "workflow-control-plane",
+      "index": "https://docs.github.com/en/actions"
+    },
+    "github.codespaces": {
+      "kind": "development-host",
+      "index": "https://docs.github.com/en/codespaces"
+    },
+    "github.copilot": {
+      "kind": "agent-service",
+      "index": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-on-github"
+    }
+  },
+  "sources": {
+    "openai-index": {
+      "url": "https://learn.chatgpt.com/docs/llms.txt",
+      "status": "content-read",
+      "legacyUrl": "https://developers.openai.com/codex/llms.txt",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "meta-index": {
+      "url": "https://dev.meta.ai/llms.txt",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "hermes-index": {
+      "url": "https://hermes-agent.nousresearch.com/docs/llms.txt",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "hostinger-index": {
+      "url": "https://docs.hostinger.com/llms.txt",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "github-docs-api": {
+      "url": "https://docs.github.com/en/get-started/using-github-docs/github-docs-api",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "github-allowance": {
+      "url": "https://docs.github.com/en/billing/reference/product-usage-included",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "github-codespaces-billing": {
+      "url": "https://docs.github.com/en/billing/concepts/product-billing/github-codespaces",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "github-copilot-plans": {
+      "url": "https://docs.github.com/en/copilot/get-started/plans",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "github-secure-use": {
+      "url": "https://docs.github.com/en/actions/reference/security/secure-use",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "github-actions-billing": {
+      "url": "https://docs.github.com/en/actions/concepts/billing-and-usage",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "github-actions-limits": {
+      "url": "https://docs.github.com/en/actions/reference/limits",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "codex-app-server": {
+      "url": "https://learn.chatgpt.com/docs/app-server",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "codex-approvals": {
+      "url": "https://learn.chatgpt.com/docs/agent-approvals-security",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "hostinger-dashboard": {
+      "url": "https://www.hostinger.com/support/5726606-how-to-use-the-vps-dashboard-in-hostinger/",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "hostinger-api": {
+      "url": "https://docs.hostinger.com/api-reference/overview",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "docker-compose": {
+      "url": "https://docs.docker.com/reference/compose-file/",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "docker-security": {
+      "url": "https://docs.docker.com/engine/security/",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "docker-inspect": {
+      "url": "https://docs.docker.com/reference/cli/docker/inspect/",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "github-cli": {
+      "url": "https://cli.github.com/manual/gh_api",
+      "status": "content-read",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "muse-sdk": {
+      "url": "https://meta-models.github.io/muse-code-sdk/",
+      "status": "page-opened-limited-content",
+      "checkedOn": "2026-10-14",
+      "rawBytesVerified": false,
+      "bodySha256": null,
+      "finalReviewCanonicalUrl": "https://meta-models.github.io/muse-code-sdk/1.4/"
+    }
+  },
+  "captures": [
+    {
+      "id": "openai-index",
+      "url": "https://learn.chatgpt.com/docs/llms.txt",
+      "finalUrl": "https://learn.chatgpt.com/docs/llms.txt",
+      "retrievedAt": "2026-10-13T23:51:27.649Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "72459eb4e2e6d3b1a143f3c40860b7dd65fb061cdec3b18470ed8867382d8552",
+          "bytes": 31741,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "meta-index",
+      "url": "https://dev.meta.ai/llms.txt",
+      "finalUrl": "https://dev.meta.ai/llms.txt",
+      "retrievedAt": "2026-10-13T23:51:28.130Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "1e780bdd258ffba8a80b9ca062f3700179cdbd18b839ff165825ffefb42d2687",
+          "bytes": 29734,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "hermes-index",
+      "url": "https://hermes-agent.nousresearch.com/docs/llms.txt",
+      "finalUrl": "https://hermes-agent.nousresearch.com/docs/llms.txt",
+      "retrievedAt": "2026-10-13T23:51:28.366Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "998daadea48d327b6ab509c309927c8db63fcba04b60bba640a725c228ab7774",
+          "bytes": 44874,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "hostinger-index",
+      "url": "https://docs.hostinger.com/llms.txt",
+      "finalUrl": "https://docs.hostinger.com/llms.txt",
+      "retrievedAt": "2026-10-13T23:51:28.671Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "7e1327b196c18b9d3e2b9214056695e666d09bcce9a96b35e138aeaee7c4aa2e",
+          "bytes": 135164,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "github-docs-api",
+      "url": "https://docs.github.com/api/article/body?pathname=/en/get-started/using-github-docs/github-docs-api",
+      "finalUrl": "https://docs.github.com/api/article/body?pathname=/en/get-started/using-github-docs/github-docs-api",
+      "retrievedAt": "2026-10-13T23:51:29.082Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "52f5df1e6c2651d8628a6a3a8b2f2606c5a232c8e3032ef02fd58827e28c85eb",
+          "bytes": 5057,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "codex.cli.permissions",
+      "url": "https://learn.chatgpt.com/docs/agent-approvals-security.md",
+      "finalUrl": "https://learn.chatgpt.com/docs/agent-approvals-security.md",
+      "retrievedAt": "2026-10-13T23:52:16.726Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "595db3a5a3276996071dcc2442e2cfcfef2c11c50cf46fccfd1de4a869a82017",
+          "bytes": 35349,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "codex.cli.protocol",
+      "url": "https://learn.chatgpt.com/docs/app-server.md",
+      "finalUrl": "https://learn.chatgpt.com/docs/app-server.md",
+      "retrievedAt": "2026-10-13T23:52:17.364Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "f879715bb0d440db60b71e7a5bfe1258d045520feabe3fc6b11847100c8d064b",
+          "bytes": 102656,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "codex.cli.wsl",
+      "url": "https://learn.chatgpt.com/docs/windows/wsl.md",
+      "finalUrl": "https://learn.chatgpt.com/docs/windows/wsl.md",
+      "retrievedAt": "2026-10-13T23:52:17.784Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "7bc7cabfbe456741e7c93ec7fb1e006e82176e052446a66f87926602114bd59e",
+          "bytes": 3403,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "codex.cli.commands",
+      "url": "https://learn.chatgpt.com/docs/developer-commands.md?surface=cli",
+      "finalUrl": "https://learn.chatgpt.com/docs/developer-commands.md?surface=cli",
+      "retrievedAt": "2026-10-13T23:52:18.380Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "1347b0eb55a085c4d6bdb53b5825935e6479fe368518a23a914d08c7235a3567",
+          "bytes": 54649,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "codex.cli.mcp-server-migration",
+      "url": "https://learn.chatgpt.com/docs/mcp-server.md",
+      "finalUrl": "https://learn.chatgpt.com/docs/mcp-server.md",
+      "retrievedAt": "2026-10-13T23:52:18.842Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "9fe223993523b4e6d991fd229888ecb1a770a3df3aa7bea946ae6674f8af32da",
+          "bytes": 1239,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "muse.code.configuration",
+      "url": "https://dev.meta.ai/docs/muse-code/configuration.md",
+      "finalUrl": "https://dev.meta.ai/docs/muse-code/configuration.md",
+      "retrievedAt": "2026-10-13T23:52:19.548Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "a43998535617ac19ecb45a39e9ba1c7565d51b6825ae88c4479a1a385dade504",
+          "bytes": 8715,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "muse.code.extensions",
+      "url": "https://dev.meta.ai/docs/muse-code/extending.md",
+      "finalUrl": "https://dev.meta.ai/docs/muse-code/extending.md",
+      "retrievedAt": "2026-10-13T23:52:20.298Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "050c645d0406e74a776d133e840f7a79a2325b0d7489b426631d5b6589fff4b2",
+          "bytes": 14298,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "muse.code.messaging",
+      "url": "https://dev.meta.ai/docs/muse-code/session-messaging.md",
+      "finalUrl": "https://dev.meta.ai/docs/muse-code/session-messaging.md",
+      "retrievedAt": "2026-10-13T23:52:21.171Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "6a2de44437f35162cd7d838c93eb265656c28b879e5a860a5f3fc56b6688b926",
+          "bytes": 7894,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "hermes.agent.tools",
+      "url": "https://hermes-agent.nousresearch.com/docs/developer-guide/tools-runtime",
+      "finalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/tools-runtime",
+      "retrievedAt": "2026-10-13T23:52:21.669Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "13a6a24559f8a71e9e2adb59181b37fc4d2a8bdd19ea05e291961c87eff61e1f",
+          "bytes": 63435,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "hermes.agent.docker",
+      "url": "https://hermes-agent.nousresearch.com/docs/user-guide/docker",
+      "finalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/docker",
+      "retrievedAt": "2026-10-13T23:52:21.991Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "f166e296b5b10fc3cd46f464a98e6b09d68b66e12df66437310fd5d6d08eb233",
+          "bytes": 215411,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "hermes.agent.kanban",
+      "url": "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban",
+      "finalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban",
+      "retrievedAt": "2026-10-13T23:52:22.281Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "da830a99997b2ef7d44c3236e4dab5e41a282e3fa66a5bed0ba359bc4109c332",
+          "bytes": 269859,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "hostinger.control.docker",
+      "url": "https://docs.hostinger.com/api-reference/endpoints/vps/docker-manager.md",
+      "finalUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/docker-manager.md",
+      "retrievedAt": "2026-10-13T23:52:22.862Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "497cf68c8275f119f5a75dcae980cf8ed371a879ca4556ef651e0055327d4f54",
+          "bytes": 1943,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "hostinger.control.api",
+      "url": "https://docs.hostinger.com/api-reference/overview.md",
+      "finalUrl": "https://docs.hostinger.com/api-reference/overview.md",
+      "retrievedAt": "2026-10-13T23:52:23.492Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "0637639270b8f453a4e105c4a9ecf94786a75db75242746ac23dd95dad9f10db",
+          "bytes": 5254,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "github.actions.pull-request-target",
+      "url": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/security/securely-using-pull_request_target",
+      "finalUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/security/securely-using-pull_request_target",
+      "retrievedAt": "2026-10-13T23:52:23.891Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "9617a439f721b0785a4d41f905cc658aa3ada83749428b9c9b6e8d8eb5f5aab5",
+          "bytes": 12710,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "github.repo.billing",
+      "url": "https://docs.github.com/api/article/body?pathname=/en/billing/reference/product-usage-included",
+      "finalUrl": "https://docs.github.com/api/article/body?pathname=/en/billing/reference/product-usage-included",
+      "retrievedAt": "2026-10-13T23:52:24.299Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "0bb5d65bd9b7161c23bed4112fdd58a8a2e7fe6481a9f155d656e1f28ec2f23e",
+          "bytes": 2598,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "github.codespaces.billing",
+      "url": "https://docs.github.com/api/article/body?pathname=/en/billing/concepts/product-billing/github-codespaces",
+      "finalUrl": "https://docs.github.com/api/article/body?pathname=/en/billing/concepts/product-billing/github-codespaces",
+      "retrievedAt": "2026-10-13T23:52:24.764Z",
+      "status": 200,
+      "captureOutcome": "partial",
+      "expectedPredicateMatched": false,
+      "responseContent": [
+        {
+          "sha256": "96784c4a1059447de4f464a829c7081fcd5e54e3c5b4a69cb23e410ecd9b23e5",
+          "bytes": 11798,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "github.copilot.billing",
+      "url": "https://docs.github.com/api/article/body?pathname=/en/copilot/get-started/plans",
+      "finalUrl": "https://docs.github.com/api/article/body?pathname=/en/copilot/get-started/plans",
+      "retrievedAt": "2026-10-13T23:52:25.682Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "2971060070cc8bd2846f818fd3336aa6289fe9c18a76fc7df0bfd4aa93b78c49",
+          "bytes": 219892,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "github.repo.api",
+      "url": "https://cli.github.com/manual/gh_api",
+      "finalUrl": "https://cli.github.com/manual/gh_api",
+      "retrievedAt": "2026-10-13T23:52:26.112Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "a8587627ddf09ac4ef25f6046efac1fb9978b51e57c82d27b8904fa53ede850b",
+          "bytes": 111604,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "muse.code.protocol",
+      "url": "https://meta-models.github.io/muse-code-sdk/",
+      "finalUrl": "https://meta-models.github.io/muse-code-sdk/",
+      "retrievedAt": "2026-10-13T23:52:26.565Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "1e028134140678f0ae66d4aa19c2cd73027f004024a0728094c6b9dedc31562b",
+          "bytes": 247,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "muse-sdk-latest",
+      "url": "https://meta-models.github.io/muse-code-sdk/latest/",
+      "finalUrl": "https://meta-models.github.io/muse-code-sdk/latest/",
+      "retrievedAt": "2026-10-13T23:52:59.345Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "62b59669a336f5849c9c0294d0ba14722664184a95a8e690290193164f6310dc",
+          "bytes": 247,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "github-codespaces-billing-retry",
+      "url": "https://docs.github.com/api/article/body?pathname=/en/billing/concepts/product-billing/github-codespaces",
+      "finalUrl": "https://docs.github.com/api/article/body?pathname=/en/billing/concepts/product-billing/github-codespaces",
+      "retrievedAt": "2026-10-13T23:52:59.555Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "96784c4a1059447de4f464a829c7081fcd5e54e3c5b4a69cb23e410ecd9b23e5",
+          "bytes": 11798,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "github-search-api",
+      "url": "https://docs.github.com/api/search/v1?query=pull_request_target&client_name=runtime-routing-pack&version=free-pro-team&language=en&size=5",
+      "finalUrl": "https://docs.github.com/api/search/v1?query=pull_request_target&client_name=runtime-routing-pack&version=free-pro-team&language=en&size=5",
+      "retrievedAt": "2026-10-13T23:53:00.089Z",
+      "status": 200,
+      "captureOutcome": "success",
+      "expectedPredicateMatched": true,
+      "responseContent": [
+        {
+          "sha256": "0545ca79806462ccc3827ceb4f28460424953be85cd6711d3525652bf8a69edb",
+          "bytes": 3209,
+          "complete": true
+        }
+      ]
+    },
+    {
+      "id": "muse-sdk-1.4",
+      "url": "https://meta-models.github.io/muse-code-sdk/1.4/",
+      "finalUrl": "https://meta-models.github.io/muse-code-sdk/1.4/",
+      "retrievedAt": "2026-10-13T23:53:26.388Z",
+      "status": 200,
+      "captureOutcome": "partial",
+      "expectedPredicateMatched": false,
+      "responseContent": [
+        {
+          "sha256": "39f2162ea3bbdc57d7acf20eb9b419b66ced7c17e92af2166fd12b60ecda6e27",
+          "bytes": 20200,
+          "complete": true
+        }
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "id": "muse.code.configuration",
+      "surface": "muse.code",
+      "topic": "configuration",
+      "aliases": ["settings", "config", "설정"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/configuration",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/configuration.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/configuration",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Model/effort, AGENTS.md and durable memory; do not infer effective configuration from docs.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "muse.code.permissions",
+      "surface": "muse.code",
+      "topic": "permissions",
+      "aliases": ["approval", "sandbox", "권한", "승인"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/permissions",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/permissions.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/permissions",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Approval and sandbox are separate controls.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "muse.code.extensions",
+      "surface": "muse.code",
+      "topic": "extensions",
+      "aliases": ["skills", "hooks", "mcp", "subagents", "확장"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/extending",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/extending.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/extending",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "MCP consumption, lifecycle hooks and delegation.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "muse.code.headless",
+      "surface": "muse.code",
+      "topic": "headless",
+      "aliases": ["exec", "ci", "비대화형"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/extending",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/extending.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/extending",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Headless launch flags and authentication can differ from the interactive client.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "muse.code.sessions",
+      "surface": "muse.code",
+      "topic": "sessions",
+      "aliases": ["context", "session", "세션"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/interactive",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/interactive.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/interactive",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Interactive context and session operations.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "muse.code.workflows",
+      "surface": "muse.code",
+      "topic": "workflows",
+      "aliases": ["multi-agent", "협업"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/workflows",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/workflows.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/workflows",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Workflow contracts are runtime-specific.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "muse.code.messaging",
+      "surface": "muse.code",
+      "topic": "messaging",
+      "aliases": ["handoff", "메시지"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/session-messaging",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/session-messaging.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/session-messaging",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Do not assume local session messages cross machines or containers.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "muse.code.rewind",
+      "surface": "muse.code",
+      "topic": "rewind",
+      "aliases": ["branch", "되감기"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/rewind",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/rewind.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/rewind",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Conversation branching is not a filesystem or Git rollback.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "muse.code.auth",
+      "surface": "muse.code",
+      "topic": "auth",
+      "aliases": ["authentication", "인증"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/auth",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/auth.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/auth",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Browser subscription authentication and API credentials are separate.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "muse.code.billing",
+      "surface": "muse.code",
+      "topic": "billing",
+      "aliases": ["subscription", "요금", "구독"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/subscriptions",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/subscriptions.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/subscriptions",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "This explicit route was missing from the supplied direct-route list.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "muse.code.changelog",
+      "surface": "muse.code",
+      "topic": "changelog",
+      "aliases": ["release", "latest", "변경사항"],
+      "canonicalUrl": "https://dev.meta.ai/docs/muse-code/changelog",
+      "preferredUrl": "https://dev.meta.ai/docs/muse-code/changelog.md",
+      "fallbackUrl": "https://dev.meta.ai/docs/muse-code/changelog",
+      "evidenceStatus": "index-listed",
+      "sourceId": "meta-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Current changelog does not identify the installed binary.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "muse.code.protocol",
+      "surface": "muse.code",
+      "topic": "protocol",
+      "aliases": ["sdk", "schema"],
+      "canonicalUrl": "https://meta-models.github.io/muse-code-sdk/1.4/",
+      "preferredUrl": "https://meta-models.github.io/muse-code-sdk/1.4/",
+      "fallbackUrl": "https://meta-models.github.io/muse-code-sdk/1.4/",
+      "evidenceStatus": "content-read",
+      "sourceId": "muse-sdk",
+      "checkedOn": "2026-10-14",
+      "notes": "Verified 2026-10-14 static-readable Muse Code SDK 1.4 documentation. Root and latest/ are HTML meta-refresh landing pages. This is an SDK/protocol contract, not full runtime source or installed-host compatibility proof. For another installed version select matching generated docs/schema and compare initialize/schema fingerprint.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general",
+      "documentationVersion": "1.4"
+    },
+    {
+      "id": "hermes.agent.architecture",
+      "surface": "hermes.agent",
+      "topic": "architecture",
+      "aliases": ["구조"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/architecture",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/architecture",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Follow with agent-loop only for a specific loop gap.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "developer-guide/architecture",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.agent-loop",
+      "surface": "hermes.agent",
+      "topic": "agent-loop",
+      "aliases": ["loop", "루프"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "developer-guide/agent-loop",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.configuration",
+      "surface": "hermes.agent",
+      "topic": "configuration",
+      "aliases": ["settings", "설정"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/configuration",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/configuration",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/configuration",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.models",
+      "surface": "hermes.agent",
+      "topic": "models",
+      "aliases": ["model", "모델"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/configuring-models",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/configuring-models",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/configuring-models",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.profiles",
+      "surface": "hermes.agent",
+      "topic": "profiles",
+      "aliases": ["profile", "프로필"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/profiles",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/profiles",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/profiles",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.sessions",
+      "surface": "hermes.agent",
+      "topic": "sessions",
+      "aliases": ["session", "세션"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/sessions",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/sessions",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/sessions",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.session-storage",
+      "surface": "hermes.agent",
+      "topic": "session-storage",
+      "aliases": ["storage", "세션저장"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/session-storage",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/session-storage",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "developer-guide/session-storage",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.context",
+      "surface": "hermes.agent",
+      "topic": "context",
+      "aliases": ["context-files", "문맥"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/context-files",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/context-files",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/context-files",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.memory",
+      "surface": "hermes.agent",
+      "topic": "memory",
+      "aliases": ["기억"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/memory",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/memory",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/memory",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.compression",
+      "surface": "hermes.agent",
+      "topic": "compression",
+      "aliases": ["cache", "압축"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/context-compression-and-caching",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/context-compression-and-caching",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "developer-guide/context-compression-and-caching",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.tools",
+      "surface": "hermes.agent",
+      "topic": "tools",
+      "aliases": ["tool-call", "도구"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/tools-runtime",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/tools-runtime",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Terminal backend may execute elsewhere; do not equate gateway host and tool host.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "developer-guide/tools-runtime",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.tools-reference",
+      "surface": "hermes.agent",
+      "topic": "tools-reference",
+      "aliases": ["도구명세"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/reference/tools-reference",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/reference/tools-reference",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "reference/tools-reference",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.mcp",
+      "surface": "hermes.agent",
+      "topic": "mcp",
+      "aliases": ["MCP"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/mcp",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.mcp-config",
+      "surface": "hermes.agent",
+      "topic": "mcp-config",
+      "aliases": ["mcp-settings"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/reference/mcp-config-reference",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "reference/mcp-config-reference",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.delegation",
+      "surface": "hermes.agent",
+      "topic": "delegation",
+      "aliases": ["subagents", "위임"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/delegation",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/delegation",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/delegation",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.subagent-lifecycle",
+      "surface": "hermes.agent",
+      "topic": "subagent-lifecycle",
+      "aliases": ["subagent-api"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/subagent-lifecycle-api",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/subagent-lifecycle-api",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "developer-guide/subagent-lifecycle-api",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.hooks",
+      "surface": "hermes.agent",
+      "topic": "hooks",
+      "aliases": ["훅"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/hooks",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.cron",
+      "surface": "hermes.agent",
+      "topic": "cron",
+      "aliases": ["schedule", "자동화"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/cron",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/cron",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/cron",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.goals",
+      "surface": "hermes.agent",
+      "topic": "goals",
+      "aliases": ["목표"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/goals",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/goals",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/goals",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.kanban",
+      "surface": "hermes.agent",
+      "topic": "kanban",
+      "aliases": ["칸반"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/kanban",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.plugins",
+      "surface": "hermes.agent",
+      "topic": "plugins",
+      "aliases": ["플러그인"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/plugins",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/plugins",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "developer-guide/plugins",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.gateway",
+      "surface": "hermes.agent",
+      "topic": "gateway",
+      "aliases": ["게이트웨이"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/gateway-internals",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/developer-guide/gateway-internals",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "developer-guide/gateway-internals",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.docker",
+      "surface": "hermes.agent",
+      "topic": "docker",
+      "aliases": ["container", "도커"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/docker",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/docker",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Distinguish running Hermes in Docker from its selected terminal backend.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/docker",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.permissions",
+      "surface": "hermes.agent",
+      "topic": "permissions",
+      "aliases": ["security", "승인", "권한"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/security",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/security",
+      "fallbackUrl": null,
+      "evidenceStatus": "user-supplied-index-family",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Container boundary stays in force; provider ownership is not executor permission.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/security",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "codex.cli.overview",
+      "surface": "codex.cli",
+      "topic": "overview",
+      "aliases": ["cli", "개요"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/codex/cli",
+      "preferredUrl": "https://learn.chatgpt.com/docs/codex/cli.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/codex/cli",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.configuration",
+      "surface": "codex.cli",
+      "topic": "configuration",
+      "aliases": ["settings", "설정"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/config-file/config-basic",
+      "preferredUrl": "https://learn.chatgpt.com/docs/config-file/config-basic.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/config-file/config-basic",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.config-reference",
+      "surface": "codex.cli",
+      "topic": "config-reference",
+      "aliases": ["config", "requirements"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/config-file/config-reference",
+      "preferredUrl": "https://learn.chatgpt.com/docs/config-file/config-reference.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/config-file/config-reference",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Config and requirements are not equivalent to observed effective policy.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.config-advanced",
+      "surface": "codex.cli",
+      "topic": "config-advanced",
+      "aliases": ["profiles", "advanced", "프로필"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/config-file/config-advanced",
+      "preferredUrl": "https://learn.chatgpt.com/docs/config-file/config-advanced.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/config-file/config-advanced",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.instructions",
+      "surface": "codex.cli",
+      "topic": "instructions",
+      "aliases": ["agents.md", "지침"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+      "preferredUrl": "https://learn.chatgpt.com/docs/agent-configuration/agents-md.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.permissions",
+      "surface": "codex.cli",
+      "topic": "permissions",
+      "aliases": ["approval", "sandbox", "권한", "보안"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/agent-approvals-security",
+      "preferredUrl": "https://learn.chatgpt.com/docs/agent-approvals-security.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/agent-approvals-security",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Do not use `/security`: that is a separate Codex Security product.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "codex.cli.rules",
+      "surface": "codex.cli",
+      "topic": "rules",
+      "aliases": ["execpolicy", "규칙"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/agent-configuration/rules",
+      "preferredUrl": "https://learn.chatgpt.com/docs/agent-configuration/rules.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/agent-configuration/rules",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "codex.cli.auth",
+      "surface": "codex.cli",
+      "topic": "auth",
+      "aliases": ["authentication", "인증"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/auth",
+      "preferredUrl": "https://learn.chatgpt.com/docs/auth.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/auth",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "ChatGPT account, API credentials and GitHub repository authentication are separate.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "codex.cli.commands",
+      "surface": "codex.cli",
+      "topic": "commands",
+      "aliases": ["flags", "sessions", "resume", "명령"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/developer-commands?surface=cli",
+      "preferredUrl": "https://learn.chatgpt.com/docs/developer-commands.md?surface=cli",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/developer-commands?surface=cli",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Filter to CLI; documentation now spans multiple products.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.headless",
+      "surface": "codex.cli",
+      "topic": "headless",
+      "aliases": ["exec", "ci", "비대화형"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/non-interactive-mode",
+      "preferredUrl": "https://learn.chatgpt.com/docs/non-interactive-mode.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/non-interactive-mode",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.protocol",
+      "surface": "codex.cli",
+      "topic": "protocol",
+      "aliases": ["app-server", "schema", "protocol-contract"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/app-server",
+      "preferredUrl": "https://learn.chatgpt.com/docs/app-server.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/app-server",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Generate protocol artifacts from the exact installed binary.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.sdk",
+      "surface": "codex.cli",
+      "topic": "sdk",
+      "aliases": ["integration", "통합"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/codex-sdk",
+      "preferredUrl": "https://learn.chatgpt.com/docs/codex-sdk.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/codex-sdk",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "SDK surface is not a substitute for binary protocol verification.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.subagents",
+      "surface": "codex.cli",
+      "topic": "subagents",
+      "aliases": ["delegation", "위임"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/agent-configuration/subagents",
+      "preferredUrl": "https://learn.chatgpt.com/docs/agent-configuration/subagents.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/agent-configuration/subagents",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.hooks",
+      "surface": "codex.cli",
+      "topic": "hooks",
+      "aliases": ["훅"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/hooks",
+      "preferredUrl": "https://learn.chatgpt.com/docs/hooks.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/hooks",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Check installed version before relying on current hooks.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.wsl",
+      "surface": "codex.cli",
+      "topic": "wsl",
+      "aliases": ["wsl2", "리눅스"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/windows/wsl",
+      "preferredUrl": "https://learn.chatgpt.com/docs/windows/wsl.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/windows/wsl",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.windows-sandbox",
+      "surface": "codex.cli",
+      "topic": "windows-sandbox",
+      "aliases": ["powershell", "windows"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/windows/windows-sandbox",
+      "preferredUrl": "https://learn.chatgpt.com/docs/windows/windows-sandbox.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/windows/windows-sandbox",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Windows native and WSL are distinct execution environments.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "codex.cli.mcp-server-migration",
+      "surface": "codex.cli",
+      "topic": "mcp-server-migration",
+      "aliases": ["mcp-server"],
+      "canonicalUrl": "https://learn.chatgpt.com/docs/mcp-server",
+      "preferredUrl": "https://learn.chatgpt.com/docs/mcp-server.md",
+      "fallbackUrl": "https://learn.chatgpt.com/docs/mcp-server",
+      "evidenceStatus": "index-listed",
+      "sourceId": "openai-index",
+      "checkedOn": "2026-10-14",
+      "notes": "The current index labels this as a removal/migration page, not a recommended new server route.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hostinger.control.api",
+      "surface": "hostinger.control",
+      "topic": "api",
+      "aliases": ["auth", "api-reference", "인증"],
+      "canonicalUrl": "https://docs.hostinger.com/api-reference/overview",
+      "preferredUrl": "https://docs.hostinger.com/api-reference/overview.md",
+      "fallbackUrl": "https://docs.hostinger.com/api-reference/overview",
+      "evidenceStatus": "index-listed",
+      "sourceId": "hostinger-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Hostinger provider API; not an OS shell.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hostinger.control.vms",
+      "surface": "hostinger.control",
+      "topic": "vms",
+      "aliases": ["inventory", "vm", "서버목록"],
+      "canonicalUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/virtual-machine/get-virtual-machines",
+      "preferredUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/virtual-machine/get-virtual-machines.md",
+      "fallbackUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/virtual-machine/get-virtual-machines",
+      "evidenceStatus": "index-listed",
+      "sourceId": "hostinger-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Use discovered VM IDs; never infer a numeric VM ID from a container name.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hostinger.control.metrics",
+      "surface": "hostinger.control",
+      "topic": "metrics",
+      "aliases": ["monitoring", "성능"],
+      "canonicalUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/virtual-machine/get-metrics",
+      "preferredUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/virtual-machine/get-metrics.md",
+      "fallbackUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/virtual-machine/get-metrics",
+      "evidenceStatus": "index-listed",
+      "sourceId": "hostinger-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hostinger.control.docker",
+      "surface": "hostinger.control",
+      "topic": "docker",
+      "aliases": ["compose", "projects", "도커"],
+      "canonicalUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/docker-manager",
+      "preferredUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/docker-manager.md",
+      "fallbackUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/docker-manager",
+      "evidenceStatus": "index-listed",
+      "sourceId": "hostinger-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Provider project operations may restart or recreate multiple services. Official documentation limits this experimental Docker Manager API to VPS Docker OS templates; current callable account/template capability remains unverified.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hostinger.control.firewall",
+      "surface": "hostinger.control",
+      "topic": "firewall",
+      "aliases": ["network", "방화벽"],
+      "canonicalUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/firewall",
+      "preferredUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/firewall.md",
+      "fallbackUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/firewall",
+      "evidenceStatus": "index-listed",
+      "sourceId": "hostinger-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Provider firewall is distinct from guest OS firewall and Docker networking.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hostinger.control.backups",
+      "surface": "hostinger.control",
+      "topic": "backups",
+      "aliases": ["backup", "백업"],
+      "canonicalUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/backups",
+      "preferredUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/backups.md",
+      "fallbackUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/backups",
+      "evidenceStatus": "index-listed",
+      "sourceId": "hostinger-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Restoring a VM is a production mutation, not a docs lookup.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hostinger.control.snapshots",
+      "surface": "hostinger.control",
+      "topic": "snapshots",
+      "aliases": ["snapshot", "스냅샷"],
+      "canonicalUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/snapshots",
+      "preferredUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/snapshots.md",
+      "fallbackUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/snapshots",
+      "evidenceStatus": "index-listed",
+      "sourceId": "hostinger-index",
+      "checkedOn": "2026-10-14",
+      "notes": "",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "hostinger.control.ssh-keys",
+      "surface": "hostinger.control",
+      "topic": "ssh-keys",
+      "aliases": ["keys", "ssh", "키"],
+      "canonicalUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/public-keys",
+      "preferredUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/public-keys.md",
+      "fallbackUrl": "https://docs.hostinger.com/api-reference/endpoints/vps/public-keys",
+      "evidenceStatus": "index-listed",
+      "sourceId": "hostinger-index",
+      "checkedOn": "2026-10-14",
+      "notes": "SSH keys and Hostinger API token are different authentication surfaces.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "vps.host.overview",
+      "surface": "vps.host",
+      "topic": "overview",
+      "aliases": ["host", "hpanel", "호스트"],
+      "canonicalUrl": "https://www.hostinger.com/support/5726606-how-to-use-the-vps-dashboard-in-hostinger/",
+      "preferredUrl": "https://www.hostinger.com/support/5726606-how-to-use-the-vps-dashboard-in-hostinger/",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "hostinger-dashboard",
+      "checkedOn": "2026-10-14",
+      "notes": "Provider dashboard does not establish local executor host/root access.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "vps.host.docker-security",
+      "surface": "vps.host",
+      "topic": "docker-security",
+      "aliases": ["permissions", "socket", "권한"],
+      "canonicalUrl": "https://docs.docker.com/engine/security/",
+      "preferredUrl": "https://docs.docker.com/engine/security/",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "docker-security",
+      "checkedOn": "2026-10-14",
+      "notes": "Do not mount docker.sock or grant Docker-group membership to bypass a container boundary.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "vps.host.compose",
+      "surface": "vps.host",
+      "topic": "compose",
+      "aliases": ["docker", "설정"],
+      "canonicalUrl": "https://docs.docker.com/reference/compose-file/",
+      "preferredUrl": "https://docs.docker.com/reference/compose-file/",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "docker-compose",
+      "checkedOn": "2026-10-14",
+      "notes": "Use observed Compose version; do not dump effective Compose secrets into logs.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "vps.host.inspection",
+      "surface": "vps.host",
+      "topic": "inspection",
+      "aliases": ["inspect", "점검"],
+      "canonicalUrl": "https://docs.docker.com/reference/cli/docker/inspect/",
+      "preferredUrl": "https://docs.docker.com/reference/cli/docker/inspect/",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "docker-inspect",
+      "checkedOn": "2026-10-14",
+      "notes": "Inspect selected allowlisted fields only, using an already-authorized host executor.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "vps.container.compose",
+      "surface": "vps.container",
+      "topic": "compose",
+      "aliases": ["network", "mounts", "도커"],
+      "canonicalUrl": "https://docs.docker.com/reference/compose-file/",
+      "preferredUrl": "https://docs.docker.com/reference/compose-file/",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "docker-compose",
+      "checkedOn": "2026-10-14",
+      "notes": "Shared volumes/networks do not authorize sibling/host control.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "vps.container.permissions",
+      "surface": "vps.container",
+      "topic": "permissions",
+      "aliases": ["security", "권한"],
+      "canonicalUrl": "https://docs.docker.com/engine/security/",
+      "preferredUrl": "https://docs.docker.com/engine/security/",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "docker-security",
+      "checkedOn": "2026-10-14",
+      "notes": "Root inside a container is not proof of authorized host scope.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "vps.container.hermes",
+      "surface": "vps.container",
+      "topic": "hermes",
+      "aliases": ["agent", "hermes-agent-2q3y"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/docker",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/docker",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-index",
+      "checkedOn": "2026-10-14",
+      "notes": "Resolve actual container/service/profile identifiers in the authorized environment.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.repo.documentation",
+      "surface": "github.repo",
+      "topic": "documentation",
+      "aliases": ["docs", "문서"],
+      "canonicalUrl": "https://docs.github.com/en/get-started/using-github-docs/github-docs-api",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/get-started/using-github-docs/github-docs-api",
+      "fallbackUrl": "https://docs.github.com/en/get-started/using-github-docs/github-docs-api",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Article API requires pathname; Search API requires query and client_name.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.repo.billing",
+      "surface": "github.repo",
+      "topic": "billing",
+      "aliases": ["pro", "subscription", "요금"],
+      "canonicalUrl": "https://docs.github.com/en/billing/reference/product-usage-included",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/billing/reference/product-usage-included",
+      "fallbackUrl": "https://docs.github.com/en/billing/reference/product-usage-included",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "GitHub Pro allowance is account-scoped, dated and not current remaining usage.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "github.actions.workflow",
+      "surface": "github.actions",
+      "topic": "workflow",
+      "aliases": ["yaml", "ci", "workflow", "워크플로"],
+      "canonicalUrl": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/workflows-and-actions/workflow-syntax",
+      "fallbackUrl": "https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Workflow control plane and actual runner host are separate.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.actions.contexts",
+      "surface": "github.actions",
+      "topic": "contexts",
+      "aliases": ["runner", "environment", "환경"],
+      "canonicalUrl": "https://docs.github.com/en/actions/reference/workflows-and-actions/contexts",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/workflows-and-actions/contexts",
+      "fallbackUrl": "https://docs.github.com/en/actions/reference/workflows-and-actions/contexts",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Use runner/environment observations, not the name of the repository.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.actions.permissions",
+      "surface": "github.actions",
+      "topic": "permissions",
+      "aliases": ["token", "auth", "권한"],
+      "canonicalUrl": "https://docs.github.com/en/actions/tutorials/authenticate-with-github_token",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/tutorials/authenticate-with-github_token",
+      "fallbackUrl": "https://docs.github.com/en/actions/tutorials/authenticate-with-github_token",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "GITHUB_TOKEN scope, repo settings, fork restrictions and native tool capability all matter.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "github.actions.security",
+      "surface": "github.actions",
+      "topic": "security",
+      "aliases": ["secrets", "untrusted", "보안"],
+      "canonicalUrl": "https://docs.github.com/en/actions/reference/security/secure-use",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/security/secure-use",
+      "fallbackUrl": "https://docs.github.com/en/actions/reference/security/secure-use",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Untrusted code must not share a production self-hosted runner or production credentials.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "github.actions.pull-request-target",
+      "surface": "github.actions",
+      "topic": "pull-request-target",
+      "aliases": ["pull_request_target"],
+      "canonicalUrl": "https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/security/securely-using-pull_request_target",
+      "fallbackUrl": "https://docs.github.com/en/actions/reference/security/securely-using-pull_request_target",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Never execute an untrusted PR head with privileged base-repo credentials.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "github.actions.hosted",
+      "surface": "github.actions",
+      "topic": "hosted",
+      "aliases": ["github-hosted", "호스티드"],
+      "canonicalUrl": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/runners/github-hosted-runners",
+      "fallbackUrl": "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Choose exact OS/architecture/image/size and verify availability.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.actions.self-hosted",
+      "surface": "github.actions",
+      "topic": "self-hosted",
+      "aliases": ["selfhosted", "셀프호스트"],
+      "canonicalUrl": "https://docs.github.com/en/actions/reference/runners/self-hosted-runners",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/runners/self-hosted-runners",
+      "fallbackUrl": "https://docs.github.com/en/actions/reference/runners/self-hosted-runners",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Self-hosted on VPS consumes VPS resources and inherits its boundary.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.actions.limits",
+      "surface": "github.actions",
+      "topic": "limits",
+      "aliases": ["timeout", "시간제한"],
+      "canonicalUrl": "https://docs.github.com/en/actions/reference/limits",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/reference/limits",
+      "fallbackUrl": "https://docs.github.com/en/actions/reference/limits",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Runner-specific limits can be lower than the general maximum.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.actions.billing",
+      "surface": "github.actions",
+      "topic": "billing",
+      "aliases": ["cost", "minutes", "요금"],
+      "canonicalUrl": "https://docs.github.com/en/actions/concepts/billing-and-usage",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/actions/concepts/billing-and-usage",
+      "fallbackUrl": "https://docs.github.com/en/actions/concepts/billing-and-usage",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Private-repo allowance depends on billing owner; OS and runner category matter.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "github.codespaces.environment",
+      "surface": "github.codespaces",
+      "topic": "environment",
+      "aliases": ["devcontainer", "development", "개발환경"],
+      "canonicalUrl": "https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-a-dev-container-configuration/introduction-to-dev-containers",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/codespaces/setting-up-your-project-for-codespaces/adding-a-dev-container-configuration/introduction-to-dev-containers",
+      "fallbackUrl": "https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-a-dev-container-configuration/introduction-to-dev-containers",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Repository devcontainer config, machine type, persistence and credentials are separate inputs.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.codespaces.billing",
+      "surface": "github.codespaces",
+      "topic": "billing",
+      "aliases": ["cost", "pro", "요금"],
+      "canonicalUrl": "https://docs.github.com/en/billing/concepts/product-billing/github-codespaces",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/billing/concepts/product-billing/github-codespaces",
+      "fallbackUrl": "https://docs.github.com/en/billing/concepts/product-billing/github-codespaces",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "180 core-hours is not 180 hours on a 2-core machine; stopped spaces still occupy storage.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "github.copilot.overview",
+      "surface": "github.copilot",
+      "topic": "overview",
+      "aliases": ["agent", "cloud-agent", "coding-agent", "코딩에이전트"],
+      "canonicalUrl": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-on-github",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/copilot/concepts/copilot-surfaces/copilot-on-github",
+      "fallbackUrl": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-on-github",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Do not treat GitHub Pro as proof of Copilot entitlement or tool access.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    },
+    {
+      "id": "github.copilot.billing",
+      "surface": "github.copilot",
+      "topic": "billing",
+      "aliases": ["subscription", "pro", "요금"],
+      "canonicalUrl": "https://docs.github.com/en/copilot/get-started/plans",
+      "preferredUrl": "https://docs.github.com/api/article/body?pathname=/en/copilot/get-started/plans",
+      "fallbackUrl": "https://docs.github.com/en/copilot/get-started/plans",
+      "evidenceStatus": "content-read",
+      "sourceId": null,
+      "checkedOn": "2026-10-14",
+      "notes": "Copilot subscription, feature entitlement and AI usage are separately verified.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "github.repo.api",
+      "surface": "github.repo",
+      "topic": "api",
+      "aliases": ["gh", "repository", "pr", "저장소"],
+      "canonicalUrl": "https://cli.github.com/manual/gh_api",
+      "preferredUrl": "https://cli.github.com/manual/gh_api",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "github-cli",
+      "checkedOn": "2026-10-14",
+      "notes": "For reads with gh api parameters, explicitly specify --method GET; parameter flags may otherwise change the method.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "freshnessPolicy": "general"
+    }
+  ],
+  "policy": {
+    "executionAuthority": "none",
+    "nativePermissionGranted": false
+  },
+  "limitations": [
+    "Index membership is not a complete body reachability sweep.",
+    "Source documentation is not installed runtime, authenticated capability or behavior verification.",
+    "Two expected-predicate misses retain complete original bodies and separate readback results in the source-owned review."
+  ]
+}

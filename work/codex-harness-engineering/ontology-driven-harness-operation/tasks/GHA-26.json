@@ -1,0 +1,71 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "GHA-26",
+  "kind": "task",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+    "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+    "specRevision": 5,
+    "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "planRevision": 5,
+    "taskId": "GHA-26"
+  },
+  "title": "Completed source-only preparation/review: final-plan-review-v2.json",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "dependsOn": [],
+  "decisionIds": [
+    "common-first-implementation-explicit-publication-20261014"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:ontology-driven-harness-operation:source-preparation-gha-26"
+  ],
+  "artifact": {
+    "schemaVersion": "1.0.0",
+    "kind": "task",
+    "id": "codex-harness-engineering:task:ontology-driven-harness-operation:gha-26",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-14T13:37:44.410Z",
+    "payload": {
+      "title": "Completed source-only preparation/review: final-plan-review-v2.json",
+      "objective": "Provide independently evaluated source preparation for the adopted common Plan",
+      "status": "complete",
+      "acceptanceCriteria": [
+        "Bounded source report preserved and accepted as final Plan input"
+      ],
+      "verificationRefs": [
+        "codex-harness-engineering:verification:ontology-driven-harness-operation:source-preparation-gha-26"
+      ],
+      "details": {
+        "logical": {
+          "domainId": "native-harness",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-harness-operation",
+          "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+          "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+          "specRevision": 5,
+          "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+          "planRevision": 5,
+          "taskId": "GHA-26"
+        },
+        "scope": "source-preparation-only",
+        "nativeExecutionEstablished": false,
+        "executionClass": "source-only"
+      }
+    }
+  },
+  "executionClass": "source-only"
+}

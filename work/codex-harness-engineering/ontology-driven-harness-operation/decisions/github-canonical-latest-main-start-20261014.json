@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "github-canonical-latest-main-start-20261014",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "원본 파일은 GitHub repo에 두어야하지 않나? WSL2/VPS 어디에서 작업을 하든지, 처음 작업을 시작할 때는 항상 최신 main pull해서 작업을 시작하기를 원한다. 너는 Whole-Lens를 가지고 의사결정에 대해서 반박할 것이라면 근거를 대고, 받아들이려면 받아들여라.",
+  "meaning": "Use GitHub repository source as the canonical shared record. Every new Work on WSL2 or VPS starts by synchronizing latest main.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-3.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

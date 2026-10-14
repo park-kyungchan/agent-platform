@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U3",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "이번 인터뷰를 진행하면서, 실제 사용자가 의도한대로 그리고 목적대로 에이전트들이 움직여주는지 간략하게 테스트 진행해보면서, 병목들 파악하고 문제들 정의하는 것까지 진행하자.",
+  "meaning": "Run brief diagnostics alongside the interview, observe whether agents follow actual user purpose, identify bottlenecks and define problems.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-002.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

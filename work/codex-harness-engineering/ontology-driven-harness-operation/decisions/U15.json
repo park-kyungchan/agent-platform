@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U15",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "권장: 기존 Lead가 책임을 유지하고 새 대화는 지시 전달·병렬 기여·결과 보고를 담당 — “여기서 넘겨받아 계속해”처럼 인계를 요청하면 책임을 기록하며 이전",
+  "meaning": "A new Session for the same Task does not automatically take over Issue coordination. The current accountable Lead retains integration responsibility; the new Session may relay instructions, contribute in parallel and report results. An explicit handoff request triggers recorded responsibility transfer.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-010.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "VPS Lead가 진행 중인 같은 Task에 대해 WSL2의 새 대화에서 추가 지시하면, 통합 책임을 어떻게 이어갈까요? Issue마다 통합 책임자는 한 명이라는 기존 결정은 유지합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-010.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

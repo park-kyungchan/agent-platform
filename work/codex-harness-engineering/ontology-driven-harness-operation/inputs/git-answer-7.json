@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "git-answer-7",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-conversation:git-harness-adversarial-20261014/answer-7",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "권장대로 진행",
+    "captureQualification": "Actual visible user reply content; reconciled with accepted v6 records; not raw native transcript bytes",
+    "questionItemId": null
+  }
+}

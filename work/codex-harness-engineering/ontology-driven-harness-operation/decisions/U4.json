@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U4",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "이 검증을 나는 중요하게 생각하니까, 횟수는 40회로, 토큰은 10배로 늘리고, 시간도 2배로 늘려.",
+  "meaning": "Authorize separate diagnostic suite up to40native executions/4000000aggregate emitted tokens/90minutes inclusive children,retries and auxiliary executions.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-003.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

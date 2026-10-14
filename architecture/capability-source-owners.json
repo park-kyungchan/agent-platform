@@ -30,11 +30,7 @@
       "id": "work-continuity",
       "packagePath": "packages/work-continuity",
       "semanticOwner": "codex-harness-engineering",
-      "canonicalSource": [
-        "src/handoff.ts",
-        "src/context/",
-        "src/workspace/"
-      ],
+      "canonicalSource": ["src/handoff.ts", "src/context/", "src/workspace/"],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
       "nativeEntrypoints": [
         "src/cli.ts",
@@ -46,107 +42,157 @@
       "packageName": "@palantirkc/work-continuity",
       "packageManifest": {
         "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/package.json",
-        "sha256": "8afc36322da31336e770c9cc9812638d5e6d6253f623392df8c90a69dcdc6202"
+        "sha256": "ce6ae5645862ea9b13d6e27a863b58c6ae7761c7c11160ebb90ede1c404eafee"
       },
       "sourcePins": [
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/index.ts",
-          "sha256": "63d91d2c97eb99ff46118dfac25bb456d15ac63eeed37cc85f9bf971c32e94dc",
-          "relativePath": "packages/work-continuity/src/index.ts"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/handoff.ts",
-          "sha256": "7c0e5d0b6575e8e82d94e299c078446270c2c99c997a958da0ea2ea6ea01664d",
-          "relativePath": "packages/work-continuity/src/handoff.ts"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/index.ts",
-          "sha256": "9a649823c0d2647e1a4c2c5f907b571de59ee69199c8e7db10f802e27ddb0166",
-          "relativePath": "packages/work-continuity/src/context/index.ts"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/source.ts",
-          "sha256": "11507930a28c30d0fce389c58f6bf29e536ba472dbb26fe4bbffb794f6b2017e",
-          "relativePath": "packages/work-continuity/src/context/source.ts"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/store.ts",
-          "sha256": "87ec96ae50b2677a3920377a49de1ec69afa4deb0c514670755f9e22ae5e2307",
-          "relativePath": "packages/work-continuity/src/context/store.ts"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/types.ts",
-          "sha256": "545628f6b9af20278f3639709f3ef56f20260de4724d342321ee675836aa9347",
-          "relativePath": "packages/work-continuity/src/context/types.ts"
-        },
-        {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/boundary.ts",
-          "sha256": "801fcca92f0606ec69aea238bbe2b7eaba1e6620fda06e64bde5486ff4588ec4",
+          "sha256": "cdc026c96b6d6343db1400b7ed6508509713b2ef234518421889202ed5438817",
           "relativePath": "packages/work-continuity/src/context/boundary.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/context.ts",
-          "sha256": "88263d64e68ddd972850d29e9b962623b89bf6c9ed1b715e2e26fec885507523",
+          "sha256": "33faafbafe361b8039e5dd65048ee3db0fe615463e26fa588619cd22f28b817a",
           "relativePath": "packages/work-continuity/src/context/context.ts"
         },
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/validation.ts",
-          "sha256": "27b5417a7b1556239dd4fc505be88a4d8ab71deb00a24a1df91e0ca58c5e057e",
-          "relativePath": "packages/work-continuity/src/context/validation.ts"
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/index.ts",
+          "sha256": "253266f9a01c9f35312d445490969870654317b4dc87f4893862e92ff0c696f9",
+          "relativePath": "packages/work-continuity/src/context/index.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/sections.ts",
-          "sha256": "60df942bffaa8a3129412dbbd17ede9f28f034400048039741afb85f545198c1",
+          "sha256": "38b69f7a254064b4213a5fcc5d368062ca02e2ce8707366c204c229ef01b0143",
           "relativePath": "packages/work-continuity/src/context/sections.ts"
         },
         {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/source.ts",
+          "sha256": "50142da45b2e758ac8aba0524d760e7629340ea6a579a5ea38a3e6a908fa66e4",
+          "relativePath": "packages/work-continuity/src/context/source.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/store.ts",
+          "sha256": "ca42858aacc7e4f916b1b48ca37822ba33b302ef9408aea598e9ece0d050a823",
+          "relativePath": "packages/work-continuity/src/context/store.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/types.ts",
+          "sha256": "ef931ed0655c6342fd54629b7e2a233e2455d665dbd1e5d4a6cbf3a3131454f7",
+          "relativePath": "packages/work-continuity/src/context/types.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/context/validation.ts",
+          "sha256": "adf83d11267a40dad0f447e1481f4149dea6fbcc0fd8ba491be8b6a852e5d8bc",
+          "relativePath": "packages/work-continuity/src/context/validation.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/context.ts",
+          "relativePath": "packages/work-continuity/src/git-work/context.ts",
+          "sha256": "519a386432c788e5f82a323fc28f29c7884ce483404802e415a03b93fe0dc5d3"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/index.ts",
+          "relativePath": "packages/work-continuity/src/git-work/index.ts",
+          "sha256": "3086b9b375e0989b34bdcd483577f13e0b58ad8ac9f00cfacf5977573b71158e"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/records.ts",
+          "relativePath": "packages/work-continuity/src/git-work/records.ts",
+          "sha256": "5ab086cb44441ad268116996fe2bd01adf8dd432a57d3931fa95747e0c948b99"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/source.ts",
+          "relativePath": "packages/work-continuity/src/git-work/source.ts",
+          "sha256": "620b9b68b36d6e60b8b2f205df0ac116c27bc89867a9a003afd64a1beb7a60b5"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/types.ts",
+          "relativePath": "packages/work-continuity/src/git-work/types.ts",
+          "sha256": "cb70b46d5680b42f09e1e9d38d8eaa9025873adf0a6f78e75ab5f126ccfb97a8"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/handoff.ts",
+          "sha256": "8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a",
+          "relativePath": "packages/work-continuity/src/handoff.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/index.ts",
+          "sha256": "d3d6756be249b4028c73bf7f7c87d53ee1cc4054f0777f6474f07d89405904b8",
+          "relativePath": "packages/work-continuity/src/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/logical-identity.ts",
+          "relativePath": "packages/work-continuity/src/logical-identity.ts",
+          "sha256": "9be1b608f1058fd7a64207110c7e4d06531f96a2060811eb2f32e5619b65f84e"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/operational-state.ts",
+          "relativePath": "packages/work-continuity/src/operational-state.ts",
+          "sha256": "6bda838562d3f2375e0110d334545afa78fab3cb90649cf9c1e80ae4c9d74c63"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/runtime-docs/index.ts",
+          "relativePath": "packages/work-continuity/src/runtime-docs/index.ts",
+          "sha256": "72b4a6ef5faa84978d1a041e8d0b7f1191365c041f796b737db4ca549931c536"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/runtime-docs/types.ts",
+          "relativePath": "packages/work-continuity/src/runtime-docs/types.ts",
+          "sha256": "dd3a897c221c30ab404323604a7bb56664373ec7d26ccf1682d7bb55c4872846"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/runtime-docs/validation.ts",
+          "relativePath": "packages/work-continuity/src/runtime-docs/validation.ts",
+          "sha256": "6072f6095cc4a4f7230181dd3d6f4f9883a128af409163c593c83d1c4babc341"
+        },
+        {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/lexical-recall.ts",
-          "sha256": "8588b98c1f17e979bad0d63f0534543feae7ea3f1caf28b010317a2f33a9a94b",
+          "sha256": "5fccb346938751e0983abbed716dae5ac98c85c8b85060605d100b0dd0d2974d",
           "relativePath": "packages/work-continuity/src/workspace/lexical-recall.ts"
         },
         {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/recall-request.ts",
-          "sha256": "cb93f2760fc6c2195a194e80c9887c36adb35fd6a7e2e4d34dc68c1c310e2ffd",
-          "relativePath": "packages/work-continuity/src/workspace/recall-request.ts"
-        },
-        {
-          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/recovery.ts",
-          "sha256": "a58e0e224ba0ca0cb3dd126949c85d55da1fe0753558e4fd7d918d1dfcd28a45",
-          "relativePath": "packages/work-continuity/src/workspace/recovery.ts"
-        },
-        {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/memory.ts",
-          "sha256": "832357100fc3dd709e3df754ed293871ffca2f6af7e3ef2289e761544723935e",
+          "sha256": "d9e0e54962fef476890828626856b657c7bd299c6b818c5fedc7afb7dfbf3661",
           "relativePath": "packages/work-continuity/src/workspace/memory.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/original-producer.ts",
-          "sha256": "0051eae196617ac05c7787d3b683be1900203c646930312a7393597e9a3cae16",
+          "sha256": "c1c3e1571f1399d10ad41b99934f210623c8ca7cb6034bc6c1a92ea00b28c997",
           "relativePath": "packages/work-continuity/src/workspace/original-producer.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/qualification.ts",
-          "sha256": "136b7f5eaa10763c7b0e315d2ca0056c6ceee80df396b7ec735238e80cab57c3",
+          "sha256": "c7ef10b6633657368b1a390dc44d93a557a647c61f7077e94ca619b82a847e6d",
           "relativePath": "packages/work-continuity/src/workspace/qualification.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/recall-request.ts",
+          "sha256": "854677ea78e44a31015f69bb8869147c7377fbeb7ac7dc6b52ab5916ebe73e5f",
+          "relativePath": "packages/work-continuity/src/workspace/recall-request.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/recovery.ts",
+          "sha256": "6367efc9c3aa4dea1378d6a883d46e8d32698730c5318091ef3e3e010942c1aa",
+          "relativePath": "packages/work-continuity/src/workspace/recovery.ts"
         }
       ],
-      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
+      "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
+      "gitWorkSource": {
+        "publicSubpath": "./git-work",
+        "recordOwner": "Owning Project/Work branch in canonicalRepository",
+        "canonicalRepository": "park-kyungchan/agent-platform",
+        "nativeOriginalsAndEvidenceOwners": "Retained; source refs/captures only",
+        "authority": "none",
+        "nativePermissionGranted": false
+      }
     },
     {
       "id": "ontology-foundation",
       "packagePath": "packages/ontology",
       "semanticOwner": "ontology-foundation",
-      "canonicalSource": [
-        "src/",
-        "schemas/",
-        "scripts/generate.ts"
-      ],
+      "canonicalSource": ["src/", "schemas/", "scripts/generate.ts"],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/ontology-foundation",
-      "nativeEntrypoints": [
-        "src/index.ts",
-        "scripts/generate.ts",
-        "scripts/release-local.ts"
-      ],
+      "nativeEntrypoints": ["src/index.ts", "scripts/generate.ts", "scripts/release-local.ts"],
       "ownerBoundary": "Canonical schemas/declarations/generator are common source. Existing native release adapter assembles new versions only; published0.1.0/0.2.0 tarballs/receipts remain immutable and existing consumers retain pins.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/ontology-source",
@@ -157,7 +203,7 @@
       "sourcePins": [
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/index.ts",
-          "sha256": "a7fceba7d976650d7357fe55570d9015c93bc5db629985a9bc5cd44d4bdc43d0",
+          "sha256": "2cbf4563a48a6572117674ea1fcbde1fe188bfba270bedeed3bebbb152349446",
           "relativePath": "packages/ontology/src/index.ts"
         },
         {
@@ -167,17 +213,17 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/operational-validation.ts",
-          "sha256": "3f93d64e0f757a9e8a04c16f210af3ca4ae977de079ebd1693e3e1a22908a189",
+          "sha256": "cec705a8490974d16fd35ecc8468261e22675d3edb70e1823b037651d8b4c140",
           "relativePath": "packages/ontology/src/operational-validation.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/json-validation.ts",
-          "sha256": "46c0edc9a2228d05a5228f963e257ada7b953dcef0b49bead1755975fc91ad9a",
+          "sha256": "77e886b0c1b38b330d4b2cea98bccba5cb76394742f9740a7c18b9fd82bb3b8b",
           "relativePath": "packages/ontology/src/json-validation.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/domains/evidence.ts",
-          "sha256": "f24fb73ad9dcf3004edcf6b339bf4a132f9c1c09c39dfc2d03a893b429398ddf",
+          "sha256": "45b037a1bc4f0307057a7878e6f1965120736a7a47f05a56b5c247bb5c854b23",
           "relativePath": "packages/ontology/src/domains/evidence.ts"
         },
         {
@@ -192,12 +238,12 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/operational.ts",
-          "sha256": "832da1ef037d99cf638b668e6d2c47e74ecce45bdb62ca781c5f6e8a049538b2",
+          "sha256": "e83c2c14c266b611dfea27e6b45420da02a0696938cece9135c7e23b7c0cc33f",
           "relativePath": "packages/ontology/src/operational.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/validation.ts",
-          "sha256": "78f777ca9f27c7366e94224a56687435cf7f7ff3aa48834692c562f44c8fd378",
+          "sha256": "b02510c3ba7e27a3208c1bfe1c4466c2da3e37d4c195361d31a4e91810a3a813",
           "relativePath": "packages/ontology/src/validation.ts"
         },
         {
@@ -222,7 +268,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/src/upper.ts",
-          "sha256": "eca4eca41168ca8fc8f31ee03e8a7a9ba0b1204a364886155617d1a623ec16e7",
+          "sha256": "1bf873a46f09f12569530bf2c5c288c82730cb03d14b69c6bd3ceddae7b58e91",
           "relativePath": "packages/ontology/src/upper.ts"
         },
         {
@@ -242,7 +288,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/scripts/generate.ts",
-          "sha256": "125b9287345a5803d86efe5636b9c1011b3cc93c5a6a45e800092d70ea21c5f8",
+          "sha256": "2fca0155844b0f11ad5c7b43d484a113bdd3b4f4bf440d39bf3d5d9fe6c41416",
           "relativePath": "packages/ontology/scripts/generate.ts"
         }
       ],
@@ -252,17 +298,9 @@
       "id": "evidence-foundry",
       "packagePath": "packages/evidence-foundry",
       "semanticOwner": "evidence-foundry",
-      "canonicalSource": [
-        "src/",
-        "schemas/",
-        "scripts/generate.ts"
-      ],
+      "canonicalSource": ["src/", "schemas/", "scripts/generate.ts"],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/evidence-foundry",
-      "nativeEntrypoints": [
-        "src/cli.ts",
-        "src/service.ts",
-        "src/index.ts"
-      ],
+      "nativeEntrypoints": ["src/cli.ts", "src/service.ts", "src/index.ts"],
       "ownerBoundary": "Core requires explicit per-instance real semantic-owner policy before Store.initialize; old service/index subclass binds its own relative project.json and preserves constructor/open/default or explicit data roots. Native workflows, stores, exclusion policy and credentials stay with owner.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/evidence-foundry-core",
@@ -278,62 +316,62 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/service.ts",
-          "sha256": "ab5d9667f352e682c41309a46141e54a2fae91c2b8a9e2daa98fd043f92924cc",
+          "sha256": "c39dd48ea1610f7bdcc91584ecb9404ef7abc7ed3b03e85331f9e5bc06f72beb",
           "relativePath": "packages/evidence-foundry/src/service.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/api.ts",
-          "sha256": "71f54814e221ab09a4a90a57e163f3b94fb8cec01071a1e5700d311fd0ccdb25",
+          "sha256": "91e1dfb0bf819123bf0d4dc6eabd8d595d0859c76a629bd5b768034a49081b42",
           "relativePath": "packages/evidence-foundry/src/api.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/adapters/legacy-receipts.ts",
-          "sha256": "cbf6ba7898009493cfbcf4d2c780f4ca771411aabd71b1a5e1483a57fbd8c07e",
+          "sha256": "079e5540c1289ccac42e8013e7d768b5d12ac472e09e25ac51e4f15ccf4e920b",
           "relativePath": "packages/evidence-foundry/src/adapters/legacy-receipts.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/adapters/native-codex.ts",
-          "sha256": "9814107d33f1faf035db1b8036c45fe72f8ae1ccb648fe22b5c80f62806538f4",
+          "sha256": "6c49bfd5247588b792cee99b88330443cf6390190b8be60fcbcf6d69d76affa7",
           "relativePath": "packages/evidence-foundry/src/adapters/native-codex.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/adapters/capture-policy.ts",
-          "sha256": "2930602d225574d2ef14bc1fae330517f50f8d20e9556ea26f276ce489d8caea",
+          "sha256": "123b5906e368eb89ee3871c5ec00278ad1f6b49a106ba95750426b37da1e4084",
           "relativePath": "packages/evidence-foundry/src/adapters/capture-policy.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/storage/store.ts",
-          "sha256": "d2b8191c701fd8f11244d580af1d1746b1c3e25aaa665f1ba3cb4cc37e326588",
+          "sha256": "66e8ef7948c400bc440ea60a8260adaf4e78374449aede1e9791907d91d334c7",
           "relativePath": "packages/evidence-foundry/src/modules/storage/store.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/index.ts",
-          "sha256": "64427531e1a400de23b7b1c04c674b8b5429c3f185a90cc29651b6a0540bf569",
+          "sha256": "26e7f8ab67e24bc191ce1465c9e579d45c760274771500439028c4c50ee4d182",
           "relativePath": "packages/evidence-foundry/src/modules/evals/index.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/types.ts",
-          "sha256": "f61338d99da52770bb3c1a5cf9ed98e7d5569b2987f389b7f6d903ce8a910163",
+          "sha256": "860d0884a86b0d54788f6d25fc0d0c48fa9e53189380e27add1d26090c860fa3",
           "relativePath": "packages/evidence-foundry/src/modules/evals/types.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/runner.ts",
-          "sha256": "914929f3ac3174ac6ddaa5121b0dc186d31904bbad109a1b69716fc5f78416e4",
+          "sha256": "e3e8dcaa7dc8617ad8de8dfdb2ea1b696ea3623d3fcc88caf438367326705a2c",
           "relativePath": "packages/evidence-foundry/src/modules/evals/runner.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/claims/index.ts",
-          "sha256": "c674f4c3ff98bebd92333c91e89ebe7be2b6ee867a0337cdf740add2f20ebedb",
+          "sha256": "28655647c7ffdda408a4cc5bdafbfe147b0396aae55b48e22cd4c0b68bde4973",
           "relativePath": "packages/evidence-foundry/src/modules/claims/index.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/claims/verification.ts",
-          "sha256": "a68c7e1d8a113c15d79fc5cd34d835747248fc7c625386a8d9956efde7d52814",
+          "sha256": "4d98bc7b99e5a639735a06b6f6274860b0596f323850b0e6626e8443e40866f5",
           "relativePath": "packages/evidence-foundry/src/modules/claims/verification.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/ontology/registry.ts",
-          "sha256": "f3b5e12975a2f4cc1c896ba2874d492eac4394e6014bc12aec8808a8f9f26bd9",
+          "sha256": "ef5722a59588cac56c8ae4641a30116048da82fde5320bb2389a11538058df3c",
           "relativePath": "packages/evidence-foundry/src/modules/ontology/registry.ts"
         },
         {
@@ -353,7 +391,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/scripts/generate.ts",
-          "sha256": "ac6c215f00cc5dcdfc6d88dfd119c77b0cec9406b8253ed60d07403a2a998a39",
+          "sha256": "10a15407c71db1799876438338904ba352a5077e0782c9e385638aecd63dec91",
           "relativePath": "packages/evidence-foundry/scripts/generate.ts"
         }
       ],
@@ -363,15 +401,9 @@
       "id": "research-capture",
       "packagePath": "packages/research-capture",
       "semanticOwner": "scrapling-research",
-      "canonicalSource": [
-        "src/capture.ts",
-        "src/bundle.ts",
-        "src/upstream.ts"
-      ],
+      "canonicalSource": ["src/capture.ts", "src/bundle.ts", "src/upstream.ts"],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/scrapling-research",
-      "nativeEntrypoints": [
-        "src/cli.ts"
-      ],
+      "nativeEntrypoints": ["src/cli.ts"],
       "ownerBoundary": "Only3implementation modules are canonical here. Schema/generated/index/immutable 0.1.0 files are pinned read-only dependency copies from research owner; CLI/setup/update/smoke/Python/runtime/output roots remain owner. Direct core capture callers must supply an explicit root.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/research-capture-core",
@@ -382,22 +414,22 @@
       "sourcePins": [
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/index.ts",
-          "sha256": "8ec42ec2f6627b90f22f83d80a70b9291632f826662dc5a2f9b096fe7650d9c2",
+          "sha256": "dacf98bed5b6a359dee10f069e658e4bc82289e4acd402bbccf1b15c7a58d4b8",
           "relativePath": "packages/research-capture/src/index.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/bundle.ts",
-          "sha256": "4225a8dc6d3f6c582ef75d495b5f14168cab83ad2688f069bac2514089eeaba9",
+          "sha256": "24c1715be36922e8cdff3fe73ade027d884b27b518a72f27c166f0e6c0b842eb",
           "relativePath": "packages/research-capture/src/bundle.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/upstream.ts",
-          "sha256": "867aac36e4a5e345b13f6570688166c79cd9b4fb04dd41b3fa5c74da45281cfa",
+          "sha256": "e7a3a3d35ea45da9bbaf66e1b87baa5e1b4258fb8170251beae052a54bd9468f",
           "relativePath": "packages/research-capture/src/upstream.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/src/capture.ts",
-          "sha256": "cc6bb9ac1029c0d823faedc38d084506df5c146d4a75f510118407314225ec84",
+          "sha256": "cae088c150be3468f5efda3481a51a5e7af17efd953c2d83de46b81f11d0764f",
           "relativePath": "packages/research-capture/src/capture.ts"
         },
         {
@@ -427,14 +459,9 @@
       "id": "infrastructure-domain",
       "packagePath": "packages/infrastructure-operations",
       "semanticOwner": "vps-operations",
-      "canonicalSource": [
-        "src/domain/"
-      ],
+      "canonicalSource": ["src/domain/"],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/vps-operations",
-      "nativeEntrypoints": [
-        "src/cli.ts",
-        "src/adapters/"
-      ],
+      "nativeEntrypoints": ["src/cli.ts", "src/adapters/"],
       "ownerBoundary": "Six pure domain modules are canonical common code. Nine SSH/container/runtime/native adapter modules and CLI remain owner; no lifecycle or remote permission is implied.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/infrastructure-operations",
@@ -450,27 +477,27 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/schemas.ts",
-          "sha256": "85b7edd0e6ffbcb5c78bb17c39e03e3b3760828bd289d14c826858345977c37d",
+          "sha256": "d12b0e54312dfb51465a2ab8d53a2bdde3ffb9db980cc30e5f6de37f90d0e50a",
           "relativePath": "packages/infrastructure-operations/src/domain/schemas.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/types.ts",
-          "sha256": "7c42d38cff9f785c52f8e91dc1ffcd5cca027642f8d3465fca4e1c7085308753",
+          "sha256": "74e4a782d7c910096c71aa47b1c48afe1b12e763b269ac8e968caf8012f20dbd",
           "relativePath": "packages/infrastructure-operations/src/domain/types.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/evaluate.ts",
-          "sha256": "9ae39787628a36bd9a6df485866f7a68ac0e6bc60c192fd3eaf5281275d57a55",
+          "sha256": "edbe4fccf83ee71c5af160f1643be843fd3afb00854f4213c579e2e2c487edf0",
           "relativePath": "packages/infrastructure-operations/src/domain/evaluate.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/validation.ts",
-          "sha256": "875699e082d2c4daa31944201bec4e481c229e8f4a376ef52e697695cbe86f64",
+          "sha256": "11cc861f4e3b749fcb89fcb6685132acb62728f0cb7e1d7532026e77af31e44e",
           "relativePath": "packages/infrastructure-operations/src/domain/validation.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/infrastructure-operations/src/domain/registry.ts",
-          "sha256": "6b73cc40f8f551c77b61de540a2d7043d7d84ec40a4acaabfd319b5e84d39b52",
+          "sha256": "a8eeae2e3b73c01ea17baf09c1acf2b3704fc40468b6e080590a9420d87f3ade",
           "relativePath": "packages/infrastructure-operations/src/domain/registry.ts"
         }
       ],
@@ -501,17 +528,17 @@
       "sourcePins": [
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/home-context.ts",
-          "sha256": "30a0a8c46c07ce17481addec393746bcfd05051cf15805f15947bb94dd1222be",
+          "sha256": "3c31f5b1776993f9ddafb9d5bc6f2db6b50f648e0a80aaab81098da191b22c3c",
           "relativePath": "packages/native-codex-adapter/src/native/home-context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/hooks.ts",
-          "sha256": "d281c9aba41eaae819a3168cd0d04b75c5825f26a5356ff613eea01ed07cebea",
+          "sha256": "4af3b85bb340fb7b3c7c0750962624dfb0c0e86b202d82e3d2e8fa6225a00517",
           "relativePath": "packages/native-codex-adapter/src/native/hooks.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/evaluation-ledger.ts",
-          "sha256": "8a64851493734c0262ea760ccc1891c087eb2c8393ee3b2bf36f4ae95f50c457",
+          "sha256": "91eeda01bd8673a251f39381fad2b931ce609af007380cf0eefa7a3703ddba17",
           "relativePath": "packages/native-codex-adapter/src/native/evaluation-ledger.ts"
         }
       ],
@@ -534,7 +561,7 @@
         "src/ontology-driven/native-bundle.ts",
         "src/ontology-driven/provider-source.ts"
       ],
-      "ownerBoundary": "Nine existing context/budget providers, pure platform-governance contracts/validators/reducers, and six canonical native-required Python/YAML plugin source files. Hermes owns CLI/native promotion, profile/task/session/evidence data and actual execution; no second runtime.",
+      "ownerBoundary": "Nine existing context/budget providers, pure platform-governance contracts/validators/reducers, and four canonical native-required Python/YAML plugin source files. Hermes owns CLI/native promotion, profile/task/session/evidence data and actual execution; no second runtime.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/native-hermes-adapter",
       "packageManifest": {
@@ -574,82 +601,82 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/evaluation-budget.ts",
-          "sha256": "1f0bb1e2829b99d7c7e6faef9ce86a157f37aa81305667e9c9d563999310c1df",
+          "sha256": "de5a46c12c2b688bda2e6db95942671c806979e54622f22bf8ed4959738eb8a5",
           "relativePath": "packages/native-hermes-adapter/src/adoption/evaluation-budget.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/adoption/semantic-context.ts",
-          "sha256": "e2affef0eac169350f064ee59e66edd5ff5cc48d8eb3b578660e91f5aabd613e",
+          "sha256": "9947cac51187dd9308e05500e77fe446545a3b2416c07eef20abdd9ddea88ed9",
           "relativePath": "packages/native-hermes-adapter/src/adoption/semantic-context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/audit-adapter.ts",
-          "sha256": "b15b8097046b2ae43d0ec1606acb3d2278e8b462745dc217521148fb78090c8a",
+          "sha256": "859c667f564097222eb48dc7d575cc3a01bf13427d9bd7d4e93d11663cf9180f",
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/audit-adapter.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/contracts.ts",
-          "sha256": "abcfa1d692b6a0f6d4ec2d6174c1b201de938b819b7db3c53934267d521a1f3f",
+          "sha256": "3b4e7be2a4a98fd8fc974ddc31cd65b7d65db4244a47f15802b28d13d42efa73",
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/contracts.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/current-intent.ts",
-          "sha256": "6851cbc1e90d11255ca9d254340929693b8e72b6a52d33c82b3a8632bc79065a",
+          "sha256": "144fa1bc35c4ce78cd2f25f7edef060101ccae5605298984c169fed24e0efa9b",
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/current-intent.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/domain-context.ts",
-          "sha256": "52efe3ab246afeffdd47c4865f8bf5debccce468094a89940fb400d53eba71e1",
+          "sha256": "6389df3f6f8b554022eb0817009e7c9ef2b752ebf11a90a55336227ef17d52d0",
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/domain-context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/pinned-reader.ts",
-          "sha256": "51a1c05adc14bfb71ad9b1a484ffb1891fd71054010d46fe9628a2ecb3599764",
+          "sha256": "fb2fe3bfce24a3b68d8d98b1962609296a8bfe908d826be914ccd1ae9036a9df",
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/pinned-reader.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/role-registry.ts",
-          "sha256": "8c409468878250edd92988ea35dd2cd99a4df3cd70e4ea52b35c03ad0f62c79f",
+          "sha256": "0007ad65fced22d8063f2c7620b8599a10fd47bb2ee95770e6edbecb2c10a1d8",
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/role-registry.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/ontology-driven/work-context.ts",
-          "sha256": "0600bf7ed61af06b9995d0c8be3538341ec6f29bd347ae7ca1b80ec34bbb5dc2",
+          "sha256": "320145d8925af3e8c119ce798e8512661f28de310378810d81a51d4292cf114c",
           "relativePath": "packages/native-hermes-adapter/src/ontology-driven/work-context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/bot-correlation.ts",
-          "sha256": "baaf205518173ed999a482628f84b0fb5f0cc6e7761227b3a52376b4b7c1f9f3",
+          "sha256": "ce91c0336f2b6d3e3fcb5ef7ae23696ae78e152862bf67670e372563202374ef",
           "relativePath": "packages/native-hermes-adapter/src/platform-governance/bot-correlation.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/boundary-custody.ts",
-          "sha256": "dcc386f07b1bab452fc8c7ff2de6bbc07da1f225ffb85915464df06e3443a207",
+          "sha256": "77fc1bcf4d15143166992638a67ccd087cab4140b03763eb2d4ff37ec9703a55",
           "relativePath": "packages/native-hermes-adapter/src/platform-governance/boundary-custody.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/contracts.ts",
-          "sha256": "70f8e4369fc9845b02bcd23453471c0f6c8c99d348c6b254f7e753dd02ed7114",
+          "sha256": "9dd9df59c794998691f2badb73e86914c027b5cd28506267146d61ee1719d42a",
           "relativePath": "packages/native-hermes-adapter/src/platform-governance/contracts.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/evaluation-budget.ts",
-          "sha256": "96786f9b8fa311918b77cbe57b4919da089868a66d5dd102c873ab5190a26d29",
+          "sha256": "a0892a21b155050b810b464691c407e926069db71f5af9c3722d63df6e99c5cb",
           "relativePath": "packages/native-hermes-adapter/src/platform-governance/evaluation-budget.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/index.ts",
-          "sha256": "9f850089fca2c68a620c8c72d47c9e97c31dfd9247cc835584b0fe8e25d6d8c1",
+          "sha256": "fa106c6172e8cc8c119607949b52d6f8fa7df53f08586ebffbbd53d08429c609",
           "relativePath": "packages/native-hermes-adapter/src/platform-governance/index.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/native-bindings.ts",
-          "sha256": "c2bf6f45fa1ac3eaebdc9e6d6172b115dab9312da50a140b18d548f09ba84901",
+          "sha256": "4060332183e8e65167dedee47caac85706db43e9d79eee827c6adbe8c9b9b73a",
           "relativePath": "packages/native-hermes-adapter/src/platform-governance/native-bindings.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-governance/policy.ts",
-          "sha256": "19807c2dddc9e1727880e12b457796522bff3db5ede2455f2b4df5c07c9d69d9",
+          "sha256": "17a70390932c6195eee78a38606c0a89cce4337413e703b5e2f320b095aedae2",
           "relativePath": "packages/native-hermes-adapter/src/platform-governance/policy.ts"
         }
       ],
@@ -673,10 +700,7 @@
       "id": "operational-context",
       "packagePath": "packages/operational-context",
       "semanticOwner": "backend-ontology and SharedWiki operational-v1 domain owners",
-      "canonicalSource": [
-        "src/backend/",
-        "src/shared-wiki/"
-      ],
+      "canonicalSource": ["src/backend/", "src/shared-wiki/"],
       "nativeEntrypoints": [
         "/opt/data/workspace/backend-ontology/runtime/query.ts",
         "/opt/data/workspace/backend-ontology/runtime/intent-context/cli.ts",
@@ -697,72 +721,72 @@
       "sourcePins": [
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/contract.ts",
-          "sha256": "ae06b2abbb79a7b386a3c01b8e002531e8f1ea5bb247407305e1658691915c43",
+          "sha256": "25c87e7f42d998ee716d74e091defacbb4699f3f16477d45fcaa4e8cbc29a817",
           "relativePath": "packages/operational-context/src/backend/intent-context/contract.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/json-ingress.ts",
-          "sha256": "05d0d915b7e0c3e1b52d36b64161346230bd833c61430e9e7e2473504867ce7d",
+          "sha256": "f11a02136ed550a8d2ef46d657cb4981b8f32f6463591bd314ec9030fb0f2ba2",
           "relativePath": "packages/operational-context/src/backend/intent-context/json-ingress.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/intent-context/resolve.ts",
-          "sha256": "7c91aca8d2b400f056eee75737d04eb92f739f34810a6349002b183face04a43",
+          "sha256": "ca668c06c32286f364d002c2aecfe45c656e14a21f8fb5cb85c0e4c7b5814a77",
           "relativePath": "packages/operational-context/src/backend/intent-context/resolve.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/data-snapshot.ts",
-          "sha256": "fbeb6f6954487fc5c7ecd2f1b518b1d99fc67fd6c9ce42f234e59e3615321ea7",
+          "sha256": "043442c4a57751f652559aedf41cbc0a67e4cb98fdd2de841aa2836d7e5d91fa",
           "relativePath": "packages/operational-context/src/backend/review/data-snapshot.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/handoff-contract.ts",
-          "sha256": "ec03560724f11583512c5bdfeac639279a5d71ea5b5a865d8e8abf32a6ae7272",
+          "sha256": "1d06aa62e6858dbc33762f5f2abdac77aa8b6565c495e63a9da96545cf0d961a",
           "relativePath": "packages/operational-context/src/backend/review/handoff-contract.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/native-trace.ts",
-          "sha256": "0d0434bfdcd9acb3a5e1f290dadc941d814e4c1dffb022c144906180da375f96",
+          "sha256": "acb5dce9616c572a293c79bcbda138675decf73242eae6696a799dd5790fdeea",
           "relativePath": "packages/operational-context/src/backend/review/native-trace.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/result-contract.ts",
-          "sha256": "bc4da26619b5d8f4e4ce17523d745c9e02f36d41ed94bcd51641c94c3100a4c3",
+          "sha256": "2eda0e67add1afcc05a17947cfc6d77abb9e42f897f49468c05fddccdc6ac536",
           "relativePath": "packages/operational-context/src/backend/review/result-contract.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/review-evidence.ts",
-          "sha256": "87df31676d9e56793e3f7587232c4b33afd55abad8e857a7d225f776f8bdb00a",
+          "sha256": "61137dd1cc8efc1ed8b1c9b83288c16b9c6e70e8919fe64d45ab58cb07bc7d1a",
           "relativePath": "packages/operational-context/src/backend/review/review-evidence.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/review/source-coverage.ts",
-          "sha256": "e591cdfdd3c0c1be29e022d046374c3deaaf8e41045da74bb8b706de6a93c03c",
+          "sha256": "3f80c8c992e2c7d9eb011efc558020f93dc66819ef914c9f906e8fe1f07162ba",
           "relativePath": "packages/operational-context/src/backend/review/source-coverage.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/contract.ts",
-          "sha256": "e62feaf2ee52d334e149a2bb74ea29597894ec65493066a77d37af807e662574",
+          "sha256": "824bf38cf6e00d657c7d06994427569d810625722061ce7c8972eb17ee4df3c5",
           "relativePath": "packages/operational-context/src/backend/work-artifacts/contract.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/lead-evaluation.ts",
-          "sha256": "fc50c40db24ac05a6fdb84d1ee8d2c71e7e7cabc608dde88f48d87bde31ce0f9",
+          "sha256": "eee0a814d2877e0edb6ff30c2c43940dfe5f34fb3ae330530215bebceb7348bd",
           "relativePath": "packages/operational-context/src/backend/work-artifacts/lead-evaluation.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/lead-protocol.ts",
-          "sha256": "623321bac70304c6595c5b553168f81de17c1ec4c92ab21ca1fc14c95b1b5aa0",
+          "sha256": "a7987f03b7f630a73ef5b994e2a87120c2d1737d4a472a156b37011174c19d46",
           "relativePath": "packages/operational-context/src/backend/work-artifacts/lead-protocol.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/backend/work-artifacts/operating-context.ts",
-          "sha256": "fe089442d7843c93421a0afb0b392ec2acdbd7e113dfaca9a62576c7242e0471",
+          "sha256": "35a13523950eb2d406fd4028c04a4e93503a98eb2fd2b61e16dde12b0254dfcf",
           "relativePath": "packages/operational-context/src/backend/work-artifacts/operating-context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/src/shared-wiki/v1/contract.ts",
-          "sha256": "3d2434201f3bca6e7fd56d390a7fc93b075e1b2782d71346763fa6f9cccb57ee",
+          "sha256": "c113f703d15d03f9bc28f268410941c599a7c503ddd8b2856b0744cb90a19ec8",
           "relativePath": "packages/operational-context/src/shared-wiki/v1/contract.ts"
         }
       ],

@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "autonomous-common-goal-20261014",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "create_goal tool로 goal prompt에 Goal을 정밀하게 설정하고, 모든 전체 작업 완료시까지 진행해라. 유저는 더이상 개입하지 않는다.",
+  "meaning": "Set an exact native create_goal objective and autonomously finish the already authorized common Harness implementation, independent review, explicit GitHub merge, verified main and runtime-Lead handoff without further user intervention. Preserve the agreed deferred runtime-specific scope; no new model-evaluation budget or Acceptance is inferred.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/autonomous-goal-direction.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

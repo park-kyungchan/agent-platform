@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "legacy-answer-008",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "owner:.private/daily-use-interview-20261012/answer-008.json#/text",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "권장: 그 결정에 의존하는 실제 변경은 보류하고 최신 출처를 복구 — 조회와 독립적인 작업은 계속",
+    "sourceCapture": {
+      "ownerId": "codex-harness-engineering",
+      "path": ".private/daily-use-interview-20261012/answer-008.json",
+      "sha256": "2c0b35587158d12ef6a8a47eaeaf9ec58d455e44c9534c524414fd2c946884ee",
+      "fragment": "#/text",
+      "recordClass": "ActualNativeUserAnswerContent",
+      "qualification": "Selected content copied from source-owned capture; not raw native transcript bytes or new authentication proof"
+    }
+  }
+}

@@ -20,7 +20,9 @@
     "./memory/recall-request": "./src/workspace/recall-request.ts",
     "./originals": "./src/workspace/original-producer.ts",
     "./recovery": "./src/workspace/recovery.ts",
-    "./memory": "./src/workspace/memory.ts"
+    "./memory": "./src/workspace/memory.ts",
+    "./git-work": "./src/git-work/index.ts",
+    "./runtime-docs": "./src/runtime-docs/index.ts"
   },
   "engines": {
     "bun": ">=1.3.14"

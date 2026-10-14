@@ -1,0 +1,26 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "legacy-user-answer-023",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "owner:work/ontology-driven-harness-operation/final-review-20261012/user-answer-023.json#/answer",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "권고: 검증된 로컬 영수증으로 B 진행. 다른 Runtime에서는 그 영수증을 실제 수신·검증한 뒤 진행.",
+    "question": "A Task는 실행·검증·로컬 영구 기록을 완료했지만 공통 audit 전송이 지연되어 정식 완료 대기 중입니다. A에 의존하는 B Task는 언제 시작하도록 할까요? 두 선택 모두 최신 Memory 확인이 필요하며, Work Acceptance는 공통 audit 반영까지 기다립니다.",
+    "sourceCapture": {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/final-review-20261012/user-answer-023.json",
+      "sha256": "f96aa98590f9763014fd48105ff51c9e43c175a752df6aa7f3b56640ce4c6ccc",
+      "fragment": "#/answer",
+      "recordClass": "ActualUserAnswerRecordedFromCurrentNativeConversation",
+      "qualification": "Selected content copied from source-owned capture; not raw native transcript bytes or new authentication proof"
+    }
+  }
+}

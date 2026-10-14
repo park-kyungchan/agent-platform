@@ -1,0 +1,52 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "ontology-driven-harness-operation",
+  "kind": "work",
+  "repositoryId": "park-kyungchan/agent-platform",
+  "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+  "purpose": {
+    "objective": "Establish one integrated Ontology-driven harness operating model with complete source-owned traceability and purpose-aligned native consumption in WSL2 Codex and VPS Hermes.",
+    "successCriteria": [
+      "One integrated Work preserves all source/native identity distinctions and actual user decisions.",
+      "Both WSL2 and VPS demonstrate purpose-aligned native consumption before whole Work completion.",
+      "Common source milestone is independently reviewed, reproducible and explicitly merged; runtime Leads then continue from latest main"
+    ],
+    "inScope": [
+      "Git-centered typed common Work, actual decisions, relationships, effect fences and verification references",
+      "Shared docs-only Runtime Index, common CLI and finite reproducible source checks",
+      "Explicit common-source commit, push, PR and Lead merge"
+    ],
+    "outOfScope": [
+      "Runtime-specific improvements, active configuration, native activation and session/tool/permission changes",
+      "Paused Hermes Source repair, active VPS Wiki effects and all standing excluded domains",
+      "New native model evaluation suite or whole both-runtime Work Acceptance",
+      "Original/evidence store relocation, full-history/private corpus import"
+    ]
+  },
+  "spec": {
+    "id": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+    "revision": 5
+  },
+  "plan": {
+    "id": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "revision": 5
+  },
+  "governingDecisionIds": [
+    "git-canonical-common-records-design-review-20261014",
+    "review-reuse-identical-tree-current-state-20261014",
+    "github-canonical-latest-main-start-20261014",
+    "no-automatic-merge-explicit-lead-integration-20261014",
+    "single-work-branch-recording-no-separate-decision-lane-20261014",
+    "independent-reviewable-task-prs-within-work-20261014",
+    "single-repository-common-runtime-harness-20261014",
+    "explicit-lead-native-harness-activation-20261014",
+    "common-first-implementation-explicit-publication-20261014",
+    "autonomous-common-goal-20261014"
+  ],
+  "historicalFenceIds": [
+    "checkpoint-56-historical-effect-fence"
+  ]
+}

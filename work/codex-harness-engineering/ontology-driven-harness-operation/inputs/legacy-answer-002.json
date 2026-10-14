@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "legacy-answer-002",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "owner:.private/daily-use-interview-20261012/answer-002.json#/text",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "이번 인터뷰를 진행하면서, 실제 사용자가 의도한대로 그리고 목적대로 에이전트들이 움직여주는지 간략하게 테스트 진행해보면서, 병목들 파악하고 문제들 정의하는 것까지 진행하자.",
+    "sourceCapture": {
+      "ownerId": "codex-harness-engineering",
+      "path": ".private/daily-use-interview-20261012/answer-002.json",
+      "sha256": "8b7d983f9c218cb8f47cd86067c9aa5ee705c1d6a36614f2434560ae080ff970",
+      "fragment": "#/text",
+      "recordClass": "ActualUserMessageContentCapture",
+      "qualification": "Selected content copied from source-owned capture; not raw native transcript bytes or new authentication proof"
+    }
+  }
+}

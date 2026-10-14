@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U2",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "WSL2와 VPS의 공통 하네스를 기반으로 해서, 각각에서의 Runtime에서의 고유한 하네스를 가지고, Domain ID부터 Task ID까지 End to End로 빠짐없이 ID를 할당해서, 작업에 대한 감사/추적을 놓치지 않고, **\"항상 WSL2와 VPS의 모든 Lead 및 모든 에이전트들이 Palantir's AIP/Foundry급의 Ontology를 기반으로만 작업을 진행할 수 있는 환경을 만드는 것\"**. 유저의 요청은 불완전하고 narrow하므로, 이번 인터뷰 세션을 통해서 작업방향에 대한 위계와 구조를 정하고, 실제 이번에 개선된 것을 가지고 Domain ID부터 Task ID까지 할당하려고한다.",
+  "meaning": "Use this interview to determine purpose-aligned hierarchy and structure before assigning the complete identity structure to the current improvements. User requirements are incomplete and narrow; the Lead must develop the whole-system direction.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

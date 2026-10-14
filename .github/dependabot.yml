@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Bun updates npm registry dependencies using package.json + text bun.lock.
+  # A second npm updater for this same root would create duplicate ownership.
+  - package-ecosystem: bun
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    ignore:
+      # Shared immutable contracts and workspace bindings use their owner-reviewed successor flow.
+      - dependency-name: "@palantirkc/*"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3

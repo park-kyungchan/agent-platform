@@ -1,0 +1,26 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "legacy-answer-020",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "owner:.private/daily-use-interview-20261012/answer-020.json#/text",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "권장: 충돌 없는 내용은 최신 맥락을 확인해 반영 — 의미가 충돌하는 부분만 질문하고 의존 수정 보류",
+    "question": "WSL2와 VPS에서 같은 Memory ID를 기준으로 추가 지시를 받아 변경 내용이 겹쳤다면, 담당 Lead가 어디까지 자동으로 정리할까요? 두 원문과 변경 이력은 모두 보존합니다.",
+    "sourceCapture": {
+      "ownerId": "codex-harness-engineering",
+      "path": ".private/daily-use-interview-20261012/answer-020.json",
+      "sha256": "388663bfdd267c0cfe7447b1024021fc2e684c08dbae613b43566cc7b38f406f",
+      "fragment": "#/text",
+      "recordClass": "ActualNativeUserAnswerContent",
+      "qualification": "Selected content copied from source-owned capture; not raw native transcript bytes or new authentication proof"
+    }
+  }
+}

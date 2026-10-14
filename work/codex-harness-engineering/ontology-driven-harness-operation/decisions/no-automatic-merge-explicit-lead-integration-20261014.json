@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "no-automatic-merge-explicit-lead-integration-20261014",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "같은 Work를 이어가서 commit하고 push와 PR까지 올렸다고 가정하자. 이때는 자동 merge를 절대적으로 금지하면 된다. merge는 나중에 WSL2 or VPS 쪽의 Lead가 검토한 후에 진행하면 되잖아. 너는 이외에도 이러한 Git/GitHub를 최대한 활용할 수 있는 방식으로 제안해라.",
+  "meaning": "Preserve the same logical Work through commit, push and PR publication. Automatic merge is absolutely prohibited. The accountable WSL2 or VPS Lead reviews the change and then explicitly performs merge.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-4.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

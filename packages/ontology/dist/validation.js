@@ -2,7 +2,13 @@ import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import schema from "./schema.js";
 import { jsonIssue } from "./json-validation.js";
-const ajv = new Ajv2020({ strict: true, allErrors: true, coerceTypes: false, useDefaults: false, removeAdditional: false });
+const ajv = new Ajv2020({
+    strict: true,
+    allErrors: true,
+    coerceTypes: false,
+    useDefaults: false,
+    removeAdditional: false,
+});
 addFormats(ajv);
 const validateShape = ajv.compile(schema);
 /** Validate unknown JSON before narrowing it to generated schema types. Never mutates input. */
@@ -11,20 +17,33 @@ export function validateArtifact(value) {
     if (invalidJson)
         return { valid: false, issues: [invalidJson] };
     if (!validateShape(value)) {
-        return { valid: false, issues: (validateShape.errors ?? []).map(error => ({ code: `schema:${error.keyword}`, path: error.instancePath, message: error.message ?? "Schema validation failed." })) };
+        return {
+            valid: false,
+            issues: (validateShape.errors ?? []).map((error) => ({
+                code: `schema:${error.keyword}`,
+                path: error.instancePath,
+                message: error.message ?? "Schema validation failed.",
+            })),
+        };
     }
     const issues = [];
     const issue = (code, path, message) => issues.push({ code, path, message });
     if (!value.id.startsWith(`${value.projectId}:${value.kind}:`))
         issue("identity-mismatch", "/id", "ID project and kind must match the envelope.");
-    if (value.kind === "decision" && value.payload.status === "accepted" && !value.payload.authority) {
+    if (value.kind === "decision" &&
+        value.payload.status === "accepted" &&
+        !value.payload.authority) {
         issue("missing-authority", "/payload/authority", "An accepted decision requires a scoped authority declaration.");
     }
-    if (value.kind === "task" && value.payload.status === "complete" && !value.payload.verificationRefs?.length) {
+    if (value.kind === "task" &&
+        value.payload.status === "complete" &&
+        !value.payload.verificationRefs?.length) {
         issue("missing-completion-verification", "/payload/verificationRefs", "A completed task requires verification references.");
     }
     if (value.kind === "evidence") {
-        if (value.payload.result.outcome === "success" && value.payload.result.processExitCode !== null && value.payload.result.processExitCode !== 0) {
+        if (value.payload.result.outcome === "success" &&
+            value.payload.result.processExitCode !== null &&
+            value.payload.result.processExitCode !== 0) {
             issue("contradictory-exit", "/payload/result", "Successful evidence cannot declare a nonzero process exit code.");
         }
         value.payload.attempts.forEach((attempt, index) => {
@@ -33,7 +52,8 @@ export function validateArtifact(value) {
             if (attempt.outcome === "failure" && !attempt.error)
                 issue("missing-attempt-failure", `/payload/attempts/${index}/error`, "A failed attempt requires its observed failure message.");
         });
-        if (value.payload.result.outcome === "success" && value.payload.attempts.at(-1)?.outcome === "failure") {
+        if (value.payload.result.outcome === "success" &&
+            value.payload.attempts.at(-1)?.outcome === "failure") {
             issue("contradictory-final-attempt", "/payload/result/outcome", "Successful evidence must retain a final successful attempt after failures.");
         }
     }
@@ -52,7 +72,8 @@ export function validateArtifact(value) {
             issue("running-finished", "/payload/finishedAt", "A running execution has no finish timestamp.");
         if (value.payload.state !== "running" && value.payload.finishedAt === null)
             issue("terminal-unfinished", "/payload/finishedAt", "A terminal execution requires its finish timestamp.");
-        if (value.payload.finishedAt !== null && Date.parse(value.payload.finishedAt) < Date.parse(value.payload.startedAt))
+        if (value.payload.finishedAt !== null &&
+            Date.parse(value.payload.finishedAt) < Date.parse(value.payload.startedAt))
             issue("negative-duration", "/payload/finishedAt", "Finish time cannot precede start time.");
     }
     if (value.kind === "run" || value.kind === "verification") {
@@ -68,7 +89,7 @@ export function validateArtifact(value) {
 export function assertArtifact(value) {
     const result = validateArtifact(value);
     if (!result.valid)
-        throw new Error(`Invalid artifact: ${result.issues.map(issue => `${issue.path} ${issue.code}: ${issue.message}`).join("; ")}`);
+        throw new Error(`Invalid artifact: ${result.issues.map((issue) => `${issue.path} ${issue.code}: ${issue.message}`).join("; ")}`);
 }
 /** Resolve a closed record set. External records must be supplied explicitly. Hashes are syntax-checked, not authenticated. */
 export function validateReferences(records) {
@@ -78,7 +99,7 @@ export function validateReferences(records) {
     for (const [index, record] of records.entries()) {
         const result = validateArtifact(record);
         if (!result.valid) {
-            issues.push(...result.issues.map(item => ({ ...item, path: `/records/${index}${item.path}` })));
+            issues.push(...result.issues.map((item) => ({ ...item, path: `/records/${index}${item.path}` })));
             continue;
         }
         if (artifacts.has(result.value.id))
@@ -121,7 +142,14 @@ export function validateReferences(records) {
             if (artifact.payload.status === "accepted" && authority) {
                 const source = evidence(authority.sourceEvidenceRef, `${base}/payload/authority/sourceEvidenceRef`);
                 const declaration = source?.payload.details?.authority;
-                if (source && (source.payload.result.outcome !== "success" || typeof declaration !== "object" || declaration === null || Array.isArray(declaration) || declaration.actorType !== authority.actorType || declaration.actorId !== authority.actorId || declaration.scope !== authority.scope)) {
+                if (source &&
+                    (source.payload.result.outcome !== "success" ||
+                        typeof declaration !== "object" ||
+                        declaration === null ||
+                        Array.isArray(declaration) ||
+                        declaration.actorType !== authority.actorType ||
+                        declaration.actorId !== authority.actorId ||
+                        declaration.scope !== authority.scope)) {
                     issue("authority-scope-mismatch", `${base}/payload/authority`, "Authority evidence must explicitly declare the same actor and scope and have a successful observation.");
                 }
             }
@@ -130,7 +158,10 @@ export function validateReferences(records) {
             artifact.payload.targetRefs.forEach((id, index) => resolve(id, `${base}/payload/targetRefs/${index}`));
             artifact.payload.criteria.forEach((criterion, index) => criterion.evidenceRefs.forEach((id, refIndex) => {
                 const source = evidence(id, `${base}/payload/criteria/${index}/evidenceRefs/${refIndex}`);
-                if (criterion.status === "pass" && source && (source.payload.result.outcome !== "success" || source.payload.result.contentMatched === false)) {
+                if (criterion.status === "pass" &&
+                    source &&
+                    (source.payload.result.outcome !== "success" ||
+                        source.payload.result.contentMatched === false)) {
                     issue("inapplicable-pass-evidence", `${base}/payload/criteria/${index}`, "Passing criteria require successful evidence with no observed content mismatch.");
                 }
             }));
@@ -138,7 +169,10 @@ export function validateReferences(records) {
         if (artifact.kind === "task") {
             (artifact.payload.verificationRefs ?? []).forEach((id, index) => {
                 const receipt = verification(id, `${base}/payload/verificationRefs/${index}`);
-                if (artifact.payload.status === "complete" && receipt && (!receipt.payload.targetRefs.includes(artifact.id) || receipt.payload.criteria.some(criterion => criterion.status !== "pass"))) {
+                if (artifact.payload.status === "complete" &&
+                    receipt &&
+                    (!receipt.payload.targetRefs.includes(artifact.id) ||
+                        receipt.payload.criteria.some((criterion) => criterion.status !== "pass"))) {
                     issue("incomplete-task-verification", `${base}/payload/verificationRefs/${index}`, "Task completion requires a receipt targeting this task with all declared criteria passing.");
                 }
             });

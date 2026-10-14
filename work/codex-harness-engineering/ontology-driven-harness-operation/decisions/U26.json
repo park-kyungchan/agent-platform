@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U26",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "권장: 로컬에 ID·이력을 먼저 영속 기록한 작업은 계속 — 공통 전송은 미동기화로 표시하고 복구 후 반영; 로컬 기록도 실패하면 해당 변경 보류",
+  "meaning": "When required latest Memory has been verified but common audit transmission alone is unavailable, continue work whose Domain-through-Task identities and before/after execution history are durably recorded in the local Runtime. Label shared delivery as unsynchronized and reconcile after recovery. If local durable recording also fails, hold the corresponding change. This does not relax U22 currentness requirements or establish native durable-recording behavior.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-021.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "최신 Memory는 확인했지만, 실행 이력을 공통 기록에 전송하는 경로만 일시적으로 끊겼다고 하겠습니다. 해당 Runtime에 Domain→Task ID와 실행 전·후 이력을 영속 저장할 수 있다면, 실제 변경을 계속할까요? 최신 Memory 확인이 안 되면 의존 수정을 보류한다는 기존 결정은 그대로 적용합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-021.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

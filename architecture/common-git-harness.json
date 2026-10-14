@@ -1,0 +1,71 @@
+{
+  "schema": "agent-platform.common-git-harness.v1",
+  "ontologyVersion": "0.2.0",
+  "codeOwner": "agent-platform",
+  "nativeEngineeringOwner": "codex-harness-engineering",
+  "canonicalRepository": "park-kyungchan/agent-platform",
+  "workRoot": "work/<project-key>/<work-key>",
+  "entrypoint": "scripts/harness.ts",
+  "publicApis": [
+    "@palantirkc/work-continuity/git-work",
+    "@palantirkc/work-continuity/runtime-docs"
+  ],
+  "deliveredWork": {
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json"
+  },
+  "publication": {
+    "automaticMerge": false,
+    "mergeOwner": "Accountable native Lead",
+    "newWorkBaseline": "Native-owner-observed freshly synchronized main",
+    "continuation": "Same Work IDs and published branch",
+    "reviewReuse": "Identical source tree, explicit independent successor binding, current review state and zero unresolved findings"
+  },
+  "sourceLineage": {
+    "baseCommit": "ffba2462a08b9f8c83c6f87b1043403e5cb748d7",
+    "importedFoundationCommit": "0cc96d15a9795fc008286b2dec54cbb7641646e3",
+    "method": "git cherry-pick --no-commit followed by reviewed fixes; old PR2 review not reused",
+    "reviewedPlan": {
+      "ownerId": "codex-harness-engineering",
+      "path": "work/ontology-driven-harness-operation/common-implementation-20261014/final-plan-v2.json",
+      "sha256": "baf628973ecf3c402533d3d4afdffe5bddc5cc5ca7ea576f940c0aa2aa53fc5c"
+    },
+    "preservedNativePlugins": [
+      {
+        "path": "packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py",
+        "sha256": "373905be599bc79411ab35ce8b97f7932ed8cd3521eb53a5b527e1f5fc599dc7",
+        "sourceCommit": "ffba2462a08b9f8c83c6f87b1043403e5cb748d7"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml",
+        "sha256": "f190f796e3800741e5bb768b6220fc189cf81af3979f1c46b7295523832d05bc",
+        "sourceCommit": "ffba2462a08b9f8c83c6f87b1043403e5cb748d7"
+      }
+    ],
+    "nativeTypescriptQualification": "Independent source check: all20 imported native TypeScript deltas emit identical Bun JavaScript to main; no runtime verification"
+  },
+  "nativeOwners": {
+    "loopsSessionsToolsPermissions": "Native Codex/Hermes",
+    "originalsAndEvidence": "Existing original/evidence owners",
+    "activation": "Each WSL2/VPS Lead verifies and explicitly activates after pulling completed main"
+  },
+  "runtimeActivationEstablished": false,
+  "wholeWorkAcceptanceEstablished": false,
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "sharedDefinitionInputs": [
+    {
+      "path": "architecture/runtime-documentation-routing/registry.json",
+      "sha256": "ebf788ed54cc1102747ef7faae9d49911c6a53b9450690f58fb6ec5ee375c3cf",
+      "ownerId": "agent-platform",
+      "purpose": "Shared docs-only source definition; no native execution or active pointer"
+    },
+    {
+      "path": "architecture/runtime-documentation-routing/host-pointer-recipe.json",
+      "sha256": "ff316946335fcf8185bdd5b035c47cd1101b7d72881608375d77f2e7616f0762",
+      "ownerId": "agent-platform",
+      "purpose": "Shared docs-only source definition; no native execution or active pointer"
+    }
+  ]
+}

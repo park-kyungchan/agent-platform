@@ -3,7 +3,7 @@
   "id": "agent-platform:projection:hermes-backend-semantic-context",
   "canonicalSource": {
     "path": "packages/native-hermes-adapter/src/adoption/semantic-context.ts",
-    "sha256": "e2affef0eac169350f064ee59e66edd5ff5cc48d8eb3b578660e91f5aabd613e"
+    "sha256": "9947cac51187dd9308e05500e77fe446545a3b2416c07eef20abdd9ddea88ed9"
   },
   "generator": "scripts/generate-hermes-semantic-context.ts",
   "generatedRepresentation": "metadata-comment-header-followed-by-byte-exact-canonical-body",

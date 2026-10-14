@@ -1,0 +1,61 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "verification-input-GHA-23",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-lead-source-verification:GHA-23",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:ontology-driven-harness-operation:source-preparation-gha-23",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-14T13:37:44.400Z",
+    "payload": {
+      "targetRefs": [
+        "codex-harness-engineering:task:ontology-driven-harness-operation:gha-23"
+      ],
+      "criteria": [
+        {
+          "id": "bounded-source-report-preserved",
+          "status": "pass",
+          "message": "Root read the completed source-only report as valid JSON and preserved its exact content in the canonical input.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-harness-operation:completed-source-review-gha-23"
+          ]
+        },
+        {
+          "id": "independent-final-plan-input-adopted",
+          "status": "pass",
+          "message": "Independent GHA-26 final Plan closure passed after reviewing these preparation inputs; this verifies source preparation only.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-harness-operation:completed-source-review-gha-26"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/source-GHA-23.json",
+          "sha256": "aa4331d69b7db10d68b88b95e3d1d04c5b1a947f3ed561e05486aa19c1fe20e8"
+        }
+      ],
+      "runtime": {
+        "name": "bun",
+        "version": "1.3.14"
+      },
+      "details": {
+        "verificationClass": "source-preparation-only",
+        "nativeExecutionEstablished": false,
+        "sharedDeliveryEstablished": false,
+        "acceptanceDecision": null
+      }
+    }
+  }
+}

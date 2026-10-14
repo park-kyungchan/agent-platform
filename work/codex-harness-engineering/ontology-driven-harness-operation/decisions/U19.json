@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U19",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "권장대로",
+  "meaning": "For this integrated Work, the accountable Lead may make, record and report the final AcceptanceDecision only after every agreed both-runtime criterion passes and independent review is complete. Purpose or scope changes require actual user decisions. This delegates the acceptance procedure; it is not a current acceptance verdict, implementation Plan adoption, deployment/runtime permission or a renewed native model budget.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-014.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "WSL2·VPS 양쪽에서 합의한 검증 기준을 모두 통과하고 독립 검토까지 마쳤을 때, 이번 통합 Work의 최종 AcceptanceDecision은 누가 내릴까요?",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-014.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

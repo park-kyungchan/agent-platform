@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "U25",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "권장: 충돌 없는 내용은 최신 맥락을 확인해 반영 — 의미가 충돌하는 부분만 질문하고 의존 수정 보류",
+  "meaning": "For overlapping Memory updates from WSL2 and VPS, preserve both actual originals and revision history. The accountable owner Lead rereads latest purpose/context and may incorporate compatible updates. Ask the user only about genuine semantic conflicts and hold effects dependent on those conflicts. Source/CAS success does not itself establish semantic compatibility; the existing coordinator remains responsible.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-020.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "WSL2와 VPS에서 같은 Memory ID를 기준으로 추가 지시를 받아 변경 내용이 겹쳤다면, 담당 Lead가 어디까지 자동으로 정리할까요? 두 원문과 변경 이력은 모두 보존합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-020.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

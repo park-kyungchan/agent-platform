@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "review-reuse-identical-tree-current-state-20261014",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "동일 tree와 현재 review 상태가 입증되면 재사용 (권장)",
+  "meaning": "Retain independent review and permit reuse across final commit SHAs only when reviewed source-tree equality, an explicit successor binding to the new commit, current review state and absence of unresolved findings are proven. A changed tree or unresolved finding requires new review.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-2.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "독립 review는 유지하되, final commit SHA가 달라도 reviewed source tree가 동일하다는 증명과 새 commit 연결 기록이 있고 미해결 finding이 없으면 기존 review를 재사용할까요? tree가 달라지거나 finding이 남으면 새 review가 필요합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-2.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

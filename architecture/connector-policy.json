@@ -1,0 +1,35 @@
+{
+  "schema": "agent-platform.connector-policy.v1",
+  "recordClass": "accepted-user-direction-for-native-connectors-not-runtime-or-tool-registry",
+  "owner": "agent-platform",
+  "decisionRef": "../hermes-harness-engineering/decisions/mcp-connector-consolidation.json",
+  "environments": ["WSL2 Codex", "hermes-agent-2q3y"],
+  "default": "Use the native runtime MCP client with an existing maintained provider MCP server for external service connectors.",
+  "customTools": "Review existing custom tools, plugins and service API wrappers for equivalent MCP capabilities. Migrate active consumers and retire redundant implementations after actual native consumption succeeds.",
+  "selection": [
+    "Prefer the service provider's maintained MCP server and documented native installation/authentication.",
+    "Select capabilities for the actual Project/Work and profile; do not enable every connector in every profile.",
+    "Distinguish configured, exposed, authenticated and behaviorally verified capabilities.",
+    "Keep native lifecycle, credentials, permissions and tool discovery with Codex or Hermes."
+  ],
+  "replacement": [
+    "Verify capability coverage, current consumers, required account/scopes and actual native behavior.",
+    "Preserve original bytes and completed effects, switch consumers, then remove the exact redundant custom entrypoint.",
+    "For a required function absent from MCP, record the gap and retain the smallest supported official/native operation until coverage exists.",
+    "Do not add a custom MCP bridge around the old API merely to rename its transport."
+  ],
+  "retainedMeaning": [
+    "Shared Ontology and domain semantics",
+    "Project/Work/Issue/Spec/Plan identities and actual user decisions",
+    "Source bytes, provenance, evidence and common checkpoint CAS",
+    "Native product APIs, local computation and official runtime tools"
+  ],
+  "nativeOwnership": {
+    "codex": "Native MCP configuration, client, tool catalog, authentication and session lifecycle",
+    "hermes": "Native profile MCP configuration, client, process connection pools, authentication and session lifecycle",
+    "common": "Connector selection and migration meaning only; no second client, registry, scheduler or credential store"
+  },
+  "scope": "Only admitted Work and custom integrations; excluded domains and vendor/builtin skills remain outside migration scope.",
+  "modelBudgetRenewed": false,
+  "implementationResultsAccepted": false
+}
