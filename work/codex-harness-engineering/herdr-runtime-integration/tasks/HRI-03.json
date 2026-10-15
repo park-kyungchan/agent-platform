@@ -21,8 +21,8 @@
     "execution": "complete",
     "verification": "passed",
     "localAudit": "result-durable",
-    "sharedAudit": "pending",
-    "formalCompletion": "audit-synchronization-pending"
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
   },
   "executionClass": "native-effect",
   "dependsOn": [
