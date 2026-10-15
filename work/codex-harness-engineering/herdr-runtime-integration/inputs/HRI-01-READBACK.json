@@ -1,0 +1,23 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "input",
+  "id": "HRI-01-READBACK",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "vps-operations",
+    "locator": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/integration-work-validation.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "originalReceiptSha256": "827bf578899c2543c62f3842405f23569febcb80d3f83e1c29bb312affaf94fb",
+    "receipt": {
+      "exitCode": 0,
+      "stdout": "{\n  \"valid\": true,\n  \"findings\": [],\n  \"authority\": \"none\",\n  \"nativePermissionGranted\": false,\n  \"semanticAcceptanceEstablished\": false\n}\n",
+      "stderr": "$ bun scripts/harness.ts validate \"/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/integration-snapshot.json\"\n"
+    },
+    "classification": "Observed owner-native readback, not an authenticated native permission assertion or user AcceptanceDecision."
+  }
+}

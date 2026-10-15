@@ -1,0 +1,12 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "plan",
+  "id": "HRI-PLAN",
+  "revision": 1,
+  "specId": "HRI-SPEC",
+  "specRevision": 1,
+  "objective": "Preserve verified effects; qualify source and Work identity; normalize owned topology after dependency audit; add relevant CI; deliver exact-reviewed source and native readback; leave manual continuation ready."
+}

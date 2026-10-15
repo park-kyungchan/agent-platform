@@ -1,0 +1,42 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "task",
+  "id": "HRI-05",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "herdr-runtime-integration",
+    "issueId": "HRI-ISSUE-20261015",
+    "specId": "HRI-SPEC",
+    "specRevision": 1,
+    "planId": "HRI-PLAN",
+    "planRevision": 1,
+    "taskId": "HRI-05"
+  },
+  "title": "Deliver exact independently reviewed Git/GitHub source",
+  "state": {
+    "execution": "running",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    {
+      "taskId": "HRI-04",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "HRI-DECISION-SCOPE",
+    "HRI-DECISION-CONTINUITY",
+    "HRI-DECISION-GOAL"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74"
+}

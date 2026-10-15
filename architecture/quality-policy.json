@@ -105,6 +105,18 @@
       "sha256": "41e9055533e666d86d6dfd008ef71bbb4c87f4fc7ba63e944a19b9248ff14e0a",
       "capabilityId": "ontology-foundation",
       "reason": "Existing package-local vocabulary/registry definition imported by the admitted source; preserves semantic ownership without treating it as a second implementation."
+    },
+    {
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/checkpoint-contract.json",
+      "sha256": "f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4",
+      "capabilityId": "native-codex-source",
+      "reason": "Exact common-owned Herdr long-work skill reference; source definition and captured standing user decision only, without native permission, runtime activation or acceptance."
+    },
+    {
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/standing-user-decision.json",
+      "sha256": "40c5e87f935697962f205ba7c1c3612e2fcfb2a6293099e6842d380b356c4137",
+      "capabilityId": "native-codex-source",
+      "reason": "Exact common-owned Herdr long-work skill reference; source definition and captured standing user decision only, without native permission, runtime activation or acceptance."
     }
   ],
   "stagedSources": [

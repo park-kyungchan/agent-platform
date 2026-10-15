@@ -1,0 +1,47 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "task",
+  "id": "HRI-06",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "herdr-runtime-integration",
+    "issueId": "HRI-ISSUE-20261015",
+    "specId": "HRI-SPEC",
+    "specRevision": 1,
+    "planId": "HRI-PLAN",
+    "planRevision": 1,
+    "taskId": "HRI-06"
+  },
+  "title": "Leave one blank native Orchestrator and reverify retained service owners",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "HRI-02",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "HRI-03",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "HRI-03-NATIVE-EXECUTION"
+    }
+  ],
+  "decisionIds": [
+    "HRI-DECISION-SCOPE",
+    "HRI-DECISION-CONTINUITY",
+    "HRI-DECISION-GOAL"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74"
+}

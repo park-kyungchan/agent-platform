@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Herdr Codex long-work fallback checkpoint",
+  "description": "Use only when the selected owner has no available current checkpoint contract. This descriptive work record grants no authority. Serialized readable content must fit within 16000 characters; retain referenced unresolved effects and holds.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "ontologyPackage", "projectId", "workId", "version", "updatedAtUtc", "intent", "authority", "phase", "plan", "sourcePins", "runtime", "delegations", "effects", "receipts", "holds", "nextSafeAction"],
+  "properties": {
+    "schemaVersion": {"const": "1.0.0"},
+    "kind": {"const": "herdr-codex-long-work-checkpoint"},
+    "ontologyPackage": {"const": {"name": "@palantirkc/ontology", "version": "0.2.0"}},
+    "projectId": {"$ref": "#/$defs/ref"},
+    "workId": {"$ref": "#/$defs/ref"},
+    "version": {"type": "integer", "minimum": 1},
+    "updatedAtUtc": {"type": "string", "format": "date-time"},
+    "intent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["objective", "successCriteria"],
+      "properties": {
+        "objective": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "successCriteria": {"$ref": "#/$defs/refs"}
+      }
+    },
+    "authority": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourceRefs", "allowedScope", "exclusions"],
+      "properties": {
+        "sourceRefs": {"$ref": "#/$defs/refs"},
+        "allowedScope": {"$ref": "#/$defs/refs"},
+        "exclusions": {"$ref": "#/$defs/refs"}
+      }
+    },
+    "phase": {"$ref": "#/$defs/ref"},
+    "plan": {
+      "type": "array", "maxItems": 16,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["step", "status"],
+        "properties": {"step": {"$ref": "#/$defs/ref"}, "status": {"enum": ["pending", "in_progress", "completed"]}}
+      }
+    },
+    "sourcePins": {
+      "type": "array", "maxItems": 32,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["ref", "revision"],
+        "properties": {"ref": {"$ref": "#/$defs/ref"}, "revision": {"$ref": "#/$defs/ref"}}
+      }
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nativeThreadRef", "nativeGoalRef", "goalObservation", "herdrContextRef", "observedAtUtc"],
+      "properties": {
+        "nativeThreadRef": {"$ref": "#/$defs/nullableRef"},
+        "nativeGoalRef": {"$ref": "#/$defs/nullableRef"},
+        "goalObservation": {"$ref": "#/$defs/ref"},
+        "herdrContextRef": {"$ref": "#/$defs/nullableRef"},
+        "observedAtUtc": {"type": "string", "format": "date-time"}
+      }
+    },
+    "delegations": {
+      "type": "array", "maxItems": 32,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "runtimeRef", "scope", "state", "outputRefs"],
+        "properties": {
+          "id": {"$ref": "#/$defs/ref"}, "runtimeRef": {"$ref": "#/$defs/nullableRef"},
+          "scope": {"$ref": "#/$defs/ref"}, "state": {"$ref": "#/$defs/ref"},
+          "outputRefs": {"$ref": "#/$defs/refs"}
+        }
+      }
+    },
+    "effects": {
+      "type": "array", "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "scope", "state", "receiptRefs", "nextSafeObservation", "replayPolicy"],
+        "properties": {
+          "id": {"$ref": "#/$defs/ref"}, "scope": {"$ref": "#/$defs/ref"},
+          "state": {"enum": ["planned", "running", "completed", "consumed", "failed", "unknown"]},
+          "receiptRefs": {"$ref": "#/$defs/refs"},
+          "nextSafeObservation": {"$ref": "#/$defs/ref"},
+          "replayPolicy": {"const": "never-replay-recorded-dispatch"}
+        }
+      }
+    },
+    "receipts": {
+      "type": "array", "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["ref", "classification", "result"],
+        "properties": {
+          "ref": {"$ref": "#/$defs/ref"},
+          "classification": {"enum": ["observation", "verification", "acceptance-decision"]},
+          "result": {"$ref": "#/$defs/ref"}
+        }
+      }
+    },
+    "holds": {
+      "type": "array", "maxItems": 32,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "scope", "reason", "releaseCondition"],
+        "properties": {
+          "id": {"$ref": "#/$defs/ref"}, "scope": {"$ref": "#/$defs/ref"},
+          "reason": {"$ref": "#/$defs/ref"}, "releaseCondition": {"$ref": "#/$defs/ref"}
+        }
+      }
+    },
+    "nextSafeAction": {"$ref": "#/$defs/ref"}
+  },
+  "$defs": {
+    "ref": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "nullableRef": {"type": ["string", "null"], "minLength": 1, "maxLength": 1024},
+    "refs": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/ref"}}
+  }
+}
