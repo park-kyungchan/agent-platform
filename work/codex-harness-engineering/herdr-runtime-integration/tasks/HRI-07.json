@@ -18,21 +18,23 @@
   },
   "title": "Publish cross-host receipts and manual continuation with unresolved boundaries",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
-  "executionClass": "source-only",
+  "executionClass": "native-effect",
   "dependsOn": [
     {
       "taskId": "HRI-05",
-      "milestone": "execution-and-verification"
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "HRI-05-NATIVE-EXECUTION"
     },
     {
       "taskId": "HRI-06",
-      "milestone": "execution-and-verification"
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "HRI-06-NATIVE-EXECUTION"
     }
   ],
   "decisionIds": [
@@ -40,7 +42,18 @@
     "HRI-DECISION-CONTINUITY",
     "HRI-DECISION-GOAL"
   ],
-  "effectIds": [],
-  "verificationEvidenceIds": [],
-  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74"
+  "effectIds": [
+    "HRI-07-cross-host-receipts-and-pointers",
+    "HRI-07-owned-state-directory-permissions"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:herdr-runtime-integration:hri-07"
+  ],
+  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74",
+  "occurrence": {
+    "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74",
+    "attemptId": "herdr-session-handoff-20261015-continuity-notices",
+    "occurrenceId": "cross-host-continuity-result.json"
+  },
+  "executionEvidenceId": "HRI-07-NATIVE-EXECUTION"
 }

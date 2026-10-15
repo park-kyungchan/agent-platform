@@ -1,0 +1,14 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "evidence",
+  "id": "codex-harness-engineering:evidence:herdr-runtime-integration:hri-05-owner-readback",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-05-OWNER-RESULT.json",
+    "fragment": "#/content"
+  }
+}

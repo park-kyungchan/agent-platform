@@ -1,0 +1,55 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "input",
+  "id": "HRI-06-EXECUTION-RECEIPT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "vps-operations",
+    "locator": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/native-orchestrator-result.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common.git-prerequisite-receipt.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "herdr-runtime-integration",
+      "issueId": "HRI-ISSUE-20261015",
+      "specId": "HRI-SPEC",
+      "specRevision": 1,
+      "planId": "HRI-PLAN",
+      "planRevision": 1,
+      "taskId": "HRI-06"
+    },
+    "occurrence": {
+      "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74",
+      "attemptId": "herdr-session-handoff-20261015-native-orchestrator",
+      "occurrenceId": "native-orchestrator-result.json"
+    },
+    "state": {
+      "execution": "complete",
+      "verification": "passed",
+      "localAudit": "result-durable",
+      "sharedAudit": "pending",
+      "formalCompletion": "audit-synchronization-pending"
+    },
+    "intent": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-06-EXECUTION-INTENT.json",
+      "fragment": "#/content"
+    },
+    "result": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-06-OWNER-RESULT.json",
+      "fragment": "#/content/nativeReceipt"
+    },
+    "verification": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-06-VERIFICATION-INPUT.json",
+      "fragment": "#/content"
+    }
+  }
+}

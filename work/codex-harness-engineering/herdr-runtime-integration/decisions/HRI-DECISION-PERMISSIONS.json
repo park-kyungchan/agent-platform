@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "decision",
+  "id": "HRI-DECISION-PERMISSIONS",
+  "status": "accepted",
+  "answer": "적용: container 안에서 full access·never (권장)",
+  "meaning": "Apply sandbox_mode=danger-full-access and approval_policy=never only to VPS Codex inside the existing dedicated container. Preserve Docker isolation, selected model, manual source Work stop and native effect ownership.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-INPUT-PERMISSIONS.json",
+    "fragment": "#/content/answer"
+  },
+  "selectionContext": {
+    "text": "Actual sandbox probe failed namespace creation; user selected the concrete container-only full access and never proposal. No privileged/SYS_ADMIN/host-sysctl change.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-PERMISSIONS-SELECTION-CONTEXT.json",
+      "fragment": "#/content"
+    }
+  },
+  "supersedes": []
+}

@@ -1,0 +1,65 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "input",
+  "id": "HRI-PERMISSIONS-SELECTION-CONTEXT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "vps-operations",
+    "locator": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/codex-unattended-permissions-proposal.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "proposal": {
+      "schema": "vps.codex-unattended-permissions-proposal.v1",
+      "recordedAtUtc": "2026-10-15T12:31:47.452220+00:00",
+      "status": "awaiting-actual-user-decision;not-applied",
+      "target": "herdr-runtime:/home/palantirkc/.codex/config.toml",
+      "expectedCurrentSha256": "339796c485137382a74162b95b2272d13ec74d2c0c3cbb7c413f335b2b54edc0",
+      "observedCurrent": "Native doctor: approvalOnRequest, restrictedfilesystem/network. Native fixedprintf sandboxprobe failed namespacecreation.",
+      "evidence": "native-codex-sandbox-probe.json",
+      "proposedAssignments": {
+        "sandbox_mode": "danger-full-access",
+        "approval_policy": "never"
+      },
+      "scope": "Native Codex in existingdedicatedcontainer; no privilegedcontainer/SYS_ADMIN/hostsysctl/seccompchange. ExistingindependentSSHauthority remainsavailablewithinitsownerWorkboundaries.",
+      "preserve": [
+        "modelgpt-6.1-sol/context872000/reasoninghigh",
+        "nativeeffectauthorization andmanualsourceWorkpause",
+        "nativehooktrust policy",
+        "existingcontainers,hostports andcredentials"
+      ],
+      "activation": "Onlyafteractualuserapproval; validateCASnativeconfig/doctor, fixedno-modelcommand, restartonlyownedblankOrchestrator afterfreshno-turngate.",
+      "officialDocumentation": "https://learn.chatgpt.com/docs/agent-approvals-security",
+      "modelVerificationPrompts": 0,
+      "automaticSourceWorkResume": false
+    },
+    "observedNativeFailure": {
+      "schema": "vps.native-codex-sandbox-probe.v1",
+      "recordedAtUtc": "2026-10-15T12:30:58.273070+00:00",
+      "argv": [
+        "codex",
+        "-c",
+        "permissions.sandbox-probe.extends=\":workspace\"",
+        "sandbox",
+        "--permission-profile",
+        "sandbox-probe",
+        "-C",
+        "/home/palantirkc",
+        "--",
+        "/usr/bin/printf",
+        "CODEX_SANDBOX_PROBE_OK"
+      ],
+      "exitCode": 1,
+      "stdout": "",
+      "stderr": "bwrap: No permissions to create a new namespace, likely because the kernel does not allow non-privileged user namespaces. On e.g. debian this can be enabled with 'sysctl kernel.unprivileged_userns_clone=1'.\n",
+      "invocationOnlyProfile": true,
+      "persistedConfigChanged": false,
+      "modelPrompts": 0,
+      "test": "Native sandbox executes fixed printf; no filesystem writes or network."
+    },
+    "actualUserDecisionRef": "HRI-INPUT-PERMISSIONS"
+  }
+}

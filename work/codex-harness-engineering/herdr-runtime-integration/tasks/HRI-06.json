@@ -18,11 +18,11 @@
   },
   "title": "Leave one blank native Orchestrator and reverify retained service owners",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "native-effect",
   "dependsOn": [
@@ -39,9 +39,21 @@
   "decisionIds": [
     "HRI-DECISION-SCOPE",
     "HRI-DECISION-CONTINUITY",
-    "HRI-DECISION-GOAL"
+    "HRI-DECISION-GOAL",
+    "HRI-DECISION-PERMISSIONS"
   ],
-  "effectIds": [],
-  "verificationEvidenceIds": [],
-  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74"
+  "effectIds": [
+    "HRI-06-container-codex-permissions",
+    "HRI-06-blank-orchestrator-start-and-restart"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:herdr-runtime-integration:hri-06"
+  ],
+  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74",
+  "occurrence": {
+    "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74",
+    "attemptId": "herdr-session-handoff-20261015-native-orchestrator",
+    "occurrenceId": "native-orchestrator-result.json"
+  },
+  "executionEvidenceId": "HRI-06-NATIVE-EXECUTION"
 }
