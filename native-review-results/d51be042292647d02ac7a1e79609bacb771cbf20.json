@@ -1,0 +1,658 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "d51be042292647d02ac7a1e79609bacb771cbf20",
+  "reviewedTreeSha": "95156570aaee2dcde684803512cf53407abb54a4",
+  "reviewedSourceManifestSha256": "84730aa0c89e7d9dae3c7de69db28146dbae62c3b18c5bc850b17cfee66dc52f",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/checkpoint_v4_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/bun_provisioning_source"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "independentSourceReview": {
+    "schema": "harness.independent-exact-source-review.v1",
+    "reviewer": {
+      "nativeTask": "/root/checkpoint_v4_review",
+      "context": "Fresh-context independent native internal agent; no separate CLI/pane authentication claimed",
+      "independentFromAuthor": true
+    },
+    "reviewedAtUtc": "2026-10-15T20:00:38.364Z",
+    "reviewClass": "committed-common-source-only",
+    "repository": "park-kyungchan/agent-platform",
+    "repositoryRoot": "/home/palantirkc/code/worktrees/harness-continuation-delivery-20261016",
+    "branch": "task/harness-continuation-delivery-20261016",
+    "base": {
+      "commit": "e8f041751a6b4bdee1108b22bbb831114b685232",
+      "tree": "dd2d66c594abbe7a63036d4800a4c0abf55f7243"
+    },
+    "head": {
+      "commit": "d51be042292647d02ac7a1e79609bacb771cbf20",
+      "tree": "95156570aaee2dcde684803512cf53407abb54a4"
+    },
+    "mainBaseline": "9c1da6c27581c5c29256787327bc680d9c4a4827",
+    "logicalWork": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-harness-operation",
+      "specRevision": 7,
+      "planRevision": 7
+    },
+    "scope": {
+      "allSixAdditiveFilesReviewed": true,
+      "existingEightPublishedFilesIndependentlyByteCompared": true,
+      "exactFallbackContractReviewed": true,
+      "standaloneOriginalCustodyReconstructed": true,
+      "genericWorkValidationAndIncrementalTransition": true
+    },
+    "status": "pass",
+    "unresolvedFindingCount": 0,
+    "findings": [],
+    "historicalFindingClosures": [
+      {
+        "commentId": 4287242542,
+        "severity": "P2",
+        "disposition": "closed-for-this-exact-source-successor",
+        "files": [
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v2-utf8-20261016.json",
+            "line": 26
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v3-utf8-20261016.json",
+            "line": 26
+          }
+        ],
+        "proof": "Each distinct shared-tree capture contains the complete original envelope UTF-8 string, original commit/path/blob and exact byteCount/SHA256. Extracted using only copied committed capture files in a no-Git temporary directory; no unpublished Git dependency during reconstruction. Afterwards both recovered byte arrays independently match original local source Git blobs exactly.",
+        "reconstruction": {
+          "directory": "/tmp/independent-v4-no-git-QqtHGd",
+          "gitDirectoryPresent": false,
+          "recovered": [
+            {
+              "version": "v2",
+              "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v2-utf8-20261016.json",
+              "source": {
+                "repository": "park-kyungchan/agent-platform",
+                "commit": "18e5a5ea0d09250bbf491f24ce6bc36bf277627a",
+                "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016.json",
+                "blobOid": "cc492511f7768643051b78f5bc38671f18ad2473"
+              },
+              "byteCount": 16057,
+              "sha256": "bd8934a50058c093e0406403e9d8553249f5a2822a47f07a3b582f25f7ef3171",
+              "expectedByteCount": 16057,
+              "expectedSha256": "bd8934a50058c093e0406403e9d8553249f5a2822a47f07a3b582f25f7ef3171",
+              "exactRoundTrip": true,
+              "validEnvelope": true,
+              "requiresGitForExtraction": false
+            },
+            {
+              "version": "v3",
+              "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v3-utf8-20261016.json",
+              "source": {
+                "repository": "park-kyungchan/agent-platform",
+                "commit": "5cfbe6c14a9bb399cf8acdb713aaf8f61f800681",
+                "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016.json",
+                "blobOid": "95430bd6e8e669bb13f4e19a905a18d63bdc2d3b"
+              },
+              "byteCount": 16717,
+              "sha256": "8f5c2c89868e46732d622ac4430db9a4d7611b52cb777800e17ac13c56fde14d",
+              "expectedByteCount": 16717,
+              "expectedSha256": "8f5c2c89868e46732d622ac4430db9a4d7611b52cb777800e17ac13c56fde14d",
+              "exactRoundTrip": true,
+              "validEnvelope": true,
+              "requiresGitForExtraction": false
+            }
+          ]
+        },
+        "originalComparisons": [
+          {
+            "version": "v2",
+            "exactOriginalBytes": true,
+            "originalBytes": 16057,
+            "originalSha256": "bd8934a50058c093e0406403e9d8553249f5a2822a47f07a3b582f25f7ef3171",
+            "blobOid": "cc492511f7768643051b78f5bc38671f18ad2473",
+            "expectedBlobOid": "cc492511f7768643051b78f5bc38671f18ad2473"
+          },
+          {
+            "version": "v3",
+            "exactOriginalBytes": true,
+            "originalBytes": 16717,
+            "originalSha256": "8f5c2c89868e46732d622ac4430db9a4d7611b52cb777800e17ac13c56fde14d",
+            "blobOid": "95430bd6e8e669bb13f4e19a905a18d63bdc2d3b",
+            "expectedBlobOid": "95430bd6e8e669bb13f4e19a905a18d63bdc2d3b"
+          }
+        ]
+      },
+      {
+        "commentId": 4287242550,
+        "severity": "P2",
+        "disposition": "closed-for-this-exact-source-successor",
+        "files": [
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v4.json",
+            "line": 133
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-1.json",
+            "line": 34
+          }
+        ],
+        "proof": "Unchanged pinned fallback contract compiled with strict AJV2020 and addFormats; v4 is valid with required scopes and no unsupported root/runtime fields. Supplemental provenance and bounded completion object exactly match their preserved v3 fields in the separate input. Published v3 remains byte-identical, historical and schema-invalid with exactly seven errors. Pretty serialized v4 content is 15935 characters, below the independent 16000-character bound.",
+        "schema": {
+          "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/checkpoint-contract.json",
+          "sha256": "f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4",
+          "unchangedFromBase": true,
+          "importer": "/home/palantirkc/code/worktrees/harness-continuation-delivery-20261016/node_modules/.bun/@palantirkc+ontology@releases+palantirkc-ontology-0.2.0.tgz/node_modules/@palantirkc/ontology/dist/validation.js",
+          "ajvPath": "/home/palantirkc/code/worktrees/harness-continuation-delivery-20261016/node_modules/.bun/ajv@8.20.0/node_modules/ajv/dist/2020.js",
+          "formatsPath": "/home/palantirkc/code/worktrees/harness-continuation-delivery-20261016/node_modules/.bun/ajv-formats@3.0.1/node_modules/ajv-formats/dist/index.js",
+          "versions": [
+            {
+              "name": "continuation-checkpoint-20261016.json",
+              "valid": true,
+              "coreChars": 12286,
+              "errors": [],
+              "validatorMutated": false
+            },
+            {
+              "name": "continuation-checkpoint-20261016-v2.json",
+              "valid": true,
+              "coreChars": 15101,
+              "errors": [],
+              "validatorMutated": false
+            },
+            {
+              "name": "continuation-checkpoint-20261016-v3.json",
+              "valid": false,
+              "coreChars": 14966,
+              "errors": [
+                {
+                  "instancePath": "",
+                  "schemaPath": "#/additionalProperties",
+                  "keyword": "additionalProperties",
+                  "params": {
+                    "additionalProperty": "captureProvenance"
+                  },
+                  "message": "must NOT have additional properties"
+                },
+                {
+                  "instancePath": "",
+                  "schemaPath": "#/additionalProperties",
+                  "keyword": "additionalProperties",
+                  "params": {
+                    "additionalProperty": "inheritedEffectFenceSource"
+                  },
+                  "message": "must NOT have additional properties"
+                },
+                {
+                  "instancePath": "/runtime",
+                  "schemaPath": "#/properties/runtime/additionalProperties",
+                  "keyword": "additionalProperties",
+                  "params": {
+                    "additionalProperty": "completedMilestone"
+                  },
+                  "message": "must NOT have additional properties"
+                },
+                {
+                  "instancePath": "/delegations/0",
+                  "schemaPath": "#/properties/delegations/items/required",
+                  "keyword": "required",
+                  "params": {
+                    "missingProperty": "scope"
+                  },
+                  "message": "must have required property 'scope'"
+                },
+                {
+                  "instancePath": "/delegations/1",
+                  "schemaPath": "#/properties/delegations/items/required",
+                  "keyword": "required",
+                  "params": {
+                    "missingProperty": "scope"
+                  },
+                  "message": "must have required property 'scope'"
+                },
+                {
+                  "instancePath": "/delegations/2",
+                  "schemaPath": "#/properties/delegations/items/required",
+                  "keyword": "required",
+                  "params": {
+                    "missingProperty": "scope"
+                  },
+                  "message": "must have required property 'scope'"
+                },
+                {
+                  "instancePath": "/delegations/3",
+                  "schemaPath": "#/properties/delegations/items/required",
+                  "keyword": "required",
+                  "params": {
+                    "missingProperty": "scope"
+                  },
+                  "message": "must have required property 'scope'"
+                }
+              ],
+              "validatorMutated": false
+            },
+            {
+              "name": "continuation-checkpoint-20261016-v4.json",
+              "valid": true,
+              "coreChars": 15935,
+              "errors": [],
+              "validatorMutated": false
+            }
+          ],
+          "negatives": [
+            {
+              "name": "missingDelegationScope",
+              "rejected": true,
+              "errors": [
+                {
+                  "instancePath": "/delegations/0",
+                  "schemaPath": "#/properties/delegations/items/required",
+                  "keyword": "required",
+                  "params": {
+                    "missingProperty": "scope"
+                  },
+                  "message": "must have required property 'scope'"
+                }
+              ]
+            },
+            {
+              "name": "unsupportedRuntimeProperty",
+              "rejected": true,
+              "errors": [
+                {
+                  "instancePath": "/runtime",
+                  "schemaPath": "#/properties/runtime/additionalProperties",
+                  "keyword": "additionalProperties",
+                  "params": {
+                    "additionalProperty": "completedMilestone"
+                  },
+                  "message": "must NOT have additional properties"
+                }
+              ]
+            },
+            {
+              "name": "unsupportedRootProperty",
+              "rejected": true,
+              "errors": [
+                {
+                  "instancePath": "",
+                  "schemaPath": "#/additionalProperties",
+                  "keyword": "additionalProperties",
+                  "params": {
+                    "additionalProperty": "captureProvenance"
+                  },
+                  "message": "must NOT have additional properties"
+                }
+              ]
+            },
+            {
+              "name": "invalidDateTime",
+              "rejected": true,
+              "errors": [
+                {
+                  "instancePath": "/updatedAtUtc",
+                  "schemaPath": "#/properties/updatedAtUtc/format",
+                  "keyword": "format",
+                  "params": {
+                    "format": "date-time"
+                  },
+                  "message": "must match format \"date-time\""
+                }
+              ]
+            },
+            {
+              "name": "wrongOntologyVersion",
+              "rejected": true,
+              "errors": [
+                {
+                  "instancePath": "/ontologyPackage",
+                  "schemaPath": "#/properties/ontologyPackage/const",
+                  "keyword": "const",
+                  "params": {
+                    "allowedValue": {
+                      "name": "@palantirkc/ontology",
+                      "version": "0.2.0"
+                    }
+                  },
+                  "message": "must be equal to constant"
+                }
+              ]
+            },
+            {
+              "name": "wrongReplayPolicy",
+              "rejected": true,
+              "errors": [
+                {
+                  "instancePath": "/effects/0/replayPolicy",
+                  "schemaPath": "#/properties/effects/items/properties/replayPolicy/const",
+                  "keyword": "const",
+                  "params": {
+                    "allowedValue": "never-replay-recorded-dispatch"
+                  },
+                  "message": "must be equal to constant"
+                }
+              ]
+            }
+          ]
+        },
+        "sidecarExactPreservation": [
+          {
+            "key": "captureProvenance",
+            "exact": true
+          },
+          {
+            "key": "inheritedEffectFenceSource",
+            "exact": true
+          },
+          {
+            "key": "runtime.completedMilestone",
+            "exact": true
+          }
+        ]
+      }
+    ],
+    "performedChecks": [
+      {
+        "check": "exact identities and append-only diff",
+        "result": "pass",
+        "proof": "HEAD d51be042/tree95156570; all six changes are additions; no pre-existing tracked file changed; working tree clean. Main remains9c1da6c.",
+        "files": [
+          {
+            "kind": "A",
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v4.json",
+            "bytes": 17019,
+            "sha256": "1225c99527e478eca8a57d8282b7b21031e6fd82e01a5d1a9fe15c46a34d2c9b"
+          },
+          {
+            "kind": "A",
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-1.json",
+            "bytes": 4315,
+            "sha256": "17beaaf0b967f5fe76959f47c80fd25ae82059685fcf3207a57f26e805255ae0"
+          },
+          {
+            "kind": "A",
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-v4-schema-verification-20261016.json",
+            "bytes": 9168,
+            "sha256": "77ce0919f2f619915da024577693a416fc08ccafb7e2bb99c05acf937025053b"
+          },
+          {
+            "kind": "A",
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v2-utf8-20261016.json",
+            "bytes": 18339,
+            "sha256": "f39515ba51dc0d024d37ebf9712fc5ddc1057aa6385aa6cf47333ac799f96cbb"
+          },
+          {
+            "kind": "A",
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v3-utf8-20261016.json",
+            "bytes": 19050,
+            "sha256": "56df00c64625db6d78b55015cb8170b7a3e758b07ef60a062b68486da45c8a41"
+          },
+          {
+            "kind": "A",
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/post-goal-orchestrator-interview-20261016.json",
+            "bytes": 2752,
+            "sha256": "beba5a609f1c811827c01e93049882f50ba01bb60841976eb76b25152db887ff"
+          }
+        ]
+      },
+      {
+        "check": "old eight byte and SHA preservation",
+        "result": "pass",
+        "proof": [
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Aevidence%3Aontology-driven-harness-operation%3Aacademy-context-independent-review-20261016.json",
+            "expected": "3f619ba4aacb35622e308e154651fd00b2a47c464156b7468c1ecba6733e3923",
+            "baseSha256": "3f619ba4aacb35622e308e154651fd00b2a47c464156b7468c1ecba6733e3923",
+            "headSha256": "3f619ba4aacb35622e308e154651fd00b2a47c464156b7468c1ecba6733e3923",
+            "exactBytes": true
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Averification%3Aacademy-context-review-20261016.json",
+            "expected": "a4ac093dcb779b75afe98b8ca1e792385c5d87b745816c3a7f7ad40ebf3a96c4",
+            "baseSha256": "a4ac093dcb779b75afe98b8ca1e792385c5d87b745816c3a7f7ad40ebf3a96c4",
+            "headSha256": "a4ac093dcb779b75afe98b8ca1e792385c5d87b745816c3a7f7ad40ebf3a96c4",
+            "exactBytes": true
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-context-review-result-20261016.json",
+            "expected": "2e230e1fefbe8ff5aa5db7e6eb226968ab6d6a03cf5d6b99c5a6cd42ef359d97",
+            "baseSha256": "2e230e1fefbe8ff5aa5db7e6eb226968ab6d6a03cf5d6b99c5a6cd42ef359d97",
+            "headSha256": "2e230e1fefbe8ff5aa5db7e6eb226968ab6d6a03cf5d6b99c5a6cd42ef359d97",
+            "exactBytes": true
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-context-review-verification-20261016.json",
+            "expected": "3c6cf80e9fde12cb577833309305bfbc55aa25833c4a9313fc5519dbff877886",
+            "baseSha256": "3c6cf80e9fde12cb577833309305bfbc55aa25833c4a9313fc5519dbff877886",
+            "headSha256": "3c6cf80e9fde12cb577833309305bfbc55aa25833c4a9313fc5519dbff877886",
+            "exactBytes": true
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v2.json",
+            "expected": "9c24ed9a9edd750312954942bc623e41dfc15d20d9e96dedc964206f08778635",
+            "baseSha256": "9c24ed9a9edd750312954942bc623e41dfc15d20d9e96dedc964206f08778635",
+            "headSha256": "9c24ed9a9edd750312954942bc623e41dfc15d20d9e96dedc964206f08778635",
+            "exactBytes": true
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v3.json",
+            "expected": "cec38245e57c9e6eb7bb06f87357bad65e05b451b27f8aaf0c89204f9269b730",
+            "baseSha256": "cec38245e57c9e6eb7bb06f87357bad65e05b451b27f8aaf0c89204f9269b730",
+            "headSha256": "cec38245e57c9e6eb7bb06f87357bad65e05b451b27f8aaf0c89204f9269b730",
+            "exactBytes": true
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016.json",
+            "expected": "d70176b15a99d5cfec3fdb465356089814050edd879b89252452febbe08468a2",
+            "baseSha256": "d70176b15a99d5cfec3fdb465356089814050edd879b89252452febbe08468a2",
+            "headSha256": "d70176b15a99d5cfec3fdb465356089814050edd879b89252452febbe08468a2",
+            "exactBytes": true
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-CONTEXT-REVALIDATION-REVIEW.json",
+            "expected": "8e72586b0d968e8d0a18e8ea5c8e990a5e99e16898e8175d751d0784a98087c9",
+            "baseSha256": "8e72586b0d968e8d0a18e8ea5c8e990a5e99e16898e8175d751d0784a98087c9",
+            "headSha256": "8e72586b0d968e8d0a18e8ea5c8e990a5e99e16898e8175d751d0784a98087c9",
+            "exactBytes": true
+          }
+        ]
+      },
+      {
+        "check": "original local history preservation",
+        "result": "pass",
+        "head": "5cfbe6c14a9bb399cf8acdb713aaf8f61f800681",
+        "proof": "Original local branch/history remains at5cfbe6c14a9bb399cf8acdb713aaf8f61f800681; only read-only git show/rev-parse were used."
+      },
+      {
+        "check": "strict checkpoint contract and negative cases",
+        "result": "pass",
+        "proof": "No schema/code/dependency changes. AJV strict/allErrors, coerceTypes/useDefaults/removeAdditional=false; validator did not mutate content. v1/v2/v4 valid, v3 seven expected errors. Missing scope, extra runtime/root property, invalid date-time, wrong Ontology version and wrong replay policy all rejected."
+      },
+      {
+        "check": "same-owner source pins",
+        "result": "pass",
+        "proof": [
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-1.json",
+            "expected": "sha256:17beaaf0b967f5fe76959f47c80fd25ae82059685fcf3207a57f26e805255ae0",
+            "actual": "sha256:17beaaf0b967f5fe76959f47c80fd25ae82059685fcf3207a57f26e805255ae0"
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/post-goal-orchestrator-interview-20261016.json",
+            "expected": "sha256:beba5a609f1c811827c01e93049882f50ba01bb60841976eb76b25152db887ff",
+            "actual": "sha256:beba5a609f1c811827c01e93049882f50ba01bb60841976eb76b25152db887ff"
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v3.json",
+            "expected": "sha256:cec38245e57c9e6eb7bb06f87357bad65e05b451b27f8aaf0c89204f9269b730",
+            "actual": "sha256:cec38245e57c9e6eb7bb06f87357bad65e05b451b27f8aaf0c89204f9269b730"
+          }
+        ]
+      },
+      {
+        "check": "bun run harness validate exact head",
+        "result": "pass",
+        "exitCode": 0,
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      },
+      {
+        "check": "bun run harness transition exact e8 to d51",
+        "result": "pass",
+        "exitCode": 0,
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      },
+      {
+        "check": "bun run harness context GHA-22 latestRelevant=current",
+        "result": "pass",
+        "exitCode": 0,
+        "status": "source-qualified",
+        "holdReasons": [],
+        "specRevision": 7,
+        "planRevision": 7,
+        "historicalEffects": {
+          "completedCount": 63,
+          "uncertainCount": 2
+        },
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      },
+      {
+        "check": "COMMON_BASE_SHA=e8 bun scripts/verify-common-work.ts . d51",
+        "result": "pass",
+        "exitCode": 0,
+        "records": 161,
+        "actualDecisions": 47,
+        "completedHistoricalEffects": 63,
+        "uncertainHistoricalEffects": 2,
+        "transitionValidated": true,
+        "runtimeDocumentationRoutes": 84,
+        "runtimeActivationEstablished": false,
+        "wholeWorkAcceptanceEstablished": false
+      },
+      {
+        "check": "bun run check:handoff",
+        "result": "pass",
+        "exitCode": 0,
+        "testsPassed": 39,
+        "testsFailed": 0,
+        "expectCalls": 223,
+        "scope": "Synthetic temporary-file source tests only"
+      },
+      {
+        "check": "bun run check:imports",
+        "result": "pass",
+        "exitCode": 0,
+        "legacyAndCanonicalSameModule": true,
+        "sha256": "8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a",
+        "modelCalls": 0,
+        "canonicalIssueStateMutation": false
+      },
+      {
+        "check": "git diff --check e8 d51",
+        "result": "pass",
+        "proof": "No whitespace errors"
+      },
+      {
+        "check": "post-Goal actual user instruction custody",
+        "result": "pass",
+        "file": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/post-goal-orchestrator-interview-20261016.json",
+        "line": 26,
+        "proof": {
+          "rawSourceSha256": "3e38a239ee4c36e0bf586e70618a752e99647238378cd944ebc43f53a7ee6e6c",
+          "expectedSourceSha256": "3e38a239ee4c36e0bf586e70618a752e99647238378cd944ebc43f53a7ee6e6c",
+          "captureEqualsOriginal": true,
+          "deferred": {
+            "status": "deferred-until-current-goal-achieved",
+            "topic": "Orchestrator-Harness worker context freshness, native CLI/pane lifecycle, reuse versus isolation, and closure policy",
+            "engineeringAuthorizedNow": false,
+            "questionsSelectedNow": false
+          }
+        }
+      }
+    ],
+    "semanticReview": {
+      "actualDecisions": "All47 accepted decision meanings read; no decision record changes. Existing purpose, identity, provenance, private reorganization, native ownership, separate review/merge/activation and Acceptance boundaries preserved.",
+      "goal": "v4 runtime.nativeGoalRef binds native thread01a13f90-74a0-7930-a5bc-9663e9ec9f86:createdAt:1792089018 and explicitly labels full-Spec7 ACTIVE as Lead-relayed. Source-only reviewer has not independently authenticated native Goal state.",
+      "boundedMilestone": "Supplement preserves prior complete bounded custody/review/Bun milestone, wholeWorkComplete=false, acceptanceDecision=null; this is distinct from current full-Spec7 Goal.",
+      "effectFences": "All six v3 checkpoint effect objects exactly preserved in v4, including both unknown effects and never-replay-recorded-dispatch. The canonical historical fence remains63completed/2uncertain.",
+      "holds": "All five pre-existing v3 holds retained: original WSL writer paused, native provider currentness, frozen corrective scripts, fresh evaluation authority, whole-Work Acceptance. Added commonPR16 exact successor review and native metadata observer holds. No current native activation or historical allocation retry granted.",
+      "deferredInterview": "Exact operations source SHA and complete captured object match. engineeringAuthorizedNow=false and questionsSelectedNow=false; Orchestrator-Harness interview/engineering remains deferred until current Goal achieved.",
+      "distinctions": "Observation, verification, actual user instructions, shared delivery, native behavior and Acceptance remain distinct. NativeSource/source pins and logical records grant no permission. No cryptographic native authorship or current native acceptance is inferred from Git or JSON."
+    },
+    "currentLimits": [
+      "Review qualifies this exact local source commit/tree and the specified delta only; no authenticated GitHub review/status, publication, PR merge or current required hosted checks were performed by this reviewer.",
+      "The external non-authorizing latest-harness-continuation.json route read during review still points to e8/v3. Publishing or redirecting it to an accepted successor belongs to the Lead; this review did not mutate the route or native state.",
+      "Current full-Spec7 Goal ACTIVE, hosted CI/main events and native observer two-P2 state are explicitly Lead-relayed/recorded observations, not fresh native-state authentication by this reviewer.",
+      "No appserver, hooks, native runtime/admissions, model evaluation, real-data queries, authentication/configuration changes or original WSL writer resume were run.",
+      "Source-only local checks establish neither current consumer qualification nor whole-Work Acceptance. Separate accountable Lead required-check review and expected-head integration remain pending."
+    ],
+    "artifacts": {
+      "computed": "/tmp/checkpoint-v4-independent-computed-20261016.json",
+      "verificationScript": "/tmp/checkpoint-v4-independent-check.ts",
+      "standaloneDirectory": "/tmp/independent-v4-no-git-QqtHGd"
+    },
+    "effects": {
+      "temporaryReviewArtifactsOnly": true,
+      "sourceMutation": false,
+      "goalMutation": false,
+      "nativeConfigMutation": false,
+      "authMutation": false,
+      "modelEvaluation": false,
+      "realDataQueries": false,
+      "push": false,
+      "statusWrite": false,
+      "prMutation": false,
+      "merge": false
+    },
+    "nativePermissionGranted": false,
+    "runtimeActivationEstablished": false,
+    "wholeWorkAcceptanceEstablished": false,
+    "acceptanceDecision": null
+  },
+  "leadVerification": {
+    "schemaCheckRef": "/tmp/common-fallback-checkpoint-schema-review-20261016.json",
+    "currentV4Valid": true,
+    "currentCoreChars": 15935,
+    "previousV3SchemaErrors": 7,
+    "priorPublishedHead": "e8f041751a6b4bdee1108b22bbb831114b685232",
+    "priorStatusInvalidated": 56463056482,
+    "existingEightFilesUnchanged": true
+  },
+  "nativeCompletionReadback": {
+    "method": "Native subagent completed result notification plus exact reviewer-authored artifact readback",
+    "taskPath": "/root/checkpoint_v4_review",
+    "nativeAuthorshipCryptographicallyVerified": false
+  },
+  "findingClosure": {
+    "comments": [
+      4287242542,
+      4287242550
+    ],
+    "status": "independently-closed-for-this-successor-source",
+    "oldReviewReceiptsUnchanged": true
+  },
+  "limits": [
+    "Source/custody/schema verification only; no native activation, model evaluation or whole-Work Acceptance.",
+    "Required hosted successor source/quality/native-review checks remain pending at result capture.",
+    "Original published e8/v3 remains immutable historical evidence; explicit v4 is the current typed checkpoint."
+  ],
+  "acceptanceDecision": null
+}
