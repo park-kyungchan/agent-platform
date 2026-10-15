@@ -1,0 +1,434 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+  "reviewedTreeSha": "d230c84acc159461d9ee3f16096cd49da7ce4ca4",
+  "reviewedSourceManifestSha256": "2049e1e9636bddc7258e6a640d5a99bfb1a07371afc42059cbf32f1efce0c971",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "herdr:srv1873899-herdr/w3:p5:term_65de74534095d5:batch770a4a6f"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a13f90-74a0-7930-a5bc-9663e9ec9f86"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "independentSuccessorBinding": {
+    "schema": "agent-platform.exact-main-source-review-binding.v1",
+    "correlation": "academy-phase-review-20261016-batch770a4a6f",
+    "observedAtUtc": "2026-10-15T21:53:39.707Z",
+    "result": "PASS-source-review-reuse",
+    "conclusion": "pass",
+    "unresolvedFindingCount": 0,
+    "newFindings": [],
+    "binding": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "baseSha": "98eb139ded111fb42f5ae7c24f250d92d53a69de",
+      "reviewedHeadSha": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+      "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+      "reviewedTreeSha": "d230c84acc159461d9ee3f16096cd49da7ce4ca4",
+      "remoteMainSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+      "remoteMainGitLsRemote": "3cb565efdcf9634b057fa77948f4222b93255604",
+      "mergeParents": [
+        "98eb139ded111fb42f5ae7c24f250d92d53a69de",
+        "0a8af1f5c1905d0de71c4377da92285dc821dfce"
+      ],
+      "treeEquality": true,
+      "explicitSuccessorBinding": true,
+      "reusedReview": {
+        "path": "/tmp/academy-phase-review-successor0a8-result.json",
+        "sha256": "7fda4a4c99b229cd921cc90adeacb9cf483c9f9c43f42ec71993ddf1448efe86",
+        "sourceClosedComments": [
+          4288374930,
+          4288374938
+        ]
+      },
+      "meaning": "Explicitly reuse the independently reviewed0a8 source and two-P2 closure for exact main3cb because the complete Git trees are identical and current complete PR thread enumeration has zero unresolved findings. This is source suitability only; no main CI gate PASS or native permission is inferred."
+    },
+    "merge": {
+      "pr": 17,
+      "url": "https://github.com/park-kyungchan/agent-platform/pull/17",
+      "state": "MERGED",
+      "mergedAt": "2026-10-15T21:47:35Z",
+      "mergedBy": "park-kyungchan",
+      "mergeCommitSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+      "expectedHeadMatched": true,
+      "autoMerge": null,
+      "rootReportedCommand": "gh pr merge17 --merge --match-head-commit0a8",
+      "commandProvenance": "Root reports explicit expected-head merge without auto/admin/bypass. GitHub independently confirms merged commit/head/parents/actor and auto_merge:null; API metadata does not authenticate exact shell command or prove all bypass settings."
+    },
+    "currentFindings": {
+      "completeThreadEnumeration": true,
+      "threadCount": 2,
+      "inlineCommentCount": 2,
+      "unresolvedThreadCount": 0,
+      "reviewSubmissionCount": 1,
+      "conversationCommentCount": 1,
+      "threads": [
+        {
+          "threadId": "PRRT_kwDOVD2my86s-GWV",
+          "isResolved": true,
+          "isOutdated": false,
+          "resolvedBy": "park-kyungchan",
+          "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-2.json",
+          "line": 260,
+          "inlineComments": [
+            {
+              "id": 4288374930,
+              "originalCommit": "770a4a6f25f34cd317da290438110a87c71d949a",
+              "currentCommit": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+              "url": "https://github.com/park-kyungchan/agent-platform/pull/17#discussion_r4288374930",
+              "sourceClosureHead": "0a8af1f5c1905d0de71c4377da92285dc821dfce"
+            }
+          ]
+        },
+        {
+          "threadId": "PRRT_kwDOVD2my86s-GWa",
+          "isResolved": true,
+          "isOutdated": false,
+          "resolvedBy": "park-kyungchan",
+          "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-plan-20261016.json",
+          "line": 189,
+          "inlineComments": [
+            {
+              "id": 4288374938,
+              "originalCommit": "770a4a6f25f34cd317da290438110a87c71d949a",
+              "currentCommit": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+              "url": "https://github.com/park-kyungchan/agent-platform/pull/17#discussion_r4288374938",
+              "sourceClosureHead": "0a8af1f5c1905d0de71c4377da92285dc821dfce"
+            }
+          ]
+        }
+      ],
+      "additionalInlineComments": [],
+      "reviews": [
+        {
+          "id": 5540050712,
+          "commitSha": "770a4a6f25f34cd317da290438110a87c71d949a",
+          "state": "COMMENTED",
+          "author": "chatgpt-codex-connector[bot]",
+          "submittedAt": "2026-10-15T21:17:41Z"
+        }
+      ],
+      "historicalSummaryComments": [
+        {
+          "id": 6202365134,
+          "author": "chatgpt-codex-connector[bot]",
+          "updatedAt": "2026-10-15T21:17:44Z",
+          "summaryCommit": "770a4a6f25f34cd317da290438110a87c71d949a",
+          "meaning": "Bot summary still records old770 findings. It is historical evidence, not a new unresolved successor-head finding; original_commit_id, source closure and current resolved thread state govern. Thread isOutdated:false does not negate the immutable historical finding or its additive fix."
+        }
+      ]
+    },
+    "reviewedHeadPublication": {
+      "statusId": 56473614360,
+      "state": "success",
+      "createdAt": "2026-10-15T21:40:52Z",
+      "creator": {
+        "id": 241037670,
+        "login": "park-kyungchan"
+      },
+      "receiptUrl": "https://github.com/park-kyungchan/agent-platform/blob/78fb69e77557c9f26796ff09913907c81a97f6b9/native-reviews/0a8af1f5c1905d0de71c4377da92285dc821dfce.json",
+      "receiptSha256": "7532b02f6fdf69769979d80f4d6e82ce0bc08fd9b7f9e284f54fff325417946e",
+      "resultUrl": "https://github.com/park-kyungchan/agent-platform/blob/0e951c96e775ee7a0d8096f85d0445c2b18019c0/native-review-results/0a8af1f5c1905d0de71c4377da92285dc821dfce.json",
+      "resultSha256": "5a4339fb4a9afa0c3ef58c22c0e415ce48f934a9d768ec556569dadc4fac2e3d",
+      "embeddedIndependentReviewMatchesLocal": true,
+      "priorHeadStatusHistory": [
+        {
+          "id": 56473614360,
+          "state": "success",
+          "createdAt": "2026-10-15T21:40:52Z",
+          "targetUrl": "https://github.com/park-kyungchan/agent-platform/blob/78fb69e77557c9f26796ff09913907c81a97f6b9/native-reviews/0a8af1f5c1905d0de71c4377da92285dc821dfce.json"
+        },
+        {
+          "id": 56473613034,
+          "state": "failure",
+          "createdAt": "2026-10-15T21:40:51Z",
+          "targetUrl": "https://github.com/park-kyungchan/agent-platform/pull/17"
+        },
+        {
+          "id": 56473555505,
+          "state": "success",
+          "createdAt": "2026-10-15T21:40:06Z",
+          "targetUrl": "https://github.com/park-kyungchan/agent-platform/blob/78fb69e138a4a976dc7fca1d734139d881a599a0/native-reviews/0a8af1f5c1905d0de71c4377da92285dc821dfce.json"
+        }
+      ]
+    },
+    "checks": {
+      "reviewedHead": {
+        "run": 38811910184,
+        "attempt": 1,
+        "event": "pull_request",
+        "headSha": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38811910184",
+        "jobs": [
+          {
+            "id": 116686959324,
+            "name": "Prospective merge integration",
+            "status": "completed",
+            "conclusion": "success",
+            "headSha": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+            "startedAt": "2026-10-15T21:42:38Z",
+            "completedAt": "2026-10-15T21:44:59Z",
+            "failedSteps": []
+          },
+          {
+            "id": 116686959468,
+            "name": "Quality and architecture checks",
+            "status": "completed",
+            "conclusion": "success",
+            "headSha": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+            "startedAt": "2026-10-15T21:42:37Z",
+            "completedAt": "2026-10-15T21:43:29Z",
+            "failedSteps": []
+          },
+          {
+            "id": 116686959568,
+            "name": "Exact head native independent review",
+            "status": "completed",
+            "conclusion": "success",
+            "headSha": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+            "startedAt": "2026-10-15T21:42:37Z",
+            "completedAt": "2026-10-15T21:42:49Z",
+            "failedSteps": []
+          },
+          {
+            "id": 116686959685,
+            "name": "Canonical source checks",
+            "status": "completed",
+            "conclusion": "success",
+            "headSha": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+            "startedAt": "2026-10-15T21:42:37Z",
+            "completedAt": "2026-10-15T21:44:08Z",
+            "failedSteps": []
+          },
+          {
+            "id": 116687942248,
+            "name": "Source and native review gate",
+            "status": "completed",
+            "conclusion": "success",
+            "headSha": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+            "startedAt": "2026-10-15T21:45:01Z",
+            "completedAt": "2026-10-15T21:45:05Z",
+            "failedSteps": []
+          }
+        ]
+      },
+      "exactMain": {
+        "run": 38812534981,
+        "attempt": 1,
+        "event": "push",
+        "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38812534981",
+        "jobs": [
+          {
+            "id": 116689042493,
+            "name": "Exact head native independent review",
+            "status": "completed",
+            "conclusion": "failure",
+            "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+            "startedAt": "2026-10-15T21:47:41Z",
+            "completedAt": "2026-10-15T21:47:47Z",
+            "failedSteps": [
+              "Read immutable native review receipt for this exact head"
+            ]
+          },
+          {
+            "id": 116689042785,
+            "name": "Quality and architecture checks",
+            "status": "completed",
+            "conclusion": "success",
+            "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+            "startedAt": "2026-10-15T21:47:41Z",
+            "completedAt": "2026-10-15T21:48:24Z",
+            "failedSteps": []
+          },
+          {
+            "id": 116689042871,
+            "name": "Canonical source checks",
+            "status": "completed",
+            "conclusion": "success",
+            "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+            "startedAt": "2026-10-15T21:47:41Z",
+            "completedAt": "2026-10-15T21:49:19Z",
+            "failedSteps": []
+          },
+          {
+            "id": 116689044139,
+            "name": "Prospective merge integration",
+            "status": "completed",
+            "conclusion": "skipped",
+            "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+            "startedAt": "2026-10-15T21:47:39Z",
+            "completedAt": "2026-10-15T21:47:38Z",
+            "failedSteps": []
+          },
+          {
+            "id": 116689736432,
+            "name": "Source and native review gate",
+            "status": "completed",
+            "conclusion": "failure",
+            "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+            "startedAt": "2026-10-15T21:49:21Z",
+            "completedAt": "2026-10-15T21:49:25Z",
+            "failedSteps": [
+              "Require source quality and exact head native review"
+            ]
+          }
+        ],
+        "nativeReviewStatusesObserved": 0,
+        "mainGatePass": false,
+        "observedFailure": "Exact-head native review step rejected missing/unsuccessful/unexpected-creator status; at this read no main status exists. Source and quality succeeded, review/aggregate failed, prospective merge skipped by push-event contract."
+      }
+    },
+    "correctPublicationSequence": [
+      "Root reads back this independent exact-main artifact and publishes immutable exact-main result plus digest-bound receipt with explicit0a8-to3cb identical-tree reuse and current zero findings.",
+      "Root separately publishes and verifies authenticated native-independent-review SUCCESS for exact3cb pointing to its immutable exact-main receipt. Head0a8 SUCCESS does not satisfy3cb exact-head status lookup.",
+      "Only after exact-main result/receipt/status readback, Root may explicitly rerun the failed exact-main native-review and aggregate gate jobs; retain original attempt1 failures. No rerun or external write was performed by this review.",
+      "Independently read the later run/attempt and required outcomes before claiming main gate PASS. Source/quality success and push-event prospective-integration skip remain scoped to observed attempt1 until any later readback.",
+      "Root performs final exact-source/main-binding artifact readback before closing its bounded owned w3:p5 role. Role completion and pane closure do not activate native or PG/product configuration."
+    ],
+    "evidence": [
+      {
+        "path": "/tmp/academy-phase-review-main3cb-ref.json",
+        "bytes": 356,
+        "sha256": "32cc5be98d4cbb28dd737a9c5d82c4ff56d7ca39fe9ab80790d54be7f8643f8b"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-commit.json",
+        "bytes": 2824,
+        "sha256": "81bd302ec712a7da48d9618b430e0aab15edd03ac29dcf98e8a25f76a1f8612a"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-reviewed-commit.json",
+        "bytes": 1464,
+        "sha256": "be9ec909093dbac1745d1948a2107086788a4aa16c2a70d126aa976a7e7e2048"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-pr.json",
+        "bytes": 19254,
+        "sha256": "ea4034af603cbb58f4bf38aaa89aa0f1e46eceee8d920424f309a2f9ac0aa518"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-threads.json",
+        "bytes": 3722,
+        "sha256": "a5a67e47c034210240e95fb758beac0e9fb42a4b09080ac7c54ad18ac381a2b8"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-inline.jsonl",
+        "bytes": 33234,
+        "sha256": "6136adb6369a7b2bfc2a65bacb25ad9dfc7809bc422b3bf3d4f183d0d2856100"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-reviews.jsonl",
+        "bytes": 2514,
+        "sha256": "e59675e3f603a3b538f06233c0076cbb6ee074d2a70a84e3c49e851c213ea158"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-conversation.jsonl",
+        "bytes": 5319,
+        "sha256": "e6ea2851cace0b6aed3da77348181d614c90ef953ef58295180d1ef154bdb384"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-headrun.json",
+        "bytes": 13283,
+        "sha256": "f0f75b7b975b9e33008f41202348cec0bfaa0a6014b4ce65e17d56dd87cae121"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-mainrun.json",
+        "bytes": 13348,
+        "sha256": "8ba29ef9156ee0cd44b1bfccfcf3e991f18f78d8bcfb773c0b30872476844b70"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-headjobs.jsonl",
+        "bytes": 11886,
+        "sha256": "b36dd1cb48843ec1a7ea77aefb49b1010253d49b40c7327656072d0eb540bf58"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-mainjobs.jsonl",
+        "bytes": 9738,
+        "sha256": "93c8eb70063cd7e6ec4e936a44cc2b24a367d33b15524ca8f674a377d5a9bc0d"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-statuses.jsonl",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-headstatuses.jsonl",
+        "bytes": 4794,
+        "sha256": "391676e543e9c3c227fa02b5fbcb18a4ebfd3f6e6dfdc4d0dec611cea1fa7853"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-lsremote.txt",
+        "bytes": 57,
+        "sha256": "3632b5e70363aa082d34dd007ed9e84dadff09e42b914d5f31c829d818ebdff1"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-review-job.log",
+        "bytes": 14794,
+        "sha256": "670e0af5fac711ce89e347799694cc5c41e7b12b425a7cb77f15f1aec1644615"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-headreceipt-api.json",
+        "bytes": 2849,
+        "sha256": "2e6856a775191e0003b7a5d496ee386798a4de65cfbf95653141d5e69853e75b"
+      },
+      {
+        "path": "/tmp/academy-phase-review-main3cb-headresult-api.json",
+        "bytes": 21430,
+        "sha256": "f9c7bcab441b7e97a9a8d80a3e26ca6deabf784c937310e467ca2e274adb959b"
+      }
+    ],
+    "historicalReview": {
+      "path": "/tmp/academy-phase-review-batch770a4a6f-result.json",
+      "sha256": "a4c7d9e91fa8c7a402b893754aeedda5f70b1f8701ec5937c9abafd262775f17",
+      "preserved": true,
+      "currentQualification": false,
+      "invalidatedStatusId": 56472006032
+    },
+    "limits": [
+      "Point-in-time read-only GitHub metadata/commit/ref/thread/check/status/log and immutable evidence reads, plus HTTPS git ls-remote. No Git fetch, checkout, source change, rerun, push, status publication, thread mutation, merge, Goal/native/auth/config effect or activation.",
+      "No source tests rerun for main: complete remote main tree equals reviewed0a8, whose independent checks and findings are reused explicitly. Current main CI failure remains visible and unqualified.",
+      "GitHub actor/status creator metadata and immutable evidence equality establish publication/source binding; they do not cryptographically authenticate native authorship, runtime execution or exact Root command.",
+      "Original v5/HOLD, old770 invalidation and0a8 closure artifacts remain unchanged. No native/PG source-authority gate, Bun1.4.3 executable successor, private product gate, original-owner-exit durability, activation or whole-Work Acceptance is established.",
+      "Remote state may advance after these reads; reuse requires unchanged exact reviewed tree, explicit binding and current zero-unresolved-finding state at the consuming action."
+    ],
+    "nativePermissionGranted": false,
+    "mainGatePass": false,
+    "pgSourceAuthorityGateAccepted": false,
+    "nativeActivationEstablished": false,
+    "wholeWorkComplete": false,
+    "acceptanceDecision": null
+  },
+  "independentArtifactSha256": "ee64587b3e18efc7a79da0a8938a393f515c1c1130ff6584650117c2540afeb3",
+  "priorExactReview": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/0e951c96e775ee7a0d8096f85d0445c2b18019c0/native-review-results/0a8af1f5c1905d0de71c4377da92285dc821dfce.json",
+    "sha256": "5a4339fb4a9afa0c3ef58c22c0e415ce48f934a9d768ec556569dadc4fac2e3d"
+  },
+  "nativeCompletionReadback": {
+    "method": "Settled native lifecycle plus actual terminal/artifact readback",
+    "paneId": "w3:p5",
+    "terminalId": "term_65de74534095d5",
+    "completionSeq": 46,
+    "nativeAuthorshipCryptographicallyVerified": false,
+    "ownedPaneClosedAfterReadback": true
+  },
+  "completedLeadIntegrationReceipt": "/home/palantirkc/operations/harness-continuation-20261016/common-pr17-explicit-integration-receipt.json",
+  "limits": [
+    "Exact identical main source tree only; no PG authority, executable Bun successor, runtime activation or Acceptance.",
+    "Main source/quality passed; exact-main receipt/status publication and explicit failed-review-job rerun remain separate."
+  ],
+  "acceptanceDecision": null
+}
