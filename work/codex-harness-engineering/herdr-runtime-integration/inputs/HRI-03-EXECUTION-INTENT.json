@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "input",
+  "id": "HRI-03-EXECUTION-INTENT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "vps-operations",
+    "locator": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/filesystem-helper-review.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "reviewedHelperSha256": "3140d6b4401144292aa14ee96b626d362a3c6ae6eb0b87db9c3365ef6d9c77ac",
+    "effectScope": "Owned deployment directory/projection normalization, exact obsolete helper removal and one locked native workspace declaration correction; no lifecycle/data moves/model prompts.",
+    "reviewSha256": "c6e51f771edb8680dc66d9ecf2bea445d6045e5d95144de16108cd3f92856e6b"
+  }
+}

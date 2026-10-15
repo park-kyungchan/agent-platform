@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "evidence",
+  "id": "HRI-03-NATIVE-EXECUTION",
+  "evidenceKind": "native-execution",
+  "source": {
+    "kind": "native",
+    "ownerId": "vps-operations",
+    "locator": "HRI-03:filesystem-normalization-receipt.json",
+    "receipt": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-03-EXECUTION-RECEIPT.json",
+      "fragment": "#/content"
+    }
+  }
+}

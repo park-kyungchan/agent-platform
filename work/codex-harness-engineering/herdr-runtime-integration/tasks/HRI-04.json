@@ -32,7 +32,8 @@
     },
     {
       "taskId": "HRI-03",
-      "milestone": "execution-and-verification"
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "HRI-03-NATIVE-EXECUTION"
     }
   ],
   "decisionIds": [
@@ -41,5 +42,6 @@
     "HRI-DECISION-GOAL"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [],
+  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74"
 }
