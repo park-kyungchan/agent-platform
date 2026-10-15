@@ -1,0 +1,190 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "770a4a6f25f34cd317da290438110a87c71d949a",
+  "reviewedTreeSha": "6de0d1ad417f5197ae56e9d3a1ba81e2031cd56b",
+  "reviewedSourceManifestSha256": "8ae3d27596662d3c2437deb495cf73f52a573d3fd0b4ef9e59bb3e35662a817b",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "herdr:srv1873899-herdr/w3:p5:term_65de74534095d5:batch770a4a6f"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a13f90-74a0-7930-a5bc-9663e9ec9f86"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "independentSourceReview": {
+    "schema": "agent-platform.correlated-independent-source-review.v1",
+    "correlation": "academy-phase-review-20261016-batch770a4a6f",
+    "reviewedAtUtc": "2026-10-15T21:04:32.420Z",
+    "reviewClass": "ordinary-engineering-source-only",
+    "result": "PASS",
+    "unresolvedFindingCount": 0,
+    "findings": [],
+    "source": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "root": "/home/palantirkc/code/worktrees/harness-product-continuation-batch-20261016",
+      "base": "98eb139ded111fb42f5ae7c24f250d92d53a69de",
+      "head": "770a4a6f25f34cd317da290438110a87c71d949a",
+      "tree": "6de0d1ad417f5197ae56e9d3a1ba81e2031cd56b",
+      "parents": [
+        "93f3a3dfa40668db84a4ef04bacaa0546bcdc31e",
+        "61edbbe94c977b254e60361e5672991c8329e146"
+      ],
+      "cleanAtFinalReadback": true,
+      "addedRecords": 8,
+      "maintainedCodeChanges": 0,
+      "sharedReaderCommit": "98eb139ded111fb42f5ae7c24f250d92d53a69de"
+    },
+    "priorSubmission": {
+      "completedMatchingReviewFound": false,
+      "scope": "Initial bounded local artifact search found task/context artifacts for the exact correlation/head, no completed matching review result; no prior native submission or state is authenticated by this search. No native task, pane or action was created or replayed."
+    },
+    "assessment": [
+      "Read all eight added JSON records, root instructions, project/semantic-owner registry and relevant Git Work reader/validator/context entrypoints. The merge preserves author commits93f3a3d and61edbbe9 as its two parents.",
+      "All161 preexisting Work files are exact Git-blob matches, including raw original custody,47 actual decisions,63 completed and2 uncertain historical effect fences. No other repository paths change.",
+      "V5 satisfies unchanged strict AJV2020 fallback schema with15915 readable core characters (limit16000). No coercion, defaults or extra-property removal; unsupported root/runtime fields and missing delegation scope are rejected. Supplement/reference digests match.",
+      "26 local packet/evidence/receipt pins match, three historical source bodies exactly match retained capture bytes and declared UTF-8 hashes/sizes; four missing source bodies remain explicit holds. Captured code is inert input evidence, with no second maintained implementation or new runtime/controller/admission framework.",
+      "Actual once observation exactly equals its retained original receipt: HOLD unexpected_native_notification, projectionnull, no retry/model methods/allocations. Admission is consumed. Source PASS0 and receipt-consistency PASS establish no native qualification or owner-exit durability.",
+      "Private plan separates compiler successor, fresh observation, migration permission retirement, release selection, app start, tunnel start, private verification and later recovery. All operational phases remain held. Immutable1.4.2 sources and PG birth-authority/host-contract coupling are preserved;1.4.3 is only a proposed candidate with successor hashes null.",
+      "Controller source confirms exclusive cooperating-operation lock plus expected-byte comparison and fsynced-file rename, without kernel CAS. Plan requires current exclusive-writer qualification and immediate exact-path pointer absence/hash. Historical absence is not a future expected value.",
+      "PG start/migration/AFTER and uncertain official score.create remain fenced against replay. Missing-source recovery is an unexecuted proposal. Original WSL writer pause, missing fresh evaluation budget, provider activation hold, question-selection boundary and null whole-Work Acceptance remain explicit."
+    ],
+    "verification": {
+      "checks": [
+        {
+          "command": "bun run harness validate /tmp/harness-product-batch-after-20261016.json",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-batch770a4a6f-validate.json",
+          "bytes": 139,
+          "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb"
+        },
+        {
+          "command": "bun run harness transition /tmp/harness-product-batch-before-20261016.json /tmp/harness-product-batch-after-20261016.json",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-batch770a4a6f-transition.json",
+          "bytes": 139,
+          "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb"
+        },
+        {
+          "command": "bun run harness context /tmp/harness-product-batch-context-20261016.json",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-batch770a4a6f-context.json",
+          "bytes": 19041,
+          "sha256": "7320f06b0db2bbb3b7fafeb60db26dd6472846fdf1805d98d2b4fadc2135ab17"
+        },
+        {
+          "command": "COMMON_BASE_SHA=98eb139ded111fb42f5ae7c24f250d92d53a69de bun scripts/verify-common-work.ts /home/palantirkc/code/worktrees/harness-product-continuation-batch-20261016 770a4a6f25f34cd317da290438110a87c71d949a",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-batch770a4a6f-common-work.json",
+          "bytes": 662,
+          "sha256": "d40ba43351c4339619a38043923c6040e8276f8a8e35e8c1ee9476a3c01453a5"
+        },
+        {
+          "command": "bun run check:handoff",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-batch770a4a6f-handoff.log",
+          "bytes": 4984,
+          "sha256": "d9e5dddd146e4966abb11479078d4172d1f5cabafa314cec8503f0e571bc900e"
+        },
+        {
+          "command": "bun run check:imports",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-batch770a4a6f-imports.log",
+          "bytes": 584,
+          "sha256": "71028b0ea55556cb40a69cde4426e818aa8af52df7b25dad72b3aa6169cf52e2"
+        },
+        {
+          "command": "bun run check:git-work",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-batch770a4a6f-git-work.log",
+          "bytes": 12158,
+          "sha256": "12f1c887068cb244a2b4cebad575b1b85483a5c50966272ed6646fe0b7199962"
+        },
+        {
+          "command": "bun /tmp/academy-phase-review-batch770a4a6f-check.ts",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-batch770a4a6f-integrity.json",
+          "bytes": 7804,
+          "sha256": "dfc19ad7c2b8af7c4e27b4ae72cc4120a935a8f2731aa0c3618625503c02b2b7"
+        }
+      ],
+      "handoff": {
+        "passed": 39,
+        "failed": 0
+      },
+      "gitWorkAndRuntimeDocs": {
+        "passed": 91,
+        "failed": 0
+      },
+      "commonWork": {
+        "records": 169,
+        "actualDecisions": 47,
+        "completedHistoricalEffects": 63,
+        "uncertainHistoricalEffects": 2,
+        "transitionValidated": true
+      },
+      "strictCheckpoint": {
+        "valid": true,
+        "coreChars": 15915,
+        "schemaPath": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/checkpoint-contract.json",
+        "schemaSha256": "f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4",
+        "options": {
+          "strict": true,
+          "allErrors": true,
+          "coerceTypes": false,
+          "useDefaults": false,
+          "removeAdditional": false
+        },
+        "negativeRejected": [
+          "root-extra",
+          "runtime-extra",
+          "delegation-scope"
+        ],
+        "ajvPath": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/ajv@8.20.0/node_modules/ajv/dist/2020.js",
+        "formatsPath": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/ajv-formats@3.0.1/node_modules/ajv-formats/dist/index.js"
+      },
+      "commonRegistrySourcePins": {
+        "verified": 131,
+        "drift": 0
+      }
+    },
+    "limits": [
+      "Conclusion applies only to exact base/head/tree and source-record suitability; review reuse needs identical tree, explicit successor binding and current zero-unresolved-finding state.",
+      "Checks ran from unchanged installed shared98eb139 reader/dependencies against explicit target committed objects. No dependencies installed or aliased. Shared reader/source paths and131 registry source pins match; native owner registrations/first-import closure were not executed or activated and their currentness is not established.",
+      "Local evidence hash/equality checks establish retained-byte consistency, not authenticated native authorship, present remote/runtime/PG/app/tunnel/pointer state, binary currentness or operational permission. Historical1.4.2 release payload archives were not reopened; all existing repository bytes are unchanged.",
+      "Four missing source bodies prevent executable1.4.3 successor/PG coupling qualification. Future source publication, observation, permission retirement, pointer write, process startup/recovery and business verification each require their own exact current review/admission.",
+      "No hosted CI/network/SSH/HTTP/DB/native CLI/appserver/model evaluation/auth/config/trust/admission/source effects/push/status/PR/merge/Goal mutation. No operational route or maintained source edited. Only local review artifacts and source checks were produced.",
+      "Root owns integration and native result readback before pane closure. This review performed no pane closure or native result-readback call; the bounded result artifact is available for that readback."
+    ],
+    "nativePermissionGranted": false,
+    "nativeQualificationEstablished": false,
+    "activationGranted": false,
+    "acceptanceDecision": null
+  },
+  "independentArtifactSha256": "a4c7d9e91fa8c7a402b893754aeedda5f70b1f8701ec5937c9abafd262775f17",
+  "nativeCompletionReadback": {
+    "method": "Settled lifecycle and actual terminal/artifact readback",
+    "paneId": "w3:p5",
+    "terminalId": "term_65de74534095d5",
+    "completionSeq": 40,
+    "nativeAuthorshipCryptographicallyVerified": false
+  },
+  "authorCommits": [
+    "93f3a3dfa40668db84a4ef04bacaa0546bcdc31e",
+    "61edbbe94c977b254e60361e5672991c8329e146"
+  ],
+  "limits": [
+    "Eight additive source records only; no executable source or native effect admission.",
+    "Current required hosted source/quality/review checks and accountable expected-head merge remain separate.",
+    "Snapshot states are time-bound; later runtime observations are not retroactively part of this review."
+  ],
+  "nativeActivationEstablished": false,
+  "acceptanceDecision": null
+}
