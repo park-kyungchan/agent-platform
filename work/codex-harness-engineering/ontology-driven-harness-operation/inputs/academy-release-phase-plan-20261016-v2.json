@@ -1,0 +1,582 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "academy-release-phase-plan-20261016-v2",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "academy-workbench",
+    "locator": "source-correction:github-pr17-review-comment4288374938:phase-plan-v2",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "academy.retained-release-selection-phase-plan.v2",
+    "recordClass": "CorrectiveProposal",
+    "ontologyVersion": "0.2.0",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-harness-operation",
+      "specRevision": 7,
+      "planRevision": 7,
+      "sourceTaskId": "ACADEMY-RELEASE-SELECTION-PREPARATION",
+      "existingNativeProductTaskId": "71c5a0e737e0",
+      "newNativeRegistration": false
+    },
+    "basis": {
+      "commonMain": "98eb139ded111fb42f5ae7c24f250d92d53a69de",
+      "commonTree": "95156570aaee2dcde684803512cf53407abb54a4",
+      "mainQualification": "git fetch --no-tags origin refs/heads/main; FETCH_HEAD exact98eb139 before isolated worktree creation",
+      "academyCurrentSourceCommit": "6808c783457e73f8535b1e83ab7fcd82606e1b50",
+      "academyCurrentSourceTree": "8657d18b8f85896a4336e6402581e68a9629478f",
+      "sourceRecordId": "academy-release-phase-sources-20261016",
+      "priorAssessmentSha256": "38ce1fa88d6e4f54e8fd576f579223c34cb6c15dba2c3aa479b36f618cb62b4e"
+    },
+    "scope": "Concrete source-only review packet for the next retained product release-selection phase. This record is neither an admission, execution intent, runtime activation nor AcceptanceDecision.",
+    "authority": {
+      "sourcePreparationAuthorized": true,
+      "goIssued": false,
+      "admissionIssued": false,
+      "executionIntentIssued": false,
+      "nativeEffectsAdmitted": false,
+      "sourceAcademyEffect": "absolutely-read-only",
+      "acceptanceDecision": null
+    },
+    "toolchainSuccessor": {
+      "priority": "P0-before-any-future-Bun-domain-or-app-execution",
+      "historical": {
+        "version": "1.4.2",
+        "binary": "/opt/data/toolchains/bun/1.4.2/bin/bun",
+        "sha256": "a83d263767d839e4d2649ca8e35d07159c7afc99afdc96d731ced29e056dda0c",
+        "immutableReleaseSourcePreserved": true,
+        "reAdmitted": false,
+        "protectedContractsChanged": false
+      },
+      "proposedCurrentCandidate": {
+        "version": "1.4.3",
+        "binary": "/opt/data/.local/bin/bun",
+        "sha256": "7ce7d6b654eddeec20afddf2396317fba6dc19ab52788a27e894e1806bf8f24b",
+        "bytes": 88979072,
+        "uid": 10000,
+        "gid": 10000,
+        "mode": "0o755",
+        "revision": "1.4.3+c6da4a4d3",
+        "source": "existing vps-operations apply-readback-receipt.json; observed native default only, not Academy product closure qualification",
+        "observedAtUtc": "2026-10-15T18:21:14.203498+00:00",
+        "freshNativeRehashRequired": true,
+        "newBinaryInstallProposed": false
+      },
+      "exactHistoricalCoupling": [
+        {
+          "owner": "root-product-bootstrap.py host_contract",
+          "requires": "Invocation --contract-sha, rootBootstrapSha256, nativeRuntimePins and nativeInputPins; any native deployment/compiler change needs exact host contract closure successor."
+        },
+        {
+          "owner": "root-product-bootstrap.py authority_shape/main",
+          "requires": "PG role birth authority embeds hostContractSha256/deploymentContractSha256; swapping either old contract can invalidate stop/status/reconciliation of the already running PG."
+        },
+        {
+          "owner": "product-domain-controller.ts runtimePins/prepareRole",
+          "requires": "All runtime pins are currently checked for role preparation; app argv uses contract.bunBinary. Editing PATH/default Bun does not change the explicit old1.4.2 argv."
+        },
+        {
+          "owner": "native-product-os.py",
+          "requires": "Exact body unavailable locally. Do not infer which guards, pins or live-PG admission checks permit a source/contract successor."
+        }
+      ],
+      "minimalReviewedSourceOrder": [
+        {
+          "order": 1,
+          "owner": "existing protected Root/native product owner",
+          "deliverable": "Recover immutable host-contract.json/native-product-os.py/guarded-io.ts/product-migration.ts bodies through a separately admitted source-only read; verify known pins. No service/business operation."
+        },
+        {
+          "order": 2,
+          "owner": "same existing product source owner",
+          "deliverable": "Prepare exact compiler-source candidate selecting the already observed native Bun1.4.3 path/hash/size and leaving final-product/golden archives untouched. Qualify fresh binary metadata and exact retained compile/SQL/app behavior separately."
+        },
+        {
+          "order": 3,
+          "owner": "same root/bootstrap/native OS/controller owners",
+          "deliverable": "Review minimal existing-owner source/contract successor that can use1.4.3 for domain/app without replacing the historical PG contract/authority. Missing bodies prevent selecting or pinning an executable diff now; do not invent a second controller, rename native Task or edit protected current contracts."
+        },
+        {
+          "order": 4,
+          "owner": "independent reviewer then Root",
+          "deliverable": "Bind exact successor source/tree and compiler/nativeInput/nativeRuntime/deployment/host closure hashes; prove historical PG authority still reconciles and reject mixed old/new closure. New successor body hashes remain null until exact bytes are reviewed."
+        },
+        {
+          "order": 5,
+          "owner": "existing native publication/activation owner",
+          "deliverable": "Separate reviewed immutable successor publication/receipt readback and operation permission retirement. This packet issues no publication command, admission or execution intent."
+        },
+        {
+          "order": 6,
+          "owner": "existing selectRelease owner",
+          "deliverable": "Only then perform P1/P2/P3 with immediate pointer observation under the exact selected successor. If a reviewed successor changes root/pointer address, independently qualify that exact new identity and retain the old absent observation; never carry absence across paths."
+        }
+      ],
+      "successorHashes": {
+        "hostContract": null,
+        "deploymentContract": null,
+        "nativeOsShim": null,
+        "nativeController": null,
+        "reason": "No executable successor code/contracts emitted or silently rehashed; exact missing bodies and PG coupling require owner source review."
+      },
+      "state": "held-before-executable-successor"
+    },
+    "historicalRelease": {
+      "label": "final-product-df7793a",
+      "repositoryId": "park-kyungchan/education-platform",
+      "commit": "df7793a4d26b73a57ad53405e2d817bd908ceb16",
+      "tree": "a50dfcf4f7c95c23963f7fb33258f41525208ab8",
+      "manifestSha256": "149b6fc9089e99e28396dfc75a91e4ce27a86ba015d5c94a0b24ee3422dbef93",
+      "archiveSha256": "d3733700b65b08b0ab30f89035c55a3cf03bd365cfe7216e6b3e9c29d97442c3",
+      "entrypoint": "apps/academy/dc-gang-a/src/academy/main.ts",
+      "args": ["--retained-only"],
+      "payloadBytesFreshlyVerified": false,
+      "sourceAcquisition": false,
+      "meaning": "Immutable historical release payload, distinct from current Academy consumer PR15 source and future compiler/deployment closure."
+    },
+    "pointerCompareAndReplace": {
+      "owner": "product-domain-controller.ts selectRelease -> lock -> atomic",
+      "historicalPath": "/opt/data/academy-release-staging-20261015-71c5a0e737e0/state/selected-release.json",
+      "priorObservation": {
+        "status": "verified-absent-at-observation",
+        "observedAtUtc": "2026-10-15T19:56:44.746Z",
+        "sourceSha256": "9599c1f3d6a7be8bde01f6db65528a51002c6e17da0a6fe1be8d9dfc983e0e18"
+      },
+      "expectedArgumentForFutureOperation": null,
+      "requiredFreshObservation": "Immediately after current source/authority/role/release preflight, observe exact qualified pointer path as absent or exactSHA256 and pass that value unchanged once. Reject different root/path, malformed/inaccessible bytes or source drift.",
+      "implementationGuarantee": "An exclusive domain-operation lock serializes cooperating native controller operations. atomic() compares current bytes and later renames a fsynced temporary file; this is cooperating-writer compare-and-replace, not a kernel CAS or protection against every writer.",
+      "concurrentWriterBoundary": "Root must qualify exclusive ownership/quiescence for all writers that can alter this exact state path. Unknown or competing writer holds the operation.",
+      "uncertainty": "Retain original transport/native outcomes; independent exact pointer readback before any next step. No blind replay on timeout or lost acknowledgement."
+    },
+    "consumedMigrationPermission": {
+      "state": "completed-once-never-replay",
+      "migrationReceiptSha256": "414649f7c04e3823e48d8aeb2dc373ec166064c7559e67c36b2289bea8d5a747",
+      "independentAfterSha256": "430e3b8cf987536bf19e84f34599c126b140188050103f3923cc5948b8fc968d",
+      "retirement": "P2 separately reviews successor operation permission removing migrate from both Root/native activation scopes. Retain consumed migration-admission bytes, receipts and original displacement archives as evidence; this packet does not unlink or replace them.",
+      "separation": "Permission retirement is distinct from release pointer selection, initial app/tunnel startup and later recovery.",
+      "preservePG": true,
+      "anyPGStartStopRestartOrMigration": false
+    },
+    "phaseEffectMatrix": [
+      {
+        "id": "P0-current-compiler-successor-source",
+        "state": "source-preparation-only",
+        "owner": "existing Academy protected-root/native-product source owners; Root integrates exact reviewed successor",
+        "operations": [],
+        "effects": ["local-source-artifacts-only"],
+        "requires": [
+          "Recovered source pin integrity.",
+          "Missing host-contract/native-product-os/guarded-io/product-migration immutable source bodies before exact executable successor.",
+          "Bun1.4.3 candidate closure and preservation of existing PostgreSQL birth-authority coupling."
+        ],
+        "refuses": [
+          "Silently edit installed/staged protected contracts.",
+          "Re-admit historical Bun1.4.2 for future execution.",
+          "Duplicate maintained controller, dispatcher or native Task."
+        ],
+        "output": "An independently reviewed Bun1.4.3 owner source/contract successor, still separate from native publication or activation."
+      },
+      {
+        "id": "P1-fresh-owner-observation",
+        "state": "held-not-admitted",
+        "owner": "existing protected Root/native UID10000 observation owner",
+        "operations": ["status:app", "status:tunnel", "status:postgres"],
+        "effects": ["bounded-deployment-metadata-read-only"],
+        "requires": [
+          "Fresh exact source review of the actual observation route; prior native observer HOLD was not a successful Harness proof.",
+          "Current container/PG births, app/tunnel role and endpoint ownership, current activation files and optional startup-control metadata.",
+          "Qualify pointer schema from exact selected controller before observing its exact pointer path.",
+          "Independently observe and reconcile the actual PG role birth and original protected Root/native authority through a fresh exact existing-owner read-only route. App/tunnel statuses alone are insufficient.",
+          "Bind the observation to the unchanged original PG host/deployment contracts, original authority receipt hashes and the same current container/boot/native-manager/Postgres/socket identities. No P2 permission retirement if evidence is stale, missing, unknown, conflicting or unrelated."
+        ],
+        "refuses": [
+          "Historical metadata as current process absence.",
+          "Native status absence as running-service readiness.",
+          "Any business records, credentials, HTTP or source Academy query.",
+          "Treat status:app/status:tunnel or their endpoint absence as a PG observation.",
+          "Treat positive PG absence as proof that the already running original PG is unchanged.",
+          "Stop/start/restart PG, migrate, repeat AFTER, rehash old contracts or transplant authority to satisfy an observation gate."
+        ],
+        "output": "Scoped current app/tunnel/pointer metadata PLUS a distinct fresh exact read-only PG birth-and-original-authority reconciliation receipt. Preserve stale/missing/unknown/conflicting PG evidence as HOLD before P2; no operational effect follows.",
+        "operationsMeaning": "Source operation references only, not an executable admission. The current Root status:postgres route is a positive-absence guard, so it cannot qualify an unchanged running PG. For the preserved live PG use the strictly equivalent existing-owner read-only birth/authority reconciliation described below, after exact source review.",
+        "requiredReadonlyPgObservation": {
+          "requirement": "fresh-exact-original-PG-birth-and-authority-reconciliation",
+          "selectedAlternative": "strictly-equivalent-existing-owner-readonly-observation",
+          "requiredIndependentlyOf": ["status:app", "status:tunnel"],
+          "alternatives": [
+            {
+              "operationReference": "status:postgres",
+              "owner": "existing Root bootstrap main/native_status -> existing native OS status requested postgres role",
+              "runningPgQualification": "not-supported-by-current-captured-root-status-wrapper",
+              "limitation": "native_status requires absent and ownedEndpointAbsent; do not stop PG or run a blind refusal merely to make this route PASS. No status command is dispatched by this plan."
+            },
+            {
+              "operationReference": "existing-owner-readonly-PG-birth-and-authority-observation",
+              "owner": "existing protected Root product owner plus existing native UID10000 PG manager/data owner",
+              "newNativeCommandDefined": false,
+              "exactExistingOwnerRoute": "Must be identified and independently reviewed against the retained Root bootstrap/native OS authority schemas; this is an evidence requirement, not a new controller or inspection driver.",
+              "protectedRootAuthorityPath": "/opt/academy-product-supervisor/71c5a0e737e0/state/authority-postgres.json",
+              "nativeAuthorityLocator": "Existing native owner-declared original PG birth receipt exact path/schema; qualify from reviewed native-product-os.py, never synthesize a locator.",
+              "requiredEvidence": [
+                "current container/image/init/namespace/boot identity",
+                "original Root PG supervisor birth and protected PG authority image/hash",
+                "original hostContractSha256 and deploymentContractSha256 bindings",
+                "native PG manager and Postgres exact birth/executable/cwd/argv identities",
+                "original native PG authority/receipt hash reconciliation",
+                "same owned PG socket/kernel identity",
+                "before/after identity stability for this bounded observation",
+                "explicit read-only source route and evidence observation time/current scope"
+              ],
+              "unknownMeans": "hold-before-P2-permission-retirement",
+              "allowedEffects": [
+                "existing-owner-readonly-deployment-and-PG-birth-authority-metadata"
+              ],
+              "forbiddenEffects": [
+                "PG start",
+                "PG stop",
+                "PG restart",
+                "migration",
+                "AFTER replay",
+                "contract/authority mutation",
+                "business/DB/HTTP query",
+                "admission publication"
+              ]
+            }
+          ],
+          "originalSourceGrounding": {
+            "inputId": "academy-release-phase-sources-20261016",
+            "jsonPointer": "/content/sourceSnapshots/0/source",
+            "sha256": "cdaab87e6517273fe3d316832e649ca4dc424f4d9fe5271ed7a40c8ed393633c",
+            "functions": ["main", "native_status", "authority_shape"],
+            "meaning": "main loads authority for the requested role only; native_status is positive absence; PG authority binds original host/deployment and native receipts."
+          },
+          "observationStateRequired": "fresh-exact-owner-readonly-reconciled",
+          "evidenceProvidedByThisPlan": false
+        }
+      },
+      {
+        "id": "P2-retire-consumed-migration-permission",
+        "state": "held-not-admitted",
+        "owner": "existing Root/native activation-admission owners",
+        "operations": ["status:app", "status:tunnel", "select-release"],
+        "effects": ["separately-reviewed-activation-permission-successor-only"],
+        "requires": [
+          "P0 executable closure and P1 current exact admission images.",
+          "Review missing native OS admission-read behavior against the unchanged running PG incarnation.",
+          "Separate exact-byte publication review and independent readback before release selection.",
+          "P1 distinct fresh exact PG birth-and-original-authority reconciliation is mandatory. Reconcile historical host/deployment contract hashes and original protected/native PG authority before any permission successor publication; app/tunnel status results alone cannot satisfy this prerequisite."
+        ],
+        "refuses": [
+          "migrate in either activation operations array.",
+          "serve:postgres, stop:postgres, ready:postgres, PostgreSQL restart or migration replay.",
+          "Delete or rewrite consumed migration admissions, migration receipt, AFTER or original authority evidence.",
+          "Publish or prepare an executable permission retirement from app/tunnel statuses alone.",
+          "Use stale, missing, unknown, conflicting, authority-unbound or different-incarnation PG evidence.",
+          "Invalidate or replace the original live PG host/deployment contract and authority reconciliation while changing app/domain/compiler permission scope."
+        ],
+        "output": "Separately reviewed permission successor proposal only after P0 closure, current exact admissions AND P1 fresh exact original-PG birth/authority reconciliation. App/tunnel statuses alone never permit publication. Preserve consumed migration evidence and unchanged live PG authority; this input issues nothing.",
+        "pgObservationGate": {
+          "kind": "source-plan-evidence-requirement",
+          "sourcePhaseId": "P1-fresh-owner-observation",
+          "sourceRequirement": "requiredReadonlyPgObservation",
+          "mandatory": true,
+          "acceptedState": "fresh-exact-owner-readonly-reconciled",
+          "rejectedStates": [
+            "stale",
+            "missing",
+            "unknown",
+            "conflicting",
+            "app-tunnel-only",
+            "different-incarnation",
+            "original-authority-unbound"
+          ],
+          "preserveOriginalPgContractsAndAuthorities": true,
+          "requiredBefore": "any consumed-migration-permission retirement publication",
+          "automaticGateImplementation": false,
+          "admissionIssued": false,
+          "evidenceSupplied": false
+        }
+      },
+      {
+        "id": "P3-select-release-compare-and-replace",
+        "state": "held-not-admitted",
+        "owner": "existing Root domain route -> native-product-os.py -> product-domain-controller.ts selectRelease",
+        "operations": ["select-release"],
+        "effects": [
+          "selected-release-pointer-write",
+          "existing-private-product-read-only-DB-verification",
+          "owned-operation-lock-and-finite-receipts"
+        ],
+        "requires": [
+          "P0 Bun1.4.3 reviewed executable closure; no old1.4.2 execution fallback.",
+          "P1 exact stopped app/tunnel and owned endpoint absence.",
+          "P2 exact independent permission successor readback.",
+          "Fresh immediate pointer absence/hash from this exact controller root after preflight, carried unchanged as expected argument.",
+          "Immutable final-product source manifest/files and consumed12-table migration receipt must verify through existing owners."
+        ],
+        "refuses": [
+          "Hardcode the audit absence as a future CAS expected value.",
+          "Blind retry after timeout or uncertain pointer/transport outcome.",
+          "Any final exam/question selection, paper generation, source acquisition, auth reset or DB rewind."
+        ],
+        "output": "Existing controller returns label/pointerSha256/dbRewind:false/authReset:false. Independent exact pointer and release readback must precede app start."
+      },
+      {
+        "id": "P4-initial-app-start",
+        "state": "held-not-admitted",
+        "owner": "existing Root/native product lifecycle owner and existing app unit",
+        "operations": ["status:app", "serve:app", "ready:app"],
+        "effects": [
+          "private-app-process-first-start",
+          "existing-private-product-read-only-runtime-readiness",
+          "owned-lifecycle-receipts"
+        ],
+        "requires": [
+          "P3 independent selected pointer/release readback.",
+          "Separate initial-start permission/window and positive current app birth/endpoint absence.",
+          "Bun1.4.3 and retained-only source closure; optional startup inputs qualified without exporting secrets."
+        ],
+        "refuses": [
+          "Combined release-selection/start dispatch.",
+          "Runtime source-acquisition composition or automatic startup migration.",
+          "Infer authenticated teacher/browser/TLS acceptance from /health."
+        ],
+        "output": "Exact app birth and limited owned-local readiness; no teacher acceptance or source qualification."
+      },
+      {
+        "id": "P5-initial-tunnel-start",
+        "state": "held-not-admitted",
+        "owner": "existing Root/native product lifecycle owner and existing tunnel unit",
+        "operations": ["status:tunnel", "serve:tunnel", "ready:tunnel"],
+        "effects": ["existing-private-tunnel-process-first-start", "owned-lifecycle-receipts"],
+        "requires": [
+          "P4 owned app readiness.",
+          "Separate initial-tunnel scope and exact native tunnel configuration custody/positive absence."
+        ],
+        "refuses": [
+          "New account/service/paid infrastructure.",
+          "Treat ready:tunnel as TLS/auth/browser proof."
+        ],
+        "output": "Owned tunnel process only; external TLS/auth/browser still unverified."
+      },
+      {
+        "id": "P6-private-product-verification",
+        "state": "held-not-admitted",
+        "owner": "existing private teacher application owner and independently scoped verifier",
+        "operations": [],
+        "effects": ["separately-admitted-private-origin-auth-TLS-browser-read-probes"],
+        "requires": [
+          "P4/P5 exact process/readiness receipts.",
+          "Separate bounded authenticated verification scope using existing supported auth.",
+          "Fence all refresh/write/exam candidate/selection controls and all official Academy requests."
+        ],
+        "refuses": [
+          "Forge a session from sessionKey or reset existing credentials.",
+          "Candidate/selection/assessment mutation requests or generated24-question paper.",
+          "Claim PC-off recovery or teacher acceptance from synthetic/browser registration evidence."
+        ],
+        "output": "Exact release private-origin verification with passed/failed/not-run scope retained."
+      },
+      {
+        "id": "P7-later-app-tunnel-recovery",
+        "state": "held-not-admitted",
+        "owner": "existing Root/native lifecycle/recovery owners",
+        "operations": [
+          "status:app",
+          "status:tunnel",
+          "stop:app",
+          "stop:tunnel",
+          "serve:app",
+          "serve:tunnel",
+          "ready:app",
+          "ready:tunnel"
+        ],
+        "effects": ["separately-admitted-app-tunnel-successor-incarnations-only"],
+        "requires": [
+          "Distinct recovery admission/window with positive prior child/manager/endpoint absence.",
+          "Explicit source review of host/deployment hash coupling to historical PG authority; retain unchanged PG owner.",
+          "Separate backup/restore/rollback/re-upgrade/fresh-host/cadence and dirty-PG requirements."
+        ],
+        "refuses": [
+          "Enable global restart while serve:postgres is admitted.",
+          "Automatic replay of selection/start/PG/migration effects.",
+          "Promote app/tunnel recovery to PostgreSQL recovery or whole-Work Acceptance."
+        ],
+        "output": "Scoped app/tunnel recovery evidence; PG recovery remains a separate unadmitted requirement."
+      }
+    ],
+    "existingValidationOwners": [
+      {
+        "owner": "@palantirkc/work-continuity/git-work",
+        "commands": [
+          "bun run harness validate <snapshot.json>",
+          "bun run harness context <request.json>",
+          "bun run harness transition <before.json> <after.json>",
+          "bun run check:common-work"
+        ],
+        "scope": "Canonical record/reference/transition/source context integrity; no admission or operational semantics inferred."
+      },
+      {
+        "owner": "existing Academy source checks",
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/recovery-20261015/pg-additive-migration-preparation/verify-source-contracts.ts",
+        "scope": "Historical migration-specific checker; references missing historical local source root and completed migration artifacts. Do not rerun/reuse its PASS as qualification of this different source packet."
+      }
+    ],
+    "dependencyHolds": [
+      "Missing immutable host/native OS/helper source bodies.",
+      "Exact Bun1.4.3 deployment/compiler closure with preserved PG authority coupling.",
+      "Fresh current role/authority/endpoint/optional startup metadata and exclusive pointer-writer ownership.",
+      "Immediate exact pointer absence/hash read before future operation.",
+      "Independent exact review before any native publication/admission/effect."
+    ],
+    "fences": {
+      "officialScoreCreate": "Earlier official score.create=1 remains an uncertain possible business effect; no request/retry/reconciliation in this packet.",
+      "nativeObserver": "Root-relayed prior native observer once ended HOLD unexpected notification and was conclusively reconciled; no successful Harness/native metadata proof inferred.",
+      "completedEffectsNeverReplay": [
+        "original auth/artifact14 staging",
+        "unit install",
+        "PG first start",
+        "four migration admission publications",
+        "additive6to12migration",
+        "independent12tableAFTER",
+        "existing native Task allocations/readbacks"
+      ],
+      "questionBoundary": "No new24-question paper, Academy-server question selection or final exam membership; teacher decisions and source truth remain separate.",
+      "noNewRecurringCost": true,
+      "nativeModelEvaluationRequests": 0,
+      "futureOrchestratorFrameworkStarted": false
+    },
+    "expectedReview": "Exact-head/tree independent review of this proposal and source captures. Shared delivery, expected-head Root integration, native source publication, activation, business verification and Lead Acceptance all remain separate.",
+    "effectsPerformed": {
+      "nativeCalls": 0,
+      "sshCalls": 0,
+      "httpOrBusinessQueries": 0,
+      "sqlCalls": 0,
+      "services": 0,
+      "credentials": 0,
+      "pointerWrites": 0,
+      "admissions": 0,
+      "executionIntents": 0,
+      "modelEvaluationRequests": 0,
+      "pushes": 0,
+      "merges": 0
+    },
+    "missingSourceRecoveryProposal": {
+      "recordClass": "SourceReadProposalOnly",
+      "status": "not-executed-not-admitted",
+      "sourceCustodyMeaning": "Missing locally is a source-custody hold; prior target source hashes indicate a concrete recovery route may exist. Installed runtime bytes do not establish canonical engineering ownership, current permission or source acceptance.",
+      "historicalSourceReadCapability": "The prior exact source audit captured Root bootstrap and native UID10000 controller/deployment contract through the existing source-owned bounded helper route. That receipt proves only those historical reads; it does not admit this proposal or bypass any current native ownership refusal.",
+      "targets": [
+        {
+          "role": "protected-host-contract",
+          "owner": "existing protected Root product owner",
+          "path": "/opt/academy-product-supervisor/71c5a0e737e0/host-contract.json",
+          "sha256": "cc15984302e48265bc852d8274d8cb0002c632249a45e6ce9c06ba05a396ed90",
+          "bytes": 65979,
+          "cap": 70000,
+          "uid": 0,
+          "gid": 0,
+          "mode": 384,
+          "plainReadCapability": "Historically hash/metadata-read through protected Root source route; UID10000 must not read this Root-owned private file.",
+          "exportHold": "Qualify the immutable source-contract schema/content before retaining full body. Do not follow credential/config paths or export secret fields.",
+          "metadataQualification": "Prior protected-source observation; fresh reobservation required"
+        },
+        {
+          "role": "native-os-shim-source",
+          "owner": "existing native product UID10000 owner",
+          "path": "/opt/data/academy-release-staging-20261015-71c5a0e737e0/native-product-os.py",
+          "sha256": "97cf419d17b6e2bd013f9966a38c86704c103f00272177df402487c3aa6c6b18",
+          "bytes": 26911,
+          "cap": 30000,
+          "uid": 10000,
+          "gid": 10000,
+          "mode": 384,
+          "plainReadCapability": "Proposed fixed-path read using the already source-owned UID10000 finite helper; no import/eval or native CLI invocation.",
+          "exportHold": "Current owner/source-route admission and exact metadata/pin checks required.",
+          "metadataQualification": "Expected role metadata only; exact current ownership/mode not observed by this packet"
+        },
+        {
+          "role": "native-guard-helper-source",
+          "owner": "existing native product UID10000 owner",
+          "path": "/opt/data/academy-release-staging-20261015-71c5a0e737e0/guarded-io.ts",
+          "sha256": "e2bedd294b1a7d9973e38d63871629539c9b26fb8179d21c659e12b133e0f3de",
+          "bytes": 2317,
+          "cap": 4000,
+          "uid": 10000,
+          "gid": 10000,
+          "mode": 384,
+          "plainReadCapability": "Same proposed fixed UID10000 source read; no application or source modules imported.",
+          "exportHold": "Current owner/source-route admission and exact metadata/pin checks required.",
+          "metadataQualification": "Expected role metadata only; exact current ownership/mode not observed by this packet"
+        },
+        {
+          "role": "native-migration-source-only",
+          "owner": "existing native product UID10000 owner",
+          "path": "/opt/data/academy-release-staging-20261015-71c5a0e737e0/product-migration.ts",
+          "sha256": "af83a5ca0cc8d5323f844431eb7b846e21f05b013b01406554755744f63d2dfb",
+          "bytes": 14115,
+          "cap": 16000,
+          "uid": 10000,
+          "gid": 10000,
+          "mode": 384,
+          "plainReadCapability": "Same proposed fixed UID10000 source read; never import/execute migration code or open a DB.",
+          "exportHold": "Current owner/source-route admission and exact metadata/pin checks required.",
+          "metadataQualification": "Expected role metadata only; exact current ownership/mode not observed by this packet"
+        }
+      ],
+      "finiteReadRequirements": [
+        "Independently review one fixed finite source-audit using existing native/root owners and supported helper; no broad directory traversal or native identity allocation.",
+        "Verify current caller/role/container/source custody first; available SSH credentials grant no Root/native permission.",
+        "Trusted nonsymlink parent chain; O_RDONLY/O_NOFOLLOW/O_NONBLOCK, regular single-link file, exact owner/mode/size/hash and stable descriptor/parent identity before/after.",
+        "Cap each file and total retained bytes; exact source metadata and UTF-8 bodies only after source-role qualification.",
+        "No auth/owner/config/session/transcript/student files, SQL/HTTP/business requests, process signals, service lifecycle, imports/eval, admission/state writes or fallback routes.",
+        "Any inaccessible/missing/drifted/refused target remains unknown/held; retain exact outcome and never bypass or rerun automatically."
+      ],
+      "laterReadActualEffectCount": 0,
+      "readDriverEmitted": false,
+      "admissionIssued": false,
+      "executionIntentIssued": false
+    },
+    "supersession": {
+      "supersedesInputId": "academy-release-phase-plan-20261016",
+      "supersedesPath": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-plan-20261016.json",
+      "supersedesSha256": "b787534a9903389e2b7b1ee65b02ab09f802b708ac6539b6239a1984b8728720",
+      "historicalInputPreserved": true,
+      "currentSelectionMeaning": "Use this additive successor for the P1-to-P2 PostgreSQL observation requirement; original source facts, effects and phase plan remain immutable historical evidence."
+    },
+    "correctionSource": {
+      "recordClass": "RootRelayedValidatedReviewFinding",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "pullRequest": 17,
+      "commentId": 4288374938,
+      "classification": "validated-P2",
+      "locator": "github:park-kyungchan/agent-platform:pr:17:review-comment:4288374938",
+      "observation": "P1 status:app/status:tunnel dispatch only their requested roles. They do not observe or reconcile the PG role birth/authority required by P2 permission retirement.",
+      "sourceVerified": "Exact preserved Root bootstrap dispatch/native_status code in academy-release-phase-sources-20261016.",
+      "scope": "Source-only correction; independent native-phase review closure pending. Other checkpoint-stale finding4288374930 is owned by a separate freshv6 author."
+    },
+    "currentSourceSelection": {
+      "currentPlanInputId": "academy-release-phase-plan-20261016-v2",
+      "historicalPlanInputId": "academy-release-phase-plan-20261016",
+      "existingSourceTaskId": "ACADEMY-RELEASE-SELECTION-PREPARATION",
+      "newNativeTaskAllocated": false,
+      "supersedesRelationId": "academy-release-phase-plan-v2-supersedes-v1",
+      "sourceGroundingRelationId": "academy-release-phase-plan-v2-source-grounding"
+    },
+    "currentObservationBoundary": {
+      "P0Bun143Closure": "held-unqualified",
+      "P1PgEvidence": "not-supplied-by-source-correction",
+      "P2PermissionPublication": "held-not-admitted",
+      "rootRelayedSeparateNativeGuards": "Root once2 and distinct once3 PASS belong to separate guards and are not substituted for this phase evidence; original HOLD remains preserved.",
+      "officialScoreCreateUncertainty": "unchanged-never-replay",
+      "phaseAcceptance": false,
+      "nativePermission": false
+    }
+  }
+}

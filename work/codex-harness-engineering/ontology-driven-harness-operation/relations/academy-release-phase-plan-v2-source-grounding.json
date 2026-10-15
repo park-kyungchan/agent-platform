@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "academy-release-phase-plan-v2-source-grounding",
+  "kind": "relation",
+  "relation": "purpose",
+  "from": {
+    "kind": "input",
+    "id": "academy-release-phase-plan-20261016-v2"
+  },
+  "to": {
+    "kind": "input",
+    "id": "academy-release-phase-sources-20261016"
+  }
+}
