@@ -14,11 +14,11 @@
     "fragment": "#/content/answer"
   },
   "selectionContext": {
-    "text": "Actual sandbox probe failed namespace creation; user selected the concrete container-only full access and never proposal. No privileged/SYS_ADMIN/host-sysctl change.",
+    "text": "VPS Codex의 실제 sandbox probe가 namespace 권한 부족으로 실패했습니다. 무인 작업용으로 herdr-runtime의 Codex 설정에 `sandbox_mode=\"danger-full-access\"`, `approval_policy=\"never\"`를 적용할까요? 기존 Docker 격리는 유지하며 privileged·SYS_ADMIN·host sysctl은 변경하지 않습니다. 다만 Codex가 container 파일·인증과 이미 준비된 VPS SSH 권한을 사용할 수 있으므로, 현재 제한보다 권한을 넓히는 새 결정입니다. [구체안](/hom",
     "source": {
       "kind": "snapshot",
-      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-PERMISSIONS-SELECTION-CONTEXT.json",
-      "fragment": "#/content"
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-INPUT-PERMISSIONS.json",
+      "fragment": "#/content/question"
     }
   },
   "supersedes": []

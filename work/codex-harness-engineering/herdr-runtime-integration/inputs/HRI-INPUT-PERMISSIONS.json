@@ -16,6 +16,7 @@
     "originalText": "<send_user_message_question_reply>\n[{\"answer\":\"적용: container 안에서 full access·never (권장)\",\"question\":\"VPS Codex의 실제 sandbox probe가 namespace 권한 부족으로 실패했습니다. 무인 작업용으로 herdr-runtime의 Codex 설정에 `sandbox_mode=\\\"danger-full-access\\\"`, `approval_policy=\\\"never\\\"`를 적용할까요? 기존 Docker 격리는 유지하며 privileged·SYS_ADMIN·host sysctl은 변경하지 않습니다. 다만 Codex가 container 파일·인증과 이미 준비된 VPS SSH 권한을 사용할 수 있으므로, 현재 제한보다 권한을 넓히는 새 결정입니다. [구체안](/hom\",\"questionItemId\":\"[\\\"request_user_input_async\\\",\\\"call_3688b1b11ba0406f80b002e6fdf9f2c4\\\",0]\"}]\n</send_user_message_question_reply>",
     "originalTextSha256": "4ae0dc63202b032315f8e7731b6d73cfe29ab1a19ca241049e8bdc342e856743",
     "nativeRecordedAt": "2026-10-15T12:32:20.945Z",
-    "verbatim": true
+    "verbatim": true,
+    "question": "VPS Codex의 실제 sandbox probe가 namespace 권한 부족으로 실패했습니다. 무인 작업용으로 herdr-runtime의 Codex 설정에 `sandbox_mode=\"danger-full-access\"`, `approval_policy=\"never\"`를 적용할까요? 기존 Docker 격리는 유지하며 privileged·SYS_ADMIN·host sysctl은 변경하지 않습니다. 다만 Codex가 container 파일·인증과 이미 준비된 VPS SSH 권한을 사용할 수 있으므로, 현재 제한보다 권한을 넓히는 새 결정입니다. [구체안](/hom"
   }
 }
