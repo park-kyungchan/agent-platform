@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Start the user-facing native Codex TUI without submitting a task or resuming Work.
+exec /usr/local/bin/codex-herdr -C /home/palantirkc -m gpt-6.1-sol -c 'model_reasoning_effort="high"' "$@"

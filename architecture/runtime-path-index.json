@@ -1,0 +1,139 @@
+{
+  "schema": "vps.runtime-path-index.v1",
+  "ownerProject": "vps-operations",
+  "semanticContract": {
+    "repositoryId": "park-kyungchan/agent-platform",
+    "path": "architecture/runtime-filesystem-contract.json",
+    "workId": "herdr-runtime-integration"
+  },
+  "classification": "Source policy and projection index; live verification is separately receipted.",
+  "naming": {
+    "ownedNewNames": "lower-kebab-case",
+    "nativeRequiredNames": "Retain native interfaces and product-owned names.",
+    "commonRecordFiles": "Use the common Git-Work reader encoding and explicit revision suffix.",
+    "historicalCustody": "Preserve original paths/bytes and link their logical owner; do not rename sealed custody."
+  },
+  "paths": [
+    {
+      "id": "herdr-deployment",
+      "hostPath": "/docker/herdr-runtime/deployment",
+      "runtime": "host",
+      "role": "deployment-source-projection",
+      "nativeOwner": "docker-compose/systemd",
+      "sourceRef": "deployments/herdr-runtime",
+      "mutability": "reviewed-owner-deployment",
+      "retention": "current source plus bounded predecessor receipts"
+    },
+    {
+      "id": "herdr-build-compatibility",
+      "hostPath": "/docker/herdr-runtime/build",
+      "runtime": "host",
+      "role": "compatibility-alias",
+      "nativeOwner": "vps-operations",
+      "sourceRef": "herdr-deployment",
+      "mutability": "owned-relative-symlink",
+      "retention": "retain until active and historical references are qualified"
+    },
+    {
+      "id": "herdr-home",
+      "hostPath": "/docker/herdr-runtime/home",
+      "containerPath": "/home/palantirkc",
+      "runtime": "herdr-runtime",
+      "role": "native-persistent-home",
+      "nativeOwner": "palantirkc/native-codex",
+      "sourceRef": null,
+      "mutability": "native-owner-only",
+      "retention": "preserve sessions/auth/config/live source; no Git publication"
+    },
+    {
+      "id": "herdr-ssh-host-keys",
+      "hostPath": "/docker/herdr-runtime/ssh-host-keys",
+      "containerPath": "/var/lib/herdr-ssh",
+      "runtime": "herdr-runtime",
+      "role": "native-credential-state",
+      "nativeOwner": "openssh",
+      "sourceRef": null,
+      "mutability": "native-owner-only",
+      "retention": "preserve; exclude from Git/artifact transfer"
+    },
+    {
+      "id": "hermes-data",
+      "hostPath": "/docker/hermes-agent-2q3y/data",
+      "containerPath": "/opt/data",
+      "runtime": "hermes-agent-2q3y",
+      "role": "native-state-and-data",
+      "nativeOwner": "hermes-uid10000",
+      "sourceRef": null,
+      "mutability": "native-owner-only",
+      "retention": "preserve profiles/conversations/auth/databases/native layout"
+    },
+    {
+      "id": "hermes-workspace",
+      "hostPath": "/docker/hermes-agent-2q3y/data/workspace",
+      "containerPath": "/workspace",
+      "runtime": "code-server",
+      "role": "native-workspace-bind",
+      "nativeOwner": "hermes-uid10000/code-server",
+      "sourceRef": "native-host-compose:code-server-volume",
+      "mutability": "declaration follows verified existing live source; no data rename",
+      "retention": "preserve live inode and future mount source"
+    },
+    {
+      "id": "shared-harness-source",
+      "containerPath": "/home/palantirkc/code/shared/agent-platform",
+      "runtime": "herdr-runtime",
+      "role": "canonical-git-source-checkout",
+      "nativeOwner": "git/project-owners",
+      "sourceRef": "park-kyungchan/agent-platform",
+      "mutability": "native Git branches/explicit-reviewed main",
+      "retention": "preserve dirty branches; no automatic reset/merge"
+    },
+    {
+      "id": "native-operations-source",
+      "containerPath": "/home/palantirkc/code/shared/vps-operations",
+      "runtime": "herdr-runtime",
+      "role": "independent-native-owner-source",
+      "nativeOwner": "git/vps-operations",
+      "sourceRef": "vps-operations",
+      "mutability": "reviewed native CLI source with immutable common dependency",
+      "retention": "source only; operations/runtime state excluded"
+    },
+    {
+      "id": "native-entrypoints",
+      "containerPath": "/home/palantirkc/.local/bin",
+      "runtime": "herdr-runtime",
+      "role": "native-launcher-projection",
+      "nativeOwner": "palantirkc",
+      "sourceRef": "deployments/herdr-entrypoint",
+      "mutability": "exact reviewed source projection",
+      "retention": "current source hashes; no copied credential/runtime engine"
+    },
+    {
+      "id": "host-operation-receipts",
+      "hostPath": "/docker/operations",
+      "runtime": "host",
+      "role": "owner-operation-evidence",
+      "nativeOwner": "vps-operations",
+      "sourceRef": null,
+      "mutability": "append effects/corrections; current pointers are projections",
+      "retention": "preserve exact consumed/uncertain receipts; no replay"
+    },
+    {
+      "id": "herdr-operation-entrypoints",
+      "containerPath": "/home/palantirkc/operations",
+      "runtime": "herdr-runtime",
+      "role": "bounded-continuity-and-receipt-projection",
+      "nativeOwner": "vps-operations",
+      "sourceRef": "host-operation-receipts",
+      "mutability": "scoped current pointer/readback",
+      "retention": "record source/hash identity; no native transcript mirror"
+    }
+  ],
+  "forbiddenEffects": [
+    "Move native auth/session databases to Git",
+    "Rename the sealed537 original custody paths",
+    "Global chown/cache purge or native data cleanup from this index",
+    "Infer runtime acceptance or execution permission from source policy"
+  ],
+  "acceptanceDecision": null
+}

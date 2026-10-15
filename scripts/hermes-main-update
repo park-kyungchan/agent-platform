@@ -1,0 +1,1966 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+
+ROOT="/docker/hermes-agent-2q3y"
+COMPOSE="$ROOT/docker-compose.yml"
+SERVICE="hermes-serve"
+SERVICES=("hermes-serve")
+UPSTREAM="https://github.com/NousResearch/hermes-agent.git"
+UPDATER="$ROOT/.main-updater"
+OVERLAY_DIR="$UPDATER/overlays"
+OVERLAY_ALLOWED_PATHS=("Dockerfile" "hermes_cli/dashboard_auth/middleware.py" "hermes_cli/dashboard_auth/prefix.py" "hermes_cli/dashboard_auth/routes.py" "hermes_cli/web_routers/status.py" "agent/evaluation_accounting.py" "agent/chat_completion_helpers.py" "agent/aux_accounting.py" "hermes_cli/oneshot.py" "agent/codex_runtime.py" "agent/auxiliary_client.py" "agent/conversation_loop.py" "agent/prompt_builder.py" "hermes_cli/runtime_provider.py" "hermes_cli/auth_codex.py" "hermes_cli/auth.py" "agent/evaluation_operational.py" "model_tools.py" "agent/turn_context.py" "tools/bot_mode_dm.py" "hermes_cli/kanban_db_dispatch.py" "tools/computer_use/cua_backend_capture.py")
+OVERLAY_ADDED_POLICY='{"agent/evaluation_accounting.py":["35555419a3d28a73eb129991c4383cdd545ee340ef399dc22d5eb22dd58ce1f4","1e328a828ad99e95de0768f6784a6965526ee94a4fd7be397fc7a9755b8ea9d9","00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09"],"agent/evaluation_operational.py":["f9163dfa2aeb4f3ab22c465db928a73d597e82a9b798be07aad7defd18585195","a932a93451534c86a6d5b283b3ec6399a35f2c196b1e86a8f48b307601ab6844","cd8385e338710b9567389bf66374f4a9668604f645b2e38e63b5cb053f03db9c"]}'
+
+overlay_added_path() {
+  [[ "$1" == "agent/evaluation_accounting.py" || "$1" == "agent/evaluation_operational.py" ]]
+}
+overlay_added_digest_allowed() {
+  case "$1:$2" in
+    "agent/evaluation_accounting.py:35555419a3d28a73eb129991c4383cdd545ee340ef399dc22d5eb22dd58ce1f4"|"agent/evaluation_accounting.py:1e328a828ad99e95de0768f6784a6965526ee94a4fd7be397fc7a9755b8ea9d9"|"agent/evaluation_operational.py:f9163dfa2aeb4f3ab22c465db928a73d597e82a9b798be07aad7defd18585195"|"agent/evaluation_accounting.py:00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09"|"agent/evaluation_operational.py:a932a93451534c86a6d5b283b3ec6399a35f2c196b1e86a8f48b307601ab6844"|"agent/evaluation_operational.py:cd8385e338710b9567389bf66374f4a9668604f645b2e38e63b5cb053f03db9c") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+RECOVERY_ADOPT_IMAGE_ID="sha256:c9ffe654e975ecfb9a5e948852033a70751b4bb2c7616993276c927fe7d1307d"
+RECOVERY_ADOPT_SHA="d0288be5b3330d2442e3907185b8e9d0958297bb"
+RECOVERY_ADOPT_OVERLAY_SHA="d816083914b0522ebe004abf8af022f6395985c52aa6ae9ab9ee816df5a6e27e"
+F42_RECOVERY_ADOPT_IMAGE_ID="sha256:62336c24c30f7de87b3178b8db05d8823d4fdc356c649604c6c88cbb73901c3a"
+F42_RECOVERY_ADOPT_SHA="f42f579cf8bac4918ac9599bece71618afadd846"
+F42_RECOVERY_ADOPT_OVERLAY_SHA="5d6aef36358e1f85c443a2ae56076f282c3faae200ecfa5aae3c64ee9ea3599e"
+F42_RECOVERY_ADOPT_TREE_SHA="3d12eae53da41ba1fc96f296945a5f37dc596247"
+ADOPT_REQUEST_GATE_PY='import re, sys
+command, action, requested_sha, overlay_mode, overlay_sha, force_rebuild, approve, image_id = sys.argv[1:]
+valid = (
+    (command == "prepare" and action == "")
+    or (command == "start" and action == "prepare")
+)
+allowlisted = {
+    ("sha256:c9ffe654e975ecfb9a5e948852033a70751b4bb2c7616993276c927fe7d1307d", "d0288be5b3330d2442e3907185b8e9d0958297bb", "d816083914b0522ebe004abf8af022f6395985c52aa6ae9ab9ee816df5a6e27e"),
+    ("sha256:62336c24c30f7de87b3178b8db05d8823d4fdc356c649604c6c88cbb73901c3a", "f42f579cf8bac4918ac9599bece71618afadd846", "5d6aef36358e1f85c443a2ae56076f282c3faae200ecfa5aae3c64ee9ea3599e"),
+}
+valid = valid and overlay_mode == "1"
+valid = valid and force_rebuild == "0" and approve == "0"
+valid = valid and (image_id, requested_sha, overlay_sha) in allowlisted
+valid = valid and re.fullmatch(r"sha256:[0-9a-f]{64}", image_id) is not None
+raise SystemExit(0 if valid else 1)
+'
+ADOPT_STATE_GATE_PY='import json, re, sys
+path, tag, image_id = sys.argv[1:]
+if re.fullmatch(r"sha256:[0-9a-f]{64}", image_id) is None:
+    raise SystemExit(2)
+with open(path, encoding="utf-8") as handle:
+    state = json.load(handle)
+if not isinstance(state, dict):
+    raise SystemExit(2)
+if state.get("candidate") is not None:
+    raise SystemExit(5)
+found = False
+for name in ("current", "previous", "candidate"):
+    item = state.get(name)
+    if item is None:
+        continue
+    if not isinstance(item, dict):
+        raise SystemExit(2)
+    if item.get("tag") != tag:
+        continue
+    saved_id = item.get("image_id")
+    if not isinstance(saved_id, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", saved_id) is None:
+        raise SystemExit(2)
+    if saved_id != image_id:
+        raise SystemExit(3)
+    found = True
+if found:
+    raise SystemExit(4)
+print("orphan")
+'
+
+overlay_path_allowed() {
+  local candidate="$1" allowed_path
+  for allowed_path in "${OVERLAY_ALLOWED_PATHS[@]}"; do
+    [[ "$candidate" == "$allowed_path" ]] && return 0
+  done
+  return 1
+}
+
+REPO="$UPDATER/repo.git"
+WORKTREES="$UPDATER/worktrees"
+REPORTS="$UPDATER/reports"
+RECEIPTS="$UPDATER/receipts"
+LOGS="$UPDATER/logs"
+COMPOSE_BACKUPS="$UPDATER/compose"
+TRANSACTIONS="$UPDATER/transactions"
+JOBS="$UPDATER/jobs"
+STATE="$UPDATER/state.json"
+LOCK="$UPDATER/lock"
+IMAGE_PREFIX="hermes-agent:main-"
+MIN_FREE_GIB="${HERMES_UPDATE_MIN_FREE_GIB:-16}"
+ANOMALY_BYTES="${HERMES_DISK_ANOMALY_BYTES:-5368709120}"
+CANARY_URL="${HERMES_CANARY_URL:-https://srv1873899.tail68ea8d.ts.net/hermes/api/status}"
+
+mkdir -p "$UPDATER" "$OVERLAY_DIR" "$WORKTREES" "$REPORTS" "$RECEIPTS" "$LOGS" "$COMPOSE_BACKUPS" "$TRANSACTIONS" "$JOBS"
+chmod 700 "$UPDATER" "$OVERLAY_DIR" "$WORKTREES" "$REPORTS" "$RECEIPTS" "$LOGS" "$COMPOSE_BACKUPS" "$TRANSACTIONS" "$JOBS"
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || die "required command is missing: $1"
+}
+
+valid_sha() {
+  [[ "${1:-}" =~ ^[0-9a-f]{40}$ ]]
+}
+
+valid_overlay_sha() {
+  [[ "${1:-}" =~ ^[0-9a-f]{64}$ ]]
+}
+
+set_candidate_tag() {
+  if [[ "${OVERLAY_MODE:-0}" == 1 ]]; then
+    [[ "${BOT_DESKTOP:-0}" != 1 ]] || die "--bot-desktop cannot be combined with an overlay"
+    CANDIDATE_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-overlay-${OVERLAY_SHA256}"
+  elif [[ "${BOT_DESKTOP:-0}" == 1 ]]; then
+    CANDIDATE_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-desktop"
+  else
+    CANDIDATE_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}"
+  fi
+}
+
+valid_release_tag() {
+  [[ "${1:-}" =~ ^v(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+}
+
+verify_release_tag() {
+  [[ -n "${RELEASE_TAG:-}" ]] || return 0
+  need timeout
+  local refs remote_sha local_sha
+  refs="$(timeout 45s git ls-remote "$UPSTREAM" "refs/tags/$RELEASE_TAG" "refs/tags/$RELEASE_TAG^{}")" || die "release tag lookup timed out or failed"
+  remote_sha="$(awk -v ref="refs/tags/$RELEASE_TAG" '$2 == ref {tag=$1} $2 == ref "^{}" {peeled=$1} END {print peeled ? peeled : tag}' <<<"$refs")"
+  [[ "$remote_sha" == "$CANDIDATE_SHA" ]] || die "release tag does not resolve to the requested source SHA"
+  # No forced refspec: an existing local tag cannot silently be rewritten.
+  git -C "$REPO" fetch --no-tags origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG" || die "could not fetch the exact immutable release tag"
+  local_sha="$(git -C "$REPO" rev-parse "refs/tags/$RELEASE_TAG^{commit}")" || die "could not peel the local release tag"
+  [[ "$local_sha" == "$CANDIDATE_SHA" ]] || die "fetched release tag does not match the requested source SHA"
+}
+
+bot_desktop_image_valid() {
+  local image="$1" expected="$2" label
+  label="$(docker image inspect --format '{{index .Config.Labels "io.nousresearch.hermes.bot-desktop"}}' "$image" 2>/dev/null)" || return 1
+  [[ "$label" == "<no value>" ]] && label=""
+  if [[ "$expected" == 1 ]]; then
+    [[ "$label" == 1 ]] || return 1
+    docker run --rm --network none --entrypoint /bin/sh "$image" -c 'command -v Xvnc >/dev/null && command -v xfwm4 >/dev/null' >/dev/null 2>&1 || return 1
+  else
+    [[ -z "$label" ]] || return 1
+  fi
+}
+
+select_overlay_identity() {
+  if [[ -z "${REQUESTED_OVERLAY_FILE:-}" && -z "${REQUESTED_OVERLAY_SHA256:-}" ]]; then
+    OVERLAY_MODE=0
+    OVERLAY_FILE=""
+    OVERLAY_SHA256=""
+    export OVERLAY_SHA256
+    return 0
+  fi
+  [[ -n "${REQUESTED_OVERLAY_FILE:-}" && -n "${REQUESTED_OVERLAY_SHA256:-}" ]] || die "--overlay-file and --overlay-sha256 must be supplied together"
+  valid_overlay_sha "$REQUESTED_OVERLAY_SHA256" || die "--overlay-sha256 must be a full 64-character lowercase SHA256"
+  OVERLAY_FILE="$REQUESTED_OVERLAY_FILE"
+  [[ "$OVERLAY_FILE" == "$OVERLAY_DIR/$REQUESTED_OVERLAY_SHA256.patch" ]] || die "overlay must use the fixed content-addressed path $OVERLAY_DIR/$REQUESTED_OVERLAY_SHA256.patch"
+  [[ -f "$OVERLAY_FILE" && ! -L "$OVERLAY_FILE" ]] || die "overlay file is missing, not a regular file, or a symlink"
+  local actual
+  actual="$(sha256sum -- "$OVERLAY_FILE" | awk '{print $1}')"
+  [[ "$actual" == "$REQUESTED_OVERLAY_SHA256" ]] || die "overlay file SHA256 does not match --overlay-sha256"
+  OVERLAY_MODE=1
+  OVERLAY_SHA256="$REQUESTED_OVERLAY_SHA256"
+  export OVERLAY_SHA256
+}
+
+timestamp() {
+  date -u +%Y%m%dT%H%M%SZ
+}
+
+compose_image_ref() {
+  python3 - "$COMPOSE" <<'PY'
+import re, sys
+path = sys.argv[1]
+matches = []
+for line in open(path, encoding="utf-8"):
+    m = re.match(r"^\s*image:\s*(hermes-agent:main-(?:[0-9a-f]{40}-overlay-[0-9a-f]{64}|[0-9a-f]{40}-desktop|[0-9a-f]{7,40}))\s*$", line)
+    if m:
+        matches.append(m.group(1))
+if len(matches) != 1:
+    raise SystemExit(f"expected exactly one Hermes image reference line, found {len(matches)}")
+print(matches[0])
+PY
+}
+
+running_container() {
+  local cid
+  cid="$(docker compose --project-directory "$ROOT" -f "$COMPOSE" ps -q "$SERVICE")"
+  [[ -n "$cid" ]] || die "Hermes service has no running container"
+  printf '%s\n' "$cid"
+}
+
+all_services_healthy_for_image() {
+  local expected_id="$1" service cid image_id health
+  for service in "${SERVICES[@]}"; do
+    cid="$(docker compose --project-directory "$ROOT" -f "$COMPOSE" ps -q "$service" 2>/dev/null || true)"
+    [[ -n "$cid" ]] || return 1
+    image_id="$(docker inspect --format '{{.Image}}' "$cid" 2>/dev/null || true)"
+    health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" 2>/dev/null || true)"
+    [[ "$image_id" == "$expected_id" && "$health" == "healthy" ]] || return 1
+  done
+}
+
+current_facts() {
+  CURRENT_TAG="$(compose_image_ref)"
+  export CURRENT_OVERLAY_SHA256 CURRENT_OVERLAY_TREE_SHA
+  CURRENT_CID="$(running_container)"
+  CURRENT_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$CURRENT_CID")"
+  CURRENT_SHA="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$CURRENT_IMAGE_ID")"
+  CURRENT_OVERLAY_SHA256="$(docker image inspect --format '{{index .Config.Labels "io.nousresearch.hermes.overlay.sha256"}}' "$CURRENT_IMAGE_ID")"
+  [[ "$CURRENT_OVERLAY_SHA256" == "<no value>" ]] && CURRENT_OVERLAY_SHA256=""
+  CURRENT_OVERLAY_TREE_SHA=""
+  CURRENT_BOT_DESKTOP=0
+  if [[ "$(docker image inspect --format '{{index .Config.Labels "io.nousresearch.hermes.bot-desktop"}}' "$CURRENT_IMAGE_ID")" == 1 ]]; then CURRENT_BOT_DESKTOP=1; fi
+  bot_desktop_image_valid "$CURRENT_IMAGE_ID" "$CURRENT_BOT_DESKTOP" || die "running image Bot Screen variant label or binaries are invalid"
+  CURRENT_RELEASE_TAG="$(python3 - "$STATE" "$CURRENT_SHA" "$CURRENT_TAG" <<'PY'
+import json,sys
+try:
+ with open(sys.argv[1], encoding="utf-8") as handle: current=json.load(handle).get("current") or {}
+except FileNotFoundError: current={}
+print(current.get("release_tag") or "" if current.get("sha")==sys.argv[2] and current.get("tag")==sys.argv[3] else "")
+PY
+)"
+  export CURRENT_BOT_DESKTOP CURRENT_RELEASE_TAG
+  [[ -z "$CURRENT_RELEASE_TAG" ]] || valid_release_tag "$CURRENT_RELEASE_TAG" || die "saved current release tag is invalid"
+  valid_sha "$CURRENT_SHA" || die "running image has no valid org.opencontainers.image.revision label"
+  local configured_image_id stamp_output stamp_values stamp_commit stamp_overlay stamp_tree provenance_output provenance_revision expected_tag
+  configured_image_id="$(docker image inspect --format '{{.Id}}' "$CURRENT_TAG")"
+  [[ "$configured_image_id" == "$CURRENT_IMAGE_ID" ]] || die "Compose image and running container image differ"
+  if [[ -n "$CURRENT_OVERLAY_SHA256" ]]; then
+    valid_overlay_sha "$CURRENT_OVERLAY_SHA256" || die "running image has an invalid overlay SHA256 label"
+    stamp_output="$(docker run --rm --network none --entrypoint cat "$CURRENT_IMAGE_ID" /opt/hermes/install-stamp.json 2>/dev/null)" || die "could not read current overlay install stamp"
+    stamp_values="$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("commit", "")); print(d.get("overlaySha256", "")); print(d.get("overlayTreeSha", ""))' <<<"$stamp_output")" || die "current overlay install stamp is invalid"
+    readarray -t _stamp <<<"$stamp_values"
+    stamp_commit="${_stamp[0]:-}"; stamp_overlay="${_stamp[1]:-}"; stamp_tree="${_stamp[2]:-}"
+    [[ "$stamp_commit" == "$CURRENT_SHA" && "$stamp_overlay" == "$CURRENT_OVERLAY_SHA256" && "$stamp_tree" =~ ^[0-9a-f]{40}$ ]] || die "current source, overlay label, and install stamp do not agree"
+    provenance_output="$(docker run --rm --network none --entrypoint cat "$CURRENT_IMAGE_ID" /etc/hermes/image-provenance.json 2>/dev/null)" || die "could not read current image provenance"
+    provenance_revision="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("revision") or "")' <<<"$provenance_output")" || die "current image provenance is invalid"
+    [[ "$provenance_revision" == "$CURRENT_SHA" ]] || die "current image provenance does not match its OCI revision label"
+    CURRENT_OVERLAY_TREE_SHA="$stamp_tree"
+  fi
+  if [[ "$CURRENT_OVERLAY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
+    [[ "$CURRENT_BOT_DESKTOP" == 0 ]] || die "running desktop variant cannot also carry an overlay"
+    expected_tag="${IMAGE_PREFIX}${CURRENT_SHA}-overlay-${CURRENT_OVERLAY_SHA256}"
+  elif [[ "$CURRENT_BOT_DESKTOP" == 1 ]]; then
+    expected_tag="${IMAGE_PREFIX}${CURRENT_SHA}-desktop"
+  else
+    expected_tag="${IMAGE_PREFIX}${CURRENT_SHA:0:12}"
+  fi
+  [[ "$CURRENT_TAG" == "$expected_tag" || ( -z "$CURRENT_OVERLAY_SHA256" && "$CURRENT_BOT_DESKTOP" == 0 && "$CURRENT_TAG" == "${IMAGE_PREFIX}${CURRENT_SHA}" ) ]] || die "running Compose tag does not match the image source, overlay, and Bot Screen identities"
+}
+
+resolve_main_once() {
+  local line
+  need timeout
+  line="$(timeout 45s git ls-remote "$UPSTREAM" refs/heads/main)" || die "upstream main lookup timed out or failed"
+  CANDIDATE_SHA="${line%%[[:space:]]*}"
+  valid_sha "$CANDIDATE_SHA" || die "could not resolve a valid upstream main SHA"
+  set_candidate_tag
+}
+
+resolve_candidate_once() {
+  if [[ -n "${REQUESTED_SHA:-}" ]]; then
+    valid_sha "$REQUESTED_SHA" || die "--sha must be a full 40-character SHA"
+    CANDIDATE_SHA="$REQUESTED_SHA"
+    set_candidate_tag
+    CANDIDATE_SOURCE=explicit-sha
+  else
+    resolve_main_once
+    CANDIDATE_SOURCE=upstream-main
+  fi
+}
+
+disk_available_bytes() {
+  df -B1 --output=avail "$ROOT" | awk 'NR==2 {print $1}'
+}
+
+disk_used_bytes() {
+  df -B1 --output=used "$ROOT" | awk 'NR==2 {print $1}'
+}
+
+disk_used_percent() {
+  df -P "$ROOT" | awk 'NR==2 {gsub(/%/, "", $5); print $5}'
+}
+
+bytes_to_gib() {
+  python3 - "$1" <<'PY'
+import sys
+n = int(sys.argv[1])
+print(f"{n / (1 << 30):.1f}")
+PY
+}
+
+required_free_bytes() {
+  local image_bytes calculated configured
+  image_bytes="$(docker image inspect --format '{{.Size}}' "$CURRENT_IMAGE_ID")"
+  calculated=$(( image_bytes + 2147483648 + 4294967296 ))
+  configured=$(( MIN_FREE_GIB * 1073741824 ))
+  (( calculated < configured )) && calculated="$configured"
+  printf '%s\n' "$calculated"
+}
+
+buildkit_total() {
+  docker buildx du 2>/dev/null | awk '/^Total:/ {print $2; exit}'
+}
+
+large_external_files() {
+  find /root /var /docker -xdev \
+    \( -path "$ROOT" -o -path /var/lib/docker -o -path /var/lib/containerd \) -prune -o \
+    -type f -size "+${ANOMALY_BYTES}c" -printf '%s %p\n' 2>/dev/null | sort -nr || true
+}
+
+check_free_space() {
+  local available required available_gib required_gib anomalies
+  available="$(disk_available_bytes)"
+  required="$(required_free_bytes)"
+  available_gib="$(bytes_to_gib "$available")"
+  required_gib="$(bytes_to_gib "$required")"
+  (( available >= required )) || die "only ${available_gib} GiB free; ${required_gib} GiB is required for image, cache, and safety headroom"
+  case "${HERMES_UPDATER_SKIP_PREFLIGHT_FILE_SCAN:-0}" in
+    1)
+      anomalies=""
+      printf 'INFO: host-wide large-file metadata scan skipped for target-only prepare/deploy preflight.\n' >&2
+      ;;
+    0) anomalies="$(large_external_files)" ;;
+    *) die 'HERMES_UPDATER_SKIP_PREFLIGHT_FILE_SCAN must be 0 or 1' ;;
+  esac
+  if [[ -n "$anomalies" ]]; then
+    printf 'WARNING: external files larger than 5 GiB were found and will not be deleted automatically:\n%s\n' "$anomalies" >&2
+  fi
+}
+
+acquire_lock() {
+  exec 9>"$LOCK"
+  if ! flock -n 9; then
+    die "another Hermes main update is already running"
+  fi
+  printf '%s\n' "$$" >"$UPDATER/active.pid"
+}
+
+release_active_pid() {
+  rm -f -- "$UPDATER/active.pid"
+}
+
+record_phase() {
+  [[ -n "${RUN_ID:-}" ]] || return 0
+  local phase="$1" result="$2" detail="${3:-}" transaction="$TRANSACTIONS/$RUN_ID.json"
+  python3 - "$transaction" "$RUN_ID" "$phase" "$result" "$detail" "${CURRENT_SHA:-}" "${CURRENT_TAG:-}" "${CANDIDATE_SHA:-}" "${CANDIDATE_TAG:-}" <<'PY'
+import datetime
+import json
+import os
+import sys
+
+(path, run_id, phase, result, detail, current_sha, current_tag,
+ candidate_sha, candidate_tag) = sys.argv[1:]
+try:
+    with open(path, encoding="utf-8") as handle:
+        doc = json.load(handle)
+except FileNotFoundError:
+    doc = {"schema": 1, "run_id": run_id, "history": []}
+event = {
+    "at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    "phase": phase,
+    "result": result,
+}
+if detail:
+    event["detail"] = detail
+if result in ("passed", "failed"):
+    for prior in reversed(doc["history"]):
+        if prior["phase"] == phase and prior["result"] == "running":
+            event["duration_seconds"] = round((datetime.datetime.fromisoformat(event["at"]) - datetime.datetime.fromisoformat(prior["at"])).total_seconds(), 3)
+            break
+doc["history"].append(event)
+doc["last_phase"] = phase
+doc["result"] = result
+doc["pid"] = os.getppid()
+doc["current"] = {"sha": current_sha, "tag": current_tag, "overlay_sha256": os.environ.get("CURRENT_OVERLAY_SHA256", ""), "overlay_tree_sha": os.environ.get("CURRENT_OVERLAY_TREE_SHA", ""), "bot_desktop": os.environ.get("CURRENT_BOT_DESKTOP") == "1", "release_tag": os.environ.get("CURRENT_RELEASE_TAG") or None}
+doc["candidate"] = {"sha": candidate_sha, "tag": candidate_tag, "overlay_sha256": os.environ.get("OVERLAY_SHA256", ""), "overlay_tree_sha": os.environ.get("OVERLAY_TREE_SHA", ""), "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None}
+tmp = path + ".tmp"
+with open(tmp, "w", encoding="utf-8") as handle:
+    json.dump(doc, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+os.chmod(tmp, 0o600)
+os.replace(tmp, path)
+PY
+}
+
+prepare_exit_handler() {
+  local rc="$1"
+  set +e
+  if (( rc != 0 )); then
+    record_phase "${PHASE:-prepare}" failed "exit code $rc"
+  fi
+  release_active_pid
+  remove_worktree
+  return "$rc"
+}
+
+start_log() {
+  RUN_ID="$(timestamp)-${CANDIDATE_SHA:0:12}"
+  RUN_LOG="$LOGS/$RUN_ID.log"
+  touch "$RUN_LOG"
+  chmod 600 "$RUN_LOG"
+  exec > >(tee -a "$RUN_LOG") 2>&1
+}
+
+ensure_repo() {
+  if [[ ! -d "$REPO" ]]; then
+    local tmp_repo="$UPDATER/repo.git.new.$RUN_ID"
+    git clone --bare "$UPSTREAM" "$tmp_repo"
+    mv "$tmp_repo" "$REPO"
+  fi
+  [[ "$(git -C "$REPO" config --get remote.origin.url)" == "$UPSTREAM" ]] || die "unexpected origin URL in $REPO"
+  git -C "$REPO" fetch --prune --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+  verify_release_tag
+  git -C "$REPO" cat-file -e "$CANDIDATE_SHA^{commit}"
+  local fetched_main
+  fetched_main="$(git -C "$REPO" rev-parse refs/remotes/origin/main)"
+  if [[ "$fetched_main" != "$CANDIDATE_SHA" ]]; then
+    git -C "$REPO" merge-base --is-ancestor "$CANDIDATE_SHA" "$fetched_main" || die "pinned candidate is not an ancestor of fetched main"
+    printf 'NOTICE: upstream main moved after pinning; continuing with pinned %s\n' "$CANDIDATE_SHA"
+  fi
+  git -C "$REPO" cat-file -e "$CURRENT_SHA^{commit}"
+  git -C "$REPO" merge-base --is-ancestor "$CURRENT_SHA" "$CANDIDATE_SHA" || die "running revision is not an ancestor of candidate; refusing a non-fast-forward update"
+}
+
+generate_report() {
+  REPORT="$REPORTS/$RUN_ID.md"
+  /docker/hermes-agent-2q3y/bin/hermes-main-report "$REPO" "$CURRENT_SHA" "$CANDIDATE_SHA" "$REPORT"
+  if [[ "$OVERLAY_MODE" == 1 ]]; then
+    {
+      printf '\n## Pinned local overlay\n\n'
+      printf -- '- Upstream source SHA: `%s`\n' "$CANDIDATE_SHA"
+      printf -- '- Patch SHA256: `%s`\n' "$OVERLAY_SHA256"
+      local allowed_path
+      for allowed_path in "${OVERLAY_ALLOWED_PATHS[@]}"; do
+        printf -- '- Allowed path: `%s`\n' "$allowed_path"
+      done
+      printf -- '- Applied tree SHA: `%s`\n\n' "$OVERLAY_TREE_SHA"
+      printf '```diff\n'
+      git -C "$WORKTREE" diff --no-ext-diff --unified=3 HEAD -- "${OVERLAY_ALLOWED_PATHS[@]}"
+      printf '```\n'
+    } >>"$REPORT"
+  fi
+  {
+    printf '\n## Image and cache retention\n\n'
+    printf '%s\n' '- Deployment retains all Hermes image tags, including prior and temporary build tags, and the shared BuildKit cache.'
+    printf '%s\n' '- No automatic image removal or BuildKit pruning runs.'
+    printf '%s\n' '- Docker tags are mutable; precheck and readback cannot stop another writer from racing promotion or retagging later.'
+  } >>"$REPORT"
+  chmod 600 "$REPORT"
+  cat "$REPORT"
+}
+
+prepare_worktree() {
+  local worktree_suffix
+  worktree_suffix="$CANDIDATE_SHA"
+  if [[ "$OVERLAY_MODE" == 1 ]]; then worktree_suffix="${CANDIDATE_SHA}-${OVERLAY_SHA256}"; fi
+  if [[ "${BOT_DESKTOP:-0}" == 1 ]]; then worktree_suffix="${CANDIDATE_SHA}-desktop"; fi
+  WORKTREE="$WORKTREES/$worktree_suffix"
+  if [[ -e "$WORKTREE" ]]; then
+    git -C "$REPO" worktree remove --force "$WORKTREE"
+  fi
+  git -C "$REPO" worktree prune
+  git -C "$REPO" worktree add --detach "$WORKTREE" "$CANDIDATE_SHA"
+  [[ "$(git -C "$WORKTREE" rev-parse HEAD)" == "$CANDIDATE_SHA" ]] || die "candidate worktree does not match pinned upstream SHA"
+  [[ -z "$(git -C "$WORKTREE" status --porcelain)" ]] || die "candidate worktree is not clean before overlay application"
+  if [[ "$OVERLAY_MODE" == 1 ]]; then
+    select_overlay_identity
+    local path base_file_mode applied_file_mode
+    local -a base_file_modes=() changed_paths=()
+    for path in "${OVERLAY_ALLOWED_PATHS[@]}"; do
+      base_file_mode="$(git -C "$WORKTREE" ls-files -s -- "$path" | awk 'NR==1 {print $1}')"
+      if overlay_added_path "$path" && [[ -z "$base_file_mode" ]]; then
+        base_file_mode="absent"
+      else
+        [[ "$base_file_mode" == "100644" ]] || die "upstream allowlisted file is missing or has an unexpected file mode: $path"
+      fi
+      base_file_modes+=("$base_file_mode")
+    done
+    git -C "$WORKTREE" apply --check --whitespace=error-all "$OVERLAY_FILE" || die "pinned overlay does not apply cleanly to upstream SHA"
+    git -C "$WORKTREE" apply --whitespace=error-all "$OVERLAY_FILE" || die "could not apply pinned overlay"
+    local -a present_paths=()
+    for path in "${OVERLAY_ALLOWED_PATHS[@]}"; do
+      if overlay_added_path "$path" && [[ ! -e "$WORKTREE/$path" && ! -L "$WORKTREE/$path" ]]; then continue; fi
+      [[ -f "$WORKTREE/$path" && ! -L "$WORKTREE/$path" ]] || die "overlay replaced an allowlisted regular file with a non-regular file: $path"
+      if overlay_added_path "$path"; then
+        overlay_added_digest_allowed "$path" "$(sha256sum -- "$WORKTREE/$path" | awk '{print $1}')" || die "added overlay module digest mismatch"
+      fi
+      present_paths+=("$path")
+    done
+    local accounting_digest="" operational_digest=""
+    if [[ -f "$WORKTREE/agent/evaluation_accounting.py" ]]; then accounting_digest="$(sha256sum -- "$WORKTREE/agent/evaluation_accounting.py" | awk '{print $1}')"; fi
+    if [[ -f "$WORKTREE/agent/evaluation_operational.py" ]]; then operational_digest="$(sha256sum -- "$WORKTREE/agent/evaluation_operational.py" | awk '{print $1}')"; fi
+    case "$accounting_digest:$operational_digest" in
+      ":"|"35555419a3d28a73eb129991c4383cdd545ee340ef399dc22d5eb22dd58ce1f4:"|"1e328a828ad99e95de0768f6784a6965526ee94a4fd7be397fc7a9755b8ea9d9:f9163dfa2aeb4f3ab22c465db928a73d597e82a9b798be07aad7defd18585195"|"00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09:a932a93451534c86a6d5b283b3ec6399a35f2c196b1e86a8f48b307601ab6844"|"00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09:cd8385e338710b9567389bf66374f4a9668604f645b2e38e63b5cb053f03db9c") ;;
+      *) die "added overlay module generation mismatch" ;;
+    esac
+    local applied_patch_sha
+    applied_patch_sha="$(sha256sum -- "$OVERLAY_FILE" | awk '{print $1}')"
+    [[ "$applied_patch_sha" == "$OVERLAY_SHA256" ]] || die "overlay changed while being applied"
+    readarray -t changed_paths < <({ git -C "$WORKTREE" diff --name-only HEAD; git -C "$WORKTREE" ls-files --others --exclude-standard; } | sort -u)
+    (( ${#changed_paths[@]} > 0 )) || die "overlay made no source changes"
+    for path in "${changed_paths[@]}"; do
+      overlay_path_allowed "$path" || die "overlay changed a path outside the exact allowlist: $path"
+    done
+    git -C "$WORKTREE" diff --check HEAD || die "overlay has whitespace errors"
+    git -C "$WORKTREE" add -- "${present_paths[@]}"
+    local i=0
+    for path in "${OVERLAY_ALLOWED_PATHS[@]}"; do
+      applied_file_mode="$(git -C "$WORKTREE" ls-files -s -- "$path" | awk 'NR==1 {print $1}')"
+      if [[ "${base_file_modes[$i]}" == "absent" ]]; then
+        [[ -z "$applied_file_mode" || "$applied_file_mode" == "100644" ]] || die "added overlay module has an unexpected mode"
+      else
+        [[ "$applied_file_mode" == "${base_file_modes[$i]}" ]] || die "overlay changed the allowlisted file mode: $path"
+      fi
+      i=$((i + 1))
+    done
+    OVERLAY_TREE_SHA="$(git -C "$WORKTREE" write-tree)"
+    [[ "$OVERLAY_TREE_SHA" =~ ^[0-9a-f]{40}$ ]] || die "could not identify the effective overlay tree"
+    export OVERLAY_TREE_SHA
+  else
+    OVERLAY_TREE_SHA=""
+  fi
+}
+
+remove_worktree() {
+  if [[ -n "${WORKTREE:-}" && -e "$WORKTREE" ]]; then
+    git -C "$REPO" worktree remove --force "$WORKTREE" || true
+  fi
+  if [[ -d "$REPO" ]]; then
+    git -C "$REPO" worktree prune || true
+  fi
+}
+
+candidate_image_valid() {
+  local image="${1:-$CANDIDATE_TAG}" revision overlay_label provenance_output provenance_revision stamp_output stamp_values stamp_revision stamp_overlay stamp_tree
+  docker image inspect "$image" >/dev/null 2>&1 || return 1
+  revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image" 2>/dev/null)" || return 1
+  [[ "$revision" == "$CANDIDATE_SHA" ]] || return 1
+  bot_desktop_image_valid "$image" "${BOT_DESKTOP:-0}" || return 1
+  overlay_label="$(docker image inspect --format '{{index .Config.Labels "io.nousresearch.hermes.overlay.sha256"}}' "$image" 2>/dev/null)" || return 1
+  [[ "$overlay_label" == "<no value>" ]] && overlay_label=""
+  if [[ "$OVERLAY_MODE" == 1 ]]; then
+    [[ "$overlay_label" == "$OVERLAY_SHA256" ]] || return 1
+  else
+    [[ -z "$overlay_label" ]] || return 1
+  fi
+  provenance_output="$(docker run --rm --network none --entrypoint cat "$image" /etc/hermes/image-provenance.json 2>/dev/null)" || return 1
+  provenance_revision="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("revision") or "")' <<<"$provenance_output")" || return 1
+  [[ "$provenance_revision" == "$CANDIDATE_SHA" ]] || return 1
+  stamp_output="$(docker run --rm --network none --entrypoint cat "$image" /opt/hermes/install-stamp.json 2>/dev/null)" || return 1
+  stamp_values="$(python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("commit", "")); print(d.get("overlaySha256", "")); print(d.get("overlayTreeSha", ""))' <<<"$stamp_output")" || return 1
+  readarray -t _candidate_stamp <<<"$stamp_values"
+  stamp_revision="${_candidate_stamp[0]:-}"; stamp_overlay="${_candidate_stamp[1]:-}"; stamp_tree="${_candidate_stamp[2]:-}"
+  [[ "$stamp_revision" == "$CANDIDATE_SHA" ]] || return 1
+  if [[ "$OVERLAY_MODE" == 1 ]]; then
+    [[ "$stamp_overlay" == "$OVERLAY_SHA256" && "$stamp_tree" == "$OVERLAY_TREE_SHA" ]] || return 1
+    [[ "$stamp_tree" =~ ^[0-9a-f]{40}$ ]] || return 1
+  else
+    [[ -z "$stamp_overlay" && -z "$stamp_tree" ]] || return 1
+  fi
+  if [[ -n "${RELEASE_TAG:-}" ]]; then
+    python3 -c 'import json,sys; d=json.load(sys.stdin); version=sys.argv[1][1:]; raise SystemExit(0 if d.get("baseVersion")==version and d.get("displayVersion")==version and d.get("distance")==0 and d.get("dirty") is False else 1)' "$RELEASE_TAG" <<<"$stamp_output" || return 1
+  fi
+}
+
+recovery_adoption_matches_candidate() {
+  [[ "${OVERLAY_MODE:-0}" == 1 ]] || return 1
+  [[ "$CANDIDATE_TAG" == "${IMAGE_PREFIX}${CANDIDATE_SHA}-overlay-${OVERLAY_SHA256}" ]] || return 1
+  if [[ "$ADOPT_IMAGE_ID" == "$RECOVERY_ADOPT_IMAGE_ID" && "$CANDIDATE_SHA" == "$RECOVERY_ADOPT_SHA" && "$OVERLAY_SHA256" == "$RECOVERY_ADOPT_OVERLAY_SHA" ]]; then
+    return 0
+  fi
+  if [[ "$ADOPT_IMAGE_ID" == "$F42_RECOVERY_ADOPT_IMAGE_ID" && "$CANDIDATE_SHA" == "$F42_RECOVERY_ADOPT_SHA" && "$OVERLAY_SHA256" == "$F42_RECOVERY_ADOPT_OVERLAY_SHA" && "$OVERLAY_TREE_SHA" == "$F42_RECOVERY_ADOPT_TREE_SHA" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+build_overlay_candidate() {
+  if [[ -z "${WORKTREE:-}" || ! -d "$WORKTREE" ]]; then prepare_worktree; fi
+  if docker image inspect "$CANDIDATE_TAG" >/dev/null 2>&1; then
+    local existing_id
+    existing_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")"
+    if [[ -n "$ADOPT_IMAGE_ID" ]]; then
+      recovery_adoption_matches_candidate || die "resolved candidate source, image ID, overlay, or tree differs from the explicit recovery pin"
+      assert_orphan_overlay_tag_adoption_allowed "$CANDIDATE_TAG" "$existing_id"
+      [[ "$FORCE_REBUILD" != 1 ]] || die "--force-rebuild cannot be combined with orphan-image adoption"
+      candidate_image_valid "$ADOPT_IMAGE_ID" || die "pinned orphan image source, patch, tree, label, install stamp, or provenance does not match"
+      [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$ADOPT_IMAGE_ID" ]] || die "overlay identity tag changed during orphan-image validation"
+      printf 'Validated explicit orphan-image adoption %s for %s\n' "$ADOPT_IMAGE_ID" "$CANDIDATE_TAG"
+    else
+      assert_tag_image_id_consistent "$CANDIDATE_TAG" "$existing_id"
+      candidate_image_valid "$CANDIDATE_TAG" || die "overlay identity tag already exists but its source, patch, tree, label, or provenance does not match; refusing to repoint it"
+      [[ "$FORCE_REBUILD" != 1 ]] || die "--force-rebuild cannot repoint an existing overlay identity tag"
+      printf 'Reusing state-verified overlay image %s (%s)\n' "$CANDIDATE_TAG" "$existing_id"
+    fi
+    return
+  fi
+  [[ -z "$ADOPT_IMAGE_ID" ]] || die "orphan-image adoption requires the existing exact candidate tag; refusing to build or repoint"
+  local display base development distance stamp_path
+  local -a identity
+  display="$(cd "$WORKTREE" && python3 -m scripts.releases.distance)"
+  identity=(--commit "$CANDIDATE_SHA")
+  if [[ -n "$display" ]]; then
+    base="${display%%+*}"
+    development="${display#*+}"
+    if [[ "$development" == "$display" ]]; then distance=0; else distance="${development%%.*}"; fi
+    identity+=(--base-version "$base" --display-version "$display" --distance "$distance")
+  fi
+  stamp_path="$WORKTREE/install-stamp.json"
+  python3 "$WORKTREE/scripts/write_install_stamp.py" \
+    --output "$stamp_path" \
+    --distribution docker --update-mechanism external --source docker "${identity[@]}"
+  python3 - "$stamp_path" "$CANDIDATE_SHA" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" <<'PY'
+import json, os, sys
+path, commit, overlay_sha, tree_sha = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    stamp = json.load(handle)
+if stamp.get("commit") != commit:
+    raise SystemExit("install stamp commit does not match the pinned upstream SHA")
+stamp["overlaySha256"] = overlay_sha
+stamp["overlayTreeSha"] = tree_sha
+tmp = path + ".overlay.tmp"
+with open(tmp, "w", encoding="utf-8") as handle:
+    json.dump(stamp, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+os.chmod(tmp, 0o644)
+os.replace(tmp, path)
+PY
+  TEMP_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-overlay-build-${RUN_ID}-${BASHPID}"
+  docker buildx build \
+    --load \
+    --pull \
+    --provenance=mode=max \
+    --build-arg "HERMES_GIT_SHA=$CANDIDATE_SHA" \
+    --label "org.opencontainers.image.revision=$CANDIDATE_SHA" \
+    --label "io.nousresearch.hermes.overlay.sha256=$OVERLAY_SHA256" \
+    --tag "$TEMP_TAG" \
+    "$WORKTREE"
+  candidate_image_valid "$TEMP_TAG" || die "temporary overlay image failed label, install-stamp, or upstream provenance verification"
+  if docker image inspect "$CANDIDATE_TAG" >/dev/null 2>&1; then
+    die "overlay identity tag appeared during build; refusing to repoint it"
+  fi
+  local built_id
+  built_id="$(docker image inspect --format '{{.Id}}' "$TEMP_TAG")"
+  docker image tag "$TEMP_TAG" "$CANDIDATE_TAG"
+  [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$built_id" ]] || die "promoted overlay tag does not resolve to the validated image ID"
+  candidate_image_valid "$CANDIDATE_TAG" || die "promoted overlay candidate failed identity verification"
+  TEMP_TAG=""
+}
+
+build_candidate() {
+  if [[ "$OVERLAY_MODE" == 1 ]]; then
+    build_overlay_candidate
+    return
+  fi
+  if [[ "${BOT_DESKTOP:-0}" == 1 || -n "${RELEASE_TAG:-}" ]] && docker image inspect "$CANDIDATE_TAG" >/dev/null 2>&1; then
+    local existing_id
+    existing_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")"
+    assert_tag_image_id_consistent "$CANDIDATE_TAG" "$existing_id"
+    candidate_image_valid "$CANDIDATE_TAG" || die "source variant tag exists with different identity or missing Bot Screen binaries; refusing to repoint it"
+    [[ "$FORCE_REBUILD" != 1 ]] || die "--force-rebuild cannot repoint an existing source variant tag"
+    printf 'Reusing state-verified source variant %s (%s)\n' "$CANDIDATE_TAG" "$existing_id"
+    return
+  fi
+  if candidate_image_valid && [[ "${FORCE_REBUILD:-0}" != "1" ]]; then
+    printf 'Reusing already verified candidate image %s\n' "$CANDIDATE_TAG"
+    return
+  fi
+  prepare_worktree
+  [[ "$(git -C "$WORKTREE" rev-parse HEAD)" == "$CANDIDATE_SHA" ]] || die "candidate worktree does not match pinned SHA"
+  local display base development distance
+  local -a identity
+  display="$(cd "$WORKTREE" && python3 -m scripts.releases.distance)"
+  identity=(--commit "$CANDIDATE_SHA")
+  if [[ -n "$display" ]]; then
+    base="${display%%+*}"
+    development="${display#*+}"
+    if [[ "$development" == "$display" ]]; then distance=0; else distance="${development%%.*}"; fi
+    identity+=(--base-version "$base" --display-version "$display" --distance "$distance")
+  fi
+  python3 "$WORKTREE/scripts/write_install_stamp.py" \
+    --output "$WORKTREE/install-stamp.json" \
+    --distribution docker --update-mechanism external --source docker "${identity[@]}"
+  local build_tag="$CANDIDATE_TAG"
+  local -a variant_args=()
+  if [[ "${BOT_DESKTOP:-0}" == 1 ]]; then
+    variant_args=(--build-arg HERMES_BOT_DESKTOP=1 --label io.nousresearch.hermes.bot-desktop=1)
+  fi
+  if [[ "${BOT_DESKTOP:-0}" == 1 || -n "${RELEASE_TAG:-}" ]]; then
+    TEMP_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-source-build-${RUN_ID}-${BASHPID}"
+    build_tag="$TEMP_TAG"
+  fi
+  docker buildx build \
+    --load \
+    --pull \
+    --provenance=mode=max \
+    --build-arg "HERMES_GIT_SHA=$CANDIDATE_SHA" \
+    "${variant_args[@]}" \
+    --label "org.opencontainers.image.revision=$CANDIDATE_SHA" \
+    --tag "$build_tag" \
+    "$WORKTREE"
+  candidate_image_valid "$build_tag" || die "built image source, release stamp, or Bot Screen binaries do not match the pinned candidate"
+  if [[ "$build_tag" != "$CANDIDATE_TAG" ]]; then
+    ! docker image inspect "$CANDIDATE_TAG" >/dev/null 2>&1 || die "source variant tag appeared during build; refusing to repoint it"
+    local built_id
+    built_id="$(docker image inspect --format '{{.Id}}' "$build_tag")"
+    docker image tag "$build_tag" "$CANDIDATE_TAG"
+    [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$built_id" ]] || die "source variant promotion image ID mismatch"
+    candidate_image_valid "$CANDIDATE_TAG" || die "promoted source variant identity no longer matches"
+    TEMP_TAG=""
+  fi
+}
+
+smoke_candidate() {
+  local version_output provenance_output provenance_revision
+  version_output="$(docker run --rm --network none --entrypoint hermes "$CANDIDATE_TAG" --version)"
+  printf '%s\n' "$version_output"
+  grep -q 'Hermes Agent' <<<"$version_output" || die "candidate CLI smoke test failed"
+  provenance_output="$(docker run --rm --network none --entrypoint cat "$CANDIDATE_TAG" /etc/hermes/image-provenance.json)"
+  provenance_revision="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("revision") or "")' <<<"$provenance_output")"
+  [[ "$provenance_revision" == "$CANDIDATE_SHA" ]] || die "candidate internal provenance revision does not match the pinned SHA"
+  printf 'Internal image provenance revision: %s\n' "$provenance_revision"
+  candidate_image_valid "$CANDIDATE_TAG" || die "candidate install stamp, overlay label, or internal provenance failed readback"
+}
+
+doctor_isolated_home_result_acceptable() {
+  local log="$1" failure issue issue_count=0
+  local marker
+  for marker in \
+    'No active security advisories' \
+    'SQLite 3.' \
+    'Config version up to date' \
+    '◆ Tool Availability'; do
+    grep -Fq "$marker" "$log" || {
+      printf 'Doctor log is missing required success marker: %s\n' "$marker" >&2
+      return 1
+    }
+  done
+
+  while IFS= read -r failure; do
+    case "$failure" in
+      *'~/.local/bin/hermes not found'*) ;;
+      *)
+        printf 'Doctor reported an unexpected hard failure: %s\n' "$failure" >&2
+        return 1
+        ;;
+    esac
+  done < <(grep -E '^  ✗ ' "$log" || true)
+
+  while IFS= read -r issue; do
+    issue_count=$((issue_count + 1))
+    case "$issue" in
+      *'state.db FTS write corruption'*)
+        printf 'Doctor reported an FTS issue against the isolated writable fixture.\n' >&2
+        return 1
+        ;;
+      *'state.db is large'*) ;;
+      *'Missing ~/.local/bin/hermes symlink'*) ;;
+      *"Run 'hermes setup' to configure API keys"*) ;;
+      *"Run 'hermes setup' to configure missing API keys"*) ;;
+      *)
+        printf 'Doctor reported an unexpected issue: %s\n' "$issue" >&2
+        return 1
+        ;;
+    esac
+  done < <(grep -E '^  [0-9]+\. ' "$log" || true)
+
+  (( issue_count > 0 )) || {
+    printf 'Doctor exited non-zero without a recognized issue list.\n' >&2
+    return 1
+  }
+}
+
+ISOLATED_HOME_BOOTSTRAP='import json, os, subprocess, sys
+from pathlib import Path
+sys.path.insert(0, "/opt/hermes")
+from hermes_cli.config import get_config_path, get_env_path, seed_config_file
+env_path = get_env_path()
+config_path = get_config_path()
+if env_path.exists() or config_path.exists():
+    raise SystemExit("unexpected preexisting file in isolated Hermes home")
+env_path.parent.mkdir(parents=True, exist_ok=True)
+fd = os.open(env_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+os.close(fd)
+seed_config_file(config_path)
+exe = "/opt/hermes/.venv/bin/hermes"
+args = list(sys.argv[1:])
+if args == ["--updater-plugin-contract-smoke"]:
+    fixture = Path("/opt/data/plugin-contract-smoke")
+    fixture.mkdir(parents=True, exist_ok=False)
+    (fixture / "plugin.yaml").write_text("name: hermes-update-smoke\nversion: 0.1.0\nprovides_hooks:\n  - on_session_start\n", encoding="utf-8")
+    (fixture / "__init__.py").write_text("def on_session_start(**kwargs):\n    return None\n\ndef register(ctx):\n    ctx.register_hook(\"on_session_start\", on_session_start)\n", encoding="utf-8")
+    try:
+        completed = subprocess.run([exe, "plugins", "doctor", str(fixture), "--ci"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", timeout=90)
+        output = completed.stdout or ""
+        exit_code = completed.returncode
+    except subprocess.TimeoutExpired:
+        output = ""
+        exit_code = 124
+    manifest_marker = "  manifest: hermes-update-smoke 0.1.0 (standalone)"
+    runtime_marker = "  OK: runtime discovery, manifest parsing, import, and registration passed"
+    hooks_marker = "  registrations: 0 tool(s), 1 hook(s)"
+    markers = {"manifest": manifest_marker in output, "runtime": runtime_marker in output, "hook_registration": hooks_marker in output}
+    diagnostics = [line.strip() for line in output.splitlines() if line.lstrip().startswith(("ERROR:", "WARN:"))]
+    passed = exit_code == 0 and all(markers.values()) and not diagnostics
+    print(json.dumps({"schema": 1, "check": "synthetic-plugin-doctor", "result": "passed" if passed else "failed", "fixture": "hermes-update-smoke", "markers": markers, "unexpected_diagnostics": bool(diagnostics), "exit_code": exit_code, "installed_user_plugins": "not_scanned", "live_data_mounted": False}, sort_keys=True))
+    raise SystemExit(0 if passed else 1)
+os.execv(exe, [exe, *args])
+'
+
+run_isolated_hermes_diagnostic() {
+  local timeout_seconds="$1" output="$2"
+  shift 2
+  timeout "$timeout_seconds"s docker run --rm --init --network none \
+      --user 10000:10000 \
+      --env HOME=/opt/data \
+      --env HERMES_HOME=/opt/data \
+      --env PYTHONDONTWRITEBYTECODE=1 \
+      --tmpfs /opt/data:rw,nosuid,nodev,size=256m,mode=1777 \
+      --tmpfs /opt/data/installs:rw,nosuid,nodev,noexec,size=256m,mode=1777 \
+      --entrypoint /opt/hermes/.venv/bin/python \
+      "$CANDIDATE_TAG" -I -B -c "$ISOLATED_HOME_BOOTSTRAP" "$@" >"$output" 2>&1
+}
+
+
+validation_key() {
+  sha256sum "$0" | awk '{print $1}'
+}
+
+validation_cache_valid() {
+  [[ -f "$STATE" ]] || return 1
+  local evidence
+  evidence="$(python3 - "$STATE" "$CANDIDATE_SHA" "$CANDIDATE_TAG" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" "$(validation_key)" <<'PY'
+import hashlib, json, sys
+path, sha, tag, overlay, tree, key = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    item = json.load(handle).get("candidate") or {}
+if not (item.get("status") == "prepared" and item.get("sha") == sha
+        and item.get("tag") == tag and (item.get("overlay_sha256") or "") == overlay
+        and (item.get("overlay_tree_sha") or "") == tree
+        and item.get("validation_key") == key):
+    raise SystemExit(1)
+paths = []
+for name in ("doctor", "plugin"):
+    evidence = item.get("validation_evidence", {}).get(name, {})
+    p = evidence.get("path", "")
+    try:
+        with open(p, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+    except OSError:
+        raise SystemExit(1)
+    if digest != evidence.get("sha256"):
+        raise SystemExit(1)
+    paths.append(p)
+print("\n".join(paths))
+PY
+)" || return 1
+  local saved_id actual_id
+  saved_id="$(state_candidate_field image_id)"
+  actual_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" || return 1
+  [[ "$saved_id" == "$actual_id" ]] || die "validation cache image ID mismatch"
+  readarray -t _validation_paths <<<"$evidence"
+  VALIDATION_DOCTOR_LOG="${_validation_paths[0]}"
+  VALIDATION_PLUGIN_LOG="${_validation_paths[1]}"
+}
+
+resume_recorded_candidate() {
+  [[ -f "$STATE" ]] || return 1
+  local saved_sha saved_tag saved_overlay saved_tree saved_id
+  saved_sha="$(state_candidate_field sha)"
+  saved_tag="$(state_candidate_field tag)"
+  saved_overlay="$(state_candidate_field overlay_sha256)"
+  [[ "$saved_sha" == "$CANDIDATE_SHA" && "$saved_tag" == "$CANDIDATE_TAG" && "$saved_overlay" == "$OVERLAY_SHA256" ]] || return 1
+  [[ "$(state_candidate_field release_tag)" == "${RELEASE_TAG:-}" ]] || return 1
+  local saved_desktop
+  saved_desktop="$(state_candidate_field bot_desktop)"
+  if [[ "${BOT_DESKTOP:-0}" == 1 ]]; then
+    [[ "$saved_desktop" == True ]] || return 1
+  else
+    [[ -z "$saved_desktop" || "$saved_desktop" == False ]] || return 1
+  fi
+  [[ "$(state_candidate_field source_verified)" == True ]] || return 1
+  [[ "$FORCE_REBUILD" != 1 && -z "$ADOPT_IMAGE_ID" ]] || return 1
+  saved_id="$(state_candidate_field image_id)"
+  if ! docker image inspect "$saved_id" >/dev/null 2>&1; then
+    die "recorded candidate image is missing; reconcile the candidate before rebuilding"
+  fi
+  [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$saved_id" ]] || die "recorded candidate tag changed"
+  saved_tree="$(state_candidate_field overlay_tree_sha)"
+  OVERLAY_TREE_SHA="$saved_tree"
+  export OVERLAY_TREE_SHA
+  candidate_image_valid "$saved_id" || die "recorded candidate provenance no longer matches"
+  [[ -d "$REPO" && "$(git -C "$REPO" config --get remote.origin.url)" == "$UPSTREAM" ]] || die "candidate source repository is missing or changed"
+  git -C "$REPO" merge-base --is-ancestor "$CURRENT_SHA" "$CANDIDATE_SHA" || die "recorded candidate is not a fast-forward of the running revision"
+  REPORT="$(state_candidate_field report)"
+  [[ -f "$REPORT" ]] || die "recorded candidate report is missing"
+  record_phase source passed "cache hit: recorded immutable candidate; no fetch or worktree"
+  printf 'Resuming recorded candidate %s (%s); no source fetch or rebuild.\n' "$CANDIDATE_TAG" "$saved_id"
+}
+
+validate_runtime_image() {
+  local stage="$1"
+  if validation_cache_valid; then
+    record_phase "$stage-validation" passed "cache hit: same immutable image, validator, and hashed diagnostic evidence"
+    printf '%s validation reused for the same immutable image and validator.\n' "$stage"
+    return 0
+  fi
+  local doctor_log="$REPORTS/$RUN_ID-$stage-doctor.log"
+  local plugin_smoke_json="$REPORTS/$RUN_ID-$stage-plugin-subsystem-smoke.json"
+  local doctor_rc=0
+  record_phase "$stage-validation" running
+  run_isolated_hermes_diagnostic 180 "$doctor_log" doctor || doctor_rc=$?
+  if (( doctor_rc != 0 )); then
+    if (( doctor_rc == 124 )) || ! doctor_isolated_home_result_acceptable "$doctor_log"; then
+      record_phase "$stage-validation" failed "hermes doctor failed (rc=$doctor_rc); see $doctor_log"
+      printf 'Candidate Hermes doctor failed (rc=%s); see %s\n' "$doctor_rc" "$doctor_log" >&2
+      return 1
+    fi
+    printf 'Candidate Hermes doctor returned rc=%s only for allowlisted isolated-home environment issues.\n' "$doctor_rc"
+  fi
+  if ! run_isolated_hermes_diagnostic 120 "$plugin_smoke_json" --updater-plugin-contract-smoke; then
+    record_phase "$stage-validation" failed "synthetic plugin doctor smoke failed; see $plugin_smoke_json"
+    printf 'Candidate synthetic plugin subsystem smoke failed; see %s\n' "$plugin_smoke_json" >&2
+    return 1
+  fi
+  if ! python3 -m json.tool "$plugin_smoke_json" >/dev/null; then
+    record_phase "$stage-validation" failed "synthetic plugin subsystem smoke output is not valid JSON; see $plugin_smoke_json"
+    printf 'Synthetic plugin subsystem smoke output is not valid JSON: %s\n' "$plugin_smoke_json" >&2
+    return 1
+  fi
+  if ! python3 - "$plugin_smoke_json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    d = json.load(handle)
+markers = d.get("markers") or {}
+if not (
+    d.get("schema") == 1
+    and d.get("check") == "synthetic-plugin-doctor"
+    and d.get("result") == "passed"
+    and d.get("fixture") == "hermes-update-smoke"
+    and d.get("exit_code") == 0
+    and markers.get("manifest") is True
+    and markers.get("runtime") is True
+    and markers.get("hook_registration") is True
+    and d.get("unexpected_diagnostics") is False
+    and d.get("installed_user_plugins") == "not_scanned"
+    and d.get("live_data_mounted") is False
+):
+    raise SystemExit("synthetic plugin subsystem smoke schema or required markers failed")
+PY
+  then
+    record_phase "$stage-validation" failed "synthetic plugin subsystem smoke schema or required markers failed; see $plugin_smoke_json"
+    printf 'Synthetic plugin subsystem smoke schema or required markers failed: %s\n' "$plugin_smoke_json" >&2
+    return 1
+  fi
+  chmod 600 "$doctor_log" "$plugin_smoke_json"
+  VALIDATION_DOCTOR_LOG="$doctor_log"
+  VALIDATION_PLUGIN_LOG="$plugin_smoke_json"
+  record_phase "$stage-validation" passed "doctor=$doctor_log plugin_subsystem_smoke=passed; synthetic fixture only; installed user plugins and live /data not assessed"
+  printf '%s validation passed in an isolated empty HOME; synthetic plugin runtime smoke passed; installed user plugins were not assessed.\n' "$stage"
+}
+
+gateway_canary() {
+  local code curl_rc=0 diagnostic_code
+  need curl
+  record_phase gateway-canary running
+  printf 'Gateway canary starting: %s\n' "$CANARY_URL"
+  code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+    --max-time 10 --retry 5 --retry-delay 2 --retry-connrefused "$CANARY_URL")" || curl_rc=$?
+  if [[ "$code" =~ ^[0-9]{3}$ ]]; then
+    diagnostic_code="$code"
+  else
+    diagnostic_code=invalid
+  fi
+  printf 'Gateway canary result: curl_exit=%s http_code=%s\n' "$curl_rc" "$diagnostic_code"
+  if (( curl_rc != 0 )); then
+    record_phase gateway-canary failed "curl_exit=$curl_rc http_code=$diagnostic_code"
+    printf 'Gateway canary curl failed: exit=%s http_code=%s\n' "$curl_rc" "$diagnostic_code" >&2
+    return 1
+  fi
+  [[ "$code" =~ ^(200|301|302|401|403)$ ]] || {
+    record_phase gateway-canary failed "curl_exit=0 http_code=$diagnostic_code; rejected HTTP status"
+    printf 'Unexpected gateway canary HTTP status: %s\n' "$diagnostic_code" >&2
+    return 1
+  }
+  record_phase gateway-canary passed "curl_exit=0 http_code=$diagnostic_code"
+  printf 'Gateway canary passed: %s -> HTTP %s\n' "$CANARY_URL" "$code"
+}
+
+write_candidate_state() {
+  local candidate_status="${1:-prepared}"
+  local candidate_image_id
+  candidate_image_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")"
+  if [[ -n "$ADOPT_IMAGE_ID" ]]; then
+    recovery_adoption_matches_candidate || die "prepared-state adoption no longer matches an exact allowlisted identity"
+    [[ "$candidate_image_id" == "$ADOPT_IMAGE_ID" ]] || die "candidate image ID changed before prepared state write"
+    candidate_image_valid "$ADOPT_IMAGE_ID" || die "adopted image failed final source, patch, tree, install-stamp, or provenance validation"
+    [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$ADOPT_IMAGE_ID" ]] || die "candidate tag no longer resolves to the adopted image ID"
+  fi
+  python3 - "$STATE" "$CURRENT_SHA" "$CURRENT_TAG" "$CURRENT_IMAGE_ID" "$CURRENT_OVERLAY_SHA256" "$CURRENT_OVERLAY_TREE_SHA" "$CANDIDATE_SHA" "$CANDIDATE_TAG" "$candidate_image_id" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" "$REPORT" "$RUN_ID" "$candidate_status" "$(validation_key)" "${VALIDATION_DOCTOR_LOG:-}" "${VALIDATION_PLUGIN_LOG:-}" <<'PY'
+import hashlib, json, os, sys
+(path, current_sha, current_tag, current_id, current_overlay, current_tree,
+ candidate_sha, candidate_tag, candidate_id, candidate_overlay, candidate_tree,
+ report, run_id, status, validator_key, doctor_log, plugin_log) = sys.argv[1:]
+try:
+    with open(path, encoding="utf-8") as f:
+        state = json.load(f)
+except FileNotFoundError:
+    state = {}
+state.update({
+    "schema": 1,
+    "current": {"sha": current_sha, "tag": current_tag, "image_id": current_id,
+                "overlay_sha256": current_overlay or None, "overlay_tree_sha": current_tree or None,
+                "bot_desktop": os.environ.get("CURRENT_BOT_DESKTOP") == "1", "release_tag": os.environ.get("CURRENT_RELEASE_TAG") or None},
+    "candidate": {"sha": candidate_sha, "tag": candidate_tag, "image_id": candidate_id,
+                  "overlay_sha256": candidate_overlay or None, "overlay_tree_sha": candidate_tree or None,
+                  "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None,
+                  "report": report, "prepared_run": run_id, "status": status, "source_verified": True,
+                  "validation_key": validator_key if status == "prepared" else None},
+})
+if status == "prepared":
+    state["candidate"]["validation_evidence"] = {}
+    for name, evidence_path in (("doctor", doctor_log), ("plugin", plugin_log)):
+        with open(evidence_path, "rb") as handle:
+            digest = hashlib.sha256(handle.read()).hexdigest()
+        state["candidate"]["validation_evidence"][name] = {"path": evidence_path, "sha256": digest}
+tmp = path + ".tmp"
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump(state, f, indent=2, sort_keys=True)
+    f.write("\n")
+    f.flush()
+    os.fsync(f.fileno())
+os.chmod(tmp, 0o600)
+os.replace(tmp, path)
+directory = os.open(os.path.dirname(path), os.O_RDONLY | os.O_DIRECTORY)
+try:
+    os.fsync(directory)
+finally:
+    os.close(directory)
+PY
+}
+
+assert_orphan_overlay_tag_adoption_allowed() {
+  local tag="$1" image_id="$2" result
+  recovery_adoption_matches_candidate || die "recovery adoption does not match an exact allowlisted source, overlay, tree, and image tuple"
+  [[ "$tag" == "$CANDIDATE_TAG" && "$image_id" == "$ADOPT_IMAGE_ID" ]] || die "orphan tag or image ID differs from the exact requested candidate"
+  [[ -f "$STATE" && ! -L "$STATE" ]] || die "candidate state is missing or unsafe; refusing orphan adoption"
+  result="$(python3 -c "$ADOPT_STATE_GATE_PY" "$STATE" "$tag" "$image_id")" || die "saved state is invalid or records this tag; refusing orphan adoption"
+  [[ "$result" == "orphan" ]] || die "saved state already records this tag; refusing orphan adoption"
+}
+assert_tag_image_id_consistent() {
+  local tag="$1" image_id="$2" saved_id found=0
+  [[ -f "$STATE" ]] || die "overlay identity tag already exists without a saved state record; refusing to adopt it"
+  while IFS= read -r saved_id; do
+    [[ -n "$saved_id" ]] || continue
+    found=1
+    [[ "$saved_id" == "$image_id" ]] || die "saved state records a different image ID for tag $tag; refusing a repoint"
+  done < <(python3 - "$STATE" "$tag" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    state = json.load(handle)
+for name in ("current", "previous", "candidate"):
+    item = state.get(name) or {}
+    if item.get("tag") == sys.argv[2] and item.get("image_id"):
+        print(item["image_id"])
+PY
+)
+  (( found == 1 )) || die "overlay identity tag has no saved image ID; refusing to adopt or repoint it"
+}
+
+state_candidate_field() {
+  python3 - "$STATE" "$1" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    state = json.load(f)
+value = (state.get("candidate") or {}).get(sys.argv[2], "")
+if value is None:
+    value = ""
+print(value)
+PY
+}
+
+save_and_write_compose() {
+  PREVIOUS_COMPOSE="$COMPOSE_BACKUPS/docker-compose.yml.pre-$RUN_ID"
+  cp --preserve=mode,timestamps "$COMPOSE" "$PREVIOUS_COMPOSE"
+  chmod 600 "$PREVIOUS_COMPOSE"
+  local tmp="$ROOT/.docker-compose.yml.main-updater.$RUN_ID.tmp"
+  python3 - "$COMPOSE" "$tmp" "$CANDIDATE_TAG" <<'PY'
+import os, re, sys
+source, target, image = sys.argv[1:]
+text = open(source, encoding="utf-8").read()
+pattern = re.compile(r"^(\s*image:\s*)hermes-agent:main-(?:[0-9a-f]{40}-overlay-[0-9a-f]{64}|[0-9a-f]{40}-desktop|[0-9a-f]{7,40})(\s*)$", re.MULTILINE)
+updated, count = pattern.subn(lambda m: m.group(1) + image + m.group(2), text)
+service = None
+lines = updated.splitlines(keepends=True)
+for index, line in enumerate(lines):
+    match = re.match(r"^  ([a-zA-Z0-9_-]+):\s*$", line)
+    if match:
+        service = match.group(1)
+    if service == "hermes-serve":
+        match = re.match(r"^(\s+)interval: 30s\s*$", line)
+        if match:
+            lines[index] = f"{match.group(1)}interval: 10s\n{match.group(1)}start_interval: 2s\n"
+        match = re.match(r"^(\s+)retries: 10\s*$", line)
+        if match:
+            lines[index] = f"{match.group(1)}retries: 12\n"
+updated = "".join(lines)
+if count != 1:
+    raise SystemExit(f"expected one Hermes image line, changed {count}")
+with open(target, "x", encoding="utf-8") as f:
+    f.write(updated)
+os.chmod(target, 0o600)
+PY
+  docker compose --project-directory "$ROOT" -f "$tmp" config --quiet
+  mv "$tmp" "$COMPOSE"
+  COMPOSE_CHANGED=1
+}
+
+wait_for_candidate() {
+  local expected_id deadline facts image status health all_ready
+  local -a cids=()
+  expected_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")"
+  deadline=$((SECONDS + 180))
+  while (( SECONDS < deadline )); do
+    if (( ${#cids[@]} != ${#SERVICES[@]} )); then
+      readarray -t cids < <(docker compose --project-directory "$ROOT" -f "$COMPOSE" ps -q "${SERVICES[@]}" 2>/dev/null)
+    fi
+    all_ready=0
+    if (( ${#cids[@]} == ${#SERVICES[@]} )); then
+      facts="$(docker inspect --format '{{.Image}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' "${cids[@]}" 2>/dev/null)" || return 1
+      all_ready=1
+      while read -r image status health; do
+        [[ "$image" == "$expected_id" ]] || return 1
+        [[ "$status" != exited && "$status" != dead && "$health" != unhealthy ]] || return 1
+        [[ "$status" == running && "$health" == healthy ]] || all_ready=0
+      done <<<"$facts"
+    fi
+    if (( all_ready == 1 )); then
+      printf 'Candidate image is healthy for services: %s\n' "${SERVICES[*]}"
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+rollback_compose_after_failure() {
+  record_phase rollback running "restoring $CURRENT_TAG"
+  printf 'Deployment failed; restoring the previous pinned image configuration.\n' >&2
+  cp "$PREVIOUS_COMPOSE" "$COMPOSE"
+  chmod 600 "$COMPOSE"
+  docker compose --project-directory "$ROOT" -f "$COMPOSE" config --quiet
+  docker compose --project-directory "$ROOT" -f "$COMPOSE" up -d --no-deps --force-recreate "${SERVICES[@]}"
+  if wait_for_previous_image; then
+    record_phase rollback passed "previous images healthy"
+    printf 'Previous Hermes images are healthy again.\n'
+    return 0
+  fi
+  printf 'CRITICAL: automatic image rollback did not become healthy; recover data from the operator-provided Hostinger snapshot if needed.\n' >&2
+  record_phase rollback failed "previous image did not become healthy"
+  return 1
+}
+
+wait_for_previous_image() {
+  local i
+  for i in $(seq 1 90); do
+    all_services_healthy_for_image "$CURRENT_IMAGE_ID" && return 0
+    sleep 2
+  done
+  return 1
+}
+
+deploy_exit_handler() {
+  local rc="$1"
+  set +e
+  if (( rc != 0 )) && { [[ "${SERVICE_QUIESCED:-0}" == "1" ]] || [[ "${COMPOSE_CHANGED:-0}" == "1" ]]; }; then
+    printf 'A deploy step failed after service quiesce or Compose change; restoring the previous service.\n' >&2
+    if [[ "${COMPOSE_CHANGED:-0}" == "1" && -f "${PREVIOUS_COMPOSE:-}" ]]; then
+      cp "$PREVIOUS_COMPOSE" "$COMPOSE"
+      chmod 600 "$COMPOSE"
+    fi
+    docker compose --project-directory "$ROOT" -f "$COMPOSE" up -d --no-deps --force-recreate "${SERVICES[@]}"
+    if wait_for_previous_image; then
+      printf 'Previous Hermes image is healthy again.\n' >&2
+    else
+      printf 'CRITICAL: the previous Hermes image did not return healthy.\n' >&2
+    fi
+  fi
+  if (( rc != 0 )); then
+    record_phase "${PHASE:-deploy}" failed "exit code $rc"
+  fi
+  release_active_pid
+  return "$rc"
+}
+
+write_deploy_receipt() {
+  local candidate_image_id receipt
+  candidate_image_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")"
+  receipt="$RECEIPTS/$RUN_ID.json"
+  python3 - "$receipt" "$RUN_ID" "$CURRENT_SHA" "$CURRENT_TAG" "$CURRENT_IMAGE_ID" "$CURRENT_OVERLAY_SHA256" "$CURRENT_OVERLAY_TREE_SHA" "$CANDIDATE_SHA" "$CANDIDATE_TAG" "$candidate_image_id" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" "$REPORT" <<'PY'
+import json, os, sys
+(path, run_id, old_sha, old_tag, old_id, old_overlay, old_tree,
+ new_sha, new_tag, new_id, new_overlay, new_tree, report) = sys.argv[1:]
+doc = {
+    "schema": 1,
+    "run_id": run_id,
+    "result": "deployed-and-healthy",
+    "validation_reuse": "immutable image + updater SHA256 + diagnostic evidence SHA256",
+    "runtime_validation": "the single hermes-serve service healthy on the pinned image ID plus gateway canary",
+    "previous": {"sha": old_sha, "tag": old_tag, "image_id": old_id,
+                 "overlay_sha256": old_overlay or None, "overlay_tree_sha": old_tree or None,
+                 "bot_desktop": os.environ.get("CURRENT_BOT_DESKTOP") == "1", "release_tag": os.environ.get("CURRENT_RELEASE_TAG") or None},
+    "current": {"sha": new_sha, "tag": new_tag, "image_id": new_id,
+                "overlay_sha256": new_overlay or None, "overlay_tree_sha": new_tree or None,
+                "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None},
+    "preupdate_protection": {"mode": "external-hostinger-snapshot", "assumed_present": True, "local_backup_created": False},
+    "report": report,
+    "services": ["hermes-serve"],
+    "validation": {"doctor": "passed", "plugin_compatibility": "not_scanned", "plugin_subsystem_smoke": "synthetic_fixture_passed", "plugin_subsystem_smoke_scope": "minimal hook plugin via plugins doctor --ci; isolated empty HOME; installed user plugins and live /data not assessed", "installed_user_plugin_compatibility": "not_scanned", "gateway_canary": "passed"},
+}
+def atomic(path, value):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(value, f, indent=2, sort_keys=True)
+        f.write("\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+atomic(path, doc)
+state_path = os.path.join(os.path.dirname(os.path.dirname(path)), "state.json")
+atomic(state_path, {"schema": 1, "previous": doc["previous"], "current": doc["current"],
+                    "candidate": None, "last_receipt": path})
+PY
+  printf 'Receipt: %s\n' "$receipt"
+}
+
+write_rollback_state() {
+  local target_image_id receipt
+  target_image_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")"
+  receipt="$RECEIPTS/$RUN_ID.json"
+  python3 - "$receipt" "$RUN_ID" "$CURRENT_SHA" "$CURRENT_TAG" "$CURRENT_IMAGE_ID" "$CURRENT_OVERLAY_SHA256" "$CURRENT_OVERLAY_TREE_SHA" "$CANDIDATE_SHA" "$CANDIDATE_TAG" "$target_image_id" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" <<'PY'
+import json, os, sys
+(path, run_id, old_sha, old_tag, old_id, old_overlay, old_tree,
+ new_sha, new_tag, new_id, new_overlay, new_tree) = sys.argv[1:]
+doc = {
+    "schema": 1,
+    "run_id": run_id,
+    "result": "rolled-back-image-only",
+    "previous": {"sha": old_sha, "tag": old_tag, "image_id": old_id,
+                 "overlay_sha256": old_overlay or None, "overlay_tree_sha": old_tree or None,
+                 "bot_desktop": os.environ.get("CURRENT_BOT_DESKTOP") == "1", "release_tag": os.environ.get("CURRENT_RELEASE_TAG") or None},
+    "current": {"sha": new_sha, "tag": new_tag, "image_id": new_id,
+                "overlay_sha256": new_overlay or None, "overlay_tree_sha": new_tree or None,
+                "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None},
+    "data_restored": False,
+}
+def atomic(path, value):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(value, f, indent=2, sort_keys=True)
+        f.write("\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+atomic(path, doc)
+state_path = os.path.join(os.path.dirname(os.path.dirname(path)), "state.json")
+atomic(state_path, {"schema": 1, "previous": doc["previous"], "current": doc["current"],
+                    "candidate": None, "last_receipt": path})
+PY
+  printf 'Rollback receipt: %s\n' "$receipt"
+}
+
+
+stage_overlay_command() {
+  need git; need python3; need flock
+  valid_sha "$REQUESTED_SHA" || die "stage-overlay requires a full --sha"
+  valid_overlay_sha "$REQUESTED_OVERLAY_SHA256" || die "stage-overlay requires a full --overlay-sha256"
+  [[ -z "$REQUESTED_OVERLAY_FILE" && -z "$ADOPT_IMAGE_ID" && -z "$JOB_ACTION" && -z "$REQUESTED_UNIT" && "$APPROVE_DEPLOY" == 0 && "$FORCE_REBUILD" == 0 && "$JSON_OUTPUT" == 0 ]] || die "stage-overlay received an unrelated argument"
+  acquire_lock
+  trap 'release_active_pid' EXIT
+  python3 -c '
+import hashlib,json,os,pathlib,stat,subprocess,sys,tempfile
+repo,directory,sha,digest,added_policy,*allowed=sys.argv[1:]
+added_paths=json.loads(added_policy)
+patch=sys.stdin.buffer.read(1048577)
+if not patch or len(patch)>1048576: raise SystemExit("Overlay must be nonempty and at most 1 MiB")
+if hashlib.sha256(patch).hexdigest()!=digest: raise SystemExit("Overlay digest mismatch")
+def git(args,env=None,input=None):
+ result=subprocess.run(["git","--git-dir",repo,*args],input=input,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
+ if result.returncode: raise SystemExit(result.stderr.decode() or "Overlay source check failed")
+ return result.stdout.decode()
+git(["cat-file","-e",sha+"^{commit}"])
+git(["merge-base","--is-ancestor",sha,"refs/remotes/origin/main"])
+rows=git(["apply","--numstat","-"],input=patch).splitlines()
+paths=[row.split("\t",2)[-1] for row in rows]
+if not paths or len(paths)!=len(set(paths)) or any(path not in allowed for path in paths): raise SystemExit("Overlay path outside exact allowlist")
+new_paths=[]
+for path in paths:
+ entry=git(["ls-tree",sha,"--",path])
+ if not entry and path in added_paths: new_paths.append(path)
+ elif not entry.startswith("100644 blob "): raise SystemExit("Overlay base path is not a regular tracked file")
+summary=git(["apply","--summary","-"],input=patch).strip()
+expected_summary={"create mode 100644 "+path for path in new_paths}
+summary_lines=[row.strip() for row in summary.splitlines()]
+if set(summary_lines)!=expected_summary or len(summary_lines)!=len(expected_summary): raise SystemExit("Overlay must preserve existing paths and modes except the pinned added module")
+with tempfile.TemporaryDirectory(prefix="stage-overlay-",dir=directory) as scratch:
+ env=dict(os.environ,GIT_INDEX_FILE=os.path.join(scratch,"index"))
+ git(["read-tree",sha],env=env)
+ git(["apply","--cached","--check","--whitespace=error-all","-"],env=env,input=patch)
+ git(["apply","--cached","--whitespace=error-all","-"],env=env,input=patch)
+ for path in paths:
+  if not git(["ls-files","-s","--",path],env=env).startswith("100644 "): raise SystemExit("Overlay result is not regular mode100644")
+ added_state={}
+ for added_path,admitted_digests in added_paths.items():
+  if added_path in paths:
+   body=subprocess.check_output(["git","--git-dir",repo,"show",":"+added_path],env=env)
+   digest_value=hashlib.sha256(body).hexdigest()
+   if digest_value not in admitted_digests: raise SystemExit("Added overlay module digest mismatch")
+   added_state[added_path]=digest_value
+ if (added_state.get("agent/evaluation_accounting.py"),added_state.get("agent/evaluation_operational.py")) not in [(None,None),("35555419a3d28a73eb129991c4383cdd545ee340ef399dc22d5eb22dd58ce1f4",None),("1e328a828ad99e95de0768f6784a6965526ee94a4fd7be397fc7a9755b8ea9d9","f9163dfa2aeb4f3ab22c465db928a73d597e82a9b798be07aad7defd18585195"),("00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09","a932a93451534c86a6d5b283b3ec6399a35f2c196b1e86a8f48b307601ab6844"),("00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09","cd8385e338710b9567389bf66374f4a9668604f645b2e38e63b5cb053f03db9c")]: raise SystemExit("Added overlay module generation mismatch")
+ destination=pathlib.Path(directory)/(digest+".patch")
+ if destination.exists() or destination.is_symlink():
+  metadata=destination.lstat()
+  if not stat.S_ISREG(metadata.st_mode) or hashlib.sha256(destination.read_bytes()).hexdigest()!=digest: raise SystemExit("Existing overlay identity mismatch")
+  result="existing-identical"
+ else:
+  temporary=pathlib.Path(scratch)/"overlay.patch"
+  fd=os.open(temporary,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+  with os.fdopen(fd,"wb") as handle:
+   handle.write(patch); handle.flush(); os.fsync(handle.fileno())
+  os.link(temporary,destination,follow_symlinks=False)
+  directory_fd=os.open(directory,os.O_RDONLY|os.O_DIRECTORY)
+  try: os.fsync(directory_fd)
+  finally: os.close(directory_fd)
+  result="staged"
+ print(json.dumps({"schema":1,"operation":"stage-overlay","result":result,"source_sha":sha,"overlay_sha256":digest,"byte_length":len(patch),"paths":paths,"path":str(destination)}))
+' "$REPO" "$OVERLAY_DIR" "$REQUESTED_SHA" "$REQUESTED_OVERLAY_SHA256" "$OVERLAY_ADDED_POLICY" "${OVERLAY_ALLOWED_PATHS[@]}"
+}
+
+prepare_latest() {
+  need docker; need git; need flock; need python3
+  acquire_lock
+  trap 'prepare_exit_handler $?' EXIT
+  current_facts
+  [[ "$OVERLAY_MODE" != 1 || -n "${REQUESTED_SHA:-}" ]] || die "an overlay prepare requires an explicit full --sha"
+  resolve_candidate_once
+  start_log
+  PHASE=preflight
+  record_phase "$PHASE" running
+  printf 'Pinned candidate:     %s (%s)\n' "$CANDIDATE_SHA" "$CANDIDATE_SOURCE"
+  printf 'Running revision:    %s\n' "$CURRENT_SHA"
+  if [[ "$OVERLAY_MODE" != 1 && "$CURRENT_TAG" == "$CANDIDATE_TAG" ]] && all_services_healthy_for_image "$CURRENT_IMAGE_ID"; then
+    record_phase complete passed "already current"
+    printf 'Already at the pinned candidate; nothing to build.\n'
+    return 0
+  fi
+  check_free_space
+  record_phase "$PHASE" passed
+  if resume_recorded_candidate; then
+    PHASE=build
+    record_phase "$PHASE" passed "cache hit: recorded immutable image"
+    smoke_candidate
+  else
+    PHASE=source
+    record_phase "$PHASE" running
+    ensure_repo
+    if [[ "$OVERLAY_MODE" == 1 ]]; then
+      prepare_worktree
+      if [[ "$CURRENT_TAG" == "$CANDIDATE_TAG" && "$CURRENT_OVERLAY_TREE_SHA" == "$OVERLAY_TREE_SHA" ]] && all_services_healthy_for_image "$CURRENT_IMAGE_ID"; then
+        record_phase complete passed "already current with verified overlay tree"
+        printf 'Already at the pinned upstream and overlay identities; nothing to build.\n'
+        return 0
+      fi
+    fi
+    generate_report
+    record_phase "$PHASE" passed "$REPORT"
+    PHASE=build
+    record_phase "$PHASE" running
+    build_candidate
+    write_candidate_state built
+    smoke_candidate
+    record_phase "$PHASE" passed "$CANDIDATE_TAG"
+  fi
+  PHASE=predeploy-validation
+  validate_runtime_image predeploy || die "candidate runtime validation failed"
+  write_candidate_state
+  PHASE=complete
+  record_phase "$PHASE" passed "candidate prepared"
+  printf 'Prepared candidate %s\n' "$CANDIDATE_TAG"
+  if [[ "$OVERLAY_MODE" == 1 ]]; then
+    printf 'Deploy with: %s deploy --sha %s --overlay-file %s --overlay-sha256 %s --approve-deploy\n' "$0" "$CANDIDATE_SHA" "$OVERLAY_FILE" "$OVERLAY_SHA256"
+  else
+    printf 'Deploy with: %s deploy --sha %s' "$0" "$CANDIDATE_SHA"
+    [[ "$BOT_DESKTOP" == 1 ]] && printf ' --bot-desktop'
+    [[ -n "$RELEASE_TAG" ]] && printf ' --release-tag %s' "$RELEASE_TAG"
+    printf ' --approve-deploy\n'
+  fi
+}
+
+deploy_candidate() {
+  need docker; need flock; need python3
+  [[ "${APPROVE_DEPLOY:-0}" == "1" ]] || die "deploy requires --approve-deploy"
+  valid_sha "${REQUESTED_SHA:-}" || die "deploy requires --sha with a full 40-character SHA"
+  acquire_lock
+  SERVICE_QUIESCED=0
+  COMPOSE_CHANGED=0
+  trap 'deploy_exit_handler $?' EXIT
+  current_facts
+  CANDIDATE_SHA="$REQUESTED_SHA"
+  set_candidate_tag
+  start_log
+  PHASE=preflight
+  record_phase "$PHASE" running
+  local recorded_sha recorded_tag recorded_id recorded_overlay recorded_tree actual_id
+  [[ "$(state_candidate_field status)" == prepared ]] || die "candidate is built but not prepared; rerun prepare validation before deploy"
+  recorded_sha="$(state_candidate_field sha)"
+  recorded_tag="$(state_candidate_field tag)"
+  recorded_id="$(state_candidate_field image_id)"
+  recorded_overlay="$(state_candidate_field overlay_sha256)"
+  recorded_tree="$(state_candidate_field overlay_tree_sha)"
+  [[ "$recorded_sha" == "$CANDIDATE_SHA" ]] || die "requested SHA is not the prepared candidate"
+  [[ "$recorded_tag" == "$CANDIDATE_TAG" ]] || die "prepared tag does not match the requested source and overlay identity"
+  [[ "${recorded_overlay:-}" == "${OVERLAY_SHA256:-}" ]] || die "requested overlay digest differs from the prepared candidate"
+  [[ "$(state_candidate_field release_tag)" == "${RELEASE_TAG:-}" ]] || die "requested release tag differs from the prepared candidate"
+  local recorded_desktop
+  recorded_desktop="$(state_candidate_field bot_desktop)"
+  if [[ "${BOT_DESKTOP:-0}" == 1 ]]; then
+    [[ "$recorded_desktop" == True ]] || die "prepared candidate does not record the requested Bot Screen variant"
+  else
+    [[ -z "$recorded_desktop" || "$recorded_desktop" == False ]] || die "prepared candidate records a different Bot Screen variant"
+  fi
+  OVERLAY_TREE_SHA="$recorded_tree"
+  export OVERLAY_TREE_SHA
+  CANDIDATE_OVERLAY_TREE_SHA="$recorded_tree"
+  actual_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")"
+  [[ "$actual_id" == "$recorded_id" ]] || die "candidate image ID no longer matches its prepared state"
+  candidate_image_valid "$CANDIDATE_TAG" || die "candidate labels, install stamp, or provenance no longer match prepared source and overlay identity"
+  if [[ "$CURRENT_TAG" == "$CANDIDATE_TAG" ]] && all_services_healthy_for_image "$CURRENT_IMAGE_ID"; then
+    record_phase complete passed "candidate already running"
+    printf 'Candidate is already running.\n'
+    return 0
+  fi
+  check_free_space
+  REPORT="$(state_candidate_field report)"
+  [[ -f "$REPORT" ]] || die "candidate report is missing"
+  PHASE=predeploy-validation
+  validate_runtime_image predeploy || die "candidate runtime validation failed"
+  record_phase preflight passed
+  PHASE=preupdate-protection
+  record_phase "$PHASE" passed "external Hostinger snapshot assumed by operator policy; no local backup created"
+  PHASE=compose
+  record_phase "$PHASE" running
+  save_and_write_compose
+  record_phase "$PHASE" passed "$CANDIDATE_TAG"
+  PHASE=deploy
+  record_phase "$PHASE" running
+  if ! docker compose --project-directory "$ROOT" -f "$COMPOSE" up -d --no-deps --force-recreate "${SERVICES[@]}" \
+      || ! wait_for_candidate \
+      || ! validate_runtime_image postdeploy \
+      || ! gateway_canary; then
+    if rollback_compose_after_failure; then
+      SERVICE_QUIESCED=0
+      COMPOSE_CHANGED=0
+    fi
+    die "candidate deployment failed and the previous image was restored"
+  fi
+  SERVICE_QUIESCED=0
+  record_phase "$PHASE" passed "both containers healthy and canary passed"
+  write_deploy_receipt
+  COMPOSE_CHANGED=0
+  PHASE=complete
+  record_phase "$PHASE" passed "deployment receipt written"
+  printf 'Deployment completed: %s\n' "$CANDIDATE_SHA"
+}
+
+status_command() {
+  need docker; need git; need python3
+  current_facts
+  resolve_main_once
+  local health available used percent required buildkit anomalies previous_tag previous_id previous_present latest_transaction services_consistent
+  health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CURRENT_CID")"
+  services_consistent=false
+  all_services_healthy_for_image "$CURRENT_IMAGE_ID" && services_consistent=true
+  available="$(disk_available_bytes)"
+  used="$(disk_used_bytes)"
+  percent="$(disk_used_percent)"
+  required="$(required_free_bytes)"
+  buildkit="$(buildkit_total)"
+  anomalies="$(large_external_files)"
+  readarray -t previous < <(python3 - "$STATE" <<'PY'
+import json, os, sys
+if not os.path.isfile(sys.argv[1]):
+    print("")
+    print("")
+else:
+    with open(sys.argv[1], encoding="utf-8") as handle:
+        previous = json.load(handle).get("previous") or {}
+    print(previous.get("tag", ""))
+    print(previous.get("image_id", ""))
+PY
+)
+  previous_tag="${previous[0]:-}"
+  previous_id="${previous[1]:-}"
+  previous_present=false
+  if [[ -n "$previous_tag" ]] && [[ "$(docker image inspect --format '{{.Id}}' "$previous_tag" 2>/dev/null || true)" == "$previous_id" ]]; then
+    previous_present=true
+  fi
+  latest_transaction="$(python3 - "$TRANSACTIONS" <<'PY'
+import os, sys
+items = []
+for name in os.listdir(sys.argv[1]):
+    path = os.path.join(sys.argv[1], name)
+    if name.endswith(".json") and os.path.isfile(path):
+        items.append((os.stat(path).st_mtime_ns, path))
+print(max(items)[1] if items else "")
+PY
+)"
+  if [[ "${JSON_OUTPUT:-0}" == 1 ]]; then
+    python3 - "$ROOT" "$CURRENT_TAG" "$CURRENT_SHA" "$CURRENT_CID" "$health" "$CANDIDATE_SHA" "$used" "$available" "$percent" "$required" "$buildkit" "$previous_tag" "$previous_id" "$previous_present" "$latest_transaction" "$anomalies" "$services_consistent" "$CURRENT_OVERLAY_SHA256" "$CURRENT_OVERLAY_TREE_SHA" <<'PY'
+import json, sys
+(root, current_tag, current_sha, cid, health, upstream_sha, used, available,
+ percent, required, buildkit,
+ previous_tag, previous_id, previous_present, latest_transaction, anomalies_raw, services_consistent, overlay_sha, overlay_tree) = sys.argv[1:]
+anomalies = []
+for line in anomalies_raw.splitlines():
+    size, _, path = line.partition(" ")
+    if size.isdigit() and path:
+        anomalies.append({"bytes": int(size), "path": path})
+print(json.dumps({
+    "schema": 1,
+    "root": root,
+    "running": {"tag": current_tag, "sha": current_sha, "overlay_sha256": overlay_sha or None, "overlay_tree_sha": overlay_tree or None, "container_id": cid, "health": health},
+    "upstream_main": upstream_sha,
+    "update_available": current_sha != upstream_sha or services_consistent != "true",
+    "service_consistency": {"all_running_current_image": services_consistent == "true", "services": ["hermes-serve"]},
+    "disk": {"used_bytes": int(used), "available_bytes": int(available), "used_percent": int(percent), "required_free_bytes": int(required), "large_external_files": anomalies},
+    "buildkit": {"total": buildkit, "automatic_prune": False},
+    "rollback": {"tag": previous_tag, "image_id": previous_id, "present": previous_present == "true"},
+    "preupdate_protection": {"mode": "external-hostinger-snapshot", "assumed_present": True, "local_backup_created": False},
+    "latest_transaction": latest_transaction,
+}, indent=2, sort_keys=True))
+PY
+    return
+  fi
+  printf 'Root:            %s\n' "$ROOT"
+  printf 'Compose image:   %s\n' "$CURRENT_TAG"
+  printf 'Running SHA:     %s\n' "$CURRENT_SHA"
+  printf 'Running overlay: %s (tree %s)\n' "${CURRENT_OVERLAY_SHA256:-none}" "${CURRENT_OVERLAY_TREE_SHA:-none}"
+  printf 'Upstream main:   %s\n' "$CANDIDATE_SHA"
+  printf 'Container:       %s (%s)\n' "$CURRENT_CID" "$health"
+  printf 'Services:        hermes-serve (healthy image: %s)\n' "$services_consistent"
+  printf 'Disk:            %s%% used, %s GiB available, %s GiB required for update\n' "$percent" "$(bytes_to_gib "$available")" "$(bytes_to_gib "$required")"
+  printf 'BuildKit cache:  %s (retained; automatic prune disabled)\n' "${buildkit:-unknown}"
+  printf 'Rollback image:  %s (present: %s)\n' "${previous_tag:-not recorded}" "$previous_present"
+  printf 'Data protection: external Hostinger snapshot assumed; no local backup created\n'
+  printf 'Last transaction:%s\n' "${latest_transaction:+ $latest_transaction}"
+  if [[ -n "$anomalies" ]]; then
+    printf 'Disk warnings:   external files larger than 5 GiB (not auto-deleted)\n%s\n' "$anomalies"
+  else
+    printf 'Disk warnings:   none\n'
+  fi
+  if [[ -f "$STATE" ]]; then
+    printf 'State file:      %s\n' "$STATE"
+  else
+    printf 'State file:      not initialized (first prepare will create it)\n'
+  fi
+  if [[ "$CURRENT_SHA" == "$CANDIDATE_SHA" && "$services_consistent" == true ]]; then
+    printf 'Update status:   current\n'
+  elif [[ "$CURRENT_SHA" == "$CANDIDATE_SHA" ]]; then
+    printf 'Update status:   service recovery required\n'
+  else
+    printf 'Update status:   update available\n'
+  fi
+}
+
+rollback_command() {
+  need docker; need python3; need flock
+  [[ "${APPROVE_DEPLOY:-0}" == "1" ]] || die "rollback requires --approve-deploy"
+  [[ -f "$STATE" ]] || die "state file is missing"
+  acquire_lock
+  SERVICE_QUIESCED=0
+  COMPOSE_CHANGED=0
+  trap 'deploy_exit_handler $?' EXIT
+  current_facts
+  local previous_sha previous_tag previous_id previous_overlay previous_tree expected_tag
+  readarray -t previous < <(python3 - "$STATE" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    p = json.load(f).get("previous") or {}
+for key in ("sha", "tag", "image_id", "overlay_sha256", "overlay_tree_sha"):
+    print(p.get(key) or "")
+print("1" if p.get("bot_desktop", str(p.get("tag", "")).endswith("-desktop")) else "0")
+print(p.get("release_tag") or "")
+PY
+)
+  previous_sha="${previous[0]:-}"; previous_tag="${previous[1]:-}"; previous_id="${previous[2]:-}"
+  previous_overlay="${previous[3]:-}"; previous_tree="${previous[4]:-}"
+  BOT_DESKTOP="${previous[5]:-0}"; RELEASE_TAG="${previous[6]:-}"
+  export BOT_DESKTOP RELEASE_TAG
+  [[ -z "$RELEASE_TAG" ]] || valid_release_tag "$RELEASE_TAG" || die "previous release tag is invalid"
+  valid_sha "$previous_sha" || die "previous revision is unavailable"
+  if [[ -n "$previous_overlay" ]]; then
+    valid_overlay_sha "$previous_overlay" || die "previous overlay SHA256 is invalid"
+    [[ "$previous_tree" =~ ^[0-9a-f]{40}$ ]] || die "previous overlay tree SHA is invalid"
+    OVERLAY_MODE=1; OVERLAY_SHA256="$previous_overlay"; OVERLAY_TREE_SHA="$previous_tree"
+    export OVERLAY_SHA256 OVERLAY_TREE_SHA
+  else
+    OVERLAY_MODE=0; OVERLAY_SHA256=""; OVERLAY_TREE_SHA=""
+    export OVERLAY_SHA256 OVERLAY_TREE_SHA
+  fi
+  CANDIDATE_SHA="$previous_sha"
+  set_candidate_tag
+  expected_tag="$CANDIDATE_TAG"
+  [[ "$previous_tag" == "$expected_tag" ]] || die "previous tag does not match its saved source and overlay identities"
+  CANDIDATE_TAG="$previous_tag"
+  [[ "$(docker image inspect --format '{{.Id}}' "$previous_tag")" == "$previous_id" ]] || die "previous image ID no longer matches state"
+  candidate_image_valid "$previous_tag" || die "previous image source, overlay, install stamp, or provenance no longer matches state"
+  RUN_ID="$(timestamp)-rollback-${previous_sha:0:12}"
+  RUN_LOG="$LOGS/$RUN_ID.log"; touch "$RUN_LOG"; chmod 600 "$RUN_LOG"; exec > >(tee -a "$RUN_LOG") 2>&1
+  PHASE=rollback
+  record_phase "$PHASE" running "$CANDIDATE_TAG"
+  save_and_write_compose
+  if ! docker compose --project-directory "$ROOT" -f "$COMPOSE" up -d --no-deps --force-recreate "${SERVICES[@]}" \
+      || ! wait_for_candidate \
+      || ! gateway_canary; then
+    die "rollback image did not pass health and gateway canary checks"
+  fi
+  write_rollback_state
+  COMPOSE_CHANGED=0
+  record_phase complete passed "rolled back image only"
+  printf 'Rolled back image to %s (overlay %s). Data was not restored automatically.
+' "$previous_sha" "${OVERLAY_SHA256:-none}"
+}
+
+start_job_command() {
+  need systemd-run; need python3
+  case "${JOB_ACTION:-}" in
+    status|prepare|deploy|update) ;;
+    *) die "start requires --action status, prepare, deploy, or update" ;;
+  esac
+  if [[ "$JOB_ACTION" == deploy || "$JOB_ACTION" == update ]]; then
+    [[ "${APPROVE_DEPLOY:-0}" == 1 ]] || die "a background $JOB_ACTION requires --approve-deploy"
+  fi
+  if [[ "$JOB_ACTION" == deploy ]]; then
+    valid_sha "${REQUESTED_SHA:-}" || die "a background deploy requires --sha with a full 40-character SHA"
+  fi
+  if [[ "$OVERLAY_MODE" == 1 && ( "$JOB_ACTION" == prepare || "$JOB_ACTION" == deploy || "$JOB_ACTION" == update ) ]]; then
+    valid_sha "${REQUESTED_SHA:-}" || die "a background overlay job requires --sha with a full 40-character SHA"
+  fi
+  if [[ -n "${REQUESTED_SHA:-}" && "$JOB_ACTION" != deploy ]]; then
+    [[ "$JOB_ACTION" == prepare || "$JOB_ACTION" == update ]] || die "--sha is only valid with prepare, deploy, or update"
+    valid_sha "$REQUESTED_SHA" || die "a background $JOB_ACTION --sha requires a full 40-character SHA"
+  fi
+  local job_id unit job_file skip_preflight_scan
+  skip_preflight_scan="${HERMES_UPDATER_SKIP_PREFLIGHT_FILE_SCAN:-0}"
+  [[ "$skip_preflight_scan" == 0 || "$skip_preflight_scan" == 1 ]] || die 'HERMES_UPDATER_SKIP_PREFLIGHT_FILE_SCAN must be 0 or 1'
+  job_id="$(timestamp)-$$-$JOB_ACTION"
+  unit="hermes-main-update-$job_id"
+  job_file="$JOBS/$job_id.json"
+  local -a args=("$0" "$JOB_ACTION")
+  [[ "${FORCE_REBUILD:-0}" == 1 ]] && args+=(--force-rebuild)
+  [[ -n "${REQUESTED_SHA:-}" && "$JOB_ACTION" != status ]] && args+=(--sha "$REQUESTED_SHA")
+  [[ "$BOT_DESKTOP" == 1 ]] && args+=(--bot-desktop)
+  [[ -n "$RELEASE_TAG" ]] && args+=(--release-tag "$RELEASE_TAG")
+  if [[ "$OVERLAY_MODE" == 1 && "$JOB_ACTION" != status ]]; then args+=(--overlay-file "$OVERLAY_FILE" --overlay-sha256 "$OVERLAY_SHA256"); fi
+  [[ -n "$ADOPT_IMAGE_ID" ]] && args+=(--adopt-image-id "$ADOPT_IMAGE_ID")
+  [[ "$JOB_ACTION" == deploy || "$JOB_ACTION" == update ]] && args+=(--approve-deploy)
+  systemd-run --setenv="HERMES_UPDATER_SKIP_PREFLIGHT_FILE_SCAN=$skip_preflight_scan" \
+    --unit "$unit" \
+    --collect \
+    --property Type=exec \
+    --property TimeoutStartSec=infinity \
+    --property RuntimeMaxSec=6h \
+    --property Nice=10 \
+    -- "${args[@]}"
+  python3 - "$job_file" "$job_id" "$unit" "$JOB_ACTION" "${REQUESTED_SHA:-}" "${OVERLAY_SHA256:-}" <<'PY'
+import datetime, json, os, sys
+path, job_id, unit, action, requested_sha, overlay_sha = sys.argv[1:]
+doc = {
+    "schema": 1,
+    "job_id": job_id,
+    "unit": unit,
+    "action": action,
+    "launched_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    "bot_desktop": os.environ.get("BOT_DESKTOP") == "1",
+    "release_tag": os.environ.get("RELEASE_TAG") or None,
+}
+if requested_sha:
+    doc["requested_sha"] = requested_sha
+if overlay_sha:
+    doc["overlay_sha256"] = overlay_sha
+tmp = path + ".tmp"
+with open(tmp, "x", encoding="utf-8") as handle:
+    json.dump(doc, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+os.chmod(tmp, 0o600)
+os.replace(tmp, path)
+PY
+  printf 'Background job: %s\n' "$unit"
+  printf 'Inspect with: %s job-status --unit %s\n' "$0" "$unit"
+}
+
+job_status_command() {
+  need systemctl; need journalctl; need python3
+  local unit="${REQUESTED_UNIT:-}"
+  if [[ -z "$unit" ]]; then
+    unit="$(python3 - "$JOBS" <<'PY'
+import json, os, sys
+items = []
+for name in os.listdir(sys.argv[1]):
+    path = os.path.join(sys.argv[1], name)
+    if name.endswith(".json") and os.path.isfile(path):
+        items.append((os.stat(path).st_mtime_ns, path))
+if items:
+    with open(max(items)[1], encoding="utf-8") as handle:
+        print(json.load(handle).get("unit", ""))
+PY
+)"
+  fi
+  [[ "$unit" =~ ^hermes-main-update-[0-9TZ-]+-(status|prepare|deploy|update)$ ]] || die "invalid or missing Hermes updater unit"
+  printf 'Unit: %s\n' "$unit"
+  systemctl show "$unit" --property=LoadState,ActiveState,SubState,Result,ExecMainStatus,ExecMainStartTimestamp,ExecMainExitTimestamp 2>/dev/null || true
+  journalctl --unit "$unit" --no-pager --lines 80
+}
+
+recover_command() {
+  need docker; need flock; need python3; need curl
+  [[ "${APPROVE_DEPLOY:-0}" == 1 ]] || die "recover requires --approve-deploy"
+  acquire_lock
+  RUN_ID="$(timestamp)-recovery"
+  RUN_LOG="$LOGS/$RUN_ID.log"
+  touch "$RUN_LOG"; chmod 600 "$RUN_LOG"; exec > >(tee -a "$RUN_LOG") 2>&1
+  trap 'deploy_exit_handler $?' EXIT
+  PHASE=recovery
+  record_phase "$PHASE" running
+  local configured_tag configured_id action receipt
+  configured_tag="$(compose_image_ref)"
+  configured_id="$(docker image inspect --format '{{.Id}}' "$configured_tag")"
+  if all_services_healthy_for_image "$configured_id"; then
+    action=verified-no-restart
+  else
+    action=recreated-configured-images
+    docker compose --project-directory "$ROOT" -f "$COMPOSE" up -d --no-deps --force-recreate "${SERVICES[@]}"
+    CANDIDATE_TAG="$configured_tag"
+    wait_for_candidate || die "configured images did not become healthy; use rollback only after inspecting the transaction and confirming the Hostinger snapshot"
+  fi
+  gateway_canary || die "configured image is healthy but the gateway canary failed"
+  rm -f -- "$UPDATER/active.pid"
+  WORKTREE=""
+  remove_worktree
+  receipt="$RECEIPTS/$RUN_ID.json"
+  python3 - "$receipt" "$RUN_ID" "$action" "$configured_tag" "$configured_id" <<'PY'
+import json, os, sys
+path, run_id, action, tag, image_id = sys.argv[1:]
+doc = {"schema": 1, "run_id": run_id, "result": "recovered-and-healthy", "action": action,
+       "configured_image": {"tag": tag, "image_id": image_id}, "gateway_canary": "passed"}
+tmp = path + ".tmp"
+with open(tmp, "x", encoding="utf-8") as handle:
+    json.dump(doc, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+os.chmod(tmp, 0o600)
+os.replace(tmp, path)
+PY
+  record_phase "$PHASE" passed "$action"
+  printf 'Recovery completed: %s (%s)\n' "$configured_tag" "$action"
+  printf 'Receipt: %s\n' "$receipt"
+}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  hermes-main-update status
+  hermes-main-update stage-overlay --sha FULL_SHA --overlay-sha256 FULL_SHA256 < PATCH
+  hermes-main-update prepare [--sha FULL_SHA] [--overlay-file FIXED_PATH --overlay-sha256 FULL_SHA256] [--force-rebuild] [--adopt-image-id FULL_IMAGE_ID]
+  hermes-main-update deploy --sha FULL_SHA [--overlay-file FIXED_PATH --overlay-sha256 FULL_SHA256] --approve-deploy
+  hermes-main-update update [--sha FULL_SHA] [--overlay-file FIXED_PATH --overlay-sha256 FULL_SHA256] --approve-deploy [--force-rebuild]
+  hermes-main-update rollback --approve-deploy
+  hermes-main-update start --action status|prepare|deploy|update [--sha FULL_SHA] [--overlay-file FIXED_PATH --overlay-sha256 FULL_SHA256] [--approve-deploy] [--force-rebuild] [--adopt-image-id FULL_IMAGE_ID]
+  hermes-main-update job-status [--unit UNIT]
+  hermes-main-update recover --approve-deploy
+  hermes-main-update status --json
+
+The recommended Codex workflow is status -> prepare -> inspect report -> deploy.
+Prepare/deploy/update and start jobs accept --bot-desktop to select the official
+Dockerfile's HERMES_BOT_DESKTOP=1 build. Its full-SHA-desktop tag is immutable;
+the image label and Xvnc/xfwm4 binaries are verified without live data mounts.
+It cannot be combined with overlays. --release-tag vMAJOR.MINOR.PATCH requires
+an explicit --sha, verifies the official remote tag's peeled SHA, and fetches
+that tag without force so version metadata matches the pin. A tag alone is not
+evidence of release publication; the requesting owner verifies publication.
+Without --sha, prepare pins refs/heads/main exactly once. With --sha, prepare
+builds only that commit and verifies it remains on the fetched main lineage.
+A local patch overlay requires both --overlay-file and --overlay-sha256, uses the
+fixed content-addressed path under .main-updater/overlays, and may change only:
+  Dockerfile
+  hermes_cli/dashboard_auth/login_page.py
+  hermes_cli/dashboard_auth/middleware.py
+  hermes_cli/dashboard_auth/prefix.py
+  hermes_cli/dashboard_auth/routes.py
+  hermes_cli/version_info.py
+  hermes_cli/web_routers/status.py
+Overlay tags include the full upstream SHA and patch digest.
+Dockerfile is allowlisted only for the authorized dependency-cache optimization.
+Built candidates are durably recorded before runtime validation. A retry reuses
+their immutable image without fetching source or rebuilding. Only prepared
+candidates can deploy. Diagnostic reuse requires the same image ID, updater
+SHA256 and unchanged hashed evidence. Live service health and canary still run. Saved image IDs are
+checked before reuse; the canonical tag is checked before promotion; and the
+promoted image ID is read back. Docker tags are mutable, so this relies on the
+updater being the sole Docker tag writer. Another concurrent Docker writer can
+race promotion despite these checks, and any Docker-authorized writer can retag
+later. Deployment retains prior image tags and
+the shared BuildKit cache; no automatic image removal or cache pruning runs.
+The predeploy plugin gate runs a synthetic minimal hook plugin through
+`hermes plugins doctor --ci` in an isolated, network-disabled empty home. It checks
+runtime discovery, manifest parsing, import, and hook registration only; installed
+user plugins and live /data are not scanned. The update command performs prepare
+and deploy in one invocation and is intended only when promotion is already approved.
+Use start for a systemd-backed job that survives an SSH disconnect. Disk preflight
+fails if required free space is unavailable. For target-only prepare/deploy jobs,
+HERMES_UPDATER_SKIP_PREFLIGHT_FILE_SCAN=1 skips only the host-wide large-file
+metadata scan; the target filesystem free-space threshold remains active. Without
+this opt-in, existing prepare/deploy scans remain. The status diagnostic keeps its
+existing host-wide scan. By operator policy, each update assumes that a
+Hostinger VPS snapshot already exists; this updater does not create local data backups.
+EOF
+}
+
+COMMAND="${1:-help}"
+shift || true
+APPROVE_DEPLOY=0
+FORCE_REBUILD=0
+BOT_DESKTOP=0
+RELEASE_TAG=""
+ADOPT_IMAGE_ID=""
+REQUESTED_SHA=""
+REQUESTED_OVERLAY_FILE=""
+REQUESTED_OVERLAY_SHA256=""
+OVERLAY_MODE=0
+OVERLAY_FILE=""
+OVERLAY_SHA256=""
+OVERLAY_TREE_SHA=""
+CURRENT_OVERLAY_SHA256=""
+CURRENT_OVERLAY_TREE_SHA=""
+CURRENT_BOT_DESKTOP=0
+CURRENT_RELEASE_TAG=""
+export BOT_DESKTOP RELEASE_TAG CURRENT_BOT_DESKTOP CURRENT_RELEASE_TAG
+export OVERLAY_SHA256 OVERLAY_TREE_SHA CURRENT_OVERLAY_SHA256 CURRENT_OVERLAY_TREE_SHA
+REQUESTED_UNIT=""
+JOB_ACTION=""
+JSON_OUTPUT=0
+while (($#)); do
+  case "$1" in
+    --approve-deploy) APPROVE_DEPLOY=1 ;;
+    --force-rebuild) FORCE_REBUILD=1 ;;
+    --bot-desktop) BOT_DESKTOP=1 ;;
+    --release-tag)
+      shift
+      (($#)) || die "--release-tag needs a value"
+      RELEASE_TAG="$1"
+      ;;
+    --adopt-image-id)
+      shift
+      (($#)) || die "--adopt-image-id needs a value"
+      ADOPT_IMAGE_ID="$1"
+      ;;
+    --json) JSON_OUTPUT=1 ;;
+    --sha)
+      shift
+      (($#)) || die "--sha needs a value"
+      REQUESTED_SHA="$1"
+      ;;
+    --overlay-file)
+      shift
+      (($#)) || die "--overlay-file needs a value"
+      REQUESTED_OVERLAY_FILE="$1"
+      ;;
+    --overlay-sha256)
+      shift
+      (($#)) || die "--overlay-sha256 needs a value"
+      REQUESTED_OVERLAY_SHA256="$1"
+      ;;
+    --unit)
+      shift
+      (($#)) || die "--unit needs a value"
+      REQUESTED_UNIT="$1"
+      ;;
+    --action)
+      shift
+      (($#)) || die "--action needs a value"
+      JOB_ACTION="$1"
+      ;;
+    *) die "unknown argument: $1" ;;
+  esac
+  shift
+done
+if [[ "$BOT_DESKTOP" == 1 || -n "$RELEASE_TAG" ]]; then
+  [[ -z "$REQUESTED_OVERLAY_FILE" && -z "$REQUESTED_OVERLAY_SHA256" ]] || die "Bot Screen and release-tag options require pristine official source; overlays are excluded"
+  case "$COMMAND" in
+    prepare|deploy|update) ;;
+    start) [[ "$JOB_ACTION" == prepare || "$JOB_ACTION" == deploy || "$JOB_ACTION" == update ]] || die "source variant options require a prepare, deploy, or update job" ;;
+    *) die "source variant options are only valid with prepare, deploy, or update" ;;
+  esac
+fi
+if [[ -n "$RELEASE_TAG" ]]; then
+  valid_release_tag "$RELEASE_TAG" || die "--release-tag must be a canonical vMAJOR.MINOR.PATCH stable tag"
+  valid_sha "$REQUESTED_SHA" || die "--release-tag requires an explicit full --sha"
+fi
+if [[ "$COMMAND" != stage-overlay ]]; then select_overlay_identity; fi
+if [[ -n "$ADOPT_IMAGE_ID" ]]; then
+  python3 -c "$ADOPT_REQUEST_GATE_PY" "$COMMAND" "$JOB_ACTION" "$REQUESTED_SHA" "$OVERLAY_MODE" "$OVERLAY_SHA256" "$FORCE_REBUILD" "$APPROVE_DEPLOY" "$ADOPT_IMAGE_ID" || die "--adopt-image-id is restricted to exact reviewed orphan prepare identities"
+fi
+if [[ "$OVERLAY_MODE" == 1 ]]; then
+  case "$COMMAND" in
+    prepare|deploy|update) ;;
+    start)
+      [[ "$JOB_ACTION" == prepare || "$JOB_ACTION" == deploy || "$JOB_ACTION" == update ]] || die "overlay arguments are only valid for prepare, deploy, or update jobs"
+      ;;
+    *) die "overlay arguments are only valid for prepare, deploy, or update" ;;
+  esac
+fi
+
+case "$COMMAND" in
+  stage-overlay) stage_overlay_command ;;
+  status) status_command ;;
+  prepare) prepare_latest ;;
+  deploy) deploy_candidate ;;
+  update)
+    [[ "$APPROVE_DEPLOY" == "1" ]] || die "update requires --approve-deploy"
+    prepare_latest
+    [[ "${CURRENT_TAG:-}" == "${CANDIDATE_TAG:-}" ]] && exit 0
+    release_active_pid
+    trap - EXIT
+    remove_worktree
+    if [[ "$OVERLAY_MODE" == 1 ]]; then
+      exec "$0" deploy --sha "$CANDIDATE_SHA" --overlay-file "$OVERLAY_FILE" --overlay-sha256 "$OVERLAY_SHA256" --approve-deploy
+    else
+      source_args=()
+      [[ "$BOT_DESKTOP" == 1 ]] && source_args+=(--bot-desktop)
+      [[ -n "$RELEASE_TAG" ]] && source_args+=(--release-tag "$RELEASE_TAG")
+      exec "$0" deploy --sha "$CANDIDATE_SHA" "${source_args[@]}" --approve-deploy
+    fi
+    ;;
+  rollback) rollback_command ;;
+  start) start_job_command ;;
+  job-status) job_status_command ;;
+  recover) recover_command ;;
+  help|-h|--help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

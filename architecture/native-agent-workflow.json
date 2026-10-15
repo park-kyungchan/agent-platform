@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "project": "vps-operations",
+  "repository": "/home/palantirkc/code/shared/vps-operations",
+  "role": "VPS container infrastructure operator using Native Codex",
+  "commands": {
+    "inventory": "bun run cli inventory",
+    "doctor": "bun run cli doctor",
+    "verifySaved": "bun run cli verify <observation.json>",
+    "proposeLifecycle": "bun run cli plan <start|stop|restart>",
+    "applyAuthorizedLifecycle": "bun run cli apply <authorized-operation-payload.json> --confirm-exact-target <full-container-id>",
+    "browserVerification": "bun scripts/verify-hermes-ui.ts",
+    "check": "bun run check"
+  },
+  "exitCodes": { "0": "Current native control plane and active adapters are healthy", "1": "Execution or shape validation failed", "2": "Native control-plane verification failed", "3": "Control plane passed but active adapter health is degraded" },
+  "workflow": [
+    "Query requesting-project and shared evidence through Evidence Foundry before cross-session claims",
+    "Discover actual current containers, mounts, PID namespaces, process incarnations and port owners",
+    "Verify native identity and serving as the recorded runtime UID for every expected profile",
+    "Check dependencies after native PM environment activation; the image bootstrap venv is insufficient evidence",
+    "Retain source observation bytes and hashes; create Observation and VerificationResult records separately",
+    "Propose a bounded OperationRequest and apply only under the current user's actual authority",
+    "Revalidate process identity and exact held lock before stop; wait for s6 service DOWN and lock release before start",
+    "Preserve Desktop/TUI processes and credential/data hashes around a necessary gateway lifecycle action",
+    "Require fresh native serving, actual port ownership and authenticated browser readback after the action",
+    "Create an independent AcceptanceDecision with limitations; never infer acceptance from a zero exit status"
+  ],
+  "boundaries": [
+    "Native Codex retains the agent loop; no separate orchestrator or resident agent runtime",
+    "User permission is not granted by an authority-shaped object",
+    "Do not automatically stop containers, delete raw evidence, alter credentials or change business workloads",
+    "Use hermes-main-update for source/image/Compose deployment; this project does not bypass its single-writer contract",
+    "The duplicate gateway park marker is current-runtime state; durable boot-role convergence remains separate work",
+    "Disabled historical adapter errors remain evidence and cannot count as active failures only when current native configuration proves them disabled"
+  ],
+  "ontology": { "package": "@palantirkc/ontology", "version": "0.2.0", "domain": "infrastructure", "registry": "src/domain/registry.ts" }
+}

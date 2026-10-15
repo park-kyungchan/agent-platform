@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+packet=/home/palantirkc/operations/herdr-session-handoff-20261015/continuation.json
+if [[ $# -eq 1 && ( "$1" == --help || "$1" == -h ) ]]; then
+  printf '%s\n' 'continue-harness-work: manually start a new native Codex session for the prepared logical Work.' "Prepared context: $packet" 'Default: gpt-6.1-sol / high. The original WSL session remains paused.'
+  exit 0
+fi
+if [[ $# -ne 0 ]]; then
+  printf '%s\n' 'Usage: continue-harness-work [--help]' >&2
+  exit 2
+fi
+[[ -r "$packet" ]] || { printf '%s\n' 'Prepared continuation record is missing.' >&2; exit 78; }
+exec /usr/local/bin/codex-herdr -C /home/palantirkc -m gpt-6.1-sol -c 'model_reasoning_effort="high"' \
+  "The user manually invokes continuation of logical Work ontology-driven-harness-operation in herdr-runtime. Read $packet, then its exact source-owned handoff and current Spec7/Plan7 in bounded sections. Continue the same Work after reconciling current source and native ownership. Preserve actual decisions, exclusions, completed/uncertain effect fences and review holds. Do not resume the original WSL source session or replay completed effects. Do not transplant native stores or silently activate stale bindings. Choose the checkpoint's next pending task under its preserved gates."

@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local.palantirkc/vps-operations/herdr-entrypoint/facts.v1.schema.json",
+  "title": "Herdr Hermes Entrypoint Preparation Facts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schema", "observedAtUtc", "ownerProject", "status", "target", "nativeDependencies", "tuiArtifact", "semantics", "verification"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "vps-operations.herdr-hermes-entrypoint.facts.v1" },
+    "observedAtUtc": { "type": "string", "format": "date-time" },
+    "ownerProject": { "const": "vps-operations" },
+    "status": { "const": "prepared-local-only" },
+    "target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["host", "tailscaleAddress", "sshHostKeyAlias", "containerName", "observedContainerId", "observedImageId", "observedStartedAt", "uid", "gid", "home", "hermesHome", "profile", "cwd"],
+      "properties": {
+        "host": { "const": "srv1873899" }, "tailscaleAddress": { "const": "100.95.133.99" }, "sshHostKeyAlias": { "const": "srv1873899" },
+        "containerName": { "const": "hermes-agent-2q3y-hermes-serve-1" },
+        "observedContainerId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "observedImageId": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "observedStartedAt": { "type": "string" },
+        "uid": { "const": 10000 }, "gid": { "const": 10000 }, "home": { "const": "/opt/data" }, "hermesHome": { "const": "/opt/data" }, "profile": { "const": "default" }, "cwd": { "const": "/opt/data" }
+      }
+    },
+    "nativeDependencies": {
+      "type": "object", "additionalProperties": false,
+      "required": ["hermes", "node", "nodeVersion", "python", "pythonVersion", "bash", "existingDiagnostic"],
+      "properties": {
+        "hermes": { "type": "string" }, "node": { "type": "string" }, "nodeVersion": { "type": "string" }, "python": { "type": "string" }, "pythonVersion": { "type": "string" }, "bash": { "type": "string" }, "existingDiagnostic": { "type": "string" }
+      }
+    },
+    "tuiArtifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "byteLength", "sha256", "equivalentSourceDistPath", "buildRequiredForObservedArtifact", "missingArtifactAction"],
+      "properties": {
+        "path": { "type": "string" }, "byteLength": { "type": "integer", "minimum": 1 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "equivalentSourceDistPath": { "type": "string" }, "buildRequiredForObservedArtifact": { "const": false }, "missingArtifactAction": { "type": "string" }
+      }
+    },
+    "semantics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["nativeCommand", "profileSelection", "autoResumePolicy", "executionMode", "desktopRouteMutation", "customAgentRuntime", "credentialExtraction", "explicitResumeOnly", "defaultProfileAutoResumeObserved", "clearedChildVariables", "sourceReferences", "zeroTurnSourceClaim"],
+      "properties": {
+        "profileSelection": {
+          "type": "object", "additionalProperties": false,
+          "required": ["flag", "default", "allowedPattern", "nativeResolution", "ownerUidUnchanged"],
+          "properties": { "flag": { "const": "--profile" }, "default": { "const": "default" }, "allowedPattern": { "const": "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$" }, "nativeResolution": { "const": true }, "ownerUidUnchanged": { "const": true } }
+        },
+        "autoResumePolicy": { "type": "string" },
+        "nativeCommand": { "type": "array", "items": { "type": "string" }, "minItems": 4 }, "executionMode": { "const": "native-tui-with-profile-local-gateway-child" }, "desktopRouteMutation": { "const": false }, "customAgentRuntime": { "const": false }, "credentialExtraction": { "const": false }, "explicitResumeOnly": { "const": true }, "defaultProfileAutoResumeObserved": { "const": false }, "clearedChildVariables": { "type": "array", "items": { "type": "string" } }, "sourceReferences": { "type": "array", "items": { "type": "string" } }, "zeroTurnSourceClaim": { "type": "string" }
+      }
+    },
+    "verification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sourceInspection", "readOnlyNativeHelp", "readOnlyArtifactInspection", "nativeTuiStarted", "modelInferenceStarted", "remoteDeploymentApplied", "remaining"],
+      "properties": {
+        "sourceInspection": { "const": true }, "readOnlyNativeHelp": { "const": true }, "readOnlyArtifactInspection": { "const": true }, "nativeTuiStarted": { "const": false }, "modelInferenceStarted": { "const": false }, "remoteDeploymentApplied": { "const": false }, "remaining": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

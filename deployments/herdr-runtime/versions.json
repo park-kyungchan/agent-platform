@@ -1,0 +1,43 @@
+{
+  "schema": "herdr-runtime.deployment-inputs.v1",
+  "platform": "linux/amd64",
+  "images": {
+    "node": {
+      "tag": "node:22.23.3-bookworm-slim",
+      "indexDigest": "sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392",
+      "amd64Digest": "sha256:efd0ab5780c2d9ab1f0f869571a00d5edb17793bff4cce4a2792e3eb0ffc7562",
+      "source": "https://hub.docker.com/_/node"
+    },
+    "bun": {
+      "tag": "oven/bun:1.3.14",
+      "indexDigest": "sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4",
+      "amd64Digest": "sha256:50317d83cd5a5ae1d8b35b3379c69f57ce1a0dbf4def91f0965653d767851834",
+      "source": "https://hub.docker.com/r/oven/bun"
+    }
+  },
+  "herdr": {
+    "version": "0.9.5",
+    "sourceCommit": "2ecf19a92fc3a7fff75b6ce3655ef04f4625ec01",
+    "assetUrl": "https://github.com/herdrdev/herdr/releases/download/v0.9.5/herdr-linux-x86_64",
+    "sha256": "14d9e8bc8b4a9e0118d77c32266f76d461f09b40342eb23752960bd89f59929d",
+    "checksumSources": [
+      "https://api.github.com/repos/herdrdev/herdr/releases/tags/v0.9.5",
+      "https://herdr.dev/latest.json"
+    ],
+    "signatureVerification": "not-performed-no-detached-signature-asset-published"
+  },
+  "codex": {
+    "package": "@openai/codex",
+    "version": "0.162.1",
+    "registryUrl": "https://registry.npmjs.org/@openai/codex/0.162.1",
+    "tarballIntegrity": "sha512-NWZdi/kxyjv/8EUGFupziGU38YyleugZRM4JXgY5XFH7FUmaFA33NZS2Bmq0HPazf7S3jJQQWsZ/jAK9jsrV3Q=="
+  },
+  "packagePolicy": "Base images and application versions are pinned. Debian security package resolution occurs during build; final image identity must be recorded during deployment.",
+  "identity": {
+    "user": "palantirkc",
+    "uid": 1000,
+    "gid": 1000,
+    "home": "/home/palantirkc",
+    "defaultProject": "/home/palantirkc/code/shared/agent-platform"
+  }
+}

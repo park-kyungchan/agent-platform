@@ -1,0 +1,9 @@
+*
+!Dockerfile
+!sshd_config
+!supervisord.conf
+!profile.sh
+!entrypoint.sh
+!healthcheck.sh
+!codex-herdr
+!herdr-codex

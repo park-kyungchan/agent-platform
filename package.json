@@ -1,0 +1,30 @@
+{
+  "name": "@palantirkc/vps-operations",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.3.14",
+  "description": "Typed, evidence-aware VPS container and native gateway operations.",
+  "exports": {
+    "./domain": "./src/domain/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit && bun test ./tests",
+    "cli": "bun src/cli.ts",
+    "update:backend": "bun src/cli.ts update backend-only",
+    "update:coordinated": "bun src/cli.ts update coordinated",
+    "update:release": "bun src/cli.ts update coordinated --release",
+    "check:source": "bun scripts/ci/source-policy.ts && bun scripts/ci/infrastructure-release.ts verify",
+    "check:deployment": "bun scripts/ci/deployment-syntax.ts"
+  },
+  "dependencies": {
+    "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "@palantirkc/infrastructure-operations": "file:releases/palantirkc-infrastructure-operations-0.0.0-2f8ca5da92d1.tgz"
+  },
+  "devDependencies": {
+    "bun-types": "1.3.14",
+    "typescript": "5.9.3"
+  }
+}

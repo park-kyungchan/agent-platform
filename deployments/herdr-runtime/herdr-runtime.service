@@ -1,0 +1,16 @@
+[Unit]
+Description=Dedicated Herdr Codex container over Tailscale
+Requires=docker.service
+Wants=network-online.target tailscaled.service
+After=network-online.target docker.service tailscaled.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker compose -f /docker/herdr-runtime/deployment/compose.yaml up -d --no-build
+ExecStop=/usr/bin/docker compose -f /docker/herdr-runtime/deployment/compose.yaml stop
+TimeoutStartSec=90
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

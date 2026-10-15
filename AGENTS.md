@@ -1,0 +1,17 @@
+# VPS operations
+
+Use the workspace and shared-project instructions. Read `project.json` for scope and commands. This is an independent TypeScript/Bun infrastructure project; install the copied immutable Ontology `0.2.0` release with `bun install --frozen-lockfile`.
+
+Native Codex owns the agent loop. Model stable infrastructure entities, observations, verification results, acceptance decisions, and bounded operation requests. Parsers and utilities remain ordinary TypeScript. Observation does not imply verification; a passing verification does not imply user acceptance or permission.
+
+Read `state/latest-operation.json` when present before continuing infrastructure maintenance. It points to actual deployment/cleanup effects, the user's rationale, and remaining work. Preserve its completed-effect fences; do not replay an old apply merely because a new session starts.
+
+Inspect current host, container IDs, shared mounts, PID namespaces, process-start identities, lock device/inode, and port ownership before relying on a historical record. For Hermes use the installed native lifecycle and run native serving probes as the recorded owner UID with the verified `HOME` and `HERMES_HOME`. A Docker healthy state, s6 up status, HTTP login redirect, or stored served-profile list alone cannot establish gateway serving. A sibling container can share data and a callable UNIX socket while its PID-identity guard rejects the owner.
+
+Preserve active conversations, session history, databases, tunnels, and unrelated services. Do not automatically perform broad restarts, deletion, credential exposure/rotation, forced singleton bypass, or native lock replacement. Revalidate exact process incarnation immediately before a narrowly authorized lifecycle action. External operation requests are records; schema validation does not grant execution authority. Ask for explicit current instruction before an interruption outside the user's authorized bounded action.
+
+Ministry and academy business effects are excluded. Do not read session transcripts or dump environment variables, credential values, or unrelated process arguments. Keep errors sanitized and report adapter failures separately from gateway control-plane verification. Preserve the original evidence and record subsequent corrections separately.
+
+Run `bun run check` for domain or adapter changes. Deterministic domain checks are not native model evals. Native model evals require an explicit suite budget. Do not commit, publish, deploy, or introduce a second agent runtime as a side effect.
+
+For an explicitly requested Hermes version update, read `architecture/update-workflow.json` and use `bun run cli update backend-only` or `coordinated`. Default CLI planning is read-only; under the current explicit update instruction use `--apply --authorization '<current instruction>'` without asking for the same permission again. Backend-only never inspects or changes Desktop. Coordinated uses the official native Desktop updater's completed artifact SHA as the backend target; installation and running alignment are separate. Resume the saved run and pinned SHA; a changed overlay uses a new native backend attempt within that run. Recover existing Desktop receipts before another invocation. Native helper receipts and current serving checks establish completion; an app version label, zero process exit, or collected systemd unit alone cannot.

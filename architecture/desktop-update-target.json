@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "windows-hermes-desktop",
+  "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+  "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+  "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+  "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+  "nativeUserHomeWindows": "C:\\Users\\packr",
+  "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+  "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+  "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+  "branch": "main",
+  "receiptTimeoutMs": 3600000,
+  "allowedNativeRuntimes": [
+    {
+      "kind": "serve",
+      "supervisor": "desktop"
+    }
+  ],
+  "policy": {
+    "noArbitraryShaInput": true,
+    "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+    "runningAppRequiresExplicitCdp": true,
+    "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+    "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+    "automaticKillOrLockReplacement": false,
+    "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+  },
+  "allowedPreUpdateDiff": {
+    "sha256": "04fa0f68034f875192a76e1d7680f46019ba01d18adfeed094f2bffdff7105dc",
+    "paths": [
+      "apps/desktop/electron/app-version.test.ts",
+      "apps/desktop/electron/app-version.ts",
+      "apps/desktop/electron/main.ts",
+      "apps/desktop/src/app/shell/hooks/use-statusbar-items.tsx"
+    ]
+  }
+}
