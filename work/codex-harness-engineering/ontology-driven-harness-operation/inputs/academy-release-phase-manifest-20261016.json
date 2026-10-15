@@ -1,0 +1,177 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "academy-release-phase-manifest-20261016",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "academy-workbench",
+    "locator": "source-preparation:ACADEMY-RELEASE-SELECTION-PREPARATION:academy-release-phase-manifest-20261016",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "academy.retained-release-phase-pin-manifest.v1",
+    "recordClass": "ExactSourcePinManifest",
+    "ontologyVersion": "0.2.0",
+    "sourceBase": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "98eb139ded111fb42f5ae7c24f250d92d53a69de",
+      "tree": "95156570aaee2dcde684803512cf53407abb54a4"
+    },
+    "packetPins": [
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-RELEASE-SELECTION-PREPARATION.json",
+        "bytes": 1288,
+        "sha256": "243c7b1ce5a5fc822ec17ec594b1993476705c281d04452e7135cc9172281bce",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan7-contains-ACADEMY-RELEASE-SELECTION-PREPARATION.json",
+        "bytes": 499,
+        "sha256": "28d458cf1dcf9fa3c24fc06724bddf2f5c5451ae6411b78bd9a2119e0c673128",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/academy-release-selection-preparation-source-plan.json",
+        "bytes": 441,
+        "sha256": "a07fc1b7217e2c424f46f676483a8a2e6eb5e0030664fda579ba6b325905f93f",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-plan-20261016.json",
+        "bytes": 26848,
+        "sha256": "b787534a9903389e2b7b1ee65b02ab09f802b708ac6539b6239a1984b8728720",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-sources-20261016.json",
+        "bytes": 62434,
+        "sha256": "0c93da585bc68e5cdc7d6acf983ae42fb924ba006bb71062603166e8e603738e",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      }
+    ],
+    "capturedImmutableSourcePins": [
+      {
+        "owner": "existing-protected-root-product-owner",
+        "originalPath": "/opt/academy-product-supervisor/71c5a0e737e0/root-product-bootstrap.py",
+        "bytes": 31471,
+        "sha256": "cdaab87e6517273fe3d316832e649ca4dc424f4d9fe5271ed7a40c8ed393633c",
+        "encoding": "UTF-8"
+      },
+      {
+        "owner": "existing-native-UID10000-product-owner",
+        "originalPath": "/opt/data/academy-release-staging-20261015-71c5a0e737e0/product-domain-controller.ts",
+        "bytes": 17993,
+        "sha256": "9599c1f3d6a7be8bde01f6db65528a51002c6e17da0a6fe1be8d9dfc983e0e18",
+        "encoding": "UTF-8"
+      },
+      {
+        "owner": "existing-native-UID10000-product-owner",
+        "originalPath": "/opt/data/academy-release-staging-20261015-71c5a0e737e0/deployment-contract.json",
+        "bytes": 8196,
+        "sha256": "04c1fef0049b64f9fdcc62a0c9c6b4aac06fef63e92d2d1052e6fc68c8a8016c",
+        "encoding": "UTF-8"
+      }
+    ],
+    "capturedSourceBytesLocator": {
+      "recordId": "academy-release-phase-sources-20261016",
+      "jsonPointer": "/content/sourceSnapshots",
+      "semantics": "Unescaped UTF-8 source bytes in canonical source-owner input; preserve exact SHA256. Not an executable or second maintained implementation."
+    },
+    "historicalNativeClosurePins": [
+      {
+        "path": "product-domain-controller.ts",
+        "sha256": "9599c1f3d6a7be8bde01f6db65528a51002c6e17da0a6fe1be8d9dfc983e0e18",
+        "bytes": 17993
+      },
+      {
+        "path": "guarded-io.ts",
+        "sha256": "e2bedd294b1a7d9973e38d63871629539c9b26fb8179d21c659e12b133e0f3de",
+        "bytes": 2317
+      },
+      {
+        "path": "product-migration.ts",
+        "sha256": "af83a5ca0cc8d5323f844431eb7b846e21f05b013b01406554755744f63d2dfb",
+        "bytes": 14115
+      }
+    ],
+    "historicalProtectedHostContractPin": {
+      "path": "/opt/academy-product-supervisor/71c5a0e737e0/host-contract.json",
+      "sha256": "cc15984302e48265bc852d8274d8cb0002c632249a45e6ce9c06ba05a396ed90",
+      "bytes": 65979,
+      "sourceBodyAvailableLocally": false
+    },
+    "historicalNativeOsPin": {
+      "path": "/opt/data/academy-release-staging-20261015-71c5a0e737e0/native-product-os.py",
+      "sha256": "97cf419d17b6e2bd013f9966a38c86704c103f00272177df402487c3aa6c6b18",
+      "bytes": 26911,
+      "sourceBodyAvailableLocally": false
+    },
+    "proposedCompilerPin": {
+      "path": "/opt/data/.local/bin/bun",
+      "sha256": "7ce7d6b654eddeec20afddf2396317fba6dc19ab52788a27e894e1806bf8f24b",
+      "bytes": 88979072,
+      "version": "1.4.3",
+      "revision": "1.4.3+c6da4a4d3",
+      "observedByExistingOperationsReceipt": true,
+      "exactAcademyProductQualification": false,
+      "freshNativeObservationRequired": true
+    },
+    "executableSuccessorPinsIssued": false,
+    "localEvidencePins": [
+      {
+        "path": "/tmp/academy-current-pointer-source-capture-20261016.json",
+        "bytes": 61349,
+        "sha256": "f7fd27f5886d37007cf62a54e8453ab36bbc6b57abfc399537a88c77d202134d",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "/tmp/academy-current-release-pointer-audit-20261016.json",
+        "bytes": 22374,
+        "sha256": "f3257c016ce02e03d59c7c9cee8131d1e9aeea5dd9a968cb64a6fcfb1157ba99",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "/tmp/academy-current-release-pointer-remote-20261016.json",
+        "bytes": 3958,
+        "sha256": "6f4278f1864f27e00e4baa3bf7eb371cdeb382a7f89994f7c1faf25eb9c27caf",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "/tmp/academy-next-authorized-action-assessment-20261016.json",
+        "bytes": 27785,
+        "sha256": "38ce1fa88d6e4f54e8fd576f579223c34cb6c15dba2c3aa479b36f618cb62b4e",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "/home/palantirkc/operations/bun-unification-20261016/apply-readback-receipt.json",
+        "bytes": 11147,
+        "sha256": "a6f420addedfebfc2795bfb70807bb691e00620d4458ece3e3ff46000791c19b",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/recovery-20261015/academy-boundary-audit-pause-inventory-20261015.json",
+        "bytes": 109224,
+        "sha256": "a06bc76a9c7056467ce15b0b4ac9e161ecd02f70014abe0ee42f698d014fb8d3",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/recovery-20261015/pg-additive-migration-preparation/twelve-table-after-root-independent/actual-after-result.json",
+        "bytes": 6861,
+        "sha256": "430e3b8cf987536bf19e84f34599c126b140188050103f3923cc5948b8fc968d",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      },
+      {
+        "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/recovery-20261015/worktrees/source-session-handoff/state/continuity/boundaries/ontology-driven-harness-operation/herdr-session-handoff-20261015/checkpoint.json",
+        "bytes": 29203,
+        "sha256": "6f97d5007b5ecb930bb427ce462d984d6fb5045db7b4563396044de332fe25a7",
+        "qualification": "exact-local-source-or-evidence-bytes-only"
+      }
+    ],
+    "evidencePortability": "Recovered immutable code/contract bytes are included. Private runtime/binary/release payloads and full operational receipts remain with their owners; exact external locators/hashes are evidence references only, not executable retry instructions.",
+    "nativeAuthorityGranted": false,
+    "acceptanceDecision": null
+  }
+}
