@@ -1,0 +1,110 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "67f4de62ca082fa2c591fd6682b95b8eabf3596f",
+  "reviewedTreeSha": "9beaf9dbf024c6d7a2d58875844192d3a978f9ed",
+  "reviewedSourceManifestSha256": "7dff473d74096e4b2ab16f1228f9f361a0db82a86bf3a8c87279c187fc4e7e19",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/git_recovery_audit"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "independentSourceReview": {
+    "schema": "agent-platform.independent-source-review.v1",
+    "recordClass": "IndependentSourceReview",
+    "reviewer": "/root/git_recovery_audit",
+    "actualNativeChildThreadId": "01a13e48-97ff-7a32-b9df-7081c090897c",
+    "nativeTranscript": "/home/palantirkc/.codex/sessions/2026/10/15/rollout-2026-10-15T15-38-27-01a13e48-97ff-7a32-b9df-7081c090897c.jsonl",
+    "candidateAuthoredOrModifiedByReviewer": false,
+    "target": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "67f4de62ca082fa2c591fd6682b95b8eabf3596f",
+      "tree": "9beaf9dbf024c6d7a2d58875844192d3a978f9ed",
+      "base": "2d1949e7b0c9f970cfdf2300d89200e79c401d47",
+      "files": [
+        "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/CODEX-NATIVE-ADOPTION-RECOVERY.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/HERMES-NATIVE-ADOPTION-RECOVERY.json"
+      ]
+    },
+    "disposition": "pass",
+    "findings": [],
+    "blockingFindings": 0,
+    "materialFindings": 0,
+    "unresolvedFindings": 0,
+    "sourceObservations": [
+      "Both new Tasks preserve existing Domain/Project/Work/Issue identity and bind Spec7/Plan7.",
+      "Both explicitly declare executionClass=native-effect, execution=planned, verification/sharedAudit/formalCompletion=pending and localAudit=intent-durable.",
+      "No native Runtime/Session/Thread/Task/Run ID, occurrence, effect or verification receipt is fabricated; effectIds and verificationEvidenceIds are empty.",
+      "The three decision references are existing original-bound broad-engineering, explicit-native-activation and current preselection boundary decisions.",
+      "Only two Task files are added. No historical contract, original decision, completed/uncertain fence, existing Task or Work acceptance criterion changes.",
+      "Titles require actual owner qualification/current reviewed Work consumption and verification before explicit activation; source registration is not native registration or execution authority."
+    ],
+    "checks": [
+      {
+        "command": "COMMON_BASE_SHA=2d1949e7b0c9f970cfdf2300d89200e79c401d47 GIT_NO_LAZY_FETCH=1 GIT_OPTIONAL_LOCKS=0 bun scripts/verify-common-work.ts . 67f4de62ca082fa2c591fd6682b95b8eabf3596f",
+        "status": "pass",
+        "records": 147,
+        "actualDecisions": 47,
+        "completedHistoricalEffects": 63,
+        "uncertainHistoricalEffects": 2,
+        "runtimeDocumentationRoutes": 84,
+        "transitionValidated": true
+      },
+      {
+        "method": "Exact-commit readGitWorkContext latestRelevant=current maxChars=24000 maxRecords=128",
+        "contexts": [
+          {
+            "taskId": "CODEX-NATIVE-ADOPTION-RECOVERY",
+            "status": "source-qualified",
+            "chars": 17091,
+            "records": 22,
+            "sources": 29,
+            "holdReasons": []
+          },
+          {
+            "taskId": "HERMES-NATIVE-ADOPTION-RECOVERY",
+            "status": "source-qualified",
+            "chars": 17073,
+            "records": 22,
+            "sources": 29,
+            "holdReasons": []
+          }
+        ],
+        "authority": "none",
+        "nativePermissionGranted": false
+      }
+    ],
+    "limitations": {
+      "verificationClass": "committed-common-source-only",
+      "remoteOrRuntimeWrites": false,
+      "actualRuntimeOwnersOrMetadataReverified": false,
+      "nativeTaskAllocationEstablished": false,
+      "nativeActivationEstablished": false,
+      "wholeWorkAcceptanceEstablished": false,
+      "modelRequests": 0,
+      "publication": "Root must publish authenticated exact-head V2 result/receipt/status; this local report alone does not authenticate native authorship",
+      "terminalJoin": "Parent must join the actual task_complete after this final; no historical event is a substitute"
+    }
+  },
+  "nativeCompletionReadback": {
+    "actualChildThreadId": "01a13e48-97ff-7a32-b9df-7081c090897c",
+    "sourceLine": 828,
+    "at": "2026-10-15T07:32:28.399Z",
+    "eventType": "task_complete",
+    "turnId": "01a13e69-41f1-7300-8675-2db707cf9029",
+    "inheritedRootIdentitySubstituted": false
+  },
+  "limitations": [
+    "Source Task registration only; no native identity, activation or whole-Work Acceptance established."
+  ]
+}
