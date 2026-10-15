@@ -1,0 +1,26 @@
+{
+  "schema": "native-independent-review.v2",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "d51be042292647d02ac7a1e79609bacb771cbf20",
+  "reviewedTreeSha": "95156570aaee2dcde684803512cf53407abb54a4",
+  "reviewedSourceManifestSha256": "84730aa0c89e7d9dae3c7de69db28146dbae62c3b18c5bc850b17cfee66dc52f",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/checkpoint_v4_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/bun_provisioning_source"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/0e94377c9b360a41694356009bb4fef72df18da8/native-review-results/d51be042292647d02ac7a1e79609bacb771cbf20.json",
+    "sha256": "de88cfb992b8220824529fa5f1071870470eb32ad4f1e692f336f2bb840c9fc2"
+  }
+}
