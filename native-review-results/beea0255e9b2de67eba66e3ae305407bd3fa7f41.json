@@ -1,0 +1,95 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "beea0255e9b2de67eba66e3ae305407bd3fa7f41",
+  "reviewedTreeSha": "c09bf9af3ec19a101412d2635d3347a3f29e5b22",
+  "reviewedSourceManifestSha256": "f7119da3cba28874d4444fdc96298856d609c86ec4abd1013db36372a92ddd41",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_program_context"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-15T05:38:07.553Z",
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "c09bf9af3ec19a101412d2635d3347a3f29e5b22",
+    "entryCount": 557,
+    "blobCount": 442,
+    "sha256": "f7119da3cba28874d4444fdc96298856d609c86ec4abd1013db36372a92ddd41"
+  },
+  "resultAuthorship": {
+    "authoredBy": "/root",
+    "deltaAuthor": "/root/integrated_program_context",
+    "qualification": "Actual native collaboration Task paths; source declaration is distinct from authenticated runtime authorship or native consumer acceptance."
+  },
+  "reviewDetail": {
+    "reviewKind": "fresh-exact-three-file-delta-plus-preserved-source-baseline",
+    "comparisonBase": "5c0c844ffb877724a9abf367f4484deccc7e251b",
+    "changedFiles": [
+      "architecture/capability-source-owners.json",
+      "packages/native-hermes-adapter/src/platform-current-work/context.test.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/context.ts"
+    ],
+    "materialFindings": [],
+    "independentReceipt": {
+      "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-context-original-projection-root-independent-review/independent-source-review.json",
+      "bytes": 3886,
+      "sha256": "b285a0cc396da43a6353305f74a99fee5af35cd095001bdbecaf50789474fc92"
+    },
+    "ownBoundaryCases": 8,
+    "ownAffectedTests": {
+      "command": "bun test packages/native-hermes-adapter/src/platform-current-work/context.test.ts",
+      "runtime": "Bun1.3.14",
+      "exitCode": 0,
+      "tests": 19,
+      "assertions": 140,
+      "elapsedSeconds": 1.87,
+      "nativeExecChunks": [
+        "d17801",
+        "66fa70"
+      ]
+    },
+    "authorChecks": {
+      "fullSourceCommands": 26,
+      "fullQualityChecks": 14,
+      "strictTypeScript": "pass",
+      "attribution": "Author executions rehashed and inspected; Root did not repeat these full unchanged suites."
+    },
+    "actualWorkSourceProof": {
+      "governingOriginals": 17,
+      "requiredTaskOriginals": 3,
+      "optionalOmissions": 12,
+      "projectionChars": 5571,
+      "qualification": "Author local Git-source execution inspected and rehashed; no actual Hermes hook/model run claimed."
+    },
+    "unchangedSourceBaseline": {
+      "rootBinding": "d4b1d2486466b5c4b6f39d6718543e43d422741f75322f72e0bf1f4932afb853",
+      "tree": "fe0652d18acfdc76d522808497bd1079a0e90509",
+      "qualification": "Git parent and exact three-file delta preserve unchanged source coverage. This is a new exact-commit delta review, not a claim of a new whole-source execution."
+    },
+    "method": [
+      "Read complete production/test/pin delta; optional question requirement follows declared selectionContext only.",
+      "Full Git original validation precedes projection; actual missing/drifted omitted originals retain HOLD.",
+      "All current Task decision originals, purpose and title remain essential; optional governing omissions expose counts and governing Git index; essential overflow returns held/null without truncating meaning.",
+      "Exact native tuple/currentness/closure/privacy/legacy logic is unchanged; Root affected tests and eight independent extracted-source boundary cases pass."
+    ],
+    "limits": [
+      "Source only; native Hermes delivery/configuration/consent/context consumption and model verification remain pending.",
+      "Local author35source/624physicaldeps is distinct from preserved native-candidate35/590; future selected native closure must be independently qualified.",
+      "Old unselected and selected5c/HOLD packets, all originals and closed effects remain preserved."
+    ]
+  },
+  "nativeEffects": 0,
+  "nativeModelRequests": 0,
+  "wholeGoalAcceptance": false
+}
