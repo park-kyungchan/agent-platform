@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "whole-lens-unfinished-delivery-cleanup-20261015",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "기존에 하던 작업들 commit-push-PR-merge 안된 것들 있는지 찾아보고 cleanup까지 해주면서 너가 여기서 이어서 진행해줘야돼. 유저의 요청은 불완전하니까, 너가 Whole-Lens를 가지고 판단해라",
+  "meaning": "The accountable Lead audits the whole interrupted program, finishes authorized unfinished commit/push/PR/explicit merge and continues engineering here. Clean up only verified merged or source-equivalent superseded Task branches/worktrees after preserving unique commits, private evidence, active native sessions and recovery custody; retain unresolved work. This is not automatic merge or blanket deletion authority.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/recovery-user-instructions-20261015.json",
+    "fragment": "#/content/instructions/1/text"
+  },
+  "supersedes": []
+}

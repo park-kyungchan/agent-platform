@@ -8,20 +8,19 @@
   "repositoryId": "park-kyungchan/agent-platform",
   "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
   "purpose": {
-    "objective": "Complete the integrated private common Harness, native WSL2/VPS adoption, related portfolio reorganization and Academy product/operational backlog. The pinned Spec retains every full acceptance criterion.",
+    "objective": "Finish the private integrated common Harness, WSL2/VPS native adoption, portfolio reorganization and Academy backlog under the full pinned Spec.",
     "successCriteria": [
-      "Stable Domain/Project/Work/Task/Run identities, Git/native joins and no duplicate manual registration.",
-      "Addressable original Q/A, choices, rationale and history; preserve completed/uncertain fences without replay.",
-      "Complete related WSL2/VPS topology, justified private reorganization and verified custody/recovery.",
-      "One typed common/Codex/Hermes source repo, distinct domain/native/data/evidence owners, no parallel runtime.",
-      "Both native consumers verified against current common contracts and official docs, then explicitly activated.",
-      "Useful native delegation, handoff/resume, Memory, Kanban/Session, concurrency and local/shared receiver proofs.",
-      "VPS currentness and continuation with the PC off; configuration, behavior and formal completion stay distinct.",
-      "Academy seven gates: actual auth/storage/source import/recovery/hosting/workflow/release verification.",
-      "Teacher workflows, edition/history, parent DailyRecord, exams and concept graph; source Academy read-only.",
-      "Checks, independent exact-head review, private delivery, explicit Lead merge/readback and successor bindings.",
-      "Fresh evaluation only: 48 requests, 2000000 emitted tokens, 8 hours; no new paid infrastructure/recurring cost.",
-      "Lead Acceptance after every full Spec criterion passes; never infer human satisfaction or teacher judgment."
+      "Stable logical identities and Git/native joins without duplicate registration.",
+      "Addressable original Q/A, rationale/history and completed/uncertain effect fences.",
+      "Measured private portfolio topology, ownership, reorganization and verified recovery.",
+      "One typed common/Codex/Hermes source; native/domain/data/evidence owners retained.",
+      "Both native consumers verified and explicitly activated; VPS continuation works PC-off.",
+      "Useful delegation/handoff/resume, Memory, Kanban/Session, concurrency and local/shared receipts.",
+      "Academy seven operational gates and source-grounded teacher/concept workflows; source server read-only.",
+      "Month-end analysis ends before user selects existing items; no agent generation/final membership.",
+      "Exact independent review, private delivery, explicit Lead merge/readback and safe cleanup.",
+      "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero added recurring cost.",
+      "Lead Acceptance after all pinned Spec criteria pass; teacher/human judgment stays separate."
     ],
     "inScope": [
       "Common Harness and both native runtime engineering, verification and activation",
@@ -33,16 +32,17 @@
       "Academy source-server mutation, denied-source access or unrequested physical/third-party effects",
       "Unrelated excluded domains, credential disclosure, trust bypass or a parallel agent runtime",
       "Automatic merge, new paid infrastructure, historical effect replay or reused evaluation budgets",
-      "Invented student data, teacher decisions, human satisfaction or unverified whole completion"
+      "Invented student data, teacher decisions, human satisfaction or unverified whole completion",
+      "Agent-generated month-end papers or autonomous question selection/final membership; user selection remains separate."
     ]
   },
   "spec": {
     "id": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
-    "revision": 6
+    "revision": 7
   },
   "plan": {
     "id": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
-    "revision": 6
+    "revision": 7
   },
   "governingDecisionIds": [
     "git-canonical-common-records-design-review-20261014",
@@ -61,7 +61,10 @@
     "complete-interviews-before-autonomous-goal-20261015",
     "academy-product-operational-backlog-included-20261015",
     "fresh-native-evaluation-suite-budget-20261015",
-    "delegated-evidence-based-lead-acceptance-20261015"
+    "delegated-evidence-based-lead-acceptance-20261015",
+    "resume-with-monthly-preselection-boundary-20261015"
   ],
-  "historicalFenceIds": ["checkpoint-56-historical-effect-fence"]
+  "historicalFenceIds": [
+    "checkpoint-56-historical-effect-fence"
+  ]
 }
