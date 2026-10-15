@@ -1,0 +1,14 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "evidence",
+  "id": "HRI-02-VERIFIED",
+  "evidenceKind": "verification",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-02-VERIFICATION-INPUT.json",
+    "fragment": "#/content"
+  }
+}

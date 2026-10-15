@@ -1,0 +1,54 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "input",
+  "id": "HRI-01-VERIFICATION-INPUT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "vps-operations",
+    "locator": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/integration-work-validation.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "HRI-01-VERIFIED",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-15T10:53:55.359687+00:00",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:c6bc205729cf0133f5a039726ed0039b22f4c2070e33b29fcbceb23eb0656b29"
+      ],
+      "criteria": [
+        {
+          "id": "hri-01-scoped-readback",
+          "status": "pass",
+          "message": "Current published source start qualification and committed common Work record validation passed; native permission/semantic acceptance remain false.",
+          "evidenceRefs": [
+            "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/integration-work-validation.json"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/integration-work-validation.json",
+          "sha256": "827bf578899c2543c62f3842405f23569febcb80d3f83e1c29bb312affaf94fb"
+        }
+      ],
+      "runtime": {
+        "name": "native-codex-lead",
+        "version": "0.162.1"
+      },
+      "details": {
+        "verificationClass": "source-and-native-metadata-readback",
+        "semanticAcceptanceEstablished": false,
+        "nativeWorkResumed": false,
+        "sourceReceiptOwner": "vps-operations",
+        "sourceReceipt": "integration-work-validation.json"
+      }
+    }
+  }
+}

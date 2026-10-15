@@ -18,7 +18,7 @@
   },
   "title": "Normalize owned filesystem topology and naming after reference audit",
   "state": {
-    "execution": "planned",
+    "execution": "running",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",

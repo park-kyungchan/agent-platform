@@ -18,11 +18,11 @@
   },
   "title": "Deliver common-owned long-work skill and native projection discovery",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [
@@ -37,5 +37,7 @@
     "HRI-DECISION-GOAL"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "HRI-02-VERIFIED"
+  ]
 }
