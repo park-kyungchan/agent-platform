@@ -1,0 +1,247 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+  "reviewedTreeSha": "d230c84acc159461d9ee3f16096cd49da7ce4ca4",
+  "reviewedSourceManifestSha256": "2049e1e9636bddc7258e6a640d5a99bfb1a07371afc42059cbf32f1efce0c971",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "herdr:srv1873899-herdr/w3:p5:term_65de74534095d5:batch770a4a6f"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a13f90-74a0-7930-a5bc-9663e9ec9f86"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "independentSourceReview": {
+    "schema": "agent-platform.correlated-independent-source-successor-review.v1",
+    "correlation": "academy-phase-review-20261016-batch770a4a6f",
+    "reviewedAtUtc": "2026-10-15T21:36:27.126Z",
+    "reviewClass": "same-context-independent-source-finding-closure",
+    "result": "PASS",
+    "newFindings": [],
+    "unresolvedFindingCount": 0,
+    "source": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "root": "/home/palantirkc/code/worktrees/harness-product-continuation-batch-20261016",
+      "base": "770a4a6f25f34cd317da290438110a87c71d949a",
+      "head": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+      "tree": "d230c84acc159461d9ee3f16096cd49da7ce4ca4",
+      "parents": [
+        "e4029fe674760b076a832b5922c9583a312377bf",
+        "45ad69427faa5c49d7253cb7c967741c5f9eacc8"
+      ],
+      "addedWorkFiles": 8,
+      "oldWorkFilesByteIdentical": 169,
+      "totalWorkFiles": 177,
+      "maintainedSourceChanges": 0,
+      "cleanAtFinalReadback": true
+    },
+    "historicalReview": {
+      "path": "/tmp/academy-phase-review-batch770a4a6f-result.json",
+      "sha256": "a4c7d9e91fa8c7a402b893754aeedda5f70b1f8701ec5937c9abafd262775f17",
+      "unchanged": true,
+      "currentQualification": false,
+      "invalidationStatusId": 56472006032,
+      "statusProvenance": "Root-relayed FAILURE and exact v6 source; GitHub not queried or changed",
+      "meaning": "Original PASS missed these two defects and is preserved as historical evidence only. This new review independently closes the defects for the frozen successor; it does not rehabilitate770."
+    },
+    "sourceFindingClosure": [
+      {
+        "commentId": 4288374930,
+        "priority": "P2",
+        "originalValidity": "valid",
+        "disposition": "closed-in-exact-successor-source",
+        "proof": [
+          "New v6 checkpoint and supplement3 are appended, preserving all v5/supplement2 bytes. v6 phase/delegation/academyPreparation explicitly capture v1 complete/result-durable and academyCorrection captures completed frozen45ad v2 correction.",
+          "Task execution complete/localAudit result-durable remain exact. Independent verification, shared audit delivery, formal completion, successor closure/delivery and runtime results remain separately pending at the checkpoint observation time.",
+          "V6 sourcePins explicitly identify current45ad plan/manifest paths and SHA256; Git blobs match both45ad and0a8. v2 supersession, purpose and original-source relations validate. No automatic input injection/current selection by the bounded reader is claimed.",
+          "Separate916 once2 and once3 receipts are correctly scoped to supported metadata/one-page and distinct-reader comparison; retained raw observation digests and result objects match. Earlier once1 remains immutable consumed HOLD. Source/metadata evidence is not PG evidence, owner-exit durability, native activation or whole-Work Acceptance."
+        ]
+      },
+      {
+        "commentId": 4288374938,
+        "priority": "P2",
+        "originalValidity": "valid",
+        "disposition": "closed-in-exact-successor-source",
+        "proof": [
+          "Immutable phase-plan v2 and manifest v2 supersede v1 through new exact relations without replacing old records. All original six phase-packet records remain exact.",
+          "Exact captured Root bootstrap main selects requested-role authority and native_status enforces absent plus ownedEndpointAbsent. Plan v2 explicitly names status:postgres as insufficient for unchanged RUNNING PG, and selects a strictly equivalent existing-owner read-only birth/original-authority reconciliation instead.",
+          "P1 requires current container/image/init/namespace/boot, original Root supervisor and PG authority image/hash, original host/deployment contract bindings, native PG manager/Postgres exact birth/executable/cwd/argv, native original-authority receipt hash, same owned socket/kernel identity, before/after stability, exact reviewed read-only route and observation time.",
+          "P2 pgObservationGate is mandatory before ANY consumed-migration-permission retirement publication; it explicitly rejects stale, missing, unknown, conflicting, app-tunnel-only, different-incarnation and original-authority-unbound evidence. EvidenceProvided/evidenceSupplied remain false; actual route identification/source review and actual gate acceptance remain held.",
+          "No PG start/stop/restart, migrate or AFTER replay is authorized. No driver, native command, executable gate implementation, admission or permission publication is emitted. P0 compiler/Root-contract qualification and all operational phases remain held."
+        ]
+      }
+    ],
+    "verification": {
+      "checks": [
+        {
+          "command": "bun run harness validate /tmp/harness-product-batch-successor-after-20261016.json",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-successor0a8-validate.json",
+          "bytes": 139,
+          "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb"
+        },
+        {
+          "command": "bun run harness transition /tmp/harness-product-batch-after-20261016.json /tmp/harness-product-batch-successor-after-20261016.json",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-successor0a8-transition.json",
+          "bytes": 139,
+          "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb"
+        },
+        {
+          "command": "bun run harness context /tmp/harness-product-batch-successor-context-20261016.json",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-successor0a8-context.json",
+          "bytes": 19041,
+          "sha256": "4c1107c9348665228a61b5611fabcbff03341026e8116f76b4ff3f2564eb7677"
+        },
+        {
+          "command": "COMMON_BASE_SHA=770a4a6f25f34cd317da290438110a87c71d949a bun scripts/verify-common-work.ts /home/palantirkc/code/worktrees/harness-product-continuation-batch-20261016 0a8af1f5c1905d0de71c4377da92285dc821dfce",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-successor0a8-common-work.json",
+          "bytes": 662,
+          "sha256": "f509deaf16ec8422a95a4d264e7d71cc48bb0e0993e9c3903497c497a04e3055"
+        },
+        {
+          "command": "bun run check:handoff",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-successor0a8-handoff.log",
+          "bytes": 4983,
+          "sha256": "3da5b2250a3db23a1f151a3346297dc61c15431424f6d03105c85b95071e234c"
+        },
+        {
+          "command": "bun run check:imports",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-successor0a8-imports.log",
+          "bytes": 584,
+          "sha256": "71028b0ea55556cb40a69cde4426e818aa8af52df7b25dad72b3aa6169cf52e2"
+        },
+        {
+          "command": "bun /tmp/academy-phase-review-successor0a8-check.ts",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-successor0a8-integrity.json",
+          "bytes": 13585,
+          "sha256": "6ea780caace5b57a77d51eb4671ceb3288c855e480a84f5b93d03b8cfd4cd2b8"
+        },
+        {
+          "command": "Canonical @palantirkc/work-continuity Git Work readSource for exact v6/supplement/v2plan/v2manifest",
+          "status": "pass",
+          "path": "/tmp/academy-phase-review-successor0a8-source-read.json",
+          "bytes": 1770,
+          "sha256": "bcdd95ae73ac0efc5600c87ed6111f702f263059e4feefd8f11e8f8a9bdf5000"
+        }
+      ],
+      "strictSchema": {
+        "valid": true,
+        "coreChars": 15970,
+        "schemaSha256": "f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4",
+        "options": {
+          "strict": true,
+          "allErrors": true,
+          "coerceTypes": false,
+          "useDefaults": false,
+          "removeAdditional": false
+        },
+        "negativeRejected": [
+          "root-extra",
+          "runtime-extra",
+          "delegation-scope"
+        ],
+        "ajvPath": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/ajv@8.20.0/node_modules/ajv/dist/2020.js",
+        "formatsPath": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/ajv-formats@3.0.1/node_modules/ajv-formats/dist/index.js"
+      },
+      "pinChecks": 41,
+      "rawOriginalCustody": [
+        {
+          "version": "v2",
+          "bytes": 16057,
+          "sha256": "bd8934a50058c093e0406403e9d8553249f5a2822a47f07a3b582f25f7ef3171"
+        },
+        {
+          "version": "v3",
+          "bytes": 16717,
+          "sha256": "8f5c2c89868e46732d622ac4430db9a4d7611b52cb777800e17ac13c56fde14d"
+        }
+      ],
+      "oldWorkFilesByteIdentical": 169,
+      "actualDecisions": 47,
+      "completedHistoricalFences": 63,
+      "uncertainHistoricalFences": 2,
+      "handoff": {
+        "passed": 39,
+        "failed": 0
+      },
+      "commonWork": {
+        "schema": "agent-platform.common-work-verification.v1",
+        "status": "pass",
+        "verificationClass": "committed-common-source-only",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "0a8af1f5c1905d0de71c4377da92285dc821dfce",
+        "records": 177,
+        "actualDecisions": 47,
+        "completedHistoricalEffects": 63,
+        "uncertainHistoricalEffects": 2,
+        "contextRecords": 33,
+        "contextSources": 44,
+        "runtimeDocumentationRoutes": 84,
+        "comparisonBaseCommit": "770a4a6f25f34cd317da290438110a87c71d949a",
+        "transitionValidated": true,
+        "runtimeActivationEstablished": false,
+        "wholeWorkAcceptanceEstablished": false,
+        "nativePermissionGranted": false
+      },
+      "context": {
+        "status": "source-qualified",
+        "records": 21,
+        "holdReasons": [],
+        "omittedRecords": 0,
+        "nativePermissionGranted": false
+      }
+    },
+    "preservedBoundaries": [
+      "V6 reports three product code bodies recovered privately and Root contract masked; retained private-capture hash and actual source-read receipt/reconciliation pins match. This does not recover genuine Hermes engineering-owner closure or qualify full Root contract contents, PG original authority, Bun executable successor or product gates.",
+      "Historical1.4.2 release/controller/contract bytes and PG authority coupling remain preserved; proposed1.4.3 executable successor hashes remain null. Historical pointer unknown/fresh absence remain distinct; expected future pointer bytes remain null.",
+      "Original WSL writer remains paused. Separate observed source916 reader receipts retain original active writer still-running limits, no owner-exit durability/full-history/auth/common-consumption/activation claim. Reasoning ultra/high difference remains unresolved.",
+      "Completed/uncertain no-replay fences, original answer custody, official score.create uncertainty, source-Academy read-only boundary, question selection/final-membership prohibition, no paid infrastructure, fresh evaluation budget hold and null whole-Work Acceptance remain intact."
+    ],
+    "limits": [
+      "This source-only conclusion applies to exact old770 -> new0a8/tree d230 and closes only the two supplied P2 comments. It neither resolves GitHub threads nor publishes an authenticated review status.",
+      "Checks used unchanged installed shared98eb139 reader/dependencies against explicit committed target objects; no dependency installation or alias. Input/schema/native/provider code, metadata and historical release files have no diff. Native first-import/owner registration closure was not executed or activated.",
+      "Local pins and receipt equality establish retained-byte consistency, not independently authenticated native authorship or fresh remote/runtime/PG/pointer/binary state. Private capture was hashed without exporting its bodies. No live observation, gate satisfaction, runtime or business qualification was performed.",
+      "Required hosted checks for new0a8 were not run or asserted. Historical770 CI results remain historical. New status publication, PR integration, main binding and native activation require Root-owned exact reviewed steps; none is complete or inferred here.",
+      "No SSH/HTTP/DB/native CLI/appserver/model evaluation/auth/config/trust/Goal/source edit/push/status/thread resolution or native effects. Only local review artifacts and source checks were produced.",
+      "Root must read back this exact artifact/result before publishing successor status/head and obtain final source/main-binding readback before closing the bounded native reviewer role. This review did not close a pane or perform native readback."
+    ],
+    "nativePermissionGranted": false,
+    "pgObservationGateAccepted": false,
+    "nativeActivationGranted": false,
+    "wholeWorkComplete": false,
+    "acceptanceDecision": null
+  },
+  "independentArtifactSha256": "7fda4a4c99b229cd921cc90adeacb9cf483c9f9c43f42ec71993ddf1448efe86",
+  "nativeCompletionReadback": {
+    "method": "Settled lifecycle and actual terminal/artifact readback",
+    "paneId": "w3:p5",
+    "terminalId": "term_65de74534095d5",
+    "completionSeq": 44,
+    "nativeAuthorshipCryptographicallyVerified": false
+  },
+  "authorCommits": [
+    "e4029fe674760b076a832b5922c9583a312377bf",
+    "45ad69427faa5c49d7253cb7c967741c5f9eacc8"
+  ],
+  "limits": [
+    "Eight additive source records only; no executable source or native effect admission.",
+    "Current required hosted source/quality/review checks and accountable expected-head merge remain separate.",
+    "Snapshot states are time-bound; later runtime observations are not retroactively part of this review."
+  ],
+  "nativeActivationEstablished": false,
+  "acceptanceDecision": null
+}
