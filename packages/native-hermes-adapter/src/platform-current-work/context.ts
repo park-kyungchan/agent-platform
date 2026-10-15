@@ -299,11 +299,7 @@ function bounded(
   }
   if (!fits()) {
     // Never shrink essential originals, purpose or Task text into a qualified view.
-    return result([
-      view.decisions.some((decision) => essentialDecisionIds.has(decision.id))
-        ? "REQUIRED_TASK_DECISION_ORIGINALS_OUTPUT_LIMIT"
-        : "REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT",
-    ]);
+    return result(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
   }
   return result(reasons, view);
 }

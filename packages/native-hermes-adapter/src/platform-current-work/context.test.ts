@@ -75,6 +75,7 @@ async function fixture(
     questionlessDecisions?: number[];
     missingQuestionDecision?: number;
     badAnswerDecision?: number;
+    objective?: string;
     dependencies?: number;
     badAnswer?: boolean;
     closed?: boolean;
@@ -108,7 +109,7 @@ async function fixture(
       repositoryId: "synthetic/common",
       issueId: identity.issueId,
       purpose: {
-        objective: "Preserve the current integrated purpose",
+        objective: options.objective ?? "Preserve the current integrated purpose",
         successCriteria: ["Exact logical/native selection"],
         inScope: ["Source context"],
         outOfScope: ["Native authority"],
@@ -496,13 +497,24 @@ test("essential Task original overflow stays held without truncating purpose or 
   const f = await fixture({ decisions: 17 });
   const value = await f.read();
   expect(value.status).toBe("held");
-  expect(value.holdReasons).toEqual(["REQUIRED_TASK_DECISION_ORIGINALS_OUTPUT_LIMIT"]);
+  expect(value.holdReasons).toEqual(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
   expect(value.context).toBeNull();
   expect(JSON.stringify(value).length).toBeLessThanOrEqual(6000);
   f.provider.maxChars = 1200;
   const tiny = await f.read();
   expect(tiny.status).toBe("held");
   expect(JSON.stringify(tiny).length).toBeLessThanOrEqual(1200);
+});
+
+test("oversized purpose with one small Task decision reports only the startup context limit", async () => {
+  const small = await fixture();
+  expect((await small.read()).status).toBe("source-qualified");
+  const large = await fixture({ objective: "Synthetic oversized purpose: " + "x".repeat(6100) });
+  const value = await large.read();
+  expect(value.status).toBe("held");
+  expect(value.holdReasons).toEqual(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
+  expect(value.context).toBeNull();
+  expect(JSON.stringify(value).length).toBeLessThanOrEqual(6000);
 });
 
 test("direct dependency projection has explicit omission counts while prerequisites remain held", async () => {
