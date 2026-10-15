@@ -14,7 +14,7 @@
   "content": {
     "schemaVersion": "1.0.0",
     "kind": "verification",
-    "id": "HRI-02-VERIFIED",
+    "id": "codex-harness-engineering:verification:herdr-runtime-integration:hri-02",
     "projectId": "codex-harness-engineering",
     "domainId": "native-harness",
     "createdAt": "2026-10-15T10:53:55.359687+00:00",
@@ -28,14 +28,14 @@
           "status": "pass",
           "message": "Reviewed common-owned skill bytes match enabled native Home discovery; no native thread/turn/model prompt created. Model behavior and user acceptance are not claimed.",
           "evidenceRefs": [
-            "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/long-work-skill-native-readback.json"
+            "codex-harness-engineering:evidence:herdr-runtime-integration:hri-02-source-readback"
           ]
         }
       ],
       "inputHashes": [
         {
-          "path": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/long-work-skill-native-readback.json",
-          "sha256": "cdeafc5d29854cdab38d0beb6bb5d743b81e971ac9408913b80bc13364afcc9f"
+          "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-02-READBACK.json",
+          "sha256": "4c87d065a7e30033b9caf3b71e2a5a3f1054c9ae8fe73d934dacb5dc548d5e6c"
         }
       ],
       "runtime": {

@@ -14,7 +14,7 @@
   "content": {
     "schemaVersion": "1.0.0",
     "kind": "verification",
-    "id": "HRI-01-VERIFIED",
+    "id": "codex-harness-engineering:verification:herdr-runtime-integration:hri-01",
     "projectId": "codex-harness-engineering",
     "domainId": "native-harness",
     "createdAt": "2026-10-15T10:53:55.359687+00:00",
@@ -28,14 +28,14 @@
           "status": "pass",
           "message": "Current published source start qualification and committed common Work record validation passed; native permission/semantic acceptance remain false.",
           "evidenceRefs": [
-            "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/integration-work-validation.json"
+            "codex-harness-engineering:evidence:herdr-runtime-integration:hri-01-source-readback"
           ]
         }
       ],
       "inputHashes": [
         {
-          "path": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/integration-work-validation.json",
-          "sha256": "827bf578899c2543c62f3842405f23569febcb80d3f83e1c29bb312affaf94fb"
+          "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-01-READBACK.json",
+          "sha256": "574daebcc2d75b5cac003987d0305ae1fa1d891bb5e3a9f497a77fe2d534fe10"
         }
       ],
       "runtime": {

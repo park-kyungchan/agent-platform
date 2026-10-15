@@ -4,11 +4,11 @@
   "projectId": "codex-harness-engineering",
   "workId": "herdr-runtime-integration",
   "kind": "evidence",
-  "id": "HRI-02-VERIFIED",
+  "id": "codex-harness-engineering:verification:herdr-runtime-integration:hri-01",
   "evidenceKind": "verification",
   "source": {
     "kind": "snapshot",
-    "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-02-VERIFICATION-INPUT.json",
+    "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-01-VERIFICATION-INPUT.json",
     "fragment": "#/content"
   }
 }
