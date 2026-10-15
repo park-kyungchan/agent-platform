@@ -1,0 +1,224 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "e8116803ad92e6ac22a191a779e8f778cd00c657",
+  "reviewedTreeSha": "201eaab8df39e02fc5b716f158f9ade40ab575e7",
+  "reviewedSourceManifestSha256": "68821132f1dbce36ce4f2f3eb7b69ef54247f8f988f7d219b01e07ee1831e1d0",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/git_recovery_audit"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "independentSourceReview": {
+    "schema": "agent-platform.independent-source-review.v1",
+    "recordClass": "IndependentSourceReview",
+    "reviewedAtUtc": "2026-10-15T06:54:15Z",
+    "reviewer": "/root/git_recovery_audit",
+    "nativeReviewerIdentity": {
+      "actualNativeChildThreadId": "01a13e48-97ff-7a32-b9df-7081c090897c",
+      "transcriptPath": "/home/palantirkc/.codex/sessions/2026/10/15/rollout-2026-10-15T15-38-27-01a13e48-97ff-7a32-b9df-7081c090897c.jsonl",
+      "identitySource": "First session_meta payload.id and source.subagent.thread_spawn.agent_path; corroborated by this child transcript's own independent-review tool calls.",
+      "sessionMetaLine": 1,
+      "logicalAgentPath": "/root/git_recovery_audit",
+      "inheritedRootSessionId": "01a13e45-ee6e-7770-8aff-3bfe03f57b24",
+      "inheritedRootSessionIdUsedAsChildIdentity": false,
+      "reportCreationToolCallId": "call_9a7c6f764088429b8549e3a0493dd2c7",
+      "reportCreationTranscriptLine": 359,
+      "terminalTaskCompleteEvent": "Not yet observed before this child's final response; parent must join the subsequent actual native task_complete event.",
+      "finalAnswerIsTerminalEventSubstitute": false
+    },
+    "reviewerIndependence": {
+      "candidateAuthoredOrModifiedByReviewer": false,
+      "candidateAndRemoteWritesPerformed": false,
+      "classification": "ordinary delegated independent source review, outside the native evaluation suite",
+      "nativeAuthorshipAuthenticationEstablished": false,
+      "publicationRule": "The accountable Lead must bind and publish authenticated exact-head review evidence and status before the PR. This local report is not an authenticated GitHub status."
+    },
+    "target": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "repositoryRoot": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/worktrees/interruption-recovery-preselection",
+      "baseCommit": "ac1a13fbf246fa8a4f9407894d370f192848e98f",
+      "commit": "e8116803ad92e6ac22a191a779e8f778cd00c657",
+      "tree": "201eaab8df39e02fc5b716f158f9ade40ab575e7",
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-harness-operation",
+      "taskId": "INTERRUPTION-RECOVERY-AND-PRESELECTION",
+      "changedFiles": 9,
+      "scope": "Two current decisions, their exact original input capture, Spec7/Plan7 successors, two supersession relations, the running source-only recovery Task, and the bounded Work summary."
+    },
+    "disposition": "pass",
+    "findings": [],
+    "findingCounts": {
+      "blocking": 0,
+      "material": 0,
+      "unresolved": 0
+    },
+    "checks": [
+      {
+        "command": "git status --porcelain=v1; git rev-parse HEAD HEAD^{tree}",
+        "result": "pass",
+        "observation": "The candidate worktree was clean and HEAD/tree matched the exact review target before and after the read-only review."
+      },
+      {
+        "command": "git diff --stat ac1a13fbf246fa8a4f9407894d370f192848e98f e8116803ad92e6ac22a191a779e8f778cd00c657",
+        "result": "pass",
+        "observation": "Only the nine intended Work contract files changed: eight additions and the Work summary. No runtime source, credential, native configuration, historical contract, existing decision, existing Task, effect or fence file changed."
+      },
+      {
+        "command": "COMMON_BASE_SHA=ac1a13fbf246fa8a4f9407894d370f192848e98f GIT_NO_LAZY_FETCH=1 GIT_OPTIONAL_LOCKS=0 bun scripts/verify-common-work.ts . e8116803ad92e6ac22a191a779e8f778cd00c657",
+        "result": "pass",
+        "records": 145,
+        "actualDecisions": 47,
+        "completedHistoricalEffects": 63,
+        "uncertainHistoricalEffects": 2,
+        "runtimeDocumentationRoutes": 84,
+        "transitionValidated": true,
+        "comparisonBaseCommit": "ac1a13fbf246fa8a4f9407894d370f192848e98f"
+      }
+    ],
+    "independentReadOnlyApiAndInvariantChecks": {
+      "execution": "Inline Bun TypeScript through the native delegated tool transcript; no audit script or request file was written into the candidate.",
+      "sourceApi": "openGitWork and resolveGitWorkSelection at the exact candidate commit, followed by readGitWorkContext with latestRelevant=current, maxChars=24000 and maxRecords=128",
+      "contexts": [
+        {
+          "taskId": "INTERRUPTION-RECOVERY-AND-PRESELECTION",
+          "status": "source-qualified",
+          "chars": 17765,
+          "records": 23,
+          "sources": 30,
+          "omittedRecords": 0,
+          "holdReasons": [],
+          "bothCurrentDecisionIdsIncluded": true,
+          "authority": "none",
+          "nativePermissionGranted": false,
+          "semanticAcceptanceEstablished": false
+        },
+        {
+          "taskId": "GHA-22",
+          "status": "source-qualified",
+          "chars": 23779,
+          "records": 33,
+          "sources": 44,
+          "omittedRecords": 0,
+          "holdReasons": [],
+          "authority": "none",
+          "nativePermissionGranted": false,
+          "semanticAcceptanceEstablished": false
+        }
+      ],
+      "history": {
+        "priorWorkFiles": 137,
+        "onlyChangedPriorPath": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json",
+        "allHistoricalSpecAndPlanBlobsRetained": true,
+        "allPriorActualDecisionsRetained": true,
+        "allPriorGoverningDecisionIdsRetained": true,
+        "historicalFenceLinksAndBytesUnchanged": true,
+        "inScopeArrayUnchanged": true,
+        "allPriorOutOfScopeEntriesRetained": true,
+        "spec6OutcomeRetainedAsExactPrefix": true,
+        "spec6CriteriaCount": 12,
+        "spec7CriteriaCount": 13,
+        "changedOriginalCriterionNumbers": [
+          9
+        ],
+        "interpretation": "Eleven prior full criteria remain byte-identical. Criterion9 changes the month-end outcome to the new user selection boundary while retaining teacher workflows, identities, edition hierarchy, DailyRecord, the student knowledge graph and other authorized independent private-runtime workflows. Criterion13 adds recovery and bounded cleanup. The shorter Work summary continues to bind the complete Spec7 without shrinking the accepted integrated program."
+      },
+      "sourceOnlyTaskState": {
+        "execution": "running",
+        "verification": "pending",
+        "localAudit": "intent-durable",
+        "sharedAudit": "pending",
+        "formalCompletion": "pending",
+        "effectIdsEmpty": true,
+        "verificationEvidenceIdsEmpty": true,
+        "falseCompletionClaimFound": false
+      }
+    },
+    "originalInstructionChecks": {
+      "candidatePath": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/recovery-user-instructions-20261015.json",
+      "localNativeTranscript": "/home/palantirkc/.codex/sessions/2026/10/15/rollout-2026-10-15T15-35-32-01a13e45-ee6e-7770-8aff-3bfe03f57b24.jsonl",
+      "captureLimitationPreserved": true,
+      "bindings": [
+        {
+          "instructionId": "resume-and-monthly-preselection",
+          "exactLocalUserMessageMatch": true,
+          "transcriptLine": 10,
+          "timestamp": "2026-10-15T06:37:50.905Z",
+          "fragment": "#/content/instructions/0/text",
+          "textSha256": "beb37846418e9cbaa8f62201b382769c44226470ede67584d6df5ea22a6b009d"
+        },
+        {
+          "instructionId": "whole-lens-delivery-cleanup",
+          "exactLocalUserMessageMatch": true,
+          "transcriptLine": 140,
+          "timestamp": "2026-10-15T06:41:23.898Z",
+          "fragment": "#/content/instructions/1/text",
+          "textSha256": "bcb4bd90964d04f18eaf080579893e1564fbb0c68c7a21ae2c97efccf279a8bf"
+        }
+      ],
+      "nativeAuthorshipAuthenticated": false
+    },
+    "semanticReview": {
+      "monthEndBoundary": "The current decision, full Spec7 and Work out-of-scope explicitly prohibit a new agent-generated 24-question paper, autonomous selection of Academy-server questions and persistence of final exam membership. The required deliverable is analysis plus a pre-selection handoff for the user; existing source-server access remains absolutely read-only.",
+      "integratedPurpose": "Common Harness, both native consumers, private portfolio topology and reorganization, Academy product/operational backlog, seven operational gates, useful native handoff/resume/Memory/concurrency proofs, PC-off VPS operation, exact delivery and delegated evidence-based Lead Acceptance all remain required.",
+      "cleanupBoundary": "Cleanup requires verified merged or source-equivalent superseded Task source and preserved unique commits, private evidence, active native sessions and recovery custody. It does not grant automatic merge or blanket deletion. The revision records an obligation and limits, not a claim that cleanup already occurred.",
+      "budgetAndAuthority": "The prior fresh-suite limits remain unchanged at48requests/2000000emitted tokens/8hours and remain separate from ordinary engineering and the native Goal. Historical suites and completed effects are not renewed or replayable. Native permission and human/domain acceptance are not inferred."
+    },
+    "nonblockingObservations": [
+      "The legacy GHA-22 projection currently has221characters of headroom under its24000-character bound. Future contract additions need a fresh bounded-context check. This candidate passes with no omissions.",
+      "The recovery Task context includes both current decisions. The Work-wide context carries the month-end purpose boundary; the detailed cleanup decision is scoped to the recovery Task."
+    ],
+    "limitations": {
+      "verificationClass": "exact-commit common-source and contract review only",
+      "runtimeActivationEstablished": false,
+      "nativeRuntimeBehaviorVerified": false,
+      "existingExamImplementationRequalified": false,
+      "monthEndAnalysisDeliverableVerified": false,
+      "actualQuestionSelectionPerformed": false,
+      "academySourceServerWrites": 0,
+      "cleanupOrRemoteEffectsPerformed": false,
+      "githubReviewStatusPublished": false,
+      "wholeWorkAcceptanceEstablished": false,
+      "humanOrTeacherAcceptanceObserved": false,
+      "nativeEvaluationRequestsDispatched": 0,
+      "historicalFailedCandidateEvidenceModified": false
+    }
+  },
+  "nativeCompletionReadback": {
+    "actor": "/root",
+    "actualChildThreadId": "01a13e48-97ff-7a32-b9df-7081c090897c",
+    "eventType": "task_complete",
+    "sourceLine": 412,
+    "at": "2026-10-15T06:57:16.315Z",
+    "turnId": "01a13e53-f652-79e3-9627-92ab217658bf",
+    "inheritedRootIdentitySubstituted": false
+  },
+  "localChecks": {
+    "source": "pass",
+    "quality": "pass",
+    "commonWork": "pass",
+    "gitWorkAndRuntimeDocs": {
+      "pass": 91,
+      "fail": 0
+    },
+    "handoff": {
+      "pass": 39,
+      "fail": 0
+    },
+    "imports": "pass"
+  },
+  "limitations": [
+    "Source/quality review only; no runtime activation, whole-Work completion, teacher selection or human satisfaction established."
+  ]
+}
