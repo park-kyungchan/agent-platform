@@ -18,11 +18,11 @@
   },
   "title": "Enforce source/path/skill/deployment consistency in CI",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [
@@ -42,6 +42,8 @@
     "HRI-DECISION-GOAL"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": [],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:herdr-runtime-integration:hri-04"
+  ],
   "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74"
 }
