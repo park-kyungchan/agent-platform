@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "spec",
+  "id": "HRI-SPEC",
+  "revision": 1,
+  "outcome": "Complete the unified Herdr entrypoint, durable Codex unattended-work continuity, coherent common/native-runtime filesystem ownership and Git/GitHub CI delivery while preserving the paused source Work and live Hermes/Desktop services.",
+  "criteria": [
+    "Exact WSL command herdr --remote srv1873899 and one ready user-facing native Codex Orchestrator.",
+    "Native Hermes TUI and on-demand Codex workers use existing native owners without a second scheduler.",
+    "Durable automatic long-work Goal/plan/checkpoint routing is source-controlled and natively discoverable.",
+    "Source/runtime/data/artifact/cache paths have one coherent contract, justified normalization and verified references.",
+    "Common/Codex/Hermes Harness source and Work records remain modules of agent-platform; independent project/native state owners remain distinct.",
+    "Git branches, exact independent review and CI checks cover changed source and relevant path/skill/deployment contracts.",
+    "Original source Work remains paused; no historical effect replay; current receipts and manual continuation survive compaction and cross-host handoff."
+  ]
+}

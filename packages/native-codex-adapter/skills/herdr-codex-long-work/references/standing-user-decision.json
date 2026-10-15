@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "decision",
+  "id": "codex-harness-engineering:decision:herdr-codex-long-work-20261015",
+  "projectId": "codex-harness-engineering",
+  "domainId": "native-harness",
+  "createdAt": "2026-10-15T10:37:56Z",
+  "ontologyPackage": {"name": "@palantirkc/ontology", "version": "0.2.0"},
+  "payload": {
+    "title": "Standing instructions for entrusted long complex unattended work in Herdr",
+    "status": "accepted",
+    "choice": "Prepare and maintain a native Goal, native plan, and source-owned continuity without requiring the user to repeat those requests for qualifying entrusted work.",
+    "authority": {
+      "actorType": "user",
+      "actorId": "current-user",
+      "sourceKind": "parent-agent-relay-of-actual-user-instruction",
+      "sourceDate": "2026-10-15",
+      "verbatimUserText": null,
+      "scope": "This user's entrusted long, complex, unattended Codex work in Herdr; future concrete work retains its own effect authority and boundaries."
+    },
+    "conditions": [
+      "The user actually entrusts sustained complex work intended to continue unattended; ordinary tasks do not qualify.",
+      "Read native Goal state first and reuse the current active Goal without creating a competitor or silently changing its scope.",
+      "Create a Goal only if no unfinished Goal exists; objective at most 4000 characters and token_budget only when explicitly provided.",
+      "Use native plans and bounded English typed source-owned continuity records at material boundaries.",
+      "After compaction or handoff, rehydrate from current records and verify live identities before action.",
+      "Use on-demand workers and state waits; native internal delegation remains allowed.",
+      "Herdr controls require HERDR_ENV=1 and the existing herdr skill."
+    ],
+    "preservedBoundaries": [
+      "Explicit stop, pause, manual-resume, evaluation budget, selected profile, permissions and excluded domains.",
+      "Completed, consumed and uncertain effects are not replayable; correlated receipts retain their original identity.",
+      "No new model evaluation suite, second agent runtime, scheduler, hook configuration or session replica.",
+      "No resumed provider-drift repair, paused Work mutation, direct pane-to-pane messaging test, automatic merge or remote deployment through this record.",
+      "No claim that compaction is prevented or multi-day process survival is guaranteed."
+    ],
+    "implementationStatus": "candidate-source-awaiting-parent-review-and-deployment",
+    "acceptanceDecision": null
+  },
+  "sourceEvidence": {
+    "taskOwner": "/root",
+    "implementationWorker": "/root/vps_capacity_audit",
+    "description": "The parent explicitly relayed the actual 2026-10-15 user request and native create_goal authorization in this bounded implementation task. This record is a paraphrase, not a fabricated direct quote or a deployment receipt."
+  },
+  "documentationRefs": [
+    "https://developers.openai.com/cookbook/examples/codex/using_goals_in_codex",
+    "https://learn.chatgpt.com/docs/build-skills"
+  ]
+}

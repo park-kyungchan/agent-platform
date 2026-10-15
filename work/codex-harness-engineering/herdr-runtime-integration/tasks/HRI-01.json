@@ -1,0 +1,36 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "task",
+  "id": "HRI-01",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "herdr-runtime-integration",
+    "issueId": "HRI-ISSUE-20261015",
+    "specId": "HRI-SPEC",
+    "specRevision": 1,
+    "planId": "HRI-PLAN",
+    "planRevision": 1,
+    "taskId": "HRI-01"
+  },
+  "title": "Qualify current source and preserve explicit integration Work identity",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "HRI-DECISION-SCOPE",
+    "HRI-DECISION-CONTINUITY",
+    "HRI-DECISION-GOAL"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

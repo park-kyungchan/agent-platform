@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "decision",
+  "id": "HRI-DECISION-CONTINUITY",
+  "status": "accepted",
+  "answer": "참고로 내가 장시간 복잡한 작업을 사용자 개입 없이 맡길 때, 이러한 요청이 적용될 수 있도록 Herdr의 Codex 전용 Harness Engineering을 미리 해둬, 내가 반복해서 이러한 요청을 하지 않도록 적절한 곳에다 해주면 돼, 또는 스킬을 만들어서 라우팅하든지.",
+  "meaning": "Standing user request for durable native Goal, plan and checkpoint routing for future long complex unattended Herdr Codex tasks; concrete task authority and pause boundaries remain.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-INPUT-CONTINUITY.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}
