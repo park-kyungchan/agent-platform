@@ -71,6 +71,11 @@ const state: TaskRecord["state"] = {
 async function fixture(
   options: {
     decisions?: number;
+    taskDecisions?: number;
+    questionlessDecisions?: number[];
+    missingQuestionDecision?: number;
+    badAnswerDecision?: number;
+    objective?: string;
     dependencies?: number;
     badAnswer?: boolean;
     closed?: boolean;
@@ -104,7 +109,7 @@ async function fixture(
       repositoryId: "synthetic/common",
       issueId: identity.issueId,
       purpose: {
-        objective: "Preserve the current integrated purpose",
+        objective: options.objective ?? "Preserve the current integrated purpose",
         successCriteria: ["Exact logical/native selection"],
         inScope: ["Source context"],
         outOfScope: ["Native authority"],
@@ -139,7 +144,7 @@ async function fixture(
       title: "Current integrated Task",
       state,
       executionClass: "source-only",
-      decisionIds,
+      decisionIds: decisionIds.slice(0, options.taskDecisions ?? decisionIds.length),
       dependsOn: dependencyIds.map((taskId) => ({
         taskId,
         milestone: "execution-and-verification" as const,
@@ -161,7 +166,8 @@ async function fixture(
       verificationEvidenceIds: [],
     })),
   ];
-  for (const id of decisionIds) {
+  for (const [index, id] of decisionIds.entries()) {
+    const questionless = options.questionlessDecisions?.includes(index) ?? false;
     const original = { kind: "snapshot" as const, path: path("input", `${id}-original`) };
     records.push({
       ...base,
@@ -175,7 +181,9 @@ async function fixture(
       },
       content: {
         answer: `PRIVATE-ANSWER-SENTINEL-${id}`,
-        question: `PRIVATE-QUESTION-SENTINEL-${id}`,
+        ...(!questionless && options.missingQuestionDecision !== index
+          ? { question: `PRIVATE-QUESTION-SENTINEL-${id}` }
+          : {}),
       },
     });
     records.push({
@@ -183,13 +191,20 @@ async function fixture(
       kind: "decision",
       id,
       status: options.closed ? "superseded" : "accepted",
-      answer: options.badAnswer ? "BROKEN-ORIGINAL-BINDING" : `PRIVATE-ANSWER-SENTINEL-${id}`,
+      answer:
+        options.badAnswer || options.badAnswerDecision === index
+          ? "BROKEN-ORIGINAL-BINDING"
+          : `PRIVATE-ANSWER-SENTINEL-${id}`,
       meaning: "Actual decision rationale retained in the immutable record",
       answerSource: { ...original, fragment: "#/content/answer" },
-      selectionContext: {
-        text: `PRIVATE-QUESTION-SENTINEL-${id}`,
-        source: { ...original, fragment: "#/content/question" },
-      },
+      ...(!questionless
+        ? {
+            selectionContext: {
+              text: `PRIVATE-QUESTION-SENTINEL-${id}`,
+              source: { ...original, fragment: "#/content/question" },
+            },
+          }
+        : {}),
       supersedes: options.superseded ? [`${id}-previous`] : [],
     });
     if (options.superseded)
@@ -427,18 +442,79 @@ test("moving local ref and source-closure drift produce truthful holds with safe
   expect(JSON.stringify(drift)).not.toContain("PRIVATE-CLOSURE-ERROR-SENTINEL");
 });
 
-test("startup projection omits originals explicitly and never exceeds its requested bound", async () => {
-  const f = await fixture({ decisions: 10 });
+test("seventeen governing decisions retain three Task originals with disclosed optional omissions", async () => {
+  const f = await fixture({
+    decisions: 17,
+    taskDecisions: 3,
+    questionlessDecisions: [2, 5, 6, 9, 12],
+  });
+  const value = await f.read();
+  expect(value.status).toBe("source-qualified");
+  expect(value.holdReasons).toEqual([]);
+  expect(value.context?.omitted.decisions).toBeGreaterThan(0);
+  expect(value.context?.decisions.slice(0, 3).map((decision) => decision.id)).toEqual([
+    "decision-0",
+    "decision-1",
+    "decision-2",
+  ]);
+  expect(value.context?.decisions[2]?.question).toBeNull();
+  expect(value.context?.decisions.every((decision) => decision.answer?.blobOid)).toBe(true);
+  expect(value.context?.governingDecisionIndex).toBe("work.json#/governingDecisionIds");
+  expect(value.context?.omitted.decisions! + value.context?.decisions.length!).toBe(17);
+  expect(value.context?.purpose.objective).toBe("Preserve the current integrated purpose");
+  expect(value.context?.currentTask.title).toBe("Current integrated Task");
+  expect(value.context?.omitted.fields).toEqual([]);
+  expect(JSON.stringify(value)).not.toContain("PRIVATE-ANSWER-SENTINEL");
+  expect(JSON.stringify(value)).not.toContain("PRIVATE-QUESTION-SENTINEL");
+  expect(JSON.stringify(value).length).toBeLessThanOrEqual(6000);
+});
+
+test("a direct actual answer needs no invented question while a declared missing question holds", async () => {
+  const direct = await fixture({ questionlessDecisions: [0] });
+  const value = await direct.read();
+  expect(value.status).toBe("source-qualified");
+  expect(value.context?.decisions[0]?.answer?.fragment).toBe("#/content/answer");
+  expect(value.context?.decisions[0]?.question).toBeNull();
+  const missing = await fixture({ missingQuestionDecision: 0 });
+  const held = await missing.read();
+  expect(held.status).toBe("held");
+  expect(held.holdReasons).toContain("REQUIRED_DECISION_ORIGINAL_LOCATOR_UNAVAILABLE");
+  expect(JSON.stringify(held)).not.toContain("PRIVATE-QUESTION-SENTINEL");
+});
+
+test("an omitted nonessential governing original is still fully validated", async () => {
+  const f = await fixture({ decisions: 17, taskDecisions: 3, badAnswerDecision: 16 });
   const value = await f.read();
   expect(value.status).toBe("held");
+  expect(value.holdReasons).toContain("ACTUAL_ANSWER_FRAGMENT_MISMATCH");
+  expect(value.context?.decisions.some((decision) => decision.id === "decision-16")).toBe(false);
   expect(value.context?.omitted.decisions).toBeGreaterThan(0);
-  expect(value.holdReasons).toContain("UNEXPANDED_DECISION_ORIGINALS");
-  expect(value.context?.decisions.length).toBeGreaterThan(0);
+  expect(JSON.stringify(value)).not.toContain("BROKEN-ORIGINAL-BINDING");
+  expect(JSON.stringify(value).length).toBeLessThanOrEqual(6000);
+});
+
+test("essential Task original overflow stays held without truncating purpose or Task text", async () => {
+  const f = await fixture({ decisions: 17 });
+  const value = await f.read();
+  expect(value.status).toBe("held");
+  expect(value.holdReasons).toEqual(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
+  expect(value.context).toBeNull();
   expect(JSON.stringify(value).length).toBeLessThanOrEqual(6000);
   f.provider.maxChars = 1200;
   const tiny = await f.read();
   expect(tiny.status).toBe("held");
   expect(JSON.stringify(tiny).length).toBeLessThanOrEqual(1200);
+});
+
+test("oversized purpose with one small Task decision reports only the startup context limit", async () => {
+  const small = await fixture();
+  expect((await small.read()).status).toBe("source-qualified");
+  const large = await fixture({ objective: "Synthetic oversized purpose: " + "x".repeat(6100) });
+  const value = await large.read();
+  expect(value.status).toBe("held");
+  expect(value.holdReasons).toEqual(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
+  expect(value.context).toBeNull();
+  expect(JSON.stringify(value).length).toBeLessThanOrEqual(6000);
 });
 
 test("direct dependency projection has explicit omission counts while prerequisites remain held", async () => {

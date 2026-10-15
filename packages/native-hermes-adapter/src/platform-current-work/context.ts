@@ -278,13 +278,18 @@ function bounded(
   view: HermesCurrentWorkView,
   reasons: string[],
   maxChars: number,
+  essentialDecisionIds: Set<string>,
 ): HermesCurrentWorkResult {
   const fits = () => JSON.stringify(result(reasons, view)).length <= maxChars;
-  while (!fits() && view.decisions.length) {
-    view.decisions.pop();
+  while (!fits()) {
+    const optional = view.decisions.findLastIndex(
+      (decision) => !essentialDecisionIds.has(decision.id),
+    );
+    if (optional < 0) break;
+    // Every original was validated before projection. The Git governing index retains
+    // omitted governing records; the selected Task's originals remain essential.
+    view.decisions.splice(optional, 1);
     view.omitted.decisions++;
-    if (!reasons.includes("UNEXPANDED_DECISION_ORIGINALS"))
-      reasons.push("UNEXPANDED_DECISION_ORIGINALS");
   }
   while (!fits() && view.directDependencies.length) {
     view.directDependencies.pop();
@@ -293,12 +298,9 @@ function bounded(
       reasons.push("UNEXPANDED_DIRECT_DEPENDENCIES");
   }
   if (!fits()) {
-    delete view.purpose.objective;
-    delete view.currentTask.title;
-    view.omitted.fields.push("purpose.objective", "currentTask.title");
-    reasons.push("REQUIRED_CONTEXT_TEXT_NOT_EXPANDED");
+    // Never shrink essential originals, purpose or Task text into a qualified view.
+    return result(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
   }
-  if (!fits()) return result(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
   return result(reasons, view);
 }
 
@@ -373,7 +375,8 @@ export async function readHermesCurrentWorkContext(
         const question = source(
           context.sources.find((row) => row.id === item.selectionContextSource),
         );
-        if (!answer || !question) reasons.push("REQUIRED_DECISION_ORIGINAL_LOCATOR_UNAVAILABLE");
+        if (!answer || (record.selectionContext && !question))
+          reasons.push("REQUIRED_DECISION_ORIGINAL_LOCATOR_UNAVAILABLE");
         decisions.push({
           id: record.id,
           status: record.status,
@@ -420,7 +423,7 @@ export async function readHermesCurrentWorkContext(
       };
       const after = await api.resolveGitWorkSelection(selected.snapshot);
       if (after.commit !== snapshot.commit) reasons.push("SELECTED_LOCAL_REF_ADVANCED_DURING_READ");
-      return bounded(view, reasons, maxChars);
+      return bounded(view, reasons, maxChars, new Set(task.decisionIds));
     } finally {
       await options.verifySourceClosure();
     }
