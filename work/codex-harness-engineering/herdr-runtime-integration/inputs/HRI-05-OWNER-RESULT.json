@@ -1,0 +1,84 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "input",
+  "id": "HRI-05-OWNER-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "vps-operations",
+    "locator": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/git-source-delivery-result.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "nativeReceipt": {
+      "schema": "vps.hri-owner-result.v1",
+      "taskId": "HRI-05",
+      "recordedAtUtc": "2026-10-15T12:53:56.314317+00:00",
+      "status": "passed",
+      "observations": {
+        "commonPr": 14,
+        "commonMergedMain": "e9a06f056c272afe89245e5779bdc7716aee1bb0",
+        "commonCi": {
+          "runId": 38735234900,
+          "result": "success",
+          "missingMergedReceiptPredecessorRetained": true
+        },
+        "nativeSource": "528f16f8ba3156147ca0339dfa20bda38114432a",
+        "nativeCi": {
+          "runId": 38735255873,
+          "result": "success"
+        },
+        "nativeRepoPrivate": true,
+        "automaticMerge": false,
+        "nativeMainProtection": "independently verified strict app-bound source check, PR/admin/force/delete/conversation guards",
+        "installedSources": "exact reviewed common and native checkouts; frozen dependencies;4skill files match",
+        "privateAdapterActivation": false
+      },
+      "sourceReceipts": [
+        {
+          "path": "common-pr14-premerge-readback.json",
+          "sha256": "0a0582cdff68fc653a9f7c5381828dc03c254f2aa00903b278e7386acbf9c429",
+          "bytes": 2143
+        },
+        {
+          "path": "common-pr14-lead-merge-decision.json",
+          "sha256": "c9f135f1b573c988a402a6cf8f81b5af1ab8ba9688a16bf3f386f06dda006423",
+          "bytes": 621
+        },
+        {
+          "path": "common-main-independent-review-result.json",
+          "sha256": "4ae95fb2553021d6fa128343fb32bae5dcbf9ff5d79af8970d705343edabc15d",
+          "bytes": 715
+        },
+        {
+          "path": "native-source-successor-independent-review.json",
+          "sha256": "af4c773142d2745645901af3b973c568affec062f5ce07b092cbb1630fe6a952",
+          "bytes": 7038
+        },
+        {
+          "path": "native-github-delivery-readback.json",
+          "sha256": "8fa6f1dd65b5a9358691392bee3460b5ee080d5d46d62df9a6333989e69d9d4d",
+          "bytes": 5211
+        },
+        {
+          "path": "native-main-protection-independent-readback.json",
+          "sha256": "81c1facdd0196db614547c2350b6c4542ac4a563f16caa7e95ff73faaf5edb6c",
+          "bytes": 5356
+        },
+        {
+          "path": "source-activation.json",
+          "sha256": "8a177f47e2a7ec92ec2eb8500e13f21fa876faa1075514d5c1567cad42eb199d",
+          "bytes": 1308
+        }
+      ],
+      "nativePermissionGrantedByRecord": false,
+      "modelEvaluationRequests": 0,
+      "originalWorkResumed": false,
+      "acceptanceDecision": null
+    },
+    "originalReceiptSha256": "4f55330f4339f24ed6bf93e6777a872540d68935dd9f94b6a636f05b5c7a1e7e",
+    "classification": "Source capture of actual owner execution/readback; this record authenticates no native permission and establishes no user AcceptanceDecision."
+  }
+}

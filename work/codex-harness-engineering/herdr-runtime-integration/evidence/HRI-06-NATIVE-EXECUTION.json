@@ -1,0 +1,14 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "evidence",
+  "id": "HRI-06-NATIVE-EXECUTION",
+  "evidenceKind": "native-execution",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-06-EXECUTION-RECEIPT.json",
+    "fragment": "#/content"
+  }
+}

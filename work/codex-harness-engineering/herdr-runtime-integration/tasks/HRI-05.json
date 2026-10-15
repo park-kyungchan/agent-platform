@@ -18,13 +18,13 @@
   },
   "title": "Deliver exact independently reviewed Git/GitHub source",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
-    "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
   },
-  "executionClass": "source-only",
+  "executionClass": "native-effect",
   "dependsOn": [
     {
       "taskId": "HRI-04",
@@ -36,7 +36,20 @@
     "HRI-DECISION-CONTINUITY",
     "HRI-DECISION-GOAL"
   ],
-  "effectIds": [],
-  "verificationEvidenceIds": [],
-  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74"
+  "effectIds": [
+    "HRI-05-common-reviewed-source-publication",
+    "HRI-05-private-native-source-publication",
+    "HRI-05-native-main-protection",
+    "HRI-05-reviewed-source-activation"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:herdr-runtime-integration:hri-05"
+  ],
+  "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74",
+  "occurrence": {
+    "runtimeId": "native-codex:01a13e6b-01ad-7642-bbd6-fdc67fcffe74",
+    "attemptId": "herdr-session-handoff-20261015-git-delivery",
+    "occurrenceId": "git-source-delivery-result.json"
+  },
+  "executionEvidenceId": "HRI-05-NATIVE-EXECUTION"
 }

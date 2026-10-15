@@ -1,0 +1,73 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "input",
+  "id": "HRI-07-OWNER-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "vps-operations",
+    "locator": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/cross-host-continuity-result.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "nativeReceipt": {
+      "schema": "vps.hri-owner-result.v1",
+      "taskId": "HRI-07",
+      "recordedAtUtc": "2026-10-15T12:53:56.316129+00:00",
+      "status": "passed",
+      "observations": {
+        "noticeFiles": 23,
+        "crossHostCopies": 46,
+        "hostHomeNativeProjectPointers": 3,
+        "wslOwnerPointer": "same exact final-preparation hash",
+        "originalCleanup": "Exact26path/36cache deletions and reasons preserved; no replay",
+        "nativeStateDirectory": "Only newly created state directory corrected toUID/GID1000; no recursive chown",
+        "sourceThread": "01a13e45-ee6e-7770-8aff-3bfe03f57b24",
+        "freshSourceState": "Goal paused;thread idle",
+        "manualContinuationReady": true,
+        "automaticSourceWorkResume": false,
+        "originalProviderHold": "402pass/24fail not resolved by this preparation"
+      },
+      "sourceReceipts": [
+        {
+          "path": "cross-host-notice-apply.json",
+          "sha256": "a8d3bbd223a1f468806c4602ef000a4a36129ae789123b957644145df8b6ff6d",
+          "bytes": 11773
+        },
+        {
+          "path": "cross-host-notice-readback.json",
+          "sha256": "4fa8e1e8b1e91913ad16c31ca414cf8e03ebc5442a8a7f7f0ff31fbed334c757",
+          "bytes": 356
+        },
+        {
+          "path": "native-state-directory-owner-correction.json",
+          "sha256": "2a9df673aa8613d63290fca081071be299b8310e57a71041c593fe4958415067",
+          "bytes": 341
+        },
+        {
+          "path": "final-preparation.json",
+          "sha256": "99ff2e900d2adae5fe8ca9804fa0088f66e487a1d30f5e8f0f0b897d6c7867e9",
+          "bytes": 8720
+        },
+        {
+          "path": "source-native-final-status.json",
+          "sha256": "0f1a8e665e7880ea11b0ed7df1e3dc0e21fe171160bef0caeba4a597f44d9993",
+          "bytes": 859
+        },
+        {
+          "path": "predecessor-latest-operation.json",
+          "sha256": "54b487678726171bf7d1ec7108250d892783936f2847f4b6690473d1b48e1718",
+          "bytes": 13957
+        }
+      ],
+      "nativePermissionGrantedByRecord": false,
+      "modelEvaluationRequests": 0,
+      "originalWorkResumed": false,
+      "acceptanceDecision": null
+    },
+    "originalReceiptSha256": "8f315cfd606475d6f29354645e2fcc8bc319e160a938f3ddce5d4bf3880c4666",
+    "classification": "Source capture of actual owner execution/readback; this record authenticates no native permission and establishes no user AcceptanceDecision."
+  }
+}

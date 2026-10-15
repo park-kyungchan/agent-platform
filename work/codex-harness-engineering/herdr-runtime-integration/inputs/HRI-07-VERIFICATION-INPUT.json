@@ -1,0 +1,54 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "herdr-runtime-integration",
+  "kind": "input",
+  "id": "HRI-07-VERIFICATION-INPUT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "vps-operations",
+    "locator": "/home/palantirkc/code/shared/vps-operations/runs/herdr-session-handoff-20261015/cross-host-continuity-result.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:herdr-runtime-integration:hri-07",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-15T12:55:59.960045+00:00",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:7a5d674e1a499108652148c228cd88571bf33fa4ae4090b4511993f3ad6130a8"
+      ],
+      "criteria": [
+        {
+          "id": "hri-07-owner-readback",
+          "status": "pass",
+          "message": "23 continuity records and46copies match across host/Home; WSL and native project entry pointers match; exact cleanup predecessor and source manual-resume fences remain discoverable.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:herdr-runtime-integration:hri-07-owner-readback"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-07-OWNER-RESULT.json",
+          "sha256": "6593aa76c982728bc98cd2aa9506142176aaf9e02c28e93652c46d583a6cca2a"
+        }
+      ],
+      "runtime": {
+        "name": "native-codex-lead",
+        "version": "0.162.1"
+      },
+      "details": {
+        "verificationClass": "source-and-native-owner-readback",
+        "semanticAcceptanceEstablished": false,
+        "sourceReceiptOwner": "vps-operations",
+        "sourceReceipt": "cross-host-continuity-result.json",
+        "nativeWorkResumed": false
+      }
+    }
+  }
+}
