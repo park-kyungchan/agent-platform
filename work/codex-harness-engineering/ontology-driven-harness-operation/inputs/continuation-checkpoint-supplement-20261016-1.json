@@ -1,0 +1,81 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "continuation-checkpoint-supplement-20261016-1",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-lead:checkpoint-correction:4287242542/4287242550",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "harness.continuation-supplement.v1",
+    "historicalSource": {
+      "commit": "e8f041751a6b4bdee1108b22bbb831114b685232",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v3.json"
+    },
+    "rawCaptures": [
+      {
+        "id": "continuation-original-v2-utf8-20261016",
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v2-utf8-20261016.json",
+        "sha256": "f39515ba51dc0d024d37ebf9712fc5ddc1057aa6385aa6cf47333ac799f96cbb",
+        "bytes": 18339
+      },
+      {
+        "id": "continuation-original-v3-utf8-20261016",
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v3-utf8-20261016.json",
+        "sha256": "56df00c64625db6d78b55015cb8170b7a3e758b07ef60a062b68486da45c8a41",
+        "bytes": 19050
+      }
+    ],
+    "captureProvenance": {
+      "sourceCommit": "5cfbe6c14a9bb399cf8acdb713aaf8f61f800681",
+      "sourcePath": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016.json",
+      "sourceSha256": "8f5c2c89868e46732d622ac4430db9a4d7611b52cb777800e17ac13c56fde14d",
+      "normalization": "Unique input ID/path; currentness and bounded fallback finalized before first delivery commit. Original v3 bytes remain at the pinned unpublished source commit; v1/v2 captures are preserved separately.",
+      "previousCaptureIds": [
+        "continuation-checkpoint-20261016",
+        "continuation-checkpoint-20261016-v2"
+      ],
+      "futureCapturePolicy": "Append a new input ID/path. Never rewrite committed checkpoint inputs."
+    },
+    "completedMilestone": {
+      "status": "complete",
+      "scope": "Bounded custody recovery, Academy exact source review/result delivery and requested live Bun unification.",
+      "wholeWorkComplete": false,
+      "acceptanceDecision": null,
+      "nativeEvidence": "Lead-relayed update_goal completion followed by create_goal/get_goal for full Spec7 created1792089018; source records do not authenticate native state."
+    },
+    "inheritedEffectFenceSource": {
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v2.json",
+      "semantics": "Relative receiptRefs below are Work-root snapshot paths. The unchanged v2 capture retains exact original custody receipts, unknown states and no-replay rules."
+    },
+    "historicalFindings": [
+      {
+        "commentId": 4287242542,
+        "priority": "P2",
+        "finding": "Original v3 raw source bytes only referenced unpublished local commit5cfbe6c; not standalone-clone addressable.",
+        "repair": "Exact original v2/v3 full UTF-8 bytes captured as distinct committed inputs. Original branches/history retained."
+      },
+      {
+        "commentId": 4287242550,
+        "priority": "P2",
+        "finding": "Published v3 fallback core has unsupported supplemental root/runtime fields and missing required delegation scopes.",
+        "repair": "Published v3 remains unchanged as invalid historical capture; v4 removes unsupported fields, restores scopes, and is checked against exact pinned fallback schema."
+      }
+    ],
+    "reviewState": {
+      "commonPr": 16,
+      "state": "open-held-pending-independent-successor-review",
+      "previousHead": "e8f041751a6b4bdee1108b22bbb831114b685232",
+      "previousReviewInvalidatedByLateFindings": true,
+      "unresolvedHistoricalP2Count": 2,
+      "newIndependentClosure": "pending",
+      "currentHeadPassClaimed": false
+    },
+    "nativeGoalObservation": "Lead relays full Spec7 Goal ACTIVE created1792089018. Completed bounded milestone is distinct; no whole-Work Acceptance. Git/JSON do not authenticate native authorship or Goal state."
+  }
+}
