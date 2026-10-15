@@ -1,0 +1,78 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "aaa0106868b2f41cfff61dc1a965672bd4666ab8",
+  "reviewedTreeSha": "7c940c21861d979b9aa3831d199ba1d3d93f8901",
+  "reviewedSourceManifestSha256": "c08d4f8579fc8b9360a1820f3b6a288b8da172ad387b480361e49f0a954ea70c",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_program_context"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "observedAtUtc": "2026-10-15T06:16:15.177Z",
+  "sourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "7c940c21861d979b9aa3831d199ba1d3d93f8901",
+    "entryCount": 557,
+    "blobCount": 442,
+    "sha256": "c08d4f8579fc8b9360a1820f3b6a288b8da172ad387b480361e49f0a954ea70c"
+  },
+  "reviewDetail": {
+    "reviewKind": "fresh-exact-diagnostic-delta-plus-preserved-parent-review",
+    "comparisonBase": "beea0255e9b2de67eba66e3ae305407bd3fa7f41",
+    "changedFiles": [
+      "architecture/capability-source-owners.json",
+      "packages/native-hermes-adapter/src/platform-current-work/context.test.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/context.ts"
+    ],
+    "independentReceipt": {
+      "path": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/hermes-context-essential-overflow-diagnostic-root-independent-review/independent-source-review.json",
+      "bytes": 5008,
+      "sha256": "9fb08bdea6fff7a39de8249b7622bf55c26964ab1e12a50b7b63085d67f6db3e"
+    },
+    "ownBoundaryCases": 9,
+    "ownAffectedTests": "Root affected context tests run separately; exact execution completion remains separate evidence.",
+    "authorChecks": {
+      "affectedTests": 20,
+      "assertions": 145,
+      "fullSourceCommands": 26,
+      "fullQualityChecks": 14,
+      "strictTypeScript": "pass",
+      "attribution": "Author evidence rehashed; no claim that Root repeated full unchanged checks"
+    },
+    "resolvedFinding": {
+      "thread": "PRRT_kwDOVD2my86so6mb",
+      "commentId": 4279529882,
+      "source": "Oversized startup purpose with tiny Task decision now uses generic REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT; no unsupported causal attribution.",
+      "actualGitHubThreadResolution": "pending"
+    },
+    "preservedParentReview": {
+      "head": "beea0255e9b2de67eba66e3ae305407bd3fa7f41",
+      "resultSha256": "a73f172d1f48b2397dac5cc5a9db569c2e6c61a9c989f6dc4fc9782db8437d32",
+      "qualification": "Prior source review preserved, current-head merge approval withdrawn after new P2finding. New exact diagnostic delta reviewed independently."
+    },
+    "method": [
+      "Read complete production/test/source-pin delta and original automatic review comment.",
+      "Rehash all three current files and thirteen artifact pins plus exact Git commit/tree/parent.",
+      "Exercise generic overflow with all essential originals and oversized purpose plus one tiny Task original; both held/null without truncating authority-bearing text.",
+      "Reconfirm optional question/source-original validation and bounded essential retention from exact maintained production functions."
+    ],
+    "limits": [
+      "Source only; native Hermes delivery/configuration/consumer/models pending.",
+      "Old selected5c/HOLD and prior diagnostics/reviews remain immutable; no native runtime equivalence inferred."
+    ]
+  },
+  "nativeEffects": 0,
+  "nativeModelRequests": 0,
+  "wholeGoalAcceptance": false
+}
