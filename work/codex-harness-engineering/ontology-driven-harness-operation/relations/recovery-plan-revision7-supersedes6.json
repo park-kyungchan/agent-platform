@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "recovery-plan-revision7-supersedes6",
+  "kind": "relation",
+  "relation": "supersedes",
+  "from": {
+    "kind": "plan",
+    "id": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "revision": 7
+  },
+  "to": {
+    "kind": "plan",
+    "id": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "revision": 6
+  }
+}
