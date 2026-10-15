@@ -89,9 +89,11 @@ For the observed default profile, resolved
 `display.tui_auto_resume_recent` was `false`. Installed source submits a startup
 prompt only when `HERMES_TUI_QUERY` or `HERMES_TUI_IMAGE` is nonempty; this wrapper
 clears both. Native startup can still create session metadata, initialize tools,
-and discover configured MCP servers. The source-preparation observations in
-`facts.json` predate deployment. Subsequent native startup verification is
-recorded separately in
+and discover configured MCP servers. Source ships `facts.schema.json` as the
+observation record contract; it does not ship an adjacent `facts.json` or live
+readback. Historical preparation facts and startup verification remain native
+owner run records, so a fresh checkout does not contain those observations.
+Subsequent native startup verification is recorded separately in the owner's
 `runs/herdr-session-handoff-20261015/hermes-tui-startup-readback.json`: an owned
 temporary tab rendered the native ready/input screen, no prompt was submitted,
 and Ctrl+C returned to the shell before the owned tab was closed. This did not
@@ -105,7 +107,8 @@ the preferred persisted dependency-selection ledger differed. Native TUI startup
 succeeded. Reconciliation remains with the native Hermes installation owner;
 the image was not repaired or rebuilt.
 
-`facts.json` separates observations, source-derived behavior, and pending runtime
-verification. Its adjacent JSON Schema defines the record shape. The owning agent
-must independently verify the deployed pane, current container identity, native
-TUI readiness, and absence of an unintended initial model turn.
+The source-owned `facts.schema.json` defines the shape of historical/run records
+that separate observations, source-derived behavior, and pending runtime
+verification. The owning agent must independently verify the deployed pane,
+current container identity, native TUI readiness, and absence of an unintended
+initial model turn.
