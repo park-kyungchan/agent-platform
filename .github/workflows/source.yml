@@ -28,6 +28,10 @@ jobs:
         run: bun ci/source-check.ts
         env:
           COMMON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - name: Verify common runtime layout and native skill source
+        run: |
+          bun ci/verify-runtime-layout.ts
+          bun test ci/verify-runtime-layout.test.ts
   quality:
     name: Quality and architecture checks
     runs-on: ubuntu-latest

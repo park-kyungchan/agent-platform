@@ -1,0 +1,230 @@
+{
+  "schema": "agent-platform.runtime-filesystem-contract.v1",
+  "verificationClass": "source-layout-only",
+  "nativePermissionGranted": false,
+  "canonicalRepository": "park-kyungchan/agent-platform",
+  "sourceRegistry": "architecture/capability-source-owners.json",
+  "commonPackage": "@palantirkc/agent-platform",
+  "modules": [
+    {
+      "capabilityId": "native-codex-source",
+      "packagePath": "packages/native-codex-adapter",
+      "packageName": "@palantirkc/native-codex-adapter",
+      "semanticOwner": "codex-harness-engineering"
+    },
+    {
+      "capabilityId": "native-hermes-context",
+      "packagePath": "packages/native-hermes-adapter",
+      "packageName": "@palantirkc/native-hermes-adapter",
+      "semanticOwner": "ontology-platform and hermes-harness-engineering"
+    },
+    {
+      "capabilityId": "infrastructure-domain",
+      "packagePath": "packages/infrastructure-operations",
+      "packageName": "@palantirkc/infrastructure-operations",
+      "semanticOwner": "vps-operations"
+    }
+  ],
+  "nativeSourceProjects": [
+    {
+      "id": "codex-harness-engineering",
+      "homeRelativeRoot": "code/shared/codex-harness-engineering",
+      "boundary": "Native Codex configuration, trust, authentication, sessions and ledgers retain their owner; shared Harness implementation belongs to the canonical common modules."
+    },
+    {
+      "id": "hermes-harness-engineering",
+      "homeRelativeRoot": "code/shared/hermes-harness-engineering",
+      "boundary": "Native Hermes profiles, Task/Run, credentials, stores, activation and lifecycle retain their owner."
+    },
+    {
+      "id": "vps-operations",
+      "homeRelativeRoot": "code/shared/vps-operations",
+      "boundary": "Independent native infrastructure CLI, SSH/container adapters and deployment source; pure domain modules are consumed as an immutable exact-common-commit distribution, without a sibling-private credential bridge."
+    }
+  ],
+  "classes": [
+    {
+      "id": "maintained-source",
+      "locations": ["packages/", "architecture/", "ci/"],
+      "policy": "One canonical maintained writer; source references and exact review do not establish native readiness."
+    },
+    {
+      "id": "work-records",
+      "locations": ["work/"],
+      "policy": "Typed shared Work records retain encoded stable record IDs; original paused Work is separate from new integration Work."
+    },
+    {
+      "id": "service-data",
+      "locations": ["/docker/herdr-runtime/home", "/docker/hermes-agent-2q3y/data"],
+      "policy": "Persistent native data stays outside deployment source and is never included in source publication."
+    },
+    {
+      "id": "runtime-state",
+      "locations": [
+        "$HOME/.config/herdr/herdr.sock",
+        "$HOME/.config/herdr/herdr-client.sock",
+        "$HOME/.config/herdr/session.json",
+        "$HOME/.config/herdr/session-snapshots/",
+        "$HOME/.config/herdr/herdr-server.log",
+        "/run/"
+      ],
+      "policy": "Pinned native Herdr 0.9.5 process, IPC, session, snapshot and log state is not maintained source; source publication does not reproduce a live runtime."
+    },
+    {
+      "id": "native-configuration",
+      "locations": ["$HOME/.config/herdr/config.toml"],
+      "policy": "Native Herdr configuration has a distinct role from sockets, sessions, logs and cache. Its owner controls configuration adoption; source validation never changes the native file."
+    },
+    {
+      "id": "native-private-state",
+      "locations": [
+        "$HOME/.codex/",
+        "$HOME/.ssh/",
+        "/opt/data/profiles/",
+        "/docker/herdr-runtime/ssh-host-keys"
+      ],
+      "policy": "Native sessions, authentication, host keys and databases are excluded from maintained source and never transplanted by this contract."
+    },
+    {
+      "id": "generated-projection",
+      "locations": [
+        "$HOME/.agents/skills/",
+        "/opt/data/workspace/hermes-harness-audit/platform/current",
+        "/docker/herdr-runtime/deployment"
+      ],
+      "policy": "Install from exact reviewed canonical source with provenance and readback; projection is not another maintained implementation."
+    },
+    {
+      "id": "immutable-custody",
+      "locations": [
+        "history/",
+        "owner-fixture/",
+        "releases/",
+        "$HOME/code/shared/academy-workbench/.local/"
+      ],
+      "policy": "Preserve existing paths, hashes and immutable dependency/evidence custody; no cosmetic rename or replay."
+    },
+    {
+      "id": "evidence",
+      "locations": ["$HOME/operations/", "/docker/operations/", "runs/"],
+      "policy": "Evidence, operation receipts, source verification and acceptance are distinct and remain with their owners."
+    },
+    {
+      "id": "cache",
+      "locations": ["node_modules/", "$HOME/.cache/"],
+      "policy": "Reconstructible cache is not source or session custody; this contract authorizes no cleanup."
+    }
+  ],
+  "naming": {
+    "newOwnedPaths": "lower-kebab-case with lowercase dot-separated extensions",
+    "nativeRequiredNames": ["SKILL.md", "AGENTS.md", "Dockerfile", "README.md"],
+    "compatibility": "Existing native names, encoded common Work IDs and immutable source537 paths are preserved. Verify aliases and projection hashes before host migration; source checks do not establish a live alias."
+  },
+  "sourcePolicy": {
+    "ownedPaths": [
+      "architecture/runtime-filesystem-contract.json",
+      "ci/verify-runtime-layout.ts",
+      "ci/verify-runtime-layout.test.ts",
+      ".github/workflows/source.yml"
+    ],
+    "excludedSegments": [
+      ".codex",
+      ".config",
+      ".hermes",
+      ".ssh",
+      ".private",
+      ".local",
+      "node_modules",
+      "home",
+      "native-home",
+      "runtime-home",
+      "sessions",
+      "state",
+      "runs",
+      "backups",
+      "credentials",
+      "secrets",
+      ".cache"
+    ],
+    "custodyPrefixes": ["history/", "work/", "owner-fixture/"],
+    "forbiddenBasenames": [
+      "auth.json",
+      "credentials.json",
+      "authorized_keys",
+      "known_hosts",
+      "id_ed25519",
+      "id_rsa",
+      "state_5.sqlite",
+      "thread_history_1.sqlite"
+    ],
+    "releasePolicy": "Only explicitly pinned immutable distributions with provenance/content validation may enter releases; native databases, backups, credentials and run archives are never release inputs."
+  },
+  "skills": [
+    {
+      "id": "herdr-codex-long-work",
+      "semanticOwner": "codex-harness-engineering",
+      "packagePath": "packages/native-codex-adapter",
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work",
+      "files": [
+        "SKILL.md",
+        "references/checkpoint-contract.json",
+        "references/standing-user-decision.json",
+        "references/home-routing.candidate.md"
+      ],
+      "nativeProjection": "$HOME/.agents/skills/herdr-codex-long-work",
+      "officialFormat": "https://learn.chatgpt.com/docs/build-skills",
+      "verification": "Metadata, bounded relative links and readable JSON only; native discovery, tools/authentication and behavior need separate verification."
+    }
+  ],
+  "deploymentProjection": {
+    "owner": "vps-operations",
+    "sourceRelativeRoot": "deployments/herdr-runtime",
+    "requiredFiles": [
+      "compose.yaml",
+      "herdr-runtime.service",
+      "Dockerfile",
+      "sshd_config",
+      "supervisord.conf",
+      "entrypoint.sh",
+      "healthcheck.sh"
+    ],
+    "serviceRoot": "/docker/herdr-runtime",
+    "deploymentRoot": "/docker/herdr-runtime/deployment",
+    "compatibilityAliases": [
+      {
+        "path": "/docker/herdr-runtime/build",
+        "target": "/docker/herdr-runtime/deployment",
+        "status": "proposed-requires-owner-review-and-live-readback"
+      }
+    ],
+    "persistentMounts": [
+      {
+        "source": "/docker/herdr-runtime/home",
+        "target": "/home/palantirkc",
+        "class": "service-data"
+      },
+      {
+        "source": "/docker/herdr-runtime/ssh-host-keys",
+        "target": "/var/lib/herdr-ssh",
+        "class": "native-private-state"
+      },
+      {
+        "source": "/docker/herdr-runtime/authorized_keys",
+        "target": "/etc/ssh/authorized_keys/palantirkc",
+        "class": "native-private-state",
+        "readOnly": true
+      }
+    ],
+    "preservedOwners": [
+      "Existing Hermes native data under /docker/hermes-agent-2q3y/data -> /opt/data and UID10000",
+      "Existing Windows Desktop client and authenticated backend route",
+      "Original source537 custody paths and hashes"
+    ],
+    "nativeSourceCheck": "Optional finite source inspection only when an explicit owner source root is supplied; missing private sibling checkout is reported as not inspected.",
+    "hostMigration": "Proposal only. Root owns review/apply/alias/readback. The current unit may reference the declared build compatibility route.",
+    "residuals": [
+      "The baseline audit found stale staged unit/README and retired readiness helpers; current resolution belongs to separate owner readback, not this source CI.",
+      "The baseline audit found code-server live singular data/workspace versus declared absent plural data/workspaces; current resolution belongs to its owner and authorizes no data move here."
+    ]
+  }
+}
