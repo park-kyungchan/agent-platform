@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM oven/bun:1.3.14@sha256:e10577f0db68676a7024391c6e5cb4b879ebd17188ab750cf10024a6d700e5c4 AS bun
+FROM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598 AS bun
 FROM node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -38,7 +38,7 @@ RUN ln -s bun /usr/local/bin/bunx \
  && rm /tmp/herdr \
  && npm install --global --omit=dev "@openai/codex@${CODEX_VERSION}" \
  && npm cache clean --force \
- && test "$(bun --version)" = 1.3.14 \
+ && test "$(bun --version)" = 1.4.3 \
  && test "$(node --version)" = v22.23.3 \
  && test "$(herdr --version)" = "herdr ${HERDR_VERSION}" \
  && test "$(codex --version)" = "codex-cli ${CODEX_VERSION}"
