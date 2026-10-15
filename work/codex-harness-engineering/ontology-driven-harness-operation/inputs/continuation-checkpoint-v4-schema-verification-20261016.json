@@ -1,0 +1,216 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "continuation-checkpoint-v4-schema-verification-20261016",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-source-verification:checkpoint-v4-schema-20261016",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "harness.checkpoint-exact-schema-verification.v1",
+    "schemaSource": {
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/checkpoint-contract.json",
+      "sha256": "f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4"
+    },
+    "validator": {
+      "importer": "/home/palantirkc/code/worktrees/harness-continuation-delivery-20261016/node_modules/.bun/@palantirkc+ontology@releases+palantirkc-ontology-0.2.0.tgz/node_modules/@palantirkc/ontology/dist/validation.js",
+      "ontologyVersion": "0.2.0",
+      "ajvPath": "/home/palantirkc/code/worktrees/harness-continuation-delivery-20261016/node_modules/.bun/ajv@8.20.0/node_modules/ajv/dist/2020.js",
+      "formatsPath": "/home/palantirkc/code/worktrees/harness-continuation-delivery-20261016/node_modules/.bun/ajv-formats@3.0.1/node_modules/ajv-formats/dist/index.js",
+      "options": {
+        "strict": true,
+        "allErrors": true,
+        "coerceTypes": false,
+        "useDefaults": false,
+        "removeAdditional": false
+      }
+    },
+    "previous": {
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v3.json",
+      "valid": false,
+      "classification": "preserved-schema-invalid-historical-capture",
+      "errors": [
+        {
+          "instancePath": "",
+          "schemaPath": "#/additionalProperties",
+          "keyword": "additionalProperties",
+          "params": {
+            "additionalProperty": "captureProvenance"
+          },
+          "message": "must NOT have additional properties"
+        },
+        {
+          "instancePath": "",
+          "schemaPath": "#/additionalProperties",
+          "keyword": "additionalProperties",
+          "params": {
+            "additionalProperty": "inheritedEffectFenceSource"
+          },
+          "message": "must NOT have additional properties"
+        },
+        {
+          "instancePath": "/runtime",
+          "schemaPath": "#/properties/runtime/additionalProperties",
+          "keyword": "additionalProperties",
+          "params": {
+            "additionalProperty": "completedMilestone"
+          },
+          "message": "must NOT have additional properties"
+        },
+        {
+          "instancePath": "/delegations/0",
+          "schemaPath": "#/properties/delegations/items/required",
+          "keyword": "required",
+          "params": {
+            "missingProperty": "scope"
+          },
+          "message": "must have required property 'scope'"
+        },
+        {
+          "instancePath": "/delegations/1",
+          "schemaPath": "#/properties/delegations/items/required",
+          "keyword": "required",
+          "params": {
+            "missingProperty": "scope"
+          },
+          "message": "must have required property 'scope'"
+        },
+        {
+          "instancePath": "/delegations/2",
+          "schemaPath": "#/properties/delegations/items/required",
+          "keyword": "required",
+          "params": {
+            "missingProperty": "scope"
+          },
+          "message": "must have required property 'scope'"
+        },
+        {
+          "instancePath": "/delegations/3",
+          "schemaPath": "#/properties/delegations/items/required",
+          "keyword": "required",
+          "params": {
+            "missingProperty": "scope"
+          },
+          "message": "must have required property 'scope'"
+        }
+      ]
+    },
+    "current": {
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v4.json",
+      "sha256": "1225c99527e478eca8a57d8282b7b21031e6fd82e01a5d1a9fe15c46a34d2c9b",
+      "valid": true,
+      "coreChars": 15935
+    },
+    "negativeChecks": [
+      {
+        "name": "missingDelegationScope",
+        "rejected": true,
+        "errors": [
+          {
+            "instancePath": "/delegations/0",
+            "schemaPath": "#/properties/delegations/items/required",
+            "keyword": "required",
+            "params": {
+              "missingProperty": "scope"
+            },
+            "message": "must have required property 'scope'"
+          }
+        ]
+      },
+      {
+        "name": "unsupportedRuntimeProperty",
+        "rejected": true,
+        "errors": [
+          {
+            "instancePath": "/runtime",
+            "schemaPath": "#/properties/runtime/additionalProperties",
+            "keyword": "additionalProperties",
+            "params": {
+              "additionalProperty": "completedMilestone"
+            },
+            "message": "must NOT have additional properties"
+          }
+        ]
+      },
+      {
+        "name": "unsupportedRootProperty",
+        "rejected": true,
+        "errors": [
+          {
+            "instancePath": "",
+            "schemaPath": "#/additionalProperties",
+            "keyword": "additionalProperties",
+            "params": {
+              "additionalProperty": "captureProvenance"
+            },
+            "message": "must NOT have additional properties"
+          }
+        ]
+      }
+    ],
+    "originalRawCaptures": [
+      {
+        "version": "v2",
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v2-utf8-20261016.json",
+        "byteCount": 16057,
+        "sha256": "bd8934a50058c093e0406403e9d8553249f5a2822a47f07a3b582f25f7ef3171",
+        "roundTripExact": true,
+        "independentlyGitCompared": true,
+        "standaloneRecoveryNeedsUnpublishedGit": false
+      },
+      {
+        "version": "v3",
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v3-utf8-20261016.json",
+        "byteCount": 16717,
+        "sha256": "8f5c2c89868e46732d622ac4430db9a4d7611b52cb777800e17ac13c56fde14d",
+        "roundTripExact": true,
+        "independentlyGitCompared": true,
+        "standaloneRecoveryNeedsUnpublishedGit": false
+      }
+    ],
+    "allEightPublishedFilesUnchanged": [
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Aevidence%3Aontology-driven-harness-operation%3Aacademy-context-independent-review-20261016.json",
+        "sha256": "3f619ba4aacb35622e308e154651fd00b2a47c464156b7468c1ecba6733e3923"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Averification%3Aacademy-context-review-20261016.json",
+        "sha256": "a4ac093dcb779b75afe98b8ca1e792385c5d87b745816c3a7f7ad40ebf3a96c4"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-context-review-result-20261016.json",
+        "sha256": "2e230e1fefbe8ff5aa5db7e6eb226968ab6d6a03cf5d6b99c5a6cd42ef359d97"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-context-review-verification-20261016.json",
+        "sha256": "3c6cf80e9fde12cb577833309305bfbc55aa25833c4a9313fc5519dbff877886"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v2.json",
+        "sha256": "9c24ed9a9edd750312954942bc623e41dfc15d20d9e96dedc964206f08778635"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v3.json",
+        "sha256": "cec38245e57c9e6eb7bb06f87357bad65e05b451b27f8aaf0c89204f9269b730"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016.json",
+        "sha256": "d70176b15a99d5cfec3fdb465356089814050edd879b89252452febbe08468a2"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-CONTEXT-REVALIDATION-REVIEW.json",
+        "sha256": "8e72586b0d968e8d0a18e8ea5c8e990a5e99e16898e8175d751d0784a98087c9"
+      }
+    ],
+    "sourceOnly": true,
+    "nativePermissionGranted": false,
+    "currentIndependentReviewStatus": "pending",
+    "acceptanceDecision": null,
+    "validationAttemptHistory": "First preparer attempted import.meta.resolve from a symlinked Ontology importer and could not resolve transitive AJV. No schema result was fabricated. This verifier resolves the real pinned Ontology importer via createRequire; no dependency/config changes. Initial uncommitted v4 core had16526 characters and failed the separate16000-character bound despite schema shape passing; compressed historical audit receipts into their preserved v3 reference before first commit. Final core15935 characters passes."
+  }
+}
