@@ -1,0 +1,318 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "continuation-checkpoint-20261016-v3",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "01a13f90-74a0-7930-a5bc-9663e9ec9f86/root/material-boundary-1",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "herdr-codex-long-work-checkpoint",
+    "ontologyPackage": {
+      "name": "@palantirkc/ontology",
+      "version": "0.2.0"
+    },
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "version": 3,
+    "updatedAtUtc": "2026-10-15T18:37:01.010Z",
+    "intent": {
+      "objective": "Finish the full selected Work under Spec7/Plan7: reviewed source delivery, both native adoption/recovery, portfolio/private Academy outcomes, independent integrated verification and separate Lead Acceptance.",
+      "successCriteria": [
+        "Preserve IDs, actual decisions, provenance and completed/uncertain fences.",
+        "Exact reviewed delivery and explicit expected-head Lead integration, followed by exact-main evidence.",
+        "Qualify both native behaviors before activation; durable cross-runtime handoff/recovery and PC-off continuation.",
+        "Complete private Academy seven gates/teacher/month-end analysis; stop before user question selection.",
+        "Fresh explicit budget for evaluation; all Spec7 evidence before separate Lead Acceptance."
+      ]
+    },
+    "authority": {
+      "sourceRefs": [
+        "Current user manual continuation request in native thread 01a13f90-74a0-7930-a5bc-9663e9ec9f86",
+        "Current user request to unify VPS Bun to latest stable",
+        "/home/palantirkc/operations/herdr-session-handoff-20261015/continuation.json",
+        "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/recovery-20261015/worktrees/source-session-handoff/state/continuity/boundaries/ontology-driven-harness-operation/herdr-session-handoff-20261015/checkpoint.json"
+      ],
+      "allowedScope": [
+        "Same logical Work continuation; source-only independent review; reversible VPS development runtime maintenance requested by user.",
+        "Native internal delegation and task-specific Herdr worker; no automatic merge."
+      ],
+      "exclusions": [
+        "ministry, spt, math-teaching-and-educational-video, music-production, hermes-application-workflows, jev-research-experiments",
+        "Official Academy mutation; user question selection/final exam membership; new recurring costs",
+        "Historical admissions/allocation replay; credential or native store transfer; hook trust bypass; native activation without current evidence",
+        "Historical model evaluation budgets are not portable; no evaluation suite started."
+      ]
+    },
+    "phase": "Full Spec7: source delivery/main proof and native currentness",
+    "plan": [
+      {
+        "step": "Recover custody/native state and complete independent Academy review",
+        "status": "completed"
+      },
+      {
+        "step": "Deliver Academy and Bun provisioning with exact review/integration",
+        "status": "in_progress"
+      },
+      {
+        "step": "Qualify Codex/Hermes successors before activation",
+        "status": "in_progress"
+      },
+      {
+        "step": "Verify durable handoff/recovery and portfolio",
+        "status": "pending"
+      },
+      {
+        "step": "Complete private Academy gates and preselection analysis",
+        "status": "pending"
+      },
+      {
+        "step": "Resolve evaluation authority; integrated independent verification and Lead Acceptance",
+        "status": "pending"
+      }
+    ],
+    "sourcePins": [
+      {
+        "ref": "park-kyungchan/agent-platform:main",
+        "revision": "9c1da6c27581c5c29256787327bc680d9c4a4827/tree8475440be633c47c6a6a6e5192be0751f7346d22"
+      },
+      {
+        "ref": "Preserved Academy candidate",
+        "revision": "4c1ee550c7d3d70804fb8b8d719ab3d3cf6cea0a/tree8657d18b8f85896a4336e6402581e68a9629478f"
+      },
+      {
+        "ref": "Handoff custody",
+        "revision": "ac26a91747fb6e87ade6440804c26fe73a913c1d/treec180f6c2cc086c91b0dfee42a0f5c61bd5d6d017"
+      },
+      {
+        "ref": "/home/palantirkc/code/shared/academy-workbench/.local/reorganization-kickoff/current-session/recovery-20261015/worktrees/source-session-handoff/state/continuity/boundaries/ontology-driven-harness-operation/herdr-session-handoff-20261015/checkpoint.json",
+        "revision": "sha256:6f97d5007b5ecb930bb427ce462d984d6fb5045db7b4563396044de332fe25a7"
+      },
+      {
+        "ref": "VPS Bun provisioning source candidate",
+        "revision": "0f0e24156887013999c25820c620a1374c602989/tree6da7a984c1fc0868e7c2c1a7521c80234ef07fcd"
+      }
+    ],
+    "runtime": {
+      "nativeThreadRef": "01a13f90-74a0-7930-a5bc-9663e9ec9f86",
+      "nativeGoalRef": "01a13f90-74a0-7930-a5bc-9663e9ec9f86:createdAt:1792089018",
+      "goalObservation": "Full Spec7 Goal ACTIVE, unbudgeted, created1792089018; prior bounded milestone completed. Whole-Work Acceptance null; native update_plan unavailable.",
+      "herdrContextRef": "srv1873899-herdr/w3:t1/w3:p1/orchestrator",
+      "observedAtUtc": "2026-10-15T18:37:01.010Z",
+      "completedMilestone": {
+        "status": "complete",
+        "scope": "Bounded custody recovery, Academy exact source review/result delivery and requested live Bun unification.",
+        "wholeWorkComplete": false,
+        "acceptanceDecision": null,
+        "nativeEvidence": "Lead-relayed update_goal completion followed by create_goal/get_goal for full Spec7 created1792089018; source records do not authenticate native state."
+      }
+    },
+    "delegations": [
+      {
+        "id": "continuation_fences",
+        "runtimeRef": "/root/continuation_fences",
+        "state": "Proposal complete; no source repin/native activation",
+        "outputRefs": [
+          "/tmp/codex-provider-currentness-proposal-20261016.json"
+        ]
+      },
+      {
+        "id": "academy-review",
+        "runtimeRef": "Herdr srv1873899-herdr/w3:p3/term_65de4f665b1a23",
+        "state": "Academy/VPS static reviews PASS0; source artifacts read back",
+        "outputRefs": [
+          "/tmp/academy-context-independent-review-20261016.json"
+        ]
+      },
+      {
+        "id": "bun_provisioning_source",
+        "runtimeRef": "/root/bun_provisioning_source",
+        "state": "P2-001 Goal binding corrected. P2-002 immutable input rewrite corrected by append-only captures on fresh delivery branch; independent exact review pending.",
+        "outputRefs": [
+          "/tmp/vps-bun-unification-20261016-source-receipt.json"
+        ]
+      },
+      {
+        "id": "hermes_packet_recovery",
+        "runtimeRef": "/root/hermes_packet_recovery",
+        "state": "Complete; named owner repo lookup failed, no clone/native execution",
+        "outputRefs": [
+          "/tmp/hermes-current-packet-proposal-20261016.json"
+        ]
+      }
+    ],
+    "effects": [
+      {
+        "id": "preserved-completed-effects",
+        "scope": "Source deliveries, cleanup, private custody/staging, PostgreSQL start/admissions/additive migration/AFTER",
+        "state": "consumed",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-20261016-v2.json#/content/effects/0"
+        ],
+        "nextSafeObservation": "Read exact original receipts; no repeat dispatch.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "existing-hermes-task",
+        "scope": "Task t_4d5043c5 / Session 20261015_043614_20d028",
+        "state": "completed",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-20261016-v2.json#/content/effects/1"
+        ],
+        "nextSafeObservation": "Existing native owner readback only; retain genuine null fields.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "historical-codex-transient-allocation",
+        "scope": "01a13ea3-469b-7221-b46e-6f65108194d6; allocation and conclusive failed durability readback",
+        "state": "completed",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-20261016-v2.json#/content/effects/2"
+        ],
+        "nextSafeObservation": "Review frozen corrective source; original ID is unusable and must not be retried/resumed/reallocated.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "official-score-create-route",
+        "scope": "Earlier score.create=1 grade-render route; possible business effect",
+        "state": "unknown",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-20261016-v2.json#/content/effects/3"
+        ],
+        "nextSafeObservation": "Current owner-side read-only reconciliation under separate purpose/source boundary.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "private-selected-release",
+        "scope": "Current protected private selected-release pointer",
+        "state": "unknown",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-20261016-v2.json#/content/effects/4"
+        ],
+        "nextSafeObservation": "Fresh protected owner read-only observation before any future CAS.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "bun-unification-20261016",
+        "scope": "Host /usr/local/bin, Herdr /usr/local/bin, Hermes UID10000 persistent /opt/data/.local/bin defaults",
+        "state": "completed",
+        "receiptRefs": [
+          "/home/palantirkc/operations/bun-unification-20261016/apply-readback-receipt.json"
+        ],
+        "nextSafeObservation": "Read current executable version/hash via inherited PATH; do not repeat install. Future recreation source pin delivery remains separate.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      }
+    ],
+    "receipts": [
+      {
+        "ref": "Native /root/continuation_fences result",
+        "classification": "verification",
+        "result": "537 files/8611056 bytes and 13 frozen entries match custody hashes."
+      },
+      {
+        "ref": "/tmp/harness-continuation-context-result-20261016.json",
+        "classification": "verification",
+        "result": "Source-qualified Spec7/Plan7; 63 completed/2 uncertain historical fences."
+      },
+      {
+        "ref": "bun run harness validate /tmp/harness-continuation-selection-20261016.json",
+        "classification": "verification",
+        "result": "valid=true; authority none; native permission/Acceptance false."
+      },
+      {
+        "ref": "/home/palantirkc/operations/bun-unification-20261016/apply-readback-receipt.json",
+        "classification": "verification",
+        "result": "Selected host/Herdr/Hermes defaults1.4.3+c6da4a4d3; reload=false. Exact hashes/process scope retained in receipt."
+      },
+      {
+        "ref": "/tmp/academy-context-independent-review-20261016.json",
+        "classification": "verification",
+        "result": "Exact4c1ee550/tree8657d18b static PASS0; reviewer tests not-run."
+      },
+      {
+        "ref": "Academy local source checks under Bun1.4.3",
+        "classification": "verification",
+        "result": "check/test/synthetic43/offline25 PASS; isolated CI12/12. Initial missing-dependency2pass/10fail, Bun1.3.14 frozen install failure, concurrent CI11pass/1timeout+cleanupENOENT remain in original v2 and immutable published result449e063."
+      },
+      {
+        "ref": "https://github.com/park-kyungchan/academy-workbench/blob/6447552c4c27aa5bd6f7fe6c00d3a6ca7d6a97f6/native-reviews/4c1ee550c7d3d70804fb8b8d719ab3d3cf6cea0a.json",
+        "classification": "verification",
+        "result": "V2 result/receipt and status56456783324 expected creator241037670 read back; exact source head4c1ee550."
+      },
+      {
+        "ref": "/tmp/common-continuation-independent-review-20261016.json",
+        "classification": "verification",
+        "result": "18e5a5ea HOLD P2-001 stale Goal binding; v3 corrects currentness."
+      },
+      {
+        "ref": "Academy PR15 hostedCI38785648604 and VPS native Compose source config check",
+        "classification": "verification",
+        "result": "Source/review gates PASS; exact VPS Compose config PASS, no lifecycle effects."
+      },
+      {
+        "ref": "/tmp/common-continuation-independent-review-successor-20261016.json",
+        "classification": "verification",
+        "result": "5cfbe6c HOLD P2-002 immutable input overwritten. This delivery retains v1 and adds unique v2/v3 inputs; exact transition/review required."
+      },
+      {
+        "ref": "https://github.com/park-kyungchan/academy-workbench/pull/15",
+        "classification": "observation",
+        "result": "Fresh GitHub read-only metadata: MERGED, reviewed head4c1ee550, merge6808c783457e73f8535b1e83ab7fcd82606e1b50, hosted gates SUCCESS. Review snapshots remain historical pre-merge captures; final-main independent evidence pending."
+      }
+    ],
+    "holds": [
+      {
+        "id": "original-wsl-writer",
+        "scope": "Original native thread and Goal",
+        "reason": "Must remain paused; this is a new native continuation session.",
+        "releaseCondition": "No release requested."
+      },
+      {
+        "id": "native-provider-currentness",
+        "scope": "Codex native activation",
+        "reason": "Published source-provider pins differ from current common; no silent repin/trust copy.",
+        "releaseCondition": "Owning Work reviews exact successor and separately verifies current native behavior."
+      },
+      {
+        "id": "historical-native-corrective-scripts",
+        "scope": "Frozen WSL diagnostic/admissions",
+        "reason": "Host-specific historical evidence, not target executable instructions.",
+        "releaseCondition": "Reviewed target-host successor and separate current admission."
+      },
+      {
+        "id": "evaluation",
+        "scope": "Native model evaluation suite",
+        "reason": "No fresh explicit suite budget/current activation in this session.",
+        "releaseCondition": "Fresh explicit budget and all native gates; ordinary engineering tracked separately."
+      },
+      {
+        "id": "whole-work-acceptance",
+        "scope": "Spec7 integrated outcome",
+        "reason": "Native adoption, private product and recovery/teacher/evaluation outcomes remain pending.",
+        "releaseCondition": "Required independent outcomes and separate accountable Lead Acceptance."
+      }
+    ],
+    "nextSafeAction": "Freeze/review this append-only delivery, publish exact source proof, independently bind Academy main6808c783; deliver VPS Bun source; qualify Codex/Hermes source successors without activation/replay.",
+    "captureProvenance": {
+      "sourceCommit": "5cfbe6c14a9bb399cf8acdb713aaf8f61f800681",
+      "sourcePath": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016.json",
+      "sourceSha256": "8f5c2c89868e46732d622ac4430db9a4d7611b52cb777800e17ac13c56fde14d",
+      "normalization": "Unique input ID/path; currentness and bounded fallback finalized before first delivery commit. Original v3 bytes remain at the pinned unpublished source commit; v1/v2 captures are preserved separately.",
+      "previousCaptureIds": [
+        "continuation-checkpoint-20261016",
+        "continuation-checkpoint-20261016-v2"
+      ],
+      "futureCapturePolicy": "Append a new input ID/path. Never rewrite committed checkpoint inputs."
+    },
+    "inheritedEffectFenceSource": {
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v2.json",
+      "semantics": "Relative receiptRefs below are Work-root snapshot paths. The unchanged v2 capture retains exact original custody receipts, unknown states and no-replay rules."
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "ACADEMY-CONTEXT-REVALIDATION-REVIEW",
+  "kind": "task",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+    "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+    "specRevision": 7,
+    "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "planRevision": 7,
+    "taskId": "ACADEMY-CONTEXT-REVALIDATION-REVIEW"
+  },
+  "title": "Independently review and verify the preserved Academy context revalidation correction at exact source identity",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "broad-engineering-authority-20261015",
+    "resume-with-monthly-preselection-boundary-20261015",
+    "no-automatic-merge-explicit-lead-integration-20261014"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:academy-context-review-20261016"
+  ]
+}
