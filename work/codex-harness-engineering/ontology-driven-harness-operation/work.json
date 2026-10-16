@@ -10,12 +10,12 @@
   "purpose": {
     "objective": "Complete full private Spec7/Plan7.",
     "successCriteria": [
-      "Full Spec7/Plan7; original purpose/provenance.",
-      "IDs/originals/fences; one typed common/native source; owners/no duplicate joins.",
-      "Verify activation/PC-off, portfolio/recovery, useful delegation/handoff/resume/Memory/Kanban/Session/concurrency/local/shared receipts.",
-      "Academy seven gates/teacher/concept; private/read-only source; month-end before user choice.",
-      "Independent review/private delivery/Lead merge/readback/cleanup; separate Lead Acceptance.",
-      "Fresh <=48 requests/2000000 emitted tokens/8h; zero recurring cost."
+      "Full Spec7/Plan7.",
+      "IDs/originals/fences; typed common/native source/owners/no duplicates.",
+      "Verify activation/PC-off/portfolio/recovery/delegation/handoff/resume/Memory/Kanban/Session/concurrency/local/shared receipts.",
+      "Academy seven gates/teacher/concept/private/read-only source; month-end before user choice.",
+      "Independent review/private delivery/Lead merge/readback/cleanup; Lead Acceptance.",
+      "Fresh<=48 requests/2000000 emitted tokens/8h; zero recurring cost."
     ],
     "inScope": [
       "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
@@ -58,6 +58,7 @@
   "historicalFenceIds": [
     "checkpoint-56-historical-effect-fence",
     "academy-root-source-read-once1-fence",
-    "p1-once1-20261016"
+    "p1-once1-20261016",
+    "completed-source-actions-20261016"
   ]
 }

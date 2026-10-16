@@ -1,0 +1,129 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "work-purpose-compaction-provenance-20261016-v10",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "lead:PR21:4291846426:unchanged-context-cap",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "LosslessPositivePurposeRoutingProvenance",
+    "priorPublishedCommit": "e0537d2ddf605b6e7eaa4355ea94bddfda709a88",
+    "priorPurpose": {
+      "objective": "Complete full private Spec7/Plan7.",
+      "successCriteria": [
+        "Full Spec7/Plan7; original purpose/provenance.",
+        "IDs/originals/fences; one typed common/native source; owners/no duplicate joins.",
+        "Verify activation/PC-off, portfolio/recovery, useful delegation/handoff/resume/Memory/Kanban/Session/concurrency/local/shared receipts.",
+        "Academy seven gates/teacher/concept; private/read-only source; month-end before user choice.",
+        "Independent review/private delivery/Lead merge/readback/cleanup; separate Lead Acceptance.",
+        "Fresh <=48 requests/2000000 emitted tokens/8h; zero recurring cost."
+      ],
+      "inScope": [
+        "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
+      ],
+      "outOfScope": [
+        "Source mutation/denied access, unrequested physical/third-party effects, excluded domains.",
+        "Credential disclosure/trust bypass/parallel runtime; auto-merge/paid infrastructure/replay/reused budgets.",
+        "Invented student/teacher/human outcomes; agent papers/membership. User question choice and teacher/human judgments remain separate."
+      ]
+    },
+    "successorPurpose": {
+      "objective": "Complete full private Spec7/Plan7.",
+      "successCriteria": [
+        "Full Spec7/Plan7.",
+        "IDs/originals/fences; typed common/native source/owners/no duplicates.",
+        "Verify activation/PC-off/portfolio/recovery/delegation/handoff/resume/Memory/Kanban/Session/concurrency/local/shared receipts.",
+        "Academy seven gates/teacher/concept/private/read-only source; month-end before user choice.",
+        "Independent review/private delivery/Lead merge/readback/cleanup; Lead Acceptance.",
+        "Fresh<=48 requests/2000000 emitted tokens/8h; zero recurring cost."
+      ],
+      "inScope": [
+        "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
+      ],
+      "outOfScope": [
+        "Source mutation/denied access, unrequested physical/third-party effects, excluded domains.",
+        "Credential disclosure/trust bypass/parallel runtime; auto-merge/paid infrastructure/replay/reused budgets.",
+        "Invented student/teacher/human outcomes; agent papers/membership. User question choice and teacher/human judgments remain separate."
+      ]
+    },
+    "baselinePurpose": {
+      "objective": "Complete full private Spec7/Plan7.",
+      "successCriteria": [
+        "Full Spec7/Plan7 and original purpose in inputs/work-purpose-compaction-provenance-20261016.json.",
+        "Stable IDs/originals/fences; one typed common/native source, retained owners; no duplicate registration.",
+        "Verified native activation/PC-off, full portfolio boundaries/recovery; useful delegation/handoff/resume/Memory/Kanban/Session/concurrency and local/shared receipts.",
+        "Academy seven gates/teacher/concept work; private runtime, source read-only; month-end analysis before user choice.",
+        "Exact review/private delivery/Lead merge/readback/cleanup; separate evidence-based Lead Acceptance.",
+        "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero added recurring cost."
+      ],
+      "inScope": [
+        "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
+      ],
+      "outOfScope": [
+        "Source mutation/denied access, unrequested physical/third-party effects, excluded domains.",
+        "Credential disclosure/trust bypass/parallel runtime; auto-merge/paid infrastructure/replay/reused budgets.",
+        "Invented student/teacher/human outcomes; agent papers/membership. User question choice and teacher/human judgments remain separate."
+      ]
+    },
+    "fullOriginalPurpose": {
+      "objective": "Finish the private integrated common Harness, WSL2/VPS native adoption, portfolio reorganization and Academy backlog under the full pinned Spec.",
+      "successCriteria": [
+        "Stable logical identities and Git/native joins without duplicate registration.",
+        "Addressable original Q/A, rationale/history and completed/uncertain effect fences.",
+        "Measured private portfolio topology, ownership, reorganization and verified recovery.",
+        "One typed common/Codex/Hermes source; native/domain/data/evidence owners retained.",
+        "Both native consumers verified and explicitly activated; VPS continuation works PC-off.",
+        "Useful delegation/handoff/resume, Memory, Kanban/Session, concurrency and local/shared receipts.",
+        "Academy seven operational gates and source-grounded teacher/concept workflows; source server read-only.",
+        "Month-end analysis ends before user selects existing items; no agent generation/final membership.",
+        "Exact independent review, private delivery, explicit Lead merge/readback and safe cleanup.",
+        "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero added recurring cost.",
+        "Lead Acceptance after all pinned Spec criteria pass; teacher/human judgment stays separate."
+      ],
+      "inScope": [
+        "Common Harness and both native runtime engineering, verification and activation",
+        "The complete related repository portfolio, justified module boundaries and recovery",
+        "Academy product/operational backlog in an independent private runtime with read-only source access",
+        "Fresh budgeted native evaluation and delegated evidence-based Lead Acceptance"
+      ],
+      "outOfScope": [
+        "Academy source-server mutation, denied-source access or unrequested physical/third-party effects",
+        "Unrelated excluded domains, credential disclosure, trust bypass or a parallel agent runtime",
+        "Automatic merge, new paid infrastructure, historical effect replay or reused evaluation budgets",
+        "Invented student data, teacher decisions, human satisfaction or unverified whole completion",
+        "Agent-generated month-end papers or autonomous question selection/final membership; user selection remains separate."
+      ]
+    },
+    "routingFacts": [
+      "Stable logical identities",
+      "Git/native joins without duplicate registration",
+      "Addressable original Q/A",
+      "Rationale/history",
+      "Completed/uncertain effect fences",
+      "Measured private portfolio topology/ownership",
+      "Portfolio reorganization/recovery",
+      "One typed common/Codex/Hermes source",
+      "Native/domain/data/evidence owners retained",
+      "Both native consumers verified and explicitly activated; PC-off",
+      "Useful delegation/handoff/resume",
+      "Memory/Kanban/Session/concurrency and local/shared receipts",
+      "Academy seven operational gates",
+      "Source-grounded teacher/concept workflows; independent private runtime/read-only source",
+      "Month-end before user choice; no agent papers/membership",
+      "Exact independent review/private delivery/explicit Lead merge/readback/safe cleanup",
+      "Fresh bounded suite/zero recurring cost; integrated Lead Acceptance and separate teacher/human judgments"
+    ],
+    "immutablePriorProvenance": "inputs/work-purpose-compaction-provenance-20261016-v9.json",
+    "reason": "Actual new mandatory source fence made WSL defaultcontext exceed unchanged24000 cap. Only positive routing wording is minimally compacted; all original positive requirements and17facts remain required under immutable Spec7/Plan7/fullOriginalPurpose. Exact baseline outOfScope and all published records unchanged. Separate evidence-based Lead Acceptance and teacher/human judgment remain required.",
+    "initialCanonicalFailure": "/tmp/checkpoint-v10-canonical-initial-20261016.log",
+    "defaultContextCap": 24000,
+    "nativePermissionGranted": false,
+    "AcceptanceDecision": null
+  }
+}

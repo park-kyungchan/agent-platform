@@ -1,0 +1,32 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "NEW-HERMES-FACADE-SOURCE-APPLY-ONCE1-20261016",
+  "kind": "task",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+    "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+    "specRevision": 7,
+    "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "planRevision": 7,
+    "taskId": "NEW-HERMES-FACADE-SOURCE-APPLY-ONCE1-20261016"
+  },
+  "title": "Record consumed exact Hermes source apply; data/native gates held",
+  "state": {
+    "execution": "complete",
+    "verification": "pending",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "dependsOn": [],
+  "decisionIds": [],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "executionClass": "source-only"
+}

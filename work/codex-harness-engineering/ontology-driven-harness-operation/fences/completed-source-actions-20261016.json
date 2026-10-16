@@ -1,0 +1,18 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "completed-source-actions-20261016",
+  "kind": "effect-fence",
+  "completedEffectIds": [
+    "NEW-HERMES-FACADE-SOURCE-APPLY-ONCE1-20261016",
+    "EXACT_REVIEWED_SOURCE_ONLY_CAS-1C7BE9B-2E4E927-20261016"
+  ],
+  "uncertainEffectIds": [],
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/source-actions-20261016.json",
+    "fragment": "#/content"
+  }
+}

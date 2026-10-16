@@ -1,0 +1,109 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "source-actions-20261016",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "completed-source-custody:PR21:4291846426",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "CompletedSourceTaskReplayFenceProjection",
+    "completedEffectIds": [
+      "NEW-HERMES-FACADE-SOURCE-APPLY-ONCE1-20261016",
+      "EXACT_REVIEWED_SOURCE_ONLY_CAS-1C7BE9B-2E4E927-20261016"
+    ],
+    "uncertainEffectIds": [],
+    "identityPolicy": "Existing conservative SOURCE Task replay-guard projection. Hermes custody ID is exact source receipt/marker occurrence. CodeX custody ID scopes actual implementationStep to the exact before/after Git transition and completion date, preserving raw step provenance and leaving later independent CAS transitions usable. No native Task/session/occurrence, new dispatch/admission or manual runtime identity engine is constructed.",
+    "actions": [
+      {
+        "sourceTaskId": "NEW-HERMES-FACADE-SOURCE-APPLY-ONCE1-20261016",
+        "idFrom": "actual source receipt.occurrence and durable marker.occurrence",
+        "parentTaskId": "HERMES-CURRENT-WORK-SOURCE",
+        "executionClass": "source-only",
+        "execution": "complete",
+        "actualSourceAction": "Exact absent-only NEW source facade apply",
+        "actualOwnerAPIInvocations": 1,
+        "completed": {
+          "directory": 7,
+          "source": 14,
+          "link": 1,
+          "total": 22
+        },
+        "uncertain": [],
+        "receipt": {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-source-apply-once1-author-actual-receipt.json",
+          "sha256": "d6be928274ad360c01198365c2f6bf2dede0aaed0a702caff03ecd91f63a7d48",
+          "bytes": 13218
+        },
+        "independentReadback": {
+          "path": "/tmp/hermes-source-apply-once1-actual-reconciliation-20261016.json",
+          "sha256": "325f387443ae0c62dd7fc5f12e5145501a041d7be244a8467bdc0fcba5af5e82",
+          "bytes": 17318
+        },
+        "consumedMarker": {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-source-apply-once1-attempt.json",
+          "sha256": "bc40686f1bd996c79b9a9307dd942707790a6bbf2b53c01b0371fa9aa182a7cf",
+          "bytes": 742
+        },
+        "recordedIntervalUtc": ["2026-10-16T06:19:39.864Z", "2026-10-16T06:19:47.861Z"],
+        "targetRoot": "/home/palantirkc/code/shared/hermes-harness-engineering",
+        "planSha256": "2932164e29a9df087035c8a784cfb3756caebcc4f376f143fa2b31143f9b8903",
+        "replayPolicy": "never-replay-recorded-dispatch",
+        "nativeActivation": false,
+        "originalSourceRestored": false
+      },
+      {
+        "sourceTaskId": "EXACT_REVIEWED_SOURCE_ONLY_CAS-1C7BE9B-2E4E927-20261016",
+        "idFrom": "Retrospective source custody ID scoped to receipt implementationStep plus exact1c7 to2e transition and actual completion date; raw implementationStep retained separately; never a native occurrence.",
+        "parentTaskId": "CODEX-NATIVE-ADOPTION-RECOVERY",
+        "executionClass": "source-only",
+        "execution": "complete",
+        "actualSourceAction": "git merge --ff-only 2e4e927c2a9e5bc89dce0891bbe7cfd66c787288",
+        "actualOccurrences": 1,
+        "before": {
+          "head": "1c7be9b832fb305da5c81ccddc7f33c10886680c",
+          "tree": "429693cbdd8cef571ff842d8534b8edd271504f7"
+        },
+        "after": {
+          "head": "2e4e927c2a9e5bc89dce0891bbe7cfd66c787288",
+          "tree": "15951a469ccdd327c1b547626a83fd3e3d070467"
+        },
+        "completedReadbackAtUtc": "2026-10-16T06:01:15.528Z",
+        "receipt": {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/codex-source-only-cas-actual-receipt-20261016.json",
+          "sha256": "c8e300e10638a89c9e9bec9ef5638cf2241d153ea2c02f89eae180f3db273a36",
+          "bytes": 11016
+        },
+        "sourceOnly": true,
+        "nativeOccurrenceDeclared": false,
+        "replayPolicy": "never-replay-recorded-dispatch",
+        "nativeActivation": false,
+        "implementationStep": "EXACT_REVIEWED_SOURCE_ONLY_CAS"
+      }
+    ],
+    "historicalCounts": {
+      "originalCompleted": 63,
+      "originalUncertain": 2,
+      "priorCombinedCompleted": 64,
+      "priorCombinedUncertain": 2,
+      "v8v9CombinedCompleted": 64,
+      "v8v9CombinedUncertain": 3,
+      "currentCompletedSOURCE": 66,
+      "currentUncertain": 3,
+      "newCompletedSourceActions": 2
+    },
+    "parentTaskPolicy": "Both ongoing parent Tasks remain byte-identical and are not in this new completed fence. New independent source/native steps retain their own prerequisites; only these exact completed source custody IDs are replay-fenced. No pendingEffectIds/native effect records or native occurrence is fabricated.",
+    "priorCheckpoint": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v9.json",
+      "sha256": "e7ccefd8853b3229ee2c20eec10e7cfc6efff14f1cf4116b0ec37499ad8e6299"
+    },
+    "nativePermissionGranted": false,
+    "AcceptanceDecision": null
+  }
+}

@@ -1266,6 +1266,8 @@ describe("source qualification does not grant startup or native authority", () =
       "GHA-27",
       "WSL2-LEAD-HANDOFF",
       "ACADEMY-ROOT-SOURCE-READ-ONCE1",
+      "NEW-HERMES-FACADE-SOURCE-APPLY-ONCE1-20261016",
+      "EXACT_REVIEWED_SOURCE_ONLY_CAS-1C7BE9B-2E4E927-20261016",
     ]) {
       const result = await readGitWorkContext(reader, { taskId, latestRelevant: "current" });
       expect(result.holdReasons).toEqual([]);
@@ -1286,9 +1288,9 @@ describe("source qualification does not grant startup or native authority", () =
       latestRelevant: "current",
     });
     expect(context.historicalEffects).toMatchObject({
-      completedCount: 64,
+      completedCount: 66,
       uncertainCount: 3,
-      projectedFenceRecords: 3,
+      projectedFenceRecords: 4,
     });
     expect(context.historicalEffects?.relevantCompletedIds).toContain(sourceTaskId);
     expect(
@@ -1308,5 +1310,44 @@ describe("source qualification does not grant startup or native authority", () =
     expect((await validateGitWorkRecords(replayReader)).findings).toContain(
       "COMPLETED_EFFECT_REPLAY:" + sourceTaskId,
     );
-  });
+    await writeFile(join(target, "tasks", sourceTaskId + ".json"), JSON.stringify(sourceTask));
+    for (const completedId of [
+      "NEW-HERMES-FACADE-SOURCE-APPLY-ONCE1-20261016",
+      "EXACT_REVIEWED_SOURCE_ONLY_CAS-1C7BE9B-2E4E927-20261016",
+    ]) {
+      const completed = await reader.readRecord({ kind: "task", id: completedId });
+      if (completed.kind !== "task") throw Error("Expected retrospective source custody Task");
+      expect(completed.executionClass).toBe("source-only");
+      expect(completed.state.execution).toBe("complete");
+      expect(completed.occurrence).toBeUndefined();
+      expect(completed.effectIds).toEqual([]);
+      await writeFile(
+        join(target, "tasks", completedId + ".json"),
+        JSON.stringify({ ...completed, state }),
+      );
+      const replay = await openGitWork({ ...reader.selection, commit: await commit(root) });
+      expect((await validateGitWorkRecords(replay)).findings).toContain(
+        "COMPLETED_EFFECT_REPLAY:" + completedId,
+      );
+      await writeFile(join(target, "tasks", completedId + ".json"), JSON.stringify(completed));
+    }
+    // A new independent step is usable; neither ongoing parent is fenced as complete.
+    const freshId = "EXACT_REVIEWED_SOURCE_ONLY_CAS-2E4E927-FUTURE-FIXTURE";
+    await writeFile(
+      join(target, "tasks", freshId + ".json"),
+      JSON.stringify({
+        ...sourceTask,
+        id: freshId,
+        logical: { ...sourceTask.logical, taskId: freshId },
+        state,
+      }),
+    );
+    const fresh = await openGitWork({ ...reader.selection, commit: await commit(root) });
+    expect((await validateGitWorkRecords(fresh)).valid).toBe(true);
+    for (const parentId of ["HERMES-CURRENT-WORK-SOURCE", "CODEX-NATIVE-ADOPTION-RECOVERY"]) {
+      const parent = await fresh.readRecord({ kind: "task", id: parentId });
+      if (parent.kind !== "task") throw Error("Expected ongoing parent Task");
+      expect(parent.state.execution).not.toBe("complete");
+    }
+  }, 15000);
 });
