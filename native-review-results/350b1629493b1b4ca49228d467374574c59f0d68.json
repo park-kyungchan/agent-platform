@@ -1,0 +1,298 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "reviewStatus": "complete",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "350b1629493b1b4ca49228d467374574c59f0d68",
+  "reviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+  "reviewedSourceManifestSha256": "b68687bb59f97734f280f786a996044c4f11b4956756d6076d03a905f521d7e2",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a144db-2ddf-7990-9fba-3a175265e424"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14419-af50-72d3-b918-cc32a50a1913"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "completedAtUtc": "2026-10-16T14:45:03.299Z",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "harness-reliability-reprioritization-20261016",
+    "issueId": "HRR-ISSUE-20261016",
+    "specId": "HRR-SPEC",
+    "specRevision": 1,
+    "planId": "HRR-PLAN",
+    "planRevision": 2,
+    "taskId": "HRR-RECOVERY-SOURCE-REVIEW"
+  },
+  "confirmationScope": "Bounded native-reviewer-authored identical-tree successor identity/currentness confirmation for merged main; original full review was executed on 34e",
+  "reviewReuseBinding": {
+    "explicitSuccessor": true,
+    "confirmedByOriginalNativeReviewer": true,
+    "originalHeadSha": "34e3bedd66e6697f199456f32374ba00711d47b6",
+    "originalReviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+    "originalReviewedSourceManifestSha256": "b68687bb59f97734f280f786a996044c4f11b4956756d6076d03a905f521d7e2",
+    "originalResult": {
+      "schema": "agent-platform.independent-review-result.v1",
+      "recordClass": "verification",
+      "reviewStatus": "complete",
+      "conclusion": "pass",
+      "unresolvedFindings": 0,
+      "completedAtUtc": "2026-10-16T14:16:17.140Z",
+      "sha256": "3ae50495e0444103496676846fd44f3d60e934972b410b52d99fd41b26705633",
+      "immutableCommit": "f770517458ef701ba2e2ae3442cd792f0e3588ab",
+      "immutablePath": "native-review-results/34e3bedd66e6697f199456f32374ba00711d47b6.json",
+      "immutableUrl": "https://github.com/park-kyungchan/agent-platform/blob/f770517458ef701ba2e2ae3442cd792f0e3588ab/native-review-results/34e3bedd66e6697f199456f32374ba00711d47b6.json",
+      "gitBlobOid": "30b2315ac502600888d3a8dca4d2556b7eea2f71",
+      "localOriginalPath": ".private/hrr-recovery/final-source-review-34e3bed.json",
+      "immutablePublishedBytesEqualReviewerOriginalBytes": true
+    },
+    "originalReviewer": {
+      "runtime": "native-codex",
+      "taskId": "01a144db-2ddf-7990-9fba-3a175265e424"
+    },
+    "originalAuthor": {
+      "runtime": "native-codex",
+      "taskId": "01a14419-af50-72d3-b918-cc32a50a1913"
+    },
+    "successorHeadSha": "350b1629493b1b4ca49228d467374574c59f0d68",
+    "successorReviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+    "successorReviewedSourceManifestSha256": "b68687bb59f97734f280f786a996044c4f11b4956756d6076d03a905f521d7e2",
+    "exactTreeIdentityIndependentlyVerified": true,
+    "emptyGitDiffIndependentlyVerified": true,
+    "fullManifestsIndependentlyDerivedAndEqual": true,
+    "currentZeroUnresolvedFindingStateIndependentlyObserved": true,
+    "scopeOfReuse": "Original complete canonical-source-ci-quality review and its exact-byte QA/evidence apply to the identical merged tree. This document explicitly binds that review to M; it does not claim another full source review or new test executions."
+  },
+  "manifestConfirmation": {
+    "original": {
+      "schema": "agent-platform.reviewed-source-manifest.v1",
+      "reviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+      "entryCount": 799,
+      "blobCount": 663,
+      "sha256": "b68687bb59f97734f280f786a996044c4f11b4956756d6076d03a905f521d7e2"
+    },
+    "successor": {
+      "schema": "agent-platform.reviewed-source-manifest.v1",
+      "reviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+      "entryCount": 799,
+      "blobCount": 663,
+      "sha256": "b68687bb59f97734f280f786a996044c4f11b4956756d6076d03a905f521d7e2"
+    },
+    "derivation": {
+      "module": "ci/quality/receipt-validator.ts",
+      "function": "deriveReviewedSourceManifest",
+      "source": "Complete local immutable Git tree entries from ls-tree -r -t -z for both commits; no path exclusions",
+      "nativeProviderPermissionInferred": false
+    }
+  },
+  "currentnessConfirmation": {
+    "observedAtUtc": "2026-10-16T14:45:03.299Z",
+    "mergedPullRequest": {
+      "url": "https://github.com/park-kyungchan/agent-platform/pull/22",
+      "number": 22,
+      "state": "MERGED",
+      "mergedAt": "2026-10-16T14:34:31Z",
+      "mergedExpectedHead": "34e3bedd66e6697f199456f32374ba00711d47b6",
+      "mergeCommit": "350b1629493b1b4ca49228d467374574c59f0d68",
+      "base": "main"
+    },
+    "originalHeadCurrentChecks": {
+      "success": 6,
+      "failed": 0,
+      "pending": 0,
+      "checks": [
+        {
+          "name": "Canonical source checks",
+          "state": "SUCCESS",
+          "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38915837052/job/117022939605"
+        },
+        {
+          "name": "Quality and architecture checks",
+          "state": "SUCCESS",
+          "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38915837052/job/117022939571"
+        },
+        {
+          "name": "Prospective merge integration",
+          "state": "SUCCESS",
+          "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38915837052/job/117022939681"
+        },
+        {
+          "name": "Exact head native independent review",
+          "state": "SUCCESS",
+          "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38915837052/job/117022939353"
+        },
+        {
+          "name": "Source and native review gate",
+          "state": "SUCCESS",
+          "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38915837052/job/117025048631"
+        },
+        {
+          "name": "native-independent-review",
+          "state": "SUCCESS",
+          "url": "https://github.com/park-kyungchan/agent-platform/blob/fee8fa836f99aa5fddc3bdb84a357a1fd454deff/native-reviews/34e3bedd66e6697f199456f32374ba00711d47b6.json"
+        }
+      ]
+    },
+    "currentReviewThreads": {
+      "total": 0,
+      "unresolved": 0
+    },
+    "currentReviewSubmissions": 0,
+    "codeAndSecurityFindingState": [
+      {
+        "url": "https://github.com/park-kyungchan/agent-platform/pull/22#issuecomment-6217650894",
+        "id": 6217650894,
+        "author": "chatgpt-codex-connector[bot]",
+        "updatedAt": "2026-10-16T14:31:49Z",
+        "state": {
+          "code_review": {
+            "commit_sha": "34e3bedd66e6697f199456f32374ba00711d47b6",
+            "has_any_findings": false,
+            "has_unresolved_findings": false,
+            "status": "completed"
+          },
+          "security_review": {
+            "commit_sha": "34e3bedd66e6697f199456f32374ba00711d47b6",
+            "has_any_findings": false,
+            "has_unresolved_findings": false,
+            "status": "completed"
+          }
+        }
+      }
+    ],
+    "mergedHeadCurrentCi": {
+      "allChecksGreen": false,
+      "checks": [
+        {
+          "conclusion": "failure",
+          "head_sha": "350b1629493b1b4ca49228d467374574c59f0d68",
+          "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38916870569/job/117028376500",
+          "name": "Source and native review gate",
+          "status": "completed"
+        },
+        {
+          "conclusion": "skipped",
+          "head_sha": "350b1629493b1b4ca49228d467374574c59f0d68",
+          "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38916870569/job/117026477457",
+          "name": "Prospective merge integration",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "head_sha": "350b1629493b1b4ca49228d467374574c59f0d68",
+          "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38916870569/job/117026475413",
+          "name": "Canonical source checks",
+          "status": "completed"
+        },
+        {
+          "conclusion": "success",
+          "head_sha": "350b1629493b1b4ca49228d467374574c59f0d68",
+          "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38916870569/job/117026475288",
+          "name": "Quality and architecture checks",
+          "status": "completed"
+        },
+        {
+          "conclusion": "failure",
+          "head_sha": "350b1629493b1b4ca49228d467374574c59f0d68",
+          "html_url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38916870569/job/117026474958",
+          "name": "Exact head native independent review",
+          "status": "completed"
+        }
+      ],
+      "statuses": [],
+      "sourceAndQualitySucceeded": true,
+      "exactMainReviewStatusNotYetPublished": true,
+      "reviewGateFailureObserved": "Native independent review status missing, unsuccessful or from unexpected creator",
+      "disposition": "Pending Root publication of native-reviewer-authored main result/receipt/authenticated exact-M status, then explicit rerun/dispatch of existing CI. This is not a current source-code finding and is not claimed as passing main CI."
+    },
+    "access": {
+      "maintainedProviderReads": "GitHub MCP PR, review threads/reviews, statuses, immutable original result commit/file",
+      "additionalReadOnlyOfficialCli": "gh pr view for CheckRun rollup and gh API/run view for main check-run/failure observations; MCP combined-status tool omits Actions CheckRuns",
+      "externalWrites": false
+    }
+  },
+  "originalReviewAndEvidencePreserved": {
+    "originalNativeFullReviewExecutedAt": "34e3bedd66e6697f199456f32374ba00711d47b6",
+    "originalImmutableResultUrl": "https://github.com/park-kyungchan/agent-platform/blob/f770517458ef701ba2e2ae3442cd792f0e3588ab/native-review-results/34e3bedd66e6697f199456f32374ba00711d47b6.json",
+    "originalResultSha256": "3ae50495e0444103496676846fd44f3d60e934972b410b52d99fd41b26705633",
+    "currentConfirmationRerunsFullReview": false,
+    "testsRerunForThisConfirmation": 0,
+    "modelEvaluationSuiteRun": false,
+    "originalReportsRewritten": false,
+    "originalRModified": false,
+    "rootDerivedEnvelopeUsedAsApproval": false
+  },
+  "retainedHolds": [
+    "Root publishes this actual native-reviewer-authored result through immutable R/E and authenticated exact-main status; main CI attestation and rerun remain separate pending actions",
+    "No native activation or shared checkout pull/synchronization follows from merge or this binding",
+    "Native 1500-token/v2 hook admission, actual profile/global Home consumption, independent/shared/native installation qualification and fresh model-evaluation budget remain unqualified",
+    "Original candidate/current-v2 proposal/preparation and native trust/config/credential/service boundaries remain held",
+    "Completed/consumed/uncertain no-replay fences, original answers and actual manual-source recovery scope remain preserved",
+    "Formal Task completion, whole Goal/Work Acceptance, paused predecessor/native owners and independent month-end remain separate"
+  ],
+  "effects": {
+    "trackedSourceEdits": false,
+    "sharedCheckoutSynchronization": false,
+    "dependencyInstallsOrCachePurge": false,
+    "nativeHooksGuardsTrustConfigCredentialsProfilesServicesChanged": false,
+    "candidatePreparation": false,
+    "nativeActivation": false,
+    "modelEvaluationSuite": false,
+    "goalCreatedCopiedResumedOrCompleted": false,
+    "historicalEffectReplay": false,
+    "publicationPushStatusPrMergeOrWorkflowDispatch": false,
+    "externalMessagesOrSiblingPrompts": false,
+    "boundedPrivateConfirmationAndReadOnlyEvidenceOnly": true
+  },
+  "localCheckoutObservation": {
+    "headUnchanged": "34e3bedd66e6697f199456f32374ba00711d47b6",
+    "trackedStatus": "",
+    "mergedCommitReadFromExistingOwnGitObjectsOnly": true,
+    "fetchPerformedByReviewer": false
+  },
+  "evidence": [
+    {
+      "path": ".private/hrr-recovery/main350/github-source-observations.json",
+      "bytes": 1274,
+      "sha256": "6b5970a558e479a151f8c38cb0aef1532c0b5041b1d30ce64dfec4effcd07f55"
+    },
+    {
+      "path": ".private/hrr-recovery/main350/original-published-34e3bed.json",
+      "bytes": 36104,
+      "sha256": "3ae50495e0444103496676846fd44f3d60e934972b410b52d99fd41b26705633"
+    },
+    {
+      "path": ".private/hrr-recovery/main350/pr22-check-rollup.json",
+      "bytes": 2217,
+      "sha256": "3e6aa80606572d608587da0668db920f86bb6f1278e7cdae11b0855cd79bc12d"
+    },
+    {
+      "path": ".private/hrr-recovery/main350/pr22-current-findings.json",
+      "bytes": 967,
+      "sha256": "df237ff0bf801214464a8921b14e835b11350decb19adc0aa53ccf674c24bc79"
+    },
+    {
+      "path": ".private/hrr-recovery/main350/main-check-runs.json",
+      "bytes": 1251,
+      "sha256": "84360e0866ed8e05fe6edb1b4a6e7572918ba86e148db8bf3429fb53195f9831"
+    },
+    {
+      "path": ".private/hrr-recovery/main350/main-attestation-failure.log",
+      "bytes": 3394,
+      "sha256": "e4ce2d683dcbfcd806ac3a1e6a6cb927c2057f7c2def4d232013b6d99616ddd2"
+    }
+  ],
+  "authority": "None from source review reuse or serialization",
+  "nativePermissionGranted": false,
+  "semanticAcceptanceEstablished": false,
+  "resultMeaning": "Actual reviewer-authored explicit identical-tree successor PASS for canonical source review on merged M, preserving original full review identity, immutable result bytes and current zero findings. No newly performed full review/tests/native qualification, main-CI success or whole-Work Acceptance is asserted."
+}
