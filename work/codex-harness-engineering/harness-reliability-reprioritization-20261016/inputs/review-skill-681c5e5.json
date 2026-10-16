@@ -1,0 +1,189 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "review-skill-681c5e5",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "independent-native-source-review",
+    "locator": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-reviews/skill-681c5e5.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "report": {
+      "schema": "hrr.independent-source-protocol-review.v1",
+      "artifact": "canonical Herdr long-work skill and current successor Work coherence",
+      "repository": "park-kyungchan/agent-platform",
+      "commit": "681c5e553c486a0d15d9b8d8d75f9aeda9610505",
+      "tree": "32de775c92a7a716018448be835403ab00abbfff",
+      "base": "7bd9a2d3bad6008f73b59aa06cb721927940cc8e",
+      "skillPath": "packages/native-codex-adapter/skills/herdr-codex-long-work/SKILL.md",
+      "skillSha256": "3e1cd493a6582993d83856471dfd3edd36279ee935777af24f5d03c030872c13",
+      "reviewer": {
+        "name": "hrr-review",
+        "previouslyObservedRuntime": "native Codex CLI in Herdr w3:pN",
+        "namedVariable": "CODEX_THREAD_ID",
+        "namedVariableValue": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+        "sourceRecordedLeadThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+        "identityMeaning": "Only the named variable was read. It matches the user-reported reviewer thread and differs from the source-recorded Lead thread. This does not independently authenticate process ownership, ancestry, idle status or native authorship. No environment dump, rollout/transcript read or new process observation was performed."
+      },
+      "scope": {
+        "work": "native-harness/codex-harness-engineering/harness-reliability-reprioritization-20261016",
+        "classification": "read-only source protocol and reasoning review",
+        "skillInvokedAsRuntimeWorkflow": false,
+        "goalCreatedOrResumed": false,
+        "agentsCreated": 0,
+        "panesChanged": false,
+        "siblingPromptsSent": false,
+        "realInterruptionSimulated": false,
+        "nativeEvaluationRun": false,
+        "nativeActivation": false,
+        "nativePermissionGranted": false,
+        "acceptanceEstablished": false,
+        "formalCompletion": false
+      },
+      "result": "skill-protocol-sound; current-work-result-routing-needs-successor",
+      "findingCount": 1,
+      "skillFindingCount": 0,
+      "currentWorkFindingCount": 1,
+      "findings": [
+        {
+          "id": "HRR-SKILL-CUSTODY-001",
+          "severity": "medium",
+          "priority": "P2",
+          "status": "unresolved-at-observed-current-source",
+          "scope": "Current uncommitted Work recovery routing, not a defect in the immutable skill text",
+          "title": "Route the recovery checkpoint to the retained owning-Work result and exact hash",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v4.json",
+          "line": 87,
+          "fileSha256": "f9a70a95d5b340c21ba635a6076ff93540ad9479fba1735684ae6c9feb0c0c4d",
+          "evidence": "The hrr-codex delegation says its result is durable in Work, but resultPath still names only .private/hrr-task-result.json in the writer worktree. Neither this latest checkpoint nor HRR-B-CODEX-CANDIDATE provides the retained inputs/codex-candidate-source-result-1033d6f.json address and hash. That complete retained Input exists and its embedded result reproduces the original hash. The immutable 681 selected Task context also does not reach that Input through its dependency/source closure. Native receiver guidance at SKILL.md:27/44 explicitly requires retained source-address recovery rather than relying on a temporary path.",
+          "impact": "If the producer pane/worktree is unavailable, a new receiver following the latest checkpoint is directed to the temporary original and must rediscover the canonical capture by listing and inspecting unrelated Inputs. There is no demonstrated data loss or replay, but the durable result route is incomplete for the agreed bounded recovery path.",
+          "requestedChange": "In a new checkpoint or existing Task-owned result routing field, retain the canonical Work Input path/fragment plus its exact blob/hash, original result hash, producer/source Task and commit/tree. Retain the private path as historical origin only. Reference the current independent review Inputs and unresolved holds there. Preserve old checkpoints and all original bytes; no new registry, scheduler or native occurrence is needed.",
+          "releaseCondition": "Independently read back a successor route, verify its exact current hashes and show that a new receiver can locate this retained result from the selected Work/Task without the producer pane or temporary path."
+        }
+      ],
+      "checks": [
+        {
+          "name": "Immutable skill identity/diff",
+          "result": "pass",
+          "detail": "Exact commit/tree/parent and all four added lines read from Git objects; git diff --check base..commit passes. Full skill, checkpoint fallback, standing-decision and Home-routing reference read at the same exact commit."
+        },
+        {
+          "name": "Amended protocol semantics",
+          "result": "pass",
+          "detail": "Lines 26/27/44 bind Work/Task/base, distinguish thread/pane/process identities, separate submission from observed work, retain result hashes/source addresses, require consumer readback and preserve no-replay uncertainty. Existing native loops, on-demand workers, explicit pause boundaries and proportional checks remain."
+        },
+        {
+          "name": "Source Work validation and transition",
+          "result": "pass-with-defined-limits",
+          "detail": "Read-only bun run harness validate for exact Work snapshot 681 and common-reader transition 7bd..681 pass with source validator from frozen reviewed A982. This checks source joins only and does not close A's known uncertain Task-ID finding, activate source or validate current uncommitted records as Git evidence."
+        },
+        {
+          "name": "Current record coherence",
+          "result": "pass-except-result-routing-finding",
+          "detail": "Read current Work, active Spec/Plan, actual interview originals and selection decisions, Tasks, lineage, historical inventory/fence, checkpoint-v1 through v4 and retained source/review Inputs. v4 appeared during review and was reread instead of treating v3 as current."
+        },
+        {
+          "name": "Historical custody",
+          "result": "pass",
+          "detail": "Inventory and fence lists exactly match: 68 completed and 3 uncertain IDs. Successor lineage preserves paused predecessor Goal/WSL writer; no fence or original was changed by review."
+        },
+        {
+          "name": "Retained result bytes",
+          "result": "pass",
+          "detail": "Encoding each embedded sourceResult with JSON.stringify(value,null,2) plus newline reproduces recorded original hashes: Codex 40347d0812b7e2d00623ee737769f1c0b2e6d586854bc0f386291bdbbfad2dae, 13305 bytes; VPS 0cdb12c9e95a9f071464204d8046044a2577b49b32f7409f1822d09a752b511b, 5027 bytes. Writer PASS strings were not used as independent verification."
+        },
+        {
+          "name": "Independent review custody",
+          "result": "pass",
+          "detail": "Current Work review-A/B/C Inputs retain objects semantically equal to the reviewer reports and their original exact report hashes. The wrapper hashes are distinct from original report hashes; parsed-object equality alone is not original-byte or native-authorship proof."
+        },
+        {
+          "name": "Bounded source reachability",
+          "result": "routing-gap-confirmed",
+          "detail": "A982 reader against immutable 681 selected Codex Task context returns source-qualified but does not include the retained Codex result Input. This is a source routing check, not native delivery verification."
+        }
+      ],
+      "coherence": {
+        "userPriority": "A then B then C governs integration; independent source work in parallel is explicitly accepted. Starting C source recipe review while A is corrected does not claim earlier native completion.",
+        "logicalContracts": "Work selects Plan2; prior Tasks retain Plan1 and the new Codex context Task uses Plan2. Both revisions and their supersession relation remain present; historical Task IDs are not rewritten.",
+        "milestones": "Codex source Task is complete/result-durable but unverified with shared audit and formal completion pending. This conservatively separates retained writer result from independent source verification and delivery. v4 records A's unresolved finding, B/C zero findings and native gates; historical checkpoints retain their earlier observations.",
+        "successorAndMonthEnd": "Actual decisions preserve the new successor Work, paused predecessor Goal/WSL writer, independently progressing month-end and discussion only after first useful real recovery acceptance.",
+        "preferences": "Selected model/reasoning/permissions and closed evaluation budgets remain unchanged. Source observations of those choices are not new native changes or permissions.",
+        "remainingCurrentness": "The latest checkpoint still contains historical delegation-state text. Treat that as observation, verify current source reviews and this report, and use an append-only successor checkpoint rather than inferring live worker state."
+      },
+      "forwardCase": {
+        "classification": "reasoning case only; no dispatch, new agent, simulated interruption or native action",
+        "scenario": "A source writer's pane disappears after its complete result was retained in the owning Work. A different prior dispatch has an uncertain outcome.",
+        "minimumRawSources": [
+          "Selected Work purpose and exact active Spec/Plan, latest checkpoint/holds, and only the relevant original interview answer/selection fragments reached by those records.",
+          "The writer Task and one exact retained result Input/source blob, its recorded original hash and exact source commit/tree/base, plus the independent review evidence actually required for the proposed next action.",
+          "The existing completed/uncertain inventory/fence and the original correlated receipt/status evidence for the uncertain dispatch. Read large referenced evidence only when needed to reconcile that occurrence."
+        ],
+        "receiverChoices": [
+          {
+            "step": 1,
+            "choice": "Explicitly select the successor Work/Task, read the newest checkpoint, original user decisions and holds, and preserve the paused predecessor, month-end, profile and permission boundaries. Do not create/resume a Goal for this bounded review."
+          },
+          {
+            "step": 2,
+            "choice": "Follow a retained owning-Work result address. Verify wrapper/blob hash, original result hash, producer Task/logical contract and exact source commit/tree/base. If only a temporary path is supplied, keep delivery uncertain and recover its existing canonical capture; do not ask for another execution to obtain output."
+          },
+          {
+            "step": 3,
+            "choice": "Compare current source/finding/check evidence with the exact result. An independent source-zero review can support a later authorized source step; writer PASS claims, a copied file or a vanished/done pane cannot substitute for that review."
+          },
+          {
+            "step": 4,
+            "choice": "Record this receiver's readback under the existing evidence owner. For a source-only Task retain source capture/review evidence without inventing a native occurrence. For a genuine native-effect dependency use the existing prerequisite/receiver contracts with matching logical identity, original occurrence, intent/result/verification and receiving runtime when required. Git joins still do not authenticate that runtime."
+          },
+          {
+            "step": 5,
+            "choice": "Keep the uncertain dispatch fenced. Read its original correlated evidence and, only where authorized, observe the same existing owner occurrence. Missing output or a missing pane does not establish non-execution. Do not resend completed or uncertain work, allocate a replacement merely for retrieval, or clear a lock/cache. A distinct future action needs its own reconciled scope and authority."
+          },
+          {
+            "step": 6,
+            "choice": "Choose the next safe source action from current evidence; A's unresolved finding and native qualification gates still hold integration/activation. Keep source verification, receiver delivery, formal completion and Acceptance separate. This reasoning case does not satisfy the actual NEW-session recovery acceptance criterion."
+          }
+        ],
+        "evidenceDistinctions": {
+          "sourceVerification": "Exact source commit/tree, applicable tests and independent current finding state establish reviewed source behavior only.",
+          "resultReceipt": "The intended receiver's exact retained-source readback, producer/Task binding and required receipt joins establish a particular delivery observation; existence in Git or a filesystem alone does not establish receipt.",
+          "nativeIdentity": "Authenticated native-owner observation is needed for native authorship/occurrence claims. Thread variables, pane IDs and process file membership are separate limited observations; unknown remains unknown.",
+          "acceptance": "Actual agreed interruption/NEW-session recovery/delegated-result observations and a distinct accountable AcceptanceDecision are required. Source tests or this walkthrough do not establish them."
+        },
+        "protocolAssessment": "The amendment leads to the correct choices without a scheduler/session replica or mandatory extra bureaucracy. The concrete current Work route must still be completed as the finding requests."
+      },
+      "currentSourceEvidence": {
+        "pathBase": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/",
+        "classification": "Exact observed file hashes; uncommitted current files are not exact Git commit evidence",
+        "hashes": {
+          "work.json": "fb7dbc6fdb43fa73b43e3fbb868a94dad28d1982b4ca9bc8edddf9db5a2251ad",
+          "plans/HRR-PLAN@2.json": "da1bfe3ded23e19cbd7bb4f86acd533b9785fb1c3a1f682ff66a5c880667bb88",
+          "inputs/checkpoint-v4.json": "f9a70a95d5b340c21ba635a6076ff93540ad9479fba1735684ae6c9feb0c0c4d",
+          "inputs/interview-answers-20261016.json": "bcbdb8d402dab110f3c8f1d15ee973c7e1a7740a131cf569e68061727ffd8933",
+          "inputs/interview-questions-20261016.json": "8f7eecf294a8b3538ca9d4c5685981c2916328b8da9bdbdea05ca88099ecd425",
+          "inputs/successor-lineage.json": "7f34d9d5b1db5eac4a44f9823d2d22d5fa66c524fd9326365a06f9654382763e",
+          "inputs/predecessor-effect-custody.json": "da9364f2290faa74b67f7655ec2d85762811e61b8f62b315adbd892b03d2488a",
+          "fences/predecessor-effects.json": "def6581d060c98c0e392e583ec5baef4e8b57249f7e9dc0abf3c9a39ff3252b1",
+          "inputs/codex-candidate-source-result-1033d6f.json": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5",
+          "inputs/vps-diagnostics-source-result-d0501dd.json": "5f5b13e68afea8ace234bde1b785b47645b4248c0b3008db035ddd419564ef7b",
+          "inputs/review-A-98206df.json": "506085c5e46b4e13cbcb32539c1a35b898d539443ba0c129078c92e0b7d765c1",
+          "inputs/review-B-7bd9a2d.json": "737a736d98d4682951b68e0123338e139b3371e5098546d4f6b72bbff8394866",
+          "inputs/review-C-1033d6f.json": "b3caa7bc4e2939154909bfca743269bc292fc63faefed7a8977b1ffcc2b1bfd0"
+        }
+      },
+      "unresolvedQualification": [
+        "The canonical skill's native projection/discovery/current installed bytes and behavior are not observed or activated by this source review.",
+        "Corrected A/compact and native adapter successors, exact provider closure, actual native delivery capability/admission and runtime Lead activation require their later independent gates.",
+        "The 12000-character v2 policy is separately reviewed as a file-hash-bound source design, not a new user answer, token/model budget or proof of native injection support.",
+        "No transcript, credential, native store, config, trust, service, source or pane mutation was performed; only requested private review reports were written."
+      ]
+    },
+    "sha256": "9dd6f5f2f6ad2b8ba7e5b51de9bf0ffa09b16015354a8692298c3f5991bfcd58",
+    "scope": "Source-only exact review; no nativepermission or Acceptance."
+  }
+}

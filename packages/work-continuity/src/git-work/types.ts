@@ -49,6 +49,14 @@ export interface WorkRecord extends RecordBase {
   plan: { id: string; revision: number };
   governingDecisionIds: string[];
   historicalFenceIds: string[];
+  /** Explicit source bindings; omitted on historical records, never inferred from prose. */
+  continuity?: {
+    schema: "common.git-work-continuity.v1";
+    /** Each selected Input fragment contains this exact current typed purpose. */
+    purposeSources: SourceReference[];
+    /** Each selected fragment is a complete consumed-effect inventory. */
+    effectInventorySources: SourceReference[];
+  };
 }
 export interface SpecRecord extends RecordBase {
   kind: "spec";
@@ -62,6 +70,8 @@ export interface PlanRecord extends RecordBase {
   specId: string;
   specRevision: number;
   objective: string;
+  /** Absent on historical objective-only Plans. New clauses require a new Plan revision. */
+  clauses?: string[];
 }
 export interface InputRecord extends RecordBase {
   kind: "input";
@@ -99,6 +109,8 @@ export interface TaskRecord extends RecordBase {
   kind: "task";
   logical: LogicalIdentity;
   title: string;
+  /** Authored recovery instruction, never inferred from title or execution state. */
+  nextAction?: string;
   state: TaskOperationalState;
   executionClass: "source-only" | "native-effect";
   dependsOn: TaskDependency[];
@@ -231,11 +243,62 @@ export interface ContextSourceProjection {
   id: string;
   path: string;
   blobOid: string;
+  /** Explicit address base; missing legacy metadata cannot establish a compact exact path. */
+  pathBase: "work" | "repository";
   fragment?: string;
   repositoryId?: string;
   commit?: string;
   declaredNativeSource?: Readonly<NativeSource>;
   nativeAuthorshipVerified?: false;
+}
+interface NormativeContextSourceBase {
+  id: string;
+  /** Source ID addresses the complete canonical record; fields are exact JSON pointers. */
+  source: string;
+}
+export type NormativeContextSource = NormativeContextSourceBase &
+  (
+    | {
+        kind: "work";
+        fields: {
+          purpose: "#/purpose";
+          spec: "#/spec";
+          plan: "#/plan";
+        };
+        coverage: "complete";
+      }
+    | {
+        kind: "spec";
+        revision: number;
+        fields: { outcome: "#/outcome"; criteria: "#/criteria" };
+        coverage: "complete";
+      }
+    | {
+        kind: "plan";
+        revision: number;
+        fields: {
+          objective: "#/objective";
+          clauses?: "#/clauses";
+          specId: "#/specId";
+          specRevision: "#/specRevision";
+        };
+        coverage: "complete" | "legacy-objective-only";
+      }
+    | {
+        kind: "task";
+        fields: { nextAction?: "#/nextAction" };
+        coverage: "complete" | "unspecified";
+      }
+  );
+export interface GitWorkNormativeContext {
+  schema: "common.git-work-context.normative.v1";
+  contracts: NormativeContextSource[];
+}
+export interface GitWorkContinuityBinding {
+  schema: "common.git-work-context.continuity.v1";
+  coverage: "bound" | "legacy-unbound" | "unavailable";
+  purposeSources: string[];
+  effectInventorySources: string[];
 }
 export interface GitWorkContext {
   status: "source-qualified" | "held";
@@ -249,6 +312,10 @@ export interface GitWorkContext {
   sourcePathBase: string;
   holdReasons: string[];
   omittedRecords: number;
+  latestRelevant: ContextRequest["latestRelevant"];
+  /** Required values remain in records, addressed through these pooled exact Git sources. */
+  normative: GitWorkNormativeContext;
+  continuityBinding: GitWorkContinuityBinding;
   historicalEffects?: {
     completedCount: number;
     uncertainCount: number;
@@ -259,6 +326,149 @@ export interface GitWorkContext {
   authority: "none";
   nativePermissionGranted: false;
   semanticAcceptanceEstablished: false;
+}
+/** Zero-based source address pool; optional repository/commit inherit the compact
+ * context. A work path is relative to explicit sourcePathBase; repository paths
+ * are already exact repository-relative paths. Neither base is guessed. */
+export type CompactGitSourceAddress = [
+  pathBase: "work" | "repository",
+  path: string,
+  blobOid: string,
+  repositoryId?: string | null,
+  commit?: string | null,
+];
+export type CompactSourcePointer = [
+  source: number,
+  fragment: string,
+  native?: { ownerId: string; locator: string; receiptKind: "snapshot" | "git"; sha256?: string },
+];
+/** Every number indexes strings. Empty arrays and original order are preserved. */
+export type CompactPurpose = [
+  objective: number,
+  successCriteria: number[],
+  inScope: number[],
+  outOfScope: number[],
+];
+/** Decode value string indices using strings. Each fields pointer selects that
+ * exact corresponding value in the canonical source record. IDs/revisions are
+ * record identities, independent of pooled values and source indices. */
+export type CompactNormativeContract =
+  | [
+      kind: "work",
+      id: string,
+      source: number,
+      fields: {
+        purpose: "#/purpose";
+        spec: "#/spec";
+        plan: "#/plan";
+        domainId: "#/domainId";
+        issueId: "#/issueId";
+      },
+      coverage: "complete",
+      purpose: CompactPurpose,
+      active: { spec: [id: string, revision: number]; plan: [id: string, revision: number] },
+      scope: { domainId: string; issueId: string },
+    ]
+  | [
+      kind: "spec",
+      id: string,
+      revision: number,
+      source: number,
+      fields: { outcome: "#/outcome"; criteria: "#/criteria" },
+      coverage: "complete",
+      values: [outcome: number, criteria: number[]],
+    ]
+  | [
+      kind: "plan",
+      id: string,
+      revision: number,
+      source: number,
+      fields: {
+        objective: "#/objective";
+        clauses?: "#/clauses";
+        specId: "#/specId";
+        specRevision: "#/specRevision";
+      },
+      coverage: "complete" | "legacy-objective-only",
+      values: [objective: number, clauses?: number[]],
+      spec: [id: string, revision: number],
+    ];
+export interface CompactTaskContext {
+  id: string;
+  source: CompactSourcePointer;
+  /** Exact LogicalIdentity fields in their named tuple positions. */
+  logical: [
+    domainId: string,
+    projectId: string,
+    workId: string,
+    issueId: string,
+    specId: string,
+    specRevision: number,
+    planId: string,
+    planRevision: number,
+    taskId: string,
+  ];
+  /** Exact operational milestones; no formal completion/Acceptance conflation. */
+  state: [
+    execution: TaskOperationalState["execution"],
+    verification: TaskOperationalState["verification"],
+    localAudit: TaskOperationalState["localAudit"],
+    sharedAudit: TaskOperationalState["sharedAudit"],
+    formalCompletion: TaskOperationalState["formalCompletion"],
+  ];
+  executionClass: TaskRecord["executionClass"];
+  effectIds: string[];
+  pendingEffectIds: string[];
+  nextActionCoverage: "authored" | "unspecified";
+  nextAction?: { value: number; source: CompactSourcePointer };
+}
+/** Original-answer and question addresses only, without original text or Input.origin. */
+export type CompactDecisionContext = [
+  id: string,
+  status: DecisionRecord["status"],
+  answerSource: CompactSourcePointer,
+  selectionContextSource?: CompactSourcePointer,
+];
+export interface CompactGitWorkContext {
+  schema: "common.git-work-context.compact.v1";
+  sourcePathBase: string;
+  /** In-band layout makes the lossless tuples usable in a fresh native session. */
+  layout: Record<string, string>;
+  status: GitWorkContext["status"];
+  repositoryId: string;
+  commit: string;
+  projectId: string;
+  workId: string;
+  latestRelevant: ContextRequest["latestRelevant"];
+  strings: string[];
+  sources: CompactGitSourceAddress[];
+  normative: CompactNormativeContract[];
+  task?: CompactTaskContext;
+  decisions: CompactDecisionContext[];
+  continuityBinding: Omit<GitWorkContinuityBinding, "purposeSources" | "effectInventorySources"> & {
+    purposeSources: CompactSourcePointer[];
+    effectInventorySources: CompactSourcePointer[];
+  };
+  historicalEffects?: GitWorkContext["historicalEffects"];
+  holdReasons: string[];
+  authority: "none";
+  nativePermissionGranted: false;
+  semanticAcceptanceEstablished: false;
+}
+export interface DecodedCompactGitWorkContext {
+  normative: ContextRecordProjection[];
+  task?: Omit<CompactTaskContext, "logical" | "state" | "nextAction"> & {
+    logical: LogicalIdentity;
+    state: TaskOperationalState;
+    nextAction?: { value: string; source: CompactSourcePointer };
+  };
+  sources: { repositoryId: string; commit: string; path: string; blobOid: string }[];
+  decisions: {
+    id: string;
+    status: DecisionRecord["status"];
+    answerSource: CompactSourcePointer;
+    selectionContextSource?: CompactSourcePointer;
+  }[];
 }
 export type StartRequest =
   | {

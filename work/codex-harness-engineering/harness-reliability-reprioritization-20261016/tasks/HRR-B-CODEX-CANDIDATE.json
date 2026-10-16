@@ -1,0 +1,39 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "task",
+  "id": "HRR-B-CODEX-CANDIDATE",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "harness-reliability-reprioritization-20261016",
+    "issueId": "HRR-ISSUE-20261016",
+    "specId": "HRR-SPEC",
+    "specRevision": 1,
+    "planId": "HRR-PLAN",
+    "planRevision": 1,
+    "taskId": "HRR-B-CODEX-CANDIDATE"
+  },
+  "title": "Correct the three current Codex candidate findings with canonical runtime readers and complete owner binding.",
+  "state": {
+    "execution": "complete",
+    "verification": "unverified",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "HRR-INTERVIEW-1",
+    "HRR-INTERVIEW-2",
+    "HRR-INTERVIEW-3",
+    "HRR-INTERVIEW-4",
+    "HRR-INTERVIEW-5"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "nextAction": "Recover the retained source result from this exact Git source {\"kind\":\"git\",\"repositoryId\":\"park-kyungchan/agent-platform\",\"commit\":\"0febc8f76276b2faaeb01ae25e8828f62648d869\",\"path\":\"work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-candidate-source-result-1033d6f.json\",\"fragment\":\"#/content/sourceResult\",\"sha256\":\"cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5\"}. Verify original result SHA25640347d0812b7e2d00623ee737769f1c0b2e6d586854bc0f386291bdbbfad2dae, code1033d6f/tree89e3f97 and current independent review/provider-closure holds. The private writer path is historical origin only. No native preparation or activation."
+}

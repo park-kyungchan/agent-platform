@@ -11,6 +11,8 @@ import {
   validateGitWorkRecords,
   validateGitWorkTransition,
   taskVerificationTarget,
+  compactGitWorkContext,
+  decodeCompactGitWorkContext,
 } from "./index.ts";
 import type {
   GitWorkRecord,
@@ -18,6 +20,7 @@ import type {
   LogicalIdentity,
   TaskOperationalState,
   TaskRecord,
+  WorkRecord,
 } from "./types.ts";
 
 const temporaryRoots: string[] = [];
@@ -1261,16 +1264,13 @@ describe("source qualification does not grant startup or native authority", () =
       projectId: "codex-harness-engineering",
       workId: "ontology-driven-harness-operation",
     });
-    for (const taskId of [
-      "GHA-22",
-      "GHA-27",
-      "WSL2-LEAD-HANDOFF",
-      "ACADEMY-ROOT-SOURCE-READ-ONCE1",
-    ]) {
+    // These historical selections also need the active and historical Spec criteria.
+    // Previously omitted criteria made them appear to fit. Keep the actual cap and hold.
+    for (const taskId of ["GHA-22", "GHA-27", "WSL2-LEAD-HANDOFF"]) {
       const result = await readGitWorkContext(reader, { taskId, latestRelevant: "current" });
-      expect(result.holdReasons).toEqual([]);
-      expect(result.status).toBe("source-qualified");
-      expect(result.records.some((row) => row.kind === "task" && row.id === taskId)).toBe(true);
+      expect(result.holdReasons).toEqual(["REQUIRED_CONTEXT_OUTPUT_LIMIT"]);
+      expect(result.status).toBe("held");
+      expect(result.records).toEqual([]);
       expect(JSON.stringify(result).length).toBeLessThanOrEqual(24000);
       expect(result.semanticAcceptanceEstablished).toBe(false);
     }
@@ -1285,6 +1285,9 @@ describe("source qualification does not grant startup or native authority", () =
       taskId: sourceTaskId,
       latestRelevant: "current",
     });
+    expect(context.status).toBe("source-qualified");
+    expect(context.holdReasons).toEqual([]);
+    expect(JSON.stringify(context).length).toBeLessThanOrEqual(24000);
     expect(context.historicalEffects).toMatchObject({
       completedCount: 64,
       uncertainCount: 2,
@@ -1308,5 +1311,891 @@ describe("source qualification does not grant startup or native authority", () =
     expect((await validateGitWorkRecords(replayReader)).findings).toContain(
       "COMPLETED_EFFECT_REPLAY:" + sourceTaskId,
     );
+  });
+});
+
+function boundRecords(): GitWorkRecord[] {
+  const rows = initialRecords();
+  const work = rows.find((row) => row.kind === "work") as WorkRecord;
+  work.continuity = {
+    schema: "common.git-work-continuity.v1",
+    purposeSources: [ref("purpose")],
+    effectInventorySources: [ref("fences")],
+  };
+  rows.push(input("purpose", JSON.parse(JSON.stringify(work.purpose))));
+  const plan = rows.find((row) => row.kind === "plan");
+  if (plan?.kind !== "plan") throw Error("fixture");
+  plan.clauses = ["Read originals before acting", "Never replay consumed effects"];
+  for (const record of rows)
+    if (record.kind === "task") record.nextAction = "Read verified context before proceeding";
+  return rows;
+}
+function addStandaloneEffect(rows: GitWorkRecord[], id: string, status: "completed" | "uncertain") {
+  const producer = task(`producer-${id}`);
+  producer.executionClass = "native-effect";
+  producer.state = { ...state, execution: "running" };
+  producer.runtimeId = "native-fixture";
+  producer.occurrence = { runtimeId: producer.runtimeId, attemptId: id, occurrenceId: id };
+  producer.effectIds = [id];
+  rows.push(
+    producer,
+    input(`observation-${id}`, { observed: id }),
+    {
+      ...base,
+      kind: "evidence",
+      id: `proof-${id}`,
+      evidenceKind: "observation",
+      source: ref(`observation-${id}`),
+    },
+    {
+      ...base,
+      kind: "effect",
+      id,
+      taskId: producer.id,
+      status,
+      occurrence: { ...producer.occurrence },
+      evidenceIds: [`proof-${id}`],
+    },
+  );
+  return producer;
+}
+
+describe("source-addressed normative continuity and consumed effect closure", () => {
+  test("full purpose, Spec criteria and Plan clauses equal their exact addressed fragments", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const reader = await open(root, oid);
+    const context = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    expect(context.status).toBe("source-qualified");
+    expect(context.continuityBinding.coverage).toBe("bound");
+    expect(context.normative.contracts).toHaveLength(4);
+    for (const contract of context.normative.contracts) {
+      const record = context.records.find(
+        (row) => row.kind === contract.kind && row.id === contract.id,
+      );
+      const source = context.sources.find((row) => row.id === contract.source)!;
+      expect(contract.coverage).toBe("complete");
+      for (const [field, fragment] of Object.entries(contract.fields)) {
+        const resolved = await reader.readSource({
+          kind: "snapshot",
+          path: `${reader.workPath}/${source.path}`,
+          fragment,
+        });
+        expect(record![field]).toEqual(resolved.value);
+        expect(source.blobOid).toBe(resolved.blobOid);
+      }
+    }
+    expect(context.continuityBinding.purposeSources).toHaveLength(1);
+    expect(context.continuityBinding.effectInventorySources).toHaveLength(1);
+    expect(context.records.find((row) => row.kind === "task")?.effectIds).toEqual([]);
+    expect(context.authority).toBe("none");
+    expect(context.nativePermissionGranted).toBe(false);
+  });
+  test("legacy Work and objective-only Plans remain explicit rather than inventing bindings", async () => {
+    const { root, oid } = await fixture();
+    const context = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(context.status).toBe("source-qualified");
+    expect(context.continuityBinding.coverage).toBe("legacy-unbound");
+    expect(context.normative.contracts.find((row) => row.kind === "plan")?.coverage).toBe(
+      "legacy-objective-only",
+    );
+    expect(context.normative.contracts.find((row) => row.kind === "task")?.coverage).toBe(
+      "unspecified",
+    );
+    expect(context.records.find((row) => row.kind === "spec")?.criteria).toEqual([
+      "Bounded source closure",
+    ]);
+  });
+  test("bound selected Task requires authored next action with its canonical source pointer", async () => {
+    const rows = boundRecords();
+    delete byTask(rows, "a").nextAction;
+    const { root, oid } = await fixture(rows);
+    const context = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(context.holdReasons).toContain("SELECTED_TASK_NEXT_ACTION_REQUIRED:a");
+    expect(context.normative.contracts.find((row) => row.kind === "task")?.coverage).toBe(
+      "unspecified",
+    );
+  });
+  test.each(["value", "class", "scope", "missing"] as const)(
+    "required purpose provenance holds on %s mismatch",
+    async (variant) => {
+      const rows = boundRecords();
+      const work = rows.find((row) => row.kind === "work") as WorkRecord;
+      const purpose = rows.find(
+        (row) => row.kind === "input" && row.id === "purpose",
+      ) as InputRecord;
+      if (variant === "value") purpose.content = { objective: "Different purpose" };
+      if (variant === "class")
+        work.continuity!.purposeSources = [
+          { kind: "snapshot", path: pathOf("work", scope.workId), fragment: "#/purpose" },
+        ];
+      if (variant === "scope") purpose.projectId = "other";
+      if (variant === "missing") work.continuity!.purposeSources = [ref("absent")];
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      expect((await validateGitWorkRecords(reader)).valid).toBe(false);
+      expect(
+        (await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" })).status,
+      ).toBe("held");
+    },
+  );
+  test.each(["completed", "uncertain"] as const)(
+    "typed inventory requires reachable %s consumed effect",
+    async (status) => {
+      const rows = boundRecords();
+      const work = rows.find((row) => row.kind === "work") as WorkRecord;
+      work.continuity!.effectInventorySources.push(ref("consumed"));
+      rows.push(
+        input("consumed", {
+          completedEffectIds: status === "completed" ? ["lost"] : [],
+          uncertainEffectIds: status === "uncertain" ? ["lost"] : [],
+        }),
+      );
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      for (const result of [
+        await validateGitWorkRecords(reader),
+        await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" }),
+      ]) {
+        const findings = "findings" in result ? result.findings : result.holdReasons;
+        expect(findings).toContain(`CONSUMED_${status.toUpperCase()}_EFFECT_NOT_REACHABLE:lost`);
+      }
+    },
+  );
+  test.each(["completed", "uncertain"] as const)(
+    "pending disconnected %s effect reaches producer/proof and rejects replay",
+    async (status) => {
+      const rows = initialRecords();
+      const producer = addStandaloneEffect(rows, "external-once", status);
+      const consumer = byTask(rows, "a");
+      consumer.executionClass = "native-effect";
+      consumer.pendingEffectIds = ["external-once"];
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      const context = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+      expect(context.holdReasons).toContain("EFFECT_REPLAY_OR_UNCERTAIN:external-once");
+      expect((await validateGitWorkRecords(reader)).findings).toContain(
+        "EFFECT_REPLAY_OR_UNCERTAIN:external-once",
+      );
+      expect(context.records.some((row) => row.kind === "task" && row.id === producer.id)).toBe(
+        true,
+      );
+      expect(
+        context.records.some((row) => row.kind === "evidence" && row.id === "proof-external-once"),
+      ).toBe(true);
+      expect(
+        context.historicalEffects?.[
+          status === "completed" ? "relevantCompletedIds" : "relevantUncertainIds"
+        ],
+      ).toContain("external-once");
+    },
+  );
+  test("consumed inventory reaches standalone effects without pending consumer edges", async () => {
+    const rows = boundRecords();
+    addStandaloneEffect(rows, "recorded-once", "completed");
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    rows.push(input("consumed", { completedEffectIds: ["recorded-once"], uncertainEffectIds: [] }));
+    work.continuity!.effectInventorySources.push(ref("consumed"));
+    const { root, oid } = await fixture(rows);
+    const context = await readGitWorkContext(await open(root, oid), { latestRelevant: "current" });
+    expect(context.status).toBe("source-qualified");
+    expect(context.records.some((row) => row.kind === "effect" && row.id === "recorded-once")).toBe(
+      true,
+    );
+    expect(context.historicalEffects?.completedCount).toBe(2);
+  });
+  test("pending lookup recursively checks newly reached producers and respects required limits", async () => {
+    const rows = initialRecords();
+    const producer = addStandaloneEffect(rows, "outer", "completed");
+    addStandaloneEffect(rows, "inner", "uncertain");
+    producer.pendingEffectIds = ["inner"];
+    const consumer = byTask(rows, "a");
+    consumer.executionClass = "native-effect";
+    consumer.pendingEffectIds = ["outer"];
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const context = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    expect(context.holdReasons).toContain("EFFECT_REPLAY_OR_UNCERTAIN:inner");
+    expect(context.records.some((row) => row.id === "producer-inner")).toBe(true);
+    const limited = await readGitWorkContext(reader, {
+      taskId: "a",
+      latestRelevant: "current",
+      maxRecords: 7,
+    });
+    expect(limited.status).toBe("held");
+    expect(limited.holdReasons).toContain("REQUIRED_CONTEXT_RECORD_LIMIT");
+  });
+  test("fresh pending IDs need no fabricated Effect and unrelated malformed payloads stay unread", async () => {
+    const rows = initialRecords();
+    const consumer = byTask(rows, "a");
+    consumer.executionClass = "native-effect";
+    consumer.pendingEffectIds = ["new-effect"];
+    const { root } = await fixture(rows);
+    await writeFile(join(root, pathOf("effect", "unrelated")), "{broken").catch(async () => {
+      await mkdir(join(root, pathOf("effect", "unrelated"), ".."), { recursive: true });
+      await writeFile(join(root, pathOf("effect", "unrelated")), "{broken");
+    });
+    const reader = await open(root, await commit(root));
+    expect(
+      (await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" })).status,
+    ).toBe("source-qualified");
+    expect((await validateGitWorkRecords(reader)).valid).toBe(false);
+  });
+  test.each(["occurrence", "evidence", "inventory-unavailable"] as const)(
+    "required pending lookup fails closed on %s",
+    async (variant) => {
+      const rows = initialRecords();
+      addStandaloneEffect(rows, "once", "completed");
+      const consumer = byTask(rows, "a");
+      consumer.executionClass = "native-effect";
+      consumer.pendingEffectIds = ["once"];
+      const effect = rows.find((row) => row.kind === "effect");
+      if (effect?.kind !== "effect") throw Error("fixture");
+      if (variant === "occurrence") effect.occurrence.attemptId = "wrong";
+      if (variant === "evidence") effect.evidenceIds = ["missing"];
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      const selected =
+        variant === "inventory-unavailable"
+          ? {
+              ...reader,
+              listRecords: async () => {
+                throw Error("INVENTORY_UNAVAILABLE");
+              },
+            }
+          : reader;
+      const context = await readGitWorkContext(selected, {
+        taskId: "a",
+        latestRelevant: "current",
+      });
+      expect(context.status).toBe("held");
+      expect(
+        context.holdReasons.some((finding) =>
+          finding.includes(
+            variant === "occurrence"
+              ? "EFFECT_TASK_OCCURRENCE_BINDING_MISMATCH"
+              : variant === "evidence"
+                ? "RECORD_DEPENDENCY_MISSING"
+                : "INVENTORY_UNAVAILABLE",
+          ),
+        ),
+      ).toBe(true);
+    },
+  );
+  test.each(["binding", "inventory", "purpose-provenance", "source-bytes"] as const)(
+    "transition protects already bound %s",
+    async (variant) => {
+      const rows = boundRecords();
+      const { root, oid } = await fixture(rows);
+      const before = await open(root, oid);
+      const work = rows.find((row) => row.kind === "work") as WorkRecord;
+      if (variant === "binding") delete work.continuity;
+      if (variant === "inventory") {
+        rows.push(
+          input("other-inventory", {
+            completedEffectIds: ["already"],
+            uncertainEffectIds: ["unknown"],
+          }),
+        );
+        work.continuity!.effectInventorySources = [ref("other-inventory")];
+      }
+      if (variant === "purpose-provenance") {
+        rows.push(input("other-purpose", JSON.parse(JSON.stringify(work.purpose))));
+        work.continuity!.purposeSources = [ref("other-purpose")];
+      }
+      if (variant === "source-bytes") {
+        const original = rows.find(
+          (row) => row.kind === "input" && row.id === "purpose",
+        ) as InputRecord;
+        original.origin.locator = "rewritten-history";
+      }
+      for (const row of rows) await put(root, row);
+      const result = await validateGitWorkTransition(before, await open(root, await commit(root)));
+      const code = {
+        binding: "CONTINUITY_BINDING_REMOVED",
+        inventory: "CONSUMED_INVENTORY_SOURCE_REMOVED",
+        "purpose-provenance": "PURPOSE_PROVENANCE_REMOVED",
+        "source-bytes": "CONTINUITY_SOURCE_HISTORY_CHANGED",
+      }[variant];
+      expect(result.findings).toContain(code);
+    },
+  );
+  test("explicit purpose successor can evolve current purpose while preserving original source bytes", async () => {
+    const rows = boundRecords();
+    const { root, oid } = await fixture(rows);
+    const before = await open(root, oid);
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.purpose.objective = "Authorized successor purpose";
+    work.continuity!.purposeSources = [ref("purpose-successor")];
+    await put(root, input("purpose-successor", JSON.parse(JSON.stringify(work.purpose))));
+    await put(root, work);
+    const after = await open(root, await commit(root));
+    expect((await validateGitWorkTransition(before, after)).findings).toEqual([]);
+    expect((await before.readSource(ref("purpose"))).sha256).toBe(
+      (await after.readSource(ref("purpose"))).sha256,
+    );
+  });
+  test("required output overflow holds without dropping normative clauses or exposing raw originals", async () => {
+    const rows = boundRecords();
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const context = await readGitWorkContext(reader, {
+      taskId: "a",
+      latestRelevant: "current",
+      maxChars: 1024,
+    });
+    expect(context.holdReasons).toEqual(["REQUIRED_CONTEXT_OUTPUT_LIMIT"]);
+    expect(context.normative.contracts).toEqual([]);
+    expect(context.continuityBinding.coverage).toBe("unavailable");
+    expect(JSON.stringify(context).length).toBeLessThanOrEqual(1024);
+    const full = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    expect(full.records.find((row) => row.kind === "decision")?.answer).toBeUndefined();
+    expect(full.records.find((row) => row.kind === "input")?.content).toBeUndefined();
+  });
+});
+
+describe("lossless shared native compact context", () => {
+  test("roundtrips every normative field, selected Task and exact source binding with an in-band layout", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.purpose.inScope = [];
+    work.purpose.outOfScope = [];
+    (rows.find((row) => row.kind === "input" && row.id === "purpose") as InputRecord).content =
+      JSON.parse(JSON.stringify(work.purpose));
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const raw = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    const compact = compactGitWorkContext(raw, { taskId: "a" });
+    expect(compact.status).toBe("source-qualified");
+    expect(compact.layout.normative).toContain("[objective,clauses?]");
+    const decoded = decodeCompactGitWorkContext(compact);
+    for (const contract of compact.normative) {
+      const kind = contract[0],
+        id = contract[1];
+      const revision = kind === "work" ? undefined : contract[2];
+      const sourceIndex = kind === "work" ? contract[2] : contract[3];
+      const fields = kind === "work" ? contract[3] : contract[4];
+      const address = decoded.sources[sourceIndex]!;
+      const record = decoded.normative.find(
+        (row) => row.kind === kind && row.id === id && row.revision === revision,
+      )!;
+      for (const [field, fragment] of Object.entries(fields)) {
+        const source = await reader.readSource({
+          kind: "git",
+          repositoryId: address.repositoryId,
+          commit: address.commit,
+          path: address.path,
+          fragment,
+        });
+        expect(source.blobOid).toBe(address.blobOid);
+        expect(record[field]).toEqual(source.value);
+      }
+    }
+    const taskRecord = await reader.readRecord({ kind: "task", id: "a" });
+    if (taskRecord.kind !== "task") throw Error("fixture");
+    expect(decoded.task?.logical).toEqual(taskRecord.logical);
+    expect(decoded.task?.state).toEqual(taskRecord.state);
+    expect(decoded.task?.effectIds).toEqual([]);
+    expect(decoded.task?.pendingEffectIds).toEqual([]);
+    expect(decoded.task?.nextAction?.value).toBe(taskRecord.nextAction!);
+    expect(decoded.task?.nextAction?.source[1]).toBe("#/nextAction");
+    expect(compact.historicalEffects).toEqual(raw.historicalEffects);
+    expect(compact.continuityBinding.coverage).toBe("bound");
+    expect(compact.authority).toBe("none");
+    expect(compact.nativePermissionGranted).toBe(false);
+  });
+  test("string pooling preserves identical values, empty purpose arrays and exact Plan clause order", async () => {
+    const rows = boundRecords();
+    const spec = rows.find((row) => row.kind === "spec");
+    const plan = rows.find((row) => row.kind === "plan");
+    if (spec?.kind !== "spec" || plan?.kind !== "plan") throw Error("fixture");
+    spec.criteria = ["Keep meaning and original proof"];
+    plan.clauses = ["Second clause first", "Keep meaning and original proof", "First clause last"];
+    const { root, oid } = await fixture(rows);
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, oid), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    expect(
+      compact.strings.filter((text) => text === "Keep meaning and original proof"),
+    ).toHaveLength(1);
+    expect(
+      decodeCompactGitWorkContext(compact).normative.find((row) => row.kind === "plan")?.clauses,
+    ).toEqual(plan.clauses);
+  });
+  test("all active and selected historical contract revisions retain their own source identity", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    const spec = rows.find((row) => row.kind === "spec");
+    const plan = rows.find((row) => row.kind === "plan");
+    if (spec?.kind !== "spec" || plan?.kind !== "plan") throw Error("fixture");
+    work.spec.revision = 2;
+    work.plan.revision = 2;
+    rows.push(
+      { ...spec, revision: 2, outcome: "Current outcome", criteria: ["Current criteria"] },
+      { ...plan, revision: 2, specRevision: 2, clauses: ["Current authored clause"] },
+    );
+    const { root, oid } = await fixture(rows);
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, oid), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    const decoded = decodeCompactGitWorkContext(compact);
+    expect(
+      decoded.normative
+        .filter((row) => row.kind === "spec")
+        .map((row) => row.revision)
+        .sort(),
+    ).toEqual([1, 2]);
+    expect(
+      decoded.normative
+        .filter((row) => row.kind === "plan")
+        .map((row) => row.revision)
+        .sort(),
+    ).toEqual([1, 2]);
+    expect(decoded.task?.logical.specRevision).toBe(1);
+    expect(decoded.task?.logical.planRevision).toBe(1);
+    expect(decoded.normative.find((row) => row.kind === "work")?.spec).toEqual({
+      id: "spec",
+      revision: 2,
+    });
+    expect(decoded.normative.find((row) => row.kind === "work")?.plan).toEqual({
+      id: "plan",
+      revision: 2,
+    });
+    expect(
+      decoded.normative
+        .filter((row) => row.kind === "plan")
+        .map((row) => [row.specId, row.specRevision])
+        .sort(),
+    ).toEqual([
+      ["spec", 1],
+      ["spec", 2],
+    ]);
+  });
+  test("same blob original fragments share one address without exposing raw answer/question or origin", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, oid), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    const decision = decodeCompactGitWorkContext(compact).decisions[0]!;
+    expect(decision.answerSource[0]).toBe(decision.selectionContextSource![0]);
+    expect(decision.answerSource[1]).toBe("#/content/text");
+    expect(decision.selectionContextSource![1]).toBe("#/content/question");
+    const serialized = JSON.stringify(compact);
+    expect(serialized).not.toContain("Which canonical source?");
+    expect(serialized).not.toContain("fixture:user-message:1");
+    expect(serialized).not.toContain("Use Git");
+  });
+  test("native declarations stay distinct on pointers while their exact receipt address is pooled", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.continuity!.effectInventorySources = ["native-owner-a", "native-owner-b"].map(
+      (ownerId) => ({
+        kind: "native",
+        ownerId,
+        locator: `${ownerId}:inventory`,
+        receipt: ref("fences"),
+      }),
+    );
+    const { root, oid } = await fixture(rows);
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, oid), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    expect(compact.status).toBe("source-qualified");
+    const [a, b] = compact.continuityBinding.effectInventorySources;
+    expect(a![0]).toBe(b![0]);
+    expect(a![2]?.ownerId).toBe("native-owner-a");
+    expect(b![2]?.locator).toBe("native-owner-b:inventory");
+    expect(a![2]?.receiptKind).toBe("snapshot");
+    expect(compact.nativePermissionGranted).toBe(false);
+  });
+  test("explicit repository path base remains exact instead of receiving the selected Work prefix", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    const path = "architecture/consumed-inventory.json";
+    work.continuity!.effectInventorySources = [{ kind: "snapshot", path }];
+    const { root } = await fixture(rows);
+    await mkdir(join(root, "architecture"), { recursive: true });
+    await writeFile(
+      join(root, path),
+      JSON.stringify({ completedEffectIds: ["already"], uncertainEffectIds: ["unknown"] }),
+    );
+    const raw = await readGitWorkContext(await open(root, await commit(root)), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(raw.sources.find((source) => source.path === path)?.pathBase).toBe("repository");
+    const compact = compactGitWorkContext(raw, { taskId: "a" });
+    const index = compact.continuityBinding.effectInventorySources[0]![0];
+    expect(compact.sources[index]![0]).toBe("repository");
+    expect(decodeCompactGitWorkContext(compact).sources[index]!.path).toBe(path);
+  });
+  test("equal blob/path across different commits remains two exact pooled addresses", async () => {
+    const rows = boundRecords();
+    const { root, oid } = await fixture(rows);
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.continuity!.purposeSources.push({
+      kind: "git",
+      repositoryId: "fixture/repo",
+      commit: oid,
+      path: pathOf("input", "purpose"),
+      fragment: "#/content",
+    });
+    await put(root, work);
+    const next = await commit(root);
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, next), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    const decoded = decodeCompactGitWorkContext(compact);
+    const [a, b] = compact.continuityBinding.purposeSources.map(
+      (pointer) => decoded.sources[pointer[0]]!,
+    );
+    expect(a!.blobOid).toBe(b!.blobOid);
+    expect(a!.path).toBe(b!.path);
+    expect(a!.commit).toBe(next);
+    expect(b!.commit).toBe(oid);
+  });
+  test("explicit decision subsets and empty selection retain every reached original route", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(
+      compactGitWorkContext(raw, { taskId: "a", decisionIds: [] }).decisions.map((row) => row[0]),
+    ).toEqual(["direction"]);
+    for (const selection of [
+      { decisionIds: ["missing"] },
+      { decisionIds: ["direction", "direction"] },
+      { taskId: "missing" },
+    ]) {
+      const compact = compactGitWorkContext(raw, selection);
+      expect(compact.status).toBe("held");
+      expect(compact.normative).toEqual([]);
+      expect(() => decodeCompactGitWorkContext(compact)).toThrow("COMPACT_CONTEXT_NOT_QUALIFIED");
+    }
+  });
+  test.each([
+    "source",
+    "path-base",
+    "path",
+    "fragment",
+    "criteria",
+    "fields",
+    "currentness",
+    "original",
+    "clauses",
+    "next-action",
+  ] as const)(
+    "missing or malformed required %s cannot become compact qualified context",
+    async (variant) => {
+      const { root, oid } = await fixture(boundRecords());
+      const raw = await readGitWorkContext(await open(root, oid), {
+        taskId: "a",
+        latestRelevant: "current",
+      });
+      const workSource = raw.sources.find(
+        (row) => row.id === raw.normative.contracts.find((row) => row.kind === "work")!.source,
+      )!;
+      if (variant === "source") raw.sources = raw.sources.filter((row) => row !== workSource);
+      if (variant === "path-base") delete (workSource as Partial<typeof workSource>).pathBase;
+      if (variant === "path") workSource.path = "inputs/wrong.json";
+      if (variant === "fragment") workSource.fragment = "#/purpose";
+      if (variant === "criteria") delete raw.records.find((row) => row.kind === "spec")!.criteria;
+      if (variant === "fields")
+        raw.normative.contracts = raw.normative.contracts.filter((row) => row.kind !== "plan");
+      if (variant === "currentness") delete (raw as Partial<typeof raw>).latestRelevant;
+      if (variant === "original")
+        raw.records.find((row) => row.kind === "decision")!.answerSource = "absent";
+      if (variant === "clauses") raw.records.find((row) => row.kind === "plan")!.clauses = [];
+      if (variant === "next-action")
+        delete raw.records.find((row) => row.kind === "task")!.nextAction;
+      const compact = compactGitWorkContext(raw, { taskId: "a" });
+      expect(compact.status).toBe("held");
+      expect(compact.normative).toEqual([]);
+      expect(compact.strings).toEqual([]);
+      expect(compact.sources).toEqual([]);
+    },
+  );
+  test("raw context overflow/currentness holds survive compaction without a usable partial contract", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const reader = await open(root, oid);
+    for (const request of [
+      { taskId: "a", latestRelevant: "current" as const, maxChars: 1024 },
+      { taskId: "a", latestRelevant: "advanced" as const },
+    ]) {
+      const raw = await readGitWorkContext(reader, request);
+      const compact = compactGitWorkContext(raw, { taskId: "a" });
+      expect(compact.status).toBe("held");
+      expect(compact.holdReasons).toContain("SOURCE_CONTEXT_HELD");
+      expect(compact.normative).toEqual([]);
+      expect(compact.task).toBeUndefined();
+      expect(compact.nativePermissionGranted).toBe(false);
+    }
+  });
+  test("decoder rejects corrupted indices instead of manufacturing missing source values", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    const compact = compactGitWorkContext(raw, { taskId: "a" });
+    compact.task!.nextAction!.value = 9999;
+    expect(() => decodeCompactGitWorkContext(compact)).toThrow("INVALID_COMPACT_STRING_INDEX");
+  });
+  test("held native output keeps owned codes without copying forensic original snippets or external exceptions", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    const sentinel = "PRIVATE_ORIGINAL_SENTINEL";
+    const held = structuredClone(raw);
+    held.status = "held";
+    held.holdReasons = [`REQUIRED_CONTEXT_OUTPUT_LIMIT:${sentinel}`, sentinel];
+    const compact = compactGitWorkContext(held, { taskId: "a" });
+    expect(compact.status).toBe("held");
+    expect(compact.holdReasons).toContain("REQUIRED_CONTEXT_OUTPUT_LIMIT");
+    expect(JSON.stringify(compact)).not.toContain(sentinel);
+    expect(held.holdReasons[0]).toContain(sentinel);
+    Object.defineProperty(raw.sources[0], "pathBase", {
+      get() {
+        throw Error(sentinel);
+      },
+    });
+    const failed = compactGitWorkContext(raw, { taskId: "a" });
+    expect(failed.holdReasons).toContain("COMPACT_CONTEXT_UNAVAILABLE");
+    expect(JSON.stringify(failed)).not.toContain(sentinel);
+  });
+  test("rejected historical extra bytes never reach held output while validated history survives", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    const sentinel = "PRIVATE_SCHEMA_SENTINEL";
+    const malformed = structuredClone(raw);
+    Object.assign(malformed.historicalEffects!, { privateRaw: sentinel });
+    const rejected = compactGitWorkContext(malformed, { taskId: "a" });
+    expect(rejected.status).toBe("held");
+    expect(rejected.holdReasons).toContain("INVALID_COMPACT_SCHEMA");
+    expect(rejected.historicalEffects).toBeUndefined();
+    expect(JSON.stringify(rejected)).not.toContain("privateRaw");
+    expect(JSON.stringify(rejected)).not.toContain(sentinel);
+    expect(JSON.stringify(malformed)).toContain(sentinel);
+    const held = structuredClone(raw);
+    held.status = "held";
+    held.holdReasons = ["UNCERTAIN_EFFECT_REPLAY:private-detail"];
+    const safeHeld = compactGitWorkContext(held, { taskId: "a" });
+    expect(safeHeld.status).toBe("held");
+    expect(safeHeld.historicalEffects).toEqual(raw.historicalEffects);
+    held.historicalEffects!.relevantCompletedIds.push("mutated-after-return");
+    expect(safeHeld.historicalEffects).toEqual(raw.historicalEffects);
+    const valid = compactGitWorkContext(raw, { taskId: "a" });
+    expect(valid.status).toBe("source-qualified");
+    expect(valid.historicalEffects).toEqual(raw.historicalEffects);
+    for (const field of [
+      "repositoryId",
+      "commit",
+      "projectId",
+      "workId",
+      "sourcePathBase",
+      "latestRelevant",
+    ]) {
+      const invalid = structuredClone(raw);
+      Object.assign(invalid, { [field]: { privateRaw: sentinel } });
+      const result = compactGitWorkContext(invalid, { taskId: "a" });
+      expect(result.status).toBe("held");
+      expect(JSON.stringify(result)).not.toContain(sentinel);
+      expect(JSON.stringify(result)).not.toContain("privateRaw");
+    }
+  });
+});
+
+describe("uncertain legacy source Task-ID fence", () => {
+  test.each(["legacy-planned", "legacy-running", "bound-planned", "bound-running"] as const)(
+    "holds %s without fabricating a native occurrence",
+    async (variant) => {
+      const rows = variant.startsWith("bound") ? boundRecords() : initialRecords();
+      const guarded = task("unknown");
+      guarded.state.execution = variant.endsWith("running") ? "running" : "planned";
+      guarded.nextAction = "Recover the uncertain observation without repeating its action";
+      rows.push(guarded);
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      const validation = await validateGitWorkRecords(reader);
+      expect(validation.findings).toContain("UNCERTAIN_EFFECT_REPLAY:unknown");
+      const raw = await readGitWorkContext(reader, {
+        taskId: "unknown",
+        latestRelevant: "current",
+      });
+      expect(raw.status).toBe("held");
+      expect(raw.holdReasons).toContain("UNCERTAIN_EFFECT_REPLAY:unknown");
+      expect(raw.historicalEffects?.relevantUncertainIds).toContain("unknown");
+      expect(compactGitWorkContext(raw, { taskId: "unknown" }).status).toBe("held");
+      const record = await reader.readRecord({ kind: "task", id: "unknown" });
+      if (record.kind !== "task") throw Error("fixture");
+      expect(record.executionClass).toBe("source-only");
+      expect(record.occurrence).toBeUndefined();
+      expect(record.pendingEffectIds).toBeUndefined();
+      expect(record.effectIds).toEqual([]);
+    },
+  );
+  test("distinct future source Task remains qualified beside the consumed uncertain Task-ID", async () => {
+    const rows = boundRecords();
+    const future = task("new-distinct-source-task");
+    future.nextAction = "Perform the separately authorized new source observation";
+    rows.push(future);
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    expect((await validateGitWorkRecords(reader)).findings).toEqual([]);
+    const raw = await readGitWorkContext(reader, { taskId: future.id, latestRelevant: "current" });
+    expect(raw.status).toBe("source-qualified");
+    expect(compactGitWorkContext(raw, { taskId: future.id }).status).toBe("source-qualified");
+  });
+});
+
+async function historicalCompactFixture(activeSpecRevision = 1) {
+  const rows = boundRecords();
+  const work = rows.find((row) => row.kind === "work") as WorkRecord;
+  const plan = rows.find((row) => row.kind === "plan");
+  if (plan?.kind !== "plan") throw Error("fixture");
+  work.plan.revision = 2;
+  work.spec.revision = activeSpecRevision;
+  rows.push({
+    ...plan,
+    revision: 2,
+    specRevision: activeSpecRevision,
+    clauses: ["Current Plan2 clause"],
+  });
+  if (activeSpecRevision === 2) {
+    const spec = rows.find((row) => row.kind === "spec");
+    if (spec?.kind !== "spec") throw Error("fixture");
+    rows.push({
+      ...spec,
+      revision: 2,
+      outcome: "Current Spec2 outcome",
+      criteria: ["Current Spec2 criterion"],
+    });
+  }
+  const { root, oid } = await fixture(rows);
+  const raw = await readGitWorkContext(await open(root, oid), {
+    taskId: "a",
+    latestRelevant: "current",
+  });
+  const compact = compactGitWorkContext(raw, { taskId: "a" });
+  expect(compact.status).toBe("source-qualified");
+  return { raw, compact };
+}
+
+describe("shared compact schema and closure boundary", () => {
+  test.each([
+    "missing-binding",
+    "empty-bound-inventory",
+    "invalid-inventory-index",
+    "invalid-purpose-index",
+    "no-normative",
+    "missing-active-plan",
+    "missing-selected-plan",
+    "work-source-path",
+    "spec-fields",
+    "missing-next-action",
+    "next-action-title",
+    "next-action-other-source",
+    "next-action-coverage",
+    "task-plan999",
+    "task-spec999",
+    "plan-spec999",
+    "task-issue",
+    "task-domain",
+    "duplicate-work",
+  ] as const)("decoder rejects independent malformed %s case", async (variant) => {
+    const { compact } = await historicalCompactFixture();
+    const work = compact.normative.find((row) => row[0] === "work")!;
+    const spec = compact.normative.find((row) => row[0] === "spec")!;
+    const active = compact.normative.find((row) => row[0] === "plan" && row[2] === 2)!;
+    if (work[0] !== "work" || spec[0] !== "spec" || active[0] !== "plan") throw Error("fixture");
+    if (variant === "missing-binding")
+      delete (compact as Partial<typeof compact>).continuityBinding;
+    if (variant === "empty-bound-inventory") compact.continuityBinding.effectInventorySources = [];
+    if (variant === "invalid-inventory-index")
+      compact.continuityBinding.effectInventorySources = [[9999, "#/content"]];
+    if (variant === "invalid-purpose-index")
+      compact.continuityBinding.purposeSources = [[9999, "#/content"]];
+    if (variant === "no-normative") compact.normative = [];
+    if (variant === "missing-active-plan")
+      compact.normative = compact.normative.filter((row) => row !== active);
+    if (variant === "missing-selected-plan")
+      compact.normative = compact.normative.filter((row) => !(row[0] === "plan" && row[2] === 1));
+    if (variant === "work-source-path") compact.sources[work[2]]![1] = "inputs/wrong.json";
+    if (variant === "spec-fields") Object.assign(spec[4], { criteria: "#/outcome" });
+    if (variant === "missing-next-action") delete compact.task!.nextAction;
+    if (variant === "next-action-title") compact.task!.nextAction!.source[1] = "#/title";
+    if (variant === "next-action-other-source") compact.task!.nextAction!.source[0] = spec[3];
+    if (variant === "next-action-coverage") compact.task!.nextActionCoverage = "unspecified";
+    if (variant === "task-plan999") compact.task!.logical[7] = 999;
+    if (variant === "task-spec999") compact.task!.logical[5] = 999;
+    if (variant === "plan-spec999") active[7][1] = 999;
+    if (variant === "task-issue") compact.task!.logical[3] = "different-issue";
+    if (variant === "task-domain") compact.task!.logical[0] = "different-domain";
+    if (variant === "duplicate-work") compact.normative.push(structuredClone(work));
+    expect(() => decodeCompactGitWorkContext(compact)).toThrow();
+  });
+  test.each(["missing-spec", "missing-plan", "issue", "domain", "plan-spec-mismatch"] as const)(
+    "constructor holds selected %s lineage/scope",
+    async (variant) => {
+      const { raw } = await historicalCompactFixture(variant === "plan-spec-mismatch" ? 2 : 1);
+      const task = raw.records.find((row) => row.kind === "task")!;
+      const logical = task.logical as unknown as LogicalIdentity;
+      if (variant === "missing-spec") logical.specRevision = 999;
+      if (variant === "missing-plan") logical.planRevision = 999;
+      if (variant === "issue") logical.issueId = "different-issue";
+      if (variant === "domain") logical.domainId = "different-domain";
+      if (variant === "plan-spec-mismatch") {
+        logical.specRevision = 2;
+      }
+      const compact = compactGitWorkContext(raw, { taskId: "a" });
+      expect(compact.status).toBe("held");
+      expect(compact.normative).toEqual([]);
+      expect(compact.task).toBeUndefined();
+      expect(compact.holdReasons.length).toBeGreaterThan(0);
+    },
+  );
+  test("valid historical Task Plan1 remains distinct from active Plan2 after the shared validator", async () => {
+    const { compact } = await historicalCompactFixture();
+    const decoded = decodeCompactGitWorkContext(compact);
+    const work = decoded.normative.find((row) => row.kind === "work")!;
+    expect(work.plan).toEqual({ id: "plan", revision: 2 });
+    expect(work.domainId).toBe(scope.domainId);
+    expect(work.issueId).toBe("issue");
+    expect(decoded.task?.logical.planRevision).toBe(1);
+    expect(decoded.normative.filter((row) => row.kind === "plan")).toHaveLength(2);
+  });
+  test("distinct future pending effect remains valid alongside bound consumed inventory", async () => {
+    const rows = boundRecords();
+    const future = byTask(rows, "a");
+    future.executionClass = "native-effect";
+    future.pendingEffectIds = ["new-distinct-future-effect"];
+    const { root, oid } = await fixture(rows);
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    const compact = compactGitWorkContext(raw, { taskId: "a" });
+    expect(compact.status).toBe("source-qualified");
+    expect(decodeCompactGitWorkContext(compact).task?.pendingEffectIds).toEqual(
+      future.pendingEffectIds,
+    );
+    expect(compact.historicalEffects?.uncertainCount).toBe(1);
+    expect(compact.nativePermissionGranted).toBe(false);
   });
 });

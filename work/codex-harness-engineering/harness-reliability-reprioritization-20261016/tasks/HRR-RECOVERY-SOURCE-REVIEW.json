@@ -1,0 +1,39 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "task",
+  "id": "HRR-RECOVERY-SOURCE-REVIEW",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "harness-reliability-reprioritization-20261016",
+    "issueId": "HRR-ISSUE-20261016",
+    "specId": "HRR-SPEC",
+    "specRevision": 1,
+    "planId": "HRR-PLAN",
+    "planRevision": 2,
+    "taskId": "HRR-RECOVERY-SOURCE-REVIEW"
+  },
+  "title": "Independently verify final source-publication readiness through an owned native interruption and NEW-session recovery.",
+  "state": {
+    "execution": "running",
+    "verification": "pending",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "HRR-INTERVIEW-1",
+    "HRR-INTERVIEW-2",
+    "HRR-INTERVIEW-3",
+    "HRR-INTERVIEW-4",
+    "HRR-INTERVIEW-5"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "nextAction": "Read inputs/checkpoint-v12.json#/content. ActualNEWsession recovery of this samePlan2Task and usefulc04review are verified; c04HOLD result remains immutable. The discoveredduplicateDecisionP2 is corrected/independentlyscopedreviewed at e6fc703, integratedRoot93ee2a2/registry3d21624 with ownerccef pins. Finishfresh exactcurrentcombinedtree independentcanonical review after affectedchecks; preservealloriginals/fences/result and technicalRecoveryproof. No nativeprepare/activation/evalbudget, historicreplay, oldGoal/WSLresume or publication authority fromGit."
+}

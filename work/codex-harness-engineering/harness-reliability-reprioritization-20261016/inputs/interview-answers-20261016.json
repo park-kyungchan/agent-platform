@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "interview-answers-20261016",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/user-interview-answers-20261016",
+    "kind": "native-user-message"
+  },
+  "content": {
+    "rawUserText": "1-\"A->B->C\"\n2-\"권고대로 해라. herdr skill로 pane 잘 활용하고\"\n3-\"병행\"\n4-\"권고대로\"\n5-\"month-end에서 진행 중이며, 2번 인수 기준 달성 후로 잡자\"",
+    "answers": {
+      "1": "A->B->C",
+      "2": "권고대로 해라. herdr skill로 pane 잘 활용하고",
+      "3": "병행",
+      "4": "권고대로",
+      "5": "month-end에서 진행 중이며, 2번 인수 기준 달성 후로 잡자"
+    },
+    "captureClass": "Source-owned capture of current user message; Git does not authenticate native authorship."
+  }
+}

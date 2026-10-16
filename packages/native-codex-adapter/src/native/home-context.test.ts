@@ -3,7 +3,11 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { projectHomeContext, type HomeContextContract } from "./home-context.ts";
+import {
+  projectHomeContext,
+  readHomeContextContractValue,
+  type HomeContextContract,
+} from "./home-context.ts";
 import type { HookBinding } from "./hooks.ts";
 
 test("optional omission labels preserve essential Home context at the exact budget boundary", async () => {
@@ -81,8 +85,6 @@ test("optional omission labels preserve essential Home context at the exact budg
         nativeContextTokenLimit: 1500,
       },
     };
-    await writeFile(profilePath, JSON.stringify(profile), { mode: 0o600 });
-    await writeFile(contextPath, JSON.stringify(contract), { mode: 0o600 });
     const binding: HookBinding = {
       projectId: "fixture",
       root,
@@ -91,6 +93,23 @@ test("optional omission labels preserve essential Home context at the exact budg
       entrypointCwds: [home],
       entrypointContextPath: contextPath,
     };
+    // Prospective validation must work before either global preferences or staged
+    // contract files exist; the file reader below retains its separate source SHA.
+    const prospective = readHomeContextContractValue(contract, binding, home);
+    expect(prospective).toEqual(contract);
+    expect(() =>
+      readHomeContextContractValue({ ...contract, priorities: "invalid" }, binding, home),
+    ).toThrow("Invalid bounded context list");
+    expect(() =>
+      readHomeContextContractValue({ ...contract, northStar: "N".repeat(1601) }, binding, home),
+    ).toThrow("Invalid bounded context text");
+    expect(() =>
+      readHomeContextContractValue(contract, { ...binding, workId: "another-work" }, home),
+    ).toThrow("Home context differs from the canonical owner and actual cwd");
+    prospective.boundaries.nativePermissionGranted = true;
+    expect(contract.boundaries.nativePermissionGranted).toBe(false);
+    await writeFile(profilePath, JSON.stringify(profile), { mode: 0o600 });
+    await writeFile(contextPath, JSON.stringify(contract), { mode: 0o600 });
     const contextBytes = await readFile(contextPath),
       profileBytes = await readFile(profilePath);
     const full = projectHomeContext({ binding, cwd: home });

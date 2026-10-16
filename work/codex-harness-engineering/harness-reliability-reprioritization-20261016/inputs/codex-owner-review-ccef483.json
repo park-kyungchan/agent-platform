@@ -1,0 +1,274 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "codex-owner-review-ccef483",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-12",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.retained-independent-source-report.v1",
+    "originalBytes": 15771,
+    "originalSha256": "47e8178ccfd2309a8bc141ce3438b143c1d221f24076b1df02f5892f88a7c1ed",
+    "report": {
+      "schema": "hrr.independent-owner-source-closure-successor-review.v1",
+      "reviewedAtUtc": "2026-10-16T13:50:39.829476+00:00",
+      "reviewer": {
+        "agent": "/root/review_codex_successor",
+        "role": "independent owner metadata source review and finite QA",
+        "nativeAuthenticationInferred": false
+      },
+      "result": "exact-owner-pin-successor and finite fullowner/SourceCombo checks pass; native independent code/final publication gates retained",
+      "additionalOwnerFindingCount": 0,
+      "additionalOwnerFindings": [],
+      "sourceIdentity": {
+        "ownerCommit": "ccef48306f1a3149ba6587ca61cc680c53da329c",
+        "ownerTree": "d0a343edb1b1f9707eb312d977bcfda617bf92c2",
+        "ownerParent": "74107060839c3b98402b1d203b1781829c43c4fa",
+        "canonicalCommonFix": "e6fc703e0e676d13e7db213b95a091d0ac4a3321",
+        "canonicalCommonFixTree": "008adb175a9c45a8be14d5e89e8207c46607af8b",
+        "canonicalCommonFixParent": "c04ae1c8c3e3f443ce04e9ffbeed900f9bd21eb7",
+        "exclusiveCommonComposition": "2f99da8ca9e09a393a446f49bed77d253c626dd3",
+        "exclusiveCommonCompositionTree": "7d9ef30e0f95d0230691b511b78f6592e91e11e6",
+        "exclusiveOwnerRoot": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering",
+        "exclusiveCommonRoot": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform",
+        "correspondence": "Exacte6 hook/test patch applied to existing exclusive common composition. Git diff versus exacte6 for commongit-work/nativeCodex adapter directories empty. QA whole tree differs from Root final metadata/Hermes/Work-record composition; not identical-tree reuse. Owner HEAD is exactccef. Only prior declared fictional identity/marker overlays dirty; implementation untouched."
+      },
+      "predecessorReview": {
+        "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-reviews/codex-owner-7410706.json",
+        "sha256": "123de914a13a4ea42df61754be8c4f6409e86cd3fa90ea24b523f28b956a3e2d",
+        "preserved": true,
+        "scope": "Historical exact741 report, interrupted/failed deepTMPDIR logs and short/deep canaries preserved; this is an explicit changed-source successor."
+      },
+      "scope": "Source review/exclusive finite inert QA only. No Root/writer/shared source edits, installed shared dependency edits, new install/path workaround/cache reset, actualVPS preparation, nativeRPC/models/config/trust/credentials/activation, Goal/newCLI, evalsuite or publication effects. No replay of completed/uncertain actions.",
+      "ownerMetadataReview": {
+        "changedFiles": [
+          "architecture/native-codex-provider.json",
+          "src/native/hooks.ts"
+        ],
+        "exactChange": "Only declared nativehooks SHA changes to c1e0e3b226860248c6d410fa0ae3b0179fb5e22c9019024aca7185f17891c045 and ownerhooks first-line registration marker to922565261391cb54cc3720fbfea78ca95492eb986e37b9388685e767b2fb0b83. All6 native/22 context source pins equal immutable QA Git bytes. Context registration/index byte-identical to741(regSHA90f683497ad6e7c9793a796e35bc032a1c4d6ecb75d8f13bc88f1c70d00b2228). Canonical sharedroot/schema/module/package/authority:none/nativePermission:false fields unchanged; ownerhooks implementation remainder unchanged.",
+        "evidence": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/logs/metadata-exact-review-ccef.json",
+          "bytes": 694,
+          "sha256": "84a58a749c9f1c88b6c4529bdf4534b6217676a5944bd77a7dfd7871225e4333"
+        }
+      },
+      "codeFixObservations": "Native selectedGitWork now passes insertion-order Set union of Task.decisionIds plus explicit selection.decisionId. A legitimate repeated shared ID appears once; a distinct explicit ID follows Task order. Shared constructor/decoder unique-ID validation and all common types/schema/caps are byte-unchanged. Source fix edits only hooks.ts and focused regression test; this owner report does not replace ongoing independent native exacte6 code review.",
+      "checks": [
+        {
+          "name": "Required one full owner check",
+          "cwd": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering",
+          "command": "QA_SHORT_TMP=$(cat .private/owner-qa/short-tmp-ccef.txt); TMPDIR=\"$QA_SHORT_TMP\" bun run check --timeout 30000",
+          "result": "PASS;tsc --noEmit then458 tests,2646 assertions,29files,0fail;65.71seconds",
+          "log": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/logs/full-owner-check-ccef.log",
+            "bytes": 58613,
+            "sha256": "0f333540d2ecf09eadd57b112a1fcfa4dee86e5555889e39ba9305df40495bb6"
+          },
+          "temporaryRoot": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/short-tmp-ccef.txt",
+            "bytes": 20,
+            "sha256": "bd666eb875fca1d9aee9bf25a06d5bf6e49636012cc744f213ffeeea1ee9587a"
+          }
+        },
+        {
+          "name": "Fresh31/16 source guards/new APIs",
+          "cwd": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering",
+          "command": "bun --no-env-file -e: fresh loadCodexOwnerContext/readNativeAdapterSourceClosure;verify both;import guarded Home;verify;serialize exact pins/API function types",
+          "result": "PASS;context31/native16;compact/decode/Home/delivery APIs function;source-only",
+          "log": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/logs/exact-closures-ccef.json",
+            "bytes": 11353,
+            "sha256": "524dd54e3d3421f5aeab100c4bf13b4d32a702af5c4198e5d1aa0a24b8c7cf45"
+          }
+        },
+        {
+          "name": "Actual immutable SourceCombo both events through ownerwrapper",
+          "cwd": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform",
+          "command": "TMPDIR=\"$PWD/.private/owner-ccef/tmp\" bun .private/owner-ccef/source-combo.ts",
+          "result": "PASS;SourceComboTask+explicitsharedDecision,SessionStart/resume andUserPromptSubmit;11759chars each;full5decisions/2inventory routes/68+3 retained",
+          "probe": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/owner-ccef/source-combo.ts",
+            "bytes": 6305,
+            "sha256": "6cc3a54561e529c29f7eb24c429d4c7359b1fa02fed939fc2697b5279d426b0a"
+          },
+          "log": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/owner-ccef/logs/source-combo.jsonl",
+            "bytes": 1034,
+            "sha256": "cf81ae5a7334e246ae856e07097825465b63faf1b65eb4587c3ad6888563c997"
+          }
+        },
+        {
+          "name": "Same/distinct explicitDecision regression",
+          "cwd": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform",
+          "command": "TMPDIR=\"$PWD/.private/owner-ccef/tmp\" bun test packages/native-codex-adapter/src/native/hooks.test.ts --test-name-pattern \"Task plus explicit Decision selection deduplicates\" --timeout 30000",
+          "result": "PASS;1test24assertions;both events,same anddistinct explicit decisions,expected stable order/no original payload echo",
+          "log": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/owner-ccef/logs/same-distinct-regression.log",
+            "bytes": 295,
+            "sha256": "245ccefca2ccb7ab6771881984ad41c79157be481fa77784c76a9c1e60ed14a0"
+          }
+        },
+        {
+          "name": "Exact declared pin/marker/scope correspondence",
+          "command": "Immutable ccef-vs741 Git comparison;all22+6 declared pins compared with exclusive common HEAD Git bytes;marker digest/remainder comparisons",
+          "result": "PASS;only2 expected owner files differ",
+          "log": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/logs/metadata-exact-review-ccef.json",
+            "bytes": 694,
+            "sha256": "84a58a749c9f1c88b6c4529bdf4534b6217676a5944bd77a7dfd7871225e4333"
+          }
+        },
+        {
+          "name": "Owner importer resolution",
+          "cwd": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering",
+          "command": "bun --no-env-file -e: Bun.resolveSync owner context/gitWork/native entrypoints",
+          "result": "PASS;all paths exactly adjacent canonicalQAprovider;no install/source/link workaround",
+          "log": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/logs/resolution-ccef.json",
+            "bytes": 432,
+            "sha256": "8b9bfd201bd09aadc154e084d137d71c5a5cee3cc20007380ac3b6e61ec13326"
+          }
+        },
+        {
+          "name": "Existing guard negative tests",
+          "result": "PASS within full458;exact pin sets/scope,source/registration drift,stale-preimport/freshprocess refusal,late reread,exact-path symlink refusal,native source drift before execution,registered downgrade refusal. No guard weakening or cache clear."
+        },
+        {
+          "name": "Tracked byte/diff preservation",
+          "command": "git diff --check;target canonical directory comparisons;tracked status",
+          "result": "PASS;only six declared fictional identity/marker overlay files across QA pair;Root/writer/shared maintained source untouched"
+        }
+      ],
+      "actualSourceCombo": {
+        "selectedSnapshot": {
+          "repositoryRoot": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "c04ae1c8c3e3f443ce04e9ffbeed900f9bd21eb7",
+          "projectId": "codex-harness-engineering",
+          "workId": "harness-reliability-reprioritization-20261016"
+        },
+        "selectedTask": "HRR-RECOVERY-SOURCE-REVIEW",
+        "logicalPlanRevision": 2,
+        "explicitDecisionId": "HRR-INTERVIEW-1",
+        "expectedUniqueDecisionOrder": [
+          "HRR-INTERVIEW-1",
+          "HRR-INTERVIEW-2",
+          "HRR-INTERVIEW-3",
+          "HRR-INTERVIEW-4",
+          "HRR-INTERVIEW-5"
+        ],
+        "measurements": [
+          {
+            "check": "immutable actualc04 Task plus explicit shared Decision through guarded ownerwrapper",
+            "hook_event_name": "SessionStart",
+            "selectedTask": "HRR-RECOVERY-SOURCE-REVIEW",
+            "selectedTaskPlan": 2,
+            "explicitDecisionId": "HRR-INTERVIEW-1",
+            "decisionIds": [
+              "HRR-INTERVIEW-1",
+              "HRR-INTERVIEW-2",
+              "HRR-INTERVIEW-3",
+              "HRR-INTERVIEW-4",
+              "HRR-INTERVIEW-5"
+            ],
+            "status": "context-injected",
+            "frameChars": 11759,
+            "effectInventoryRoutes": 2,
+            "completed": 68,
+            "uncertain": 3,
+            "sourceCap": 12000,
+            "nativeAdmission": false,
+            "actualGlobalProfileRead": false
+          },
+          {
+            "check": "immutable actualc04 Task plus explicit shared Decision through guarded ownerwrapper",
+            "hook_event_name": "UserPromptSubmit",
+            "selectedTask": "HRR-RECOVERY-SOURCE-REVIEW",
+            "selectedTaskPlan": 2,
+            "explicitDecisionId": "HRR-INTERVIEW-1",
+            "decisionIds": [
+              "HRR-INTERVIEW-1",
+              "HRR-INTERVIEW-2",
+              "HRR-INTERVIEW-3",
+              "HRR-INTERVIEW-4",
+              "HRR-INTERVIEW-5"
+            ],
+            "status": "context-injected",
+            "frameChars": 11759,
+            "effectInventoryRoutes": 2,
+            "completed": 68,
+            "uncertain": 3,
+            "sourceCap": 12000,
+            "nativeAdmission": false,
+            "actualGlobalProfileRead": false
+          }
+        ],
+        "fixture": {
+          "HomeContract": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/owner-ccef/tmp/frame-Dr4Jkn/owner/architecture/home.json",
+            "bytes": 2297,
+            "sha256": "c4464b7dcfe1dae04f67286ddddc6277322334aac5f96bd80bfd3d79ea396639"
+          },
+          "profile": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/owner-ccef/tmp/frame-Dr4Jkn/home/.codex/harness/profile.json",
+            "bytes": 601,
+            "sha256": "62ab31b25283c28e3d4a39eaa825bda5940c80f0ddcb92e5787d35b8d73b1841"
+          },
+          "bindingRegistry": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/owner-ccef/tmp/frame-Dr4Jkn/owner/architecture/source-combo-bindings.json",
+            "bytes": 1675,
+            "sha256": "057284cb733c4cdbbfcd10767daf23b784543089edb3125ceab6dedceae17bcf"
+          },
+          "scope": "Fictional Home/profile/binding paths only; not actualglobalHome/nativehooks. NativeAPI ownerwrapper uses actual exclusive guarded code owner while dataowner paths remain fictional. Defaultv1/Home6000/1500 unchanged; this test explicitly selects sourcev2/12000. Source frame fit is not native injection/admission/authentication proof."
+        }
+      },
+      "identityAndInstallerCustody": {
+        "ownerOverlays": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/identity-overlays-ccef.json",
+          "bytes": 1888,
+          "sha256": "413911678f5ec497713c9e47fc00a947cdf1d649455b721b4bee7915b715187f"
+        },
+        "existingCommonOverlays": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/identity-overlays-741.json",
+          "bytes": 2613,
+          "sha256": "231bbfcba76a65a45f8f953554483dc44f18847ea16848cc7dbe99a2f0d346d6"
+        },
+        "allowedSubstitutions": "Fictional consumer/provider roots; common project sourceOwnerRoot and Ontology release path; identity-dependent project/ontology pin hashes and registration marker lines only. No source implementation or packages/lock changes.",
+        "currentResolution": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/codex-harness-engineering/.private/owner-qa/logs/resolution-ccef.json",
+          "bytes": 432,
+          "sha256": "8b9bfd201bd09aadc154e084d137d71c5a5cee3cc20007380ac3b6e61ec13326"
+        },
+        "observation": "No dependency install was needed or run for this hooks-only successor. Existing owner file-import entries resolve to canonical QA paths and observe updated exacthooks bytes. Prior82symlink/noescape observations retained; no active shared/native installer claim."
+      },
+      "sourceHashes": {
+        "immutableOwner": {
+          "architecture/context-provider.json": "90f683497ad6e7c9793a796e35bc032a1c4d6ecb75d8f13bc88f1c70d00b2228",
+          "architecture/native-codex-provider.json": "922565261391cb54cc3720fbfea78ca95492eb986e37b9388685e767b2fb0b83",
+          "src/continuity/index.ts": "aa08c54977f5d9fd5cef885d67adc198cf3530db33a8672ab5eab98623f17f58",
+          "src/native/hooks.ts": "c013484f9255190f6330c8a17d4d983ebffb9e5123ab99c933c5c5d8b8d427e8"
+        },
+        "immutableCommon": {
+          "packages/work-continuity/src/git-work/context.ts": "e9f01f5c15b558ce9f6dd72880f0428903d17bd75450f424046aedca7aa739b7",
+          "packages/work-continuity/src/git-work/types.ts": "5de1a8c30ae224da1492b23cea239de684d19b36d5657a85e1a62cddb2d8960d",
+          "packages/native-codex-adapter/src/native/hooks.ts": "c1e0e3b226860248c6d410fa0ae3b0179fb5e22c9019024aca7185f17891c045",
+          "packages/native-codex-adapter/src/native/hooks.test.ts": "f95c4e06cf96b5e099adffa07670fef5dc79a553e4c370abb7400611cecaff6a",
+          "packages/native-codex-adapter/src/native/home-context.ts": "f370bcd8033ce231925e4740768f02fddec4e001b1551cfed78cecb54fc921c4"
+        }
+      },
+      "currentRootOwnedGates": [
+        "Native hrr-recovered independent exacte6 review and current finding reconciliation/final combined-tree binding remain Root gates. This report does not itself close that finding or authorize publication/integration.",
+        "Fresh31/16 SOURCE guards belong only to the exclusive fictional QA pair. Shared/current installer, actualglobalHome/nativehooks, discovery/trust/authentication/behavior/activation and wholev2native delivery remain unqualified. Native1500 is not a character/token conversion.",
+        "Legacycandidate1033/currentWork-v2proposal/preparation/nativeactivation holds unchanged. No new evalsuite budget or historical effect replay.",
+        "Real recovery/source review progress and formalAcceptance are accounted by Root using actual evidence; this inert consumer QA does not infer Acceptance. No Goal/newCLI/service/native/publication effects; independent month-end untouched."
+      ]
+    },
+    "meaning": "Exact scoped source/owner review custody; fresh finalcombinedtree approval remains separate."
+  }
+}

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import * as gitWork from "@palantirkc/work-continuity/git-work";
-import type { GitWorkRecord } from "@palantirkc/work-continuity/git-work";
+import type { GitWorkRecord, JsonValue } from "@palantirkc/work-continuity/git-work";
 import {
   handleHook,
   readHookBindings,
@@ -15,7 +15,7 @@ import {
   type NativeContextLoader,
   type SessionGitWorkSelection,
 } from "./hooks.ts";
-import type { HomeContextContract } from "./home-context.ts";
+import { projectSelectedGitWork, type HomeContextContract } from "./home-context.ts";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -52,6 +52,7 @@ async function fixture() {
   await mkdir(repositoryRoot);
   const binding: HookBinding = {
     projectId: "fixture",
+    gitWorkContextVersion: "v2",
     root: owner,
     workId: "old-completed-work",
     checkpointPath: join(owner, "state/old.json"),
@@ -154,7 +155,16 @@ async function fixture() {
       spec: { id: "spec", revision: 6 },
       plan: { id: "plan", revision: 6 },
       governingDecisionIds: ["direction"],
-      historicalFenceIds: [],
+      historicalFenceIds: ["predecessor"],
+      continuity: {
+        schema: "common.git-work-continuity.v1",
+        purposeSources: [
+          { kind: "snapshot", path: path("input", "purpose"), fragment: "#/content" },
+        ],
+        effectInventorySources: [
+          { kind: "snapshot", path: path("input", "fences"), fragment: "#/content" },
+        ],
+      },
     },
     {
       ...base,
@@ -172,6 +182,7 @@ async function fixture() {
       specId: "spec",
       specRevision: 6,
       objective: "Read current source",
+      clauses: ["Preserve every authored Plan clause", "Verify before continuation"],
     },
     {
       ...base,
@@ -200,6 +211,7 @@ async function fixture() {
       kind: "task",
       id: "current-task",
       title: "Preserve current purpose",
+      nextAction: "Recover the delegated result, then inspect its exact verification evidence",
       logical: {
         domainId: "native-harness",
         projectId: "fixture",
@@ -225,6 +237,31 @@ async function fixture() {
       verificationEvidenceIds: [],
     },
   ];
+  const work = rows.find((row) => row.kind === "work")!;
+  if (work.kind !== "work") throw Error("Synthetic Work required");
+  for (const [id, content] of [
+    ["purpose", work.purpose],
+    [
+      "fences",
+      { completedEffectIds: ["done-before-interrupt"], uncertainEffectIds: ["unknown-once"] },
+    ],
+  ] satisfies [string, JsonValue][])
+    rows.push({
+      ...base,
+      kind: "input",
+      id,
+      inputKind: "source-owner-record",
+      origin: { ownerId: "fixture", locator: `synthetic:${id}`, kind: "source-owner-capture" },
+      content,
+    });
+  rows.push({
+    ...base,
+    kind: "effect-fence",
+    id: "predecessor",
+    completedEffectIds: ["done-before-interrupt"],
+    uncertainEffectIds: ["unknown-once"],
+    source: { kind: "snapshot", path: path("input", "fences"), fragment: "#/content" },
+  });
   for (const row of rows) {
     const file = join(
       repositoryRoot,
@@ -328,22 +365,57 @@ test("selected native tuple injects immutable current Task and decision original
     const result = await handleHook(input, { bindings: f.registry }, f.load);
     expect(result.status).toBe("context-injected");
     const c = context(result.stdout);
-    expect(c.text.length).toBeLessThanOrEqual(6000);
+    expect(c.text.length).toBeLessThanOrEqual(12000);
     expect(c.value.selectedWork.status).toBe("source-qualified");
-    expect(c.value.selectedWork.pointer.commit).toBe(f.commit);
-    expect(c.value.selectedWork.purpose.objective).toContain("current Work");
-    expect(c.value.selectedWork.purpose.specRevision).toBe(6);
-    expect(c.value.selectedWork.currentTask.id).toBe("current-task");
-    expect(c.value.selectedWork.currentTask.state.execution).toBe("running");
-    expect(c.value.selectedWork.currentness).toBe("caller-declared-not-remote-verified");
-    const original = c.value.selectedWork.decisionOriginals.directPointers[0];
-    const address = c.value.selectedWork.decisionOriginals.sources.find(
-      (row: { id: string }) => row.id === original.answer.source,
+    expect(c.value.selectedWork.commit).toBe(f.commit);
+    expect(
+      gitWork
+        .decodeCompactGitWorkContext(c.value.selectedWork)
+        .normative.find((r) => r.kind === "work")!.purpose,
+    ).toMatchObject({ objective: expect.stringContaining("current Work") });
+    expect(
+      gitWork
+        .decodeCompactGitWorkContext(c.value.selectedWork)
+        .normative.find((r) => r.kind === "spec")!.revision,
+    ).toBe(6);
+    expect(c.value.selectedWork.task.id).toBe("current-task");
+    expect(gitWork.decodeCompactGitWorkContext(c.value.selectedWork).task!.state.execution).toBe(
+      "running",
     );
-    expect(address.path).toBe("inputs/original.json");
-    expect(original.answer.fragment).toBe("#/content/answer");
+    expect(c.value.selectedWork.latestRelevant).toBe("current");
+    expect(c.value.deliveryPolicy).toMatchObject({
+      policyVersion: "v2",
+      maxChars: 12000,
+      versionCapChars: 12000,
+    });
+    const decoded = gitWork.decodeCompactGitWorkContext(c.value.selectedWork);
+    const original = decoded.decisions[0]!;
+    const address = decoded.sources[original.answerSource[0]]!;
+    expect(address.path).toBe("work/fixture/current-work/inputs/original.json");
+    expect(address.repositoryId).toBe("synthetic/common");
+    expect(address.commit).toBe(f.commit);
+    expect(original.answerSource[1]).toBe("#/content/answer");
     expect(address.blobOid).toMatch(/^[a-f0-9]{40}$/);
-    expect(original.selectionContext.fragment).toBe("#/content/question");
+    expect(original.selectionContextSource![1]).toBe("#/content/question");
+    expect(c.value.selectedWork.continuityBinding.coverage).toBe("bound");
+    expect(c.value.selectedWork.historicalEffects).toMatchObject({
+      completedCount: 1,
+      uncertainCount: 1,
+      projectedFenceRecords: 1,
+    });
+    const inventory = c.value.selectedWork.continuityBinding.effectInventorySources[0];
+    expect(decoded.sources[inventory[0]]!.path).toBe(
+      "work/fixture/current-work/inputs/fences.json",
+    );
+    expect(inventory[1]).toBe("#/content");
+    expect(decoded.task!.nextAction!.value).toBe(
+      "Recover the delegated result, then inspect its exact verification evidence",
+    );
+    expect(decoded.normative.find((r) => r.kind === "spec")!.criteria).toEqual(["Exact tuple"]);
+    expect(decoded.normative.find((r) => r.kind === "plan")!.clauses).toEqual([
+      "Preserve every authored Plan clause",
+      "Verify before continuation",
+    ]);
     expect(c.value.selectedWork.nativePermissionGranted).toBe(false);
     expect(c.value.selectedWork.semanticAcceptanceEstablished).toBe(false);
     expect(c.value.preferences.excludedDomains).toEqual(["synthetic-excluded"]);
@@ -361,6 +433,59 @@ test("selected native tuple injects immutable current Task and decision original
   expect(f.counters()).toEqual({ gitReads: 4, checks: 8 });
   expect(await readFile(f.binding.entrypointContextPath!)).toEqual(before);
   expect(await command(f.repositoryRoot, "status", "--porcelain")).toBe("");
+});
+
+test("Task plus explicit Decision selection deduplicates shared IDs and retains distinct originals in order", async () => {
+  for (const decisionId of ["direction", "explicit-direction"]) {
+    const f = await fixture();
+    if (decisionId === "explicit-direction") {
+      const sourcePath = join(
+        f.repositoryRoot,
+        gitWork.gitRecordPath("fixture", "current-work", { kind: "decision", id: "direction" }),
+      );
+      const decision = JSON.parse(await readFile(sourcePath, "utf8")) as GitWorkRecord;
+      if (decision.kind !== "decision") throw Error("Synthetic Decision required");
+      await writeFile(
+        join(
+          f.repositoryRoot,
+          gitWork.gitRecordPath("fixture", "current-work", { kind: "decision", id: decisionId }),
+        ),
+        JSON.stringify({
+          ...decision,
+          id: decisionId,
+          meaning: "Retain the distinct explicit original",
+        }),
+      );
+      await command(f.repositoryRoot, "add", ".");
+      await command(f.repositoryRoot, "commit", "-qm", "Add distinct synthetic Decision");
+    }
+    f.selection.decisionId = decisionId;
+    await persistBindings(f);
+    const compact = f.provider.gitWork!.compactGitWorkContext;
+    let selectedIds: string[] | undefined;
+    f.provider.gitWork!.compactGitWorkContext = (context, selection) => {
+      selectedIds = selection.decisionIds;
+      return compact(context, selection);
+    };
+    const expected = decisionId === "direction" ? ["direction"] : ["direction", decisionId];
+    for (const input of [
+      f.input,
+      { ...f.input, hook_event_name: "SessionStart" as const, source: "resume" },
+    ]) {
+      const result = await handleHook(input, { bindings: f.registry }, f.load);
+      expect(result.status).toBe("context-injected");
+      const projected = context(result.stdout);
+      expect(selectedIds).toEqual(expected);
+      expect(projected.value.selectedWork.status).toBe("source-qualified");
+      expect(projected.value.selectedWork.holdReasons).toEqual([]);
+      expect(
+        gitWork
+          .decodeCompactGitWorkContext(projected.value.selectedWork)
+          .decisions.map((row) => row.id),
+      ).toEqual(expected);
+      expect(projected.text).not.toContain("PRIVATE-ORIGINAL-SENTINEL");
+    }
+  }
 });
 
 test("unselected, foreign and child tuples make no Git reads; explicit child identity is required", async () => {
@@ -388,7 +513,7 @@ test("unselected, foreign and child tuples make no Git reads; explicit child ide
     { bindings: f.registry },
     f.load,
   );
-  expect(context(selected.stdout).value.selectedWork.currentTask.id).toBe("current-task");
+  expect(context(selected.stdout).value.selectedWork.task.id).toBe("current-task");
   expect(f.counters().gitReads).toBe(2);
 });
 
@@ -400,7 +525,8 @@ test("unknown currentness and local ref movement remain held rather than fresh o
     .value.selectedWork;
   expect(unknown.status).toBe("held");
   expect(unknown.holdReasons).toContain("REQUIRED_LATEST_CONTEXT_UNKNOWN");
-  expect(unknown.purpose.objective).toContain("current Work");
+  expect(unknown.normative).toEqual([]);
+  expect(unknown.strings).toEqual([]);
   f.selection.latestRelevant = "current";
   await persistBindings(f);
   const original = f.provider.gitWork!.resolveGitWorkSelection;
@@ -413,7 +539,7 @@ test("unknown currentness and local ref movement remain held rather than fresh o
     .value.selectedWork;
   expect(advanced.status).toBe("held");
   expect(advanced.holdReasons).toContain("SELECTED_LOCAL_REF_ADVANCED_DURING_READ");
-  expect(advanced.pointer.commit).toBe(f.commit);
+  expect(advanced.commit).toBe(f.commit);
 });
 
 test("duplicate tuples, revision expressions, owner mismatch and missing proven Git capability refuse selection", async () => {
@@ -452,11 +578,11 @@ test("source closure drift refuses injection and bounded derived overflow stays 
   const originalRead = f.provider.gitWork!.readGitWorkContext;
   f.provider.gitWork!.readGitWorkContext = async (reader, request) => {
     const value = await originalRead(reader, request);
-    value.records.find((row) => row.kind === "task")!.title = "S".repeat(7000);
+    value.records.find((row) => row.kind === "task")!.nextAction = "S".repeat(11000);
     return value;
   };
   const bounded = context((await handleHook(f.input, { bindings: f.registry }, f.load)).stdout);
-  expect(bounded.text.length).toBeLessThanOrEqual(6000);
+  expect(bounded.text.length).toBeLessThanOrEqual(12000);
   expect(bounded.value.selectedWork.status).toBe("held");
   expect(bounded.value.selectedWork.holdReasons).toEqual(["NATIVE_CONTEXT_OUTPUT_LIMIT"]);
   expect(bounded.value.preferences.implementation.runtime).toBe("Bun");
@@ -488,7 +614,7 @@ test("shared local resolver pins a branch snapshot and ignores ambient Git direc
   );
 });
 
-test("grown verified decision history keeps Work purpose and Task inside6k with explicit unexpanded original pointers", async () => {
+test("grown verified decision history keeps every original or holds the whole required payload", async () => {
   const f = await fixture();
   const file = (kind: GitWorkRecord["kind"], id: string, revision?: number) =>
     join(
@@ -556,19 +682,18 @@ test("grown verified decision history keeps Work purpose and Task inside6k with 
   });
   expect(full.status).toBe("source-qualified");
   const c = context((await handleHook(f.input, { bindings: f.registry }, f.load)).stdout);
-  expect(c.text.length).toBeLessThanOrEqual(6000);
-  expect(c.value.selectedWork.purpose.objective).toContain("current Work");
-  expect(c.value.selectedWork.currentTask.id).toBe("current-task");
-  expect(c.value.selectedWork.status).toBe("held");
-  expect(c.value.selectedWork.holdReasons).toContain("NATIVE_DECISION_POINTERS_UNEXPANDED");
-  expect(c.value.selectedWork.decisionOriginals.directPointers.length).toBeGreaterThan(0);
-  expect(c.value.selectedWork.decisionOriginals.directPointers.length).toBeLessThan(13);
-  expect(c.value.selectedWork.decisionOriginals.unexpandedDecisionCount).toBe(
-    13 - c.value.selectedWork.decisionOriginals.directPointers.length,
-  );
-  expect(c.value.selectedWork.decisionOriginals.governingIndex).toBe(
-    "work.json#/governingDecisionIds",
-  );
+  expect(c.text.length).toBeLessThanOrEqual(12000);
+  expect(
+    gitWork
+      .decodeCompactGitWorkContext(c.value.selectedWork)
+      .normative.find((r) => r.kind === "work")!.purpose,
+  ).toMatchObject({ objective: expect.stringContaining("current Work") });
+  expect(c.value.selectedWork.task.id).toBe("current-task");
+  expect(c.value.selectedWork.status).toBe("source-qualified");
+  const decoded = gitWork.decodeCompactGitWorkContext(c.value.selectedWork);
+  expect(decoded.decisions).toHaveLength(13);
+  for (const decision of decoded.decisions)
+    expect(decoded.sources[decision.answerSource[0]]!.path).toContain("/inputs/");
   expect(c.text).not.toContain("PRIVATE-GROWN-ANSWER");
 });
 
@@ -599,11 +724,24 @@ test("historical Task contract pins remain distinct from the current Work revisi
   const c = context((await handleHook(f.input, { bindings: f.registry }, f.load)).stdout).value
     .selectedWork;
   expect(c.status).toBe("source-qualified");
-  expect(c.purpose.specRevision).toBe(6);
-  expect(c.purpose.planRevision).toBe(6);
-  expect(c.currentTask.specRevision).toBe(5);
-  expect(c.currentTask.planRevision).toBe(5);
-  expect(c.currentTask.contractSource).toBe("tasks/current-task.json#/logical");
+  const decoded = gitWork.decodeCompactGitWorkContext(c);
+  expect(
+    decoded.normative
+      .filter((r) => r.kind === "spec")
+      .map((r) => r.revision)
+      .sort(),
+  ).toEqual([5, 6]);
+  expect(
+    decoded.normative
+      .filter((r) => r.kind === "plan")
+      .map((r) => r.revision)
+      .sort(),
+  ).toEqual([5, 6]);
+  expect(decoded.task!.logical.specRevision).toBe(5);
+  expect(decoded.task!.logical.planRevision).toBe(5);
+  expect(decoded.sources[decoded.task!.source[0]]!.path).toBe(
+    "work/fixture/current-work/tasks/current-task.json",
+  );
 });
 
 test("malformed selected source cannot leak private source bytes through hook failure text", async () => {
@@ -656,11 +794,11 @@ test("documented fork starts preserve exact parent and child tuples with no infe
   await persistBindings(f);
   const selected = await handleHook(fork, { bindings: f.registry }, f.load);
   const projected = context(selected.stdout);
-  expect(projected.value.selectedWork.currentTask.id).toBe("current-task");
-  expect(projected.value.selectedWork.pointer.commit).toBe(f.commit);
+  expect(projected.value.selectedWork.task.id).toBe("current-task");
+  expect(projected.value.selectedWork.commit).toBe(f.commit);
   expect(projected.value.selectedWork.nativePermissionGranted).toBe(false);
   expect(projected.value.selectedWork.semanticAcceptanceEstablished).toBe(false);
-  expect(projected.text.length).toBeLessThanOrEqual(6000);
+  expect(projected.text.length).toBeLessThanOrEqual(12000);
   expect(f.counters().gitReads).toBe(2);
   // Fork also describes a native forked root. Absence of agent identity still
   // matches only the explicitly selected parent tuple.
@@ -669,7 +807,7 @@ test("documented fork starts preserve exact parent and child tuples with no infe
     { bindings: f.registry },
     f.load,
   );
-  expect(context(parent.stdout).value.selectedWork.currentTask.id).toBe("current-task");
+  expect(context(parent.stdout).value.selectedWork.task.id).toBe("current-task");
   expect(f.counters().gitReads).toBe(4);
 });
 
@@ -685,7 +823,7 @@ test("fork support retains legacy SessionStart sources and rejects malformed for
     expect(parseHookInput(input).source).toBe(source);
     const result = await handleHook(input, { bindings: f.registry }, f.load);
     expect(result.status).toBe("context-injected");
-    expect(context(result.stdout).value.selectedWork.currentTask.id).toBe("current-task");
+    expect(context(result.stdout).value.selectedWork.task.id).toBe("current-task");
   }
   for (const input of [
     { hook_event_name: "SessionStart", source: "fork", session_id: 7, cwd: f.home },
@@ -777,5 +915,138 @@ test("Git parent and child agent types match exactly and never borrow another tu
     { bindings: f.registry },
     f.load,
   );
-  expect(context(result.stdout).value.selectedWork.currentTask.id).toBe("current-task");
+  expect(context(result.stdout).value.selectedWork.task.id).toBe("current-task");
+});
+
+test("default v1 stays at6000 and carries full shared semantics or holds; explicit v2 never exceeds12000", async () => {
+  const f = await fixture();
+  const raw = await gitWork.readGitWorkContext(
+    await gitWork.openGitWork(await gitWork.resolveGitWorkSelection(f.selection.snapshot)),
+    { taskId: "current-task", latestRelevant: "current" },
+  );
+  const compatibility = projectSelectedGitWork(raw, { taskId: "current-task" }, gitWork);
+  expect("semanticContext" in compatibility).toBe(true);
+  if (!("semanticContext" in compatibility)) throw Error("Expected v1 compatibility view");
+  expect(compatibility.semanticContext).toEqual(
+    gitWork.compactGitWorkContext(raw, { taskId: "current-task" }),
+  );
+  delete f.registry.bindings[0]!.gitWorkContextVersion;
+  await persistBindings(f);
+  const legacy = context(
+    (await handleHook(f.input, { bindings: f.registry, maxChars: 20000 }, f.load)).stdout,
+  );
+  expect(legacy.value.deliveryPolicy).toMatchObject({
+    policyVersion: "v1",
+    maxChars: 6000,
+    versionCapChars: 6000,
+  });
+  expect(legacy.text.length).toBeLessThanOrEqual(6000);
+  if (legacy.value.selectedWork.status === "source-qualified") {
+    expect(legacy.value.selectedWork.semanticContext.schema).toBe(
+      "common.git-work-context.compact.v1",
+    );
+    const decoded = gitWork.decodeCompactGitWorkContext(legacy.value.selectedWork.semanticContext);
+    expect(decoded.normative.find((r) => r.kind === "spec")!.criteria).toEqual(["Exact tuple"]);
+    expect(decoded.normative.find((r) => r.kind === "plan")!.clauses).toEqual([
+      "Preserve every authored Plan clause",
+      "Verify before continuation",
+    ]);
+  } else {
+    expect(legacy.value.selectedWork.holdReasons).toContain("NATIVE_CONTEXT_OUTPUT_LIMIT");
+    expect(legacy.value.selectedWork.semanticContext).toBeUndefined();
+  }
+  f.registry.bindings[0]!.gitWorkContextVersion = "v2";
+  await persistBindings(f);
+  const current = context(
+    (await handleHook(f.input, { bindings: f.registry, maxChars: 20000 }, f.load)).stdout,
+  );
+  expect(current.value.deliveryPolicy).toMatchObject({
+    policyVersion: "v2",
+    maxChars: 12000,
+    versionCapChars: 12000,
+  });
+  expect(current.value.selectedWork.schema).toBe("common.git-work-context.compact.v1");
+  expect(current.value.selectedWork.semanticContext).toBeUndefined();
+  expect(current.value.selectedWork.purpose).toBeUndefined();
+  expect(current.text.length).toBeLessThanOrEqual(12000);
+  const invalid = structuredClone(f.registry) as unknown as { bindings: Record<string, unknown>[] };
+  invalid.bindings[0]!.gitWorkContextVersion = "v3";
+  await writeFile(f.registryPath, JSON.stringify(invalid));
+  expect(() => readHookBindings(f.registryPath)).toThrow("Invalid project hook binding");
+});
+
+test("missing either proven codec function holds before any selected context read", async () => {
+  for (const api of ["compactGitWorkContext", "decodeCompactGitWorkContext"] as const) {
+    const f = await fixture();
+    Object.assign(f.provider.gitWork!, { [api]: undefined });
+    const result = await handleHook(f.input, { bindings: f.registry }, f.load);
+    expect(result.status).toBe("context-held");
+    expect(f.counters().gitReads).toBe(0);
+    expect(JSON.parse(result.stdout).hookSpecificOutput).toBeUndefined();
+  }
+});
+
+test("held dependency diagnostics expose safe codes without private parser text", async () => {
+  const f = await fixture();
+  const original = f.provider.gitWork!.readGitWorkContext;
+  f.provider.gitWork!.readGitWorkContext = async (reader, request) => {
+    const value = await original(reader, request);
+    value.status = "held";
+    value.holdReasons.push("SyntaxError: PRIVATE-DEPENDENCY-BYTES");
+    return value;
+  };
+  const result = await handleHook(f.input, { bindings: f.registry }, f.load);
+  expect(result.status).toBe("context-held");
+  expect(result.stdout).not.toContain("PRIVATE-DEPENDENCY-BYTES");
+  expect(context(result.stdout).value.selectedWork.holdReasons).toContain(
+    "SOURCE_CONTEXT_UNAVAILABLE",
+  );
+});
+
+test("effectful owner cwd uses the same explicit complete v2 policy and holds required overflow", async () => {
+  const f = await fixture();
+  const binding = f.registry.bindings[0]!;
+  await mkdir(dirname(binding.checkpointPath), { recursive: true });
+  await writeFile(binding.checkpointPath, "{}");
+  delete binding.entrypointCwds;
+  delete binding.entrypointContextPath;
+  f.selection.cwd = f.owner;
+  await persistBindings(f);
+  f.provider.index.recordBoundary = async () => ({
+    path: join(f.owner, "synthetic-boundary.json"),
+    sha256: "a".repeat(64),
+  });
+  const input: HookInput = {
+    hook_event_name: "SessionStart",
+    source: "resume",
+    session_id: "parent",
+    cwd: f.owner,
+  };
+  const result = await handleHook(input, { bindings: f.registry }, f.load);
+  expect(result.error).toBeUndefined();
+  expect(result.status).toBe("context-injected");
+  const value = JSON.parse(JSON.parse(result.stdout).hookSpecificOutput.additionalContext);
+  expect(value.schema).toBe("codex.session-git-work.projection.v1");
+  expect(value.deliveryPolicy).toMatchObject({
+    policyVersion: "v2",
+    maxChars: 12000,
+    versionCapChars: 12000,
+  });
+  expect(gitWork.decodeCompactGitWorkContext(value.selectedWork).task!.nextAction!.value).toContain(
+    "delegated result",
+  );
+  const read = f.provider.gitWork!.readGitWorkContext;
+  f.provider.gitWork!.readGitWorkContext = async (reader, request) => {
+    const raw = await read(reader, request);
+    raw.records.find((r) => r.kind === "task")!.nextAction = "S".repeat(11000);
+    return raw;
+  };
+  const held = await handleHook(input, { bindings: f.registry, maxChars: 50000 }, f.load);
+  expect(held.status).toBe("context-held");
+  const text = JSON.parse(held.stdout).hookSpecificOutput.additionalContext as string;
+  const overflow = JSON.parse(text);
+  expect(overflow.selectedWork.holdReasons).toEqual(["NATIVE_CONTEXT_OUTPUT_LIMIT"]);
+  expect(overflow.requiredContextChars).toBeGreaterThan(12000);
+  expect(text.length).toBeLessThanOrEqual(12000);
+  expect(overflow.selectedWork.normative).toBeUndefined();
 });

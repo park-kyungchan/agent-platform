@@ -1,6 +1,8 @@
 import { isAbsolute, resolve } from "node:path";
+import { currentWorkOutputPolicy } from "./output-policy.ts";
 import {
   readHermesCurrentWorkContext,
+  readHermesCurrentWorkContextV2,
   type HermesCurrentWorkEvent,
   type HermesCurrentWorkOptions,
 } from "./context.ts";
@@ -54,7 +56,7 @@ function exactPath(value: unknown): string {
 export async function readHermesNativeWorkHook(
   payloadValue: unknown,
   bindingsValue: unknown,
-  options: HermesCurrentWorkOptions,
+  options: HermesCurrentWorkOptions & { outputVersion?: "v1" | "v2" },
 ): Promise<HermesNativeWorkHookResponse> {
   const payload = object(payloadValue);
   if (payload.hook_event_name !== "pre_llm_call") return {};
@@ -89,14 +91,17 @@ export async function readHermesNativeWorkHook(
   if (matches.length !== 1) return {};
   const selected = object(matches[0]).selection;
   await options.verifySourceClosure();
-  const projection = await readHermesCurrentWorkContext(
-    event,
-    selected,
-    bindings.runtimeIndex,
-    options,
-  );
+  if (options.outputVersion !== undefined && !["v1", "v2"].includes(options.outputVersion))
+    throw Error("EXPLICIT_CURRENT_WORK_OUTPUT_VERSION_REQUIRED");
+  const read =
+    options.outputVersion === "v2" ? readHermesCurrentWorkContextV2 : readHermesCurrentWorkContext;
+  const projection = await read(event, selected, bindings.runtimeIndex, options);
   await options.verifySourceClosure();
   const context = JSON.stringify(projection);
-  if (context.length > (options.maxChars ?? 6000)) throw Error("BOUNDED_NATIVE_CONTEXT_REQUIRED");
+  if (
+    context.length >
+    currentWorkOutputPolicy(options.outputVersion ?? "v1", options.maxChars).policy.maxChars
+  )
+    throw Error("BOUNDED_NATIVE_CONTEXT_REQUIRED");
   return { context };
 }

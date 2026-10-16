@@ -1,0 +1,39 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "task",
+  "id": "HRR-REAL-RECOVERY-ACCEPTANCE",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "harness-reliability-reprioritization-20261016",
+    "issueId": "HRR-ISSUE-20261016",
+    "specId": "HRR-SPEC",
+    "specRevision": 1,
+    "planId": "HRR-PLAN",
+    "planRevision": 1,
+    "taskId": "HRR-REAL-RECOVERY-ACCEPTANCE"
+  },
+  "title": "Perform the real useful task interruption/new-session recovery/delegated-result acceptance at separately current native gates.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [],
+  "decisionIds": [
+    "HRR-INTERVIEW-1",
+    "HRR-INTERVIEW-2",
+    "HRR-INTERVIEW-3",
+    "HRR-INTERVIEW-4",
+    "HRR-INTERVIEW-5"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "nextAction": "After reviewed source prerequisites, checkpoint an actual useful engineering task, interrupt its owned native session, recover in a new session and verify preserved purpose/originals/fences/next action/delegated result."
+}

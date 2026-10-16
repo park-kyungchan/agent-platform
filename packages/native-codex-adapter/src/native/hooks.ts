@@ -25,7 +25,11 @@ export type NativeContextLoader = () => Promise<{
   >;
   gitWork?: Pick<
     typeof import("@palantirkc/work-continuity/git-work"),
-    "resolveGitWorkSelection" | "openGitWork" | "readGitWorkContext"
+    | "resolveGitWorkSelection"
+    | "openGitWork"
+    | "readGitWorkContext"
+    | "compactGitWorkContext"
+    | "decodeCompactGitWorkContext"
   >;
   verifyCurrentSourceClosure(): Promise<void>;
 }>;
@@ -35,7 +39,12 @@ import {
   reserveEvaluationRequest,
   updateEvaluationLedger,
 } from "./evaluation-ledger.ts";
-import { projectHomeContext, projectSelectedGitWork } from "./home-context.ts";
+import {
+  gitWorkDeliveryPolicy,
+  selectedGitWorkPointer,
+  projectHomeContext,
+  projectSelectedGitWork,
+} from "./home-context.ts";
 import type { ContextRequest, GitWorkSelection } from "@palantirkc/work-continuity/git-work";
 
 export const nativeEvents = [
@@ -74,6 +83,8 @@ export interface HookBinding {
   root: string;
   checkpointPath: string;
   workId?: string;
+  /** Explicit source-owned delivery opt-in; native activation is a separate owner gate. */
+  gitWorkContextVersion?: "v1" | "v2";
   /** Extra isolated worktree roots must be explicitly admitted; they retain the source owner's checkpoint. */
   allowedCwds?: string[];
   /** Bootstrap entrypoints admit only this canonical cwd, never its descendants. */
@@ -538,7 +549,11 @@ async function selectedGitWork(
 ) {
   const selection = resolveSessionGitWorkSelection(input, registry, binding);
   if (!selection) return undefined;
-  if (!provider.gitWork)
+  if (
+    !provider.gitWork ||
+    typeof provider.gitWork.compactGitWorkContext !== "function" ||
+    typeof provider.gitWork.decodeCompactGitWorkContext !== "function"
+  )
     throw Error("Selected Git Work requires the proven code-owner Git context provider");
   await provider.verifyCurrentSourceClosure();
   try {
@@ -554,20 +569,34 @@ async function selectedGitWork(
     const task = selection.taskId
       ? await reader.readRecord({ kind: "task", id: selection.taskId }).catch(() => undefined)
       : undefined;
-    const view = projectSelectedGitWork(context, {
-      taskId: selection.taskId,
-      decisionIds:
-        task?.kind === "task"
-          ? [...task.decisionIds, ...(selection.decisionId ? [selection.decisionId] : [])]
-          : selection.decisionId
-            ? [selection.decisionId]
-            : undefined,
-    });
+    const view = projectSelectedGitWork(
+      context,
+      {
+        taskId: selection.taskId,
+        decisionIds:
+          task?.kind === "task"
+            ? [
+                ...new Set([
+                  ...task.decisionIds,
+                  ...(selection.decisionId ? [selection.decisionId] : []),
+                ]),
+              ]
+            : selection.decisionId
+              ? [selection.decisionId]
+              : undefined,
+      },
+      provider.gitWork,
+      binding.gitWorkContextVersion ?? "v1",
+    );
     // A moving local branch is observed twice; neither observation proves remote currentness.
     const after = await provider.gitWork.resolveGitWorkSelection(selection.snapshot);
     if (after.commit !== snapshot.commit) {
       view.status = "held";
       view.holdReasons.push("SELECTED_LOCAL_REF_ADVANCED_DURING_READ");
+      if ("semanticContext" in view) {
+        view.semanticContext.status = "held";
+        view.semanticContext.holdReasons.push("SELECTED_LOCAL_REF_ADVANCED_DURING_READ");
+      }
     }
     await provider.verifyCurrentSourceClosure();
     verifyGitSelection(selection, registry);
@@ -634,6 +663,9 @@ export function readHookBindings(path: string): HookBindings {
       typeof binding.checkpointPath !== "string" ||
       !isAbsolute(binding.checkpointPath) ||
       (binding.workId !== undefined && typeof binding.workId !== "string") ||
+      (binding.gitWorkContextVersion !== undefined &&
+        binding.gitWorkContextVersion !== "v1" &&
+        binding.gitWorkContextVersion !== "v2") ||
       (binding.allowedCwds !== undefined &&
         (!Array.isArray(binding.allowedCwds) ||
           !binding.allowedCwds.every((p) => typeof p === "string" && isAbsolute(p)))) ||
@@ -741,6 +773,7 @@ export function resolveHookBinding(cwd: string, registry: HookBindings): HookBin
           binding.qualificationLedgerPath ?? null,
           binding.childReservationTokens ?? null,
           binding.entrypointContextPath ?? null,
+          binding.gitWorkContextVersion ?? "v1",
         ]),
       ),
   );
@@ -1002,7 +1035,12 @@ export async function handleHook(
       await provider.verifyCurrentSourceClosure();
       verifySelectedGitRegistry(input, options.bindings, binding);
       return {
-        status: projection.status === "current" ? "context-injected" : "failed-open",
+        status:
+          projection.status === "current"
+            ? "context-injected"
+            : projection.status === "held"
+              ? "context-held"
+              : "failed-open",
         stdout: JSON.stringify({
           hookSpecificOutput: {
             hookEventName: input.hook_event_name,
@@ -1012,7 +1050,12 @@ export async function handleHook(
         exitCode: 0,
         projectId: binding.projectId,
         ...(projection.status !== "current"
-          ? { error: "Home context source requires repair" }
+          ? {
+              error:
+                projection.status === "held"
+                  ? "Selected Git Work context held"
+                  : "Home context source requires repair",
+            }
           : {}),
       };
     }
@@ -1062,22 +1105,27 @@ export async function handleHook(
       };
     const selected = await selectedGitWork(input, options.bindings, binding, provider);
     if (selected) {
+      const deliveryPolicy = gitWorkDeliveryPolicy(binding, options.maxChars);
       const text = JSON.stringify({
         schema: "codex.session-git-work.projection.v1",
+        deliveryPolicy,
         sourceOwnerProjectRoot: binding.root,
         actualNativeCwd: input.cwd,
         selectedWork: selected,
         authority: "none",
         nativePermissionGranted: false,
       });
-      const maxChars = Math.min(Math.max(options.maxChars ?? 6000, 2000), 6000);
+      const { maxChars } = deliveryPolicy;
+      const held = selected.status === "held" || text.length > maxChars;
       let additionalContext =
         text.length <= maxChars
           ? text
           : JSON.stringify({
               schema: "codex.session-git-work.projection.v1",
+              deliveryPolicy,
+              requiredContextChars: text.length,
               selectedWork: {
-                ...selected.pointer,
+                ...selectedGitWorkPointer(selected),
                 status: "held",
                 holdReasons: ["NATIVE_CONTEXT_OUTPUT_LIMIT"],
                 authority: "none",
@@ -1087,6 +1135,7 @@ export async function handleHook(
       if (additionalContext.length > maxChars)
         additionalContext = JSON.stringify({
           schema: "codex.session-git-work.projection.v1",
+          deliveryPolicy,
           status: "held",
           holdReasons: ["NATIVE_CONTEXT_OUTPUT_LIMIT"],
           readPolicy: "Read the exact typed session binding and immutable Git Work source.",
@@ -1096,7 +1145,7 @@ export async function handleHook(
         });
       verifySelectedGitRegistry(input, options.bindings, binding);
       return {
-        status: "context-injected",
+        status: held ? "context-held" : "context-injected",
         stdout: JSON.stringify({
           hookSpecificOutput: { hookEventName: input.hook_event_name, additionalContext },
         }),

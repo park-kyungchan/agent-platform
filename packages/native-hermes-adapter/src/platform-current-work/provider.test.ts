@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { cp, mkdtemp, mkdir, readFile, writeFile, rm, realpath } from "node:fs/promises";
+import { cp, lstat, mkdtemp, mkdir, readFile, writeFile, rm, realpath } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -196,7 +196,21 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       runtimeProviderRoot: f.root,
       runtimeRegistrationPath: join(f.root, "runtime-registration.json"),
       currentWorkBindings: { runtimePath: bindingsPath, sha256: sourceDigest(bindingsBytes) },
+      currentWorkOutputVersion: "v2" as const,
     };
+    await expect(
+      buildHermesPlatformSource({ ...request, currentWorkOutputVersion: "unknown" as "v2" }),
+    ).rejects.toThrow("EXPLICIT_CURRENT_WORK_OUTPUT_VERSION_REQUIRED");
+    await expect(
+      buildHermesPlatformSource({ ...request, currentWorkMaxChars: 12001 }),
+    ).rejects.toThrow("INVALID_CURRENT_WORK_OUTPUT_BUDGET");
+    await expect(
+      buildHermesPlatformSource({
+        ...request,
+        currentWorkOutputVersion: "v1",
+        currentWorkMaxChars: 6001,
+      }),
+    ).rejects.toThrow("INVALID_CURRENT_WORK_OUTPUT_BUDGET");
     await expect(
       buildHermesPlatformSource({
         ...request,
@@ -211,6 +225,12 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     expect(built.transitiveCompilerInputsVerified).toBe(true);
     expect(built.sourceClosureVerifiedBeforeAndAfter).toBe(true);
     expect(built.nativeActivation).toBe(false);
+    expect(built.currentWorkOutputVersion).toBe("v2");
+    expect(built.currentWorkOutputPolicy).toEqual({
+      policyVersion: "hermes.current-work-output.v2",
+      maxChars: 12000,
+      capChars: 12000,
+    });
     expect(built.compilerExecution).toBe("held-parent-file-descriptor");
     const admitted = new Set(
       [...f.registration.sourcePins, ...f.registration.dependencyPins].map((p) => p.path),
@@ -241,14 +261,22 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
         expect(JSON.parse(error).error).toBe("NATIVE_BOUNDARY_INPUT_OR_SOURCE_FAILED");
       } else if (name === "read-current-work.js") {
         expect(code).toBe(1);
-        expect(error).toBe("CURRENT_WORK_INPUT_OR_SOURCE_FAILED\n");
+        expect(JSON.parse(error)).toEqual({
+          error: "CURRENT_WORK_INPUT_OR_SOURCE_FAILED",
+          stage: "input",
+          reason: "REQUEST_UNAVAILABLE_OR_INVALID",
+        });
       } else {
         expect(code).toBe(0);
         expect(JSON.parse(out)).toEqual({});
-        expect(error).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+        expect(JSON.parse(error)).toEqual({
+          error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+          stage: "input",
+          reason: "REQUEST_UNAVAILABLE_OR_INVALID",
+        });
       }
     }
-    const invokeNative = async () => {
+    const invokeNative = async (payloadOverride: Record<string, unknown> = {}) => {
       const p = Bun.spawn(
         [compiler, "--no-env-file", join(f.root, "current-work-native-hook.js")],
         {
@@ -259,6 +287,7 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
               session_id: "synthetic-session",
               cwd: "/synthetic/cwd",
               extra: { task_id: "actual-native-task", user_message: marker },
+              ...payloadOverride,
             }),
           ]),
           stdout: "pipe",
@@ -275,11 +304,24 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     expect(unselected.code).toBe(0);
     expect(JSON.parse(unselected.stdout)).toEqual({});
     expect(unselected.stderr).toBe("");
+    const invalidProtocol = await invokeNative({ profile: "", session_id: marker });
+    expect(invalidProtocol.code).toBe(0);
+    expect(JSON.parse(invalidProtocol.stdout)).toEqual({});
+    expect(JSON.parse(invalidProtocol.stderr)).toEqual({
+      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+      stage: "context",
+      reason: "CONTEXT_PROJECTION_FAILED",
+    });
+    expect(invalidProtocol.stdout + invalidProtocol.stderr).not.toContain(marker);
     await writeFile(bindingsPath, bindingsBytes + "\n");
     const mutatedBindings = await invokeNative();
     expect(mutatedBindings.code).toBe(0);
     expect(JSON.parse(mutatedBindings.stdout)).toEqual({});
-    expect(mutatedBindings.stderr).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+    expect(JSON.parse(mutatedBindings.stderr)).toEqual({
+      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+      stage: "bindings",
+      reason: "BINDINGS_UNAVAILABLE_OR_INVALID",
+    });
     expect(mutatedBindings.stdout + mutatedBindings.stderr).not.toContain(marker);
     await writeFile(bindingsPath, bindingsBytes);
     const held = Bun.spawn([compiler, "--no-env-file", join(f.root, "read-current-work.js")], {
@@ -296,6 +338,26 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     expect(error).toBe("");
     expect(JSON.parse(out).status).toBe("held");
     expect(JSON.parse(out).holdReasons).toContain("EXPLICIT_NATIVE_WORK_SELECTION_REQUIRED");
+    expect(JSON.parse(out).schema).toBe("hermes.current-git-work-context.v1");
+    const explicitV2 = Bun.spawn(
+      [compiler, "--no-env-file", join(f.root, "read-current-work.js")],
+      {
+        stdin: new Blob([
+          JSON.stringify({ event: null, selection: null, runtimeIndex: null, outputVersion: "v2" }),
+        ]),
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [v2Code, v2Out, v2Error] = await Promise.all([
+      explicitV2.exited,
+      new Response(explicitV2.stdout).text(),
+      new Response(explicitV2.stderr).text(),
+    ]);
+    expect(v2Code).toBe(0);
+    expect(v2Error).toBe("");
+    expect(JSON.parse(v2Out).schema).toBe("hermes.current-git-work-context.v2");
+    expect(JSON.parse(v2Out).context).toBeNull();
     await writeFile(
       join(f.root, "packages/work-continuity/src/runtime-index.ts"),
       "// Synthetic source replacement after compile\n",
@@ -312,11 +374,19 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     ]);
     expect(staleCode).toBe(1);
     expect(staleOut).toBe("");
-    expect(staleError).toBe("CURRENT_WORK_INPUT_OR_SOURCE_FAILED\n");
+    expect(JSON.parse(staleError)).toEqual({
+      error: "CURRENT_WORK_INPUT_OR_SOURCE_FAILED",
+      stage: "source",
+      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
+    });
     const staleNative = await invokeNative();
     expect(staleNative.code).toBe(0);
     expect(JSON.parse(staleNative.stdout)).toEqual({});
-    expect(staleNative.stderr).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+    expect(JSON.parse(staleNative.stderr)).toEqual({
+      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+      stage: "source",
+      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
+    });
   } finally {
     await f.cleanup();
   }
@@ -365,9 +435,78 @@ test("compiled native hook refuses a changed registration before the current Wor
     });
     expect(await p.exited).toBe(0);
     expect(JSON.parse(await new Response(p.stdout).text())).toEqual({});
-    expect(await new Response(p.stderr).text()).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+    expect(JSON.parse(await new Response(p.stderr).text())).toEqual({
+      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+      stage: "source",
+      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
+    });
     expect(await Bun.file(f.markerPath).exists()).toBe(false);
   } finally {
     await f.cleanup();
   }
 }, 60000);
+
+test("actual native Work importer rejects a stale same-export projection before compiler inspection", async () => {
+  const f = await fixture();
+  try {
+    const dependency = f.registration.dependencies.find(
+      (entry) => entry.name === "@palantirkc/work-continuity",
+    );
+    expect(dependency).toBeDefined();
+    const imported = await realpath(
+      Bun.resolveSync(
+        "@palantirkc/work-continuity/git-work",
+        join(f.root, "packages/native-hermes-adapter/src/platform-current-work"),
+      ),
+    );
+    expect(imported).toBe(join(f.root, dependency!.root, "src/git-work/index.ts"));
+    const installed = join(f.root, dependency!.root, "src/git-work/context.ts");
+    expect((await lstat(installed)).nlink).toBe(1);
+    const fresh = await readFile(installed, "utf8");
+    expect(fresh).toContain("criteria: record.criteria");
+    // Same exported API, different normative behavior: stale installed code silently drops criteria.
+    await writeFile(installed, fresh.replace("criteria: record.criteria", "criteria: []"));
+    expect(
+      await readFile(join(f.root, "packages/work-continuity/src/git-work/context.ts"), "utf8"),
+    ).toBe(fresh);
+    await expect(captureHermesPlatformSource(f.root)).rejects.toThrow(
+      "INSTALLED_WORKSPACE_PROJECTION_DRIFT",
+    );
+    await expect(
+      buildHermesPlatformSource({
+        registrationPath: f.path,
+        registrationSha256: f.sha256,
+        providerRoot: f.root,
+        compiler: { path: join(f.root, "compiler-must-not-be-inspected"), sha256: "0".repeat(64) },
+        legacyManifestSha256: "1".repeat(64),
+        runtimeProviderRoot: f.root,
+        runtimeRegistrationPath: join(f.root, "runtime-registration.json"),
+      }),
+    ).rejects.toThrow("INSTALLED_WORKSPACE_PROJECTION_DRIFT");
+  } finally {
+    await f.cleanup();
+  }
+}, 30000);
+
+test("native importer readback rejects an unadmitted lookup root even after resolver priming", async () => {
+  const f = await fixture();
+  try {
+    const importedFrom = join(f.root, "packages/native-hermes-adapter/src/platform-current-work");
+    const dependency = f.registration.dependencies.find(
+      (entry) => entry.name === "@palantirkc/work-continuity",
+    )!;
+    Bun.resolveSync("@palantirkc/work-continuity/git-work", importedFrom);
+    const shadow = join(importedFrom, "node_modules/@palantirkc/work-continuity");
+    await mkdir(dirname(shadow), { recursive: true });
+    await cp(join(f.root, dependency.root), shadow, {
+      recursive: true,
+      dereference: false,
+      verbatimSymlinks: true,
+    });
+    await expect(captureHermesPlatformSource(f.root)).rejects.toThrow(
+      "UNADMITTED_WORKSPACE_LOOKUP_ROOT",
+    );
+  } finally {
+    await f.cleanup();
+  }
+}, 30000);

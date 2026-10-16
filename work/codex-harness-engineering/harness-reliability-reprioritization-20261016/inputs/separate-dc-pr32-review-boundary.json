@@ -1,0 +1,30 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "separate-dc-pr32-review-boundary",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "separate-user-authorized-native-reviewer",
+    "locator": "Current user relay of separate dc-gang-aPR32 result",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "SeparateScopeObservationAndCurrentUserSyncConstraint",
+    "repository": "park-kyungchan/dc-gang-a",
+    "PR": 32,
+    "state": "DRAFT_OPEN_NOT_MERGED",
+    "head": "b87c410a57931003032c93aad28019126ba06e08",
+    "tree": "23f1bee79d2876ccded64648242a9a6d8dae5e9f",
+    "baseMain": "14bdcd7c3efa6edaca2ed411e708a0dbec8c9589",
+    "blockingFinding": "P2 JSONL records bypass key-based credential scanning; no actual credential leak reported; correction pending.",
+    "scope": "Private five-student evidence import only; no production/database application or later post19:28KST context.",
+    "reviewUrl": "https://github.com/park-kyungchan/dc-gang-a/pull/32#pullrequestreview-5547128999",
+    "authenticatedStatus": "codex/pr32-independent-review failure",
+    "resultSha256": "2c50b6d0a19d45611cbfdf85d0c2c4820b9656aa5b56f10c205392428cd36a8a",
+    "futureIntegrationConstraint": "Before later dc-gang-a or education-platform integration, independently observe/fetch current owning remote main and verify exactSHA in isolatedcheckout. dc-gang-a is a distinct remote; PR32data is not onmain.",
+    "harnessBoundary": "Old Goal and originalcandidate/proposal/nativeactivationholds unchanged; this is not Harness nativeadmission or month-endintegration."
+  }
+}

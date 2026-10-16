@@ -17,6 +17,7 @@ import type {
   TaskRecord,
   TaskOperationalState,
   ValidationResult,
+  WorkRecord,
 } from "./types.ts";
 
 const text = (value: unknown): value is string =>
@@ -171,6 +172,35 @@ function sourceReference(value: unknown): void {
       "INVALID_EXTERNAL_GIT_SOURCE",
     );
 }
+function sourceReferences(value: unknown): void {
+  requireValue(
+    Array.isArray(value) && value.length > 0 && value.length <= 1024,
+    "INVALID_CONTINUITY_SOURCES",
+  );
+  value.forEach(sourceReference);
+  requireValue(
+    new Set(value.map((source) => JSON.stringify(source))).size === value.length,
+    "DUPLICATE_CONTINUITY_SOURCE",
+  );
+}
+export function effectInventory(value: unknown): {
+  completedEffectIds: string[];
+  uncertainEffectIds: string[];
+} {
+  requireValue(
+    object(value) && strings(value.completedEffectIds) && strings(value.uncertainEffectIds),
+    "INVALID_CONSUMED_EFFECT_INVENTORY",
+  );
+  const uncertain = value.uncertainEffectIds;
+  requireValue(
+    !value.completedEffectIds.some((id) => uncertain.includes(id)),
+    "INVALID_CONSUMED_EFFECT_INVENTORY",
+  );
+  return {
+    completedEffectIds: value.completedEffectIds,
+    uncertainEffectIds: value.uncertainEffectIds,
+  };
+}
 function occurrence(value: NativeOccurrence): void {
   requireValue(
     value && [value.runtimeId, value.attemptId, value.occurrenceId].every(text),
@@ -207,6 +237,14 @@ export function assertRecord(value: unknown): GitWorkRecord {
           strings(record.historicalFenceIds),
         "INVALID_WORK_PURPOSE_OR_CONTRACT",
       );
+      if (record.continuity !== undefined) {
+        requireValue(
+          object(record.continuity) && record.continuity.schema === "common.git-work-continuity.v1",
+          "INVALID_CONTINUITY_BINDING",
+        );
+        sourceReferences(record.continuity.purposeSources);
+        sourceReferences(record.continuity.effectInventorySources);
+      }
       break;
     case "spec":
       requireValue(
@@ -225,6 +263,8 @@ export function assertRecord(value: unknown): GitWorkRecord {
           text(record.objective),
         "INVALID_PLAN",
       );
+      if (record.clauses !== undefined)
+        requireValue(strings(record.clauses) && record.clauses.length > 0, "INVALID_PLAN_CLAUSES");
       break;
     case "input":
       requireValue(
@@ -281,6 +321,8 @@ export function assertRecord(value: unknown): GitWorkRecord {
       );
       if (record.pendingEffectIds !== undefined)
         requireValue(strings(record.pendingEffectIds), "INVALID_PENDING_EFFECTS");
+      if (record.nextAction !== undefined)
+        requireValue(text(record.nextAction), "INVALID_TASK_NEXT_ACTION");
       if (record.executionClass === "source-only")
         requireValue(
           record.occurrence === undefined &&
@@ -427,7 +469,24 @@ export async function validateRecordSources(
     sources.push(result);
     return result;
   };
-  if (record.kind === "decision") {
+  if (record.kind === "work" && record.continuity) {
+    for (const reference of record.continuity.purposeSources) {
+      const source = await read(reference);
+      const original = assertRecord(source.document);
+      requireValue(
+        original.kind === "input" &&
+          original.domainId === record.domainId &&
+          original.projectId === record.projectId,
+        "PURPOSE_SOURCE_CLASS_OR_SCOPE_MISMATCH",
+      );
+      requireValue(
+        isDeepStrictEqual(source.value, record.purpose),
+        "PURPOSE_SOURCE_VALUE_MISMATCH",
+      );
+    }
+    for (const reference of record.continuity.effectInventorySources)
+      effectInventory((await read(reference)).value);
+  } else if (record.kind === "decision") {
     const answer = await read(record.answerSource);
     const original = assertRecord(answer.document);
     requireValue(
@@ -794,9 +853,22 @@ export async function validateRecordSet(
     }
   }
   for (const id of completed) if (uncertain.has(id)) findings.push(`EFFECT_STATUS_CONFLICT:${id}`);
+  if (work.continuity)
+    for (const reference of work.continuity.effectInventorySources) {
+      try {
+        const inventory = effectInventory((await reader.readSource(reference)).value);
+        for (const id of inventory.completedEffectIds)
+          if (!completed.has(id)) findings.push(`CONSUMED_COMPLETED_EFFECT_NOT_REACHABLE:${id}`);
+        for (const id of inventory.uncertainEffectIds)
+          if (!uncertain.has(id)) findings.push(`CONSUMED_UNCERTAIN_EFFECT_NOT_REACHABLE:${id}`);
+      } catch (error) {
+        findings.push(error instanceof Error ? error.message : "CONSUMED_INVENTORY_UNAVAILABLE");
+      }
+    }
   for (const record of records.values())
     if (record.kind === "task" && ["planned", "running"].includes(record.state.execution)) {
       if (completed.has(record.id)) findings.push(`COMPLETED_EFFECT_REPLAY:${record.id}`);
+      if (uncertain.has(record.id)) findings.push(`UNCERTAIN_EFFECT_REPLAY:${record.id}`);
       for (const id of record.pendingEffectIds ?? [])
         if (completed.has(id) || uncertain.has(id))
           findings.push(`EFFECT_REPLAY_OR_UNCERTAIN:${id}`);
@@ -929,6 +1001,41 @@ export async function validateGitWorkTransition(
       record.historicalFenceIds.some((id) => !successor.historicalFenceIds.includes(id))
     )
       findings.push("HISTORICAL_FENCE_LINK_REMOVED");
+    if (record.kind === "work" && record.continuity) {
+      const binding = successor?.kind === "work" ? successor.continuity : undefined;
+      if (!binding) findings.push("CONTINUITY_BINDING_REMOVED");
+      else {
+        const includesSource = (references: SourceReference[], reference: SourceReference) =>
+          references.some((candidate) => isDeepStrictEqual(candidate, reference));
+        if (
+          record.continuity.effectInventorySources.some(
+            (reference) => !includesSource(binding.effectInventorySources, reference),
+          )
+        )
+          findings.push("CONSUMED_INVENTORY_SOURCE_REMOVED");
+        if (
+          isDeepStrictEqual(record.purpose, (successor as WorkRecord).purpose) &&
+          record.continuity.purposeSources.some(
+            (reference) => !includesSource(binding.purposeSources, reference),
+          )
+        )
+          findings.push("PURPOSE_PROVENANCE_REMOVED");
+      }
+      for (const reference of [
+        ...record.continuity.purposeSources,
+        ...record.continuity.effectInventorySources,
+      ]) {
+        try {
+          if (
+            (await before.readSource(reference)).sha256 !==
+            (await after.readSource(reference)).sha256
+          )
+            findings.push("CONTINUITY_SOURCE_HISTORY_CHANGED");
+        } catch {
+          findings.push("CONTINUITY_SOURCE_HISTORY_UNAVAILABLE");
+        }
+      }
+    }
     const historyChanged =
       record.kind === "effect-fence" && successor?.kind === "effect-fence"
         ? !isDeepStrictEqual(

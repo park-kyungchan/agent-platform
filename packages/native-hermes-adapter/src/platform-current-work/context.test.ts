@@ -11,6 +11,7 @@ import type {
 import type { RuntimeIndex } from "@palantirkc/work-continuity/runtime-index";
 import {
   readHermesCurrentWorkContext,
+  readHermesCurrentWorkContextV2,
   type HermesCurrentWorkEvent,
   type HermesCurrentWorkSelection,
   type HermesCurrentWorkOptions,
@@ -76,6 +77,10 @@ async function fixture(
     missingQuestionDecision?: number;
     badAnswerDecision?: number;
     objective?: string;
+    criteria?: string[];
+    clauses?: string[];
+    nextAction?: string;
+    activeRevision?: number;
     dependencies?: number;
     badAnswer?: boolean;
     closed?: boolean;
@@ -110,12 +115,12 @@ async function fixture(
       issueId: identity.issueId,
       purpose: {
         objective: options.objective ?? "Preserve the current integrated purpose",
-        successCriteria: ["Exact logical/native selection"],
+        successCriteria: options.criteria ?? ["Exact logical/native selection"],
         inScope: ["Source context"],
         outOfScope: ["Native authority"],
       },
-      spec: { id: identity.specId, revision: 6 },
-      plan: { id: identity.planId, revision: 6 },
+      spec: { id: identity.specId, revision: options.activeRevision ?? 6 },
+      plan: { id: identity.planId, revision: options.activeRevision ?? 6 },
       governingDecisionIds: decisionIds,
       historicalFenceIds: [],
     },
@@ -125,7 +130,7 @@ async function fixture(
       id: identity.specId,
       revision: 6,
       outcome: "Current integrated source",
-      criteria: ["Retain originals"],
+      criteria: options.criteria ?? ["Retain originals"],
     },
     {
       ...base,
@@ -135,6 +140,7 @@ async function fixture(
       specId: identity.specId,
       specRevision: 6,
       objective: "Read current source",
+      ...(options.clauses ? { clauses: options.clauses } : {}),
     },
     {
       ...base,
@@ -142,6 +148,7 @@ async function fixture(
       id: identity.taskId,
       logical: identity,
       title: "Current integrated Task",
+      ...(options.nextAction !== undefined ? { nextAction: options.nextAction } : {}),
       state,
       executionClass: "source-only",
       decisionIds: decisionIds.slice(0, options.taskDecisions ?? decisionIds.length),
@@ -166,6 +173,26 @@ async function fixture(
       verificationEvidenceIds: [],
     })),
   ];
+  if (options.activeRevision !== undefined && options.activeRevision !== 6) {
+    records.push({
+      ...base,
+      kind: "spec",
+      id: identity.specId,
+      revision: options.activeRevision,
+      outcome: "New active Work outcome",
+      criteria: ["New active criterion remains distinct"],
+    });
+    records.push({
+      ...base,
+      kind: "plan",
+      id: identity.planId,
+      revision: options.activeRevision,
+      specId: identity.specId,
+      specRevision: options.activeRevision,
+      objective: "Read the new active Work plan",
+      clauses: ["Keep active and Task contracts separately addressable"],
+    });
+  }
   for (const [index, id] of decisionIds.entries()) {
     const questionless = options.questionlessDecisions?.includes(index) ?? false;
     const original = { kind: "snapshot" as const, path: path("input", `${id}-original`) };
@@ -382,12 +409,12 @@ test("caller unknown currentness retains explicit hold rather than claiming remo
   expect(value.currentness).toBe("caller-declared-not-remote-verified");
 });
 
-test("current Work and selected Task require the exact logical Spec/Plan join", async () => {
+test("selected Task requires its exact logical Spec/Plan identity", async () => {
   const f = await fixture();
   f.selected.logical.specRevision = 5;
   f.index.entries[0]!.logical = { ...f.selected.logical };
   const value = await f.read();
-  expect(value.holdReasons).toEqual(["CURRENT_WORK_LOGICAL_CONTRACT_MISMATCH"]);
+  expect(value.holdReasons).toEqual(["CURRENT_TASK_LOGICAL_CONTRACT_MISMATCH"]);
   expect(f.counters()).toEqual({ reads: 1, checks: 2 });
 });
 
@@ -411,13 +438,13 @@ test("accepted decision revisions preserve their actual superseded original chai
   expect(value.context?.decisions.find((row) => row.id === "decision-0")?.supersedes).toEqual([
     "decision-0-previous",
   ]);
-  expect(value.context?.decisions.find((row) => row.id === "decision-0-previous")?.status).toBe(
+  const decoded = gitWork.decodeCompactGitWorkContext(value.context!.semanticContext);
+  expect(decoded.decisions.find((row) => row.id === "decision-0-previous")?.status).toBe(
     "superseded",
   );
-  expect(
-    value.context?.decisions.find((row) => row.id === "decision-0-previous")?.answer?.fragment,
-  ).toBe("#/content/answer");
-  expect(JSON.stringify(value)).not.toContain("PRIVATE-ANSWER-SENTINEL");
+  expect(decoded.decisions.find((row) => row.id === "decision-0-previous")?.answerSource[1]).toBe(
+    "#/content/answer",
+  );
 });
 
 test("moving local ref and source-closure drift produce truthful holds with safe errors", async () => {
@@ -442,31 +469,31 @@ test("moving local ref and source-closure drift produce truthful holds with safe
   expect(JSON.stringify(drift)).not.toContain("PRIVATE-CLOSURE-ERROR-SENTINEL");
 });
 
-test("seventeen governing decisions retain three Task originals with disclosed optional omissions", async () => {
+test("v1 holds when all governing originals cannot fit while explicit v2 retains every exact pointer", async () => {
   const f = await fixture({
     decisions: 17,
     taskDecisions: 3,
     questionlessDecisions: [2, 5, 6, 9, 12],
   });
-  const value = await f.read();
+  const legacy = await f.read();
+  expect(legacy.status).toBe("held");
+  expect(legacy.context).toBeNull();
+  expect(legacy.holdReasons).toEqual(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
+  const value = await readHermesCurrentWorkContextV2(event, f.selected, f.index, f.provider);
   expect(value.status).toBe("source-qualified");
-  expect(value.holdReasons).toEqual([]);
-  expect(value.context?.omitted.decisions).toBeGreaterThan(0);
-  expect(value.context?.decisions.slice(0, 3).map((decision) => decision.id)).toEqual([
+  const decoded = gitWork.decodeCompactGitWorkContext(value.context!.work);
+  expect(decoded.decisions).toHaveLength(17);
+  expect(decoded.decisions.slice(0, 3).map((decision) => decision.id)).toEqual([
     "decision-0",
     "decision-1",
     "decision-2",
   ]);
-  expect(value.context?.decisions[2]?.question).toBeNull();
-  expect(value.context?.decisions.every((decision) => decision.answer?.blobOid)).toBe(true);
-  expect(value.context?.governingDecisionIndex).toBe("work.json#/governingDecisionIds");
-  expect(value.context?.omitted.decisions! + value.context?.decisions.length!).toBe(17);
-  expect(value.context?.purpose.objective).toBe("Preserve the current integrated purpose");
-  expect(value.context?.currentTask.title).toBe("Current integrated Task");
-  expect(value.context?.omitted.fields).toEqual([]);
+  expect(decoded.decisions[2]?.selectionContextSource).toBeUndefined();
+  for (const decision of decoded.decisions)
+    expect(decoded.sources[decision.answerSource[0]]?.blobOid).toMatch(/^[a-f0-9]{40}$/u);
   expect(JSON.stringify(value)).not.toContain("PRIVATE-ANSWER-SENTINEL");
   expect(JSON.stringify(value)).not.toContain("PRIVATE-QUESTION-SENTINEL");
-  expect(JSON.stringify(value).length).toBeLessThanOrEqual(6000);
+  expect(JSON.stringify(value).length).toBeLessThanOrEqual(12000);
 });
 
 test("a direct actual answer needs no invented question while a declared missing question holds", async () => {
@@ -522,10 +549,15 @@ test("direct dependency projection has explicit omission counts while prerequisi
   f.provider.maxChars = 3000;
   const value = await f.read();
   expect(value.status).toBe("held");
-  expect(value.context?.omitted.directDependencies).toBeGreaterThan(0);
-  expect(value.holdReasons).toContain("UNEXPANDED_DIRECT_DEPENDENCIES");
-  expect(value.context?.upstream.spec.revision).toBe(6);
+  expect(value.context).toBeNull();
+  expect(value.holdReasons).toEqual(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
   expect(JSON.stringify(value).length).toBeLessThanOrEqual(3000);
+  f.provider.maxChars = 5000;
+  const disclosed = await f.read();
+  expect(disclosed.context?.omitted.directDependencies).toBeGreaterThan(0);
+  expect(disclosed.holdReasons).toContain("UNEXPANDED_DIRECT_DEPENDENCIES");
+  expect(disclosed.context?.upstream.spec.revision).toBe(6);
+  expect(JSON.stringify(disclosed).length).toBeLessThanOrEqual(5000);
 });
 
 test("missing closure verifier, bad budgets and parser errors expose no original payload", async () => {
@@ -662,4 +694,152 @@ test("native unknown currentness stays visibly held and late async closure drift
   await expect(
     readHermesNativeWorkHook(nativePayload(), hookBindings(f), f.provider),
   ).rejects.toThrow("PRIVATE-LATE-ASYNC-DRIFT");
+});
+
+test("explicit v2 native output retains shared normative clauses and authored next action without raw originals", async () => {
+  const clause = "Preserve every exact criterion after interruption";
+  const action = "Read the independently retained delegated result receipt";
+  const f = await fixture({
+    criteria: [clause],
+    clauses: [clause, "Keep month-end independent"],
+    nextAction: action,
+  });
+  const value = await readHermesCurrentWorkContextV2(event, f.selected, f.index, f.provider);
+  expect(value.schema).toBe("hermes.current-git-work-context.v2");
+  expect(value.outputPolicy).toEqual({
+    policyVersion: "hermes.current-work-output.v2",
+    maxChars: 12000,
+    capChars: 12000,
+  });
+  expect(value.status).toBe("source-qualified");
+  expect(value.context?.native).toEqual(event);
+  expect(value.context?.work.strings.filter((text) => text === clause)).toHaveLength(1);
+  expect(value.context?.work.strings).toContain(action);
+  expect(value.context?.work.strings).toContain("Keep month-end independent");
+  const decoded = gitWork.decodeCompactGitWorkContext(value.context!.work);
+  expect(decoded.task?.logical).toEqual(identity);
+  expect(decoded.task?.nextAction?.value).toBe(action);
+  expect(decoded.normative.find((record) => record.kind === "spec")?.criteria).toEqual([clause]);
+  expect(decoded.normative.find((record) => record.kind === "plan")?.clauses).toEqual([
+    clause,
+    "Keep month-end independent",
+  ]);
+  expect(decoded.task?.nextAction?.source[1]).toBe("#/nextAction");
+  const reader = await gitWork.openGitWork(
+    await gitWork.resolveGitWorkSelection(f.selected.snapshot),
+  );
+  const raw = await gitWork.readGitWorkContext(reader, {
+    taskId: identity.taskId,
+    latestRelevant: "current",
+    maxChars: 24000,
+    maxRecords: 256,
+  });
+  expect(value.context?.work).toEqual(
+    gitWork.compactGitWorkContext(raw, {
+      taskId: identity.taskId,
+      decisionIds: ["decision-0"],
+    }),
+  );
+  expect(JSON.stringify(value)).not.toContain("PRIVATE-ANSWER-SENTINEL");
+  expect(JSON.stringify(value)).not.toContain("PRIVATE-QUESTION-SENTINEL");
+  expect(JSON.stringify(value)).not.toContain("private-original");
+  expect(JSON.stringify(value).length).toBeLessThanOrEqual(6000);
+  const response = await readHermesNativeWorkHook(nativePayload(), hookBindings(f), {
+    ...f.provider,
+    outputVersion: "v2",
+  });
+  expect(JSON.parse(response.context!)).toEqual(value);
+  // The existing input bindings remain v1 and the default consumer still receives v1.
+  expect((await f.read()).schema).toBe("hermes.current-git-work-context.v1");
+});
+
+test("v2 required-clause overflow holds without dropping criteria or implying a next action from the title", async () => {
+  const f = await fixture({
+    clauses: Array.from(
+      { length: 12 },
+      (_, index) => `Required clause ${index}: ` + "indivisible semantic detail ".repeat(40),
+    ),
+  });
+  const value = await readHermesCurrentWorkContextV2(event, f.selected, f.index, f.provider);
+  expect(value.schema).toBe("hermes.current-git-work-context.v2");
+  expect(value.status).toBe("held");
+  expect(value.context).toBeNull();
+  expect(value.holdReasons).toContain("REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT");
+  const small = await fixture();
+  const legacy = await readHermesCurrentWorkContextV2(
+    event,
+    small.selected,
+    small.index,
+    small.provider,
+  );
+  expect((await small.read()).context?.currentTask.nextAction).toBeUndefined();
+  expect((await small.read()).context?.currentTask.nextActionCoverage).toBe("unspecified");
+  expect(legacy.status).toBe("source-qualified");
+});
+
+test("explicit v2 delivery policy admits complete larger packets while narrower and excessive caller budgets hold", async () => {
+  const clauses = Array.from(
+    { length: 6 },
+    (_, index) => `Required full clause ${index}: ` + "indivisible semantic detail ".repeat(32),
+  );
+  const f = await fixture({
+    clauses,
+    nextAction: "Read the retained receiver receipt before continuing",
+  });
+  const value = await readHermesCurrentWorkContextV2(event, f.selected, f.index, f.provider);
+  expect(value.status).toBe("source-qualified");
+  expect(value.outputPolicy.maxChars).toBe(12000);
+  expect(JSON.stringify(value).length).toBeGreaterThan(6000);
+  expect(JSON.stringify(value).length).toBeLessThanOrEqual(12000);
+  expect(
+    gitWork
+      .decodeCompactGitWorkContext(value.context!.work)
+      .normative.find((record) => record.kind === "plan")?.clauses,
+  ).toEqual(clauses);
+  const narrow = await readHermesCurrentWorkContextV2(event, f.selected, f.index, {
+    ...f.provider,
+    maxChars: 6000,
+  });
+  expect(narrow.status).toBe("held");
+  expect(narrow.context).toBeNull();
+  expect(narrow.outputPolicy.maxChars).toBe(6000);
+  expect(narrow.holdReasons).toContain("REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT");
+  const before = f.counters();
+  const invalid = await readHermesCurrentWorkContextV2(event, f.selected, f.index, {
+    ...f.provider,
+    maxChars: 12001,
+  });
+  expect(invalid.holdReasons).toEqual(["INVALID_STARTUP_CONTEXT_BUDGET"]);
+  expect(invalid.outputPolicy).toEqual({
+    policyVersion: "hermes.current-work-output.v2",
+    maxChars: 12000,
+    capChars: 12000,
+  });
+  expect(f.counters()).toEqual(before);
+});
+
+test("selected Task keeps its historical contract when Work active revisions advance", async () => {
+  const f = await fixture({
+    activeRevision: 7,
+    nextAction: "Read the exact Task revision-six result",
+  });
+  const value = await readHermesCurrentWorkContextV2(event, f.selected, f.index, f.provider);
+  expect(value.status).toBe("source-qualified");
+  const decoded = gitWork.decodeCompactGitWorkContext(value.context!.work);
+  expect(decoded.task?.logical).toEqual(identity);
+  expect(decoded.task?.nextAction?.value).toBe("Read the exact Task revision-six result");
+  expect(
+    decoded.normative
+      .filter((record) => record.kind === "spec")
+      .map((record) => record.revision)
+      .sort(),
+  ).toEqual([6, 7]);
+  expect(
+    decoded.normative
+      .filter((record) => record.kind === "plan")
+      .map((record) => record.revision)
+      .sort(),
+  ).toEqual([6, 7]);
+  expect(value.context?.work.strings).toContain("Retain originals");
+  expect(value.context?.work.strings).toContain("New active criterion remains distinct");
 });

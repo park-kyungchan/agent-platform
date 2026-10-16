@@ -1,0 +1,175 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "common-review-f642938",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-7",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.retained-independent-source-report.v1",
+    "originalBytes": 10759,
+    "originalSha256": "8d4b965cdd938c83d03fea60d414162638c85787a7bafb64ffe38911ddfe5571",
+    "report": {
+      "schema": "hrr.independent-source-review.v1",
+      "artifact": "A held-output privacy correction",
+      "repository": "park-kyungchan/agent-platform",
+      "commit": "f642938f4196b3ff99314f91cd0d6080d7dd46f1",
+      "tree": "de0532a209c9103cc0a66cfdf5e6b74cba33f91d",
+      "base": "1d4b1b4b33d00049f61bd8aee16b7a7731963d93",
+      "wholeAComparisonBase": "f18b8ce2e810ae94be2cf7277a9b375d955b96cd",
+      "snapshot": "/home/palantirkc/code/worktrees/hrr-review-common-privacy-20261016",
+      "reviewer": {
+        "name": "hrr-review",
+        "previouslyObservedRuntime": "native Codex CLI, Herdr w3:pN",
+        "previouslyObservedNamedCODEX_THREAD_ID": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+        "nativeAuthorshipAuthenticated": false,
+        "meaning": "Git report and named-variable observations do not authenticate native authorship."
+      },
+      "scope": {
+        "classification": "fresh independent immutable source review and exclusive inert QA",
+        "sourceEdits": false,
+        "sharedInstallsOrCachePurges": false,
+        "newAgentOrSession": false,
+        "goalCreatedOrResumed": false,
+        "nativePermissionGranted": false,
+        "nativeAdmissionEstablished": false,
+        "nativeActivation": false,
+        "modelEvaluationSuiteRun": false,
+        "formalCompletion": false,
+        "acceptanceEstablished": false
+      },
+      "result": "no-current-actionable-source-findings-for-this-exact-artifact",
+      "findingCount": 0,
+      "currentFindings": [],
+      "findings": [],
+      "findingDispositions": [
+        {
+          "id": "HRR-A-HELD-PRIVACY-001",
+          "status": "closed-for-this-exact-artifact",
+          "evidence": "The exact original unknown historicalEffects.privateRaw sentinel now causes held/INVALID_COMPACT_SCHEMA with historicalEffects absent and no unknown key or sentinel in serialized output, for both source-qualified and already-held raw inputs. The new shared history helper validates owned fields before constructing a detached owned-field copy. Invalid metadata is validated inside the guarded path before assignment; exception text stays safe. Valid raw-held history still retains68 completed/3 uncertain counts and detached arrays."
+        },
+        {
+          "id": "HRR-A-COMPACT-REVIEW-001",
+          "status": "remains-closed-for-this-exact-artifact",
+          "evidence": "All11 original decoder structural negatives and39 extended schema/cardinality/source/continuity/nextAction negatives independently reject. The shared structural boundary remains in both constructor and decoder; valid exact normative and original-pointer roundtrips pass."
+        },
+        {
+          "id": "HRR-A-COMPACT-REVIEW-002",
+          "status": "remains-closed-for-this-exact-artifact",
+          "evidence": "All5 original constructor negatives and6 extended scope/Spec/Plan join negatives independently hold without partial normative/task payload. Valid real bound681 historical Task Plan1 remains distinct from active Work Plan2."
+        },
+        {
+          "id": "HRR-A-REVIEW-001",
+          "status": "remains-closed-for-this-exact-artifact",
+          "evidence": "Independent planned/running completed and uncertain legacy Task-ID replay cases still hold without fabricated native occurrences; distinct future planned/running source Tasks qualify. The focused suite also preserves future distinct pending-effect behavior."
+        }
+      ],
+      "checks": [
+        {
+          "name": "Immutable identity and bounded scope",
+          "result": "pass",
+          "detail": "Frozen HEAD/tree/parent match assignment. Exactly context.ts and git-work.test.ts change from1d4; no schema/type/API export, cap, provider, Work, package/lock or release file changes. All changed constructor, shared history helper, decoder history use and added tests inspected. git diff --check f18..f642 passes; tracked snapshot clean before/after QA."
+        },
+        {
+          "name": "Source-specific probe reuse",
+          "result": "pass",
+          "detail": "Reviewed the correction before copying prior-probe.ts and schema-probe.ts unchanged from the old frozen schema-review snapshot. Relative imports resolve this exact successor. Earlier scripts/reports/checkpoints were preserved."
+        },
+        {
+          "name": "Exact prior independent probes",
+          "commands": [
+            "bun .private/hrr-review-qa/prior-probe.ts",
+            "bun .private/hrr-review-qa/schema-probe.ts"
+          ],
+          "result": "pass",
+          "detail": "All original and extended structural/scope cases retain expected reject/hold outcomes. The old privacy case changes only from privateSentinelExposed=true to false, with empty historicalEffectKeys. Valid roundtrips, raw held safe reasons and completed/uncertain/future fixtures remain intact."
+        },
+        {
+          "name": "Independent focused privacy/alias probe",
+          "command": "bun .private/hrr-review-qa/privacy-probe.ts",
+          "result": "pass",
+          "detail": "16 observations/checks cover original qualified/held unknown-history sentinel, all6 metadata object fields, all5 malformed owned history fields, valid raw-held detached history in both mutation directions, and safe history-accessor exception/rejection outcomes. No rejected raw metadata or sentinel is echoed. Valid held history keeps68/3 without aliasing the raw arrays."
+        },
+        {
+          "name": "Focused source suite",
+          "command": "TMPDIR=<exclusive-review-tmp> bun run check:git-work --timeout 30000",
+          "result": "pass",
+          "detail": "167 tests/0 failures/2102 assertions across4 files. Earlier source behavior/holds, lineage, replay, schema validation and the new privacy regression pass without weakened assertions."
+        },
+        {
+          "name": "Handoff preservation",
+          "command": "TMPDIR=<exclusive-review-tmp> bun run check:handoff",
+          "result": "pass",
+          "detail": "39 tests/223 assertions."
+        },
+        {
+          "name": "Canonical import preservation",
+          "command": "bun run check:imports",
+          "result": "pass",
+          "detail": "Canonical handoff and compatibility adapter remain the same module, with unchanged handoff SHA8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a."
+        },
+        {
+          "name": "Inherited immutable Work and transition gates",
+          "command": "COMMON_BASE_SHA=f18b8ce2e810ae94be2cf7277a9b375d955b96cd bun scripts/verify-common-work.ts <frozen-snapshot> f642938f4196b3ff99314f91cd0d6080d7dd46f1",
+          "result": "pass",
+          "detail": "192 records/48 actual decisions/original63 completed2 uncertain baseline/84 documentation routes; semantic transition validates and oversized historical normative context remains explicitly held."
+        },
+        {
+          "name": "Exclusive dependency setup",
+          "command": "bun install --frozen-lockfile --ignore-scripts --backend=copyfile --cache-dir .private/hrr-review-qa/bun-cache",
+          "result": "pass-with-defined-limit",
+          "detail": "Bun1.4.3; dependencies, cache and inert fixtures only in the frozen review snapshot. LOCAL file/workspace links may remain; byte equivalence is not independent-copy/native-install proof. No installed source bytes, shared owner, cache, native config or trust were modified."
+        }
+      ],
+      "sourceAndRoundtripPreservation": {
+        "immutableWorkDataSnapshot": "681c5e553c486a0d15d9b8d8d75f9aeda9610505",
+        "implementationAndDataSeparate": true,
+        "HRR-A": {
+          "rawChars": 12978,
+          "compactChars": 8740,
+          "compactUtf8Bytes": 8744
+        },
+        "HRR-REAL-RECOVERY-ACCEPTANCE": {
+          "rawChars": 13125,
+          "compactChars": 8854,
+          "compactUtf8Bytes": 8858
+        },
+        "qualifiedRoundtrip": "Every carried normative field including Work scope matches its exact source fragment/blob. All5 answer/question routes dereference correctly without raw original text output. Selected Task logical/state/authored nextAction, Work Plan2 versus Task Plan1, Plan-to-Spec joins and68 completed3 uncertain history remain unchanged.",
+        "heldBehavior": "Held output retains only validated source metadata and owned history, safe codes, empty normative/string/source/decision payload, no selected Task and unavailable continuity binding. Invalid history is omitted instead of echoed; valid held history retains its fence counts/IDs without aliasing. Held output does not claim a usable qualified partial contract.",
+        "historicalGates": "Actual user decisions, paused predecessor/WSL boundaries, independent month-end, immutable original/release evidence, old fences and prior reports/checkpoints remain intact. No authority is inferred from source-only qualification or this review."
+      },
+      "evidence": {
+        "pathBase": "/home/palantirkc/code/worktrees/hrr-review-common-privacy-20261016/.private/hrr-review-qa/",
+        "sha256": {
+          "prior-probe.ts": "2a295f7268b7b5e9c9243701f6735f4f7e67b80396bd7d9ce48bfd204ca94f7d",
+          "schema-probe.ts": "50c8fee02f7b08f225041060fd9d4cdd51616d6d7266594c9e4bf0d14622981e",
+          "privacy-probe.ts": "31b0d82096e743c281f6f55b182e5254da8a59322ce6c394ccbfe874804dd8c7",
+          "logs/prior-probe.jsonl": "6c6662ec5ab7ef30b6dfb837b15f3b30b086d2f0f4d1fe03fea6a5d6fb0804fc",
+          "logs/schema-probe.jsonl": "ee7e58eee083a1b340d8cdaeaa5bcde22311c25daa15fa299c6a8a413b77515a",
+          "logs/privacy-probe.jsonl": "dd0567b3c0eedb566758a4fce7642a9e1060b5c58274beb21f57626ba5a13daa",
+          "logs/git-work.log": "acb0c227bfe5b90a70e1becfad42686fd4f7360dbf706f52514a5520a46ba3fd",
+          "logs/handoff.log": "9d315b92a9e4b355e68840166a575ea8237c5923908bc5abb72b198048a66ab3",
+          "logs/imports.log": "40b7b49de56b777f8b386f9c1bab7b74bb35a08c1fc6101eb7c10e2caacd8ee1",
+          "logs/common-work.log": "2c8765dd1512be50198fd249c4cefeec45d9ef6a85e9d5788ac4c9ace8a2b4cb"
+        },
+        "sourceHashes": {
+          "packages/work-continuity/src/git-work/context.ts": "e9f01f5c15b558ce9f6dd72880f0428903d17bd75450f424046aedca7aa739b7",
+          "packages/work-continuity/src/git-work/git-work.test.ts": "ccb49e0a8c4127989fdb6ce4f0e06b8faaf64e10b4cb32b67f901551405b0504"
+        }
+      },
+      "limitsAndRemainingOwnerGates": [
+        "Zero findings and closure apply to this exact A source artifact and the reviewed correction/lineage scope. Final Root composition, provider/registry pin/index/marker successors and affected old-owner checks remain Root-owned and pending; a changed combined tree requires its own exact current review.",
+        "The common validator checks carried source data and does not authenticate Git/native authorship or itself prove current remote state. Reader source proof, native owner observation, result receipt, formal completion and Acceptance remain distinct.",
+        "Source default6000 cannot fit these complete compact payloads; explicit SOURCEv2 cap12000 remains separate. Whole native envelope fit, additionalContextLimit/token behavior, callable support, discovery/trust/admission/activation and actual NEW-session recovery remain unqualified. No token/billing/model-suite authority follows.",
+        "No new Root Work data, live provider, producer private artifact, native transcript/session store, service or credential was required for this scoped correction review. No source publication, push/status/PR/merge, Goal, native effect or evaluation suite was performed. Only exclusive QA and this requested private report were written."
+      ]
+    },
+    "meaning": "Immutable source custody only; actual owned native dispatch/output correlation and authenticated publication are separate."
+  }
+}

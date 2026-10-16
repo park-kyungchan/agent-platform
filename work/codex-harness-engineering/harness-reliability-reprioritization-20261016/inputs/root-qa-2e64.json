@@ -1,0 +1,158 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "root-qa-2e64",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-8",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.retained-source-artifact.v1",
+    "originalBytes": 4005,
+    "originalSha256": "2e70af2e8a7be42dffc4b7b174fc5973841172347ee578f848d1152dde60a381",
+    "originalSerialization": "JSON.stringify(value,null,2) plus newline; exact reconstruction asserted when original is canonical JSON",
+    "report": {
+      "schema": "hrr.root-source-qa.v1",
+      "sourceHead": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+      "sourceTree": "c0ddfc2572ab7679a05ef22a8ffb0212b5301276",
+      "source": {
+        "status": "pass",
+        "sourceOnly": true,
+        "nativeModelCalls": 0,
+        "nativePermissionGranted": false,
+        "sourceRegistrySha256": "331b191c7cf3410a535ab9bb3a7ef2ed16dcc57f9a863b2dd1558414024e25dc",
+        "canonicalTestFiles": 31,
+        "qualityTestFiles": 7,
+        "stagedSourceFilesExcluded": 27,
+        "stagedTestsExcluded": []
+      },
+      "sourceCommands": 26,
+      "allSourceCommandsSucceeded": true,
+      "tests": {
+        "pass": 713,
+        "skip": 7,
+        "fail": 0,
+        "assertions": 4952
+      },
+      "quality": {
+        "status": "pass",
+        "mode": "all",
+        "checks": [
+          {
+            "id": "mutation-policy",
+            "status": "pass",
+            "durationMs": 0
+          },
+          {
+            "id": "scope",
+            "status": "pass",
+            "durationMs": 1459
+          },
+          {
+            "id": "source-snapshot",
+            "status": "pass",
+            "durationMs": 82
+          },
+          {
+            "id": "source-identity",
+            "status": "pass",
+            "durationMs": 40
+          },
+          {
+            "id": "build-public-ontology-package",
+            "status": "pass",
+            "durationMs": 10575
+          },
+          {
+            "id": "architecture",
+            "status": "pass",
+            "durationMs": 1119
+          },
+          {
+            "id": "format",
+            "status": "pass",
+            "durationMs": 13016
+          },
+          {
+            "id": "typed-lint-and-explicit-any-audit",
+            "status": "pass",
+            "durationMs": 24593
+          },
+          {
+            "id": "workflow-correctness-and-security",
+            "status": "pass",
+            "durationMs": 734
+          },
+          {
+            "id": "dependency-vulnerabilities",
+            "status": "pass",
+            "durationMs": 268
+          },
+          {
+            "id": "maintained-source-secrets",
+            "status": "pass",
+            "durationMs": 3375
+          },
+          {
+            "id": "quality-negative-fixtures",
+            "status": "pass",
+            "durationMs": 8715
+          },
+          {
+            "id": "source-currentness",
+            "status": "pass",
+            "durationMs": 960
+          },
+          {
+            "id": "architecture-currentness",
+            "status": "pass",
+            "durationMs": 505
+          }
+        ],
+        "sourceIdentity": {
+          "actualCheckoutSha": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+          "githubEventSha": null,
+          "sourceRegistrySha256": "331b191c7cf3410a535ab9bb3a7ef2ed16dcc57f9a863b2dd1558414024e25dc",
+          "lockSha256": "f5723aae95044787653d1eb76c932c0c1c4ddf734966a782989e7399b7f69ffb",
+          "workingTreeHasChanges": false
+        },
+        "environmentAdoptionEstablished": false,
+        "nativePermissionGranted": false,
+        "acceptanceDecision": null
+      },
+      "logs": {
+        "source": {
+          "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-2e64/source.log",
+          "bytes": 114029,
+          "sha256": "92e1aaeb0980428526a3d4228401294a5e4df5ce5b4168376877cf03225d6957"
+        },
+        "quality": {
+          "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-2e64/quality.log",
+          "bytes": 200956,
+          "sha256": "e8f9c415dde030ea80b1ecc0150f676bfe20c7b1e38a7e6978c9dc380e15524c"
+        }
+      },
+      "ownerFixtureLimit": "Finite CI uses existing historical Hermes guard fixture; not --verify-owner-fixtures/live-all-owner equivalence. Unchanged actual19-pin generated guard separately rechecked12:16:39Z. No first-import guard/cache change.",
+      "newSuccessorWorkGate": {
+        "status": "pass",
+        "commands": [
+          "bun run harness transition .private/after-custody.json .private/root-qa-2e64/current-work.json",
+          "bun run harness validate .private/root-qa-2e64/current-work.json"
+        ],
+        "before": "2bc168954ef6e9ee1e9b44672f5499d39d199634",
+        "after": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+        "findings": [],
+        "nativePermissionGranted": false
+      },
+      "nativeActivation": false,
+      "formalCompletion": false,
+      "acceptanceEstablished": false
+    },
+    "meaning": "Source custody, not native authentication/permission or Acceptance. Actual process/session observation stays explicitly scoped."
+  }
+}
