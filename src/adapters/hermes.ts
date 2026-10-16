@@ -139,7 +139,8 @@ out['ports']=ports(all_containers)
 out['observedAtUtc']=datetime.datetime.now(datetime.timezone.utc).isoformat()
 print(json.dumps(out,indent=2))
 `.replaceAll('__PROFILE__', JSON.stringify(target.profile)).replaceAll('__TARGET__', JSON.stringify(target.gatewayService)).replace('__EXPECTED__', JSON.stringify(JSON.stringify(target.expectedProfiles)));
-  const result = await executeRemotePython(target, operation, source, runDirectory);
+  // Two native probes can each take 25 seconds, in addition to host inventory.
+  const result = await executeRemotePython(target, operation, source, runDirectory, { timeoutMs: 180_000 });
   if (result.exitCode !== 0) throw new Error('Remote native observation failed; inspect saved execution receipt: ' + result.stderr);
   return JSON.parse(result.stdout);
 }

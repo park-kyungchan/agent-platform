@@ -163,8 +163,13 @@ async function saveJson(path: string, value: unknown): Promise<void> {
   finally { await directory.close(); }
 }
 async function remote<T>(target: HermesTarget, operation: string, source: string, runDir: string): Promise<T> {
-  const receipt = await executeRemotePython(target, `backend-${operation}-${randomUUID()}`, source, runDir);
-  if (receipt.exitCode !== 0) throw new Error(`Backend ${operation} failed (exit ${receipt.exitCode}); inspect its saved execution receipt`);
+  // Prepare/deploy jobs run under the native updater's separate jobTimeoutMs.
+  // Only the multi-step owner handoff needs a longer foreground transport budget.
+  const receipt = await executeRemotePython(target, `backend-${operation}-${randomUUID()}`, source, runDir, {
+    timeoutMs: operation === 'gateway-owner-handoff' ? 600_000 : 120_000,
+    maxStdoutBytes: 16 * 1024 * 1024,
+  });
+  if (receipt.exitCode !== 0) throw new Error(`Backend ${operation} transport ${receipt.reason} (exit ${receipt.exitCode}; remote outcome ${receipt.remoteOutcome}); inspect its saved execution receipt; automatic replay prohibited`);
   try { return JSON.parse(receipt.stdout) as T; }
   catch { throw new Error(`Backend ${operation} did not return JSON; inspect its saved execution receipt`); }
 }
