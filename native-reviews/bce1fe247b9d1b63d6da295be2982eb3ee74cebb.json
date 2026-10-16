@@ -1,0 +1,43 @@
+{
+  "schema": "native-independent-review.v2",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+  "reviewedTreeSha": "574f689bac2407145ffc43eab1b04e66061cb871",
+  "reviewedSourceManifestSha256": "5bd879672fbe370c705f3b32dbe11a1afc755eec9f3ac9262abd59013f0cbcfc",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/hermes_delivery_fix_independent_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/hermes_delivery_independent_review"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/fc9617f92ec039c7e718f523caa942be80c33dde/native-review-results/bce1fe247b9d1b63d6da295be2982eb3ee74cebb.json",
+    "sha256": "4f0043dd92d0d8ad7db3ec2890dc6a459b507f53630f7dc828a5437cfab846fd"
+  },
+  "mainReviewReuse": {
+    "originalReviewedHead": "bc2500c301ac10af5c9f2722f5aa2c3f91116d15",
+    "originalObservedAtUtc": "2026-10-16T04:20:44Z",
+    "rootExplicitMerge": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+    "exactTreeIdentical": true,
+    "newReviewExecution": false,
+    "old4dAnd8fbFailuresPreserved": true
+  },
+  "originalCompletedReview": {
+    "commit": "fc9617f92ec039c7e718f523caa942be80c33dde",
+    "path": "native-review-details/bc2500c301ac10af5c9f2722f5aa2c3f91116d15-original.json",
+    "bytes": 23855,
+    "sha256": "d7bc9961de783cd63086868d64ee6549572ca5983d515a645f41ea2ff5447736",
+    "schema": "hermes.new-source-delivery-independent-review.v2",
+    "observedAtUtc": "2026-10-16T04:20:44Z",
+    "meaning": "Byte-exact original bc250 report retained in this result commit tree; original actual review time, head and content unchanged"
+  }
+}
