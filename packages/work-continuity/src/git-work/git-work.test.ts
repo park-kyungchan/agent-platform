@@ -18,6 +18,7 @@ import type {
   LogicalIdentity,
   TaskOperationalState,
   TaskRecord,
+  WorkRecord,
 } from "./types.ts";
 
 const temporaryRoots: string[] = [];
@@ -1261,16 +1262,13 @@ describe("source qualification does not grant startup or native authority", () =
       projectId: "codex-harness-engineering",
       workId: "ontology-driven-harness-operation",
     });
-    for (const taskId of [
-      "GHA-22",
-      "GHA-27",
-      "WSL2-LEAD-HANDOFF",
-      "ACADEMY-ROOT-SOURCE-READ-ONCE1",
-    ]) {
+    // These historical selections also need the active and historical Spec criteria.
+    // Previously omitted criteria made them appear to fit. Keep the actual cap and hold.
+    for (const taskId of ["GHA-22", "GHA-27", "WSL2-LEAD-HANDOFF"]) {
       const result = await readGitWorkContext(reader, { taskId, latestRelevant: "current" });
-      expect(result.holdReasons).toEqual([]);
-      expect(result.status).toBe("source-qualified");
-      expect(result.records.some((row) => row.kind === "task" && row.id === taskId)).toBe(true);
+      expect(result.holdReasons).toEqual(["REQUIRED_CONTEXT_OUTPUT_LIMIT"]);
+      expect(result.status).toBe("held");
+      expect(result.records).toEqual([]);
       expect(JSON.stringify(result).length).toBeLessThanOrEqual(24000);
       expect(result.semanticAcceptanceEstablished).toBe(false);
     }
@@ -1285,6 +1283,9 @@ describe("source qualification does not grant startup or native authority", () =
       taskId: sourceTaskId,
       latestRelevant: "current",
     });
+    expect(context.status).toBe("source-qualified");
+    expect(context.holdReasons).toEqual([]);
+    expect(JSON.stringify(context).length).toBeLessThanOrEqual(24000);
     expect(context.historicalEffects).toMatchObject({
       completedCount: 64,
       uncertainCount: 2,
@@ -1308,5 +1309,350 @@ describe("source qualification does not grant startup or native authority", () =
     expect((await validateGitWorkRecords(replayReader)).findings).toContain(
       "COMPLETED_EFFECT_REPLAY:" + sourceTaskId,
     );
+  });
+});
+
+function boundRecords(): GitWorkRecord[] {
+  const rows = initialRecords();
+  const work = rows.find((row) => row.kind === "work") as WorkRecord;
+  work.continuity = {
+    schema: "common.git-work-continuity.v1",
+    purposeSources: [ref("purpose")],
+    effectInventorySources: [ref("fences")],
+  };
+  rows.push(input("purpose", JSON.parse(JSON.stringify(work.purpose))));
+  const plan = rows.find((row) => row.kind === "plan");
+  if (plan?.kind !== "plan") throw Error("fixture");
+  plan.clauses = ["Read originals before acting", "Never replay consumed effects"];
+  for (const record of rows)
+    if (record.kind === "task") record.nextAction = "Read verified context before proceeding";
+  return rows;
+}
+function addStandaloneEffect(rows: GitWorkRecord[], id: string, status: "completed" | "uncertain") {
+  const producer = task(`producer-${id}`);
+  producer.executionClass = "native-effect";
+  producer.state = { ...state, execution: "running" };
+  producer.runtimeId = "native-fixture";
+  producer.occurrence = { runtimeId: producer.runtimeId, attemptId: id, occurrenceId: id };
+  producer.effectIds = [id];
+  rows.push(
+    producer,
+    input(`observation-${id}`, { observed: id }),
+    {
+      ...base,
+      kind: "evidence",
+      id: `proof-${id}`,
+      evidenceKind: "observation",
+      source: ref(`observation-${id}`),
+    },
+    {
+      ...base,
+      kind: "effect",
+      id,
+      taskId: producer.id,
+      status,
+      occurrence: { ...producer.occurrence },
+      evidenceIds: [`proof-${id}`],
+    },
+  );
+  return producer;
+}
+
+describe("source-addressed normative continuity and consumed effect closure", () => {
+  test("full purpose, Spec criteria and Plan clauses equal their exact addressed fragments", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const reader = await open(root, oid);
+    const context = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    expect(context.status).toBe("source-qualified");
+    expect(context.continuityBinding.coverage).toBe("bound");
+    expect(context.normative.contracts).toHaveLength(4);
+    for (const contract of context.normative.contracts) {
+      const record = context.records.find(
+        (row) => row.kind === contract.kind && row.id === contract.id,
+      );
+      const source = context.sources.find((row) => row.id === contract.source)!;
+      expect(contract.coverage).toBe("complete");
+      for (const [field, fragment] of Object.entries(contract.fields)) {
+        const resolved = await reader.readSource({
+          kind: "snapshot",
+          path: `${reader.workPath}/${source.path}`,
+          fragment,
+        });
+        expect(record![field]).toEqual(resolved.value);
+        expect(source.blobOid).toBe(resolved.blobOid);
+      }
+    }
+    expect(context.continuityBinding.purposeSources).toHaveLength(1);
+    expect(context.continuityBinding.effectInventorySources).toHaveLength(1);
+    expect(context.records.find((row) => row.kind === "task")?.effectIds).toEqual([]);
+    expect(context.authority).toBe("none");
+    expect(context.nativePermissionGranted).toBe(false);
+  });
+  test("legacy Work and objective-only Plans remain explicit rather than inventing bindings", async () => {
+    const { root, oid } = await fixture();
+    const context = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(context.status).toBe("source-qualified");
+    expect(context.continuityBinding.coverage).toBe("legacy-unbound");
+    expect(context.normative.contracts.find((row) => row.kind === "plan")?.coverage).toBe(
+      "legacy-objective-only",
+    );
+    expect(context.normative.contracts.find((row) => row.kind === "task")?.coverage).toBe(
+      "unspecified",
+    );
+    expect(context.records.find((row) => row.kind === "spec")?.criteria).toEqual([
+      "Bounded source closure",
+    ]);
+  });
+  test("bound selected Task requires authored next action with its canonical source pointer", async () => {
+    const rows = boundRecords();
+    delete byTask(rows, "a").nextAction;
+    const { root, oid } = await fixture(rows);
+    const context = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(context.holdReasons).toContain("SELECTED_TASK_NEXT_ACTION_REQUIRED:a");
+    expect(context.normative.contracts.find((row) => row.kind === "task")?.coverage).toBe(
+      "unspecified",
+    );
+  });
+  test.each(["value", "class", "scope", "missing"] as const)(
+    "required purpose provenance holds on %s mismatch",
+    async (variant) => {
+      const rows = boundRecords();
+      const work = rows.find((row) => row.kind === "work") as WorkRecord;
+      const purpose = rows.find(
+        (row) => row.kind === "input" && row.id === "purpose",
+      ) as InputRecord;
+      if (variant === "value") purpose.content = { objective: "Different purpose" };
+      if (variant === "class")
+        work.continuity!.purposeSources = [
+          { kind: "snapshot", path: pathOf("work", scope.workId), fragment: "#/purpose" },
+        ];
+      if (variant === "scope") purpose.projectId = "other";
+      if (variant === "missing") work.continuity!.purposeSources = [ref("absent")];
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      expect((await validateGitWorkRecords(reader)).valid).toBe(false);
+      expect(
+        (await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" })).status,
+      ).toBe("held");
+    },
+  );
+  test.each(["completed", "uncertain"] as const)(
+    "typed inventory requires reachable %s consumed effect",
+    async (status) => {
+      const rows = boundRecords();
+      const work = rows.find((row) => row.kind === "work") as WorkRecord;
+      work.continuity!.effectInventorySources.push(ref("consumed"));
+      rows.push(
+        input("consumed", {
+          completedEffectIds: status === "completed" ? ["lost"] : [],
+          uncertainEffectIds: status === "uncertain" ? ["lost"] : [],
+        }),
+      );
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      for (const result of [
+        await validateGitWorkRecords(reader),
+        await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" }),
+      ]) {
+        const findings = "findings" in result ? result.findings : result.holdReasons;
+        expect(findings).toContain(`CONSUMED_${status.toUpperCase()}_EFFECT_NOT_REACHABLE:lost`);
+      }
+    },
+  );
+  test.each(["completed", "uncertain"] as const)(
+    "pending disconnected %s effect reaches producer/proof and rejects replay",
+    async (status) => {
+      const rows = initialRecords();
+      const producer = addStandaloneEffect(rows, "external-once", status);
+      const consumer = byTask(rows, "a");
+      consumer.executionClass = "native-effect";
+      consumer.pendingEffectIds = ["external-once"];
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      const context = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+      expect(context.holdReasons).toContain("EFFECT_REPLAY_OR_UNCERTAIN:external-once");
+      expect((await validateGitWorkRecords(reader)).findings).toContain(
+        "EFFECT_REPLAY_OR_UNCERTAIN:external-once",
+      );
+      expect(context.records.some((row) => row.kind === "task" && row.id === producer.id)).toBe(
+        true,
+      );
+      expect(
+        context.records.some((row) => row.kind === "evidence" && row.id === "proof-external-once"),
+      ).toBe(true);
+      expect(
+        context.historicalEffects?.[
+          status === "completed" ? "relevantCompletedIds" : "relevantUncertainIds"
+        ],
+      ).toContain("external-once");
+    },
+  );
+  test("consumed inventory reaches standalone effects without pending consumer edges", async () => {
+    const rows = boundRecords();
+    addStandaloneEffect(rows, "recorded-once", "completed");
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    rows.push(input("consumed", { completedEffectIds: ["recorded-once"], uncertainEffectIds: [] }));
+    work.continuity!.effectInventorySources.push(ref("consumed"));
+    const { root, oid } = await fixture(rows);
+    const context = await readGitWorkContext(await open(root, oid), { latestRelevant: "current" });
+    expect(context.status).toBe("source-qualified");
+    expect(context.records.some((row) => row.kind === "effect" && row.id === "recorded-once")).toBe(
+      true,
+    );
+    expect(context.historicalEffects?.completedCount).toBe(2);
+  });
+  test("pending lookup recursively checks newly reached producers and respects required limits", async () => {
+    const rows = initialRecords();
+    const producer = addStandaloneEffect(rows, "outer", "completed");
+    addStandaloneEffect(rows, "inner", "uncertain");
+    producer.pendingEffectIds = ["inner"];
+    const consumer = byTask(rows, "a");
+    consumer.executionClass = "native-effect";
+    consumer.pendingEffectIds = ["outer"];
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const context = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    expect(context.holdReasons).toContain("EFFECT_REPLAY_OR_UNCERTAIN:inner");
+    expect(context.records.some((row) => row.id === "producer-inner")).toBe(true);
+    const limited = await readGitWorkContext(reader, {
+      taskId: "a",
+      latestRelevant: "current",
+      maxRecords: 7,
+    });
+    expect(limited.status).toBe("held");
+    expect(limited.holdReasons).toContain("REQUIRED_CONTEXT_RECORD_LIMIT");
+  });
+  test("fresh pending IDs need no fabricated Effect and unrelated malformed payloads stay unread", async () => {
+    const rows = initialRecords();
+    const consumer = byTask(rows, "a");
+    consumer.executionClass = "native-effect";
+    consumer.pendingEffectIds = ["new-effect"];
+    const { root } = await fixture(rows);
+    await writeFile(join(root, pathOf("effect", "unrelated")), "{broken").catch(async () => {
+      await mkdir(join(root, pathOf("effect", "unrelated"), ".."), { recursive: true });
+      await writeFile(join(root, pathOf("effect", "unrelated")), "{broken");
+    });
+    const reader = await open(root, await commit(root));
+    expect(
+      (await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" })).status,
+    ).toBe("source-qualified");
+    expect((await validateGitWorkRecords(reader)).valid).toBe(false);
+  });
+  test.each(["occurrence", "evidence", "inventory-unavailable"] as const)(
+    "required pending lookup fails closed on %s",
+    async (variant) => {
+      const rows = initialRecords();
+      addStandaloneEffect(rows, "once", "completed");
+      const consumer = byTask(rows, "a");
+      consumer.executionClass = "native-effect";
+      consumer.pendingEffectIds = ["once"];
+      const effect = rows.find((row) => row.kind === "effect");
+      if (effect?.kind !== "effect") throw Error("fixture");
+      if (variant === "occurrence") effect.occurrence.attemptId = "wrong";
+      if (variant === "evidence") effect.evidenceIds = ["missing"];
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      const selected =
+        variant === "inventory-unavailable"
+          ? {
+              ...reader,
+              listRecords: async () => {
+                throw Error("INVENTORY_UNAVAILABLE");
+              },
+            }
+          : reader;
+      const context = await readGitWorkContext(selected, {
+        taskId: "a",
+        latestRelevant: "current",
+      });
+      expect(context.status).toBe("held");
+      expect(
+        context.holdReasons.some((finding) =>
+          finding.includes(
+            variant === "occurrence"
+              ? "EFFECT_TASK_OCCURRENCE_BINDING_MISMATCH"
+              : variant === "evidence"
+                ? "RECORD_DEPENDENCY_MISSING"
+                : "INVENTORY_UNAVAILABLE",
+          ),
+        ),
+      ).toBe(true);
+    },
+  );
+  test.each(["binding", "inventory", "purpose-provenance", "source-bytes"] as const)(
+    "transition protects already bound %s",
+    async (variant) => {
+      const rows = boundRecords();
+      const { root, oid } = await fixture(rows);
+      const before = await open(root, oid);
+      const work = rows.find((row) => row.kind === "work") as WorkRecord;
+      if (variant === "binding") delete work.continuity;
+      if (variant === "inventory") {
+        rows.push(
+          input("other-inventory", {
+            completedEffectIds: ["already"],
+            uncertainEffectIds: ["unknown"],
+          }),
+        );
+        work.continuity!.effectInventorySources = [ref("other-inventory")];
+      }
+      if (variant === "purpose-provenance") {
+        rows.push(input("other-purpose", JSON.parse(JSON.stringify(work.purpose))));
+        work.continuity!.purposeSources = [ref("other-purpose")];
+      }
+      if (variant === "source-bytes") {
+        const original = rows.find(
+          (row) => row.kind === "input" && row.id === "purpose",
+        ) as InputRecord;
+        original.origin.locator = "rewritten-history";
+      }
+      for (const row of rows) await put(root, row);
+      const result = await validateGitWorkTransition(before, await open(root, await commit(root)));
+      const code = {
+        binding: "CONTINUITY_BINDING_REMOVED",
+        inventory: "CONSUMED_INVENTORY_SOURCE_REMOVED",
+        "purpose-provenance": "PURPOSE_PROVENANCE_REMOVED",
+        "source-bytes": "CONTINUITY_SOURCE_HISTORY_CHANGED",
+      }[variant];
+      expect(result.findings).toContain(code);
+    },
+  );
+  test("explicit purpose successor can evolve current purpose while preserving original source bytes", async () => {
+    const rows = boundRecords();
+    const { root, oid } = await fixture(rows);
+    const before = await open(root, oid);
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.purpose.objective = "Authorized successor purpose";
+    work.continuity!.purposeSources = [ref("purpose-successor")];
+    await put(root, input("purpose-successor", JSON.parse(JSON.stringify(work.purpose))));
+    await put(root, work);
+    const after = await open(root, await commit(root));
+    expect((await validateGitWorkTransition(before, after)).findings).toEqual([]);
+    expect((await before.readSource(ref("purpose"))).sha256).toBe(
+      (await after.readSource(ref("purpose"))).sha256,
+    );
+  });
+  test("required output overflow holds without dropping normative clauses or exposing raw originals", async () => {
+    const rows = boundRecords();
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const context = await readGitWorkContext(reader, {
+      taskId: "a",
+      latestRelevant: "current",
+      maxChars: 1024,
+    });
+    expect(context.holdReasons).toEqual(["REQUIRED_CONTEXT_OUTPUT_LIMIT"]);
+    expect(context.normative.contracts).toEqual([]);
+    expect(context.continuityBinding.coverage).toBe("unavailable");
+    expect(JSON.stringify(context).length).toBeLessThanOrEqual(1024);
+    const full = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    expect(full.records.find((row) => row.kind === "decision")?.answer).toBeUndefined();
+    expect(full.records.find((row) => row.kind === "input")?.content).toBeUndefined();
   });
 });

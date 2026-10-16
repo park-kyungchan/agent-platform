@@ -49,6 +49,14 @@ export interface WorkRecord extends RecordBase {
   plan: { id: string; revision: number };
   governingDecisionIds: string[];
   historicalFenceIds: string[];
+  /** Explicit source bindings; omitted on historical records, never inferred from prose. */
+  continuity?: {
+    schema: "common.git-work-continuity.v1";
+    /** Each selected Input fragment contains this exact current typed purpose. */
+    purposeSources: SourceReference[];
+    /** Each selected fragment is a complete consumed-effect inventory. */
+    effectInventorySources: SourceReference[];
+  };
 }
 export interface SpecRecord extends RecordBase {
   kind: "spec";
@@ -62,6 +70,8 @@ export interface PlanRecord extends RecordBase {
   specId: string;
   specRevision: number;
   objective: string;
+  /** Absent on historical objective-only Plans. New clauses require a new Plan revision. */
+  clauses?: string[];
 }
 export interface InputRecord extends RecordBase {
   kind: "input";
@@ -99,6 +109,8 @@ export interface TaskRecord extends RecordBase {
   kind: "task";
   logical: LogicalIdentity;
   title: string;
+  /** Authored recovery instruction, never inferred from title or execution state. */
+  nextAction?: string;
   state: TaskOperationalState;
   executionClass: "source-only" | "native-effect";
   dependsOn: TaskDependency[];
@@ -237,6 +249,42 @@ export interface ContextSourceProjection {
   declaredNativeSource?: Readonly<NativeSource>;
   nativeAuthorshipVerified?: false;
 }
+interface NormativeContextSourceBase {
+  id: string;
+  /** Source ID addresses the complete canonical record; fields are exact JSON pointers. */
+  source: string;
+}
+export type NormativeContextSource = NormativeContextSourceBase &
+  (
+    | { kind: "work"; fields: { purpose: "#/purpose" }; coverage: "complete" }
+    | {
+        kind: "spec";
+        revision: number;
+        fields: { outcome: "#/outcome"; criteria: "#/criteria" };
+        coverage: "complete";
+      }
+    | {
+        kind: "plan";
+        revision: number;
+        fields: { objective: "#/objective"; clauses?: "#/clauses" };
+        coverage: "complete" | "legacy-objective-only";
+      }
+    | {
+        kind: "task";
+        fields: { nextAction?: "#/nextAction" };
+        coverage: "complete" | "unspecified";
+      }
+  );
+export interface GitWorkNormativeContext {
+  schema: "common.git-work-context.normative.v1";
+  contracts: NormativeContextSource[];
+}
+export interface GitWorkContinuityBinding {
+  schema: "common.git-work-context.continuity.v1";
+  coverage: "bound" | "legacy-unbound" | "unavailable";
+  purposeSources: string[];
+  effectInventorySources: string[];
+}
 export interface GitWorkContext {
   status: "source-qualified" | "held";
   repositoryId: string;
@@ -249,6 +297,9 @@ export interface GitWorkContext {
   sourcePathBase: string;
   holdReasons: string[];
   omittedRecords: number;
+  /** Required values remain in records, addressed through these pooled exact Git sources. */
+  normative: GitWorkNormativeContext;
+  continuityBinding: GitWorkContinuityBinding;
   historicalEffects?: {
     completedCount: number;
     uncertainCount: number;

@@ -1,6 +1,7 @@
-import { assertCommit } from "./source.ts";
+import { assertCommit, gitRecordPath } from "./source.ts";
 import {
   dependencyFindings,
+  effectInventory,
   loadRecords,
   outcome,
   recordDependencies,
@@ -15,6 +16,7 @@ import type {
   GitWorkReader,
   GitWorkRecord,
   JsonValue,
+  NormativeContextSource,
   RecordReference,
   ResolvedSource,
   SourceReference,
@@ -42,6 +44,18 @@ export async function readGitWorkContext(
   const records = new Map<string, GitWorkRecord>(),
     holdReasons: string[] = [],
     sources: ResolvedSource[] = [];
+  const normativeSources = new Map<string, ResolvedSource>();
+  let existingEffects: Set<string> | undefined;
+  // Inventory only canonical tree addresses; unrelated payloads remain unread.
+  const queueExistingEffects = async (ids: string[]) => {
+    if (!ids.length) return;
+    existingEffects ??= new Set(
+      (await reader.listRecords())
+        .filter((reference) => reference.kind === "effect")
+        .map((reference) => reference.id),
+    );
+    for (const id of ids) if (existingEffects.has(id)) queue.push({ kind: "effect", id });
+  };
   const queue: RecordReference[] = [{ kind: "work", id: reader.selection.workId }];
   if (request.taskId) queue.push({ kind: "task", id: request.taskId });
   if (request.decisionId) queue.push({ kind: "decision", id: request.decisionId });
@@ -61,9 +75,27 @@ export async function readGitWorkContext(
       const record = await reader.readRecord(reference);
       records.set(key, record);
       queue.push(...recordDependencies(record));
-      for (const source of await validateRecordSources(record, reader)) {
+      const resolved = await validateRecordSources(record, reader);
+      for (const source of resolved) {
         sources.push(source);
       }
+      if (["work", "spec", "plan", "task"].includes(record.kind)) {
+        const source = await reader.readSource({
+          kind: "snapshot",
+          path: gitRecordPath(reader.selection.projectId, reader.selection.workId, reference),
+        });
+        normativeSources.set(key, source);
+        sources.push(source);
+      }
+      if (record.kind === "task") await queueExistingEffects(record.pendingEffectIds ?? []);
+      if (record.kind === "work" && record.continuity)
+        for (const reference of record.continuity.effectInventorySources) {
+          const inventory = effectInventory((await reader.readSource(reference)).value);
+          await queueExistingEffects([
+            ...inventory.completedEffectIds,
+            ...inventory.uncertainEffectIds,
+          ]);
+        }
     } catch (error) {
       holdReasons.push(
         `${error instanceof Error ? error.message : "REQUIRED_SOURCE_UNAVAILABLE"}:${key}`,
@@ -73,22 +105,34 @@ export async function readGitWorkContext(
   holdReasons.push(...(await validateRecordSet(records, reader)).findings);
   if (request.taskId) {
     const selected = records.get(recordKey({ kind: "task", id: request.taskId }));
-    if (selected?.kind === "task")
+    if (selected?.kind === "task") {
+      if (reader.work.continuity && selected.nextAction === undefined)
+        holdReasons.push(`SELECTED_TASK_NEXT_ACTION_REQUIRED:${selected.id}`);
       for (const dependency of selected.dependsOn)
         holdReasons.push(...(await dependencyFindings(selected, dependency, records, reader)));
+    }
   }
   if (request.latestRelevant !== "current")
     holdReasons.push(`REQUIRED_LATEST_CONTEXT_${request.latestRelevant.toUpperCase()}`);
   const fences = [...records.values()].filter((record) => record.kind === "effect-fence");
-  const completed = new Set(fences.flatMap((record) => record.completedEffectIds)),
-    uncertain = new Set(fences.flatMap((record) => record.uncertainEffectIds));
-  const selected = request.taskId
-    ? records.get(recordKey({ kind: "task", id: request.taskId }))
-    : undefined;
-  const relevantIds =
-    selected?.kind === "task"
-      ? [selected.id, ...selected.effectIds, ...(selected.pendingEffectIds ?? [])]
-      : [];
+  const effects = [...records.values()].filter((record) => record.kind === "effect");
+  const completed = new Set([
+      ...fences.flatMap((record) => record.completedEffectIds),
+      ...effects.filter((record) => record.status === "completed").map((record) => record.id),
+    ]),
+    uncertain = new Set([
+      ...fences.flatMap((record) => record.uncertainEffectIds),
+      ...effects.filter((record) => record.status === "uncertain").map((record) => record.id),
+    ]);
+  const relevantIds = [
+    ...new Set(
+      [...records.values()].flatMap((record) =>
+        record.kind === "task"
+          ? [record.id, ...record.effectIds, ...(record.pendingEffectIds ?? [])]
+          : [],
+      ),
+    ),
+  ];
   // Blob identity alone cannot represent distinct original owner declarations.
   const sourceKey = (reference: SourceReference): string => {
     const original = reference.kind === "native" ? reference.receipt : reference;
@@ -143,10 +187,12 @@ export async function readGitWorkContext(
         projected.push({
           ...base,
           title: record.title,
+          ...(record.nextAction === undefined ? {} : { nextAction: record.nextAction }),
           executionClass: record.executionClass,
           logical: json(record.logical),
           state: json(record.state),
           dependsOn: json(record.dependsOn),
+          effectIds: record.effectIds,
           ...(record.artifact?.kind === "task"
             ? { acceptanceCriteria: record.artifact.payload.acceptanceCriteria }
             : {}),
@@ -154,10 +200,20 @@ export async function readGitWorkContext(
         });
         break;
       case "spec":
-        projected.push({ ...base, revision: record.revision, outcome: record.outcome });
+        projected.push({
+          ...base,
+          revision: record.revision,
+          outcome: record.outcome,
+          criteria: record.criteria,
+        });
         break;
       case "plan":
-        projected.push({ ...base, revision: record.revision, objective: record.objective });
+        projected.push({
+          ...base,
+          revision: record.revision,
+          objective: record.objective,
+          ...(record.clauses ? { clauses: record.clauses } : {}),
+        });
         break;
       case "evidence":
         projected.push({
@@ -175,6 +231,44 @@ export async function readGitWorkContext(
         break;
     }
   }
+  const contracts: NormativeContextSource[] = [];
+  for (const [key, source] of normativeSources) {
+    const record = records.get(key)!;
+    const base = { id: record.id, source: sourceId(source.reference)! };
+    if (record.kind === "work")
+      contracts.push({
+        ...base,
+        kind: "work",
+        fields: { purpose: "#/purpose" },
+        coverage: "complete",
+      });
+    if (record.kind === "spec")
+      contracts.push({
+        ...base,
+        kind: "spec",
+        revision: record.revision,
+        fields: { outcome: "#/outcome", criteria: "#/criteria" },
+        coverage: "complete",
+      });
+    if (record.kind === "plan")
+      contracts.push({
+        ...base,
+        kind: "plan",
+        revision: record.revision,
+        fields: { objective: "#/objective", ...(record.clauses ? { clauses: "#/clauses" } : {}) },
+        coverage: record.clauses ? "complete" : "legacy-objective-only",
+      });
+    if (record.kind === "task")
+      contracts.push({
+        ...base,
+        kind: "task",
+        fields: record.nextAction === undefined ? {} : { nextAction: "#/nextAction" },
+        coverage: record.nextAction === undefined ? "unspecified" : "complete",
+      });
+  }
+  const binding = reader.work.continuity;
+  const purposeSources = (binding?.purposeSources ?? []).map(sourceId);
+  const effectInventorySources = (binding?.effectInventorySources ?? []).map(sourceId);
   const result: GitWorkContext = {
     status: holdReasons.length ? "held" : "source-qualified",
     repositoryId: reader.selection.repositoryId,
@@ -203,6 +297,17 @@ export async function readGitWorkContext(
     sourcePathBase: reader.workPath,
     holdReasons: [...new Set(holdReasons)],
     omittedRecords,
+    normative: { schema: "common.git-work-context.normative.v1", contracts },
+    continuityBinding: {
+      schema: "common.git-work-context.continuity.v1",
+      coverage: !binding
+        ? "legacy-unbound"
+        : [...purposeSources, ...effectInventorySources].includes(null)
+          ? "unavailable"
+          : "bound",
+      purposeSources: purposeSources.filter((id): id is string => id !== null),
+      effectInventorySources: effectInventorySources.filter((id): id is string => id !== null),
+    },
     historicalEffects: {
       completedCount: completed.size,
       uncertainCount: uncertain.size,
@@ -221,6 +326,13 @@ export async function readGitWorkContext(
       records: [],
       sources: [],
       historicalEffects: undefined,
+      normative: { schema: "common.git-work-context.normative.v1", contracts: [] },
+      continuityBinding: {
+        schema: "common.git-work-context.continuity.v1",
+        coverage: "unavailable",
+        purposeSources: [],
+        effectInventorySources: [],
+      },
       holdReasons: ["REQUIRED_CONTEXT_OUTPUT_LIMIT"],
       omittedRecords: records.size + omittedRecords,
     };

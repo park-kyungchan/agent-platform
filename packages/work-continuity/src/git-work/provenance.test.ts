@@ -201,7 +201,8 @@ test("context preserves snapshot/native owners/locators separately and reuses id
     latestRelevant: "current",
   });
   expect(context.status).toBe("source-qualified");
-  expect(context.sources).toHaveLength(4);
+  // Four original declarations plus canonical Work/Spec/Plan/Task addresses.
+  expect(context.sources).toHaveLength(8);
   const projected = new Map(
     context.records
       .filter((record) => record.kind === "evidence")
@@ -212,7 +213,13 @@ test("context preserves snapshot/native owners/locators separately and reuses id
   );
   expect(new Set(sourceIds).size).toBe(4);
   expect(projected.get("owner-a-repeat")).toBe(projected.get("owner-a"));
-  expect(new Set(context.sources.map((source) => source.blobOid)).size).toBe(1);
+  expect(
+    new Set(
+      context.sources
+        .filter((source) => sourceIds.includes(source.id))
+        .map((source) => source.blobOid),
+    ).size,
+  ).toBe(1);
   const rows = new Map(context.sources.map((source) => [source.id, source]));
   expect(rows.get(String(projected.get("snapshot")))!.declaredNativeSource).toBeUndefined();
   for (const [id, declaration] of declarations.filter(([, source]) => source.kind === "native")) {

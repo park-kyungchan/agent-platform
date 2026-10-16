@@ -44,7 +44,7 @@ export async function verifyCommonWork(repositoryRoot: string, commit = "HEAD") 
       "Original actual-decision/effect-fence baseline changed without its required source successor",
     );
   const context = await readGitWorkContext(reader, {
-    taskId: "GHA-22",
+    taskId: "ACADEMY-ROOT-SOURCE-READ-ONCE1",
     latestRelevant: "current",
     maxChars: 24_000,
     maxRecords: 128,
@@ -55,6 +55,21 @@ export async function verifyCommonWork(repositoryRoot: string, commit = "HEAD") 
     context.nativePermissionGranted !== false
   )
     throw Error("Delivered common Work context failed: " + context.holdReasons.join("; "));
+  // Full active plus historical Spec criteria exceed the cap for this older selection.
+  // Verify the hold instead of dropping normative clauses to recover the old fit.
+  const oversizedContext = await readGitWorkContext(reader, {
+    taskId: "GHA-22",
+    latestRelevant: "current",
+    maxChars: 24_000,
+    maxRecords: 128,
+  });
+  if (
+    oversizedContext.status !== "held" ||
+    oversizedContext.records.length !== 0 ||
+    oversizedContext.holdReasons.length !== 1 ||
+    oversizedContext.holdReasons[0] !== "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+  )
+    throw Error("Oversized historical normative context did not hold");
   const registry = await reader.readSource({
     kind: "snapshot",
     path: "architecture/runtime-documentation-routing/registry.json",
@@ -152,6 +167,7 @@ export async function verifyCommonWork(repositoryRoot: string, commit = "HEAD") 
     uncertainHistoricalEffects: 2,
     contextRecords: context.records.length,
     contextSources: context.sources.length,
+    oversizedHistoricalContextHeld: true,
     runtimeDocumentationRoutes: documentation.registry.routes.length,
     comparisonBaseCommit: beforeCommit ?? null,
     transitionValidated,
