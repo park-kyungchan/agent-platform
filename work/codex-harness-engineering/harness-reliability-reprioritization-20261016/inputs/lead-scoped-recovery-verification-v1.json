@@ -1,0 +1,68 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "lead-scoped-recovery-verification-v1",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-11",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.retained-source-artifact.v1",
+    "originalBytes": 2372,
+    "originalSha256": "ef2b94d93e68c30401daa94d2b6713a3b63b73ff50aca6aa4a64f44edc0b9e4d",
+    "report": {
+      "schema": "hrr.lead-scoped-recovery-verification.v1",
+      "observedAtUtc": "2026-10-16T13:40:39.296241Z",
+      "scope": "Actual ordinary-engineering useful Task interrupted between phases and recovered in a NEW native session through canonical Git sources",
+      "logical": {
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "harness-reliability-reprioritization-20261016",
+        "issueId": "HRR-ISSUE-20261016",
+        "specId": "HRR-SPEC",
+        "specRevision": 1,
+        "planId": "HRR-PLAN",
+        "planRevision": 2,
+        "taskId": "HRR-RECOVERY-SOURCE-REVIEW"
+      },
+      "result": "pass-for-scoped-recovery; useful independent review completed with one source blocker",
+      "criteria": {
+        "ownedOldSessionExited": true,
+        "differentFreshNativeSessionObserved": true,
+        "samePlan2LogicalTaskRecovered": true,
+        "fullPurposeAndScopeRecovered": true,
+        "fiveOriginalAnswerQuestionValuesRecovered": true,
+        "completed68Uncertain3FencesPreserved": true,
+        "authoredNextActionRecovered": true,
+        "genuineDelegatedResultOriginal13305BytesHashRecovered": true,
+        "usefulIndependentReviewCompleted": true,
+        "completedOrUncertainReplay": false
+      },
+      "oldNativeThread": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+      "newNativeThread": "01a144db-2ddf-7990-9fba-3a175265e424",
+      "ownedNewNativePid": 644911,
+      "processObservationSha256": "bebf7324b4b975970526c90b3fb597eac78361f2a8344dcb75ed7e021988f092",
+      "reviewResult": {
+        "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-recovery/recovered-source-review.json",
+        "head": "c04ae1c8c3e3f443ce04e9ffbeed900f9bd21eb7",
+        "tree": "7ab2c6f34d227f202ecc9cda2341385017dc3d86",
+        "sha256": "95dc42c0b977653f2343fecaec86580af3cfe4c5b49fb9fdd3f54f1e27b4ea61",
+        "conclusion": "hold",
+        "unresolvedFindings": 1
+      },
+      "sourcePublicationReadiness": "held until HRR-RECOVERY-P2-DUPLICATE-DECISION correction/current exact review/checks",
+      "nativeHookOrV2InjectionQualification": false,
+      "nativeActivation": false,
+      "evaluationSuiteRun": false,
+      "wholeWorkComplete": false,
+      "formalAcceptanceDecision": null,
+      "meaning": "Lead verified observed session boundary and immutable receiver evidence. This is technical engineering recovery verification, not fabricated human satisfaction, native-hook admission or whole-Work Acceptance."
+    },
+    "meaning": "Immutable source custody; actual session/dispatch/output correlation and scoped technical verification are separately stated. No native-hook permission or whole-Work Acceptance."
+  }
+}

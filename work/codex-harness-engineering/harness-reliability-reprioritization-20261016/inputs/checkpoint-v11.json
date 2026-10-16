@@ -1,0 +1,267 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "checkpoint-v11",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-11",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "harness.successor-continuity.v1",
+    "version": 11,
+    "updatedAtUtc": "2026-10-16T13:47:05.925161Z",
+    "logicalWork": {
+      "schema": "common.git-work.v1",
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "harness-reliability-reprioritization-20261016"
+    },
+    "nativeGoalThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+    "goalStatus": "active; new successor only",
+    "phase": "actual-NEW-session-recovery-verified-one-combined-source-regression-correcting",
+    "plan": [
+      {
+        "step": "Bind original interview decisions, successor lineage, historical fences and fresh main start",
+        "status": "completed"
+      },
+      {
+        "step": "Implement A and independent B owner source fixes with isolated worktrees and useful Herdr panes",
+        "status": "completed"
+      },
+      {
+        "step": "Exact source/transition/provider checks and independent immutable review",
+        "status": "in_progress"
+      },
+      {
+        "step": "Authenticated evidence publication, PR and explicit current expected-head Lead integration",
+        "status": "pending"
+      },
+      {
+        "step": "Actual ordinary-engineering NEW-session recovery first; native hook admission/activation remain separate current gates",
+        "status": "pending"
+      },
+      {
+        "step": "Separate Acceptance; then discuss independent month-end integration",
+        "status": "pending"
+      }
+    ],
+    "runtime": {
+      "server": "srv1873899-herdr",
+      "leadPane": "w3:pJ",
+      "leadTab": "w3:t6",
+      "nativeVersion": "0.163.0",
+      "reasoningEffort": "ultra: current user selected; startup argv high is historical initial selection",
+      "herdrVersion": "0.9.5",
+      "planTool": "not available; bounded source-owned plan retained"
+    },
+    "delegations": [
+      {
+        "id": "hrr-codex",
+        "runtime": "native-Codex-CLI",
+        "pane": "w3:pM",
+        "tab": "w3:t6",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-codex-candidate-20261016",
+        "scope": "HRR-B-CODEX-CANDIDATE",
+        "state": "originalcandidate/proposal/prepare/activationheld; separateuserPR32reviewfinishedNOTMERGED/P2, noHarnessresume",
+        "historicalOriginPath": ".private/hrr-task-result.json in original writer worktree",
+        "resultSource": {
+          "evidenceId": "HRR-CODEX-CANDIDATE-RETAINED-RESULT",
+          "source": {
+            "kind": "git",
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "0febc8f76276b2faaeb01ae25e8828f62648d869",
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-candidate-source-result-1033d6f.json",
+            "fragment": "#/content/sourceResult",
+            "sha256": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5"
+          },
+          "blobOid": "0eba05ad0161a2cbfa1ca92b8a95bc5ffbae1539",
+          "retainedInputSha256": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5",
+          "originalResultSha256": "40347d0812b7e2d00623ee737769f1c0b2e6d586854bc0f386291bdbbfad2dae",
+          "producerTaskId": "HRR-B-CODEX-CANDIDATE",
+          "producerNativeThreadId": "01a1442e-0df2-73e2-ac18-1d3bb2634e5f",
+          "codeCommit": "1033d6ff417f403e6dc05b003e42df58a947ea9e",
+          "codeTree": "89e3f97df1675108ea797369c4eda151894f0ffe",
+          "nativeAuthorshipVerified": false,
+          "receiptMeaning": "Root readback/source custody only; native authentication, shared publication and Acceptance remain separate.",
+          "sourceOnlyRouting": "Canonical checkpoint typedSource + authored Task.nextAction exactimmutableSource; source-only Task never claims native executionEvidence."
+        }
+      },
+      {
+        "id": "hrr-review",
+        "runtime": "native-Codex-CLI",
+        "pane": "w3:pN",
+        "scope": "Independent immutable source review; no writes/effects",
+        "state": "actualownedCLIendedaftermidpoint; NEWreceivernotyetstarted; taskincomplete"
+      }
+    ],
+    "effects": {
+      "historicalFence": "fences/predecessor-effects.json",
+      "completedCount": 68,
+      "uncertainCount": 3,
+      "newNativeEffects": [
+        {
+          "classification": "source-observed owned engineering session lifecycle only",
+          "kind": "owned-native-session-end",
+          "nativeThread": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+          "source": {
+            "kind": "snapshot",
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/native-recovery-owned-exit-v1.json",
+            "fragment": "#/content/observation"
+          },
+          "domainEffectOrEvaluationDispatch": false
+        },
+        {
+          "classification": "source-observed owned ordinary-engineering session lifecycle only",
+          "kind": "NEW-native-session-start-and-source-task-recovery",
+          "nativeThread": "01a144db-2ddf-7990-9fba-3a175265e424",
+          "source": {
+            "kind": "snapshot",
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-process-v1.json",
+            "fragment": "#/content/observation"
+          },
+          "domainEffectOrEvaluationDispatch": false
+        }
+      ],
+      "replayPolicy": "never replay historical completed/consumed/uncertain occurrence"
+    },
+    "holds": [
+      "No fresh model-qualification suite budget.",
+      "Native trust/config/activation needs exact reviewed current owner gate.",
+      "Source-ready does not establish native consumption or acceptance.",
+      "Source owner explicitv2 delivery policy12000chars approved for implementation from actual8297/8411+lineage8728 measurement; v1default6000 preserved; native support/admission/activation and model suite budgets remain separately unqualified/held.",
+      "Finalcombined independent review/authenticatedsourcepublication/PR/expectedheadmerge stillpending; ordinary engineering recovery is distinct from hook/nativeactivation qualification."
+    ],
+    "acceptanceDecision": null,
+    "nextSafeAction": "Finish exacte6fc703 independentfixreview; serialize reviewedhooks/test and exactregistry/newnativeproviderpin ccef483 in isolatedowners, preservingthirdstate. Runrequired affectedsource/ownerchecks+freshcombinedtree review. RetainactualRecoveryproof; onlythenauthenticatedsourcepublication/PR/explicitexpectedheadmerge. Originalcandidate/v2proposal/preparation/activation/freshsuitebudgetholdsremain; oldGoal/WSL/consumedonceeffects neverresume/replay.",
+    "componentCommits": {
+      "commonNormative": "f642938/tree de0532a209c9103cc0a66cfdf5e6b74cba33f91d; independent0findings; Root aliases07ac026+5a186f3+9326197+6063e65",
+      "prospectiveHome": "7bd9a2d; canonical validator retained in8563/Rootc5a304f",
+      "codexContext": "8563fefe3ae7d62458e74a5debf03a8c04cbe7bf; Rootc5a304f byte-exact; finalcombinedreviewpending",
+      "HermesContext": "250344d+c5c67dc; Roota703b9a+dd49f8e byte-exact; finalcombinedreviewpending",
+      "codexCandidate": "1033d6ff417f403e6dc05b003e42df58a947ea9e; sourceonly3P2fixed; actualprepare/activationheld",
+      "codexOwnerPins": "ccef48306f1a3149ba6587ca61cc680c53da329c/treed0a343edb1b1f9707eb312d977bcfda617bf92c2 proposednewhooksSHA/marker; independentownerQAongoing; Rootcommonpatchnotyetintegrated",
+      "vpsDiagnostics": "4943f05702433042c73ea609e39599e3c4d0fea8/treeb4e872663afa0f39b1ccf28d0ae5dc0d81bc13bb; independent0; noremoteeffects",
+      "rootCompositionBeforeCheckpoint": "187b6cda6bd92528a92015a5bd9e56eb00fd878b/tree8519840b09a910fcc96d0cce2de2d69402f2e663; registry12updated+2new; package/lock/projectunchanged; finalchecks/reviewpending",
+      "codexDecisionFix": "e6fc703e0e676d13e7db213b95a091d0ac4a3321/tree008adb175a9c45a8be14d5e89e8207c46607af8b twofiles; 66tests569assert/39handoff/sourcechecksPASS; freshnativeindependentreviewpending"
+    },
+    "currentFindings": [
+      {
+        "id": "HRR-RECOVERY-P2-DUPLICATE-DECISION",
+        "state": "unresolved at c04; isolatede6fc703 sourcefix under exactindependentreview",
+        "path": "packages/native-codex-adapter/src/native/hooks.ts:578",
+        "meaning": "valid Task+alreadyassociatedexplicitDecision repeatsID, commonuniqueprojection holds; ownernormalizationmustdedupwithoutdroppingdistinctoriginals"
+      }
+    ],
+    "nativeIdentityObservation": {
+      "ownNamedCODEX_THREAD_ID": "01a14419-af50-72d3-b918-cc32a50a1913",
+      "nativeGoalThreadMatches": true,
+      "ownHerdrAgent": "harness-lead/w3:pJ",
+      "reviewerNamedSelfObservation": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+      "meaning": "Own nativeGoal/namedvariable+ownedHerdrdispatch/output correlation; Git alone does not authenticate."
+    },
+    "sourceReportRoutes": [],
+    "sourceFindingDisposition": "Prior A/privacy/lineage/replay/custody issues closed for exact artifacts. Actual recovered combined c04 review is complete/HOLD with newdecisioncombinationP2; zero-finding publication blocked until correctedcombinedreview.",
+    "consumedMetadataRoute": {
+      "source": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json",
+        "fragment": "#/content"
+      },
+      "inputSha256": "0c1998291c59968cb9d05d1d7cb946864921bf06ab8e850e5b95048c6e0a5c32",
+      "blobOid": "eb98c159f756f3334f43b1366e6adc0b2947a773",
+      "meaning": "Two originalconsumedactions linked through Work.continuity; fourRPC methods/receipts/markers plus dependencyrepair2moves retained. Originalnativeauth/bookkeepingUNKNOWN; no replay/newnativeTask."
+    },
+    "realRecoveryTask": {
+      "taskId": "HRR-RECOVERY-SOURCE-REVIEW",
+      "logicalPlanRevision": 2,
+      "mode": "ordinary engineering manual canonical-reader consumption, no hook/admission/eval claim",
+      "oldNativeThread": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+      "newNativeThread": "01a144db-2ddf-7990-9fba-3a175265e424",
+      "oldNativePid": 470905,
+      "newNativePid": 644911,
+      "state": "actualsource recovery/useful independent reviewCOMPLETE for c04; source readinessHOLDoneP2",
+      "process": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-process-v1.json",
+          "fragment": "#/content/observation"
+        },
+        "inputSha256": "634f66297b8be424f90bd05e3990ac0e1be2fb75bed2a81d5c6e51c89da43e10",
+        "originalSha256": "bebf7324b4b975970526c90b3fb597eac78361f2a8344dcb75ed7e021988f092"
+      },
+      "readback": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-readback-v1.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "3ff90a662dde1fc88ef87e8914375e3f6dcb810428ca93e5b6e131618995f741",
+        "originalSha256": "b30269b59174ae4fbfae3107af3651a450063361c57d780d939d537194a1d7b1"
+      },
+      "review": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-review-c04.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "a747670b887a55f20a4aa823895d5c5f8fe905ed0a379345d0e9a0bf5845d665",
+        "originalSha256": "95dc42c0b977653f2343fecaec86580af3cfe4c5b49fb9fdd3f54f1e27b4ea61"
+      },
+      "leadScopedVerification": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/lead-scoped-recovery-verification-v1.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "1755f9c6bf820ed43ebddedbc8462c1db761cead2a8442379fd92e97330c8822",
+        "originalSha256": "ef2b94d93e68c30401daa94d2b6713a3b63b73ff50aca6aa4a64f44edc0b9e4d"
+      },
+      "technicalCriteria": "ownedoldCLIactuallyended; NEWnativeidentity confirmed; samePlan2Task/purpose/all5originalQAs/68+3fullfences/2consumedactions/nextAction/genuine13305byte40347dresult recovered; useful exactsource review complete",
+      "formalAcceptance": "null; technicalengineering recovery proof only, not nativev2hook/1500tokenadmission, activation or wholeWork"
+    },
+    "currentQa": {
+      "root": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/root-qa-2e64.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "516edab30f8b22a9124b0b0c499decb368987668eb7718664a569c27eea5a19e",
+        "originalSha256": "2e70af2e8a7be42dffc4b7b174fc5973841172347ee578f848d1152dde60a381",
+        "originalBytes": 4005
+      },
+      "result": "source713pass/7existingSkip/0fail; qualityall14checksPASS; own selectedWorkvalidate/transitionPASS",
+      "codeSnapshot": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a/treec0ddfc2572ab7679a05ef22a8ffb0212b5301276",
+      "nativeModelCalls": 0,
+      "meaning": "No sourcecode changes after these checks; later source-owned continuity additions require exact transition/readback/current combinedreview."
+    },
+    "finalDataMeasurements": {
+      "codex": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-final-data-2e64.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "3af828c2f853c5f204bd2bcecdb6d0bd5e3c58c7fca7685520c1360a07eaa268",
+        "originalSha256": "d79c0407298717fe97105ba8ed0d426fed0e998ed33cdd9fd71596a4fe09852f",
+        "originalBytes": 15915
+      },
+      "hermes": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/hermes-final-data-2e64.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "90325a4902cc86c636ae294b3d38c2293d6ba0903268721462c49e59867686bd",
+        "originalSha256": "0f5db84a87b9fdb05f89bbe6cceca7820df1cf94b34ad59ec65be5e4f87b5455",
+        "originalBytes": 19292
+      },
+      "meaning": "Fictional SOURCE-only completev2 orwholehold; actualnative1500/globalHome/admission/activation unqualified."
+    }
+  }
+}
