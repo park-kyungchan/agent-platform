@@ -1,0 +1,358 @@
+{
+  "schema": "harness.checkpoint-v8-six-file-successor-independent-source-review.v1",
+  "recordClass": "NewIndependentSourceSuccessorReview",
+  "reviewer": "/root/checkpoint_v8_independent_review",
+  "startedAtUtc": "2026-10-16T06:26:59.547Z",
+  "completedAtUtc": "2026-10-16T06:27:14.044Z",
+  "reviewed": {
+    "repository": "park-kyungchan/agent-platform",
+    "baseline": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+    "commit": "6c377521b9e1cae74e4db1d13f5a142e8e4047fc",
+    "tree": "1131d8f61782a3978d1e5f07b66836d0a748a05b",
+    "worktree": "/home/palantirkc/code/worktrees/harness-checkpoint-v8-20261016",
+    "trackedClean": true,
+    "sourceDeltaFiles": 6
+  },
+  "priorReview": {
+    "path": "/tmp/checkpoint-v8-953992-independent-review-20261016.json",
+    "sha256": "f5b808c1c2fb819fd5ea5173d648b1bd282fb8287a221245f45d2e4d4b21181b",
+    "commit": "953992a8158676811fe6c05084e3a5f888a2a165",
+    "tree": "6ff7643437ffd050fa6696e21525a000abd5b9ce",
+    "scope": "Original five-file checkpoint/fence source closure only; independently rechecked byte identity and semantic invariants for this new six-file source review",
+    "identicalTreeReuse": false,
+    "fullSuccessorReviewNewlyPerformed": true
+  },
+  "delta": [
+    {
+      "status": "M",
+      "path": "packages/work-continuity/src/git-work/git-work.test.ts",
+      "bytes": 51379,
+      "sha256": "3072b66103da0c50b6324fad800966d4aa083e68c100843767094bc9bf5f294d"
+    },
+    {
+      "status": "A",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/fences/p1-once1-20261016.json",
+      "bytes": 502,
+      "sha256": "a6d1fbf2efaee24dc2de2f2c90bac800fc0eea95cd1a295e4ff1a841b846b943"
+    },
+    {
+      "status": "A",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v8.json",
+      "bytes": 16797,
+      "sha256": "02feb7e206b4d7328e979073ab7936e2ac0a4934431d11411f732721f362aa82"
+    },
+    {
+      "status": "A",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/p1-once1-20261016.json",
+      "bytes": 2419,
+      "sha256": "e88655ac51954b37aeafb53ac947fe0e41e78e7c5d4bd66c6a4ca4b4089e8868"
+    },
+    {
+      "status": "A",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/work-purpose-compaction-provenance-20261016-v8.json",
+      "bytes": 3611,
+      "sha256": "edba14fa445b1f672a0ac56bd36dd514a778177d14b3f8813c4bf12f9ba77e19"
+    },
+    {
+      "status": "M",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json",
+      "bytes": 3006,
+      "sha256": "1270565e94038d38b838512c4a68138e575f5aaa0d67ddd9435c7eae90eb4975"
+    }
+  ],
+  "successorTestDelta": {
+    "path": "packages/work-continuity/src/git-work/git-work.test.ts",
+    "beforeSha256": "4baebdf74d98f58796f60dafc306437773f41b57b2789b9812c4de6f240e140d",
+    "afterSha256": "3072b66103da0c50b6324fad800966d4aa083e68c100843767094bc9bf5f294d",
+    "changes": [
+      {
+        "line": 1290,
+        "property": "uncertainCount",
+        "before": 2,
+        "after": 3
+      },
+      {
+        "line": 1291,
+        "property": "projectedFenceRecords",
+        "before": 2,
+        "after": 3
+      }
+    ],
+    "exactlyTwoNumericExpectationChanges": true,
+    "completedCount64Unchanged": true,
+    "reason": "Existing integration test copies the entire current canonical Work into a fictional temporary repository. Its aggregate must now include the new consumed uncertainty fence. Original63/2 is separately retained byte-exact; this test never asserted the original-only scope.",
+    "preservedGuards": [
+      "24000 default context cap",
+      "source-qualified useful task projection",
+      "source-only Task with no occurrence or native effectIds",
+      "historical consumed source relevantCompletedIds",
+      "custody input projection",
+      "latest Bun decision projection",
+      "completed Task replay negative"
+    ],
+    "runtimeImplementationChanged": false,
+    "noAssertionsRemovedOrSkipped": true
+  },
+  "originalFiveFileClosure": {
+    "allByteIdenticalTo953": true,
+    "baselineImmutableFilesByteIdentical": 191,
+    "onlyPurposeAndAppendedFenceWorkChanges": true,
+    "priorAndSuccessorPurposeExact": true,
+    "SpecRevision": 7,
+    "PlanRevision": 7,
+    "schema": {
+      "strictPass": true,
+      "sha256": "f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4",
+      "installedRepoAndBaselineExact": true,
+      "options": {
+        "strict": true,
+        "allErrors": true,
+        "coerceTypes": false,
+        "useDefaults": false,
+        "removeAdditional": false
+      },
+      "coreCharacters": 15773,
+      "characterCountDefinition": "JSON.stringify(content, null, 2) plus one trailing newline",
+      "cap": 16000
+    },
+    "historicalFences": {
+      "original": {
+        "completed": 63,
+        "uncertain": 2
+      },
+      "previousCombined": {
+        "completed": 64,
+        "uncertain": 2,
+        "fenceRecords": 2
+      },
+      "currentCombined": {
+        "completed": 64,
+        "uncertain": 3,
+        "fenceRecords": 3
+      },
+      "originalsAndPriorInputsByteIdentical": true
+    },
+    "newP1": {
+      "state": "UNKNOWN",
+      "consumed": true,
+      "possibleTargetOccurrences": "0_OR_1",
+      "observationCapture": "ABSENT",
+      "ownerAPIInvoked": true,
+      "ownerAPIReturned": false,
+      "P1Accepted": false,
+      "rootCause": "UNKNOWN_NOT_EXPORTED",
+      "noRetry": true
+    },
+    "receiptPins": [
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/academy-running-p1-read-once1-consumed-unknown-receipt.json",
+        "sha256": "6bd075e268cff521ca27933c34faf5efe8f2d94aad83a3add5e712d1feb044af",
+        "bytes": 2123
+      },
+      {
+        "path": "/tmp/academy-p1-once1-actual-reconciliation-20261016.json",
+        "sha256": "c403e65d41c2f66e78c61c13c11083ab109ed50373d4b3493a03c86be4e8d5a9",
+        "bytes": 15617
+      },
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/common-mainbce-source-ci-reconciliation-receipt.json",
+        "sha256": "a19536f58fb6db0820a26ae482038f9b9c7f5dbe07992d58d1e47fad0e3bf9d8"
+      },
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/codex-main2e4-source-publication-completion-20261016.json",
+        "sha256": "b538fdf66d934fd075f58ccb5336ad1b9598a5134a4caef04e3a4b5cf2113377"
+      },
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/academy-main2c-source-ci-reconciliation-receipt.json",
+        "sha256": "88e2ab82fff0b58e00ad9242a589a0fe351eab7ddc158bf35b4b00be36c1f052"
+      },
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-prepared-20261016-v2-receipt.json",
+        "sha256": "62202ba8a592f6fe3189a970ff610556488abfb81d016f69fc4c2f61ec33262c"
+      }
+    ]
+  },
+  "verification": {
+    "canonicalReader": {
+      "snapshot": {
+        "repositoryRoot": "/home/palantirkc/code/worktrees/harness-checkpoint-v8-20261016",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "6c377521b9e1cae74e4db1d13f5a142e8e4047fc",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-harness-operation",
+        "maxBlobBytes": 1048576,
+        "maxRecords": 2048,
+        "maxTotalBytes": 16777216
+      },
+      "validation": {
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      },
+      "transition": {
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      },
+      "contextsIndependentlyReread": [
+        {
+          "taskId": null,
+          "status": "source-qualified",
+          "holdReasons": [],
+          "characters": 16324,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "ACADEMY-ROOT-SOURCE-READ-ONCE1",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "characters": 17391,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [
+              "ACADEMY-ROOT-SOURCE-READ-ONCE1"
+            ],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "WSL2-LEAD-HANDOFF",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "characters": 23917,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "VPS-LEAD-HANDOFF",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "characters": 23914,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "INTEGRATED-SCOPE-RECONCILIATION",
+          "status": "held",
+          "holdReasons": [
+            "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+          ],
+          "characters": 509
+        },
+        {
+          "taskId": "GHA-30",
+          "status": "held",
+          "holdReasons": [
+            "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+          ],
+          "characters": 509
+        }
+      ],
+      "unchangedContextCoverage": {
+        "priorReportQualified": 26,
+        "priorReportHistoricalHeld": 2,
+        "currentRepresentativeQualified": 4,
+        "currentRepresentativeHistoricalHeld": 2,
+        "minHeadroom": 83,
+        "allSourceAndReaderBytesUnchangedExceptTestExpectations": true
+      },
+      "replayNegative": {
+        "inMemoryOnly": true,
+        "rejected": true,
+        "finding": "EFFECT_REPLAY_OR_UNCERTAIN:ACADEMY-RUNNING-P1-READ-ONCE1-20261016"
+      }
+    },
+    "affectedGitWorkQA": {
+      "path": "/tmp/checkpoint-v8-successor-git-work-20261016.log",
+      "sha256": "859b5b96a877663391ab7a50d0c7d9365724b56e15cb2001431521c28181d78d",
+      "passed": 67,
+      "failed": 0,
+      "assertions": 217,
+      "executedBy": "Root",
+      "independentlyRerun": false,
+      "independentlyReadBack": true,
+      "reasonNoRedundantRun": "Exact two expected count corrections, all maintained implementation unchanged, Root affected suite already passed; independent canonical reader and replay negative reverified the behavior."
+    },
+    "scopedUnchangedRequiredChecks": {
+      "handoff": {
+        "log": "/tmp/checkpoint-v8-handoff-qualified-20261016.log",
+        "sha256": "566672c6e1eced1bc5d4d79ac1efefc146e2fea771c2f29c37061fd12e49fe25",
+        "passed": 39,
+        "failed": 0,
+        "independentlyRerun": false
+      },
+      "imports": {
+        "log": "/tmp/checkpoint-v8-imports-local-links-20261016.log",
+        "sha256": "ef4163dd5b147db05aa83985dd98180762b0e0674a858313279f4c4a4a1aefe9",
+        "canonicalCandidateResolved": true,
+        "independentlyRerun": false,
+        "qualification": "Private ignored dependency links; no installation; common code unchanged"
+      },
+      "reason": "Implementation, package/lock, handoff and import test bytes are identical to953; successor changes only two Git Work test expectations. Logs retain original time/scope; no new full suite claimed."
+    }
+  },
+  "historicalPublicationAndFailure": {
+    "path": "/home/palantirkc/operations/harness-continuation-20261016/common-checkpoint-v8-premerge-source-delivery.json",
+    "sha256": "084050dd7e36f09f8488b8321211e6cd5a12d695abcbc579bd5135700a1f2f72",
+    "sourceHead": "953992a8158676811fe6c05084e3a5f888a2a165",
+    "pullRequest": 21,
+    "prState": "OPEN",
+    "ciRunId": 38860500479,
+    "ciAttempt": 1,
+    "ciConclusion": "failure",
+    "ciRetried": false,
+    "cause": "Actual deterministic source-fixture assertion mismatch after adding a consumed uncertainty fence; not a missing-status race.",
+    "sourceFailureLog": {
+      "path": "/tmp/checkpoint-v8-ci-source-job116841455611-20261016.log",
+      "sha256": "de812a956091b0ece4bee5e79f83ff7c59e9bab7c84187d900e3c4748eb16a54"
+    },
+    "mergeFailureLog": {
+      "jobId": 116841455739,
+      "path": "/tmp/checkpoint-v8-ci-merge-job116841455739-20261016.log",
+      "sha256": "e8fd757e76e9cef4b5951c543adb8948cf20c225232d69b1684d23c30e66ae7e",
+      "sameAssertion": "git-work.test.ts:1288 expected historical2/2 versus current3/3"
+    },
+    "oldCodeReviewState": "running",
+    "oldSecurityReviewState": "completed-zero-findings",
+    "oldUnresolvedThreads": 0,
+    "successorPublicationNotPerformedByReviewer": true,
+    "successorHostedChecksNotObserved": true,
+    "mergeReadinessNotEstablished": true
+  },
+  "findings": [],
+  "unresolvedFindings": 0,
+  "verdict": "PASS_NEW_SIX_FILE_SOURCE_SUCCESSOR_ZERO_UNRESOLVED_FINDINGS",
+  "limits": [
+    "This is a new exact six-file source review, not identical-tree reuse of953.",
+    "Hosted review/status/CI are historical953 observations only; new6c publication and current hosted checks require separate owner evidence.",
+    "The original failed953 CI and source review/status remain unchanged; no retry was performed.",
+    "Two existing historical contexts remain held at the unchanged cap; this source-only change does not repair them.",
+    "No actual P1, SSH, PG, native configuration, profile, model/evaluation, Goal, Git mutation, publication or merge performed by reviewer."
+  ],
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "semanticAcceptanceEstablished": false,
+  "AcceptanceDecision": null
+}
