@@ -61,6 +61,35 @@ const record = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
+/** Own the complete finite policy before any callback can yield or mutate its caller. */
+function snapshotOwnerPolicy(input: OwnerReviewPolicy): OwnerReviewPolicy {
+  const publisher = Object.freeze({
+    id: input.publisher.id,
+    login: input.publisher.login,
+    type: input.publisher.type,
+  });
+  const policy = Object.freeze({
+    repository: input.repository,
+    projectId: input.projectId,
+    domainId: input.domainId,
+    semanticOwner: input.semanticOwner,
+    scope: input.scope,
+    statusContext: input.statusContext,
+    publisher,
+  });
+  validateOwnerReviewPolicy(policy);
+  return policy;
+}
+/** Capture function identity while retaining each original reader method's receiver semantics. */
+function snapshotOwnerReader(reader: OwnerReviewReader): OwnerReviewReader {
+  return Object.freeze({
+    readCommit: reader.readCommit.bind(reader),
+    readStatuses: reader.readStatuses.bind(reader),
+    readTree: reader.readTree.bind(reader),
+    readFile: reader.readFile.bind(reader),
+  });
+}
+
 /** Pure read/verify gate. Git custody authenticates the publisher, never a native process. */
 export async function validateOwnerScopedReviewWithEvidence(
   policy: OwnerReviewPolicy,
@@ -78,7 +107,8 @@ export async function validateOwnerScopedReviewWithEvidence(
   nativePermissionGranted: false;
   acceptanceEstablished: false;
 }> {
-  validateOwnerReviewPolicy(policy);
+  policy = snapshotOwnerPolicy(policy);
+  reader = snapshotOwnerReader(reader);
   const { repository, head } = request;
   if (repository !== policy.repository || !/^[a-f0-9]{40}$/.test(head))
     throw new Error("Owner review request differs from fixed repository or exact head");
@@ -92,16 +122,25 @@ export async function validateOwnerScopedReviewWithEvidence(
     // Never fall back to an older successful status after a newer hold/failure.
     const status = record(statuses.find((value) => record(value).context === policy.statusContext));
     const creator = record(status.creator);
+    const id = status.id,
+      targetUrl = status.target_url;
+    const publisherId = String(creator.id),
+      publisherLogin = creator.login,
+      publisherType = creator.type;
     if (
       status.state !== "success" ||
-      !Number.isSafeInteger(status.id) ||
-      Number(status.id) <= 0 ||
-      String(creator.id) !== policy.publisher.id ||
-      creator.login !== policy.publisher.login ||
-      creator.type !== policy.publisher.type
+      typeof id !== "number" ||
+      !Number.isSafeInteger(id) ||
+      id <= 0 ||
+      typeof targetUrl !== "string" ||
+      typeof publisherLogin !== "string" ||
+      typeof publisherType !== "string" ||
+      publisherId !== policy.publisher.id ||
+      publisherLogin !== policy.publisher.login ||
+      publisherType !== policy.publisher.type
     )
       throw new Error("Owner review latest status is absent, held or from another publisher");
-    return status;
+    return Object.freeze({ id, target_url: targetUrl, publisherId, publisherLogin, publisherType });
   }
   const status = selectStatus(await reader.readStatuses(head));
   const target = immutableOwnerReviewUrl(status.target_url, policy, head, "native-reviews");
@@ -281,7 +320,13 @@ export async function validateOwnerScopedReviewWithEvidence(
       "Owner review verification does not hash-bind result, evidence and raw native output",
     );
   const currentStatus = selectStatus(await reader.readStatuses(head));
-  if (currentStatus.id !== status.id || currentStatus.target_url !== status.target_url)
+  if (
+    currentStatus.id !== status.id ||
+    currentStatus.target_url !== status.target_url ||
+    currentStatus.publisherId !== status.publisherId ||
+    currentStatus.publisherLogin !== status.publisherLogin ||
+    currentStatus.publisherType !== status.publisherType
+  )
     throw new Error("Owner review status changed while verifying immutable evidence");
   return {
     schema: "owner-scoped-native-review-ci.v1",
@@ -302,7 +347,8 @@ export async function validateOwnerScopedReviewWithEvidence(
 
 /** CI transport only; fixed reviewed policy stays in the consumer entrypoint. */
 export async function ownerScopedReviewGate(policy: OwnerReviewPolicy): Promise<void> {
-  validateOwnerReviewPolicy(policy);
+  policy = snapshotOwnerPolicy(policy);
+  const fetchReview = globalThis.fetch.bind(globalThis);
   const repository = process.env.GITHUB_REPOSITORY,
     head = process.env.REVIEW_HEAD_SHA;
   const token = process.env.GITHUB_TOKEN;
@@ -311,7 +357,7 @@ export async function ownerScopedReviewGate(policy: OwnerReviewPolicy): Promise<
       "Owner review requires fixed repository, exact head and authenticated API read",
     );
   async function api(path: string): Promise<unknown> {
-    const response = await fetch(`https://api.github.com/repos/${policy.repository}/${path}`, {
+    const response = await fetchReview(`https://api.github.com/repos/${repository}/${path}`, {
       headers: {
         Authorization: "Bearer " + token,
         Accept: "application/vnd.github+json",

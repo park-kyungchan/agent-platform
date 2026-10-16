@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import type { EvidenceArtifact, VerificationArtifact, JsonObject } from "@palantirkc/ontology";
 import { createHash } from "node:crypto";
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, spyOn } from "bun:test";
 import {
   deriveReviewedSourceManifest,
   validateIndependentReviewReceipt,
@@ -20,6 +20,7 @@ import {
 import {
   validateReceiptWithEvidence,
   validateOwnerScopedReviewWithEvidence,
+  ownerScopedReviewGate,
   type ReviewEvidenceReader,
   type OwnerReviewReader,
 } from "./receipt-validation-gate";
@@ -688,6 +689,121 @@ describe("additive owner-scoped review gate", () => {
           fixture.reader,
         ),
       ).rejects.toThrow();
+    }
+  });
+  test("retains the entry nested publisher policy across a delayed read mutation", async () => {
+    const fixture = ownerFixture(),
+      publisher = fixture.policy.publisher;
+    publisher.id = "999";
+    publisher.login = "required-other-publisher";
+    const read = fixture.reader.readCommit;
+    fixture.reader.readCommit = async (sha) => {
+      await Promise.resolve();
+      publisher.id = "123";
+      publisher.login = "fixture-publisher";
+      return read(sha);
+    };
+    await expect(
+      validateOwnerScopedReviewWithEvidence(
+        fixture.policy,
+        { repository: fixture.policy.repository, head },
+        fixture.reader,
+      ),
+    ).rejects.toThrow("publisher");
+  });
+  test("retains original denying callbacks and their receiver across delayed reader substitution", async () => {
+    const fixture = ownerFixture(),
+      validRead = fixture.reader.readFile,
+      commitRead = fixture.reader.readCommit;
+    let denied = 0;
+    fixture.reader.readFile = async function () {
+      expect(this).toBe(fixture.reader);
+      denied++;
+      throw Error("Original reader denied evidence");
+    };
+    fixture.reader.readCommit = async (sha) => {
+      await Promise.resolve();
+      fixture.reader.readFile = validRead;
+      return commitRead(sha);
+    };
+    await expect(
+      validateOwnerScopedReviewWithEvidence(
+        fixture.policy,
+        { repository: fixture.policy.repository, head },
+        fixture.reader,
+      ),
+    ).rejects.toThrow("Original reader denied");
+    expect(denied).toBe(1);
+  });
+  test("rejects aliased initial status ID and receipt target mutation during tree read", async () => {
+    const fixture = ownerFixture(),
+      treeRead = fixture.reader.readTree;
+    fixture.reader.readTree = async (sha) => {
+      await Promise.resolve();
+      fixture.statuses[0]!.id = 43;
+      fixture.statuses[0]!.target_url = fixture.statuses[0]!.target_url.replace(
+        fixture.receiptCommit,
+        "3".repeat(40),
+      );
+      return treeRead(sha);
+    };
+    await expect(
+      validateOwnerScopedReviewWithEvidence(
+        fixture.policy,
+        { repository: fixture.policy.repository, head },
+        fixture.reader,
+      ),
+    ).rejects.toThrow("status changed");
+  });
+  test("CI transport retains fixed policy, authenticated repository and fetch callback across awaits", async () => {
+    const fixture = ownerFixture(),
+      repository = fixture.policy.repository,
+      fetchBefore = globalThis.fetch;
+    const names = ["GITHUB_REPOSITORY", "REVIEW_HEAD_SHA", "GITHUB_TOKEN"] as const;
+    const envBefore = names.map((name) => process.env[name]);
+    process.env.GITHUB_REPOSITORY = repository;
+    process.env.REVIEW_HEAD_SHA = head;
+    process.env.GITHUB_TOKEN = "fictional-no-network-token";
+    const urls: string[] = [];
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    const read = fixture.reader;
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      const url = new URL(
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      );
+      urls.push(url.href);
+      expect(url.pathname.startsWith(`/repos/${repository}/`)).toBe(true);
+      const path = url.pathname.slice(`/repos/${repository}/`.length);
+      if (urls.length === 1) {
+        await Promise.resolve();
+        fixture.policy.repository = "other/unreviewed";
+        fixture.policy.publisher.id = "999";
+        globalThis.fetch = (() => {
+          throw Error("Substituted transport must never run");
+        }) as unknown as typeof fetch;
+      }
+      let value: unknown;
+      if (path.startsWith("git/commits/"))
+        value = await read.readCommit(path.slice("git/commits/".length));
+      else if (path.startsWith("commits/")) value = await read.readStatuses(head);
+      else if (path.startsWith("git/trees/")) value = await read.readTree(tree);
+      else if (path.startsWith("contents/"))
+        value = await read.readFile(path.slice("contents/".length), url.searchParams.get("ref")!);
+      else throw Error("Unexpected fictional transport route");
+      return new Response(JSON.stringify(value), { status: 200 });
+    }) as typeof fetch;
+    try {
+      await ownerScopedReviewGate(fixture.policy);
+      expect(urls).toHaveLength(12);
+      expect(log).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.fetch = fetchBefore;
+      log.mockRestore();
+      names.forEach((name, index) => {
+        const value = envBefore[index];
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      });
     }
   });
   test("rejects unreviewed runtime repository before any read", async () => {
