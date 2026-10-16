@@ -1,0 +1,634 @@
+{
+  "schema": "harness.checkpoint-v9-independent-source-review.v1",
+  "recordClass": "IndependentSourceReview",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/checkpoint_v9_fresh_independent_review",
+    "independentOfAuthor": true
+  },
+  "observedAtUtc": "2026-10-16T06:57:32.416Z",
+  "source": {
+    "repository": "park-kyungchan/agent-platform",
+    "root": "/home/palantirkc/code/worktrees/harness-checkpoint-v8-20261016",
+    "head": "e0537d2ddf605b6e7eaa4355ea94bddfda709a88",
+    "tree": "a4de59b119cdb9960172c0b11afc1569c24a681d",
+    "baseline": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+    "priorPublishedCandidate": "6c377521b9e1cae74e4db1d13f5a142e8e4047fc",
+    "clean": true,
+    "aggregateChangedFiles": 10,
+    "changedVersusPrior": 5,
+    "delta": [
+      {
+        "path": "packages/work-continuity/src/git-work/git-work.test.ts",
+        "bytes": 51379,
+        "sha256": "3072b66103da0c50b6324fad800966d4aa083e68c100843767094bc9bf5f294d",
+        "gitBlob": "1da35523d2e7b56c6b49dcda6847ff726a3c45b9"
+      },
+      {
+        "path": "work-artifacts/codex-harness-engineering/ontology-driven-harness-operation/hermes-source-plan-2932164e.tar.gz",
+        "bytes": 75408,
+        "sha256": "a6b6d71b444f673a1aeb55a7f8624ab93874ec4bc9d0fc39ee99966f3611ccd3",
+        "gitBlob": "86f6f128ffa3242495775145acaa847b5209ee38"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/fences/p1-once1-20261016.json",
+        "bytes": 502,
+        "sha256": "a6d1fbf2efaee24dc2de2f2c90bac800fc0eea95cd1a295e4ff1a841b846b943",
+        "gitBlob": "b01670f0e49e42ed650cca2e42b4e6f18a0e1d94"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v8.json",
+        "bytes": 16797,
+        "sha256": "02feb7e206b4d7328e979073ab7936e2ac0a4934431d11411f732721f362aa82",
+        "gitBlob": "a9fbbeac63138c905cf63d6f2eff5c7831862a31"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v9.json",
+        "bytes": 16881,
+        "sha256": "e7ccefd8853b3229ee2c20eec10e7cfc6efff14f1cf4116b0ec37499ad8e6299",
+        "gitBlob": "665dc9ff6f37b64c9267dd93de29c258397154ff"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/hermes-source-plan-2932164e-archive.json",
+        "bytes": 7186,
+        "sha256": "745f3475f17dbb3e273ae5e47b27da46bc99f150d99c249a29558dee9e5a571b",
+        "gitBlob": "8cd0f06b8643dc5363eb4098494dca467cc03b45"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/p1-once1-20261016.json",
+        "bytes": 2419,
+        "sha256": "e88655ac51954b37aeafb53ac947fe0e41e78e7c5d4bd66c6a4ca4b4089e8868",
+        "gitBlob": "60cec8c7440c1e4ac267481bb344946a8607b087"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/work-purpose-compaction-provenance-20261016-v8.json",
+        "bytes": 3611,
+        "sha256": "edba14fa445b1f672a0ac56bd36dd514a778177d14b3f8813c4bf12f9ba77e19",
+        "gitBlob": "ddb6ea4f980e1161ecfc66bf1c18272f361ecd4a"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/work-purpose-compaction-provenance-20261016-v9.json",
+        "bytes": 9005,
+        "sha256": "32241e31a6e548cebcef0de181a850132577b155c05fc4c8d10a8bee5f8990ea",
+        "gitBlob": "843485ae054540dbece5d19adc1b65e0f59b13ac"
+      },
+      {
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json",
+        "bytes": 3001,
+        "sha256": "fb24217f04bbdb32e28a0839cbb5bea10a087f7613bfc9d2049d2effa1441634",
+        "gitBlob": "6dd81868378202ef7488017d26c963d2da5804a6"
+      }
+    ]
+  },
+  "review": {
+    "status": "PASS",
+    "scope": "Fresh exact immutable10-file aggregate SOURCE review and two accepted PR21 P1 closures only",
+    "unresolvedFindings": [],
+    "findingsCount": 0,
+    "mergeApproved": false,
+    "remoteAuthenticationEstablished": false,
+    "nativePermissionGranted": false,
+    "semanticAcceptanceEstablished": false,
+    "AcceptanceDecision": null
+  },
+  "P1Closures": [
+    {
+      "id": 4291541993,
+      "status": "CLOSED_IN_SOURCE",
+      "evidence": {
+        "exactBaselineThreeSafeguards": true,
+        "projectedInAll26QualifiedContexts": true,
+        "all11OriginalPositiveCriteriaAnd17RoutingFactsPreserved": true,
+        "Spec7Plan7DecisionsAndOriginalsImmutable": true,
+        "purposeOnlyPositiveCriteriaCompacted": true
+      }
+    },
+    {
+      "id": 4291542001,
+      "status": "CLOSED_IN_SOURCE",
+      "evidence": {
+        "durableGitArchive": true,
+        "utf8TypedManifestNativeRead": true,
+        "rawGzipNativeReaderSupported": false,
+        "archiveRegularGitBlobAndOIDVerified": true,
+        "all15SafeRegularMemberHashesSizesAndRetainedStagingBytesMatch": true,
+        "preparedPlanOriginalSHA": "2932164e29a9df087035c8a784cfb3756caebcc4f376f143fa2b31143f9b8903",
+        "preparedPlanBytes": 142676,
+        "prepared14SourceFilesAndFixedLinkPinsMatch": true,
+        "noPrepareReplayNeeded": true,
+        "recoveryExecutionAuthority": "none"
+      }
+    }
+  ],
+  "preservation": {
+    "frozen": [
+      {
+        "commit": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+        "unchangedFiles": 191
+      },
+      {
+        "commit": "6c377521b9e1cae74e4db1d13f5a142e8e4047fc",
+        "unchangedFiles": 195
+      }
+    ],
+    "original47Decisions63Completed2Uncertain": "unchanged historical inputs/fence",
+    "prior48Decisions64SourceCompleted2Uncertain": "unchanged historical inputs/fences",
+    "current48Decisions64SourceCompleted3Uncertain": true,
+    "P1": "consumed UNKNOWN0_OR1; no retry or zero-effect/success inference",
+    "HermesApply": "API1 consumed completed22(7directories14source1link),uncertain0; immutable author/independent receiptSHA verified; no replay",
+    "CodeXCAS": "COMPLETE source-only receiptSHA verified; activation held",
+    "HermesActualGuard": "SOURCE_GUARD_HOLD_ONLY unchanged; actual runtime hardlinks versus exact1 guard remain separate owner repair",
+    "authorityAndExclusionsEqualV8": true,
+    "originalWSLWriter": "paused",
+    "nativeDataPrivateEvaluationTeacherAndWholeWorkAcceptance": "held"
+  },
+  "checkpoint": {
+    "version": 9,
+    "strictSchemaSHA256": "f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4",
+    "strictWithoutCoercionDefaultsOrAdditionalRemoval": true,
+    "coreCharacters": 15962,
+    "cap": 16000,
+    "immutableV8BytesPreserved": true
+  },
+  "archive": {
+    "path": "work-artifacts/codex-harness-engineering/ontology-driven-harness-operation/hermes-source-plan-2932164e.tar.gz",
+    "sha256": "a6b6d71b444f673a1aeb55a7f8624ab93874ec4bc9d0fc39ee99966f3611ccd3",
+    "bytes": 75408,
+    "gitBlob": "86f6f128ffa3242495775145acaa847b5209ee38",
+    "members": 15,
+    "entries": [
+      {
+        "path": "architecture/hermes-context-provider.json",
+        "bytes": 2688,
+        "sha256": "7b0ed18c0f9bb5239bf572665017b9b29c3feb35079d5e5b0856321fce889496"
+      },
+      {
+        "path": "bun.lock",
+        "bytes": 2095,
+        "sha256": "97502425141e24c5984814e0077650d02734e68c318115a4d63a5feab1b21f42"
+      },
+      {
+        "path": "delivery-plan.json",
+        "bytes": 142676,
+        "sha256": "2932164e29a9df087035c8a784cfb3756caebcc4f376f143fa2b31143f9b8903"
+      },
+      {
+        "path": "package.json",
+        "bytes": 271,
+        "sha256": "2e69486d8c6504bd25bff1c06d8202e5339e209e219a9de65116245fbc5623c0"
+      },
+      {
+        "path": "source-successor.json",
+        "bytes": 139700,
+        "sha256": "01f48a38e6b0def7789757e74980b55bfa5e3aab9a6d7ee69448a99f685baa1d"
+      },
+      {
+        "path": "src/adoption/evaluation-budget.ts",
+        "bytes": 78,
+        "sha256": "3f47ba63fffcb05a3568a35d55f86cb351fcb9c614b194791d70eb3911c8ed34"
+      },
+      {
+        "path": "src/adoption/semantic-context.ts",
+        "bytes": 77,
+        "sha256": "9870b56525392d6abf74e7ea5aa3981173a955d45a84d6c9cd2ff5d8869cd1f9"
+      },
+      {
+        "path": "src/ontology-driven/audit-adapter.ts",
+        "bytes": 81,
+        "sha256": "b333909214ffa78df527881d1b29938191ff32a3a2b4cd9d3dcee34c81fed9dd"
+      },
+      {
+        "path": "src/ontology-driven/contracts.ts",
+        "bytes": 77,
+        "sha256": "0c0280d37321103aa39e39397472ff0f3eaa6aaf022568e674097956812218f8"
+      },
+      {
+        "path": "src/ontology-driven/current-intent.ts",
+        "bytes": 82,
+        "sha256": "962392d427b7a94619c25e11422014f639884e5a87bb96855b872f99645b9ab8"
+      },
+      {
+        "path": "src/ontology-driven/domain-context.ts",
+        "bytes": 82,
+        "sha256": "0aa95c0606ae298abd91c2266c6a89b414c40a4cb2c6afa774c7fdcc6f495686"
+      },
+      {
+        "path": "src/ontology-driven/pinned-reader.ts",
+        "bytes": 81,
+        "sha256": "e8ede3346f9094dec49a007d65bde28ac3de174089eaa1fe1d21580d57b028dc"
+      },
+      {
+        "path": "src/ontology-driven/provider-source.ts",
+        "bytes": 27372,
+        "sha256": "7225ec44ca42366234379312e5dcb76c53760c49ac0ea75b60d89f629f895d62"
+      },
+      {
+        "path": "src/ontology-driven/role-registry.ts",
+        "bytes": 81,
+        "sha256": "e530a20b802a9dee04a287bc8404a33a258d2fda1bfd811f81093511f35f793b"
+      },
+      {
+        "path": "src/ontology-driven/work-context.ts",
+        "bytes": 80,
+        "sha256": "542f5ff86dfd11fe9b90d56f88ee037578e3e1b360322b7ac8f7287ff618df2c"
+      }
+    ],
+    "regularOnly": true,
+    "allSafePaths": true,
+    "tarChecksumsVerified": true,
+    "deterministicHeaders": true,
+    "originalPreparedBytesComparedViaNoFollowDescriptors": true,
+    "archiveOutsideIndexedWorkRoot": true,
+    "indexedRecords": 199,
+    "ownerDataArchived": false,
+    "originalSourceRestored": false,
+    "executionAuthority": "none"
+  },
+  "nativeReader": {
+    "entrypoint": "bun run harness / scripts/harness.ts runHarness",
+    "manifest": {
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/hermes-source-plan-2932164e-archive.json",
+      "sha256": "745f3475f17dbb3e273ae5e47b27da46bc99f150d99c249a29558dee9e5a571b",
+      "verificationClass": "git-object-source-only",
+      "nativeAuthorshipVerified": false
+    },
+    "validation": {
+      "valid": true,
+      "findings": [],
+      "authority": "none",
+      "nativePermissionGranted": false,
+      "semanticAcceptanceEstablished": false
+    },
+    "transition": {
+      "valid": true,
+      "findings": [],
+      "authority": "none",
+      "nativePermissionGranted": false,
+      "semanticAcceptanceEstablished": false
+    },
+    "contexts": {
+      "total": 28,
+      "qualified": 26,
+      "historicalHeld": 2,
+      "maxQualifiedCharacters": 23912,
+      "minQualifiedHeadroom": 88,
+      "qualifiedOmittedRecords": 0,
+      "baselineHistoricalHoldsUnchanged": true,
+      "rows": [
+        {
+          "taskId": null,
+          "status": "source-qualified",
+          "characters": 16319,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "ACADEMY-CONTEXT-REVALIDATION-REVIEW",
+          "status": "source-qualified",
+          "characters": 17447,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "ACADEMY-RELEASE-SELECTION-PREPARATION",
+          "status": "source-qualified",
+          "characters": 17135,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "ACADEMY-RETAINED-OWNER-RUNTIME",
+          "status": "source-qualified",
+          "characters": 18253,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "ACADEMY-ROOT-SOURCE-READ-ONCE1",
+          "status": "source-qualified",
+          "characters": 17386,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "CODEX-EXPLICIT-SESSION-WORK-CONTEXT",
+          "status": "source-qualified",
+          "characters": 18278,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "CODEX-HOME-CONTEXT-BUDGET-FIX",
+          "status": "source-qualified",
+          "characters": 18244,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "CODEX-NATIVE-ADOPTION-RECOVERY",
+          "status": "source-qualified",
+          "characters": 17166,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "EDUCATION-BUN-CURRENTNESS",
+          "status": "source-qualified",
+          "characters": 17099,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS",
+          "status": "source-qualified",
+          "characters": 17133,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "EDUCATION-SOURCE-INDEPENDENT-REVIEW",
+          "status": "source-qualified",
+          "characters": 17106,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-22",
+          "status": "source-qualified",
+          "characters": 23854,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-23",
+          "status": "source-qualified",
+          "characters": 18204,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-24",
+          "status": "source-qualified",
+          "characters": 18208,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-25",
+          "status": "source-qualified",
+          "characters": 18209,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-26",
+          "status": "source-qualified",
+          "characters": 18209,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-27",
+          "status": "source-qualified",
+          "characters": 23865,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-28",
+          "status": "source-qualified",
+          "characters": 23861,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-29",
+          "status": "source-qualified",
+          "characters": 23851,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "GHA-30",
+          "status": "held",
+          "characters": 509,
+          "holdReasons": [
+            "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+          ],
+          "omittedRecords": 40,
+          "sameBaselineHold": true
+        },
+        {
+          "taskId": "GHA-31",
+          "status": "source-qualified",
+          "characters": 19183,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "HERMES-CURRENT-WORK-SOURCE",
+          "status": "source-qualified",
+          "characters": 18277,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "HERMES-NATIVE-ADOPTION-RECOVERY",
+          "status": "source-qualified",
+          "characters": 17148,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "INTEGRATED-SCOPE-RECONCILIATION",
+          "status": "held",
+          "characters": 509,
+          "holdReasons": [
+            "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+          ],
+          "omittedRecords": 37,
+          "sameBaselineHold": true
+        },
+        {
+          "taskId": "INTERRUPTION-RECOVERY-AND-PRESELECTION",
+          "status": "source-qualified",
+          "characters": 17840,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "MONTH-END-PRESELECTION-ANALYSIS",
+          "status": "source-qualified",
+          "characters": 17093,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "VPS-LEAD-HANDOFF",
+          "status": "source-qualified",
+          "characters": 23909,
+          "holdReasons": [],
+          "omittedRecords": 0
+        },
+        {
+          "taskId": "WSL2-LEAD-HANDOFF",
+          "status": "source-qualified",
+          "characters": 23912,
+          "holdReasons": [],
+          "omittedRecords": 0
+        }
+      ],
+      "allQualifiedHistoricalEffects": {
+        "completed": 64,
+        "uncertain": 3,
+        "fences": 3
+      }
+    },
+    "readerSourceCapsAndPins": "unchanged"
+  },
+  "fullSourceManifest": {
+    "path": "/home/palantirkc/operations/harness-continuation-20261016/checkpoint-v9-e053-full-source-manifest-20261016.json",
+    "fileSha256": "a6ca6336d18b35fa62890397a484c6a03fe375de4082374459b07944f86fac05",
+    "entriesVerifiedAgainstExactGitTree": 727,
+    "blobEntries": 597,
+    "canonicalSha256": "8a10d5570f5e82e6640f7c225245ac06a624a3fbc3b868ca073b5fb4fee164b3",
+    "canonicalDigestIndependentlyDerived": true
+  },
+  "inputs": {
+    "authorReceipt": {
+      "path": "/home/palantirkc/operations/harness-continuation-20261016/checkpoint-v9-e053-source-author-receipt-20261016.json",
+      "sha256": "41800e82deef542073d3eecff1308aff4660779cf0a4189506dcd108a4419aa4",
+      "treatedAs": "author report, independently cross-checked"
+    },
+    "currentReviewHoldReceipt": {
+      "path": "/home/palantirkc/operations/harness-continuation-20261016/checkpoint-v8-current-review-hold-receipt.json",
+      "sha256": "3be48a9f4f010c809e740d5d09816bf34265924b2321ec77fd91643a0700b7ee",
+      "status": "historical953/6cPASS receipts preserved; current authenticated FAIL remains pending exact successor publication"
+    },
+    "receiptPinsVerified": [
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-source-apply-once1-author-actual-receipt.json",
+        "sha256": "d6be928274ad360c01198365c2f6bf2dede0aaed0a702caff03ecd91f63a7d48"
+      },
+      {
+        "path": "/tmp/hermes-source-apply-once1-actual-reconciliation-20261016.json",
+        "sha256": "325f387443ae0c62dd7fc5f12e5145501a041d7be244a8467bdc0fcba5af5e82"
+      },
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/codex-source-only-cas-actual-receipt-20261016.json",
+        "sha256": "c8e300e10638a89c9e9bec9ef5638cf2241d153ea2c02f89eae180f3db273a36"
+      },
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-actual-source-guard-qualification-once1.json",
+        "sha256": "405fb24f7df5bdb3f55652a1f5a1a117c1d7437f2e73d18052da2e00c7e82e35"
+      },
+      {
+        "path": "/home/palantirkc/operations/harness-continuation-20261016/academy-running-p1-read-once1-consumed-unknown-receipt.json",
+        "sha256": "6bd075e268cff521ca27933c34faf5efe8f2d94aad83a3add5e712d1feb044af"
+      },
+      {
+        "path": "/tmp/academy-p1-once1-actual-reconciliation-20261016.json",
+        "sha256": "c403e65d41c2f66e78c61c13c11083ab109ed50373d4b3493a03c86be4e8d5a9"
+      }
+    ]
+  },
+  "sourceQA": {
+    "gitWork": {
+      "passed": 91,
+      "failed": 0,
+      "assertions": 1746,
+      "files": 4
+    },
+    "handoff": {
+      "passed": 39,
+      "failed": 0,
+      "assertions": 223
+    },
+    "imports": "PASS canonical module identity",
+    "diffCheck": "PASS",
+    "canonicalFormat": {
+      "status": "PASS",
+      "files": 195,
+      "currentness": "unchanged",
+      "customRootAvoidedAutomaticDependencyPreparation": true
+    },
+    "successorJSONFormat": "PASS all current successor text paths",
+    "supplementalAggregateRawFormat": {
+      "status": "WARN_PRIOR_IMMUTABLE_RECORDS_ONLY",
+      "paths": [
+        "fences/p1-once1-20261016.json",
+        "inputs/continuation-checkpoint-20261016-v8.json",
+        "inputs/p1-once1-20261016.json"
+      ],
+      "classification": "Non-blocking outside canonical formatter scope; exact prior6c bytes intentionally preserved; no source alteration requested."
+    }
+  },
+  "limitations": [
+    "No live provider guard, native consumption, owner-data restoration, transport/authentication, P1, SSH, PG, evaluation or model request performed.",
+    "No Git publication/status authentication/PR resolution/merge performed; Lead owns exact successor delivery and current remote closure.",
+    "Source review does not release separate native/private/recovery/teacher/evaluation/Acceptance holds."
+  ],
+  "effects": {
+    "sourceChanges": 0,
+    "GitMutations": 0,
+    "remoteCalls": 0,
+    "dependencyInstalls": 0,
+    "actualGuardCalls": 0,
+    "P1APICalls": 0,
+    "prepareCalls": 0,
+    "applyCalls": 0,
+    "nativeConfigTrustAuthChanges": 0,
+    "ownerDataCopies": 0,
+    "SSHOrPGCalls": 0,
+    "modelOrEvaluationCalls": 0,
+    "GoalOperations": 0,
+    "reportAndRequestFilesOnly": true
+  },
+  "proofs": [
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-git-work-20261016.log",
+      "sha256": "a9a8e4f1e927b205c7ffe8872ed07282f714c482a7c01f9339549c9ef50dc812",
+      "bytes": 12161
+    },
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-handoff-20261016.log",
+      "sha256": "463c60cfbe7aa7232d13cdb7a3780d4054b22400cd0d97f3fb3ee8a86c5c41ab",
+      "bytes": 4976
+    },
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-imports-20261016.log",
+      "sha256": "ef4163dd5b147db05aa83985dd98180762b0e0674a858313279f4c4a4a1aefe9",
+      "bytes": 603
+    },
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-diff-20261016.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-canonical-format-20261016.log",
+      "sha256": "5bd4d08200aa6aa383f5b5e7834625cae482c339c2a7e8d0556823b30f040876",
+      "bytes": 143573
+    },
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-successor-format-20261016.log",
+      "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "bytes": 66
+    },
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-format-20261016.log",
+      "sha256": "04645e11870317809847944fcb7d55786f21d779911f75d1879ec87e73b0d869",
+      "bytes": 424
+    },
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-review-20261016.ts",
+      "sha256": "bb465ab1c88058449967f7daa70c5000c58a5abf9e297f97b99c6e14579ea996",
+      "bytes": 20520
+    },
+    {
+      "path": "/tmp/checkpoint-v9-e053-independent-finalize-20261016.ts",
+      "sha256": "e11959ff827e931869bd50a3642307218c1ea18a45980135cdb0580ff80f7472",
+      "bytes": 3907
+    }
+  ]
+}
