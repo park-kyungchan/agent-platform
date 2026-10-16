@@ -1,0 +1,453 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "codex-decision-fix-review-e6fc703",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-12",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.retained-independent-source-report.v1",
+    "originalBytes": 17727,
+    "originalSha256": "6e67bbf7a1fda08da3b9b6c97d133be298a82591b89304de5e7ed6660b1d75f5",
+    "report": {
+      "schema": "hrr.independent-scoped-source-review.v1",
+      "recordClass": "verification",
+      "reviewStatus": "complete",
+      "completedAtUtc": "2026-10-16T13:50:51.826Z",
+      "reviewer": {
+        "runtime": "native-codex",
+        "taskId": "01a144db-2ddf-7990-9fba-3a175265e424"
+      },
+      "author": {
+        "runtime": "native-codex",
+        "taskId": "01a14419-af50-72d3-b918-cc32a50a1913"
+      },
+      "logical": {
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "harness-reliability-reprioritization-20261016",
+        "issueId": "HRR-ISSUE-20261016",
+        "specId": "HRR-SPEC",
+        "specRevision": 1,
+        "planId": "HRR-PLAN",
+        "planRevision": 2,
+        "taskId": "HRR-RECOVERY-SOURCE-REVIEW"
+      },
+      "scope": "Fresh independent source correction review of HRR-RECOVERY-P2-DUPLICATE-DECISION only; exact two-file diff and focused source QA",
+      "sourceIdentity": {
+        "repositoryId": "park-kyungchan/agent-platform",
+        "repositoryRoot": "/home/palantirkc/code/worktrees/hrr-review-codex-decision-fix-20261016",
+        "headSha": "e6fc703e0e676d13e7db213b95a091d0ac4a3321",
+        "reviewedTreeSha": "008adb175a9c45a8be14d5e89e8207c46607af8b",
+        "parentSha": "c04ae1c8c3e3f443ce04e9ffbeed900f9bd21eb7",
+        "parentTreeSha": "7ab2c6f34d227f202ecc9cda2341385017dc3d86",
+        "detached": true,
+        "changedFiles": [
+          "packages/native-codex-adapter/src/native/hooks.test.ts",
+          "packages/native-codex-adapter/src/native/hooks.ts"
+        ],
+        "fileHashes": [
+          {
+            "path": "packages/native-codex-adapter/src/native/hooks.test.ts",
+            "reviewedSha256": "f95c4e06cf96b5e099adffa07670fef5dc79a553e4c370abb7400611cecaff6a",
+            "parentSha256": "28dd8793522adfb6ea6e992d52ffedc378f071c4e0d7030ff2fdcd8af5590503",
+            "reviewedBytes": 41123,
+            "parentBytes": 38847
+          },
+          {
+            "path": "packages/native-codex-adapter/src/native/hooks.ts",
+            "reviewedSha256": "c1e0e3b226860248c6d410fa0ae3b0179fb5e22c9019024aca7185f17891c045",
+            "parentSha256": "aba61c8db9105f0ca641fbbd0f605a3219bccdb32a6f9ad49d94f3e2e33519d1",
+            "reviewedBytes": 49205,
+            "parentBytes": 49103
+          }
+        ],
+        "diffSha256": "26071d0f3293d2c8299a3877972a7418af86a9c52a67308ddb3a6e1360cabb2a"
+      },
+      "conclusion": "scoped-source-correction-verified",
+      "unresolvedScopedFindings": 0,
+      "findings": [],
+      "disposition": {
+        "findingId": "HRR-RECOVERY-P2-DUPLICATE-DECISION",
+        "state": "resolved-for-exact-source-correction",
+        "appliesToHead": "e6fc703e0e676d13e7db213b95a091d0ac4a3321",
+        "reason": "Insertion-order Set removes duplicate associated/explicit decision IDs before compact projection, preserving every distinct Task decision in authored order and appending a new explicit decision. Shared unique validation and original-source projection are unchanged.",
+        "originalParentFinding": "Remains valid on c04; its immutable canonical HOLD result is preserved",
+        "finalCombinedCompositionDisposition": "pending Root integration/pin successor and fresh final exact-tree canonical review"
+      },
+      "independentBehavior": {
+        "actualOriginalFailureCase": {
+          "taskId": "HRR-A-CONTEXT-EFFECT",
+          "decisionId": "HRR-INTERVIEW-1",
+          "originalC04Reproduction": ".private/hrr-recovery/finding-reproduction.json",
+          "correctedEvents": [
+            {
+              "event": "UserPromptSubmit",
+              "status": "context-injected",
+              "sourceStatus": "source-qualified",
+              "selectedIds": [
+                "HRR-INTERVIEW-1",
+                "HRR-INTERVIEW-2",
+                "HRR-INTERVIEW-3",
+                "HRR-INTERVIEW-4",
+                "HRR-INTERVIEW-5"
+              ],
+              "decodedIds": [
+                "HRR-INTERVIEW-1",
+                "HRR-INTERVIEW-2",
+                "HRR-INTERVIEW-3",
+                "HRR-INTERVIEW-4",
+                "HRR-INTERVIEW-5"
+              ]
+            },
+            {
+              "event": "SessionStart",
+              "status": "context-injected",
+              "sourceStatus": "source-qualified",
+              "selectedIds": [
+                "HRR-INTERVIEW-1",
+                "HRR-INTERVIEW-2",
+                "HRR-INTERVIEW-3",
+                "HRR-INTERVIEW-4",
+                "HRR-INTERVIEW-5"
+              ],
+              "decodedIds": [
+                "HRR-INTERVIEW-1",
+                "HRR-INTERVIEW-2",
+                "HRR-INTERVIEW-3",
+                "HRR-INTERVIEW-4",
+                "HRR-INTERVIEW-5"
+              ]
+            }
+          ],
+          "allFiveOriginalAnswerQuestionAddressesAndActualValuesVerified": true,
+          "historicalTaskPlan1AndActivePlan2Preserved": true,
+          "noRawAnswerPayloadDelivered": true
+        },
+        "distinctAndOrderPreservation": {
+          "independentOriginalInputs": true,
+          "nonlexicalTaskOrder": [
+            "task-z",
+            "direction",
+            "task-a"
+          ],
+          "associatedExplicitDecision": {
+            "explicitId": "direction",
+            "observations": [
+              {
+                "event": "UserPromptSubmit",
+                "status": "source-qualified",
+                "expectedIds": [
+                  "task-z",
+                  "direction",
+                  "task-a"
+                ],
+                "decodedIds": [
+                  "task-z",
+                  "direction",
+                  "task-a"
+                ]
+              },
+              {
+                "event": "SessionStart",
+                "status": "source-qualified",
+                "expectedIds": [
+                  "task-z",
+                  "direction",
+                  "task-a"
+                ],
+                "decodedIds": [
+                  "task-z",
+                  "direction",
+                  "task-a"
+                ]
+              }
+            ],
+            "independentOriginalInputs": true,
+            "nativeExecution": false
+          },
+          "distinctExplicitDecision": {
+            "explicitId": "outside-b",
+            "observations": [
+              {
+                "event": "UserPromptSubmit",
+                "status": "source-qualified",
+                "expectedIds": [
+                  "task-z",
+                  "direction",
+                  "task-a",
+                  "outside-b"
+                ],
+                "decodedIds": [
+                  "task-z",
+                  "direction",
+                  "task-a",
+                  "outside-b"
+                ]
+              },
+              {
+                "event": "SessionStart",
+                "status": "source-qualified",
+                "expectedIds": [
+                  "task-z",
+                  "direction",
+                  "task-a",
+                  "outside-b"
+                ],
+                "decodedIds": [
+                  "task-z",
+                  "direction",
+                  "task-a",
+                  "outside-b"
+                ]
+              }
+            ],
+            "independentOriginalInputs": true,
+            "nativeExecution": false
+          },
+          "answerAndQuestionCommitPathBlobFragmentBindingsVerified": true
+        },
+        "nativeRuntimeExecutionExercised": false,
+        "fixtureMeaning": "Canonical corrected handleHook executed as an ordinary TypeScript function with inert synthetic native inputs, Home/bindings and provider callbacks. Selected actual Work is read from immutable e6 Git objects. This is source QA, not native hook admission/consumption/authentication."
+      },
+      "qa": {
+        "runtime": "Bun 1.4.3 (c6da4a4d3)",
+        "checks": [
+          {
+            "command": "bun --no-env-file test ./.private/hrr-reviews/codex-decision-e6fc703/canonical-hooks-bound.test.ts",
+            "status": "pass",
+            "tests": 19,
+            "assertions": 243,
+            "failures": 0,
+            "seconds": 5.39,
+            "includesNewBothEventSharedVsDistinctRegression": true
+          },
+          {
+            "command": "bun --no-env-file test ./.private/hrr-reviews/codex-decision-e6fc703/independent-probes-bound.test.ts",
+            "status": "pass",
+            "tests": 2,
+            "assertions": 174,
+            "failures": 0,
+            "seconds": 2.87
+          },
+          {
+            "check": "Prettier check with exact frozen config; both changed source/test files",
+            "status": "pass",
+            "writes": false
+          },
+          {
+            "check": "Exact diff and source-byte/current checkout checks",
+            "status": "pass",
+            "files": 2,
+            "trackedChangesByReview": 0
+          }
+        ],
+        "totalFreshSourceTests": 21,
+        "totalFreshAssertions": 417,
+        "totalFreshFailures": 0,
+        "importTransport": {
+          "sourceRoot": "/home/palantirkc/code/worktrees/hrr-review-codex-decision-fix-20261016",
+          "sourceFile": "packages/native-codex-adapter/src/native/hooks.test.ts",
+          "canonicalTestSha256": "f95c4e06cf96b5e099adffa07670fef5dc79a553e4c370abb7400611cecaff6a",
+          "transportedTestSha256": "490cc1e328c926b7978fc1e1da9ba901ba1b07e24842a7a8eb96f951e04d9a97",
+          "transport": "Only static test import addresses rewritten; imported runtime implementation and common reader remain exact selected source files.",
+          "mappings": {
+            "@palantirkc/work-continuity/git-work": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/packages/work-continuity/src/git-work/index.ts",
+            "./hooks.ts": "/home/palantirkc/code/worktrees/hrr-review-codex-decision-fix-20261016/packages/native-codex-adapter/src/native/hooks.ts",
+            "./home-context.ts": "/home/palantirkc/code/worktrees/hrr-review-codex-decision-fix-20261016/packages/native-codex-adapter/src/native/home-context.ts"
+          },
+          "sourceEdits": false,
+          "dependencyInstalls": false,
+          "commonDependencyBinding": {
+            "sourceRoot": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054",
+            "selectedSourceRoot": "/home/palantirkc/code/worktrees/hrr-review-codex-decision-fix-20261016",
+            "allSevenFilesByteIdentical": true,
+            "files": [
+              {
+                "path": "packages/work-continuity/src/git-work/index.ts",
+                "sha256": "ab434da3902838cc03b8e1ac96603071f93a47f11dff03aaabcc18d5b37fcb09"
+              },
+              {
+                "path": "packages/work-continuity/src/git-work/source.ts",
+                "sha256": "63463dd2b134078bb5de4c846780fee3f048e273c5cb0ab40c7b347c1463992b"
+              },
+              {
+                "path": "packages/work-continuity/src/git-work/records.ts",
+                "sha256": "8054265ca54243a7ad22619af85ae39cd66f1385a202a2e6ae4925d8de616806"
+              },
+              {
+                "path": "packages/work-continuity/src/git-work/context.ts",
+                "sha256": "e9f01f5c15b558ce9f6dd72880f0428903d17bd75450f424046aedca7aa739b7"
+              },
+              {
+                "path": "packages/work-continuity/src/git-work/types.ts",
+                "sha256": "5de1a8c30ae224da1492b23cea239de684d19b36d5657a85e1a62cddb2d8960d"
+              },
+              {
+                "path": "packages/work-continuity/src/logical-identity.ts",
+                "sha256": "9be1b608f1058fd7a64207110c7e4d06531f96a2060811eb2f32e5619b65f84e"
+              },
+              {
+                "path": "packages/work-continuity/src/operational-state.ts",
+                "sha256": "6bda838562d3f2375e0110d334545afa78fab3cb90649cf9c1e80ae4c9d74c63"
+              }
+            ],
+            "reason": "Reuse existing immutable Ontology dependency lookup. No install, source edit or native first-import equivalence claim."
+          }
+        },
+        "setupAttempts": {
+          "preserved": true,
+          "events": [
+            "Initial Bun paths without ./ were filters and selected no tests",
+            "First direct selected-common import could not resolve Ontology because detached source checkout has no node_modules",
+            "Successful runs bind all seven unchanged common reader files to identical existing canonical source with existing Ontology dependency lookup; corrected hooks/Home import exact detached source"
+          ],
+          "sourceFailureInferred": false,
+          "sharedOrPrivateDependencyInstallationPerformed": false
+        },
+        "writerCheckClaims": {
+          "source": "Current user-provided summary",
+          "tests": 66,
+          "assertions": 569,
+          "handoff": 39,
+          "typescript": "reported pass",
+          "lint": "reported pass",
+          "imports": "reported pass",
+          "format": "reported pass",
+          "independentlyRepeated": "Focused hook suite, independent behavioral probes and formatting only; writer logs not read/reused as approval"
+        },
+        "artifacts": [
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/qa-transport-bound.json",
+            "sha256": "171113b218306b11b330802d581f32bdc6b756e4d94560026de9f331c8868d8a",
+            "bytes": 2656
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/canonical-hooks-bound.test.ts",
+            "sha256": "490cc1e328c926b7978fc1e1da9ba901ba1b07e24842a7a8eb96f951e04d9a97",
+            "bytes": 41509
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/canonical-hooks-bound.log",
+            "sha256": "b7aa0324c32b2ba165879e0f711fc8f88bccca348b49b05c655557bd1c22f02d",
+            "bytes": 2183
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/independent-probes-bound.test.ts",
+            "sha256": "3f602be74439eeac205e96b1e1ed3761347dc55200e839b7a4b7faba675e63b9",
+            "bytes": 19730
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/independent-probes-bound.log",
+            "sha256": "3f5f4aabf6ec9b511ce4cea49513a4312aa540c5d21c5cd1bed732036b22ae80",
+            "bytes": 430
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/actual-original-combo.json",
+            "sha256": "84eec811a18351161c65d66d3b41aecbeeecf43ee08b7901f6e110c7f80efb26",
+            "bytes": 5146
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/independent-order-direction.json",
+            "sha256": "e0ced4c51622aec119391d57987802db52e030662f4038d84bf5069caf66ea06",
+            "bytes": 633
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/independent-order-outside-b.json",
+            "sha256": "06234531f539789efc0a6b165ae37558f935249249bd07d724d3969e28a1148d",
+            "bytes": 717
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/format.log",
+            "sha256": "6e39f15301cca6e80ba6877cfd9174be7a78f673f1d5e28331b20d91786cc0ca",
+            "bytes": 163
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/reviewed.diff",
+            "sha256": "26071d0f3293d2c8299a3877972a7418af86a9c52a67308ddb3a6e1360cabb2a",
+            "bytes": 3762
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/canonical-hooks.log",
+            "sha256": "4d0243203c5dbd1cd71290331dd703933dcdf4e3b412dd182258e6b53d144fd4",
+            "bytes": 528
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/independent-probes.log",
+            "sha256": "29941dad0ae6c66cc361919485c90d99225572abe1e61bb06fdeb3ef7e00f540",
+            "bytes": 536
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/canonical-hooks-run.log",
+            "sha256": "073b4bf3d0a3320828322f65cd6e07c6615227eb5d57dbba1bec16f90972a266",
+            "bytes": 434
+          },
+          {
+            "path": ".private/hrr-reviews/codex-decision-e6fc703/independent-probes-run.log",
+            "sha256": "9636a5a94e5de944f4c44e1ae3e30062adb7f11ecee07dd86fa68ff45aa68666",
+            "bytes": 437
+          }
+        ]
+      },
+      "corroboratingStaticReview": {
+        "agent": "/root/decision_fix_review",
+        "exactHead": "e6fc703e0e676d13e7db213b95a091d0ac4a3321",
+        "scopedFindings": 0,
+        "checks": "Independent exact two-file diff and adjacent selection/codec/original-pointer contracts; no writes or tests by subreviewer",
+        "nativeIdentityAuthorshipInferred": false
+      },
+      "originalCanonicalResult": {
+        "path": ".private/hrr-recovery/recovered-source-review.json",
+        "sha256": "95dc42c0b977653f2343fecaec86580af3cfe4c5b49fb9fdd3f54f1e27b4ea61",
+        "preservedByteForByte": true,
+        "conclusion": "hold",
+        "unresolvedFindings": 1,
+        "meaning": "Historical exact-c04 result is not rewritten by this successor finding disposition"
+      },
+      "finalCompositionGate": {
+        "status": "held-until-root-serialization-and-fresh-final-review",
+        "frozenRegistryIntentionallyPinsParentHooks": true,
+        "frozenRegistryHooksSha256": "aba61c8db9105f0ca641fbbd0f605a3219bccdb32a6f9ad49d94f3e2e33519d1",
+        "correctedHooksSha256": "c1e0e3b226860248c6d410fa0ae3b0179fb5e22c9019024aca7185f17891c045",
+        "registryOrOwnerSuccessorIntegratedByThisReview": false,
+        "sharedOrActiveSourceDriftClaimed": false,
+        "requiredNextOwnerActions": [
+          "Root serializes reviewed source and exact registry/provider registration/marker successors in owner order",
+          "Root retains actual recovery proof and current finding disposition with fresh selected Work validation/transition",
+          "Run required current source/owner closure checks against integrated bytes, then request fresh exact combined-tree canonical source review"
+        ],
+        "canonicalIndependentReviewV2PassSerialized": false,
+        "finalCombinedTreeApproved": false
+      },
+      "retainedHolds": [
+        "Original candidate and current-v2 proposal/preparation remain held",
+        "Native trust/config/activation and 1500-token/v2 hook admission are separate unqualified gates",
+        "No fresh native model-evaluation budget or whole-Work Acceptance follows from this source correction",
+        "Authenticated publication/status, PR and expected-head merge remain owner-controlled later gates"
+      ],
+      "effects": {
+        "maintainedSourceEdits": false,
+        "sharedWritesOrInstalls": false,
+        "sourcePinOrRegistrationMutation": false,
+        "nativeHistoryRead": false,
+        "goalCreatedCopiedOrResumed": false,
+        "modelEvaluationSuite": false,
+        "nativeHookActivationOrTrustConfigCredentialsServicesMutation": false,
+        "historicalEffectReplay": false,
+        "candidatePreparation": false,
+        "publicationPushStatusPrOrMerge": false,
+        "boundedPrivateQaAndReportOnly": true
+      },
+      "authority": "none-from-source-proof",
+      "nativePermissionGranted": false,
+      "semanticAcceptanceEstablished": false
+    },
+    "meaning": "Exact scoped source/owner review custody; fresh finalcombinedtree approval remains separate."
+  }
+}

@@ -20,7 +20,7 @@
   "state": {
     "execution": "running",
     "verification": "pending",
-    "localAudit": "intent-durable",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Recover inputs/checkpoint-v10.json#/content and realRecoveryTask.midpoint/ownedExit immutable sources. Old ownedCLI actuallyended after exact15968-byte midpointSHA9daff615...; same Plan2Task remains running/incomplete. NEWnative receiver must selfobserve a different CODEX_THREAD_ID, restore fullpurpose/all5originals/68+3fences/2consumedmetadataactions/genuine delegatedresult, then finish exactcurrent head/tree independent canonical-source review and output its canonical result. No oldnativehistory/producerprivatepaths, oldGoal/WSLresume, effectreplay, candidateprepare/activation, publication, newGoal or qualificationbudget inference."
+  "nextAction": "Read inputs/checkpoint-v12.json#/content. ActualNEWsession recovery of this samePlan2Task and usefulc04review are verified; c04HOLD result remains immutable. The discoveredduplicateDecisionP2 is corrected/independentlyscopedreviewed at e6fc703, integratedRoot93ee2a2/registry3d21624 with ownerccef pins. Finishfresh exactcurrentcombinedtree independentcanonical review after affectedchecks; preservealloriginals/fences/result and technicalRecoveryproof. No nativeprepare/activation/evalbudget, historicreplay, oldGoal/WSLresume or publication authority fromGit."
 }
