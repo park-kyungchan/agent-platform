@@ -63,6 +63,11 @@
         "kind": "snapshot",
         "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/predecessor-effect-custody.json",
         "fragment": "#/content"
+      },
+      {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json",
+        "fragment": "#/content"
       }
     ]
   }

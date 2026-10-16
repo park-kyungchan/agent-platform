@@ -1,0 +1,131 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "historical-consumed-actions-v1",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/code/worktrees/harness-checkpoint-v8-20261016/work/codex-harness-engineering/ontology-driven-harness-operation/inputs/custody-v11.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.historical-consumed-action-custody.v1",
+    "classification": "Retrospective source custody of already consumed actions; no new native Task or authority",
+    "completedEffectIds": [
+      "CODEX-VPS-NONMODEL-METADATA-ONCE1-20261016",
+      "COMMON-PROVIDER-SINGLELINK-DEPENDENCY-DIRECTORY-ONCE1-20261016"
+    ],
+    "uncertainEffectIds": [],
+    "actions": [
+      {
+        "custodyTaskId": "CODEX-VPS-NONMODEL-METADATA-ONCE1-20261016",
+        "idFrom": "Exact consumed occurrence in actual metadata receipt/marker",
+        "parentTaskId": "CODEX-NATIVE-ADOPTION-RECOVERY",
+        "custodyExecutionClass": "source-only",
+        "actualActionClass": "Bounded native process/read observation; retrospective SOURCE custody is not a fabricated native Task",
+        "recordedExecution": "complete",
+        "receipt": {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/codex-vps-nonmodel-metadata-once1-actual-receipt-20261016.json",
+          "sha256": "68101141cc9fca31eaf8e17376e211948aadf02726770eabbe202acf1e37646b",
+          "bytes": 6764
+        },
+        "consumedMarker": {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/codex-vps-nonmodel-metadata-once1-consumed-20261016.json",
+          "sha256": "132b5eb63d934cf9c041d96fd46d33b26c5f1d7dbe5966d45c98915dc8d1e727",
+          "bytes": 398
+        },
+        "actualRequests": [
+          {
+            "method": "initialize",
+            "result": "SUCCESS"
+          },
+          {
+            "method": "config/read",
+            "result": "SUCCESS"
+          },
+          {
+            "method": "config/read",
+            "result": "SUCCESS"
+          },
+          {
+            "method": "hooks/list",
+            "result": "SUCCESS"
+          }
+        ],
+        "successfulRPCs": 4,
+        "ownedChildCount": 1,
+        "childExitCode": 0,
+        "hooksListSupported": true,
+        "observedHooks": 0,
+        "authentication": "UNKNOWN; not qualified by metadata observation",
+        "nativeBookkeeping": "UNKNOWN; native startup may update native-owned bookkeeping; no native-store inspection",
+        "threadOrTurnMethods": 0,
+        "modelMethods": 0,
+        "nativeActivation": false,
+        "recordedIntervalUtc": [
+          "2026-10-16T06:47:32.652Z",
+          "2026-10-16T06:47:40.546Z"
+        ],
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "custodyTaskId": "COMMON-PROVIDER-SINGLELINK-DEPENDENCY-DIRECTORY-ONCE1-20261016",
+        "idFrom": "Exact original dependency repair occurrence/admission/consumed marker",
+        "parentTaskId": "HERMES-CURRENT-WORK-SOURCE",
+        "custodyExecutionClass": "source-only",
+        "actualActionClass": "Byte-identical source dependency directory storage repair",
+        "recordedExecution": "complete",
+        "receipt": {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/private/common-provider-singlelink-directory-once1-corrected-actual-receipt.json",
+          "sha256": "48cde65fa4122010ff6b0b3aa442c22eb6dfcfd517ba1f22cc229bfc22970fcd",
+          "bytes": 14539
+        },
+        "independentReconciliation": {
+          "path": "/tmp/common-provider-singlelink-directory-once1-actual-reconciliation-20261016.json",
+          "sha256": "fe7397cae9e2c139632f40ab59f07cb2b5cbd7d6b46178d063286153f1dfd734",
+          "bytes": 19985
+        },
+        "consumedMarker": {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/common-provider-singlelink-directory-once1-attempt.json",
+          "sha256": "adb930515c829e4eb0701a656c31f4da9d0059088021ae8e9fdb4c2db91008de",
+          "bytes": 1029
+        },
+        "actualMoveCommands": 2,
+        "completedSteps": 2,
+        "uncertainSteps": 0,
+        "actualNodeRoot": "/home/palantirkc/code/shared/agent-platform/node_modules",
+        "retainedPredecessor": "/home/palantirkc/operations/harness-continuation-20261016/private/common-node-modules-singlelink-candidate-7HWscX/retained-provider-predecessor",
+        "actualInode": 601346,
+        "retainedOriginalInode": 527320,
+        "regularFiles": 6597,
+        "allActualRegularNlink1": true,
+        "runtimeFiles": 590,
+        "runtimeBytes": 1524902,
+        "fullContentIdentitySha256": "6a2256e4959a2aeeb978be2e0fa922794647d872580ab5c5a3f7e027a3756612",
+        "twoStepAtomicTransaction": false,
+        "recordedIntervalUtc": [
+          "2026-10-16T08:15:44.990Z",
+          "2026-10-16T08:16:08.688Z"
+        ],
+        "cleanupOrReplayAdmitted": false,
+        "nativeActivation": false,
+        "replayPolicy": "never-replay-recorded-dispatch"
+      }
+    ],
+    "sourceCapture": {
+      "path": "/home/palantirkc/code/worktrees/harness-checkpoint-v8-20261016/work/codex-harness-engineering/ontology-driven-harness-operation/inputs/custody-v11.json",
+      "sha256": "2f176863468edc81ff0d0e53fd815beca120bd6514ad18f3d9c1aa7799aadcbf",
+      "bytes": 11874,
+      "state": "preserved uncommitted v11 source, not adopted as old Work current authority"
+    },
+    "readback": "Exact receipt and consumed-marker bytes/SHA rechecked read-only before this capture. Original operations and native stores were not replayed or changed.",
+    "authority": "none",
+    "nativeAuthorshipVerified": false,
+    "nativePermissionGranted": false,
+    "nativeActivation": false,
+    "replayPolicy": "Never replay these completed/consumed occurrences; native authentication/bookkeeping remain UNKNOWN where recorded."
+  }
+}
