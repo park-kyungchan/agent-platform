@@ -209,7 +209,7 @@
       "packageName": "@palantirkc/ontology-source",
       "packageManifest": {
         "path": "/home/palantirkc/code/shared/agent-platform/packages/ontology/package.json",
-        "sha256": "a332d1db6045eb1cb6e040f2ff8fd05fc782b5d803bdbd4f102f9ee57eec270a"
+        "sha256": "e82fb382a4d4dfbc784b293a307e8d9ef0fdcaecd637e750dc51d65ac3f0447c"
       },
       "sourcePins": [
         {
@@ -317,7 +317,7 @@
       "packageName": "@palantirkc/evidence-foundry-core",
       "packageManifest": {
         "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/package.json",
-        "sha256": "403850a137fd224b168ad61b3eb22492ba915f15be8234c552e61213359ec34f"
+        "sha256": "34fedd208a0d05f8b81cbb2d0096caaebc76faa8f7010be9c139c146aea3c50a"
       },
       "sourcePins": [
         {
@@ -420,7 +420,7 @@
       "packageName": "@palantirkc/research-capture-core",
       "packageManifest": {
         "path": "/home/palantirkc/code/shared/agent-platform/packages/research-capture/package.json",
-        "sha256": "1902f056621f384904310188e1c4f9580aacedc2fc32925a9ecd53deeafed9bd"
+        "sha256": "bcd6d0e3cebdf38e94b438e189f347b91c70ff469f45aa9c109d6d219d1e0fb3"
       },
       "sourcePins": [
         {
@@ -858,7 +858,7 @@
       "packageName": "@palantirkc/operational-context",
       "packageManifest": {
         "path": "/home/palantirkc/code/shared/agent-platform/packages/operational-context/package.json",
-        "sha256": "a2ba149b05d44dd9bb8526d2a435ef4f2a24262f89e4d09a62a273e95d1d549f"
+        "sha256": "3f93883989e034c555e1a14feea452cf2d01a1dad353f7470a6446d538a324e9"
       },
       "sourcePins": [
         {
