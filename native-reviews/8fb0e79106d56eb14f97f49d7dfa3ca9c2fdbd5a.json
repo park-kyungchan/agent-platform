@@ -1,0 +1,33 @@
+{
+  "schema": "native-independent-review.v2",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "8fb0e79106d56eb14f97f49d7dfa3ca9c2fdbd5a",
+  "reviewedTreeSha": "83eb86a3899742fc398d46dc54c42c67fa74894e",
+  "reviewedSourceManifestSha256": "1e7324fdf034af977ae947948ddfeac94c1e0bf845305572948fc4c19e814c20",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "COMMON-NATIVE-SOURCE-BATCH-INDEPENDENT-REVIEW"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "COMMON-NATIVE-SOURCE-INTEGRATION"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/eff479eabdd95a1e20c3a21004a1b130fcff93db/native-review-results/8fb0e79106d56eb14f97f49d7dfa3ca9c2fdbd5a.json",
+    "sha256": "32af7d2b425f9e7b76eea6fa8694a22cb96efbd5e06997eb0d120a9873037515"
+  },
+  "fullReviewDetails": {
+    "commit": "eff479eabdd95a1e20c3a21004a1b130fcff93db",
+    "path": "native-review-details/8fb0e79106d56eb14f97f49d7dfa3ca9c2fdbd5a-full.json",
+    "sha256": "add5fed231a3614cc1bf0786f7ce7101ada7c622ed3ae6273024d2996272ba6d",
+    "bytes": 41574,
+    "meaning": "Exact original full report accompanies its reviewer-produced bounded canonical projection in the same immutable result commit"
+  }
+}
