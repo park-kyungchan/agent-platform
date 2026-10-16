@@ -4,6 +4,7 @@ import { constants } from "node:fs";
 import { cp, mkdir, mkdtemp, open, readdir, realpath, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
+import { captureInstalledRuntimeClosure } from "./dependency-closure.ts";
 
 const canonicalRoot = resolve(import.meta.dir, "../../../..");
 const packagePath = "packages/native-hermes-adapter";
@@ -30,6 +31,7 @@ const generationPaths = [
   packagePath + "/src/source-provider/generate.ts",
   packagePath + "/src/source-provider/guard.template.ts",
   "architecture/hermes-new-source-successor.json",
+  packagePath + "/src/source-provider/dependency-closure.ts",
 ];
 const sha = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
@@ -231,12 +233,12 @@ export async function verifySourceFixture(fixture: SourceFixture) {
     if (sha(await exact(join(canonicalRoot, pin.path))) !== pin.sha256)
       throw Error("CURRENT_CANONICAL_SOURCE_CHANGED");
   assertFiniteSourceCompleteness(manifest.finiteOwnerSourceQa);
-  for (const pin of manifest.finiteOwnerSourceQa as { path: string; sha256: string }[])
-    if (
-      pin.path.startsWith("codex-") &&
-      sha(await exact(join(canonicalRoot, "owner-fixture", pin.path))) !== pin.sha256
-    )
-      throw Error("CURRENT_CODEX_QA_SOURCE_CHANGED");
+  for (const pin of manifest.finiteOwnerSourceQa as { path: string; sha256: string }[]) {
+    const actual = pin.path.startsWith("codex-")
+      ? join(canonicalRoot, "owner-fixture", pin.path)
+      : join(fixture.fixtureRoot, pin.path);
+    if (sha(await exact(actual)) !== pin.sha256) throw Error("CURRENT_FINITE_QA_SOURCE_CHANGED");
+  }
   const current = await tree(fixture.fixtureRoot);
   if (JSON.stringify(current) !== JSON.stringify({ files: manifest.files, links: manifest.links }))
     throw Error("SOURCE_FIXTURE_CLOSURE_CHANGED");
@@ -350,30 +352,40 @@ export async function generateHermesSourceFixture(): Promise<SourceFixture> {
     nativePermissionGranted: false,
   });
   await put(join(codeOwnerRoot, "architecture/hermes-context-provider.json"), registrationBytes);
+  const successorBytes = json({
+    schema: "hermes.new-source-generated-projection.v1",
+    originalSourceRestored: false,
+    codeOwner: "agent-platform",
+    semanticOwners: ["ontology-platform", "hermes-harness-engineering"],
+    nativeAndDataOwnersRetained: true,
+    nativePermissionGranted: false,
+    authority: "none",
+    lineage: "architecture/hermes-new-source-successor.json",
+    inputs: [...inputs].map(([path, bytes]) => ({ path, sha256: sha(bytes) })),
+    runtimeDependencies: await captureInstalledRuntimeClosure(providerRoot, exact, sha, false),
+  });
+  await put(join(codeOwnerRoot, "source-successor.json"), successorBytes);
+
   const template = inputs.get(generationPaths[1])!.toString();
+  const inlineMarker = "// __INLINE_CANONICAL_DEPENDENCY_CLOSURE__";
+  if (template.split(inlineMarker).length !== 2)
+    throw Error("EXACT_DEPENDENCY_PROJECTION_REQUIRED");
+  const composed = template.replace(
+    inlineMarker,
+    inputs.get(generationPaths[3])!.toString() +
+      "\ncaptureDependencies = captureInstalledRuntimeClosure;\n",
+  );
   const marker = 'const expectedRegistrationSha256 = "' + "0".repeat(64) + '";';
-  if (template.split(marker).length !== 2) throw Error("EXACT_TEMPLATE_SUBSTITUTION_REQUIRED");
+  const lineageMarker = 'const expectedSuccessorSha256 = "' + "0".repeat(64) + '";';
+  if (composed.split(marker).length !== 2 || composed.split(lineageMarker).length !== 2)
+    throw Error("EXACT_TEMPLATE_SUBSTITUTION_REQUIRED");
   await put(
     join(codeOwnerRoot, "src/ontology-driven/provider-source.ts"),
-    template.replace(
-      marker,
-      'const expectedRegistrationSha256 = "' + sha(registrationBytes) + '";',
-    ),
+    composed
+      .replace(marker, 'const expectedRegistrationSha256 = "' + sha(registrationBytes) + '";')
+      .replace(lineageMarker, 'const expectedSuccessorSha256 = "' + sha(successorBytes) + '";'),
   );
-  await put(
-    join(codeOwnerRoot, "source-successor.json"),
-    json({
-      schema: "hermes.new-source-generated-projection.v1",
-      originalSourceRestored: false,
-      codeOwner: "agent-platform",
-      semanticOwners: ["ontology-platform", "hermes-harness-engineering"],
-      nativeAndDataOwnersRetained: true,
-      nativePermissionGranted: false,
-      authority: "none",
-      lineage: "architecture/hermes-new-source-successor.json",
-      inputs: [...inputs].map(([path, bytes]) => ({ path, sha256: sha(bytes) })),
-    }),
-  );
+
   const historicalQa = JSON.parse(
     (await exact(join(canonicalRoot, "owner-fixture/manifest.json"))).toString(),
   );

@@ -707,7 +707,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/provider.ts",
-          "sha256": "109cf4a0b32fbc631b5626d0ab183303f3f307f785698ebb71950f0a697f6947",
+          "sha256": "a988f9745cadbe968fc7e744e03252d12a3348ae906258c2acc1ff2fb49d7552",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/provider.ts"
         },
         {
@@ -802,13 +802,18 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/generate.ts",
-          "sha256": "4d63ea1cac5b7ef0d312cb8df51007b3e4917ee5df993ed3bb52bac983520ae7",
+          "sha256": "d370732e99a8545c73f9b51c32d1a3ecf05e413f1afcacce8a616ae9456f00c7",
           "relativePath": "packages/native-hermes-adapter/src/source-provider/generate.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/guard.template.ts",
-          "sha256": "de39535914987f870e4b85bb811066b01a32c4fac1906fa39019dc83abb16b50",
+          "sha256": "8f3bdfc3b6d927ec4e022fd5bc5108a7724b730fee227bc675f5db1bc0885775",
           "relativePath": "packages/native-hermes-adapter/src/source-provider/guard.template.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
+          "relativePath": "packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
+          "sha256": "c49c290c6a6a363c54dd54281d8580b00dc9e1d94eeb2e5fbda8249337d7a613"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
@@ -834,7 +839,9 @@
         "outputPolicy": "Exclusive fictional temporary fixtures only; generated outputs are not a second maintained implementation.",
         "historicalOriginalSourceRestored": false,
         "activeOwnerRegistrationChanged": false,
-        "nativePermissionGranted": false
+        "nativePermissionGranted": false,
+        "dependencyObserver": "packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
+        "existingDataContentAttested": false
       }
     },
     {

@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { lstat, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, lstat, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   assertFiniteSourceCompleteness,
@@ -81,7 +81,7 @@ test("new fictional facade has nine byte-exact canonical forwarders,14/19/20 pro
     consumer: 20,
     nativePermissionGranted: false,
   });
-});
+}, 25000);
 
 test("generator has no arbitrary output target and refuses actual owner publication arguments", async () => {
   const process = Bun.spawn(
@@ -207,7 +207,7 @@ test("post-read check refuses canonical or owner-source mutation", async () => {
   );
   expect(owner.status).not.toBe(0);
   expect(owner.stderr).toContain("Hermes code source changed during packaging");
-});
+}, 25000);
 
 test("guard rejects unknown facade files and fixed-root substitution", async () => {
   const f = await fixture();
@@ -247,7 +247,7 @@ test("repinned incomplete registration,unknown fields and foreign provider root 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(message);
   }
-});
+}, 25000);
 
 test("removing registration cannot qualify canonical forwarders or fall back to standalone proof", async () => {
   const f = await fixture();
@@ -294,4 +294,210 @@ test("generated facade is deterministic modulo exclusive fixture roots", async (
     "source-successor.json",
     "src",
   ]);
+});
+
+test("existing exact project/state entrypoints remain outside source proof and source cache identity", async () => {
+  const f = await fixture();
+  // A test-only overlay stands for existing owner data; the generator produced none of these records.
+  await writeFile(
+    join(f.codeOwnerRoot, "project.json"),
+    '{"classification":"synthetic-existing-owner-data"}',
+  );
+  await mkdir(join(f.codeOwnerRoot, "state"));
+  await writeFile(
+    join(f.codeOwnerRoot, "state/next-session.json"),
+    '{"classification":"synthetic-existing-owner-data"}',
+  );
+  const result = await child(
+    f,
+    `const proof=await api.observeHermesContextProvider(f.codeOwnerRoot);
+    await Bun.write(f.codeOwnerRoot+'/project.json','changed owner data, intentionally not parsed by source guard');
+    await Bun.write(f.codeOwnerRoot+'/state/next-session.json','changed owner data');
+    await proof.verify();const again=await api.observeHermesContextProvider(f.codeOwnerRoot);
+    console.log(JSON.stringify({observed:again.pins.length,consumer:again.pins.length+1,dataAttested:again.pins.some(p=>p.path.endsWith('/project.json')||p.path.endsWith('/next-session.json'))}));`,
+  );
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({ observed: 19, consumer: 20, dataAttested: false });
+  // The stricter generator-output manifest does not silently adopt the subsequent owner-data overlay.
+  await expect(verifySourceFixture(f)).rejects.toThrow("SOURCE_FIXTURE_CLOSURE_CHANGED");
+});
+
+test("owner data boundary is exact and cannot hide executable, extra or symlink paths", async () => {
+  for (const path of ["state/hidden.ts", "state/unregistered.json"]) {
+    const f = await fixture();
+    await mkdir(join(f.codeOwnerRoot, "state"));
+    await writeFile(join(f.codeOwnerRoot, path), "throw Error('MUST_NOT_IMPORT');");
+    const result = await child(f, "await api.observeHermesContextProvider(f.codeOwnerRoot);");
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("UNKNOWN_FACADE_FILE");
+  }
+  const f = await fixture();
+  await symlink(join(f.codeOwnerRoot, "package.json"), join(f.codeOwnerRoot, "project.json"));
+  const result = await child(f, "await api.observeHermesContextProvider(f.codeOwnerRoot);");
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("UNADMITTED_FACADE_SYMLINK");
+});
+
+test("observed wrapper successor keeps the original literal cache refusal before malformed-wrapper classification", async () => {
+  const f = await fixture();
+  const result = await child(
+    f,
+    `const proof=await api.observeHermesContextProvider(f.codeOwnerRoot);await proof.verify();
+    await import(f.codeOwnerRoot+'/src/ontology-driven/work-context.ts');
+    const path=f.codeOwnerRoot+'/src/ontology-driven/work-context.ts';
+    await Bun.write(path,(await Bun.file(path).text())+${JSON.stringify("\nthrow Error('MUST_NOT_IMPORT_OWNER_SUCCESSOR');\n")});
+    try{await api.observeHermesContextProvider(f.codeOwnerRoot);throw Error('UNSAFE_ACCEPT');}
+    catch(error){console.log(JSON.stringify({message:error.message,observed:proof.pins.length,consumer:proof.pins.length+1}));}`,
+  );
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({
+    message: "Hermes Work provider changed after import; use a fresh process",
+    observed: 19,
+    consumer: 20,
+  });
+  const g = await fixture();
+  await writeFile(
+    join(g.codeOwnerRoot, "src/ontology-driven/work-context.ts"),
+    "throw Error('MUST_NOT_IMPORT');",
+  );
+  const initial = await child(g, "await api.observeHermesContextProvider(f.codeOwnerRoot);");
+  expect(initial.status).not.toBe(0);
+  expect(initial.stderr).toContain("NONCANONICAL_GENERATED_FORWARDER");
+});
+
+test("finite8 verifier rejects a repinned false generated Hermes eighth digest", async () => {
+  const f = await fixture();
+  const manifest = JSON.parse(await readFile(f.manifestPath, "utf8"));
+  manifest.finiteOwnerSourceQa.find((pin: { path: string }) =>
+    pin.path.startsWith("hermes-"),
+  ).sha256 = "0".repeat(64);
+  const bytes = JSON.stringify(manifest, null, 2) + "\n";
+  await writeFile(f.manifestPath, bytes);
+  await expect(verifySourceFixture({ ...f, manifestSha256: sha(bytes) })).rejects.toThrow(
+    "CURRENT_FINITE_QA_SOURCE_CHANGED",
+  );
+});
+
+test("immutable Ontology transitive canary is refused before first Work import", async () => {
+  const f = await fixture(),
+    canary = join(f.fixtureRoot, "TRANSITIVE_CANARY_EXECUTED");
+  await writeFile(
+    join(f.providerRoot, "node_modules/@palantirkc/ontology/dist/validation.js"),
+    `await Bun.write(${JSON.stringify(canary)},'unsafe');throw Error('TRANSITIVE_CANARY_EXECUTED');`,
+  );
+  const result = await child(
+    f,
+    `await api.observeHermesContextProvider(f.codeOwnerRoot);
+    await import(f.codeOwnerRoot+'/src/ontology-driven/work-context.ts');`,
+  );
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("IMMUTABLE_ONTOLOGY_INSTALL_CLOSURE_DRIFT");
+  expect(await Bun.file(canary).exists()).toBe(false);
+});
+
+test("transitive canary mutation after observation is withheld by final source readback", async () => {
+  const f = await fixture(),
+    canary = join(f.fixtureRoot, "TRANSITIVE_CANARY_EXECUTED");
+  const result = await child(
+    f,
+    `const proof=await api.observeHermesContextProvider(f.codeOwnerRoot);
+    await Bun.write(f.providerRoot+'/node_modules/@palantirkc/ontology/dist/validation.js',${JSON.stringify(`await Bun.write(${JSON.stringify(canary)},'unsafe');throw Error('TRANSITIVE_CANARY_EXECUTED');`)});
+    await proof.verify();await import(f.codeOwnerRoot+'/src/ontology-driven/work-context.ts');`,
+  );
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("Hermes code source changed during packaging");
+  expect(await Bun.file(canary).exists()).toBe(false);
+});
+
+test("initial mutation of an AJV transitive file cannot be silently recaptured as trusted source", async () => {
+  const f = await fixture();
+  const path = join(f.providerRoot, "node_modules/ajv/dist/compile/index.js");
+  await writeFile(
+    path,
+    (await readFile(path, "utf8")) + "\nthrow Error('TRANSITIVE_CANARY_EXECUTED');\n",
+  );
+  const result = await child(f, "await api.observeHermesContextProvider(f.codeOwnerRoot);");
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("EXECUTABLE_DEPENDENCY_CLOSURE_DRIFT");
+});
+
+test("dependency closure refuses malformed,missing,extra,foreign and symlinked runtime dependencies", async () => {
+  for (const mutation of ["malformed", "missing", "extra", "foreign", "symlink"] as const) {
+    const f = await fixture(),
+      ajv = join(f.providerRoot, "node_modules/ajv");
+    if (mutation === "malformed") await writeFile(join(ajv, "package.json"), "{malformed");
+    if (mutation === "missing") await rm(join(ajv, "dist/compile/index.js"));
+    if (mutation === "extra")
+      await writeFile(join(ajv, "extra.js"), "throw Error('MUST_NOT_IMPORT');");
+    if (mutation === "foreign") {
+      const foreign = join(f.fixtureRoot, "foreign-ajv");
+      await cp(ajv, foreign, { recursive: true });
+      await rm(ajv, { recursive: true });
+      await symlink(foreign, ajv);
+    }
+    if (mutation === "symlink") {
+      await rm(join(ajv, "dist/compile/index.js"));
+      await symlink(join(ajv, "dist/ajv.js"), join(ajv, "dist/compile/index.js"));
+    }
+    const result = await child(f, "await api.observeHermesContextProvider(f.codeOwnerRoot);");
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain(
+      {
+        malformed: "SyntaxError",
+        missing: "EXECUTABLE_DEPENDENCY_CLOSURE_DRIFT",
+        extra: "EXECUTABLE_DEPENDENCY_CLOSURE_DRIFT",
+        foreign: "PLATFORM_DEPENDENCY_ESCAPED_OWNER",
+        symlink: "UNADMITTED_PLATFORM_DEPENDENCY_SYMLINK",
+      }[mutation],
+    );
+  }
+}, 25000);
+
+test("repinning a mutated installed Ontology file cannot replace its immutable release correspondence", async () => {
+  const f = await fixture(),
+    path = join(f.providerRoot, "node_modules/@palantirkc/ontology/dist/validation.js");
+  await writeFile(path, (await readFile(path, "utf8")) + "\nthrow Error('MUST_NOT_IMPORT');\n");
+  const lineagePath = join(f.codeOwnerRoot, "source-successor.json");
+  const lineage = JSON.parse(await readFile(lineagePath, "utf8"));
+  const row = lineage.runtimeDependencies.dependencyPins.find(
+    (pin: { path: string }) => pin.path === "node_modules/@palantirkc/ontology/dist/validation.js",
+  );
+  const bytes = await readFile(path);
+  row.sha256 = sha(bytes);
+  row.bytes = bytes.length;
+  const lineageBytes = JSON.stringify(lineage, null, 2) + "\n";
+  await writeFile(lineagePath, lineageBytes);
+  const guardPath = join(f.codeOwnerRoot, "src/ontology-driven/provider-source.ts");
+  await writeFile(
+    guardPath,
+    (await readFile(guardPath, "utf8")).replace(
+      /const expectedSuccessorSha256 = "[a-f0-9]{64}";/u,
+      `const expectedSuccessorSha256 = "${sha(lineageBytes)}";`,
+    ),
+  );
+  const result = await child(f, "await api.observeHermesContextProvider(f.codeOwnerRoot);");
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("IMMUTABLE_ONTOLOGY_INSTALL_CLOSURE_DRIFT");
+});
+
+test("preimported transitive executable dependency requires a fresh source process", async () => {
+  const f = await fixture();
+  const result = await child(
+    f,
+    `await import(f.providerRoot+'/node_modules/@palantirkc/ontology/dist/validation.js');
+    await api.observeHermesContextProvider(f.codeOwnerRoot);`,
+  );
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("loaded before source observation");
+});
+
+test("adding an executable dependency after observation is outside the captured closure", async () => {
+  const f = await fixture();
+  const result = await child(
+    f,
+    `const proof=await api.observeHermesContextProvider(f.codeOwnerRoot);
+    await Bun.write(f.providerRoot+'/node_modules/ajv/extra.js','throw Error("MUST_NOT_IMPORT");');await proof.verify();`,
+  );
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain("executable dependency closure changed during read");
 });

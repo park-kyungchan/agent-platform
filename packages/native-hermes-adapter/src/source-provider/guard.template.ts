@@ -1,13 +1,27 @@
-/** NEW source-only compatibility guard. The generator substitutes only the registration digest.
+/** NEW source-only compatibility guard. The generator embeds the canonical dependency observer
+ * and substitutes only the registration and successor-manifest digests.
  * This source is not recovered historical owner code and confers no native permission. */
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
-import { open, readdir, realpath } from "node:fs/promises";
+import { lstat, open, readdir, realpath } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
+
+let captureDependencies!: (
+  root: string,
+  read: (path: string, maxBytes: number) => Promise<Uint8Array>,
+  digest: (bytes: Uint8Array | string) => string,
+  includeWorkContinuity: boolean,
+) => Promise<{
+  dependencies: { name: string; version: string; root: string }[];
+  dependencyPins: { path: string; sha256: string; bytes: number }[];
+}>;
+// __INLINE_CANONICAL_DEPENDENCY_CLOSURE__
 
 // Keep the existing v1 consumer's exact single-line marker grammar.
 // prettier-ignore
 const expectedRegistrationSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
+// prettier-ignore
+const expectedSuccessorSha256 = "0000000000000000000000000000000000000000000000000000000000000000";
 const codeOwnerRoot = resolve(import.meta.dir, "../..");
 const providerRoot = resolve(codeOwnerRoot, "../agent-platform");
 const selfPath = join(codeOwnerRoot, "src/ontology-driven/provider-source.ts");
@@ -69,6 +83,9 @@ const facadePaths = [
   "src/ontology-driven/provider-source.ts",
   ...moduleNames.map((name) => "src/" + name + ".ts"),
 ].sort();
+// Only these existing legacy consumer data entrypoints are outside generated source ownership.
+// We inspect file metadata, never read/hash their content or include it in source proof/cache identity.
+const ownerDataPaths = new Set(["project.json", "state/next-session.json"]);
 type Pin = { path: string; sha256: string };
 type Registration = {
   schema: string;
@@ -131,6 +148,18 @@ async function facadeFiles() {
         continue; // actual package resolution is separately fixed and pinned below
       }
       if (entry.isSymbolicLink()) throw Error("UNADMITTED_FACADE_SYMLINK");
+      if (ownerDataPaths.has(path)) {
+        const absolute = join(directory, entry.name),
+          info = await lstat(absolute);
+        if (
+          !entry.isFile() ||
+          !info.isFile() ||
+          info.isSymbolicLink() ||
+          (await realpath(absolute)) !== absolute
+        )
+          throw Error("INVALID_EXISTING_OWNER_DATA_ENTRYPOINT");
+        continue;
+      }
       if (entry.isDirectory()) await visit(join(directory, entry.name), path + "/");
       else if (entry.isFile()) files.push(path);
       else throw Error("UNADMITTED_FACADE_FILE");
@@ -142,6 +171,7 @@ async function facadeFiles() {
     throw Error("INCOMPLETE_OR_UNKNOWN_FACADE_FILE");
 }
 const imported = new Map<string, string>();
+const importedFacades = new Map<string, readonly Pin[]>();
 /** v1-compatible exact14 source rows, observed19 pins; caller includes this guard as pin20. */
 export async function observeHermesContextProvider(sourceRoot: string) {
   if (
@@ -153,6 +183,15 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     throw Error("Hermes source provider requires the fixed code owner, not a data or native root");
   if (sha(await exact(selfPath, 100_000)) !== initialSelf)
     throw Error("Hermes guard changed after import; use a fresh process");
+  const module = join(
+    providerRoot,
+    "packages/native-hermes-adapter/src/ontology-driven/work-context.ts",
+  );
+  // Classify a changed previously observed source facade before initial malformed-wrapper validation.
+  // This never permits a malformed first import and never clears a native module cache.
+  for (const pin of importedFacades.get(module) ?? [])
+    if (sha(await exact(pin.path)) !== pin.sha256)
+      throw Error("Hermes Work provider changed after import; use a fresh process");
   await facadeFiles();
   const registrationPath = join(codeOwnerRoot, "architecture/hermes-context-provider.json");
   const bytes = await exact(registrationPath);
@@ -186,20 +225,21 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     sourcePaths.some((path) => !registration.sourcePins.some((pin) => pin.path === path))
   )
     throw Error("Incomplete Hermes source provider denominator");
-  const lineage = keys(
-    JSON.parse((await exact(join(codeOwnerRoot, "source-successor.json"))).toString()),
-    [
-      "schema",
-      "originalSourceRestored",
-      "codeOwner",
-      "semanticOwners",
-      "nativeAndDataOwnersRetained",
-      "nativePermissionGranted",
-      "authority",
-      "lineage",
-      "inputs",
-    ],
-  );
+  const lineageBytes = await exact(join(codeOwnerRoot, "source-successor.json"));
+  if (sha(lineageBytes) !== expectedSuccessorSha256)
+    throw Error("NEW_SOURCE_SUCCESSOR_MANIFEST_CHANGED");
+  const lineage = keys(JSON.parse(lineageBytes.toString()), [
+    "schema",
+    "originalSourceRestored",
+    "codeOwner",
+    "semanticOwners",
+    "nativeAndDataOwnersRetained",
+    "nativePermissionGranted",
+    "authority",
+    "lineage",
+    "inputs",
+    "runtimeDependencies",
+  ]);
   if (
     lineage.schema !== "hermes.new-source-generated-projection.v1" ||
     lineage.originalSourceRestored !== false ||
@@ -216,6 +256,7 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     "packages/native-hermes-adapter/src/source-provider/generate.ts",
     "packages/native-hermes-adapter/src/source-provider/guard.template.ts",
     "architecture/hermes-new-source-successor.json",
+    "packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
   ];
   if (
     !Array.isArray(lineage.inputs) ||
@@ -244,14 +285,26 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     provenancePins.push({ path, sha256: pin.sha256 });
   }
   const template = (await exact(join(providerRoot, provenancePaths[1]))).toString();
+  const dependencySource = (await exact(join(providerRoot, provenancePaths[3]))).toString();
+  const inlineMarker = ["//", "__INLINE_CANONICAL_DEPENDENCY_CLOSURE__"].join(" ");
+  if (template.split(inlineMarker).length !== 2)
+    throw Error("EXACT_DEPENDENCY_PROJECTION_REQUIRED");
+  const composed = template.replace(
+    inlineMarker,
+    dependencySource + "\ncaptureDependencies = captureInstalledRuntimeClosure;\n",
+  );
   const marker = 'const expectedRegistrationSha256 = "' + "0".repeat(64) + '";';
+  const lineageMarker = 'const expectedSuccessorSha256 = "' + "0".repeat(64) + '";';
   if (
-    template.split(marker).length !== 2 ||
+    composed.split(marker).length !== 2 ||
+    composed.split(lineageMarker).length !== 2 ||
     sha(
-      template.replace(
-        marker,
-        'const expectedRegistrationSha256 = "' + expectedRegistrationSha256 + '";',
-      ),
+      composed
+        .replace(marker, 'const expectedRegistrationSha256 = "' + expectedRegistrationSha256 + '";')
+        .replace(
+          lineageMarker,
+          'const expectedSuccessorSha256 = "' + expectedSuccessorSha256 + '";',
+        ),
     ) !== initialSelf
   )
     throw Error("GENERATED_GUARD_TEMPLATE_BINDING_CHANGED");
@@ -291,10 +344,6 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     )
       throw Error("Hermes actual implementation resolution escaped canonical owner");
   }
-  const module = join(
-    providerRoot,
-    "packages/native-hermes-adapter/src/ontology-driven/work-context.ts",
-  );
   const installedPath = Bun.resolveSync("@palantirkc/ontology/package.json", dirname(module));
   if (!installedPath.startsWith(providerRoot + "/"))
     throw Error("FOREIGN_IMMUTABLE_DEPENDENCY_ROOT");
@@ -313,6 +362,13 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     join(codeOwnerRoot, "bun.lock"),
   ])
     pins.push({ path, sha256: sha(await exact(path)) });
+  const runtimeDependencies = await captureDependencies(providerRoot, exact, sha, false);
+  if (JSON.stringify(runtimeDependencies) !== JSON.stringify(lineage.runtimeDependencies))
+    throw Error("EXECUTABLE_DEPENDENCY_CLOSURE_DRIFT");
+  const runtimePins = runtimeDependencies.dependencyPins.map((pin) => ({
+    path: join(providerRoot, pin.path),
+    sha256: pin.sha256,
+  }));
   // Every generated source file participates in cache/readback currentness, beyond the compatible19 proof.
   const facadePins = await Promise.all(
     facadePaths.map(async (name) => ({
@@ -320,7 +376,7 @@ export async function observeHermesContextProvider(sourceRoot: string) {
       sha256: sha(await exact(join(codeOwnerRoot, name))),
     })),
   );
-  const closure = sha(JSON.stringify([...pins, ...facadePins, ...provenancePins]));
+  const closure = sha(JSON.stringify([...pins, ...facadePins, ...provenancePins, ...runtimePins]));
   const prior = imported.get(module);
   if (prior !== undefined && prior !== closure)
     throw Error("Hermes Work provider changed after import; use a fresh process");
@@ -334,18 +390,25 @@ export async function observeHermesContextProvider(sourceRoot: string) {
           join(providerRoot, "packages/native-hermes-adapter/src/" + name + ".ts"),
         ),
       ) ||
-      moduleNames.some((name) => Object.hasOwn(cache, join(codeOwnerRoot, "src/" + name + ".ts")))
+      moduleNames.some((name) =>
+        Object.hasOwn(cache, join(codeOwnerRoot, "src/" + name + ".ts")),
+      ) ||
+      runtimePins.some((pin) => /\.[cm]?[jt]s$/u.test(pin.path) && Object.hasOwn(cache, pin.path))
     )
       throw Error("Hermes Work code was loaded before source observation; use a fresh process");
   }
   const verify = async () => {
     await facadeFiles();
-    for (const pin of [...pins, ...facadePins, ...provenancePins])
+    for (const pin of [...pins, ...facadePins, ...provenancePins, ...runtimePins])
       if (sha(await exact(pin.path)) !== pin.sha256)
         throw Error("Hermes code source changed during packaging: " + pin.path);
+    const current = await captureDependencies(providerRoot, exact, sha, false);
+    if (JSON.stringify(current) !== JSON.stringify(runtimeDependencies))
+      throw Error("Hermes executable dependency closure changed during read");
   };
   await verify();
   imported.set(module, closure);
+  importedFacades.set(module, facadePins);
   return {
     schema: "hermes.observed-context-source-provider.v1" as const,
     codeOwnerRoot,
