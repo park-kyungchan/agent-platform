@@ -18,9 +18,9 @@
   },
   "title": "Implement typed reachable normative context and complete historical effect custody/replay validation.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "unverified",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Complete shared lossless compact normative projection; obtain independent review, then integrate exact source and provider closure."
+  "nextAction": "Source implementation and scoped independent reports are retained. Read inputs/checkpoint-v7.json#/content for exact component/source-report routes, current composition and remaining final check/publication/native gates. Source-only completion does not establish formal verification, native effects, activation or Acceptance."
 }

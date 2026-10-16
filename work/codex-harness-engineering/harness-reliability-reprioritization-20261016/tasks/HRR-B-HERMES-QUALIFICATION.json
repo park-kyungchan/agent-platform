@@ -18,9 +18,9 @@
   },
   "title": "Qualify current Hermes installation/native-adapter prerequisites and safe diagnostic stages without replaying repaired effects.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "unverified",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Consume common compact projection, preserve native v1 compatibility and strict v2 output budget, then independently review source."
+  "nextAction": "Source implementation and scoped independent reports are retained. Read inputs/checkpoint-v7.json#/content for exact component/source-report routes, current composition and remaining final check/publication/native gates. Source-only completion does not establish formal verification, native effects, activation or Acceptance."
 }

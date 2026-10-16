@@ -17,11 +17,11 @@
     "taskId": "HRR-B-CODEX-CONTEXT"
   },
   "title": "Preserve shared complete normative context in source-guarded Codex native v1/v2 delivery.",
-  "nextAction": "Consume the canonical compact API after owner source verification; keep v1 6000 and explicit v2 cap12000 with complete-contract overflow holds.",
+  "nextAction": "Source implementation and scoped independent reports are retained. Read inputs/checkpoint-v7.json#/content for exact component/source-report routes, current composition and remaining final check/publication/native gates. Source-only completion does not establish formal verification, native effects, activation or Acceptance.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "unverified",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },

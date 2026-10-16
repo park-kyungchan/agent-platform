@@ -18,9 +18,9 @@
   },
   "title": "Reconcile reusable owner lifecycle/safe-diagnostic behavior in VPS/Education without replaying old once1 or accessing business data.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "unverified",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Bound existing SSH transport diagnostics and definitive owned-child cleanup in isolated VPS source; use inert tests only."
+  "nextAction": "Source implementation and scoped independent reports are retained. Read inputs/checkpoint-v7.json#/content for exact component/source-report routes, current composition and remaining final check/publication/native gates. Source-only completion does not establish formal verification, native effects, activation or Acceptance."
 }
