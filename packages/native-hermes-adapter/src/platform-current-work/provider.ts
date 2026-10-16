@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
-import { open, readdir, realpath } from "node:fs/promises";
+import { open, realpath } from "node:fs/promises";
 import { constants } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
+
+import { captureInstalledRuntimeClosure } from "../source-provider/dependency-closure.ts";
 
 /** Bootstrap guard depends only on builtins, before any current/legacy implementation import. */
 export async function readExactFile(path: string, maxBytes: number, expectedSha256?: string) {
@@ -99,6 +101,7 @@ export const platformSourcePaths = [
   ),
   "packages/work-continuity/src/logical-identity.ts",
   "packages/work-continuity/src/operational-state.ts",
+  "packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
 ].sort();
 export interface PlatformPin {
   path: string;
@@ -130,10 +133,6 @@ function freeze<T>(value: T): T {
   }
   return value;
 }
-function within(root: string, path: string) {
-  const name = relative(root, path);
-  return name !== "" && !name.startsWith("..") && !isAbsolute(name);
-}
 function safePath(path: unknown): path is string {
   return (
     typeof path === "string" &&
@@ -148,73 +147,6 @@ async function pin(root: string, path: string): Promise<PlatformPin> {
   const bytes = await readExactFile(join(root, path), 1048576);
   return { path, sha256: sourceDigest(bytes), bytes: bytes.length };
 }
-/** Read the entire finite installed runtime package closure, including package exports and schemas. */
-async function dependencies(
-  root: string,
-): Promise<{ dependencies: PlatformDependency[]; dependencyPins: PlatformPin[] }> {
-  const rows: PlatformDependency[] = [],
-    pins: PlatformPin[] = [],
-    seen = new Set<string>();
-  let totalBytes = 0;
-  async function visit(name: string, from: string) {
-    const packagePath = await realpath(Bun.resolveSync(name + "/package.json", from)),
-      packageRoot = dirname(packagePath);
-    const canonicalWorkspace =
-      name === "@palantirkc/work-continuity" &&
-      packageRoot === join(root, "packages/work-continuity");
-    if (canonicalWorkspace) return;
-    if (!within(join(root, "node_modules"), packagePath))
-      throw Error("PLATFORM_DEPENDENCY_ESCAPED_OWNER");
-    if (seen.has(packageRoot)) return;
-    seen.add(packageRoot);
-    if (seen.size > 32) throw Error("PLATFORM_DEPENDENCY_COUNT_LIMIT");
-    const manifest: unknown = JSON.parse((await readExactFile(packagePath, 65536)).toString());
-    if (!manifest || typeof manifest !== "object" || Array.isArray(manifest))
-      throw Error("INVALID_PLATFORM_DEPENDENCY");
-    const data = manifest as Record<string, unknown>;
-    if (
-      data.name !== name ||
-      typeof data.version !== "string" ||
-      !data.version ||
-      (name === "@palantirkc/ontology" && data.version !== "0.2.0")
-    )
-      throw Error("PLATFORM_DEPENDENCY_IDENTITY_DRIFT");
-    rows.push({ name, version: data.version, root: relative(root, packageRoot) });
-    async function walk(directory: string) {
-      for (const entry of await readdir(directory, { withFileTypes: true })) {
-        if (entry.name === "node_modules") continue;
-        const path = join(directory, entry.name);
-        if (entry.isSymbolicLink()) throw Error("UNADMITTED_PLATFORM_DEPENDENCY_SYMLINK");
-        if (entry.isDirectory()) await walk(path);
-        else if (entry.isFile()) {
-          if (pins.length >= 2048) throw Error("PLATFORM_DEPENDENCY_FILE_LIMIT");
-          const next = await pin(root, relative(root, path));
-          totalBytes += next.bytes;
-          if (totalBytes > 32 * 1024 * 1024) throw Error("PLATFORM_DEPENDENCY_BYTE_LIMIT");
-          pins.push(next);
-        } else throw Error("UNADMITTED_PLATFORM_DEPENDENCY_FILE");
-      }
-    }
-    await walk(packageRoot);
-    if (data.dependencies !== undefined) {
-      if (
-        !data.dependencies ||
-        typeof data.dependencies !== "object" ||
-        Array.isArray(data.dependencies)
-      )
-        throw Error("INVALID_PLATFORM_DEPENDENCIES");
-      const children = Object.keys(data.dependencies);
-      if (children.length > 32) throw Error("PLATFORM_DEPENDENCY_COUNT_LIMIT");
-      for (const child of children.sort()) await visit(child, packageRoot);
-    }
-  }
-  await visit("@palantirkc/ontology", root);
-  await visit("@palantirkc/work-continuity", join(root, "packages/native-hermes-adapter"));
-  return {
-    dependencies: rows.sort((a, b) => a.name.localeCompare(b.name)),
-    dependencyPins: pins.sort((a, b) => a.path.localeCompare(b.path)),
-  };
-}
 export async function captureHermesPlatformSource(
   providerRoot: string,
 ): Promise<PlatformSourceRegistration> {
@@ -227,7 +159,15 @@ export async function captureHermesPlatformSource(
     packageName: "@palantirkc/native-hermes-adapter",
     entrypoints: { ...platformEntryPoints },
     sourcePins,
-    ...(await dependencies(providerRoot)),
+    ...(await captureInstalledRuntimeClosure(
+      providerRoot,
+      readExactFile,
+      sourceDigest,
+      true,
+      platformSourcePaths
+        .filter((path) => path.endsWith(".ts"))
+        .map((path) => join(providerRoot, path)),
+    )),
     authority: "none",
     nativePermissionGranted: false,
   };

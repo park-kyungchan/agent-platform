@@ -1,0 +1,313 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "continuation-checkpoint-20261016-v7",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-lead:append-only-continuation-checkpoint-20261016-v7",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "herdr-codex-long-work-checkpoint",
+    "ontologyPackage": {
+      "name": "@palantirkc/ontology",
+      "version": "0.2.0"
+    },
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "version": 7,
+    "updatedAtUtc": "2026-10-16T01:44:59.901Z",
+    "intent": {
+      "objective": "Finish full Spec7/Plan7: reviewed source delivery, both native adoption/recovery, portfolio/private Academy outcomes, integrated independent verification and separate Lead Acceptance.",
+      "successCriteria": [
+        "Preserve original47 decisions/63 completed/2 uncertain; current48/64SOURCE/2 remains distinct from native execution.",
+        "Exact independent source review/delivery/main proof; explicit Lead merge only.",
+        "Both natives, durable recovery/PC-off and Academy seven gates with real source/teacher outcomes.",
+        "Month-end analysis stops before user selects existing items; no paper generation/final membership.",
+        "Fresh explicit evaluation budget, integrated verification and separate accountable Lead Acceptance."
+      ]
+    },
+    "authority": {
+      "sourceRefs": [
+        "Current user manual continuation in Root thread01a13f90-74a0-7930-a5bc-9663e9ec9f86",
+        "Current user request: unify selected VPS Bun latest stable",
+        "/home/palantirkc/operations/herdr-session-handoff-20261015/continuation.json",
+        "inputs/continuation-checkpoint-20261016-v5.json#/content/authority exact unchanged custody",
+        "decisions/latest-bun-vps-agent-defaults-20261016.json",
+        "Root manual continuation and latest explicit PR18 expected-head merge relay; no new authority from this checkpoint."
+      ],
+      "allowedScope": [
+        "Same logical Work source continuation/review; bounded native delegation/task-specific Herdr; requested reversible maintenance."
+      ],
+      "exclusions": [
+        "ministry,spt,math-teaching-and-educational-video,music-production,hermes-application-workflows,jev-research-experiments",
+        "Official Academy mutation; user question selection/final exam membership; recurring costs",
+        "Historical admissions/allocations replay, credential/native-store transfer, trust bypass, unverified native activation",
+        "Historical evaluation budgets not portable; no fresh suite budget."
+      ]
+    },
+    "phase": "PR17/EducationPR8/AcademyPR9/commonPR18 source delivered. Main74f14 exact-main V2/status verified; mainCI failed-only final outcome pending. Hermes/P1 SOURCE corrections continue; native/private/evaluation/Acceptance held.",
+    "plan": [
+      {
+        "step": "Preserve original decisions/fences and delivered Bun/Education/Academy source",
+        "status": "completed"
+      },
+      {
+        "step": "Reconcile common74f14 final mainCI and independently review/deliver append-only v7",
+        "status": "in_progress"
+      },
+      {
+        "step": "Close four Hermes new-source findings and running-P1 source review without native effects",
+        "status": "in_progress"
+      },
+      {
+        "step": "Qualify separate native adoption/recovery/PC-off and private seven gates with current owner evidence",
+        "status": "pending"
+      },
+      {
+        "step": "Obtain fresh suite budget, integrated independent verification and separate Lead Acceptance",
+        "status": "pending"
+      }
+    ],
+    "sourcePins": [
+      {
+        "ref": "park-kyungchan/agent-platform main (Root-relayed merged)",
+        "revision": "74f14f7e04d6d1aa83b42657fc7fac4a8e2f151c/tree5dbdde6c159f7b3f845e5d466dafa71954cb19ca; V2/status56487374124 verified; mainCI38835938075 pending"
+      },
+      {
+        "ref": "Continuing reviewed source baseline",
+        "revision": "1e853cb2051e64ca9ca1620f2aa1402ea5e66ed2/tree5dbdde6c159f7b3f845e5d466dafa71954cb19ca"
+      },
+      {
+        "ref": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v6.json",
+        "revision": "sha256:683de9aaf64d16ba943df9dd66d8fc97fb31996accc3950a039e12cf481ccbe4"
+      },
+      {
+        "ref": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-4.json",
+        "revision": "sha256:fee602d0e40888828ca587b513a23bd3919a5fdacc8a85bd70563ddcd5f76cd6"
+      },
+      {
+        "ref": "Exact unchanged fallback checkpoint contract",
+        "revision": "sha256:f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4"
+      },
+      {
+        "ref": "Explicit NEW Hermes source; HOLD4, not recovered owner",
+        "revision": "a8133a55b9cc9ca95634e7f76eb0391639e74fee/tree7413cd400d1185b0bab03cd3222fe6fb9cca9b89"
+      }
+    ],
+    "runtime": {
+      "nativeThreadRef": "01a13f90-74a0-7930-a5bc-9663e9ec9f86",
+      "nativeGoalRef": "01a13f90-74a0-7930-a5bc-9663e9ec9f86:createdAt:1792089018",
+      "goalObservation": "Root-relayed native get_goal: ACTIVE/unbudgeted/fullSpec7; Acceptance null. update_plan unavailable. Git/author do not authenticate native state; original WSL writer/Goal stay PAUSED.",
+      "herdrContextRef": "srv1873899-herdr/w3:t1/w3:p1/orchestrator",
+      "observedAtUtc": "2026-10-16T01:44:59.901Z"
+    },
+    "delegations": [
+      {
+        "id": "checkpoint-v7-author",
+        "runtimeRef": "/root/remaining_gates_audit",
+        "scope": "Two append-only source inputs; same author continuity, not independent review",
+        "state": "Local preparation only; Root-owned workers0 after p6/p7/p9/pA durable closure.",
+        "outputRefs": ["inputs/continuation-checkpoint-supplement-20261016-4.json"]
+      },
+      {
+        "id": "hermes-source-compatibility-fix",
+        "runtimeRef": null,
+        "scope": "Explicit new-source closure correction",
+        "state": "Root-relayed source-only in progress; originala813 HOLD4; native publication0.",
+        "outputRefs": ["/home/palantirkc/code/worktrees/hermes-source-compatibility-fix-20261016"]
+      },
+      {
+        "id": "academy-running-p1-observer",
+        "runtimeRef": null,
+        "scope": "Exact existing-owner read-only RUNNING P1 observer source",
+        "state": "Root-relayed source-only in progress, base380; actualP1/admission0.",
+        "outputRefs": ["/home/palantirkc/code/worktrees/academy-running-p1-observer-20261016"]
+      }
+    ],
+    "effects": [
+      {
+        "id": "preserved-completed-effects",
+        "scope": "Source deliveries, cleanup, private custody/staging, PostgreSQL start/admissions/additive migration/AFTER",
+        "state": "consumed",
+        "receiptRefs": ["inputs/continuation-checkpoint-20261016-v2.json#/content/effects/0"],
+        "nextSafeObservation": "Read exact original receipts; no repeat dispatch.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "existing-hermes-task",
+        "scope": "Task t_4d5043c5 / Session 20261015_043614_20d028",
+        "state": "completed",
+        "receiptRefs": ["inputs/continuation-checkpoint-20261016-v2.json#/content/effects/1"],
+        "nextSafeObservation": "Existing native owner readback only; retain genuine null fields.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "historical-codex-transient-allocation",
+        "scope": "01a13ea3-469b-7221-b46e-6f65108194d6; allocation and conclusive failed durability readback",
+        "state": "completed",
+        "receiptRefs": ["inputs/continuation-checkpoint-20261016-v2.json#/content/effects/2"],
+        "nextSafeObservation": "Review frozen corrective source; original ID is unusable and must not be retried/resumed/reallocated.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "official-score-create-route",
+        "scope": "Earlier score.create=1 grade-render route; possible business effect",
+        "state": "unknown",
+        "receiptRefs": ["inputs/continuation-checkpoint-20261016-v2.json#/content/effects/3"],
+        "nextSafeObservation": "Current owner-side read-only reconciliation under separate purpose/source boundary.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "private-selected-release",
+        "scope": "Current protected private selected-release pointer",
+        "state": "unknown",
+        "receiptRefs": ["inputs/continuation-checkpoint-20261016-v2.json#/content/effects/4"],
+        "nextSafeObservation": "Fresh protected owner read-only observation before any future CAS.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "bun-unification-20261016",
+        "scope": "Host /usr/local/bin, Herdr /usr/local/bin, Hermes UID10000 persistent /opt/data/.local/bin defaults",
+        "state": "completed",
+        "receiptRefs": [
+          "/home/palantirkc/operations/bun-unification-20261016/apply-readback-receipt.json"
+        ],
+        "nextSafeObservation": "Read current executable version/hash via inherited PATH; do not repeat install. Future recreation source pin delivery remains separate.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "preserved-v6-delivery-and-observer-receipts",
+        "scope": "Original v6 effects6..11: PR16/VPS1 delivery, once1 consumed HOLD, once2/3 scoped PASS, three-body source read; all IDs/states/receipts retained.",
+        "state": "consumed",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/priorCheckpointEffects"
+        ],
+        "nextSafeObservation": "Read individual original receipts; no retry, native adoption or missing-field fabrication.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "source-deliveries-after-v6",
+        "scope": "PR17 common3cb, PR8 Education65dbc, PR9 Academy1ee, PR18 common74f14 completed SOURCE delivery; no runtime activation.",
+        "state": "completed",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/common",
+          "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/education",
+          "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/academy"
+        ],
+        "nextSafeObservation": "Root readback final common mainCI failed-only outcome; preserve other exact-main receipts, no delivery replay.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "academy-root-key-classification-once1",
+        "scope": "Fixed f5ed v2 classifier executed once; body/values export0; consumed.",
+        "state": "consumed",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/rootClassifier"
+        ],
+        "nextSafeObservation": "Read existing receipt only; no retry or authority inference.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "ACADEMY-ROOT-SOURCE-READ-ONCE1",
+        "scope": "Current Root SOURCE read once; CC159/F44b private, fence64/2; PG/ABI not qualified.",
+        "state": "consumed",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/privateRootSourceRead"
+        ],
+        "nextSafeObservation": "Existing private owner custody/completed SOURCE Task fence only; no repeated read or body publication.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      }
+    ],
+    "receipts": [
+      {
+        "ref": "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/common",
+        "classification": "verification",
+        "result": "Fresh independent1e PASS0; main74 exact-main identical-tree V2/status56487374124 verified. CI38835938075 failed-only outcome pending; default headroom68."
+      },
+      {
+        "ref": "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/education",
+        "classification": "verification",
+        "result": "Source/main/CI delivered; real source, teacher and runtime Acceptance unverified."
+      },
+      {
+        "ref": "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/academy",
+        "classification": "verification",
+        "result": "Canonical source/main/CI delivered; actualP1/ABI/native/private gates held."
+      },
+      {
+        "ref": "inputs/continuation-checkpoint-supplement-20261016-4.json#/content/observations/hermes",
+        "classification": "observation",
+        "result": "Original owner absent; explicit NEW a813 HOLD4. Source-only successor in progress."
+      }
+    ],
+    "holds": [
+      {
+        "id": "original-wsl-writer",
+        "scope": "Original source thread/Goal",
+        "reason": "PAUSED; no native state transplant or original-writer resume.",
+        "releaseCondition": "No release requested."
+      },
+      {
+        "id": "codex-native-adoption",
+        "scope": "Current Codex consumption/activation/recovery",
+        "reason": "Frozencc855 has5 foreign-source failures; activationfalse. No silent repin/trust copy.",
+        "releaseCondition": "Exact reviewed current owner closure and separate native qualification."
+      },
+      {
+        "id": "native-metadata-observer",
+        "scope": "Owner-exit/full history/auth/consumption",
+        "reason": "once1 consumed HOLD; once2/3 scoped metadata PASS with original owner running only.",
+        "releaseCondition": "Separate current bounded evidence; no old allocation or read retry."
+      },
+      {
+        "id": "hermes-new-source",
+        "scope": "Source lineage and native adoption",
+        "reason": "Historical owner absent119audit; explicit NEW a813 HOLD4, successor source-only in progress.",
+        "releaseCondition": "Exact independent HNS-R1..R4 closure and separate publication/native gates; no reconstruction."
+      },
+      {
+        "id": "academy-running-p1-abi",
+        "scope": "Existing PG birth/original authority and ABI",
+        "reason": "Observer source-only base380; actualP1/PGauthority/ABI/admission0. Captured status:postgres is an absence guard.",
+        "releaseCondition": "Reviewed existing-owner read-only RUNNING proof; unchanged PG authority/contracts; no start/migration/restart replay."
+      },
+      {
+        "id": "academy-private-seven-gates",
+        "scope": "Private source/storage/auth/recovery/hosting/workflow/release",
+        "reason": "Source adoption, custody and Bun defaults do not qualify native publication, actual private workflows or teacher judgments.",
+        "releaseCondition": "Separately admitted exact owner evidence for all seven gates; source Academy remains read-only."
+      },
+      {
+        "id": "evaluation",
+        "scope": "Native model suite",
+        "reason": "Historical budgets not portable; fresh explicit suite budget absent.",
+        "releaseCondition": "Fresh explicit budget plus native prerequisites."
+      },
+      {
+        "id": "whole-work-acceptance",
+        "scope": "Full Spec7 integrated outcome",
+        "reason": "Native/private/recovery/teacher/evaluation requirements incomplete; human satisfaction unobserved.",
+        "releaseCondition": "Independent integrated outcomes and separate accountable Lead Acceptance."
+      },
+      {
+        "id": "post-goal-orchestrator-engineering",
+        "scope": "Deferred framework/interview",
+        "reason": "User deferred until Goal achieved; all unused owned worker panes closed.",
+        "releaseCondition": "Goal achieved then separate interview; open only needed panes with live-ID guards."
+      },
+      {
+        "id": "current-main-checkpoint-delivery",
+        "scope": "Common mainCI and new v7 delivery",
+        "reason": "Main74 V2/status verified; failed-only finalCI and v7 exact independent review/delivery pending.",
+        "releaseCondition": "Root actual readback/append-only binding; preserve68char default headroom."
+      }
+    ],
+    "nextSafeAction": "Root readback common mainCI failed-only outcome and append binding; independently review frozen v7. Finish Hermes/P1 source corrections before separate native/private work. Preserve consumed/uncertain fences, WSL pause, fresh budget and Acceptance holds."
+  }
+}
