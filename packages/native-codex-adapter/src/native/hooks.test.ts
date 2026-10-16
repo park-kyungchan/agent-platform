@@ -435,6 +435,59 @@ test("selected native tuple injects immutable current Task and decision original
   expect(await command(f.repositoryRoot, "status", "--porcelain")).toBe("");
 });
 
+test("Task plus explicit Decision selection deduplicates shared IDs and retains distinct originals in order", async () => {
+  for (const decisionId of ["direction", "explicit-direction"]) {
+    const f = await fixture();
+    if (decisionId === "explicit-direction") {
+      const sourcePath = join(
+        f.repositoryRoot,
+        gitWork.gitRecordPath("fixture", "current-work", { kind: "decision", id: "direction" }),
+      );
+      const decision = JSON.parse(await readFile(sourcePath, "utf8")) as GitWorkRecord;
+      if (decision.kind !== "decision") throw Error("Synthetic Decision required");
+      await writeFile(
+        join(
+          f.repositoryRoot,
+          gitWork.gitRecordPath("fixture", "current-work", { kind: "decision", id: decisionId }),
+        ),
+        JSON.stringify({
+          ...decision,
+          id: decisionId,
+          meaning: "Retain the distinct explicit original",
+        }),
+      );
+      await command(f.repositoryRoot, "add", ".");
+      await command(f.repositoryRoot, "commit", "-qm", "Add distinct synthetic Decision");
+    }
+    f.selection.decisionId = decisionId;
+    await persistBindings(f);
+    const compact = f.provider.gitWork!.compactGitWorkContext;
+    let selectedIds: string[] | undefined;
+    f.provider.gitWork!.compactGitWorkContext = (context, selection) => {
+      selectedIds = selection.decisionIds;
+      return compact(context, selection);
+    };
+    const expected = decisionId === "direction" ? ["direction"] : ["direction", decisionId];
+    for (const input of [
+      f.input,
+      { ...f.input, hook_event_name: "SessionStart" as const, source: "resume" },
+    ]) {
+      const result = await handleHook(input, { bindings: f.registry }, f.load);
+      expect(result.status).toBe("context-injected");
+      const projected = context(result.stdout);
+      expect(selectedIds).toEqual(expected);
+      expect(projected.value.selectedWork.status).toBe("source-qualified");
+      expect(projected.value.selectedWork.holdReasons).toEqual([]);
+      expect(
+        gitWork
+          .decodeCompactGitWorkContext(projected.value.selectedWork)
+          .decisions.map((row) => row.id),
+      ).toEqual(expected);
+      expect(projected.text).not.toContain("PRIVATE-ORIGINAL-SENTINEL");
+    }
+  }
+});
+
 test("unselected, foreign and child tuples make no Git reads; explicit child identity is required", async () => {
   const f = await fixture();
   for (const input of [

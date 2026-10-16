@@ -575,7 +575,12 @@ async function selectedGitWork(
         taskId: selection.taskId,
         decisionIds:
           task?.kind === "task"
-            ? [...task.decisionIds, ...(selection.decisionId ? [selection.decisionId] : [])]
+            ? [
+                ...new Set([
+                  ...task.decisionIds,
+                  ...(selection.decisionId ? [selection.decisionId] : []),
+                ]),
+              ]
             : selection.decisionId
               ? [selection.decisionId]
               : undefined,
