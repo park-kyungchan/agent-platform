@@ -1,8 +1,12 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import type { HookBinding } from "./hooks.ts";
-import type { GitWorkContext } from "@palantirkc/work-continuity/git-work";
+import type { HookBinding, NativeContextLoader } from "./hooks.ts";
+import type {
+  CompactGitWorkContext,
+  CompactSourcePointer,
+  GitWorkContext,
+} from "@palantirkc/work-continuity/git-work";
 
 type ObjectValue = Record<string, unknown>;
 interface Pointer {
@@ -42,7 +46,7 @@ export interface HomeContextContract {
   boundaries: ObjectValue;
 }
 export interface HomeContextProjection {
-  status: "current" | "repair-required";
+  status: "current" | "held" | "repair-required";
   text: string;
   chars: number;
   authority: "none";
@@ -275,6 +279,38 @@ function readContract(
   };
 }
 
+export interface NativeGitWorkDeliveryPolicy {
+  policyVersion: "v1" | "v2";
+  maxChars: number;
+  versionCapChars: 6000 | 12000;
+  qualification: "source-only-not-native-admission";
+}
+/** Native delivery policy is explicit; an arbitrary caller budget cannot opt into v2. */
+export function gitWorkDeliveryPolicy(
+  binding: HookBinding,
+  requestedMaxChars?: number,
+): NativeGitWorkDeliveryPolicy {
+  if (
+    binding.gitWorkContextVersion !== undefined &&
+    binding.gitWorkContextVersion !== "v1" &&
+    binding.gitWorkContextVersion !== "v2"
+  )
+    throw Error("INVALID_GIT_WORK_CONTEXT_VERSION");
+  const policyVersion = binding.gitWorkContextVersion ?? "v1";
+  const versionCapChars = policyVersion === "v2" ? 12000 : 6000;
+  return {
+    policyVersion,
+    maxChars: Math.min(
+      versionCapChars,
+      Math.max(
+        2000,
+        Number.isSafeInteger(requestedMaxChars) ? requestedMaxChars! : versionCapChars,
+      ),
+    ),
+    versionCapChars,
+    qualification: "source-only-not-native-admission",
+  };
+}
 export interface SelectedGitWorkView {
   status: "source-qualified" | "held";
   holdReasons: string[];
@@ -289,101 +325,85 @@ export interface SelectedGitWorkView {
   currentTask?: unknown;
   decisionOriginals: unknown;
   historicalEffects: unknown;
+  /** Complete common semantics supplement the compatibility fields; never a weaker view. */
+  semanticContext: CompactGitWorkContext;
   projection: "bounded-derived-pointer-view";
   currentness: "caller-declared-not-remote-verified";
   authority: "none";
   nativePermissionGranted: false;
   semanticAcceptanceEstablished: false;
 }
-
-/** Derive pointers from the full qualified closure, never raw answers/native locators. */
+export type SelectedGitWorkContext = SelectedGitWorkView | CompactGitWorkContext;
+export function selectedGitWorkPointer(selected: SelectedGitWorkContext) {
+  return "pointer" in selected
+    ? selected.pointer
+    : {
+        repositoryId: selected.repositoryId,
+        commit: selected.commit,
+        projectId: selected.projectId,
+        workId: selected.workId,
+        sourcePathBase: selected.sourcePathBase,
+      };
+}
+/** Consume the single common codec only after the native owner has proved its closure. */
 export function projectSelectedGitWork(
   context: GitWorkContext,
   selection: { taskId?: string; decisionIds?: string[] },
-): SelectedGitWorkView {
-  const work = context.records.find((record) => record.kind === "work"),
-    task = context.records.find(
-      (record) => record.kind === "task" && record.id === selection.taskId,
-    ),
-    decisions = context.records.filter((record) => record.kind === "decision"),
-    relevant = selection.decisionIds
-      ? decisions.filter((record) => selection.decisionIds!.includes(record.id))
-      : decisions;
-  const originalSources: {
-    id: string;
-    path: string;
-    blobOid: string;
-    repositoryId?: string;
-    commit?: string;
-  }[] = [];
-  const source = (id: unknown) => {
-    const original = context.sources.find((row) => row.id === id);
-    if (!original) return null;
-    let address = originalSources.find(
-      (row) =>
-        row.path === original.path &&
-        row.blobOid === original.blobOid &&
-        row.repositoryId === original.repositoryId &&
-        row.commit === original.commit,
-    );
-    if (!address) {
-      address = {
-        id: `o${originalSources.length + 1}`,
-        path: original.path,
-        blobOid: original.blobOid,
-        ...(original.repositoryId
-          ? { repositoryId: original.repositoryId, commit: original.commit }
-          : {}),
-      };
-      originalSources.push(address);
-    }
-    return { source: address.id, ...(original.fragment ? { fragment: original.fragment } : {}) };
-  };
+  codec: Pick<
+    NonNullable<Awaited<ReturnType<NativeContextLoader>>["gitWork"]>,
+    "compactGitWorkContext" | "decodeCompactGitWorkContext"
+  >,
+  version: "v1" | "v2" = "v1",
+): SelectedGitWorkContext {
+  const semanticContext = codec.compactGitWorkContext(context, selection);
+  // Reader/parser diagnostics may contain private source bytes. Deliver codes only.
+  semanticContext.holdReasons = semanticContext.holdReasons.map((reason) =>
+    /^[A-Z][A-Z0-9_]{0,120}(?::|$)/.test(reason)
+      ? reason.split(":")[0]!
+      : "REQUIRED_SOURCE_UNAVAILABLE",
+  );
+  if (version === "v2") return semanticContext;
+  const decoded =
+    semanticContext.status === "source-qualified"
+      ? codec.decodeCompactGitWorkContext(semanticContext)
+      : undefined;
+  const work = decoded?.normative.find((record) => record.kind === "work");
   const purpose = object(work?.purpose) ? work.purpose : undefined;
-  const logical = object(task?.logical) ? task.logical : undefined;
+  const sourceWork = context.records.find((record) => record.kind === "work");
+  const task = decoded?.task;
+  const source = (address: CompactSourcePointer) => ({
+    source: `o${address[0] + 1}`,
+    ...(address[1] ? { fragment: address[1] } : {}),
+  });
   return {
-    status: context.status,
-    // Arbitrary parser exception text may contain source bytes; expose safe codes only.
-    holdReasons: context.holdReasons.map((reason) =>
-      /^[A-Z][A-Z0-9_]{0,120}(?::|$)/.test(reason)
-        ? reason.split(":")[0]!
-        : "REQUIRED_SOURCE_UNAVAILABLE",
-    ),
-    pointer: {
-      repositoryId: context.repositoryId,
-      commit: context.commit,
-      projectId: context.projectId,
-      workId: context.workId,
-      sourcePathBase: context.sourcePathBase,
-    },
+    status: semanticContext.status,
+    holdReasons: [...semanticContext.holdReasons],
+    pointer: selectedGitWorkPointer(semanticContext),
     purpose: {
       objective: purpose?.objective,
       fullPurpose: "work.json#/purpose",
       contractsSource: "work.json",
-      specRevision: object(work?.spec) ? work.spec.revision : undefined,
-      planRevision: object(work?.plan) ? work.plan.revision : undefined,
+      specRevision: object(sourceWork?.spec) ? sourceWork.spec.revision : undefined,
+      planRevision: object(sourceWork?.plan) ? sourceWork.plan.revision : undefined,
     },
-    ...(selection.taskId
+    ...(task
       ? {
           currentTask: {
-            id: selection.taskId,
-            ...(task
-              ? {
-                  title: task.title,
-                  state: task.state,
-                  contractSource: `tasks/${encodeURIComponent(task.id)}.json#/logical`,
-                  specRevision: logical?.specRevision,
-                  planRevision: logical?.planRevision,
-                }
-              : { unavailable: true }),
+            id: task.id,
+            title: context.records.find((record) => record.kind === "task" && record.id === task.id)
+              ?.title,
+            state: task.state,
+            contractSource: `tasks/${encodeURIComponent(task.id)}.json#/logical`,
+            specRevision: task.logical.specRevision,
+            planRevision: task.logical.planRevision,
           },
         }
       : {}),
     decisionOriginals: {
       governingIndex: "work.json#/governingDecisionIds",
       recordPattern: "decisions/<encodeURIComponent(id)>.json",
-      decisionCount: decisions.length,
-      directPointers: relevant.map((record) => ({
+      decisionCount: semanticContext.decisions.length,
+      directPointers: (decoded?.decisions ?? []).map((record) => ({
         id: record.id,
         status: record.status,
         answer: source(record.answerSource),
@@ -391,10 +411,14 @@ export function projectSelectedGitWork(
           ? { selectionContext: source(record.selectionContextSource) }
           : {}),
       })),
-      sources: originalSources,
-      unexpandedDecisionCount: decisions.length - relevant.length,
+      sources: (decoded?.sources ?? []).map((address, index) => ({
+        id: `o${index + 1}`,
+        ...address,
+      })),
+      unexpandedDecisionCount: 0,
     },
-    historicalEffects: context.historicalEffects,
+    historicalEffects: semanticContext.historicalEffects,
+    semanticContext,
     projection: "bounded-derived-pointer-view",
     currentness: "caller-declared-not-remote-verified",
     authority: "none",
@@ -408,13 +432,11 @@ export function projectHomeContext(options: {
   binding: HookBinding;
   cwd: string;
   maxChars?: number;
-  selectedWork?: SelectedGitWorkView;
+  selectedWork?: SelectedGitWorkContext;
 }): HomeContextProjection {
-  const maxChars = Math.min(
-    6000,
-    Math.max(2000, Number.isSafeInteger(options.maxChars) ? options.maxChars! : 6000),
-  );
   try {
+    const deliveryPolicy = gitWorkDeliveryPolicy(options.binding, options.maxChars);
+    const { maxChars } = deliveryPolicy;
     const { contract, sha256 } = readContract(options.binding, options.cwd),
       profileSource = sourceFile(contract.globalProfilePath, 128 * 1024),
       profile = safeProfile(profileSource.value);
@@ -422,6 +444,7 @@ export function projectHomeContext(options: {
     const { root: _root, effectfulWorkCwd: _effectfulCwd, ...projectRoute } = contract.projectRoute;
     const context: ObjectValue = {
       schema: "codex.home-context.projection.v1",
+      deliveryPolicy,
       sourceOwnerProjectRoot: contract.sourceProjectRoot,
       actualNativeCwd: options.cwd,
       northStar: contract.northStar,
@@ -465,54 +488,17 @@ export function projectHomeContext(options: {
     // omission cannot push otherwise valid essential context over the cap.
     const omitted = optionalContext.map(([key]) => key),
       render = () => `${prefix}${JSON.stringify({ ...context, omitted })}`;
+    let held = options.selectedWork?.status === "held";
     if (render().length > maxChars && options.selectedWork) {
-      const selected = structuredClone(options.selectedWork),
-        originals = object(selected.decisionOriginals) ? selected.decisionOriginals : undefined;
-      context.selectedWork = selected;
-      if (
-        originals &&
-        Array.isArray(originals.directPointers) &&
-        Array.isArray(originals.sources)
-      ) {
-        // The full closure is already verified. Keep purpose/Task and at least
-        // one direct original; extra originals remain addressable by the index.
-        const directPointers = originals.directPointers;
-        let sources = originals.sources;
-        while (render().length > maxChars && directPointers.length > 1) {
-          directPointers.pop();
-          originals.unexpandedDecisionCount = Number(originals.unexpandedDecisionCount) + 1;
-          const used = new Set(
-            directPointers.flatMap((row) => {
-              if (!object(row)) return [];
-              return [row.answer, row.selectionContext]
-                .filter(object)
-                .map((pointer) => pointer.source);
-            }),
-          );
-          sources = sources.filter((row) => object(row) && used.has(row.id));
-          originals.sources = sources;
-          selected.status = "held";
-          selected.holdReasons = [
-            ...new Set([...selected.holdReasons, "NATIVE_DECISION_POINTERS_UNEXPANDED"]),
-          ];
-        }
-      }
-    }
-    if (render().length > maxChars && options.selectedWork) {
-      // Keep essential Home purpose/preferences. A too-large derived view is held
-      // with an immutable read pointer, never silently clipped into qualification.
+      // Hold the complete required payload. Never drop clauses, decisions, or
+      // original pointers until a weakened projection happens to fit.
+      held = true;
       context.selectedWork = {
-        ...options.selectedWork.pointer,
-        purposeSource: "work.json#/purpose",
-        currentTaskSource:
-          object(options.selectedWork.currentTask) &&
-          typeof options.selectedWork.currentTask.id === "string"
-            ? `tasks/${encodeURIComponent(options.selectedWork.currentTask.id)}.json`
-            : undefined,
-        decisionOriginalsSource: "work.json#/governingDecisionIds",
+        ...selectedGitWorkPointer(options.selectedWork),
         status: "held",
         holdReasons: ["NATIVE_CONTEXT_OUTPUT_LIMIT"],
-        projection: "pointer-only",
+        requiredContextChars: render().length,
+        readPolicy: "Read the complete common context from this immutable Git Work source.",
         authority: "none",
         nativePermissionGranted: false,
         semanticAcceptanceEstablished: false,
@@ -531,7 +517,7 @@ export function projectHomeContext(options: {
     const result = render();
     if (result.length > maxChars) throw new Error("Home context exceeds the bounded budget");
     return {
-      status: "current",
+      status: held ? "held" : "current",
       text: result,
       chars: result.length,
       authority: "none",
