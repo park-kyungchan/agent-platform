@@ -1,0 +1,253 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "checkpoint-v13",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/checkpoint-v13",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "harness.successor-continuity.v1",
+    "version": 13,
+    "updatedAtUtc": "2026-10-16T15:27:07.102Z",
+    "logicalWork": {
+      "schema": "common.git-work.v1",
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "harness-reliability-reprioritization-20261016"
+    },
+    "nativeGoalThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+    "goalStatus": "active; successor only; not complete",
+    "phase": "source-publication-complete-technical-recovery-pass-native-authority-and-acceptance-held",
+    "plan": [
+      {
+        "step": "Bind original interview decisions, successor lineage and historical no-replay fences",
+        "status": "completed"
+      },
+      {
+        "step": "Implement A, bounded B owner repairs and C durable recovery recipe in isolated source scopes",
+        "status": "completed"
+      },
+      {
+        "step": "Exact source/transition/provider QA and independent immutable review",
+        "status": "completed"
+      },
+      {
+        "step": "Authenticated evidence before PRs; explicit current expected-head Lead integration",
+        "status": "completed"
+      },
+      {
+        "step": "Useful ordinary-engineering task interruption and actual NEW-session recovery",
+        "status": "completed"
+      },
+      {
+        "step": "Resolve current v2 successor source authority, then separately qualify native adoption under current gates",
+        "status": "pending"
+      },
+      {
+        "step": "Separate Acceptance; then discuss independently owned month-end integration",
+        "status": "pending"
+      }
+    ],
+    "actualUserDecisions": {
+      "answerSource": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/interview-answers-20261016.json",
+        "fragment": "#/content"
+      },
+      "questionSource": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/interview-questions-20261016.json",
+        "fragment": "#/content"
+      },
+      "accepted": "A→B→C; recommendations and useful Herdr panes; independent parallel source work; new logical successor linked to paused predecessor; month-end remains independent until first Acceptance.",
+      "originalQuestionSelectionBoundary": "preserved; do not reopen or ask user to reconstruct evidence",
+      "currentScopeClarification": "Async user question is pending: proceed with current Work v2 source implementation only, or retain completed source and await next scope. Existing candidate/proposal/prepare/activation holds stay effective until an actual answer; elapsed time is not authorization."
+    },
+    "runtime": {
+      "server": "srv1873899-herdr",
+      "leadPane": "w3:pJ",
+      "leadTab": "w3:t6",
+      "nativeVersion": "0.163.0",
+      "reasoningEffort": "ultra: current user selected; startup argv high is historical initial selection",
+      "herdrVersion": "0.9.5",
+      "planTool": "not available; bounded source-owned plan retained",
+      "leadNativeThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+      "recoveredReviewer": {
+        "agent": "hrr-recovered",
+        "pane": "w3:pN",
+        "thread": "01a144db-2ddf-7990-9fba-3a175265e424",
+        "state": "idle observed after completed final review and same-tree main successor confirmation"
+      },
+      "nativeIdentityMeaning": "Own Goal/named thread plus actual owned dispatch/output/process-boundary correlation; Git or pane/PID alone does not authenticate authorship."
+    },
+    "delegations": [
+      {
+        "id": "hrr-codex",
+        "pane": "w3:pM",
+        "thread": "01a1442e-0df2-73e2-ac18-1d3bb2634e5f",
+        "state": "Original bounded repair result durably retained and source merged; original candidate/proposal/preparation/activation held. Separate direct-user dc-gang-aPR32 scope remains distinct; no prompts."
+      },
+      {
+        "id": "hrr-review",
+        "pane": "w3:pN",
+        "oldThread": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+        "newThread": "01a144db-2ddf-7990-9fba-3a175265e424",
+        "state": "Actual owned old CLI ended after midpoint; NEW native session recovered same Plan2 Task and completed useful reviews; currently idle."
+      }
+    ],
+    "effects": {
+      "predecessorCompletedCount": 68,
+      "predecessorUncertainCount": 3,
+      "historicalFence": "fences/predecessor-effects.json",
+      "inventories": [
+        {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/predecessor-effect-custody.json",
+          "fragment": "#/content"
+        },
+        {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json",
+          "fragment": "#/content"
+        }
+      ],
+      "consumedMetadataSha256": "0c1998291c59968cb9d05d1d7cb946864921bf06ab8e850e5b95048c6e0a5c32",
+      "originalConsumedActions": "Four RPC initialize/config-read/config-read/hooks-list already consumed, native auth/bookkeeping UNKNOWN; two actual dependency directory moves already consumed, uncertain0/barrier released. Never replay.",
+      "ownedEngineeringLifecycle": "Owned old thread01a1443b exit and NEW01a144db start already completed; exact process receipts preserved in CP12 and recovery Inputs. No resume, store clone or domain/model dispatch.",
+      "completedSourcePublications": [
+        {
+          "repository": "park-kyungchan/agent-platform",
+          "pr": 22,
+          "head": "34e3bedd66e6697f199456f32374ba00711d47b6",
+          "tree": "6737f5fe45787264da784d148114aa923d0d43fc",
+          "merge": "350b1629493b1b4ca49228d467374574c59f0d68",
+          "sourceStatus": 56530328029,
+          "mainCi": {
+            "run": 38916870569,
+            "conclusion": "success-after-failed-attestation-job-rerun"
+          },
+          "resultCommit": "f770517458ef701ba2e2ae3442cd792f0e3588ab",
+          "evidenceOrReceiptCommit": "fee8fa836f99aa5fddc3bdb84a357a1fd454deff",
+          "mergedMainStatus": 56532599074
+        },
+        {
+          "repository": "park-kyungchan/codex-harness-engineering",
+          "pr": 3,
+          "head": "ccef48306f1a3149ba6587ca61cc680c53da329c",
+          "tree": "d0a343edb1b1f9707eb312d977bcfda617bf92c2",
+          "merge": "4539e2ac4ca9c439bdccebea459a473944f206be",
+          "sourceStatus": 56532770867,
+          "mainCi": {
+            "conclusion": "unavailable; zero hosted workflows/rulesets observed"
+          },
+          "resultCommit": "479632caf46cb0e4c8f0663abb6321fcc7da9443",
+          "evidenceOrReceiptCommit": "1f1efdcae060e55106a514a4bd0d6c54779eac71",
+          "mergedMainStatus": null
+        },
+        {
+          "repository": "park-kyungchan/vps-operations",
+          "pr": 2,
+          "head": "4943f05702433042c73ea609e39599e3c4d0fea8",
+          "tree": "b4e872663afa0f39b1ccf28d0ae5dc0d81bc13bb",
+          "merge": "40ae22bbe783e891467102e1cd255cfe097d4196",
+          "sourceStatus": 56534073669,
+          "mainCi": {
+            "run": 38923060051,
+            "conclusion": "success"
+          },
+          "resultCommit": "7f49f3af2c1952cbee869dae667f804aa1bd9c8f",
+          "evidenceOrReceiptCommit": "d1a178aa2d125c923d678f2c87c554116b7bd112",
+          "mergedMainStatus": null
+        }
+      ],
+      "publicationObservation": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/source-publication-readback-v1.json",
+        "fragment": "#/content"
+      },
+      "replayPolicy": "Historical effects, owned old-session exit/new-session start, source/evidence pushes, statuses, PR creations and all three merges are completed/consumed. Never replay. Read exact receipts/current state for successors; source publication is not native/domain activation."
+    },
+    "realRecoveryTask": {
+      "taskId": "HRR-RECOVERY-SOURCE-REVIEW",
+      "logicalPlanRevision": 2,
+      "oldNativeThread": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+      "newNativeThread": "01a144db-2ddf-7990-9fba-3a175265e424",
+      "evidenceInputNames": [
+        "native-recovery-midpoint-v1",
+        "native-recovery-owned-exit-v1",
+        "new-native-recovery-process-v1",
+        "new-native-recovery-readback-v1",
+        "new-native-recovery-review-c04",
+        "lead-scoped-recovery-verification-v1"
+      ],
+      "evidenceRouting": "Read each through inputs/<name>.json#/content in this same Work; CP12 retains exact full Git receipt addresses/hashes.",
+      "technicalCriteria": "ownedoldCLIactuallyended; NEWnativeidentity confirmed; samePlan2Task/purpose/all5originalQAs/68+3fullfences/2consumedactions/nextAction/genuine13305byte40347dresult recovered; useful exactsource review complete",
+      "leadScopedVerificationSha256": "ef2b94d93e68c30401daa94d2b6713a3b63b73ff50aca6aa4a64f44edc0b9e4d",
+      "state": "Technical ordinary-engineering recovery PASS; useful c04 review found P2, fixed and independently verified; final exact34e source review PASS0 and same-tree main successor confirmation complete.",
+      "finalIndependentReview": {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "f770517458ef701ba2e2ae3442cd792f0e3588ab",
+        "path": "native-review-results/34e3bedd66e6697f199456f32374ba00711d47b6.json",
+        "sha256": "3ae50495e0444103496676846fd44f3d60e934972b410b52d99fd41b26705633"
+      },
+      "finalSourceP2Disposition": "Duplicate Task+explicit Decision selector fixed at e6fc703; insertion order/all distinct originals preserved; independent scoped21tests417assert plus final combined PASS0. Original c04 HOLD immutable.",
+      "formalAcceptance": null,
+      "scope": "Actual native-session recovery via manual canonical common reader; not native hook whole-v2/1500-token admission, installed-source activation, model qualification or whole-Work acceptance."
+    },
+    "genuineDelegatedResult": {
+      "source": {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "0febc8f76276b2faaeb01ae25e8828f62648d869",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-candidate-source-result-1033d6f.json",
+        "fragment": "#/content/sourceResult",
+        "sha256": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5"
+      },
+      "originalBytes": 13305,
+      "originalSha256": "40347d0812b7e2d00623ee737769f1c0b2e6d586854bc0f386291bdbbfad2dae",
+      "codeCommit": "1033d6ff417f403e6dc05b003e42df58a947ea9e",
+      "meaning": "Actual delegated producer result recovered by new native session; source custody does not authenticate native authorship or establish acceptance."
+    },
+    "currentQa": {
+      "historicalBroadSource": "2e64 source713pass/7existingSkip/0fail; all14qualitychecksPASS. Subsequent e6 hook correction separately checked; do not claim no source changes after2e64.",
+      "exactFinal34e": "Native source66pass/569assert; handoff39pass/223assert; imports and all14qualitychecksPASS; selectedWork validation/transitionPASS; independent final review0findings.",
+      "exactFinalSummarySha256": "b03b551b3eff0ae525a616f99f1d1fad2ed93b3846f87e82e254fad5963dc30f",
+      "codexOwner": "Exactccef TypeScript/458pass/2646assert/29files, fictional31context+16nativeguards and original Task+Decision11759charSourceCombo; no actual Home/native admission.",
+      "vpsOwner": "Author209pass/1existingWindowsSkip; independent inert16pass/119assert plus TypeScript; PR/main sourceCI success.",
+      "rootInstallQualification": "Initial13holds traced to own stale file: Work index projection; own-only frozen forced copy refresh restored7byte matches. Same inode/hardlink nlink2 remains, so no independent installation/native qualification. Original failed QA/archive retained; package/lock/project unchanged.",
+      "sourcePayloadQualification": "Complete SOURCE v2 fits12000 or holds; v1/default6000 and Homev1 max6000/token1500 unchanged. Fictional fit is not actual native1500-token qualification."
+    },
+    "holds": [
+      "Old Lead Goal and original WSL writer remain PAUSED; no resume, store clone, transcript or credential transplantation.",
+      "Current Work v2 candidate source implementation authority awaits actual user answer; read-only proposal d686bcf4 is not implementation/preparation permission. Preserve Plan1 historical candidate tuple; explicit current Plan2 task required.",
+      "Native candidate/preparation, whole SOURCE v2 delivery/admission, current installed importer/hardlink closure, trust/config and activation remain separately held/unqualified.",
+      "No fresh model-evaluation suite budget; old48/2M/8h budgets never renew. No actual SSH/PG/gateway/DB/service effects from these source changes.",
+      "Generated Hermes facade is nonGit/not restored original data. Existing active19pin guard/source owner remains separate from merged source; shared checkouts and native installation/configuration not synchronized or activated.",
+      "Month-end proceeds independently. Separate AcceptanceDecision remains null; no integration or sibling prompts before the agreed boundary.",
+      "Before later dc-gang-a or education integration freshly fetch/pull owning main and verify exact SHA; distinct remotes. PR32 is unmerged with P2 JSONL scanner blocker, no private student data on main inferred."
+    ],
+    "separateDcScope": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/separate-dc-pr32-review-boundary.json",
+      "fragment": "#/content"
+    },
+    "acceptanceDecision": null,
+    "nextSafeAction": "Read source-publication-readback-v1 and this checkpoint via canonical common reader. Await current user's v2 source-scope answer in Lead pane; do not implement or prepare the held candidate. Preserve completed publication/session fences. Any authorized successor uses explicit current Plan2 Task, freshly observed owner main and separate exact reviews; native preparation/activation/evals need their own current gates/budget. Separate engineering verification from user Acceptance and month-end discussion.",
+    "historicalCheckpoint": {
+      "source": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v12.json",
+        "fragment": "#/content"
+      },
+      "sha256": "7978aa9dd17633c5ccf5a396581ae7a92eb8c7e2d7bff211ea3d92986de758e7",
+      "meaning": "Preserved historical material boundary. CP13 corrects stale not-yet-started reviewer, pending-publication and no-source-change-after2e64 statements; no historical bytes rewritten."
+    }
+  }
+}

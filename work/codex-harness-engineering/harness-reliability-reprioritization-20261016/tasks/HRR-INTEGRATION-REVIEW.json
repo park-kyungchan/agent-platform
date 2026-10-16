@@ -18,11 +18,11 @@
   },
   "title": "Publish independent exact reviewed source evidence/status and explicitly integrate expected heads after current gates.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
-    "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "unsynchronized",
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -34,6 +34,6 @@
     "HRR-INTERVIEW-5"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": [],
-  "nextAction": "Review immutable component commits and final combined tree; update exact provider successors; publish authenticated evidence before PR."
+  "verificationEvidenceIds": ["HRR-SCOPED-ENGINEERING-VERIFICATION"],
+  "nextAction": "Read inputs/checkpoint-v14.json#/content and remaining-goal-audit-v1.json#/content. Scoped actual recovery/source-review/publication Task verification is source-bound and passed; new verification/task closure records remain local/unsynchronized, so formal completion awaits delivery. Current-Work v2 source authority awaits actual user answer. No old effect/session replay, native prepare/activation/model suite or owner/user Acceptance follows."
 }

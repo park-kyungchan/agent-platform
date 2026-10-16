@@ -1,0 +1,51 @@
+{
+  "schema": "hrr.coordinated-bun-types-successor-proof.v1",
+  "sourceOnly": true,
+  "common": {
+    "root": "/home/palantirkc/code/worktrees/hrr-common-buntypes-20261017",
+    "commit": "a93fea1d3e2c81d8b5805a6c6668919a4d3f3890",
+    "tree": "591ab4fde353f3402516164f0be633b8908f63de",
+    "packageSha256": "a2d83cc9464156a83b3f6536517923fceb6b20bd7d36d29b214fcfc81dfa11e5",
+    "lockSha256": "423ea4c01100bf11d34eedb3357dc19d15d2b0e2806937120ebc843404a139f0"
+  },
+  "codex": {
+    "root": "/home/palantirkc/code/worktrees/hrr-codex-buntypes-20261017",
+    "commit": "3ac7059b8499d871887f112e99534812d2d643e1",
+    "tree": "a00b35d8376e70d10f385949666915daffeb9ac3",
+    "registrations": [
+      {
+        "owner": "codex",
+        "path": "architecture/context-provider.json",
+        "sha256": "2781beab7ef119966e0fee9fad37c349960155a9b260bfaf2f45aef16ad6392b",
+        "sourcePinCount": 22,
+        "markerPath": "src/continuity/index.ts",
+        "markerSha256": "47a3e8b7c575e0c09c65bfd76dd78281bd894b99a6cd33e07d84956fdf15ea59",
+        "previousRegistrationSha256": "90f683497ad6e7c9793a796e35bc032a1c4d6ecb75d8f13bc88f1c70d00b2228"
+      },
+      {
+        "owner": "codex",
+        "path": "architecture/native-codex-provider.json",
+        "sha256": "94e7d75b6e0cb27eef3254a46b59dd18a4a87774f8f3e0f634445b1f80e773d8",
+        "sourcePinCount": 6,
+        "markerPath": "src/native/hooks.ts",
+        "markerSha256": "24938537fd28b7dbc969c549189c31c451e47aeb8f5ca7b1356f59ec91c51310",
+        "previousRegistrationSha256": "922565261391cb54cc3720fbfea78ca95492eb986e37b9388685e767b2fb0b83"
+      }
+    ]
+  },
+  "hermes": {
+    "stagingRoot": "/home/palantirkc/code/worktrees/hrr-common-buntypes-20261017/.private/pr6-coordinated/hermes-v1-successor",
+    "registrationSha256": "f0c1c39aeec6c75dfd119db9802dbf3d788711abfe1f946e9ac3041c37a85227",
+    "sourceSuccessorSha256": "5aa4f30c406a3f72ab6570e032b0d34f0ce612ff8819e7ede5ce4f6232462b53",
+    "guardSha256": "caa639b62120e72f985e4ceb20c907824aeb6c7b2b74aa54a9485abddddbb514",
+    "sourcePinCount": 14,
+    "canonicalInputCount": 18,
+    "retainedOldRuntimeFileCount": 590,
+    "planSha256": "54caa43efb6ec7ea8aaf576547690488b0ff319e3cc65519d2f081894f4576d9"
+  },
+  "publicationPerformed": false,
+  "sharedOrNativeSourceDeliveryPerformed": false,
+  "nativeInstallQualified": false,
+  "nativeActivation": false,
+  "authority": "none"
+}

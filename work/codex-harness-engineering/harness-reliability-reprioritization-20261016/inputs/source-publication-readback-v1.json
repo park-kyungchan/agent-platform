@@ -1,0 +1,217 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "source-publication-readback-v1",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/source-publication-readback-v1",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "originalObservationSha256": "1052cb11d28c49deac80590b9873adff6425b23bfe7158d968f54815d738314a",
+    "observation": {
+      "schema": "hrr.post-publication-source-observation.v1",
+      "observedAtUtc": "2026-10-16T15:23:40.825222+00:00",
+      "leadNativeThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+      "sourceResults": [
+        {
+          "repository": "park-kyungchan/agent-platform",
+          "pullRequest": {
+            "headRefOid": "34e3bedd66e6697f199456f32374ba00711d47b6",
+            "mergeCommit": {
+              "oid": "350b1629493b1b4ca49228d467374574c59f0d68"
+            },
+            "mergedAt": "2026-10-16T14:34:31Z",
+            "mergedBy": {
+              "id": "U_kgDODl3xZg",
+              "is_bot": false,
+              "login": "park-kyungchan",
+              "name": ""
+            },
+            "number": 22,
+            "state": "MERGED",
+            "url": "https://github.com/park-kyungchan/agent-platform/pull/22"
+          },
+          "mergeCommit": {
+            "sha": "350b1629493b1b4ca49228d467374574c59f0d68",
+            "tree": "6737f5fe45787264da784d148114aa923d0d43fc",
+            "parents": [
+              "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+              "34e3bedd66e6697f199456f32374ba00711d47b6"
+            ]
+          },
+          "currentMain": "350b1629493b1b4ca49228d467374574c59f0d68",
+          "reviewedTreeIdentical": true,
+          "mainSourceCi": {
+            "conclusion": "success",
+            "headSha": "350b1629493b1b4ca49228d467374574c59f0d68",
+            "status": "completed",
+            "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38916870569"
+          }
+        },
+        {
+          "repository": "park-kyungchan/codex-harness-engineering",
+          "pullRequest": {
+            "headRefOid": "ccef48306f1a3149ba6587ca61cc680c53da329c",
+            "mergeCommit": {
+              "oid": "4539e2ac4ca9c439bdccebea459a473944f206be"
+            },
+            "mergedAt": "2026-10-16T15:00:00Z",
+            "mergedBy": {
+              "id": "U_kgDODl3xZg",
+              "is_bot": false,
+              "login": "park-kyungchan",
+              "name": ""
+            },
+            "number": 3,
+            "state": "MERGED",
+            "url": "https://github.com/park-kyungchan/codex-harness-engineering/pull/3"
+          },
+          "mergeCommit": {
+            "sha": "4539e2ac4ca9c439bdccebea459a473944f206be",
+            "tree": "d0a343edb1b1f9707eb312d977bcfda617bf92c2",
+            "parents": [
+              "2e4e927c2a9e5bc89dce0891bbe7cfd66c787288",
+              "ccef48306f1a3149ba6587ca61cc680c53da329c"
+            ]
+          },
+          "currentMain": "4539e2ac4ca9c439bdccebea459a473944f206be",
+          "reviewedTreeIdentical": true,
+          "hostedCi": "Unavailable: zero workflows observed at source-publication gate; required independent owner458-test/TypeScript QA passed, not hosted CI."
+        },
+        {
+          "repository": "park-kyungchan/vps-operations",
+          "pullRequest": {
+            "headRefOid": "4943f05702433042c73ea609e39599e3c4d0fea8",
+            "mergeCommit": {
+              "oid": "40ae22bbe783e891467102e1cd255cfe097d4196"
+            },
+            "mergedAt": "2026-10-16T15:19:57Z",
+            "mergedBy": {
+              "id": "U_kgDODl3xZg",
+              "is_bot": false,
+              "login": "park-kyungchan",
+              "name": ""
+            },
+            "number": 2,
+            "state": "MERGED",
+            "url": "https://github.com/park-kyungchan/vps-operations/pull/2"
+          },
+          "mergeCommit": {
+            "sha": "40ae22bbe783e891467102e1cd255cfe097d4196",
+            "tree": "b4e872663afa0f39b1ccf28d0ae5dc0d81bc13bb",
+            "parents": [
+              "f9cb609298c0b3055a31b087000b8a2863998b65",
+              "4943f05702433042c73ea609e39599e3c4d0fea8"
+            ]
+          },
+          "currentMain": "40ae22bbe783e891467102e1cd255cfe097d4196",
+          "reviewedTreeIdentical": true,
+          "mainSourceCi": {
+            "conclusion": "success",
+            "headSha": "40ae22bbe783e891467102e1cd255cfe097d4196",
+            "status": "completed",
+            "url": "https://github.com/park-kyungchan/vps-operations/actions/runs/38923060051"
+          }
+        }
+      ],
+      "nativeActivation": false,
+      "wholeWorkAcceptance": false,
+      "replayPolicy": "These source publication/PR/merge effects are completed and consumed; observe current receipts, do not replay."
+    },
+    "publication": [
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "pr": 22,
+        "head": "34e3bedd66e6697f199456f32374ba00711d47b6",
+        "tree": "6737f5fe45787264da784d148114aa923d0d43fc",
+        "merge": "350b1629493b1b4ca49228d467374574c59f0d68",
+        "result": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "f770517458ef701ba2e2ae3442cd792f0e3588ab",
+          "path": "native-review-results/34e3bedd66e6697f199456f32374ba00711d47b6.json",
+          "sha256": "3ae50495e0444103496676846fd44f3d60e934972b410b52d99fd41b26705633"
+        },
+        "reviewReceiptCommit": "fee8fa836f99aa5fddc3bdb84a357a1fd454deff",
+        "sourceStatus": 56530328029,
+        "mergedMainSuccessorResult": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "25ac1cd77f1dfae86da484af474c6bc725383a1f",
+          "path": "native-review-results/350b1629493b1b4ca49228d467374574c59f0d68.json",
+          "sha256": "fb71b577a46668b3627cfadbe9977e9ddc9d78a163512a52a5ce6a0645a674e2"
+        },
+        "mergedMainReceiptCommit": "be3a0251ee5b7fdce925731bfd36cc21be06fc73",
+        "mergedMainStatus": 56532599074,
+        "mainCi": {
+          "run": 38916870569,
+          "conclusion": "success-after-failed-attestation-job-rerun"
+        },
+        "limitation": "Original native reviewer authored explicit identical-tree successor with current zero findings. Initial main status-ordering failure and rejected Root-derived envelope retained; no false source failure or reviewer impersonation."
+      },
+      {
+        "repository": "park-kyungchan/codex-harness-engineering",
+        "pr": 3,
+        "head": "ccef48306f1a3149ba6587ca61cc680c53da329c",
+        "tree": "d0a343edb1b1f9707eb312d977bcfda617bf92c2",
+        "merge": "4539e2ac4ca9c439bdccebea459a473944f206be",
+        "result": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/codex-harness-engineering",
+          "commit": "479632caf46cb0e4c8f0663abb6321fcc7da9443",
+          "path": "source-evidence/hrr-ccef483/independent-review.json",
+          "sha256": "47e8178ccfd2309a8bc141ce3438b143c1d221f24076b1df02f5892f88a7c1ed"
+        },
+        "evidenceCommit": "1f1efdcae060e55106a514a4bd0d6c54779eac71",
+        "verification": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/codex-harness-engineering",
+          "commit": "7c45c700d38335f42d8e4301154ba3eb38f7a9d6",
+          "path": "source-evidence/hrr-ccef483/verification.json",
+          "sha256": "ad9834ae914d525b340047f9ac425626b68f6e2122a954e05da095ff048d3ea1"
+        },
+        "sourceStatus": 56532770867,
+        "mainCi": {
+          "conclusion": "unavailable; zero hosted workflows/rulesets observed"
+        },
+        "limitation": "Independent 458-test/TypeScript owner QA passed; no hosted CI or merged-main review status inferred. All28 provider pins match exact reviewed common bytes. Original Plan1 candidate constants preserved; current Work Plan2 admission remains held."
+      },
+      {
+        "repository": "park-kyungchan/vps-operations",
+        "pr": 2,
+        "head": "4943f05702433042c73ea609e39599e3c4d0fea8",
+        "tree": "b4e872663afa0f39b1ccf28d0ae5dc0d81bc13bb",
+        "merge": "40ae22bbe783e891467102e1cd255cfe097d4196",
+        "result": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/vps-operations",
+          "commit": "7f49f3af2c1952cbee869dae667f804aa1bd9c8f",
+          "path": "source-evidence/hrr-vps4943/independent-review.json",
+          "sha256": "e37bc09aceb510a9697d1c71a00652468fa8873b8de7f9d45974bec867162112"
+        },
+        "evidenceCommit": "d1a178aa2d125c923d678f2c87c554116b7bd112",
+        "verification": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/vps-operations",
+          "commit": "f7eb060bcf3618981bb102890d6bfb8285567a57",
+          "path": "source-evidence/hrr-vps4943/verification.json",
+          "sha256": "7f37d26647d950de7e7db4980db60fbd67bd72dd9c471cfd68b00e0895919faa"
+        },
+        "sourceStatus": 56534073669,
+        "mainCi": {
+          "run": 38923060051,
+          "conclusion": "success"
+        },
+        "limitation": "Current code/security reviews completed with zero findings and zero threads before expected-head Lead merge; same reviewed tree. Inert transport/lifecycle tests are not actual SSH/gateway qualification."
+      }
+    ],
+    "sourceOnly": true,
+    "nativeActivation": false,
+    "AcceptanceDecision": null
+  }
+}

@@ -18,11 +18,11 @@
   },
   "title": "Independently verify final source-publication readiness through an owned native interruption and NEW-session recovery.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
+    "execution": "complete",
+    "verification": "passed",
     "localAudit": "result-durable",
-    "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "sharedAudit": "unsynchronized",
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -34,6 +34,6 @@
     "HRR-INTERVIEW-5"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": [],
-  "nextAction": "Read inputs/checkpoint-v12.json#/content. ActualNEWsession recovery of this samePlan2Task and usefulc04review are verified; c04HOLD result remains immutable. The discoveredduplicateDecisionP2 is corrected/independentlyscopedreviewed at e6fc703, integratedRoot93ee2a2/registry3d21624 with ownerccef pins. Finishfresh exactcurrentcombinedtree independentcanonical review after affectedchecks; preservealloriginals/fences/result and technicalRecoveryproof. No nativeprepare/activation/evalbudget, historicreplay, oldGoal/WSLresume or publication authority fromGit."
+  "verificationEvidenceIds": ["HRR-SCOPED-ENGINEERING-VERIFICATION"],
+  "nextAction": "Read inputs/checkpoint-v14.json#/content and remaining-goal-audit-v1.json#/content. Scoped actual recovery/source-review/publication Task verification is source-bound and passed; new verification/task closure records remain local/unsynchronized, so formal completion awaits delivery. Current-Work v2 source authority awaits actual user answer. No old effect/session replay, native prepare/activation/model suite or owner/user Acceptance follows."
 }

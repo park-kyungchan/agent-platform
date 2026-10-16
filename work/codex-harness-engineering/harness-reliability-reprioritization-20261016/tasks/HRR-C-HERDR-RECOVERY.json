@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Source implementation and scoped independent reports are retained. Read inputs/checkpoint-v7.json#/content for exact component/source-report routes, current composition and remaining final check/publication/native gates. Source-only completion does not establish formal verification, native effects, activation or Acceptance."
+  "nextAction": "Read inputs/checkpoint-v13.json#/content and source-publication-readback-v1.json#/content. Useful NEW-session recovery/final exact source review and three authenticated source publications/expected-head merges are complete. Preserve original c04 HOLD and all completed/uncertain no-replay fences. Formal task verification/delivery/Acceptance remain separate; current Work v2 source authority awaits user answer, and native preparation/activation/evaluations remain held."
 }

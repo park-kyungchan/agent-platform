@@ -1,0 +1,15 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "evidence",
+  "id": "HRR-SCOPED-ENGINEERING-OBSERVATION",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/scoped-engineering-observation-v1.json",
+    "fragment": "#/content/evidenceArtifact",
+    "sha256": "1ea3f499b4baa66d37a232deda5119d2fd82e126c6813510afda2498e4f7572e"
+  }
+}

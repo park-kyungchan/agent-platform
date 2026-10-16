@@ -1,0 +1,233 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "scoped-engineering-observation-v1",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/scoped-engineering-observation-v1",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.scoped-engineering-observation-source.v1",
+    "evidenceArtifact": {
+      "schemaVersion": "1.0.0",
+      "kind": "evidence",
+      "id": "codex-harness-engineering:evidence:hrr-scoped-engineering-source-closure-v1",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-16T15:50:09.583Z",
+      "payload": {
+        "claim": "Observed engineering recovery/source-review Tasks produced preserved original context, useful independent reviewed findings and completed authenticated source publication; exact original receipts and current source correspondence remain matched.",
+        "method": "Root current immutable source-custody readback joined actual previously observed native session boundary, receiver/tool results, exact reviews/QA and GitHub publication/merge receipts. Seven retained Input hashes, two original native result hashes and unchanged runtime/source closure were checked before writing this record.",
+        "sourceUrl": "https://github.com/park-kyungchan/agent-platform/blob/f770517458ef701ba2e2ae3442cd792f0e3588ab/native-review-results/34e3bedd66e6697f199456f32374ba00711d47b6.json",
+        "fetchedAt": "2026-10-16T15:50:09.583Z",
+        "upstreamRevision": "34e3bedd66e6697f199456f32374ba00711d47b6",
+        "result": {
+          "outcome": "success",
+          "processExitCode": null,
+          "contentMatched": true,
+          "details": {
+            "classification": "observed-engineering-source-evidence-join",
+            "originalRecoveryCriteria": {
+              "ownedOldSessionExited": true,
+              "differentFreshNativeSessionObserved": true,
+              "samePlan2LogicalTaskRecovered": true,
+              "fullPurposeAndScopeRecovered": true,
+              "fiveOriginalAnswerQuestionValuesRecovered": true,
+              "completed68Uncertain3FencesPreserved": true,
+              "authoredNextActionRecovered": true,
+              "genuineDelegatedResultOriginal13305BytesHashRecovered": true,
+              "usefulIndependentReviewCompleted": true,
+              "completedOrUncertainReplay": false
+            },
+            "currentPublicationReceipts": [
+              {
+                "repository": "park-kyungchan/agent-platform",
+                "pullRequest": {
+                  "headRefOid": "34e3bedd66e6697f199456f32374ba00711d47b6",
+                  "mergeCommit": {
+                    "oid": "350b1629493b1b4ca49228d467374574c59f0d68"
+                  },
+                  "mergedAt": "2026-10-16T14:34:31Z",
+                  "mergedBy": {
+                    "id": "U_kgDODl3xZg",
+                    "is_bot": false,
+                    "login": "park-kyungchan",
+                    "name": ""
+                  },
+                  "number": 22,
+                  "state": "MERGED",
+                  "url": "https://github.com/park-kyungchan/agent-platform/pull/22"
+                },
+                "mergeCommit": {
+                  "sha": "350b1629493b1b4ca49228d467374574c59f0d68",
+                  "tree": "6737f5fe45787264da784d148114aa923d0d43fc",
+                  "parents": [
+                    "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+                    "34e3bedd66e6697f199456f32374ba00711d47b6"
+                  ]
+                },
+                "currentMain": "350b1629493b1b4ca49228d467374574c59f0d68",
+                "reviewedTreeIdentical": true,
+                "mainSourceCi": {
+                  "conclusion": "success",
+                  "headSha": "350b1629493b1b4ca49228d467374574c59f0d68",
+                  "status": "completed",
+                  "url": "https://github.com/park-kyungchan/agent-platform/actions/runs/38916870569"
+                }
+              },
+              {
+                "repository": "park-kyungchan/codex-harness-engineering",
+                "pullRequest": {
+                  "headRefOid": "ccef48306f1a3149ba6587ca61cc680c53da329c",
+                  "mergeCommit": {
+                    "oid": "4539e2ac4ca9c439bdccebea459a473944f206be"
+                  },
+                  "mergedAt": "2026-10-16T15:00:00Z",
+                  "mergedBy": {
+                    "id": "U_kgDODl3xZg",
+                    "is_bot": false,
+                    "login": "park-kyungchan",
+                    "name": ""
+                  },
+                  "number": 3,
+                  "state": "MERGED",
+                  "url": "https://github.com/park-kyungchan/codex-harness-engineering/pull/3"
+                },
+                "mergeCommit": {
+                  "sha": "4539e2ac4ca9c439bdccebea459a473944f206be",
+                  "tree": "d0a343edb1b1f9707eb312d977bcfda617bf92c2",
+                  "parents": [
+                    "2e4e927c2a9e5bc89dce0891bbe7cfd66c787288",
+                    "ccef48306f1a3149ba6587ca61cc680c53da329c"
+                  ]
+                },
+                "currentMain": "4539e2ac4ca9c439bdccebea459a473944f206be",
+                "reviewedTreeIdentical": true,
+                "hostedCi": "Unavailable: zero workflows observed at source-publication gate; required independent owner458-test/TypeScript QA passed, not hosted CI."
+              },
+              {
+                "repository": "park-kyungchan/vps-operations",
+                "pullRequest": {
+                  "headRefOid": "4943f05702433042c73ea609e39599e3c4d0fea8",
+                  "mergeCommit": {
+                    "oid": "40ae22bbe783e891467102e1cd255cfe097d4196"
+                  },
+                  "mergedAt": "2026-10-16T15:19:57Z",
+                  "mergedBy": {
+                    "id": "U_kgDODl3xZg",
+                    "is_bot": false,
+                    "login": "park-kyungchan",
+                    "name": ""
+                  },
+                  "number": 2,
+                  "state": "MERGED",
+                  "url": "https://github.com/park-kyungchan/vps-operations/pull/2"
+                },
+                "mergeCommit": {
+                  "sha": "40ae22bbe783e891467102e1cd255cfe097d4196",
+                  "tree": "b4e872663afa0f39b1ccf28d0ae5dc0d81bc13bb",
+                  "parents": [
+                    "f9cb609298c0b3055a31b087000b8a2863998b65",
+                    "4943f05702433042c73ea609e39599e3c4d0fea8"
+                  ]
+                },
+                "currentMain": "40ae22bbe783e891467102e1cd255cfe097d4196",
+                "reviewedTreeIdentical": true,
+                "mainSourceCi": {
+                  "conclusion": "success",
+                  "headSha": "40ae22bbe783e891467102e1cd255cfe097d4196",
+                  "status": "completed",
+                  "url": "https://github.com/park-kyungchan/vps-operations/actions/runs/38923060051"
+                }
+              }
+            ],
+            "sourceInputHashes": [
+              {
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/lead-scoped-recovery-verification-v1.json",
+                "sha256": "1755f9c6bf820ed43ebddedbc8462c1db761cead2a8442379fd92e97330c8822"
+              },
+              {
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-process-v1.json",
+                "sha256": "634f66297b8be424f90bd05e3990ac0e1be2fb75bed2a81d5c6e51c89da43e10"
+              },
+              {
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-readback-v1.json",
+                "sha256": "3ff90a662dde1fc88ef87e8914375e3f6dcb810428ca93e5b6e131618995f741"
+              },
+              {
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-review-c04.json",
+                "sha256": "a747670b887a55f20a4aa823895d5c5f8fe905ed0a379345d0e9a0bf5845d665"
+              },
+              {
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-candidate-source-result-1033d6f.json",
+                "sha256": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5"
+              },
+              {
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-owner-review-ccef483.json",
+                "sha256": "03b84d240c25fca671206713c94ff046f144f3ff71e1d88c0e1e3bf1478b58bf"
+              },
+              {
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/source-publication-readback-v1.json",
+                "sha256": "cbe5e7b222b70a82220b113fd44710aa41a5a7fd531b51a08add1a3cc6f1661e"
+              }
+            ]
+          }
+        },
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "success",
+            "details": {
+              "action": "This current bounded readback/join only; not a replay of original sessions, reviews or publication effects",
+              "verifiedOriginalInputCount": 7,
+              "originalNativeResultHashesMatched": true,
+              "runtimeSourceDeltaFrom34e": false
+            }
+          }
+        ],
+        "limitations": [
+          "Root engineering observation only; Git hash custody does not authenticate native authorship.",
+          "Original c04 HOLD and failed QA/status-ordering observations remain preserved; later exact corrections/reviews are separate successors.",
+          "No native hook whole-v2/1500-token, current installation, native activation/model qualification or human/owner Acceptance proof.",
+          "These new formal source closure records remain local and unsynchronized; no formal Task completion or remote publication is inferred."
+        ],
+        "details": {
+          "recordClass": "ObservedScopedEngineeringTaskEvidence",
+          "logicalTasks": [
+            {
+              "domainId": "native-harness",
+              "projectId": "codex-harness-engineering",
+              "workId": "harness-reliability-reprioritization-20261016",
+              "issueId": "HRR-ISSUE-20261016",
+              "specId": "HRR-SPEC",
+              "specRevision": 1,
+              "planId": "HRR-PLAN",
+              "planRevision": 2,
+              "taskId": "HRR-RECOVERY-SOURCE-REVIEW"
+            },
+            {
+              "domainId": "native-harness",
+              "projectId": "codex-harness-engineering",
+              "workId": "harness-reliability-reprioritization-20261016",
+              "issueId": "HRR-ISSUE-20261016",
+              "specId": "HRR-SPEC",
+              "specRevision": 1,
+              "planId": "HRR-PLAN",
+              "planRevision": 1,
+              "taskId": "HRR-INTEGRATION-REVIEW"
+            }
+          ],
+          "nativeGoalThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+          "nativeAuthFromGit": false,
+          "nativeActivation": false,
+          "AcceptanceDecision": null
+        }
+      }
+    }
+  }
+}
