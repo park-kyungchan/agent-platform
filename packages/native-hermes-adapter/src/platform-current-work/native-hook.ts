@@ -6,6 +6,8 @@ declare const HERMES_PLATFORM_PROVIDER_ROOT: string;
 declare const HERMES_PLATFORM_REGISTRATION_PATH: string;
 declare const HERMES_CURRENT_WORK_BINDINGS_PATH: string | undefined;
 declare const HERMES_CURRENT_WORK_BINDINGS_SHA256: string | undefined;
+declare const HERMES_CURRENT_WORK_OUTPUT_VERSION: "v1" | "v2" | undefined;
+declare const HERMES_CURRENT_WORK_MAX_CHARS: number | undefined;
 
 // Builtin-only bootstrap modules precede the implementation import. Data never chooses executable code.
 let stage: CurrentWorkDiagnosticStage = "input";
@@ -57,6 +59,14 @@ try {
     stage = "context";
     const response = await readHermesNativeWorkHook(payload, bindings, {
       verifySourceClosure: verify,
+      outputVersion:
+        typeof HERMES_CURRENT_WORK_OUTPUT_VERSION === "undefined"
+          ? "v1"
+          : HERMES_CURRENT_WORK_OUTPUT_VERSION,
+      maxChars:
+        typeof HERMES_CURRENT_WORK_MAX_CHARS === "undefined"
+          ? undefined
+          : HERMES_CURRENT_WORK_MAX_CHARS,
     });
     await verify();
     console.log(JSON.stringify(response));

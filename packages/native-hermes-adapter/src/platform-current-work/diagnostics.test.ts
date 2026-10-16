@@ -40,3 +40,29 @@ test("unregistered entrypoints preserve fail-closed protocol and report registra
     expect(output + diagnostic).not.toContain(import.meta.dir);
   }
 });
+
+test("output version rejects nonliteral values before registration without echoing them", async () => {
+  for (const outputVersion of [["v2"], null, "PRIVATE_SYNTHETIC_VERSION"]) {
+    const child = Bun.spawn(
+      [process.execPath, "--no-env-file", join(import.meta.dir, "read-current-work.ts")],
+      {
+        stdin: new Blob([JSON.stringify({ outputVersion })]),
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [code, out, diagnostic] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ]);
+    expect(code).toBe(1);
+    expect(out).toBe("");
+    expect(JSON.parse(diagnostic)).toEqual({
+      error: "CURRENT_WORK_INPUT_OR_SOURCE_FAILED",
+      stage: "input",
+      reason: "REQUEST_UNAVAILABLE_OR_INVALID",
+    });
+    expect(diagnostic).not.toContain("PRIVATE_SYNTHETIC_VERSION");
+  }
+});

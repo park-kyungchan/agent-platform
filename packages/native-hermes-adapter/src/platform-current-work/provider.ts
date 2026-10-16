@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { open, realpath } from "node:fs/promises";
+import { lstat, open, realpath } from "node:fs/promises";
 import { constants } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { captureInstalledRuntimeClosure } from "../source-provider/dependency-closure.ts";
 
@@ -96,6 +96,7 @@ export const platformSourcePaths = [
     "hook-context",
     "native-hook",
     "diagnostics",
+    "output-policy",
   ].map((name) => "packages/native-hermes-adapter/src/platform-current-work/" + name + ".ts"),
   ...["boundary-custody", "contracts", "bot-correlation"].map(
     (name) => "packages/native-hermes-adapter/src/platform-governance/" + name + ".ts",
@@ -153,27 +154,94 @@ async function pin(root: string, path: string): Promise<PlatformPin> {
   const bytes = await readExactFile(join(root, path), 1048576);
   return { path, sha256: sourceDigest(bytes), bytes: bytes.length };
 }
+/** Actual maintained native importers must use canonical code or its exact captured installed projection. */
+async function verifyInstalledWorkProjection(
+  root: string,
+  sourcePins: PlatformPin[],
+  installed: { dependencies: PlatformDependency[]; dependencyPins: PlatformPin[] },
+) {
+  const canonical = join(root, "packages/work-continuity");
+  const dependency = installed.dependencies.find(
+    (entry) => entry.name === "@palantirkc/work-continuity",
+  );
+  const projection = dependency ? join(root, dependency.root) : canonical;
+  if (projection !== canonical) {
+    const pins = new Map(installed.dependencyPins.map((pin) => [pin.path, pin]));
+    for (const canonicalPin of sourcePins.filter((pin) =>
+      pin.path.startsWith("packages/work-continuity/"),
+    )) {
+      const path =
+        dependency!.root + "/" + canonicalPin.path.slice("packages/work-continuity/".length);
+      if (pins.get(path)?.sha256 !== canonicalPin.sha256)
+        throw Error("INSTALLED_WORKSPACE_PROJECTION_DRIFT");
+    }
+  }
+  const roots = new Set([canonical, projection]);
+  const importers = [
+    [
+      "platform-current-work/context.ts",
+      [
+        ["git-work", "src/git-work/index.ts"],
+        ["runtime-index", "src/runtime-index.ts"],
+      ],
+    ],
+    ["platform-rearchitecture/work-records.ts", [["handoff", "src/handoff.ts"]]],
+    ["platform-rearchitecture/work-continuity.ts", [["handoff", "src/handoff.ts"]]],
+  ] as const;
+  for (const [path, exports] of importers) {
+    const importer = join(root, "packages/native-hermes-adapter/src", path);
+    let directory = dirname(importer);
+    while (true) {
+      const candidate = join(directory, "node_modules/@palantirkc/work-continuity");
+      let present = false;
+      try {
+        await lstat(candidate);
+        present = true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      if (present && !roots.has(dirname(await realpath(join(candidate, "package.json")))))
+        throw Error("UNADMITTED_WORKSPACE_LOOKUP_ROOT");
+      if (directory === root) break;
+      directory = dirname(directory);
+    }
+    const manifest = await realpath(
+      Bun.resolveSync("@palantirkc/work-continuity/package.json", dirname(importer)),
+    );
+    const actualRoot = dirname(manifest);
+    if (!roots.has(actualRoot)) throw Error("WORKSPACE_IMPORTER_RESOLUTION_DRIFT");
+    for (const [specifier, entry] of exports)
+      if (
+        (await realpath(
+          Bun.resolveSync("@palantirkc/work-continuity/" + specifier, dirname(importer)),
+        )) !== join(actualRoot, entry)
+      )
+        throw Error("WORKSPACE_IMPORTER_RESOLUTION_DRIFT");
+  }
+}
 export async function captureHermesPlatformSource(
   providerRoot: string,
 ): Promise<PlatformSourceRegistration> {
   if (resolve(providerRoot) !== providerRoot || (await realpath(providerRoot)) !== providerRoot)
     throw Error("EXACT_PLATFORM_SOURCE_OWNER_REQUIRED");
   const sourcePins = await Promise.all(platformSourcePaths.map((path) => pin(providerRoot, path)));
+  const installed = await captureInstalledRuntimeClosure(
+    providerRoot,
+    readExactFile,
+    sourceDigest,
+    true,
+    platformSourcePaths
+      .filter((path) => path.endsWith(".ts"))
+      .map((path) => join(providerRoot, path)),
+  );
+  await verifyInstalledWorkProjection(providerRoot, sourcePins, installed);
   return {
     schema: "hermes.platform-source-provider.v2",
     providerRoot,
     packageName: "@palantirkc/native-hermes-adapter",
     entrypoints: { ...platformEntryPoints },
     sourcePins,
-    ...(await captureInstalledRuntimeClosure(
-      providerRoot,
-      readExactFile,
-      sourceDigest,
-      true,
-      platformSourcePaths
-        .filter((path) => path.endsWith(".ts"))
-        .map((path) => join(providerRoot, path)),
-    )),
+    ...installed,
     authority: "none",
     nativePermissionGranted: false,
   };

@@ -3,6 +3,7 @@ import { open, realpath, mkdtemp, readFile, rm, lstat, type FileHandle } from "n
 import { isAbsolute, join, resolve, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+import { currentWorkOutputPolicy } from "./output-policy.ts";
 import {
   observeHermesPlatformSource,
   platformEntryPoints,
@@ -20,6 +21,9 @@ export interface PlatformBuildRequest {
   runtimeRegistrationPath: string;
   /** Exact owner-selected native bindings; absence builds a held current hook, never a legacy fallback. */
   currentWorkBindings?: { runtimePath: string; sha256: string };
+  /** Explicit version selection; omission preserves the existing v1 wire consumer. */
+  currentWorkOutputVersion?: "v1" | "v2";
+  currentWorkMaxChars?: number;
 }
 async function compilerPin(path: string) {
   if (resolve(path) !== path || (await realpath(path)) !== path)
@@ -93,6 +97,16 @@ function runtimePath(path: string) {
 export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
   request = structuredClone(request);
   if (
+    request.currentWorkOutputVersion !== undefined &&
+    !["v1", "v2"].includes(request.currentWorkOutputVersion)
+  )
+    throw Error("EXPLICIT_CURRENT_WORK_OUTPUT_VERSION_REQUIRED");
+  const outputPolicy = currentWorkOutputPolicy(
+    request.currentWorkOutputVersion ?? "v1",
+    request.currentWorkMaxChars,
+  );
+  if (!outputPolicy.valid) throw Error("INVALID_CURRENT_WORK_OUTPUT_BUDGET");
+  if (
     !/^[a-f0-9]{64}$/u.test(request.compiler.sha256) ||
     !/^[a-f0-9]{64}$/u.test(request.legacyManifestSha256)
   )
@@ -165,6 +179,11 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
           (request.currentWorkBindings
             ? JSON.stringify(request.currentWorkBindings.sha256)
             : "undefined"),
+        "--define",
+        "HERMES_CURRENT_WORK_OUTPUT_VERSION=" +
+          JSON.stringify(request.currentWorkOutputVersion ?? "v1"),
+        "--define",
+        "HERMES_CURRENT_WORK_MAX_CHARS=" + JSON.stringify(outputPolicy.policy.maxChars),
       ];
       const child = Bun.spawn(argv, {
         cwd: request.providerRoot,
@@ -261,6 +280,8 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
       transitiveCompilerInputsVerified: true,
       temporaryDirectoryRemovedBeforeReturn: true,
       nativeActivation: false as const,
+      currentWorkOutputVersion: request.currentWorkOutputVersion ?? "v1",
+      currentWorkOutputPolicy: outputPolicy.policy,
       authority: "none" as const,
       nativePermissionGranted: false as const,
     };

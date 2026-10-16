@@ -1,6 +1,9 @@
 import { isAbsolute, resolve } from "node:path";
+import { currentWorkOutputPolicy, type CurrentWorkOutputPolicy } from "./output-policy.ts";
 import {
   assertLogicalIdentity,
+  compactGitWorkContext,
+  type CompactGitWorkContext,
   openGitWork,
   readGitWorkContext,
   resolveGitWorkSelection,
@@ -59,7 +62,13 @@ export interface HermesCurrentWorkView {
     title?: string;
     state: TaskRecord["state"];
     source: string;
+    nextAction?: string;
+    nextActionCoverage: "authored" | "unspecified";
+    nextActionSource: string | null;
+    effectIds: string[];
+    pendingEffectIds: string[];
   };
+  semanticContext: CompactGitWorkContext;
   upstream: {
     spec: { id: string; revision: number; source: string };
     plan: { id: string; revision: number; source: string };
@@ -84,6 +93,17 @@ export interface HermesCurrentWorkResult {
   nativePermissionGranted: false;
   semanticAcceptanceEstablished: false;
 }
+export interface HermesCompactWorkResult extends Omit<
+  HermesCurrentWorkResult,
+  "schema" | "context"
+> {
+  schema: "hermes.current-git-work-context.v2";
+  context: { native: HermesCurrentWorkEvent; work: CompactGitWorkContext } | null;
+  outputPolicy: CurrentWorkOutputPolicy;
+}
+type HermesWorkOutputVersion = "v1" | "v2";
+type HermesWorkResult = HermesCurrentWorkResult | HermesCompactWorkResult;
+
 export type HermesCurrentWorkGitApi = Pick<
   typeof import("@palantirkc/work-continuity/git-work"),
   "resolveGitWorkSelection" | "openGitWork" | "readGitWorkContext"
@@ -245,12 +265,23 @@ function selection(value: unknown): HermesCurrentWorkSelection {
 function result(
   reasons: string[],
   context: HermesCurrentWorkView | null = null,
-): HermesCurrentWorkResult {
+  outputVersion: HermesWorkOutputVersion = "v1",
+  maxChars = 6000,
+): HermesWorkResult {
   return {
-    schema: "hermes.current-git-work-context.v1",
+    schema:
+      outputVersion === "v2"
+        ? "hermes.current-git-work-context.v2"
+        : "hermes.current-git-work-context.v1",
+    ...(outputVersion === "v2"
+      ? { outputPolicy: currentWorkOutputPolicy("v2", maxChars).policy }
+      : {}),
     status: reasons.length ? "held" : "source-qualified",
     holdReasons: [...new Set(reasons)],
-    context,
+    context:
+      context && outputVersion === "v2"
+        ? { native: context.native, work: context.semanticContext }
+        : context,
     projection: "bounded-derived-pointer-view",
     currentness: "caller-declared-not-remote-verified",
     verificationClass: "git-object-source-only",
@@ -259,7 +290,7 @@ function result(
     authority: "none",
     nativePermissionGranted: false,
     semanticAcceptanceEstablished: false,
-  };
+  } as HermesWorkResult;
 }
 const sameLogical = (a: LogicalIdentity, b: LogicalIdentity) =>
   logicalKeys.every((key) => a[key] === b[key]);
@@ -279,8 +310,14 @@ function bounded(
   reasons: string[],
   maxChars: number,
   essentialDecisionIds: Set<string>,
-): HermesCurrentWorkResult {
-  const fits = () => JSON.stringify(result(reasons, view)).length <= maxChars;
+  outputVersion: HermesWorkOutputVersion,
+): HermesWorkResult {
+  const fits = () =>
+    JSON.stringify(result(reasons, view, outputVersion, maxChars)).length <= maxChars;
+  if (outputVersion === "v2")
+    return fits()
+      ? result(reasons, view, outputVersion, maxChars)
+      : result(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"], null, outputVersion, maxChars);
   while (!fits()) {
     const optional = view.decisions.findLastIndex(
       (decision) => !essentialDecisionIds.has(decision.id),
@@ -299,36 +336,70 @@ function bounded(
   }
   if (!fits()) {
     // Never shrink essential originals, purpose or Task text into a qualified view.
-    return result(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
+    return result(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"], null, outputVersion, maxChars);
   }
-  return result(reasons, view);
+  return result(reasons, view, outputVersion, maxChars);
+}
+
+/** Existing v1 fields remain readable; required common semantics are additive and never omitted. */
+export async function readHermesCurrentWorkContext(
+  event: unknown,
+  selected: unknown,
+  runtimeIndex: unknown,
+  options: HermesCurrentWorkOptions,
+): Promise<HermesCurrentWorkResult> {
+  return (await readHermesCurrentWorkContextInternal(
+    event,
+    selected,
+    runtimeIndex,
+    options,
+    "v1",
+  )) as HermesCurrentWorkResult;
+}
+/** Explicit compact v2 output delegates semantics to the same canonical common projection. */
+export async function readHermesCurrentWorkContextV2(
+  event: unknown,
+  selected: unknown,
+  runtimeIndex: unknown,
+  options: HermesCurrentWorkOptions,
+): Promise<HermesCompactWorkResult> {
+  return (await readHermesCurrentWorkContextInternal(
+    event,
+    selected,
+    runtimeIndex,
+    options,
+    "v2",
+  )) as HermesCompactWorkResult;
 }
 
 /** Explicit local source selection only. No native store, model loop, fetch or runtime mutation. */
-export async function readHermesCurrentWorkContext(
+async function readHermesCurrentWorkContextInternal(
   eventValue: unknown,
   selectionValue: unknown,
   runtimeIndex: unknown,
   options: HermesCurrentWorkOptions,
-): Promise<HermesCurrentWorkResult> {
+  outputVersion: HermesWorkOutputVersion,
+): Promise<HermesWorkResult> {
+  const selectedPolicy = currentWorkOutputPolicy(outputVersion, options?.maxChars);
+  const maxChars = selectedPolicy.policy.maxChars;
+  const output = (reasons: string[], view: HermesCurrentWorkView | null = null) =>
+    result(reasons, view, outputVersion, maxChars);
   let selected: HermesCurrentWorkSelection;
   let event: HermesCurrentWorkEvent;
-  const maxChars = options?.maxChars ?? 6000;
-  if (!Number.isSafeInteger(maxChars) || maxChars < 1024 || maxChars > 6000)
-    return result(["INVALID_STARTUP_CONTEXT_BUDGET"]);
+  if (!selectedPolicy.valid) return output(["INVALID_STARTUP_CONTEXT_BUDGET"]);
   if (!options || typeof options.verifySourceClosure !== "function")
-    return result(["SOURCE_CLOSURE_VERIFIER_REQUIRED"]);
+    return output(["SOURCE_CLOSURE_VERIFIER_REQUIRED"]);
   try {
     event = native(eventValue);
     selected = selection(selectionValue);
   } catch {
-    return result(["EXPLICIT_NATIVE_WORK_SELECTION_REQUIRED"]);
+    return output(["EXPLICIT_NATIVE_WORK_SELECTION_REQUIRED"]);
   }
   if (!nativeKeys.every((key) => event[key] === selected.native[key]))
-    return result(["FOREIGN_NATIVE_WORK_TUPLE"]);
+    return output(["FOREIGN_NATIVE_WORK_TUPLE"]);
   const scope: NativeReferenceScope = { ...selected.native, logical: selected.logical };
   const reference = selectRuntimeReference(runtimeIndex, scope);
-  if (reference.status !== "matched") return result(reference.holdReasons);
+  if (reference.status !== "matched") return output(reference.holdReasons);
   const api = options.gitWork ?? { resolveGitWorkSelection, openGitWork, readGitWorkContext };
   try {
     await options.verifySourceClosure();
@@ -339,13 +410,9 @@ export async function readHermesCurrentWorkContext(
         reader.work.domainId !== selected.logical.domainId ||
         reader.work.projectId !== selected.logical.projectId ||
         reader.work.workId !== selected.logical.workId ||
-        reader.work.issueId !== selected.logical.issueId ||
-        reader.work.spec.id !== selected.logical.specId ||
-        reader.work.spec.revision !== selected.logical.specRevision ||
-        reader.work.plan.id !== selected.logical.planId ||
-        reader.work.plan.revision !== selected.logical.planRevision
+        reader.work.issueId !== selected.logical.issueId
       )
-        return result(["CURRENT_WORK_LOGICAL_CONTRACT_MISMATCH"]);
+        return output(["CURRENT_WORK_LOGICAL_CONTRACT_MISMATCH"]);
       const context = await api.readGitWorkContext(reader, {
         taskId: selected.logical.taskId,
         latestRelevant: selected.latestRelevant,
@@ -353,16 +420,23 @@ export async function readHermesCurrentWorkContext(
         maxRecords: 256,
       });
       if (!context.records.length)
-        return result(
+        return output(
           context.holdReasons.length
             ? safeReasons(context.holdReasons)
             : ["REQUIRED_CONTEXT_UNAVAILABLE"],
         );
       const task = await reader.readRecord({ kind: "task", id: selected.logical.taskId });
       if (task.kind !== "task" || !sameLogical(task.logical, selected.logical))
-        return result(["CURRENT_TASK_LOGICAL_CONTRACT_MISMATCH"]);
+        return output(["CURRENT_TASK_LOGICAL_CONTRACT_MISMATCH"]);
       const decisions: HermesCurrentWorkDecision[] = [];
       const reasons = safeReasons(context.holdReasons);
+      const semanticContext = compactGitWorkContext(context, {
+        taskId: task.id,
+        decisionIds: task.decisionIds,
+      });
+      reasons.push(...safeReasons(semanticContext.holdReasons));
+      if (semanticContext.status === "held" && !reasons.length)
+        reasons.push("REQUIRED_COMPACT_CONTEXT_UNAVAILABLE");
       const projectedDecisions = context.records.filter((item) => item.kind === "decision");
       // Prioritize the current Task's decisions before governing/upstream revisions.
       projectedDecisions.sort(
@@ -370,7 +444,7 @@ export async function readHermesCurrentWorkContext(
       );
       for (const item of projectedDecisions) {
         const record = await reader.readRecord({ kind: "decision", id: item.id });
-        if (record.kind !== "decision") return result(["INVALID_DECISION_CONTEXT"]);
+        if (record.kind !== "decision") return output(["INVALID_DECISION_CONTEXT"]);
         const answer = source(context.sources.find((row) => row.id === item.answerSource));
         const question = source(
           context.sources.find((row) => row.id === item.selectionContextSource),
@@ -401,7 +475,14 @@ export async function readHermesCurrentWorkContext(
           title: task.title,
           state: task.state,
           source: recordSource("tasks", task.id),
+          ...(task.nextAction !== undefined ? { nextAction: task.nextAction } : {}),
+          nextActionCoverage: task.nextAction === undefined ? "unspecified" : "authored",
+          nextActionSource:
+            task.nextAction === undefined ? null : recordSource("tasks", task.id) + "#/nextAction",
+          effectIds: [...task.effectIds],
+          pendingEffectIds: [...(task.pendingEffectIds ?? [])],
         },
+        semanticContext,
         upstream: {
           spec: {
             ...reader.work.spec,
@@ -423,13 +504,13 @@ export async function readHermesCurrentWorkContext(
       };
       const after = await api.resolveGitWorkSelection(selected.snapshot);
       if (after.commit !== snapshot.commit) reasons.push("SELECTED_LOCAL_REF_ADVANCED_DURING_READ");
-      return bounded(view, reasons, maxChars, new Set(task.decisionIds));
+      return bounded(view, reasons, maxChars, new Set(task.decisionIds), outputVersion);
     } finally {
       await options.verifySourceClosure();
     }
   } catch {
     // Parser/provider error strings may contain original inputs. Never echo them.
-    return result(["SELECTED_WORK_SOURCE_UNAVAILABLE_OR_DRIFTED"]);
+    return output(["SELECTED_WORK_SOURCE_UNAVAILABLE_OR_DRIFTED"]);
   }
 }
 function safeReasons(reasons: string[]): string[] {
