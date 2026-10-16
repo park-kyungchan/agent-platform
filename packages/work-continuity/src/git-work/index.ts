@@ -13,6 +13,11 @@ export {
   assertRecord,
   taskVerificationTarget,
 } from "./records.ts";
-export { readGitWorkContext, qualifyGitWorkStart } from "./context.ts";
+export {
+  readGitWorkContext,
+  compactGitWorkContext,
+  decodeCompactGitWorkContext,
+  qualifyGitWorkStart,
+} from "./context.ts";
 export { assertLogicalIdentity } from "../logical-identity.ts";
 export { validateTaskOperationalState } from "../operational-state.ts";

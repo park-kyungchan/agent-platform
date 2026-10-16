@@ -11,6 +11,8 @@ import {
   validateGitWorkRecords,
   validateGitWorkTransition,
   taskVerificationTarget,
+  compactGitWorkContext,
+  decodeCompactGitWorkContext,
 } from "./index.ts";
 import type {
   GitWorkRecord,
@@ -1654,5 +1656,367 @@ describe("source-addressed normative continuity and consumed effect closure", ()
     const full = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
     expect(full.records.find((row) => row.kind === "decision")?.answer).toBeUndefined();
     expect(full.records.find((row) => row.kind === "input")?.content).toBeUndefined();
+  });
+});
+
+describe("lossless shared native compact context", () => {
+  test("roundtrips every normative field, selected Task and exact source binding with an in-band layout", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.purpose.inScope = [];
+    work.purpose.outOfScope = [];
+    (rows.find((row) => row.kind === "input" && row.id === "purpose") as InputRecord).content =
+      JSON.parse(JSON.stringify(work.purpose));
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const raw = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    const compact = compactGitWorkContext(raw, { taskId: "a" });
+    expect(compact.status).toBe("source-qualified");
+    expect(compact.layout.normative).toContain("[objective,clauses?]");
+    const decoded = decodeCompactGitWorkContext(compact);
+    for (const contract of compact.normative) {
+      const kind = contract[0],
+        id = contract[1];
+      const revision = kind === "work" ? undefined : contract[2];
+      const sourceIndex = kind === "work" ? contract[2] : contract[3];
+      const fields = kind === "work" ? contract[3] : contract[4];
+      const address = decoded.sources[sourceIndex]!;
+      const record = decoded.normative.find(
+        (row) => row.kind === kind && row.id === id && row.revision === revision,
+      )!;
+      for (const [field, fragment] of Object.entries(fields)) {
+        const source = await reader.readSource({
+          kind: "git",
+          repositoryId: address.repositoryId,
+          commit: address.commit,
+          path: address.path,
+          fragment,
+        });
+        expect(source.blobOid).toBe(address.blobOid);
+        expect(record[field]).toEqual(source.value);
+      }
+    }
+    const taskRecord = await reader.readRecord({ kind: "task", id: "a" });
+    if (taskRecord.kind !== "task") throw Error("fixture");
+    expect(decoded.task?.logical).toEqual(taskRecord.logical);
+    expect(decoded.task?.state).toEqual(taskRecord.state);
+    expect(decoded.task?.effectIds).toEqual([]);
+    expect(decoded.task?.pendingEffectIds).toEqual([]);
+    expect(decoded.task?.nextAction?.value).toBe(taskRecord.nextAction!);
+    expect(decoded.task?.nextAction?.source[1]).toBe("#/nextAction");
+    expect(compact.historicalEffects).toEqual(raw.historicalEffects);
+    expect(compact.continuityBinding.coverage).toBe("bound");
+    expect(compact.authority).toBe("none");
+    expect(compact.nativePermissionGranted).toBe(false);
+  });
+  test("string pooling preserves identical values, empty purpose arrays and exact Plan clause order", async () => {
+    const rows = boundRecords();
+    const spec = rows.find((row) => row.kind === "spec");
+    const plan = rows.find((row) => row.kind === "plan");
+    if (spec?.kind !== "spec" || plan?.kind !== "plan") throw Error("fixture");
+    spec.criteria = ["Keep meaning and original proof"];
+    plan.clauses = ["Second clause first", "Keep meaning and original proof", "First clause last"];
+    const { root, oid } = await fixture(rows);
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, oid), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    expect(
+      compact.strings.filter((text) => text === "Keep meaning and original proof"),
+    ).toHaveLength(1);
+    expect(
+      decodeCompactGitWorkContext(compact).normative.find((row) => row.kind === "plan")?.clauses,
+    ).toEqual(plan.clauses);
+  });
+  test("all active and selected historical contract revisions retain their own source identity", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    const spec = rows.find((row) => row.kind === "spec");
+    const plan = rows.find((row) => row.kind === "plan");
+    if (spec?.kind !== "spec" || plan?.kind !== "plan") throw Error("fixture");
+    work.spec.revision = 2;
+    work.plan.revision = 2;
+    rows.push(
+      { ...spec, revision: 2, outcome: "Current outcome", criteria: ["Current criteria"] },
+      { ...plan, revision: 2, specRevision: 2, clauses: ["Current authored clause"] },
+    );
+    const { root, oid } = await fixture(rows);
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, oid), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    const decoded = decodeCompactGitWorkContext(compact);
+    expect(
+      decoded.normative
+        .filter((row) => row.kind === "spec")
+        .map((row) => row.revision)
+        .sort(),
+    ).toEqual([1, 2]);
+    expect(
+      decoded.normative
+        .filter((row) => row.kind === "plan")
+        .map((row) => row.revision)
+        .sort(),
+    ).toEqual([1, 2]);
+    expect(decoded.task?.logical.specRevision).toBe(1);
+    expect(decoded.task?.logical.planRevision).toBe(1);
+    expect(decoded.normative.find((row) => row.kind === "work")?.spec).toEqual({
+      id: "spec",
+      revision: 2,
+    });
+    expect(decoded.normative.find((row) => row.kind === "work")?.plan).toEqual({
+      id: "plan",
+      revision: 2,
+    });
+    expect(
+      decoded.normative
+        .filter((row) => row.kind === "plan")
+        .map((row) => [row.specId, row.specRevision])
+        .sort(),
+    ).toEqual([
+      ["spec", 1],
+      ["spec", 2],
+    ]);
+  });
+  test("same blob original fragments share one address without exposing raw answer/question or origin", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, oid), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    const decision = decodeCompactGitWorkContext(compact).decisions[0]!;
+    expect(decision.answerSource[0]).toBe(decision.selectionContextSource![0]);
+    expect(decision.answerSource[1]).toBe("#/content/text");
+    expect(decision.selectionContextSource![1]).toBe("#/content/question");
+    const serialized = JSON.stringify(compact);
+    expect(serialized).not.toContain("Which canonical source?");
+    expect(serialized).not.toContain("fixture:user-message:1");
+    expect(serialized).not.toContain("Use Git");
+  });
+  test("native declarations stay distinct on pointers while their exact receipt address is pooled", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.continuity!.effectInventorySources = ["native-owner-a", "native-owner-b"].map(
+      (ownerId) => ({
+        kind: "native",
+        ownerId,
+        locator: `${ownerId}:inventory`,
+        receipt: ref("fences"),
+      }),
+    );
+    const { root, oid } = await fixture(rows);
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, oid), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    expect(compact.status).toBe("source-qualified");
+    const [a, b] = compact.continuityBinding.effectInventorySources;
+    expect(a![0]).toBe(b![0]);
+    expect(a![2]?.ownerId).toBe("native-owner-a");
+    expect(b![2]?.locator).toBe("native-owner-b:inventory");
+    expect(a![2]?.receiptKind).toBe("snapshot");
+    expect(compact.nativePermissionGranted).toBe(false);
+  });
+  test("explicit repository path base remains exact instead of receiving the selected Work prefix", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    const path = "architecture/consumed-inventory.json";
+    work.continuity!.effectInventorySources = [{ kind: "snapshot", path }];
+    const { root } = await fixture(rows);
+    await mkdir(join(root, "architecture"), { recursive: true });
+    await writeFile(
+      join(root, path),
+      JSON.stringify({ completedEffectIds: ["already"], uncertainEffectIds: ["unknown"] }),
+    );
+    const raw = await readGitWorkContext(await open(root, await commit(root)), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(raw.sources.find((source) => source.path === path)?.pathBase).toBe("repository");
+    const compact = compactGitWorkContext(raw, { taskId: "a" });
+    const index = compact.continuityBinding.effectInventorySources[0]![0];
+    expect(compact.sources[index]![0]).toBe("repository");
+    expect(decodeCompactGitWorkContext(compact).sources[index]!.path).toBe(path);
+  });
+  test("equal blob/path across different commits remains two exact pooled addresses", async () => {
+    const rows = boundRecords();
+    const { root, oid } = await fixture(rows);
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.continuity!.purposeSources.push({
+      kind: "git",
+      repositoryId: "fixture/repo",
+      commit: oid,
+      path: pathOf("input", "purpose"),
+      fragment: "#/content",
+    });
+    await put(root, work);
+    const next = await commit(root);
+    const compact = compactGitWorkContext(
+      await readGitWorkContext(await open(root, next), { taskId: "a", latestRelevant: "current" }),
+      { taskId: "a" },
+    );
+    const decoded = decodeCompactGitWorkContext(compact);
+    const [a, b] = compact.continuityBinding.purposeSources.map(
+      (pointer) => decoded.sources[pointer[0]]!,
+    );
+    expect(a!.blobOid).toBe(b!.blobOid);
+    expect(a!.path).toBe(b!.path);
+    expect(a!.commit).toBe(next);
+    expect(b!.commit).toBe(oid);
+  });
+  test("explicit decision subsets and empty selection retain every reached original route", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(
+      compactGitWorkContext(raw, { taskId: "a", decisionIds: [] }).decisions.map((row) => row[0]),
+    ).toEqual(["direction"]);
+    for (const selection of [
+      { decisionIds: ["missing"] },
+      { decisionIds: ["direction", "direction"] },
+      { taskId: "missing" },
+    ]) {
+      const compact = compactGitWorkContext(raw, selection);
+      expect(compact.status).toBe("held");
+      expect(compact.normative).toEqual([]);
+      expect(() => decodeCompactGitWorkContext(compact)).toThrow("COMPACT_CONTEXT_NOT_QUALIFIED");
+    }
+  });
+  test.each([
+    "source",
+    "path-base",
+    "path",
+    "fragment",
+    "criteria",
+    "fields",
+    "currentness",
+    "original",
+    "clauses",
+    "next-action",
+  ] as const)(
+    "missing or malformed required %s cannot become compact qualified context",
+    async (variant) => {
+      const { root, oid } = await fixture(boundRecords());
+      const raw = await readGitWorkContext(await open(root, oid), {
+        taskId: "a",
+        latestRelevant: "current",
+      });
+      const workSource = raw.sources.find(
+        (row) => row.id === raw.normative.contracts.find((row) => row.kind === "work")!.source,
+      )!;
+      if (variant === "source") raw.sources = raw.sources.filter((row) => row !== workSource);
+      if (variant === "path-base") delete (workSource as Partial<typeof workSource>).pathBase;
+      if (variant === "path") workSource.path = "inputs/wrong.json";
+      if (variant === "fragment") workSource.fragment = "#/purpose";
+      if (variant === "criteria") delete raw.records.find((row) => row.kind === "spec")!.criteria;
+      if (variant === "fields")
+        raw.normative.contracts = raw.normative.contracts.filter((row) => row.kind !== "plan");
+      if (variant === "currentness") delete (raw as Partial<typeof raw>).latestRelevant;
+      if (variant === "original")
+        raw.records.find((row) => row.kind === "decision")!.answerSource = "absent";
+      if (variant === "clauses") raw.records.find((row) => row.kind === "plan")!.clauses = [];
+      if (variant === "next-action")
+        delete raw.records.find((row) => row.kind === "task")!.nextAction;
+      const compact = compactGitWorkContext(raw, { taskId: "a" });
+      expect(compact.status).toBe("held");
+      expect(compact.normative).toEqual([]);
+      expect(compact.strings).toEqual([]);
+      expect(compact.sources).toEqual([]);
+    },
+  );
+  test("raw context overflow/currentness holds survive compaction without a usable partial contract", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const reader = await open(root, oid);
+    for (const request of [
+      { taskId: "a", latestRelevant: "current" as const, maxChars: 1024 },
+      { taskId: "a", latestRelevant: "advanced" as const },
+    ]) {
+      const raw = await readGitWorkContext(reader, request);
+      const compact = compactGitWorkContext(raw, { taskId: "a" });
+      expect(compact.status).toBe("held");
+      expect(compact.holdReasons).toContain("SOURCE_CONTEXT_HELD");
+      expect(compact.normative).toEqual([]);
+      expect(compact.task).toBeUndefined();
+      expect(compact.nativePermissionGranted).toBe(false);
+    }
+  });
+  test("decoder rejects corrupted indices instead of manufacturing missing source values", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    const compact = compactGitWorkContext(raw, { taskId: "a" });
+    compact.task!.nextAction!.value = 9999;
+    expect(() => decodeCompactGitWorkContext(compact)).toThrow("INVALID_COMPACT_STRING_INDEX");
+  });
+  test("held native output keeps owned codes without copying forensic original snippets or external exceptions", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    const sentinel = "PRIVATE_ORIGINAL_SENTINEL";
+    const held = structuredClone(raw);
+    held.status = "held";
+    held.holdReasons = [`REQUIRED_CONTEXT_OUTPUT_LIMIT:${sentinel}`, sentinel];
+    const compact = compactGitWorkContext(held, { taskId: "a" });
+    expect(compact.status).toBe("held");
+    expect(compact.holdReasons).toContain("REQUIRED_CONTEXT_OUTPUT_LIMIT");
+    expect(JSON.stringify(compact)).not.toContain(sentinel);
+    expect(held.holdReasons[0]).toContain(sentinel);
+    Object.defineProperty(raw.sources[0], "pathBase", {
+      get() {
+        throw Error(sentinel);
+      },
+    });
+    const failed = compactGitWorkContext(raw, { taskId: "a" });
+    expect(failed.holdReasons).toContain("COMPACT_CONTEXT_UNAVAILABLE");
+    expect(JSON.stringify(failed)).not.toContain(sentinel);
+  });
+});
+
+describe("uncertain legacy source Task-ID fence", () => {
+  test.each(["legacy-planned", "legacy-running", "bound-planned", "bound-running"] as const)(
+    "holds %s without fabricating a native occurrence",
+    async (variant) => {
+      const rows = variant.startsWith("bound") ? boundRecords() : initialRecords();
+      const guarded = task("unknown");
+      guarded.state.execution = variant.endsWith("running") ? "running" : "planned";
+      guarded.nextAction = "Recover the uncertain observation without repeating its action";
+      rows.push(guarded);
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      const validation = await validateGitWorkRecords(reader);
+      expect(validation.findings).toContain("UNCERTAIN_EFFECT_REPLAY:unknown");
+      const raw = await readGitWorkContext(reader, {
+        taskId: "unknown",
+        latestRelevant: "current",
+      });
+      expect(raw.status).toBe("held");
+      expect(raw.holdReasons).toContain("UNCERTAIN_EFFECT_REPLAY:unknown");
+      expect(raw.historicalEffects?.relevantUncertainIds).toContain("unknown");
+      expect(compactGitWorkContext(raw, { taskId: "unknown" }).status).toBe("held");
+      const record = await reader.readRecord({ kind: "task", id: "unknown" });
+      if (record.kind !== "task") throw Error("fixture");
+      expect(record.executionClass).toBe("source-only");
+      expect(record.occurrence).toBeUndefined();
+      expect(record.pendingEffectIds).toBeUndefined();
+      expect(record.effectIds).toEqual([]);
+    },
+  );
+  test("distinct future source Task remains qualified beside the consumed uncertain Task-ID", async () => {
+    const rows = boundRecords();
+    const future = task("new-distinct-source-task");
+    future.nextAction = "Perform the separately authorized new source observation";
+    rows.push(future);
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    expect((await validateGitWorkRecords(reader)).findings).toEqual([]);
+    const raw = await readGitWorkContext(reader, { taskId: future.id, latestRelevant: "current" });
+    expect(raw.status).toBe("source-qualified");
+    expect(compactGitWorkContext(raw, { taskId: future.id }).status).toBe("source-qualified");
   });
 });

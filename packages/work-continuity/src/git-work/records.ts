@@ -868,6 +868,7 @@ export async function validateRecordSet(
   for (const record of records.values())
     if (record.kind === "task" && ["planned", "running"].includes(record.state.execution)) {
       if (completed.has(record.id)) findings.push(`COMPLETED_EFFECT_REPLAY:${record.id}`);
+      if (uncertain.has(record.id)) findings.push(`UNCERTAIN_EFFECT_REPLAY:${record.id}`);
       for (const id of record.pendingEffectIds ?? [])
         if (completed.has(id) || uncertain.has(id))
           findings.push(`EFFECT_REPLAY_OR_UNCERTAIN:${id}`);
