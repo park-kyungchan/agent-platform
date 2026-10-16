@@ -36,20 +36,20 @@
     "successorPurpose": {
       "objective": "Complete full private Spec7/Plan7.",
       "successCriteria": [
-        "Full Spec7/Plan7; original purpose and compression provenance remain in source inputs.",
-        "Stable IDs/originals/fences; typed common/native source; retain owners and avoid duplicate registration.",
-        "Verify native activation/PC-off, portfolio/recovery, delegation/handoff/resume/Memory/Kanban/Session/concurrency and audit receipts.",
-        "Academy seven gates/teacher/concept work; private runtime and read-only source; month-end before user choice.",
-        "Exact review/private delivery/Lead merge/readback/cleanup and separate evidence-based Lead Acceptance.",
-        "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero added recurring cost."
+        "Full Spec7/Plan7; original purpose: inputs/work-purpose-compaction-provenance-20261016.json.",
+        "Preserve IDs/originals/fences, typed common/native source and existing owners.",
+        "Verify activation/PC-off, portfolio/recovery, delegation/handoff/resume/Memory/Kanban/Session/concurrency and audit.",
+        "Academy seven gates/teacher/concept; private runtime/read-only source; month-end before user choice.",
+        "Exact review/private delivery/Lead integration/readback/cleanup; separate evidence-based Acceptance.",
+        "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero new recurring cost."
       ],
       "inScope": [
         "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
       ],
       "outOfScope": [
-        "Source mutation/denied access, unrequested third-party effects and excluded domains.",
+        "Source writes/denied access, unrequested third-party effects, excluded domains.",
         "Credential disclosure/trust bypass/parallel runtime; auto-merge/paid infrastructure/replay/reused budgets.",
-        "Invented student/teacher/human outcomes or agent papers/membership; retain user choice and teacher/human judgments."
+        "Invented human/teacher/student outcomes, agent papers or final membership; retain user choice."
       ]
     },
     "priorProvenance": "inputs/work-purpose-compaction-provenance-20261016.json",
