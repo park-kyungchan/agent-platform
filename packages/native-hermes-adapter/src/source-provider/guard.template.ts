@@ -11,6 +11,7 @@ let captureDependencies!: (
   read: (path: string, maxBytes: number) => Promise<Uint8Array>,
   digest: (bytes: Uint8Array | string) => string,
   includeWorkContinuity: boolean,
+  sourceImporters: readonly string[],
 ) => Promise<{
   dependencies: { name: string; version: string; root: string }[];
   dependencyPins: { path: string; sha256: string; bytes: number }[];
@@ -362,7 +363,10 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     join(codeOwnerRoot, "bun.lock"),
   ])
     pins.push({ path, sha256: sha(await exact(path)) });
-  const runtimeDependencies = await captureDependencies(providerRoot, exact, sha, false);
+  const importers = moduleNames.map((name) =>
+    join(providerRoot, "packages/native-hermes-adapter/src", name + ".ts"),
+  );
+  const runtimeDependencies = await captureDependencies(providerRoot, exact, sha, false, importers);
   if (JSON.stringify(runtimeDependencies) !== JSON.stringify(lineage.runtimeDependencies))
     throw Error("EXECUTABLE_DEPENDENCY_CLOSURE_DRIFT");
   const runtimePins = runtimeDependencies.dependencyPins.map((pin) => ({
@@ -402,7 +406,7 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     for (const pin of [...pins, ...facadePins, ...provenancePins, ...runtimePins])
       if (sha(await exact(pin.path)) !== pin.sha256)
         throw Error("Hermes code source changed during packaging: " + pin.path);
-    const current = await captureDependencies(providerRoot, exact, sha, false);
+    const current = await captureDependencies(providerRoot, exact, sha, false, importers);
     if (JSON.stringify(current) !== JSON.stringify(runtimeDependencies))
       throw Error("Hermes executable dependency closure changed during read");
   };

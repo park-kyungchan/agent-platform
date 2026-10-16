@@ -501,3 +501,56 @@ test("adding an executable dependency after observation is outside the captured 
   expect(result.status).not.toBe(0);
   expect(result.stderr).toContain("executable dependency closure changed during read");
 });
+
+test("nested dependency lookup directories and links refuse before and after observation", async () => {
+  for (const link of [false, true]) {
+    for (const after of [false, true]) {
+      const f = await fixture();
+      const path = join(f.providerRoot, "node_modules/ajv/dist/compile/node_modules");
+      const setup = link
+        ? `await fs.symlink(f.fixtureRoot,${JSON.stringify(path)});`
+        : `await fs.mkdir(${JSON.stringify(path)});`;
+      const result = await child(
+        f,
+        `const fs=await import('node:fs/promises');
+        ${after ? "const proof=await api.observeHermesContextProvider(f.codeOwnerRoot);" : ""}
+        ${setup}
+        ${after ? "await proof.verify();" : "await api.observeHermesContextProvider(f.codeOwnerRoot);"}`,
+      );
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("UNADMITTED_NESTED_DEPENDENCY_ROOT");
+    }
+  }
+}, 25000);
+
+test("all canonical importers refuse package-local Ontology lookup overrides before and after observation", async () => {
+  for (const location of ["", "/src/ontology-driven", "/src/adoption"]) {
+    for (const after of [false, true]) {
+      const f = await fixture();
+      const path = join(
+        f.providerRoot,
+        "packages/native-hermes-adapter" + location,
+        "node_modules/@palantirkc/ontology",
+      );
+      // Inert metadata/code fixtures only: no untrusted module is ever imported.
+      const setup = `await fs.mkdir(${JSON.stringify(path)},{recursive:true});
+        await fs.writeFile(${JSON.stringify(join(path, "package.json"))},${JSON.stringify(
+          JSON.stringify({
+            name: "@palantirkc/ontology",
+            version: "0.2.0",
+            exports: { ".": "./index.js", "./package.json": "./package.json" },
+          }),
+        )});
+        await fs.writeFile(${JSON.stringify(join(path, "index.js"))},'export const sourceFixtureOnly=true;');`;
+      const result = await child(
+        f,
+        `const fs=await import('node:fs/promises');
+        ${after ? "const proof=await api.observeHermesContextProvider(f.codeOwnerRoot);" : ""}
+        ${setup}
+        ${after ? "await proof.verify();" : "await api.observeHermesContextProvider(f.codeOwnerRoot);"}`,
+      );
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("UNADMITTED_ONTOLOGY_LOOKUP_ROOT");
+    }
+  }
+}, 25000);

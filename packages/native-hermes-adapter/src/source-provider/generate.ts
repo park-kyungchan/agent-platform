@@ -362,7 +362,13 @@ export async function generateHermesSourceFixture(): Promise<SourceFixture> {
     authority: "none",
     lineage: "architecture/hermes-new-source-successor.json",
     inputs: [...inputs].map(([path, bytes]) => ({ path, sha256: sha(bytes) })),
-    runtimeDependencies: await captureInstalledRuntimeClosure(providerRoot, exact, sha, false),
+    runtimeDependencies: await captureInstalledRuntimeClosure(
+      providerRoot,
+      exact,
+      sha,
+      false,
+      modules.map((name) => join(providerRoot, packagePath, "src", name + ".ts")),
+    ),
   });
   await put(join(codeOwnerRoot, "source-successor.json"), successorBytes);
 

@@ -159,7 +159,15 @@ export async function captureHermesPlatformSource(
     packageName: "@palantirkc/native-hermes-adapter",
     entrypoints: { ...platformEntryPoints },
     sourcePins,
-    ...(await captureInstalledRuntimeClosure(providerRoot, readExactFile, sourceDigest)),
+    ...(await captureInstalledRuntimeClosure(
+      providerRoot,
+      readExactFile,
+      sourceDigest,
+      true,
+      platformSourcePaths
+        .filter((path) => path.endsWith(".ts"))
+        .map((path) => join(providerRoot, path)),
+    )),
     authority: "none",
     nativePermissionGranted: false,
   };

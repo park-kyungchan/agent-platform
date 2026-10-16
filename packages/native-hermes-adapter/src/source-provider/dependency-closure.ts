@@ -1,6 +1,10 @@
 /** Single canonical finite dependency observer shared by v2 and the generated v1 guard.
  * The generator embeds this byte-exact builtin-only module as a projection, never a second implementation. */
-import { readdir as dependencyReaddir, realpath as dependencyRealpath } from "node:fs/promises";
+import {
+  lstat as dependencyLstat,
+  readdir as dependencyReaddir,
+  realpath as dependencyRealpath,
+} from "node:fs/promises";
 import {
   dirname as dependencyDirname,
   isAbsolute as dependencyIsAbsolute,
@@ -23,6 +27,7 @@ export async function captureInstalledRuntimeClosure(
   read: (path: string, maxBytes: number) => Promise<Uint8Array>,
   digest: (bytes: Uint8Array | string) => string,
   includeWorkContinuity = true,
+  sourceImporters: readonly string[] = [],
 ): Promise<{ dependencies: RuntimeDependency[]; dependencyPins: RuntimeDependencyPin[] }> {
   const dependencies: RuntimeDependency[] = [],
     dependencyPins: RuntimeDependencyPin[] = [];
@@ -100,7 +105,9 @@ export async function captureInstalledRuntimeClosure(
     const installed: RuntimeDependencyPin[] = [];
     async function walk(directory: string) {
       for (const entry of await dependencyReaddir(directory, { withFileTypes: true })) {
-        if (entry.name === "node_modules") continue;
+        // A resolver may select a package beside any importing file, not only the
+        // declared package root. Never omit such an executable lookup boundary.
+        if (entry.name === "node_modules") throw Error("UNADMITTED_NESTED_DEPENDENCY_ROOT");
         const path = dependencyJoin(directory, entry.name);
         if (entry.isSymbolicLink()) throw Error("UNADMITTED_PLATFORM_DEPENDENCY_SYMLINK");
         if (entry.isDirectory()) await walk(path);
@@ -139,6 +146,55 @@ export async function captureInstalledRuntimeClosure(
       "@palantirkc/work-continuity",
       dependencyJoin(root, "packages/native-hermes-adapter"),
     );
+  const ontology = dependencies.find((entry) => entry.name === "@palantirkc/ontology");
+  if (
+    !ontology ||
+    !sourceImporters.length ||
+    sourceImporters.length > 128 ||
+    new Set(sourceImporters).size !== sourceImporters.length
+  )
+    throw Error("FINITE_CANONICAL_IMPORTERS_REQUIRED");
+  const ontologyRoot = dependencyJoin(root, ontology.root);
+  const ontologyManifest = dependencyJoin(ontologyRoot, "package.json");
+  const ontologyEntry = await dependencyRealpath(Bun.resolveSync("@palantirkc/ontology", root));
+  if (
+    !within(ontologyRoot, ontologyEntry) ||
+    !dependencyPins.some((entry) => dependencyJoin(root, entry.path) === ontologyEntry)
+  )
+    throw Error("UNADMITTED_ONTOLOGY_ENTRYPOINT");
+  for (const importer of sourceImporters) {
+    if (!within(root, importer) || (await dependencyRealpath(importer)) !== importer)
+      throw Error("FOREIGN_CANONICAL_IMPORTER");
+    // Inspect physical lookup candidates too: a cached resolver answer must not
+    // conceal a newly introduced package-local override during final readback.
+    let directory = dependencyDirname(importer);
+    while (true) {
+      const candidate = dependencyJoin(directory, "node_modules/@palantirkc/ontology");
+      let present = false;
+      try {
+        await dependencyLstat(candidate);
+        present = true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+      if (
+        present &&
+        (await dependencyRealpath(dependencyJoin(candidate, "package.json"))) !== ontologyManifest
+      )
+        throw Error("UNADMITTED_ONTOLOGY_LOOKUP_ROOT");
+      if (directory === root) break;
+      directory = dependencyDirname(directory);
+    }
+    if (
+      (await dependencyRealpath(
+        Bun.resolveSync("@palantirkc/ontology/package.json", dependencyDirname(importer)),
+      )) !== ontologyManifest ||
+      (await dependencyRealpath(
+        Bun.resolveSync("@palantirkc/ontology", dependencyDirname(importer)),
+      )) !== ontologyEntry
+    )
+      throw Error("ONTOLOGY_IMPORTER_RESOLUTION_DRIFT");
+  }
   return {
     dependencies: dependencies.sort((a, b) => a.name.localeCompare(b.name)),
     dependencyPins: dependencyPins.sort((a, b) => a.path.localeCompare(b.path)),
