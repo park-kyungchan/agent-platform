@@ -177,6 +177,8 @@ export async function readGitWorkContext(
         projected.push({
           ...base,
           purpose: json(record.purpose),
+          domainId: record.domainId,
+          issueId: record.issueId,
           spec: json(record.spec),
           plan: json(record.plan),
         });
@@ -250,7 +252,11 @@ export async function readGitWorkContext(
       contracts.push({
         ...base,
         kind: "work",
-        fields: { purpose: "#/purpose", spec: "#/spec", plan: "#/plan" },
+        fields: {
+          purpose: "#/purpose",
+          spec: "#/spec",
+          plan: "#/plan",
+        },
         coverage: "complete",
       });
     if (record.kind === "spec")
@@ -389,6 +395,10 @@ const compactSourceHold = (value: unknown): string => {
   const code = typeof value === "string" ? value.split(":", 1)[0]! : "";
   return compactSourceHoldCodes.has(code) ? code : "SOURCE_CONTEXT_UNAVAILABLE";
 };
+const compactFieldsMatch = (actual: unknown, expected: Record<string, string>) =>
+  compactObject(actual) &&
+  Object.keys(actual).length === Object.keys(expected).length &&
+  Object.entries(expected).every(([key, value]) => actual[key] === value);
 const compactLayout = {
   strings:
     "Zero-based string indices; preserve array order and empty arrays. fields are exact source JSON pointers.",
@@ -397,7 +407,7 @@ const compactLayout = {
   pointer:
     "[sources index,JSON pointer,native declaration?]; Git proof never authenticates native provenance.",
   normative:
-    "work:[kind,id,source,fields,coverage,[objective,successCriteria,inScope,outOfScope],{spec:[id,revision],plan:[id,revision]}]; spec:[kind,id,revision,source,fields,coverage,[outcome,criteria]]; plan:[kind,id,revision,source,fields,coverage,[objective,clauses?],[specId,specRevision]]. Only normative text values index strings; IDs/revisions are literal.",
+    "work:[kind,id,source,fields,coverage,[objective,successCriteria,inScope,outOfScope],{spec:[id,revision],plan:[id,revision]},{domainId,issueId}]; spec:[kind,id,revision,source,fields,coverage,[outcome,criteria]]; plan:[kind,id,revision,source,fields,coverage,[objective,clauses?],[specId,specRevision]]. Only normative text values index strings; IDs/revisions are literal.",
   task: "logical:[domainId,projectId,workId,issueId,specId,specRevision,planId,planRevision,taskId]; state:[execution,verification,localAudit,sharedAudit,formalCompletion]. nextAction.value indexes strings.",
   decisions:
     "[id,status,answer pointer,question pointer?]; all reached originals retained, without raw text or Input.origin.",
@@ -478,13 +488,7 @@ export function compactGitWorkContext(
       }
       return index;
     };
-    const texts = (value: unknown): string[] => {
-      compactAssert(
-        Array.isArray(value) && value.length <= 10_000 && value.every(compactText),
-        "INVALID_COMPACT_TEXT_ARRAY",
-      );
-      return value;
-    };
+    const texts = compactTexts;
     const indices = (value: unknown): number[] => texts(value).map(stringIndex);
     const records = new Map<string, ContextRecordProjection>();
     for (const record of context.records) {
@@ -577,10 +581,6 @@ export function compactGitWorkContext(
       }
       return [index, fragment];
     };
-    const fieldsMatch = (actual: unknown, expected: Record<string, string>) =>
-      compactObject(actual) &&
-      Object.keys(actual).length === Object.keys(expected).length &&
-      Object.entries(expected).every(([key, value]) => actual[key] === value);
     const contractSources = new Map<string, NormativeContextSource>();
     for (const contract of context.normative.contracts) {
       compactAssert(
@@ -648,13 +648,15 @@ export function compactGitWorkContext(
         compactAssert(
           record.id === context.workId &&
             contract.coverage === "complete" &&
-            fieldsMatch(contract.fields, {
+            compactFieldsMatch(contract.fields, {
               purpose: "#/purpose",
               spec: "#/spec",
               plan: "#/plan",
             }) &&
             compactObject(record.purpose) &&
-            Object.keys(record.purpose).length === 4,
+            Object.keys(record.purpose).length === 4 &&
+            compactText(record.domainId) &&
+            compactText(record.issueId),
           "INVALID_COMPACT_WORK_PURPOSE",
         );
         const purpose: CompactPurpose = [
@@ -668,16 +670,23 @@ export function compactGitWorkContext(
           "work",
           record.id,
           sourceIndex,
-          { purpose: "#/purpose", spec: "#/spec", plan: "#/plan" },
+          {
+            purpose: "#/purpose",
+            spec: "#/spec",
+            plan: "#/plan",
+            domainId: "#/domainId",
+            issueId: "#/issueId",
+          },
           "complete",
           purpose,
           { spec: contractRef(record.spec, "spec"), plan: contractRef(record.plan, "plan") },
+          { domainId: record.domainId, issueId: record.issueId },
         ]);
       }
       if (record.kind === "spec") {
         compactAssert(
           contract.coverage === "complete" &&
-            fieldsMatch(contract.fields, { outcome: "#/outcome", criteria: "#/criteria" }),
+            compactFieldsMatch(contract.fields, { outcome: "#/outcome", criteria: "#/criteria" }),
           "INVALID_COMPACT_SPEC_COVERAGE",
         );
         const criteria = indices(record.criteria);
@@ -698,7 +707,7 @@ export function compactGitWorkContext(
           (clauses === undefined
             ? contract.coverage === "legacy-objective-only"
             : contract.coverage === "complete" && clauses.length > 0) &&
-            fieldsMatch(contract.fields, {
+            compactFieldsMatch(contract.fields, {
               objective: "#/objective",
               specId: "#/specId",
               specRevision: "#/specRevision",
@@ -733,7 +742,7 @@ export function compactGitWorkContext(
       const authored = record.nextAction !== undefined;
       compactAssert(
         contract.kind === "task" &&
-          fieldsMatch(contract.fields, authored ? { nextAction: "#/nextAction" } : {}) &&
+          compactFieldsMatch(contract.fields, authored ? { nextAction: "#/nextAction" } : {}) &&
           contract.coverage === (authored ? "complete" : "unspecified"),
         "INVALID_COMPACT_NEXT_ACTION_COVERAGE",
       );
@@ -747,6 +756,19 @@ export function compactGitWorkContext(
           logical.projectId === context.projectId &&
           ["source-only", "native-effect"].includes(String(record.executionClass)),
         "INVALID_COMPACT_TASK_IDENTITY",
+      );
+      contractRef({ id: logical.specId, revision: logical.specRevision }, "spec");
+      contractRef({ id: logical.planId, revision: logical.planRevision }, "plan");
+      const work = records.get(recordKey({ kind: "work", id: context.workId }));
+      const plan = records.get(
+        recordKey({ kind: "plan", id: logical.planId, revision: logical.planRevision }),
+      );
+      compactAssert(
+        work?.domainId === logical.domainId &&
+          work.issueId === logical.issueId &&
+          plan?.specId === logical.specId &&
+          plan.specRevision === logical.specRevision,
+        "COMPACT_TASK_SCOPE_OR_PLAN_SPEC_MISMATCH",
       );
       result.task = {
         id: record.id,
@@ -862,8 +884,10 @@ export function compactGitWorkContext(
       "INVALID_COMPACT_RELEVANT_EFFECTS",
     );
     result.status = "source-qualified";
+    validateAndDecodeCompactContext(result);
     return result;
   } catch (error) {
+    result.status = "held";
     result.holdReasons = [
       ...new Set([
         ...result.holdReasons,
@@ -885,11 +909,62 @@ export function compactGitWorkContext(
   }
 }
 
-/** Decode the published compact layout without reading sources or adding authority.
- * Native owners enforce their own envelope budget before delivering either representation. */
-export function decodeCompactGitWorkContext(
+/** Reject unknown/missing fields rather than silently dropping required compact semantics. */
+function compactShape(value: unknown, required: string[], optional: string[] = []): void {
+  compactAssert(
+    compactObject(value) &&
+      required.every((key) => Object.hasOwn(value, key)) &&
+      Object.keys(value).every((key) => required.includes(key) || optional.includes(key)),
+    "INVALID_COMPACT_SCHEMA",
+  );
+}
+function compactTuple(value: unknown, minimum: number, maximum = minimum): void {
+  compactAssert(
+    Array.isArray(value) && value.length >= minimum && value.length <= maximum,
+    "INVALID_COMPACT_TUPLE",
+  );
+}
+function compactTexts(value: unknown): string[] {
+  compactAssert(
+    Array.isArray(value) &&
+      value.length <= 10_000 &&
+      value.every(compactText) &&
+      new Set(value).size === value.length,
+    "INVALID_COMPACT_TEXT_ARRAY",
+  );
+  return value;
+}
+
+/** One finite structural boundary shared by construction and public decoding.
+ * It checks the carried contracts, not Git content or native producer authenticity. */
+function validateAndDecodeCompactContext(
   context: CompactGitWorkContext,
 ): DecodedCompactGitWorkContext {
+  compactShape(
+    context,
+    [
+      "schema",
+      "sourcePathBase",
+      "layout",
+      "status",
+      "repositoryId",
+      "commit",
+      "projectId",
+      "workId",
+      "latestRelevant",
+      "strings",
+      "sources",
+      "normative",
+      "decisions",
+      "continuityBinding",
+      "historicalEffects",
+      "holdReasons",
+      "authority",
+      "nativePermissionGranted",
+      "semanticAcceptanceEstablished",
+    ],
+    ["task"],
+  );
   compactAssert(
     context.schema === "common.git-work-context.compact.v1" &&
       context.status === "source-qualified" &&
@@ -897,14 +972,16 @@ export function decodeCompactGitWorkContext(
       context.authority === "none" &&
       context.nativePermissionGranted === false &&
       context.semanticAcceptanceEstablished === false &&
+      Array.isArray(context.holdReasons) &&
       context.holdReasons.length === 0 &&
       JSON.stringify(context.layout) === JSON.stringify(compactLayout),
     "COMPACT_CONTEXT_NOT_QUALIFIED",
   );
-  compactAssert(
-    context.sourcePathBase === gitWorkPath(context.projectId, context.workId),
-    "COMPACT_SOURCE_BASE_MISMATCH",
-  );
+  compactAssert(compactText(context.repositoryId), "COMPACT_REPOSITORY_REQUIRED");
+  assertCommit(context.commit);
+  const workPath = gitWorkPath(context.projectId, context.workId);
+  compactAssert(context.sourcePathBase === workPath, "COMPACT_SOURCE_BASE_MISMATCH");
+  compactTexts(context.strings);
   const string = (index: number) => {
     compactAssert(
       Number.isSafeInteger(index) && index >= 0 && compactText(context.strings[index]),
@@ -912,87 +989,297 @@ export function decodeCompactGitWorkContext(
     );
     return context.strings[index]!;
   };
-  const strings = (indices: number[]) => indices.map(string);
-  const sources = context.sources.map(([pathBase, path, blobOid, repositoryId, commit]) => {
+  const strings = (indices: number[], nonempty = false): string[] => {
     compactAssert(
-      pathBase === "work" || pathBase === "repository",
-      "COMPACT_SOURCE_PATH_BASE_UNAVAILABLE",
+      Array.isArray(indices) &&
+        indices.length <= 10_000 &&
+        (!nonempty || indices.length > 0) &&
+        new Set(indices).size === indices.length,
+      "INVALID_COMPACT_NORMATIVE_ARRAY",
     );
-    const fullPath = pathBase === "work" ? `${context.sourcePathBase}/${path}` : path;
+    return indices.map(string);
+  };
+  compactTuple(context.sources, 1, 8192);
+  const sourceKeys = new Set<string>();
+  const sources = context.sources.map((row) => {
+    compactTuple(row, 3, 5);
+    const [pathBase, path, blobOid, repositoryId, commit] = row;
+    compactAssert(
+      (pathBase === "work" || pathBase === "repository") &&
+        compactText(path) &&
+        (repositoryId == null || compactText(repositoryId)) &&
+        (commit == null || typeof commit === "string") &&
+        typeof blobOid === "string" &&
+        /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(blobOid),
+      "INVALID_COMPACT_SOURCE_ADDRESS",
+    );
+    assertGitPath(path);
+    const fullPath = pathBase === "work" ? `${workPath}/${path}` : path;
     assertGitPath(fullPath);
-    assertCommit(commit ?? context.commit);
-    compactAssert(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(blobOid), "INVALID_COMPACT_BLOB_ID");
-    return {
+    const exact = {
       repositoryId: repositoryId ?? context.repositoryId,
       commit: commit ?? context.commit,
       path: fullPath,
       blobOid,
     };
+    assertCommit(exact.commit);
+    const key = JSON.stringify(exact);
+    compactAssert(!sourceKeys.has(key), "DUPLICATE_COMPACT_SOURCE_ADDRESS");
+    sourceKeys.add(key);
+    return exact;
   });
   const source = (index: number) => {
     compactAssert(
       Number.isSafeInteger(index) && index >= 0 && sources[index],
       "INVALID_COMPACT_SOURCE_INDEX",
     );
+    return sources[index]!;
   };
-  const normative: ContextRecordProjection[] = context.normative.map((row) => {
+  const pointer = (value: CompactSourcePointer): CompactSourcePointer => {
+    compactTuple(value, 2, 3);
+    const address = source(value[0]);
+    compactAssert(
+      typeof value[1] === "string" &&
+        value[1].length <= 12_000 &&
+        (value[1] === "#" || value[1].startsWith("#/")) &&
+        !/~(?![01])/.test(value[1]),
+      "INVALID_COMPACT_SOURCE_FRAGMENT",
+    );
+    if (value.length === 3) {
+      const native = value[2];
+      compactShape(native, ["ownerId", "locator", "receiptKind"], ["sha256"]);
+      compactAssert(
+        native &&
+          compactText(native.ownerId) &&
+          compactText(native.locator) &&
+          ["snapshot", "git"].includes(native.receiptKind) &&
+          (native.sha256 === undefined ||
+            (typeof native.sha256 === "string" && /^[a-f0-9]{64}$/.test(native.sha256))) &&
+          (native.receiptKind !== "snapshot" ||
+            (address.repositoryId === context.repositoryId && address.commit === context.commit)),
+        "INVALID_COMPACT_NATIVE_DECLARATION",
+      );
+    }
+    return structuredClone(value);
+  };
+  const canonicalSource = (index: number, reference: RecordReference) => {
+    const address = source(index);
+    compactAssert(
+      address.repositoryId === context.repositoryId &&
+        address.commit === context.commit &&
+        address.path === gitRecordPath(context.projectId, context.workId, reference),
+      "COMPACT_NORMATIVE_SOURCE_BINDING_MISMATCH",
+    );
+  };
+  compactTuple(context.normative, 1, 2048);
+  const records = new Map<string, ContextRecordProjection>();
+  let work: ContextRecordProjection | undefined;
+  const normative = context.normative.map((row): ContextRecordProjection => {
+    compactTuple(row, 7, 8);
+    const kind = row[0];
+    compactAssert(
+      ["work", "spec", "plan"].includes(kind) && compactText(row[1]),
+      "INVALID_COMPACT_NORMATIVE_IDENTITY",
+    );
+    const reference: RecordReference = {
+      kind,
+      id: row[1],
+      ...(kind === "work" ? {} : { revision: row[2] }),
+    };
+    const key = recordKey(reference);
+    compactAssert(!records.has(key), "DUPLICATE_COMPACT_RECORD");
+    canonicalSource(kind === "work" ? row[2] : row[3], reference);
+    let record: ContextRecordProjection;
     if (row[0] === "work") {
-      source(row[2]);
+      compactTuple(row, 8);
+      compactAssert(
+        !work &&
+          row[1] === context.workId &&
+          row[4] === "complete" &&
+          compactFieldsMatch(row[3], {
+            purpose: "#/purpose",
+            spec: "#/spec",
+            plan: "#/plan",
+            domainId: "#/domainId",
+            issueId: "#/issueId",
+          }),
+        "INVALID_COMPACT_WORK_CONTRACT",
+      );
+      compactTuple(row[5], 4);
+      compactShape(row[6], ["spec", "plan"]);
+      compactShape(row[7], ["domainId", "issueId"]);
+      compactAssert(
+        compactText(row[7].domainId) && compactText(row[7].issueId),
+        "INVALID_COMPACT_WORK_SCOPE",
+      );
       const [objective, successCriteria, inScope, outOfScope] = row[5];
-      return {
+      const spec = row[6].spec,
+        plan = row[6].plan;
+      compactTuple(spec, 2);
+      compactTuple(plan, 2);
+      recordKey({ kind: "spec", id: spec[0], revision: spec[1] });
+      recordKey({ kind: "plan", id: plan[0], revision: plan[1] });
+      record = {
         kind: "work",
         id: row[1],
-        spec: { id: row[6].spec[0], revision: row[6].spec[1] },
-        plan: { id: row[6].plan[0], revision: row[6].plan[1] },
+        domainId: row[7].domainId,
+        issueId: row[7].issueId,
+        spec: { id: spec[0], revision: spec[1] },
+        plan: { id: plan[0], revision: plan[1] },
         purpose: {
           objective: string(objective),
-          successCriteria: strings(successCriteria),
+          successCriteria: strings(successCriteria, true),
           inScope: strings(inScope),
           outOfScope: strings(outOfScope),
         },
       };
-    }
-    source(row[3]);
-    if (row[0] === "spec")
-      return {
+      work = record;
+    } else if (row[0] === "spec") {
+      compactTuple(row, 7);
+      compactTuple(row[6], 2);
+      compactAssert(
+        row[5] === "complete" &&
+          compactFieldsMatch(row[4], { outcome: "#/outcome", criteria: "#/criteria" }),
+        "INVALID_COMPACT_SPEC_COVERAGE",
+      );
+      record = {
         kind: "spec",
         id: row[1],
         revision: row[2],
         outcome: string(row[6][0]),
-        criteria: strings(row[6][1]),
+        criteria: strings(row[6][1], true),
       };
-    compactAssert(row[0] === "plan", "INVALID_COMPACT_NORMATIVE_KIND");
+    } else {
+      compactTuple(row, 8);
+      compactTuple(row[6], 1, 2);
+      compactTuple(row[7], 2);
+      const clauses = row[6].length === 1 ? undefined : strings(row[6][1]!, true);
+      compactAssert(
+        (clauses === undefined ? row[5] === "legacy-objective-only" : row[5] === "complete") &&
+          compactFieldsMatch(row[4], {
+            objective: "#/objective",
+            specId: "#/specId",
+            specRevision: "#/specRevision",
+            ...(clauses === undefined ? {} : { clauses: "#/clauses" }),
+          }),
+        "INVALID_COMPACT_PLAN_COVERAGE",
+      );
+      recordKey({ kind: "spec", id: row[7][0], revision: row[7][1] });
+      record = {
+        kind: "plan",
+        id: row[1],
+        revision: row[2],
+        objective: string(row[6][0]),
+        specId: row[7][0],
+        specRevision: row[7][1],
+        ...(clauses === undefined ? {} : { clauses }),
+      };
+    }
+    records.set(key, record);
+    return record;
+  });
+  compactAssert(work, "COMPACT_WORK_REQUIRED");
+  const contractRef = (kind: "spec" | "plan", id: unknown, revision: unknown) => {
+    compactAssert(
+      compactText(id) && Number.isSafeInteger(revision) && Number(revision) > 0,
+      "INVALID_COMPACT_CONTRACT_BINDING",
+    );
+    const record = records.get(recordKey({ kind, id, revision: Number(revision) }));
+    compactAssert(record, "COMPACT_BOUND_CONTRACT_UNAVAILABLE");
+    return record;
+  };
+  compactAssert(
+    compactObject(work.spec) && compactObject(work.plan),
+    "INVALID_COMPACT_CONTRACT_BINDING",
+  );
+  const activeSpec = contractRef("spec", work.spec.id, work.spec.revision);
+  const activePlan = contractRef("plan", work.plan.id, work.plan.revision);
+  compactAssert(
+    activePlan.specId === activeSpec.id && activePlan.specRevision === activeSpec.revision,
+    "COMPACT_ACTIVE_PLAN_SPEC_MISMATCH",
+  );
+  for (const record of normative)
+    if (record.kind === "plan") contractRef("spec", record.specId, record.specRevision);
+
+  compactTuple(context.decisions, 0, 1024);
+  const decisionIds = new Set<string>();
+  const decisions = context.decisions.map((row) => {
+    compactTuple(row, 3, 4);
+    const [id, status, answerSource, selectionContextSource] = row;
+    compactAssert(
+      compactText(id) && !decisionIds.has(id) && ["accepted", "superseded"].includes(status),
+      "INVALID_COMPACT_DECISION",
+    );
+    decisionIds.add(id);
+    const answer = pointer(answerSource);
+    const question = row.length === 4 ? pointer(selectionContextSource!) : undefined;
+    compactAssert(
+      answer[1].startsWith("#/") && (!question || question[1].startsWith("#/")),
+      "COMPACT_ORIGINAL_FRAGMENT_REQUIRED",
+    );
     return {
-      kind: "plan",
-      id: row[1],
-      revision: row[2],
-      objective: string(row[6][0]),
-      specId: row[7][0],
-      specRevision: row[7][1],
-      ...(row[6][1] === undefined ? {} : { clauses: strings(row[6][1]) }),
+      id,
+      status,
+      answerSource: answer,
+      ...(question ? { selectionContextSource: question } : {}),
     };
   });
-  const pointer = (pointer: CompactSourcePointer) => {
-    source(pointer[0]);
-    compactAssert(
-      typeof pointer[1] === "string" &&
-        (pointer[1] === "#" || pointer[1].startsWith("#/")) &&
-        !/~(?![01])/.test(pointer[1]),
-      "INVALID_COMPACT_SOURCE_FRAGMENT",
-    );
-    return structuredClone(pointer);
-  };
-  const decisions = context.decisions.map(([id, status, answerSource, selectionContextSource]) => ({
-    id,
-    status,
-    answerSource: pointer(answerSource),
-    ...(selectionContextSource === undefined
-      ? {}
-      : { selectionContextSource: pointer(selectionContextSource) }),
-  }));
+  const binding = context.continuityBinding;
+  compactShape(binding, ["schema", "coverage", "purposeSources", "effectInventorySources"]);
+  compactAssert(
+    binding.schema === "common.git-work-context.continuity.v1" &&
+      ["bound", "legacy-unbound"].includes(binding.coverage),
+    "COMPACT_CONTINUITY_UNAVAILABLE",
+  );
+  const bound = binding.coverage === "bound";
+  compactTuple(binding.purposeSources, bound ? 1 : 0, bound ? 1024 : 0);
+  compactTuple(binding.effectInventorySources, bound ? 1 : 0, bound ? 1024 : 0);
+  for (const value of binding.purposeSources)
+    compactAssert(pointer(value)[1].startsWith("#/"), "INVALID_COMPACT_PURPOSE_POINTER");
+  for (const value of binding.effectInventorySources) pointer(value);
+  const effects = context.historicalEffects;
+  compactShape(effects, [
+    "completedCount",
+    "uncertainCount",
+    "relevantCompletedIds",
+    "relevantUncertainIds",
+    "projectedFenceRecords",
+  ]);
+  compactAssert(
+    effects &&
+      [effects.completedCount, effects.uncertainCount, effects.projectedFenceRecords].every(
+        (count) => Number.isSafeInteger(count) && count >= 0,
+      ),
+    "INVALID_COMPACT_HISTORICAL_EFFECTS",
+  );
+  const completed = compactTexts(effects.relevantCompletedIds),
+    uncertain = compactTexts(effects.relevantUncertainIds);
+  compactAssert(
+    completed.length <= effects.completedCount &&
+      uncertain.length <= effects.uncertainCount &&
+      !completed.some((id) => uncertain.includes(id)),
+    "INVALID_COMPACT_RELEVANT_EFFECTS",
+  );
   let task: DecodedCompactGitWorkContext["task"];
-  if (context.task) {
+  if (Object.hasOwn(context, "task")) {
     const compact = context.task;
+    compactShape(
+      compact,
+      [
+        "id",
+        "source",
+        "logical",
+        "state",
+        "executionClass",
+        "effectIds",
+        "pendingEffectIds",
+        "nextActionCoverage",
+      ],
+      ["nextAction"],
+    );
+    compactAssert(compact, "COMPACT_SELECTED_TASK_UNAVAILABLE");
+    compactTuple(compact.logical, 9);
+    compactTuple(compact.state, 5);
     const [
       domainId,
       projectId,
@@ -1019,22 +1306,84 @@ export function decodeCompactGitWorkContext(
     const state = { execution, verification, localAudit, sharedAudit, formalCompletion };
     assertLogicalIdentity(logical);
     validateTaskOperationalState(state);
+    compactAssert(
+      compact.id === taskId &&
+        domainId === work.domainId &&
+        issueId === work.issueId &&
+        projectId === context.projectId &&
+        workId === context.workId &&
+        ["source-only", "native-effect"].includes(compact.executionClass),
+      "INVALID_COMPACT_TASK_IDENTITY",
+    );
+    contractRef("spec", specId, specRevision);
+    const plan = contractRef("plan", planId, planRevision);
+    compactAssert(
+      plan.specId === specId && plan.specRevision === specRevision,
+      "COMPACT_TASK_PLAN_SPEC_MISMATCH",
+    );
+    const taskSource = pointer(compact.source);
+    compactAssert(taskSource.length === 2 && taskSource[1] === "#", "INVALID_COMPACT_TASK_SOURCE");
+    canonicalSource(taskSource[0], { kind: "task", id: taskId });
+    const effectIds = compactTexts(compact.effectIds),
+      pendingEffectIds = compactTexts(compact.pendingEffectIds);
+    compactAssert(
+      compact.executionClass !== "source-only" || (!effectIds.length && !pendingEffectIds.length),
+      "SOURCE_ONLY_TASK_CANNOT_CLAIM_NATIVE_EFFECT",
+    );
+    compactAssert(
+      ["authored", "unspecified"].includes(compact.nextActionCoverage) &&
+        (compact.nextActionCoverage === "authored"
+          ? Object.hasOwn(compact, "nextAction")
+          : !Object.hasOwn(compact, "nextAction")) &&
+        (!bound || compact.nextActionCoverage === "authored"),
+      "INVALID_COMPACT_NEXT_ACTION_COVERAGE",
+    );
+    let nextAction: NonNullable<DecodedCompactGitWorkContext["task"]>["nextAction"];
+    if (compact.nextActionCoverage === "authored") {
+      compactShape(compact.nextAction, ["value", "source"]);
+      compactAssert(compact.nextAction, "COMPACT_SELECTED_TASK_NEXT_ACTION_REQUIRED");
+      const nextSource = pointer(compact.nextAction.source);
+      compactAssert(
+        nextSource.length === 2 &&
+          nextSource[0] === taskSource[0] &&
+          nextSource[1] === "#/nextAction",
+        "INVALID_COMPACT_NEXT_ACTION_SOURCE",
+      );
+      nextAction = { value: string(compact.nextAction.value), source: nextSource };
+    }
+    if (["planned", "running"].includes(execution))
+      compactAssert(
+        !completed.includes(taskId) &&
+          !uncertain.includes(taskId) &&
+          !pendingEffectIds.some((id) => completed.includes(id) || uncertain.includes(id)),
+        "COMPACT_CONSUMED_EFFECT_REPLAY",
+      );
     task = {
-      ...structuredClone(compact),
-      source: pointer(compact.source),
+      id: compact.id,
+      source: taskSource,
       logical,
       state,
-      ...(compact.nextAction === undefined
-        ? { nextAction: undefined }
-        : {
-            nextAction: {
-              value: string(compact.nextAction.value),
-              source: pointer(compact.nextAction.source),
-            },
-          }),
+      executionClass: compact.executionClass,
+      effectIds: [...effectIds],
+      pendingEffectIds: [...pendingEffectIds],
+      nextActionCoverage: compact.nextActionCoverage,
+      ...(nextAction ? { nextAction } : {}),
     };
   }
   return { normative, sources, decisions, ...(task ? { task } : {}) };
+}
+
+/** Decode only a structurally complete, non-authorizing qualified compact view. */
+export function decodeCompactGitWorkContext(
+  context: CompactGitWorkContext,
+): DecodedCompactGitWorkContext {
+  try {
+    return validateAndDecodeCompactContext(context);
+  } catch (error) {
+    throw error instanceof CompactContextError
+      ? error
+      : new CompactContextError("COMPACT_CONTEXT_UNAVAILABLE");
+  }
 }
 
 /** Validates an owner observation. It never fetches, resets, merges or authenticates that owner. */

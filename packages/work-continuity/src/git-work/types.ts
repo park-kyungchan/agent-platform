@@ -260,7 +260,11 @@ export type NormativeContextSource = NormativeContextSourceBase &
   (
     | {
         kind: "work";
-        fields: { purpose: "#/purpose"; spec: "#/spec"; plan: "#/plan" };
+        fields: {
+          purpose: "#/purpose";
+          spec: "#/spec";
+          plan: "#/plan";
+        };
         coverage: "complete";
       }
     | {
@@ -353,10 +357,17 @@ export type CompactNormativeContract =
       kind: "work",
       id: string,
       source: number,
-      fields: { purpose: "#/purpose"; spec: "#/spec"; plan: "#/plan" },
+      fields: {
+        purpose: "#/purpose";
+        spec: "#/spec";
+        plan: "#/plan";
+        domainId: "#/domainId";
+        issueId: "#/issueId";
+      },
       coverage: "complete",
       purpose: CompactPurpose,
       active: { spec: [id: string, revision: number]; plan: [id: string, revision: number] },
+      scope: { domainId: string; issueId: string },
     ]
   | [
       kind: "spec",

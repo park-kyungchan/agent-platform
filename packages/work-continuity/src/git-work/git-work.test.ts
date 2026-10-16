@@ -2020,3 +2020,139 @@ describe("uncertain legacy source Task-ID fence", () => {
     expect(compactGitWorkContext(raw, { taskId: future.id }).status).toBe("source-qualified");
   });
 });
+
+async function historicalCompactFixture(activeSpecRevision = 1) {
+  const rows = boundRecords();
+  const work = rows.find((row) => row.kind === "work") as WorkRecord;
+  const plan = rows.find((row) => row.kind === "plan");
+  if (plan?.kind !== "plan") throw Error("fixture");
+  work.plan.revision = 2;
+  work.spec.revision = activeSpecRevision;
+  rows.push({
+    ...plan,
+    revision: 2,
+    specRevision: activeSpecRevision,
+    clauses: ["Current Plan2 clause"],
+  });
+  if (activeSpecRevision === 2) {
+    const spec = rows.find((row) => row.kind === "spec");
+    if (spec?.kind !== "spec") throw Error("fixture");
+    rows.push({
+      ...spec,
+      revision: 2,
+      outcome: "Current Spec2 outcome",
+      criteria: ["Current Spec2 criterion"],
+    });
+  }
+  const { root, oid } = await fixture(rows);
+  const raw = await readGitWorkContext(await open(root, oid), {
+    taskId: "a",
+    latestRelevant: "current",
+  });
+  const compact = compactGitWorkContext(raw, { taskId: "a" });
+  expect(compact.status).toBe("source-qualified");
+  return { raw, compact };
+}
+
+describe("shared compact schema and closure boundary", () => {
+  test.each([
+    "missing-binding",
+    "empty-bound-inventory",
+    "invalid-inventory-index",
+    "invalid-purpose-index",
+    "no-normative",
+    "missing-active-plan",
+    "missing-selected-plan",
+    "work-source-path",
+    "spec-fields",
+    "missing-next-action",
+    "next-action-title",
+    "next-action-other-source",
+    "next-action-coverage",
+    "task-plan999",
+    "task-spec999",
+    "plan-spec999",
+    "task-issue",
+    "task-domain",
+    "duplicate-work",
+  ] as const)("decoder rejects independent malformed %s case", async (variant) => {
+    const { compact } = await historicalCompactFixture();
+    const work = compact.normative.find((row) => row[0] === "work")!;
+    const spec = compact.normative.find((row) => row[0] === "spec")!;
+    const active = compact.normative.find((row) => row[0] === "plan" && row[2] === 2)!;
+    if (work[0] !== "work" || spec[0] !== "spec" || active[0] !== "plan") throw Error("fixture");
+    if (variant === "missing-binding")
+      delete (compact as Partial<typeof compact>).continuityBinding;
+    if (variant === "empty-bound-inventory") compact.continuityBinding.effectInventorySources = [];
+    if (variant === "invalid-inventory-index")
+      compact.continuityBinding.effectInventorySources = [[9999, "#/content"]];
+    if (variant === "invalid-purpose-index")
+      compact.continuityBinding.purposeSources = [[9999, "#/content"]];
+    if (variant === "no-normative") compact.normative = [];
+    if (variant === "missing-active-plan")
+      compact.normative = compact.normative.filter((row) => row !== active);
+    if (variant === "missing-selected-plan")
+      compact.normative = compact.normative.filter((row) => !(row[0] === "plan" && row[2] === 1));
+    if (variant === "work-source-path") compact.sources[work[2]]![1] = "inputs/wrong.json";
+    if (variant === "spec-fields") Object.assign(spec[4], { criteria: "#/outcome" });
+    if (variant === "missing-next-action") delete compact.task!.nextAction;
+    if (variant === "next-action-title") compact.task!.nextAction!.source[1] = "#/title";
+    if (variant === "next-action-other-source") compact.task!.nextAction!.source[0] = spec[3];
+    if (variant === "next-action-coverage") compact.task!.nextActionCoverage = "unspecified";
+    if (variant === "task-plan999") compact.task!.logical[7] = 999;
+    if (variant === "task-spec999") compact.task!.logical[5] = 999;
+    if (variant === "plan-spec999") active[7][1] = 999;
+    if (variant === "task-issue") compact.task!.logical[3] = "different-issue";
+    if (variant === "task-domain") compact.task!.logical[0] = "different-domain";
+    if (variant === "duplicate-work") compact.normative.push(structuredClone(work));
+    expect(() => decodeCompactGitWorkContext(compact)).toThrow();
+  });
+  test.each(["missing-spec", "missing-plan", "issue", "domain", "plan-spec-mismatch"] as const)(
+    "constructor holds selected %s lineage/scope",
+    async (variant) => {
+      const { raw } = await historicalCompactFixture(variant === "plan-spec-mismatch" ? 2 : 1);
+      const task = raw.records.find((row) => row.kind === "task")!;
+      const logical = task.logical as unknown as LogicalIdentity;
+      if (variant === "missing-spec") logical.specRevision = 999;
+      if (variant === "missing-plan") logical.planRevision = 999;
+      if (variant === "issue") logical.issueId = "different-issue";
+      if (variant === "domain") logical.domainId = "different-domain";
+      if (variant === "plan-spec-mismatch") {
+        logical.specRevision = 2;
+      }
+      const compact = compactGitWorkContext(raw, { taskId: "a" });
+      expect(compact.status).toBe("held");
+      expect(compact.normative).toEqual([]);
+      expect(compact.task).toBeUndefined();
+      expect(compact.holdReasons.length).toBeGreaterThan(0);
+    },
+  );
+  test("valid historical Task Plan1 remains distinct from active Plan2 after the shared validator", async () => {
+    const { compact } = await historicalCompactFixture();
+    const decoded = decodeCompactGitWorkContext(compact);
+    const work = decoded.normative.find((row) => row.kind === "work")!;
+    expect(work.plan).toEqual({ id: "plan", revision: 2 });
+    expect(work.domainId).toBe(scope.domainId);
+    expect(work.issueId).toBe("issue");
+    expect(decoded.task?.logical.planRevision).toBe(1);
+    expect(decoded.normative.filter((row) => row.kind === "plan")).toHaveLength(2);
+  });
+  test("distinct future pending effect remains valid alongside bound consumed inventory", async () => {
+    const rows = boundRecords();
+    const future = byTask(rows, "a");
+    future.executionClass = "native-effect";
+    future.pendingEffectIds = ["new-distinct-future-effect"];
+    const { root, oid } = await fixture(rows);
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    const compact = compactGitWorkContext(raw, { taskId: "a" });
+    expect(compact.status).toBe("source-qualified");
+    expect(decodeCompactGitWorkContext(compact).task?.pendingEffectIds).toEqual(
+      future.pendingEffectIds,
+    );
+    expect(compact.historicalEffects?.uncertainCount).toBe(1);
+    expect(compact.nativePermissionGranted).toBe(false);
+  });
+});
