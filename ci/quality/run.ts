@@ -531,7 +531,26 @@ if (import.meta.main) {
       nativePermissionGranted: false,
       acceptanceDecision: null,
     };
-  } else report = await runQuality(root, mode);
+  } else {
+    // Only the canonical read-only source CLI roles prepare their runtime. Custom roots
+    // and local mutation modes never acquire installer authority.
+    if (
+      raw.length <= 1 &&
+      (mode === "all" ||
+        mode === "format" ||
+        mode === "lint" ||
+        mode === "workflows" ||
+        mode === "architecture")
+    ) {
+      const { continueSourceCi } = await import("./source-runtime");
+      if (await continueSourceCi(mode)) process.exit(process.exitCode ?? 0);
+    } else if (Bun.version !== "1.4.3") {
+      throw Error(
+        "Custom-root or mutating source quality requires Bun 1.4.3; automatic preparation is unavailable",
+      );
+    }
+    report = await runQuality(root, mode);
+  }
   const reportPath = process.env.QUALITY_REPORT_PATH;
   if (reportPath) {
     try {

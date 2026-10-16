@@ -705,8 +705,10 @@ export async function reviewGate() {
   );
 }
 if (import.meta.main) {
-  if (process.argv.length === 2) await sourceChecks();
-  else if (process.argv.length === 3 && process.argv[2] === "--review") await reviewGate();
+  if (process.argv.length === 2) {
+    const { continueSourceCi } = await import("./quality/source-runtime");
+    if (!(await continueSourceCi("source-check"))) await sourceChecks();
+  } else if (process.argv.length === 3 && process.argv[2] === "--review") await reviewGate();
   else if (process.argv.length === 3 && process.argv[2] === "--verify-owner-fixtures")
     await liveOwnerFixtureCheck(false, true);
   else if (process.argv.length === 3 && process.argv[2] === "--refresh-owner-fixtures")
