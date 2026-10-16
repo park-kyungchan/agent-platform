@@ -1,0 +1,163 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "scoped-engineering-verification-v1",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/scoped-engineering-verification-v1",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.scoped-engineering-verification-source.v1",
+    "verificationArtifact": {
+      "schemaVersion": "1.0.0",
+      "kind": "verification",
+      "id": "codex-harness-engineering:verification:hrr-scoped-engineering-source-closure-v1",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-16T15:50:09.583Z",
+      "payload": {
+        "targetRefs": [
+          "common-harness:task:97551d6a2b2e4858ee6d049ef19eaa3359411d6fce082b6bedf4129090d2ae95",
+          "common-harness:task:7112fb973a4fd8da703e701b6199e158ac5d9bd1291aa513146c8157e8bab9f7"
+        ],
+        "criteria": [
+          {
+            "id": "exact-authored-source-task-identity",
+            "status": "pass",
+            "message": "Actual source-only Tasks retain original identities: recovery Plan2 and integration Plan1; completed output is bound to these stable Task targets. No native execution occurrence or effect receipt is fabricated.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hrr-scoped-engineering-source-closure-v1"
+            ]
+          },
+          {
+            "id": "owned-interruption-and-new-session-recovery",
+            "status": "pass",
+            "message": "Root observed owned old CLI exit and distinct NEW native session; same Plan2 recovery Task, full purpose, five original Q/A values, 68 completed/3 uncertain fences, two consumed actions, next action and genuine13305-byte result were independently read back.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hrr-scoped-engineering-source-closure-v1"
+            ]
+          },
+          {
+            "id": "useful-independent-source-review-and-finding-resolution",
+            "status": "pass",
+            "message": "Recovered useful c04 source review completed and found duplicate-Decision P2. Original HOLD preserved; e6 correction independently verified, final exact34e canonical native review PASS0 and identical-tree merged-main native successor PASS0 retained.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hrr-scoped-engineering-source-closure-v1"
+            ]
+          },
+          {
+            "id": "current-affected-source-checks",
+            "status": "pass",
+            "message": "Exact34e affected native66/569, handoff39/223, imports/all14quality checks and Work validation/transition passed; Codex exactccef458/2646 and inert VPS16/119 independent checks retained. Current branch runtime/source closure byte-identical to34e; new continuity records independently reviewed and validated.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hrr-scoped-engineering-source-closure-v1"
+            ]
+          },
+          {
+            "id": "authenticated-publication-and-explicit-reviewed-head-integration",
+            "status": "pass",
+            "message": "Immutable remote reviewer/source evidence and authenticated expected-head success statuses preceded all3PRs; Root checked current reviews/checks/head/base and explicitly merged34e,ccef,4943. All3merge trees match reviewed trees; common/VPS mainCI pass, Codex hostedCI explicitly unavailable.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hrr-scoped-engineering-source-closure-v1"
+            ]
+          },
+          {
+            "id": "scope-and-consumed-effect-boundaries-preserved",
+            "status": "pass",
+            "message": "Publication/session receipts are consumed no-replay actions. Paused predecessor, all historical effect fences, excluded owners, independent month-end, native stores/trust/credentials and original answers remain preserved. This verifies observed engineering Task output only, with native hook/install/activation/model qualification and Acceptance outside this artifact's criteria.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hrr-scoped-engineering-source-closure-v1"
+            ]
+          }
+        ],
+        "inputHashes": [
+          {
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/lead-scoped-recovery-verification-v1.json",
+            "sha256": "1755f9c6bf820ed43ebddedbc8462c1db761cead2a8442379fd92e97330c8822"
+          },
+          {
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-process-v1.json",
+            "sha256": "634f66297b8be424f90bd05e3990ac0e1be2fb75bed2a81d5c6e51c89da43e10"
+          },
+          {
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-readback-v1.json",
+            "sha256": "3ff90a662dde1fc88ef87e8914375e3f6dcb810428ca93e5b6e131618995f741"
+          },
+          {
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-review-c04.json",
+            "sha256": "a747670b887a55f20a4aa823895d5c5f8fe905ed0a379345d0e9a0bf5845d665"
+          },
+          {
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-candidate-source-result-1033d6f.json",
+            "sha256": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5"
+          },
+          {
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-owner-review-ccef483.json",
+            "sha256": "03b84d240c25fca671206713c94ff046f144f3ff71e1d88c0e1e3bf1478b58bf"
+          },
+          {
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/source-publication-readback-v1.json",
+            "sha256": "cbe5e7b222b70a82220b113fd44710aa41a5a7fd531b51a08add1a3cc6f1661e"
+          },
+          {
+            "path": "https://github.com/park-kyungchan/agent-platform/blob/f770517458ef701ba2e2ae3442cd792f0e3588ab/native-review-results/34e3bedd66e6697f199456f32374ba00711d47b6.json",
+            "sha256": "3ae50495e0444103496676846fd44f3d60e934972b410b52d99fd41b26705633"
+          },
+          {
+            "path": "https://github.com/park-kyungchan/agent-platform/blob/25ac1cd77f1dfae86da484af474c6bc725383a1f/native-review-results/350b1629493b1b4ca49228d467374574c59f0d68.json",
+            "sha256": "fb71b577a46668b3627cfadbe9977e9ddc9d78a163512a52a5ce6a0645a674e2"
+          }
+        ],
+        "runtime": {
+          "name": "Actual ordinary-engineering native session recovery, independent native source review, finite source QA and immutable publication readback",
+          "version": "Codex0.163.0 / immutable Ontology0.2.0; source Task verification only"
+        },
+        "details": {
+          "recordClass": "ScopedEngineeringTaskVerification",
+          "verifier": "native-codex-lead",
+          "nativeGoalThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+          "logicalTasks": [
+            {
+              "domainId": "native-harness",
+              "projectId": "codex-harness-engineering",
+              "workId": "harness-reliability-reprioritization-20261016",
+              "issueId": "HRR-ISSUE-20261016",
+              "specId": "HRR-SPEC",
+              "specRevision": 1,
+              "planId": "HRR-PLAN",
+              "planRevision": 2,
+              "taskId": "HRR-RECOVERY-SOURCE-REVIEW"
+            },
+            {
+              "domainId": "native-harness",
+              "projectId": "codex-harness-engineering",
+              "workId": "harness-reliability-reprioritization-20261016",
+              "issueId": "HRR-ISSUE-20261016",
+              "specId": "HRR-SPEC",
+              "specRevision": 1,
+              "planId": "HRR-PLAN",
+              "planRevision": 1,
+              "taskId": "HRR-INTEGRATION-REVIEW"
+            }
+          ],
+          "sourceReviewedHead": "34e3bedd66e6697f199456f32374ba00711d47b6",
+          "sourceReviewedTree": "6737f5fe45787264da784d148114aa923d0d43fc",
+          "currentRecordsParent": "b58fbb16e9f0623988a93918c85b13494c3a644e",
+          "actualNativeHookV2Qualification": false,
+          "installedCurrentWorkQualification": false,
+          "nativeActivation": false,
+          "modelEvaluationSuiteRun": false,
+          "wholeWorkComplete": false,
+          "formalAcceptanceDecision": null,
+          "sharedTaskAuditDelivery": "New formal verification/Task-state records remain local and unsynchronized; remote code/review publication is proven separately. No formal completion before current delivery.",
+          "authorityMeaning": "Root engineering verification of observed delegated/source tasks under existing successor authority; not a new user answer, native permission, human satisfaction or AcceptanceDecision."
+        }
+      }
+    }
+  }
+}

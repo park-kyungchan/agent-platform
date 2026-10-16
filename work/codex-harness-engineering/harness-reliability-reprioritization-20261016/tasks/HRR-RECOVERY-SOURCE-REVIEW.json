@@ -19,10 +19,10 @@
   "title": "Independently verify final source-publication readiness through an owned native interruption and NEW-session recovery.",
   "state": {
     "execution": "complete",
-    "verification": "unverified",
+    "verification": "passed",
     "localAudit": "result-durable",
     "sharedAudit": "unsynchronized",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -34,6 +34,6 @@
     "HRR-INTERVIEW-5"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": [],
-  "nextAction": "Read inputs/checkpoint-v13.json#/content and source-publication-readback-v1.json#/content. Useful NEW-session recovery/final exact source review and three authenticated source publications/expected-head merges are complete. Preserve original c04 HOLD and all completed/uncertain no-replay fences. Formal task verification/delivery/Acceptance remain separate; current Work v2 source authority awaits user answer, and native preparation/activation/evaluations remain held."
+  "verificationEvidenceIds": ["HRR-SCOPED-ENGINEERING-VERIFICATION"],
+  "nextAction": "Read inputs/checkpoint-v14.json#/content and remaining-goal-audit-v1.json#/content. Scoped actual recovery/source-review/publication Task verification is source-bound and passed; new verification/task closure records remain local/unsynchronized, so formal completion awaits delivery. Current-Work v2 source authority awaits actual user answer. No old effect/session replay, native prepare/activation/model suite or owner/user Acceptance follows."
 }
