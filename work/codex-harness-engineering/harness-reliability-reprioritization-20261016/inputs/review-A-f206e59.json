@@ -1,0 +1,158 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "review-A-f206e59",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "independent-native-source-review",
+    "locator": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-reviews/A-f206e59.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "report": {
+      "schema": "hrr.independent-source-review.v1",
+      "artifact": "A successor: replay fix and canonical compact codec",
+      "repository": "park-kyungchan/agent-platform",
+      "commit": "f206e59fb88d155d0cd6416142501643ccb18139",
+      "tree": "ffe6377c4cdef05a2d3b6b0c92903d9715c7c017",
+      "base": "98206dfb3d8951366b9ceab617af39e0fcbc04cd",
+      "wholeAComparisonBase": "f18b8ce2e810ae94be2cf7277a9b375d955b96cd",
+      "snapshot": "/home/palantirkc/code/worktrees/hrr-review-common-compact-20261016",
+      "reviewer": {
+        "name": "hrr-review",
+        "previouslyObservedRuntime": "native Codex CLI, Herdr w3:pN",
+        "observedNamedCODEX_THREAD_ID": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+        "authentication": "Named variable observation only; Git report does not authenticate native authorship."
+      },
+      "scope": {
+        "classification": "independent immutable source review and exclusive inert QA",
+        "nativeActivation": false,
+        "nativePermissionGranted": false,
+        "nativeAdmissionEstablished": false,
+        "formalCompletion": false,
+        "acceptanceEstablished": false,
+        "goalCreatedOrResumed": false,
+        "modelEvaluationSuiteRun": false,
+        "sourceEdits": false,
+        "sharedInstallsOrCachePurges": false
+      },
+      "result": "hold-new-codec-findings",
+      "findingCount": 2,
+      "priorFindingDisposition": [
+        {
+          "id": "HRR-A-REVIEW-001",
+          "status": "closed-for-this-exact-artifact",
+          "evidence": "records.ts:871 now rejects planned/running Task IDs in the uncertain set. Independent private fixtures reject both completed and uncertain source Task IDs without fabricated native occurrences/pending IDs, while distinct future planned/running source Tasks remain qualified. Existing bound/legacy negatives and recursive effect/pending checks also pass. Closure applies to f206e59 only; it is not formal Work completion or permission."
+        }
+      ],
+      "findings": [
+        {
+          "id": "HRR-A-COMPACT-REVIEW-001",
+          "severity": "medium",
+          "priority": "P2",
+          "status": "unresolved",
+          "title": "Validate required compact structure and source bindings before decoding qualified data",
+          "path": "packages/work-continuity/src/git-work/context.ts",
+          "line": 938,
+          "evidence": "Starting from an independently source-checked, bound 681 Work compact payload, decodeCompactGitWorkContext returns normally after each of: deleting continuityBinding; emptying its required effectInventorySources; replacing an inventory pointer with source index9999; deleting all normative rows; removing the active Plan2 row; changing the canonical Work source path to inputs/wrong.json; deleting nextAction while coverage remains authored; changing its source fragment to #/title; or selecting unavailable Task Plan999. Ordinary out-of-range answer/value indices do reject. The decoder never inspects continuityBinding and maps normative rows without enforcing Work cardinality, active/Task/Plan-to-Spec closure, exact field/address bindings or authored-next-action consistency.",
+          "impact": "The public decoder accepts structurally incomplete or contradictory data carrying source-qualified labels and emits usable decoded context. Required purpose/effect routes or authored recovery instructions can disappear without a hold. This violates the requested malformed/missing-pointer and lineage validation boundary; it is not a claim that pure decoding authenticates Git content or a native producer.",
+          "requestedChange": "Validate the full compact schema and cross-field invariants before returning: exactly one canonical Work, required referenced active/Task/Plan-to-Spec contracts, canonical normative field/source addresses, bound purpose/inventory pointer existence and indices, coverage/nextAction pairing and exact #/nextAction source. Use finite structural checks and reject malformed payloads without adding reads or authority. Add independent malformed-payload regressions covering these cases."
+        },
+        {
+          "id": "HRR-A-COMPACT-REVIEW-002",
+          "severity": "medium",
+          "priority": "P2",
+          "status": "unresolved",
+          "title": "Require the selected Task's referenced Spec and Plan in the compact closure",
+          "path": "packages/work-continuity/src/git-work/context.ts",
+          "line": 744,
+          "evidence": "For a real 681 raw context selected at HRR-A-CONTEXT-EFFECT, changing only its projected Task logical.planRevision from1 to999 leaves compactGitWorkContext source-qualified with holdReasons=[] even though no Plan999 is reached. The same constructor already checks existence for active Work refs and Plan-to-Spec refs through contractRef, but selected Task handling validates only logical shape and Task/Work/project IDs. The decoder also accepts this missing lineage.",
+          "impact": "The compact constructor can emit a qualified selected Task with unavailable lineage instead of holding the malformed input. Native owners using the canonical compact API cannot rely on the new lineage validation boundary for that case. No ability to forge native identity or source authority is inferred.",
+          "requestedChange": "Use the existing contract reference checks for both selected logical Spec and Plan and enforce appropriate selected Task scope/identity joins before qualifying. Preserve legitimate historical Task Plan1 while Work uses Plan2; do not force every Task onto the active revision. Add a missing selected Spec/Plan regression and retain the historical-positive test."
+        }
+      ],
+      "checks": [
+        {
+          "name": "Exact source custody",
+          "result": "pass",
+          "detail": "Frozen HEAD/tree/parent match assignment; tracked status empty before and after QA; full five-file successor diff and whole A semantics against f18 inspected; git diff --check f18..f206 passes."
+        },
+        {
+          "name": "Frozen dependencies",
+          "result": "pass-with-defined-limit",
+          "detail": "Bun1.4.3 frozen-lockfile, ignore-scripts, copyfile install and cache only inside the exclusive review snapshot. Bun file/workspace source identity may involve links; matching bytes are not independent installed/native proof. No installed source file was edited."
+        },
+        {
+          "name": "bun run check:git-work --timeout30000",
+          "result": "pass",
+          "detail": "140 tests, zero failures, 1996 assertions across four files. Existing raw-source behavior, historical holds, recursive replay checks and new compact tests passed; the suite does not cover the structural gaps reproduced separately."
+        },
+        {
+          "name": "bun run check:handoff",
+          "result": "pass",
+          "detail": "39 tests, 223 assertions."
+        },
+        {
+          "name": "bun run check:imports",
+          "result": "pass",
+          "detail": "Canonical handoff and compatibility adapter remain the same module with unchanged source SHA."
+        },
+        {
+          "name": "Exact common Work/source transition",
+          "result": "pass",
+          "detail": "verify-common-work against f18:192 records,48 actual decisions, original63 completed/2 uncertain fence baseline,84 documentation routes; semantic transition passes and historical over-budget selection remains held."
+        },
+        {
+          "name": "Independent bound681 roundtrip",
+          "result": "pass",
+          "detail": "Every encoded normative field compared to its exact reader fragment/blob; selected logical/state/nextAction compared to the original Task; all five answer/question pointers dereferenced and compared without emitting their raw text. Work Plan2, historical selected Task Plan1 and Plan-to-Spec lineage preserved. Inventory remains68 completed/3 uncertain."
+        },
+        {
+          "name": "Independent measured output",
+          "result": "pass",
+          "detail": "HRR-A raw12919/compact8614 characters (8618 UTF8 bytes); HRR-REAL-RECOVERY-ACCEPTANCE raw13066/compact8728 characters (8732 bytes), including in-band layout. These exceed native default6000; common code grants no native cap. Explicit SOURCE v2 policy12000 is separately owned and not admission evidence."
+        },
+        {
+          "name": "Independent privacy and serializer negatives",
+          "result": "pass-except-selected-lineage-finding",
+          "detail": "Missing source/answer/pathBase/currentness becomes held with no partial normative payload. Forensic sentinel suffixes and arbitrary held exception text reduce to safe owned codes. Selected unavailable Plan999 unexpectedly qualifies, as reported."
+        },
+        {
+          "name": "Independent decoder tamper negatives",
+          "result": "findings",
+          "detail": "Nine missing/contradictory structural cases decode without rejection; two out-of-range direct value/answer index controls reject. See exact private probe and findings."
+        },
+        {
+          "name": "Independent consumed/future fixtures",
+          "result": "pass",
+          "detail": "Both planned/running completed IDs and planned/running uncertain IDs reject in raw validation/context/compact; future distinct planned/running Tasks qualify. Fixtures exist only under the frozen snapshot private QA tree."
+        }
+      ],
+      "evidence": {
+        "probe": "/home/palantirkc/code/worktrees/hrr-review-common-compact-20261016/.private/hrr-review-qa/probe.ts",
+        "probeSha256": "2a295f7268b7b5e9c9243701f6735f4f7e67b80396bd7d9ce48bfd204ca94f7d",
+        "probeLog": "/home/palantirkc/code/worktrees/hrr-review-common-compact-20261016/.private/hrr-review-qa/logs/probe.jsonl",
+        "probeLogSha256": "7dcd9fffed39302ab22a113e2625bd2878ae3308d387c6461772c5f585e0ed7b",
+        "gitWorkLogSha256": "19108d514d8689e82b26def46db335f76f4c9cfac76f13d924a8a1c7e6c74bf5",
+        "commonWorkLogSha256": "a6a422e4592ad251aa2f5e6447b414dc98d23a7b5e02ace312bc523242e11b4f",
+        "sourceHashes": {
+          "packages/work-continuity/src/git-work/context.ts": "5a9ded3cf15c486098052b01958fa0613e37f78fc63f75eba99082266a27512a",
+          "packages/work-continuity/src/git-work/types.ts": "74dfb1a867d5e1c8d60326de4bab660eb67e32169c8432a2ce599fea55866e3f",
+          "packages/work-continuity/src/git-work/index.ts": "ab434da3902838cc03b8e1ac96603071f93a47f11dff03aaabcc18d5b37fcb09",
+          "packages/work-continuity/src/git-work/records.ts": "8054265ca54243a7ad22619af85ae39cd66f1385a202a2e6ae4925d8de616806"
+        }
+      },
+      "limitationsAndClosure": [
+        "Root still owns final canonical registry and active source-provider pin/index/marker composition for all four changed common source files. Pending unactivated shared bytes are not drift evidence; no guard was weakened or cache cleared.",
+        "Canonical codec ownership is preserved; pure construction/decoding is source data handling, not Git/native authentication. Structural correctness and source authenticity must remain separate.",
+        "Native6000/v2SOURCE12000 delivery, Home framing, additionalContextLimit/token behavior, current runtime capability, trust/admission/activation and actual recovery remain separately unqualified here.",
+        "Existing report/skill/policy and effect evidence remain unchanged. This exact report cannot be reused for a changed final composed tree without explicit successor binding and current zero-unresolved findings."
+      ]
+    },
+    "sha256": "ee33b1a69ba6d8a6c449bcc338049b832c92bf1c32d872965527fdd3f7b8caa5",
+    "scope": "Source-only exact review; no nativepermission or Acceptance."
+  }
+}

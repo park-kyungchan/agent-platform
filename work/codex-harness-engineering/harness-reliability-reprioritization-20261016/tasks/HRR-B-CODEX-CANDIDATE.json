@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Wait for independent exact-commit/tree review of1033d6f and canonical HomeAPI7bd9a2d; correct current findings before publication. Native prepare/activation remains separately gated."
+  "nextAction": "Recover the retained source result from this exact Git source {\"kind\":\"git\",\"repositoryId\":\"park-kyungchan/agent-platform\",\"commit\":\"0febc8f76276b2faaeb01ae25e8828f62648d869\",\"path\":\"work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-candidate-source-result-1033d6f.json\",\"fragment\":\"#/content/sourceResult\",\"sha256\":\"cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5\"}. Verify original result SHA25640347d0812b7e2d00623ee737769f1c0b2e6d586854bc0f386291bdbbfad2dae, code1033d6f/tree89e3f97 and current independent review/provider-closure holds. The private writer path is historical origin only. No native preparation or activation."
 }
