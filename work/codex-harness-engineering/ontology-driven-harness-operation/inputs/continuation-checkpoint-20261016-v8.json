@@ -1,0 +1,299 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "continuation-checkpoint-20261016-v8",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-lead:append-only-continuation-checkpoint-20261016-v8",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "herdr-codex-long-work-checkpoint",
+    "ontologyPackage": {
+      "name": "@palantirkc/ontology",
+      "version": "0.2.0"
+    },
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "version": 8,
+    "updatedAtUtc": "2026-10-16T06:01:21.559Z",
+    "intent": {
+      "objective": "Finish full Spec7/Plan7: reviewed source delivery, both native adoption/recovery, portfolio/private Academy outcomes, integrated independent verification and separate Lead Acceptance.",
+      "successCriteria": [
+        "Preserve original47 decisions/63 completed/2 uncertain; current48/64SOURCE/2 remains distinct from native execution.",
+        "Exact independent source review/delivery/main proof; explicit Lead merge only.",
+        "Both natives, durable recovery/PC-off and Academy seven gates with real source/teacher outcomes.",
+        "Month-end analysis stops before user selects existing items; no paper generation/final membership.",
+        "Fresh explicit evaluation budget, integrated verification and separate accountable Lead Acceptance."
+      ]
+    },
+    "authority": {
+      "sourceRefs": [
+        "Current user manual continuation in Root thread01a13f90-74a0-7930-a5bc-9663e9ec9f86",
+        "Current user request: unify selected VPS Bun latest stable",
+        "/home/palantirkc/operations/herdr-session-handoff-20261015/continuation.json",
+        "inputs/continuation-checkpoint-20261016-v5.json#/content/authority exact unchanged custody",
+        "decisions/latest-bun-vps-agent-defaults-20261016.json",
+        "Root manual continuation and latest explicit PR18 expected-head merge relay; no new authority from this checkpoint."
+      ],
+      "allowedScope": [
+        "Same logical Work source continuation/review; bounded native delegation/task-specific Herdr; requested reversible maintenance."
+      ],
+      "exclusions": [
+        "ministry,spt,math-teaching-and-educational-video,music-production,hermes-application-workflows,jev-research-experiments",
+        "Official Academy mutation; user question selection/final exam membership; recurring costs",
+        "Historical admissions/allocations replay, credential/native-store transfer, trust bypass, unverified native activation",
+        "Historical evaluation budgets not portable; no fresh suite budget."
+      ]
+    },
+    "phase": "CommonPR20, CodeXPR1 and AcademyPR10 reviewed source/main delivery complete. Current CodeX source CAS in progress and NEW Hermes staged-plan independent review in progress. AcademyP1once1 consumedUNKNOWN0_OR1/no-retry; native/private/evaluation/Acceptance held.",
+    "plan": [
+      {
+        "step": "Preserve Bun143 defaults, original source decisions/fences and completed source deliveries",
+        "status": "completed"
+      },
+      {
+        "step": "Record new P1 consumed uncertainty and independently deliver source checkpoint v8/fence",
+        "status": "in_progress"
+      },
+      {
+        "step": "Complete exact CodeX source CAS and separately reviewed NEW Hermes source apply",
+        "status": "in_progress"
+      },
+      {
+        "step": "Reconcile existing P1 audit evidence without replay; qualify native/recovery/PC-off and Academy gates",
+        "status": "pending"
+      },
+      {
+        "step": "Fresh budgeted suite, integrated independent verification and separate Lead Acceptance",
+        "status": "pending"
+      }
+    ],
+    "sourcePins": [
+      {
+        "ref": "Current common source baseline",
+        "revision": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb/tree574f689bac2407145ffc43eab1b04e66061cb871; exact-main V2/status56495229208 and CI38851916658attempt2SUCCESS"
+      },
+      {
+        "ref": "Current CodeX published source (active CAS separately tracked)",
+        "revision": "2e4e927c2a9e5bc89dce0891bbe7cfd66c787288/tree15951a469ccdd327c1b547626a83fd3e3d070467; owner Evidence/Verification/status56496285825; hostedCIunavailable"
+      },
+      {
+        "ref": "Current Education/Academy shared source",
+        "revision": "2c2540b56c03b84275b8a82c8a3cce28fadf7d8e/tree5d4f0b775607098acd0ea81a9c49dc48343ffb72; exact-main V2/status56496536422 and CI38854465427attempt2SUCCESS"
+      },
+      {
+        "ref": "Immutable prior source checkpoint",
+        "revision": "inputs/continuation-checkpoint-20261016-v7.json; sha256:391d7ea8941511fa1a5bb4bb9fdca0cd744dd50a4cf9552495c43bb8b9e271b1"
+      },
+      {
+        "ref": "Exact unchanged fallback checkpoint contract",
+        "revision": "sha256:f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4"
+      },
+      {
+        "ref": "NEW Hermes prepared plan, actualtargetABSENT; not original owner/data",
+        "revision": "2932164e29a9df087035c8a784cfb3756caebcc4f376f143fa2b31143f9b8903; stage/tmp/hermes-new-source-delivery-ZUqrs4;14SOURCE+fixedlink; apply0"
+      }
+    ],
+    "runtime": {
+      "nativeThreadRef": "01a13f90-74a0-7930-a5bc-9663e9ec9f86",
+      "nativeGoalRef": "01a13f90-74a0-7930-a5bc-9663e9ec9f86:createdAt:1792089018",
+      "goalObservation": "Root native get_goal ACTIVE/fullSpec7/unbudgeted; originalWSL writer/GoalPAUSED; Acceptance null. update_plan unavailable; this source plan is descriptive.",
+      "herdrContextRef": "srv1873899-herdr/w3:t1/w3:p1/orchestrator",
+      "observedAtUtc": "2026-10-16T06:01:21.559Z"
+    },
+    "delegations": [
+      {
+        "id": "codex-source-cas",
+        "runtimeRef": "/root/native_adoption_next_gate",
+        "scope": "Exact reviewed sourceFF only under Root decision d0e4a69495998dd59e1c4a70d8028782cd7c453878e56f38de937298255f6b9b",
+        "state": "in_progress; no native activation",
+        "outputRefs": [
+          "/tmp/codex-native-source-cas-preflight-20261016.json"
+        ]
+      },
+      {
+        "id": "hermes-prepared-plan-independent-review",
+        "runtimeRef": "/root/hermes_prepared_plan_independent_review",
+        "scope": "Fresh-context exactplan/stage/currentness source review; no actualapply",
+        "state": "in_progress",
+        "outputRefs": [
+          "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-preparation-handoff-20261016.json"
+        ]
+      },
+      {
+        "id": "p1-existing-audit-route-source-review",
+        "runtimeRef": "/root/academy_next_action",
+        "scope": "Already-local reviewed source only; identify preexisting independently-owned metadata route; no postHOLD probes",
+        "state": "in_progress",
+        "outputRefs": [
+          "/tmp/academy-p1-once1-actual-reconciliation-20261016.json"
+        ]
+      }
+    ],
+    "effects": [
+      {
+        "id": "official-score-create-route",
+        "scope": "Earlier score.create=1 grade-render route; possible business effect",
+        "state": "unknown",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-20261016-v2.json#/content/effects/3"
+        ],
+        "nextSafeObservation": "Current owner-side read-only reconciliation under separate purpose/source boundary.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "private-selected-release",
+        "scope": "Current protected private selected-release pointer",
+        "state": "unknown",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-20261016-v2.json#/content/effects/4"
+        ],
+        "nextSafeObservation": "Fresh protected owner read-only observation before any future CAS.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "preserved-v7-consumed-effects",
+        "scope": "All priorv7 completed/consumed effects remain individually immutable in priorcheckpoint: PGstart/admissions/migration/AFTER, HermesTask t_4d5043c5, unusableCodeX01a13ea3, Bun143, prior observer/source/delivery occurrences.",
+        "state": "consumed",
+        "receiptRefs": [
+          "inputs/continuation-checkpoint-20261016-v7.json#/content/effects"
+        ],
+        "nextSafeObservation": "Read exact individual v7/v6 receipts and fences; no retry/resume/reallocation or source/native/budget inference. Original63/2 and combined64/2 remain historical.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "reviewed-source-deliveries-after-v7",
+        "scope": "CommonPR19 historical4d/8fbPASS superseded by authenticatedFAIL; PR20 currentbcePASS. CodeXPR1 main2e and AcademyPR10 main2c source delivered; no native activation.",
+        "state": "completed",
+        "receiptRefs": [
+          "/home/palantirkc/operations/harness-continuation-20261016/common-mainbce-source-ci-reconciliation-receipt.json",
+          "/home/palantirkc/operations/harness-continuation-20261016/codex-main2e4-source-publication-completion-20261016.json",
+          "/home/palantirkc/operations/harness-continuation-20261016/academy-main2c-source-ci-reconciliation-receipt.json"
+        ],
+        "nextSafeObservation": "Read current immutable receipts and separate source CAS/apply records; source publication does not qualify native behavior.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "ACADEMY-RUNNING-P1-READ-ONCE1-20261016",
+        "scope": "Separate Root-admitted existing-owner read-only P1once1; consumed UNKNOWN0_OR1; observation absent.",
+        "state": "unknown",
+        "receiptRefs": [
+          "inputs/p1-once1-20261016.json#/content"
+        ],
+        "nextSafeObservation": "Only preexisting independently-owned audit evidence under exact separate admission. Never rerun once/API/SSH/prepare/recheck/qualifier or rename attempt.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      },
+      {
+        "id": "new-hermes-facade-source-preparation",
+        "scope": "Read-only staged14files+plan at/tmp/hermes-new-source-delivery-ZUqrs4; actualtargetstillABSENT; no ownerdata.",
+        "state": "completed",
+        "receiptRefs": [
+          "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-prepared-20261016-v2-receipt.json"
+        ],
+        "nextSafeObservation": "Independent exactplan review then separate Root exact sourceapply decision. Do not repeatprepare or infer native adoption.",
+        "replayPolicy": "never-replay-recorded-dispatch"
+      }
+    ],
+    "receipts": [
+      {
+        "ref": "/home/palantirkc/operations/harness-continuation-20261016/common-mainbce-source-ci-reconciliation-receipt.json",
+        "classification": "verification",
+        "result": "sha256:a19536f58fb6db0820a26ae482038f9b9c7f5dbe07992d58d1e47fad0e3bf9d8; retained exact scope; no native/private/wholeAcceptance inference."
+      },
+      {
+        "ref": "/home/palantirkc/operations/harness-continuation-20261016/codex-main2e4-source-publication-completion-20261016.json",
+        "classification": "verification",
+        "result": "sha256:b538fdf66d934fd075f58ccb5336ad1b9598a5134a4caef04e3a4b5cf2113377; retained exact scope; no native/private/wholeAcceptance inference."
+      },
+      {
+        "ref": "/home/palantirkc/operations/harness-continuation-20261016/academy-main2c-source-ci-reconciliation-receipt.json",
+        "classification": "verification",
+        "result": "sha256:88e2ab82fff0b58e00ad9242a589a0fe351eab7ddc158bf35b4b00be36c1f052; retained exact scope; no native/private/wholeAcceptance inference."
+      },
+      {
+        "ref": "/home/palantirkc/operations/harness-continuation-20261016/academy-running-p1-read-once1-consumed-unknown-receipt.json",
+        "classification": "observation",
+        "result": "sha256:6bd075e268cff521ca27933c34faf5efe8f2d94aad83a3add5e712d1feb044af; retained exact scope; no native/private/wholeAcceptance inference."
+      },
+      {
+        "ref": "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-prepared-20261016-v2-receipt.json",
+        "classification": "verification",
+        "result": "sha256:62202ba8a592f6fe3189a970ff610556488abfb81d016f69fc4c2f61ec33262c; retained exact scope; no native/private/wholeAcceptance inference."
+      },
+      {
+        "ref": "/tmp/academy-p1-once1-actual-reconciliation-20261016.json",
+        "classification": "verification",
+        "result": "sha256:c403e65d41c2f66e78c61c13c11083ab109ed50373d4b3493a03c86be4e8d5a9; RECONCILED_HOLD_CONSUMED_UNKNOWN_NO_RETRY; opaque rootcause and ownertransport cleanup."
+      }
+    ],
+    "holds": [
+      {
+        "id": "original-wsl-writer",
+        "scope": "Original source thread/Goal",
+        "reason": "PAUSED; no native state transplant or original-writer resume.",
+        "releaseCondition": "No release requested."
+      },
+      {
+        "id": "codex-native-adoption",
+        "scope": "Current Codex consumption/activation/recovery",
+        "reason": "Current source2e independently qualified; sourceCAS in progress. Effective hooks/trust/auth/current Work injection and owner-exit not established.",
+        "releaseCondition": "Separate exact native qualification and accountable Lead activation; no oldbindings/profile/trust transplant."
+      },
+      {
+        "id": "native-metadata-observer",
+        "scope": "Owner-exit/full history/auth/consumption",
+        "reason": "once1 consumed HOLD; once2/3 scoped metadata PASS with original owner running only.",
+        "releaseCondition": "Separate current bounded evidence; no old allocation or read retry."
+      },
+      {
+        "id": "hermes-new-source",
+        "scope": "Source lineage and native adoption",
+        "reason": "Current commonbce source qualified and new14fileplan staged; actualtargetABSENT, genuine owner/data absent. No native activation.",
+        "releaseCondition": "Independentplanreview and separate exactsourceapply; genuine data/native qualification remain separate."
+      },
+      {
+        "id": "academy-running-p1-abi",
+        "scope": "Existing PG birth/original authority and ABI",
+        "reason": "Source600/tree5d4 delivered via main2c. Actual once1 consumedUNKNOWN0_OR1/no-retry; observationABSENT; P1/PGauthority/ABI/retirement not qualified.",
+        "releaseCondition": "Reconcile original correlated existing evidence without rerunning consumedP1. Missing proof stays held; no start/migration/restart replay."
+      },
+      {
+        "id": "academy-private-seven-gates",
+        "scope": "Private source/storage/auth/recovery/hosting/workflow/release",
+        "reason": "Source adoption, custody and Bun defaults do not qualify native publication, actual private workflows or teacher judgments.",
+        "releaseCondition": "Separately admitted exact owner evidence for all seven gates; source Academy remains read-only."
+      },
+      {
+        "id": "evaluation",
+        "scope": "Native model suite",
+        "reason": "Historical budgets not portable; fresh explicit suite budget absent.",
+        "releaseCondition": "Fresh explicit budget plus native prerequisites."
+      },
+      {
+        "id": "whole-work-acceptance",
+        "scope": "Full Spec7 integrated outcome",
+        "reason": "Native/private/recovery/teacher/evaluation requirements incomplete; human satisfaction unobserved.",
+        "releaseCondition": "Independent integrated outcomes and separate accountable Lead Acceptance."
+      },
+      {
+        "id": "post-goal-orchestrator-engineering",
+        "scope": "Deferred framework/interview",
+        "reason": "User deferred until Goal achieved; all unused owned worker panes closed.",
+        "releaseCondition": "Goal achieved then separate interview; open only needed panes with live-ID guards."
+      },
+      {
+        "id": "new-p1-consumed-uncertainty",
+        "scope": "ACADEMY-RUNNING-P1-READ-ONCE1-20261016",
+        "reason": "API invoked but didnotreturn; no projection/cause exported. Original2 plus new1 uncertainty stay distinct; combined64SOURCE/3uncertain.",
+        "releaseCondition": "Existing independently owned audit evidence only; never rewrite as successful P1 or proved0effects."
+      }
+    ],
+    "nextSafeAction": "Independently review/deliver this source v8 and mandatory new uncertainty fence with unchanged24000cap/originalrecords; finish exactCodeXsourceCAS and independentHermesplanreview. Preserve actualP1once1 UNKNOWN/no-retry; review preexisting local audit routes only. Native/private/model/Acceptance gates stay separate."
+  }
+}

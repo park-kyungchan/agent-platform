@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "p1-once1-20261016",
+  "kind": "effect-fence",
+  "completedEffectIds": [],
+  "uncertainEffectIds": [
+    "ACADEMY-RUNNING-P1-READ-ONCE1-20261016"
+  ],
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/p1-once1-20261016.json",
+    "fragment": "#/content"
+  }
+}

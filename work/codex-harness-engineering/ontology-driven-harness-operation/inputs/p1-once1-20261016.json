@@ -1,0 +1,55 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "p1-once1-20261016",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "consumed-readonly-occurrence:academy-running-p1-once1",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "ConsumedUncertainEffectReplayFenceProjection",
+    "completedEffectIds": [],
+    "uncertainEffectIds": [
+      "ACADEMY-RUNNING-P1-READ-ONCE1-20261016"
+    ],
+    "state": "UNKNOWN",
+    "consumed": true,
+    "possibleTargetOccurrences": "0_OR_1",
+    "observedAtUtc": "2026-10-16T05:44:15.364Z",
+    "intervalUtc": [
+      "2026-10-16T05:38:01.947Z",
+      "2026-10-16T05:38:03.429Z"
+    ],
+    "receipt": {
+      "path": "/home/palantirkc/operations/harness-continuation-20261016/academy-running-p1-read-once1-consumed-unknown-receipt.json",
+      "sha256": "6bd075e268cff521ca27933c34faf5efe8f2d94aad83a3add5e712d1feb044af"
+    },
+    "independentReconciliation": {
+      "path": "/tmp/academy-p1-once1-actual-reconciliation-20261016.json",
+      "sha256": "c403e65d41c2f66e78c61c13c11083ab109ed50373d4b3493a03c86be4e8d5a9"
+    },
+    "markerCreated": true,
+    "markerDurable": true,
+    "ownerAPIInvoked": true,
+    "ownerAPIReturned": false,
+    "observationCapture": "ABSENT",
+    "rootCause": "UNKNOWN_NOT_EXPORTED",
+    "authentication": "UNKNOWN",
+    "sshActuallyStarted": "UNKNOWN",
+    "remoteMetadataConsumed": "UNKNOWN",
+    "wrapperDescriptorCleanupReported": true,
+    "ownerTransportCleanupProven": false,
+    "meaning": "One separately Root-admitted bounded read-only occurrence is consumed. This adds one new uncertainty; original63/2 and prior combined64/2 fences remain immutable. No successful P1, authentication or zero-effect conclusion follows. Preserve admission, marker and receipt; never retry or rename this dispatch.",
+    "nextSafeObservation": "Review already-local source for a preexisting independently owned audit route. A separately admitted existing-record read may reconcile this occurrence; no P1/SSH/API replay or replacement probe.",
+    "replayPolicy": "never-replay-recorded-dispatch",
+    "privateBodiesPublished": false,
+    "P1Accepted": false,
+    "nativePermissionGranted": false,
+    "AcceptanceDecision": null
+  }
+}

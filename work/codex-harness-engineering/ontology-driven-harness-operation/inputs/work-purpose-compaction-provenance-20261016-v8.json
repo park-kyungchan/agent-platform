@@ -1,0 +1,60 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "work-purpose-compaction-provenance-20261016-v8",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "lead:material-boundary-context-budget-preservation",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "MeaningPreservingPurposeCompressionProvenance",
+    "sourceBaseline": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+    "priorPurpose": {
+      "objective": "Complete full private Spec7/Plan7.",
+      "successCriteria": [
+        "Full Spec7/Plan7 and original purpose in inputs/work-purpose-compaction-provenance-20261016.json.",
+        "Stable IDs/originals/fences; one typed common/native source, retained owners; no duplicate registration.",
+        "Verified native activation/PC-off, full portfolio boundaries/recovery; useful delegation/handoff/resume/Memory/Kanban/Session/concurrency and local/shared receipts.",
+        "Academy seven gates/teacher/concept work; private runtime, source read-only; month-end analysis before user choice.",
+        "Exact review/private delivery/Lead merge/readback/cleanup; separate evidence-based Lead Acceptance.",
+        "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero added recurring cost."
+      ],
+      "inScope": [
+        "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
+      ],
+      "outOfScope": [
+        "Source mutation/denied access, unrequested physical/third-party effects, excluded domains.",
+        "Credential disclosure/trust bypass/parallel runtime; auto-merge/paid infrastructure/replay/reused budgets.",
+        "Invented student/teacher/human outcomes; agent papers/membership. User question choice and teacher/human judgments remain separate."
+      ]
+    },
+    "successorPurpose": {
+      "objective": "Complete full private Spec7/Plan7.",
+      "successCriteria": [
+        "Full Spec7/Plan7; original purpose and compression provenance remain in source inputs.",
+        "Stable IDs/originals/fences; typed common/native source; retain owners and avoid duplicate registration.",
+        "Verify native activation/PC-off, portfolio/recovery, delegation/handoff/resume/Memory/Kanban/Session/concurrency and audit receipts.",
+        "Academy seven gates/teacher/concept work; private runtime and read-only source; month-end before user choice.",
+        "Exact review/private delivery/Lead merge/readback/cleanup and separate evidence-based Lead Acceptance.",
+        "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero added recurring cost."
+      ],
+      "inScope": [
+        "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
+      ],
+      "outOfScope": [
+        "Source mutation/denied access, unrequested third-party effects and excluded domains.",
+        "Credential disclosure/trust bypass/parallel runtime; auto-merge/paid infrastructure/replay/reused budgets.",
+        "Invented student/teacher/human outcomes or agent papers/membership; retain user choice and teacher/human judgments."
+      ]
+    },
+    "priorProvenance": "inputs/work-purpose-compaction-provenance-20261016.json",
+    "reason": "Append the new mandatory uncertain-effect fence without expanding the native24000-character cap or changing immutable decisions, inputs, prior effects, Spec7 or Plan7. All criteria remain required.",
+    "authority": "Existing selected Work continuation; no new native/domain/model permission.",
+    "AcceptanceDecision": null
+  }
+}
