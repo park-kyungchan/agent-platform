@@ -1,3 +1,7 @@
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
 import type { EvidenceArtifact, VerificationArtifact, JsonObject } from "@palantirkc/ontology";
 import { createHash } from "node:crypto";
 import { describe, expect, test } from "bun:test";
@@ -324,6 +328,7 @@ function ownerFixture(
       },
     },
   };
+  const rawCommit = "2".repeat(40);
   const rawPath = `native-review-raw/${head}.json`;
   const evidence: EvidenceArtifact = {
     schemaVersion: "1.0.0",
@@ -335,7 +340,7 @@ function ownerFixture(
     payload: {
       claim: "Exact independent source review observed",
       method: "native-codex-independent-source-review",
-      sourceUrl: `https://github.com/${policy.repository}/blob/${resultCommit}/${rawPath}`,
+      sourceUrl: `https://github.com/${policy.repository}/blob/${rawCommit}/${rawPath}`,
       fetchedAt: "2026-10-17T00:00:00Z",
       upstreamRevision: head,
       result: { outcome: "success", processExitCode: 0, contentMatched: true },
@@ -380,7 +385,7 @@ function ownerFixture(
     files.set(path, bytes);
     return { commit: resultCommit, path, sha256: createHash("sha256").update(bytes).digest("hex") };
   }
-  const rawRef = put("native-review-raw", raw);
+  const rawRef = { ...put("native-review-raw", raw), commit: rawCommit };
   result.custody = {
     classification: "source-custody-native-parent-observation",
     publisher: policy.publisher,
@@ -419,7 +424,15 @@ function ownerFixture(
   const reader: OwnerReviewReader = {
     readCommit: async (sha) => {
       reads.push("commit:" + sha);
-      return { sha: head, tree: { sha: tree } };
+      const parent =
+        sha === rawCommit
+          ? head
+          : sha === resultCommit
+            ? rawCommit
+            : sha === receiptCommit
+              ? resultCommit
+              : undefined;
+      return { sha, tree: { sha: tree }, parents: parent ? [{ sha: parent }] : [] };
     },
     readStatuses: async (sha) => {
       reads.push("statuses:" + sha);
@@ -432,7 +445,9 @@ function ownerFixture(
     readFile: async (path, ref) => {
       reads.push(`file:${ref}:${path}`);
       const bytes = path === receiptPath ? Buffer.from(JSON.stringify(receipt)) : files.get(path)!;
-      if (ref !== (path === receiptPath ? receiptCommit : resultCommit))
+      if (
+        ref !== (path === receiptPath ? receiptCommit : path === rawPath ? rawCommit : resultCommit)
+      )
         throw Error("Unexpected fixture commit");
       return {
         type: "file",
@@ -443,7 +458,18 @@ function ownerFixture(
       };
     },
   };
-  return { policy, receipt, reader, reads, statuses, files, proof, receiptCommit, receiptPath };
+  return {
+    policy,
+    receipt,
+    reader,
+    reads,
+    statuses,
+    files,
+    proof,
+    receiptCommit,
+    receiptPath,
+    rawCommit,
+  };
 }
 
 describe("additive owner-scoped review gate", () => {
@@ -461,6 +487,208 @@ describe("additive owner-scoped review gate", () => {
     expect(verified.nativePermissionGranted).toBe(false);
     expect(verified.acceptanceEstablished).toBe(false);
     expect(reads.filter((path) => path.startsWith("file:"))).toHaveLength(5);
+  });
+  test("constructs real acyclic Git publication commits before validating unchanged raw output", async () => {
+    const root = await mkdtemp(join(tmpdir(), "owner-review-publication-"));
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-C", root, ...args], {
+        env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    const commit = (message: string) => {
+      git("add", ".");
+      git(
+        "-c",
+        "user.name=Source review fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "commit",
+        "-qm",
+        message,
+      );
+      return git("rev-parse", "HEAD").toString().trim();
+    };
+    const readCommit = async (sha: string) => {
+      const [identity, treeSha, parents] = git("show", "-s", "--format=%H%n%T%n%P", sha)
+        .toString()
+        .trim()
+        .split("\n");
+      return {
+        sha: identity,
+        tree: { sha: treeSha },
+        parents: (parents || "")
+          .split(" ")
+          .filter(Boolean)
+          .map((sha) => ({ sha })),
+      };
+    };
+    const readTree = async (treeSha: string) => ({
+      sha: treeSha,
+      truncated: false,
+      tree: git("ls-tree", "-r", "-t", "-z", treeSha)
+        .toString()
+        .split("\0")
+        .filter(Boolean)
+        .map((row) => {
+          const [metadata, path] = row.split("\t"),
+            [mode, type, sha] = metadata!.split(" ");
+          return { path, mode, type, sha };
+        }),
+    });
+    const { policy, files, proof: oldProof, receipt: template } = ownerFixture();
+    try {
+      git("init", "-q");
+      await writeFile(join(root, "source.ts"), "export const sourceOnly = true;\n");
+      const sourceHead = commit("reviewed source");
+      const sourceCommit = await readCommit(sourceHead),
+        sourceTree = sourceCommit.tree.sha!;
+      const sourceManifest = deriveReviewedSourceManifest(await readTree(sourceTree), sourceTree);
+      const proof: OwnerReviewProof = {
+        ...oldProof,
+        headSha: sourceHead,
+        reviewedTreeSha: sourceTree,
+        reviewedSourceManifestSha256: sourceManifest.sha256,
+      };
+      async function put(role: string, value: unknown) {
+        const path = `${role}/${sourceHead}.json`,
+          bytes = Buffer.from(JSON.stringify(value));
+        await mkdir(dirname(join(root, path)), { recursive: true });
+        await writeFile(join(root, path), bytes, { flag: "wx" });
+        return { path, sha256: createHash("sha256").update(bytes).digest("hex") };
+      }
+      const raw: OwnerRawNativeReview = {
+        ...proof,
+        schema: "owner-scoped-native-review-output.v1",
+        reviewStatus: "complete",
+        findings: [],
+      };
+      const rawFile = await put("native-review-raw", raw);
+      const rawCommit = commit("R0 unchanged reviewer output");
+      const rawRef = { commit: rawCommit, ...rawFile };
+      const result: OwnerReviewResult = {
+        ...proof,
+        schema: "owner-scoped-independent-review-result.v1",
+        custody: {
+          classification: "source-custody-native-parent-observation",
+          publisher: policy.publisher,
+          rawNativeResult: rawRef,
+        },
+      };
+      const evidence = JSON.parse(
+        files.get(template.provenance.evidence.path)!.toString(),
+      ) as EvidenceArtifact;
+      evidence.payload.details = {
+        semanticOwner: policy.semanticOwner,
+        review: proof as unknown as JsonObject,
+      };
+      evidence.payload.sourceUrl = `https://github.com/${policy.repository}/blob/${rawCommit}/${rawRef.path}`;
+      evidence.payload.upstreamRevision = sourceHead;
+      const resultFile = await put("native-review-results", result),
+        evidenceFile = await put("native-review-evidence", evidence);
+      const verification = JSON.parse(
+        files.get(template.provenance.verification.path)!.toString(),
+      ) as VerificationArtifact;
+      verification.payload.details = {
+        semanticOwner: policy.semanticOwner,
+        review: proof as unknown as JsonObject,
+      };
+      verification.payload.inputHashes = [resultFile, evidenceFile, rawFile];
+      const verificationFile = await put("native-review-verifications", verification);
+      const evidenceCommit = commit("E normalized custody and canonical artifacts");
+      const receipt: OwnerReviewReceipt = {
+        ...proof,
+        schema: "owner-scoped-independent-review.v1",
+        provenance: {
+          owner: policy.semanticOwner,
+          rawNativeResult: rawRef,
+          result: { commit: evidenceCommit, ...resultFile },
+          evidence: { commit: evidenceCommit, ...evidenceFile },
+          verification: { commit: evidenceCommit, ...verificationFile },
+        },
+      };
+      const receiptFile = await put("native-reviews", receipt);
+      const receiptCommit = commit("R1 owner-scoped receipt");
+      expect(new Set([sourceHead, rawCommit, evidenceCommit, receiptCommit]).size).toBe(4);
+      const reader: OwnerReviewReader = {
+        readCommit,
+        readTree,
+        readStatuses: async () => [
+          {
+            id: 1,
+            context: policy.statusContext,
+            state: "success",
+            creator: { ...policy.publisher, id: Number(policy.publisher.id) },
+            target_url: `https://github.com/${policy.repository}/blob/${receiptCommit}/${receiptFile.path}`,
+          },
+        ],
+        readFile: async (path, sha) => {
+          const bytes = git("show", `${sha}:${path}`);
+          return {
+            type: "file",
+            path,
+            encoding: "base64",
+            content: bytes.toString("base64"),
+            size: bytes.length,
+          };
+        },
+      };
+      const verified = await validateOwnerScopedReviewWithEvidence(
+        policy,
+        { repository: policy.repository, head: sourceHead },
+        reader,
+      );
+      expect(verified.receipt.commit).toBe(receiptCommit);
+      expect(verified.manifest).toEqual(sourceManifest);
+      expect(git("show", `${rawCommit}:${rawRef.path}`)).toEqual(
+        await readFile(join(root, rawRef.path)),
+      );
+      const circularReader = {
+        ...reader,
+        readCommit: async (sha: string) =>
+          sha === evidenceCommit
+            ? { ...(await readCommit(sha)), parents: [{ sha: receiptCommit }] }
+            : readCommit(sha),
+      };
+      await expect(
+        validateOwnerScopedReviewWithEvidence(
+          policy,
+          { repository: policy.repository, head: sourceHead },
+          circularReader,
+        ),
+      ).rejects.toThrow("ancestry");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+  test("rejects self-referential, future and unordered publication topology", async () => {
+    for (const modify of [
+      (fixture: ReturnType<typeof ownerFixture>) => {
+        fixture.receipt.provenance.rawNativeResult.commit = resultCommit;
+      },
+      (fixture: ReturnType<typeof ownerFixture>) => {
+        fixture.receipt.provenance.rawNativeResult.commit = fixture.receiptCommit;
+      },
+      (fixture: ReturnType<typeof ownerFixture>) => {
+        const prior = fixture.reader.readCommit;
+        fixture.reader.readCommit = async (sha) =>
+          sha === resultCommit ? { sha, parents: [{ sha: fixture.receiptCommit }] } : prior(sha);
+      },
+      (fixture: ReturnType<typeof ownerFixture>) => {
+        const prior = fixture.reader.readCommit;
+        fixture.reader.readCommit = async (sha) =>
+          sha === fixture.rawCommit ? { sha, parents: [{ sha: resultCommit }] } : prior(sha);
+      },
+    ]) {
+      const fixture = ownerFixture();
+      modify(fixture);
+      await expect(
+        validateOwnerScopedReviewWithEvidence(
+          fixture.policy,
+          { repository: fixture.policy.repository, head },
+          fixture.reader,
+        ),
+      ).rejects.toThrow();
+    }
   });
   test("rejects unreviewed runtime repository before any read", async () => {
     const { policy, reader, reads } = ownerFixture();

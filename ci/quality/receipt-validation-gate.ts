@@ -146,13 +146,29 @@ export async function validateOwnerScopedReviewWithEvidence(
     ),
   };
   if (
-    Object.values(refs).some(
+    [refs.result, refs.evidence, refs.verification].some(
       (ref) => ref.commit !== refs.result.commit || ref.commit === target.commit,
-    )
+    ) ||
+    refs.rawNativeResult.commit === refs.result.commit ||
+    refs.rawNativeResult.commit === target.commit
   )
-    throw new Error(
-      "Owner review requires one immutable evidence commit separate from receipt/source",
-    );
+    throw new Error("Owner review requires distinct raw, evidence and receipt commits");
+  // A directly parented finite chain proves publication is constructible and acyclic:
+  // H (reviewed source) -> R0 (unchanged raw output) -> E (result/Evidence/Verification) -> R1 (receipt).
+  for (const [child, parent] of [
+    [refs.rawNativeResult.commit, head],
+    [refs.result.commit, refs.rawNativeResult.commit],
+    [target.commit, refs.result.commit],
+  ]) {
+    const publication = record(await reader.readCommit(child!));
+    if (
+      publication.sha !== child ||
+      !Array.isArray(publication.parents) ||
+      publication.parents.length !== 1 ||
+      record(publication.parents[0]).sha !== parent
+    )
+      throw new Error("Owner review publication must follow source/raw/evidence/receipt ancestry");
+  }
   async function read(ref: ImmutableResult, bound = 65536) {
     return parseOwnerReviewFile(
       decodeBoundedReviewFile(await reader.readFile(ref.path, ref.commit), ref.path, bound),
