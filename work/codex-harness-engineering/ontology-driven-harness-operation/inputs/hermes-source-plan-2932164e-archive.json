@@ -1,0 +1,183 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "hermes-source-plan-2932164e-archive",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "source-owner:immutable-reviewed-generated-payload-archive",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "ImmutableReviewedSourcePayloadArchive",
+    "archive": {
+      "kind": "snapshot",
+      "path": "work-artifacts/codex-harness-engineering/ontology-driven-harness-operation/hermes-source-plan-2932164e.tar.gz",
+      "sha256": "a6b6d71b444f673a1aeb55a7f8624ab93874ec4bc9d0fc39ee99966f3611ccd3",
+      "bytes": 75408
+    },
+    "format": "deterministic ustar + gzip",
+    "canonicalSourceOwner": "agent-platform/packages/native-hermes-adapter/src/source-provider",
+    "preparedPlan": {
+      "sha256": "2932164e29a9df087035c8a784cfb3756caebcc4f376f143fa2b31143f9b8903",
+      "bytes": 142676,
+      "originalStagingRoot": "/tmp/hermes-new-source-delivery-ZUqrs4"
+    },
+    "sourceBaseline": {
+      "head": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+      "tree": "574f689bac2407145ffc43eab1b04e66061cb871"
+    },
+    "targetRoot": "/home/palantirkc/code/shared/hermes-harness-engineering",
+    "entries": [
+      {
+        "path": "architecture/hermes-context-provider.json",
+        "sha256": "7b0ed18c0f9bb5239bf572665017b9b29c3feb35079d5e5b0856321fce889496",
+        "bytes": 2688,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "bun.lock",
+        "sha256": "97502425141e24c5984814e0077650d02734e68c318115a4d63a5feab1b21f42",
+        "bytes": 2095,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "delivery-plan.json",
+        "sha256": "2932164e29a9df087035c8a784cfb3756caebcc4f376f143fa2b31143f9b8903",
+        "bytes": 142676,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "package.json",
+        "sha256": "2e69486d8c6504bd25bff1c06d8202e5339e209e219a9de65116245fbc5623c0",
+        "bytes": 271,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "source-successor.json",
+        "sha256": "01f48a38e6b0def7789757e74980b55bfa5e3aab9a6d7ee69448a99f685baa1d",
+        "bytes": 139700,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/adoption/evaluation-budget.ts",
+        "sha256": "3f47ba63fffcb05a3568a35d55f86cb351fcb9c614b194791d70eb3911c8ed34",
+        "bytes": 78,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/adoption/semantic-context.ts",
+        "sha256": "9870b56525392d6abf74e7ea5aa3981173a955d45a84d6c9cd2ff5d8869cd1f9",
+        "bytes": 77,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/ontology-driven/audit-adapter.ts",
+        "sha256": "b333909214ffa78df527881d1b29938191ff32a3a2b4cd9d3dcee34c81fed9dd",
+        "bytes": 81,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/ontology-driven/contracts.ts",
+        "sha256": "0c0280d37321103aa39e39397472ff0f3eaa6aaf022568e674097956812218f8",
+        "bytes": 77,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/ontology-driven/current-intent.ts",
+        "sha256": "962392d427b7a94619c25e11422014f639884e5a87bb96855b872f99645b9ab8",
+        "bytes": 82,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/ontology-driven/domain-context.ts",
+        "sha256": "0aa95c0606ae298abd91c2266c6a89b414c40a4cb2c6afa774c7fdcc6f495686",
+        "bytes": 82,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/ontology-driven/pinned-reader.ts",
+        "sha256": "e8ede3346f9094dec49a007d65bde28ac3de174089eaa1fe1d21580d57b028dc",
+        "bytes": 81,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/ontology-driven/provider-source.ts",
+        "sha256": "7225ec44ca42366234379312e5dcb76c53760c49ac0ea75b60d89f629f895d62",
+        "bytes": 27372,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/ontology-driven/role-registry.ts",
+        "sha256": "e530a20b802a9dee04a287bc8404a33a258d2fda1bfd811f81093511f35f793b",
+        "bytes": 81,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      },
+      {
+        "path": "src/ontology-driven/work-context.ts",
+        "sha256": "542f5ff86dfd11fe9b90d56f88ee037578e3e1b360322b7ac8f7287ff618df2c",
+        "bytes": 80,
+        "sourceMode": "444",
+        "archiveMode": "0444",
+        "type": "regular-source-file"
+      }
+    ],
+    "sourceFiles": 14,
+    "planFiles": 1,
+    "archivedLinks": 0,
+    "archivedDirectories": 0,
+    "fixedLinkDescribedByPlan": {
+      "path": "node_modules/@palantirkc/native-hermes-adapter",
+      "target": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter",
+      "expected": "absent"
+    },
+    "deterministicEncoding": {
+      "tarFormat": "ustar",
+      "entryOrder": "pathname lexical",
+      "mtime": 0,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0444",
+      "gzipLevel": 9,
+      "gzipTimestamp": 0
+    },
+    "verification": "Exclusive fictional archive workspace populated from retained no-follow descriptor snapshots; all15 sizes/hashes/currentness verified before and after; archive members match exact original prepared bytes. No prepare regeneration or target apply.",
+    "readerContract": "Native GitWork readSource validates this UTF-8 manifest via exact snapshot path+SHA. Raw gzip is not supported by its fatal UTF-8 decoder; read archive as bounded regular Git blob bytes at the manifest snapshot path, verify Git blob identity and SHA, then verify all15 regular safe members. Archive lives outside indexed work records; no reader/source-pin/cap change.",
+    "recoveryRule": "Read retained payload without regeneration. Original NEW-HERMES-FACADE-SOURCE-APPLY-ONCE1-20261016 is consumed API1/completed22/uncertain0; NEVER repeat prepare/apply or rename dispatch. This archival payload grants no execution authority; any distinct future source action requires separate currentness/authority review.",
+    "originalSourceRestored": false,
+    "nativePermissionGranted": false,
+    "ownerDataArchived": false,
+    "AcceptanceDecision": null
+  }
+}

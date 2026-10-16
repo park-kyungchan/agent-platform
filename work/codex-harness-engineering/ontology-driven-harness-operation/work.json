@@ -10,20 +10,20 @@
   "purpose": {
     "objective": "Complete full private Spec7/Plan7.",
     "successCriteria": [
-      "Full Spec7/Plan7; original purpose: inputs/work-purpose-compaction-provenance-20261016.json.",
-      "Preserve IDs/originals/fences, typed common/native source and existing owners.",
-      "Verify activation/PC-off, portfolio/recovery, delegation/handoff/resume/Memory/Kanban/Session/concurrency and audit.",
-      "Academy seven gates/teacher/concept; private runtime/read-only source; month-end before user choice.",
-      "Exact review/private delivery/Lead integration/readback/cleanup; separate evidence-based Acceptance.",
-      "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero new recurring cost."
+      "Full Spec7/Plan7; original purpose/provenance.",
+      "IDs/originals/fences; one typed common/native source; owners/no duplicate joins.",
+      "Verify activation/PC-off, portfolio/recovery, useful delegation/handoff/resume/Memory/Kanban/Session/concurrency/local/shared receipts.",
+      "Academy seven gates/teacher/concept; private/read-only source; month-end before user choice.",
+      "Independent review/private delivery/Lead merge/readback/cleanup; separate Lead Acceptance.",
+      "Fresh <=48 requests/2000000 emitted tokens/8h; zero recurring cost."
     ],
     "inScope": [
       "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
     ],
     "outOfScope": [
-      "Source writes/denied access, unrequested third-party effects, excluded domains.",
+      "Source mutation/denied access, unrequested physical/third-party effects, excluded domains.",
       "Credential disclosure/trust bypass/parallel runtime; auto-merge/paid infrastructure/replay/reused budgets.",
-      "Invented human/teacher/student outcomes, agent papers or final membership; retain user choice."
+      "Invented student/teacher/human outcomes; agent papers/membership. User question choice and teacher/human judgments remain separate."
     ]
   },
   "spec": {
