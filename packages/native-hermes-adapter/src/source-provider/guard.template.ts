@@ -401,9 +401,15 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     )
       throw Error("Hermes Work code was loaded before source observation; use a fresh process");
   }
+  // Consumers may annotate/reorder their public proof. Its rows must never alias verification state.
+  const verificationPins = Object.freeze(
+    [...pins, ...facadePins, ...provenancePins, ...runtimePins].map((pin) =>
+      Object.freeze({ ...pin }),
+    ),
+  );
   const verify = async () => {
     await facadeFiles();
-    for (const pin of [...pins, ...facadePins, ...provenancePins, ...runtimePins])
+    for (const pin of verificationPins)
       if (sha(await exact(pin.path)) !== pin.sha256)
         throw Error("Hermes code source changed during packaging: " + pin.path);
     const current = await captureDependencies(providerRoot, exact, sha, false, importers);
@@ -418,7 +424,7 @@ export async function observeHermesContextProvider(sourceRoot: string) {
     codeOwnerRoot,
     providerRoot,
     packageName: registration.packageName,
-    pins,
+    pins: pins.map((pin) => ({ ...pin })),
     verify,
   };
 }

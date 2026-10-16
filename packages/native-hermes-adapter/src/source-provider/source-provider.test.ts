@@ -209,6 +209,31 @@ test("post-read check refuses canonical or owner-source mutation", async () => {
   expect(owner.stderr).toContain("Hermes code source changed during packaging");
 }, 25000);
 
+test("public proof row and array mutations cannot change private verification or another proof", async () => {
+  const f = await fixture();
+  const result = await child(
+    f,
+    `const fs=await import('node:fs/promises');const {createHash}=await import('node:crypto');
+    const first=await api.observeHermesContextProvider(f.codeOwnerRoot);
+    const second=await api.observeHermesContextProvider(f.codeOwnerRoot);
+    if(first.pins.length!==19||second.pins.length!==19)throw Error('PUBLIC_DENOMINATOR_CHANGED');
+    const path=f.providerRoot+'/packages/native-hermes-adapter/src/ontology-driven/contracts.ts';
+    const bytes=(await fs.readFile(path,'utf8'))+'\\n// inert alias regression\\n';
+    await fs.writeFile(path,bytes);
+    first.pins.find(p=>p.path===path).sha256=createHash('sha256').update(bytes).digest('hex');
+    const refusal=async fn=>{try{await fn();return false;}catch(error){return error.message.startsWith('Hermes code source changed during packaging:');}};
+    const rowRefused=await refusal(first.verify);first.pins.splice(0,first.pins.length);
+    console.log(JSON.stringify({rowRefused,arrayRefused:await refusal(first.verify),secondRefused:await refusal(second.verify),secondPins:second.pins.length}));`,
+  );
+  expect(result.status).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({
+    rowRefused: true,
+    arrayRefused: true,
+    secondRefused: true,
+    secondPins: 19,
+  });
+});
+
 test("guard rejects unknown facade files and fixed-root substitution", async () => {
   const f = await fixture();
   const root = await child(f, "await api.observeHermesContextProvider(f.providerRoot);");
