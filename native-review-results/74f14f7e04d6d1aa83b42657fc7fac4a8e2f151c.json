@@ -1,0 +1,417 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "74f14f7e04d6d1aa83b42657fc7fac4a8e2f151c",
+  "reviewedTreeSha": "5dbdde6c159f7b3f845e5d466dafa71954cb19ca",
+  "reviewedSourceManifestSha256": "4d39023148fb434d813d9b35efe6ed0f8a22539aaced8f378b6c554fbc2d3a27",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "COMMON-SOURCE-OUTCOMES-INDEPENDENT-REVIEW"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "COMMON-SOURCE-OUTCOMES-FINDING-FIX"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "currentFindingCount": 0,
+  "findings": [],
+  "reviewedAtUtc": "2026-10-16T01:29:56.624Z",
+  "reviewerContext": {
+    "mode": "Fresh independent native Codex child context; read-only exact-source review",
+    "nativeSessionId": "not-observed",
+    "identityMeaning": "Reviewer and author Task IDs are supplied SOURCE logical attribution, not native allocations, admissions or authenticated native-store identities."
+  },
+  "baseline": {
+    "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+    "treeSha": "d230c84acc159461d9ee3f16096cd49da7ce4ca4",
+    "networkFetchPerformed": false,
+    "meaning": "Locally present author-observed common-main baseline; this review did not freshly synchronize or claim current remote main."
+  },
+  "previousReview": {
+    "headSha": "d32e6d9a20bb2832f2700dc3b8b3e3fabda730c1",
+    "treeSha": "8ab9e7312ecf2c2970d19b685883e07ff5e6689b",
+    "artifactPath": "/home/palantirkc/operations/harness-continuation-20261016/completed-reviewers-20261016/common-source-outcomes-d32-review-result-20261016.json",
+    "sha256": "f82412538b28c8620ef7a1414e2041298c8d6008e9c1dee5fdf16a0a6bb6bb1f",
+    "meaning": "Historical pass retained. Later captured real CI deterministic failure and P1/P2 findings invalidate its use as current zero-finding evidence; this is a new exact-source successor review."
+  },
+  "scope": {
+    "repositoryRoot": "/home/palantirkc/code/worktrees/common-source-outcomes-review-fix-20261016",
+    "repositoryId": "park-kyungchan/agent-platform",
+    "fullBaselineDelta": {
+      "filesChanged": 15,
+      "insertions": 493,
+      "deletions": 24,
+      "paths": [
+        "packages/work-continuity/src/git-work/git-work.test.ts",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/latest-bun-vps-agent-defaults-20261016.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/academy-root-source-read-once1-observation.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/fences/academy-root-source-read-once1-fence.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-vps-bun-user-answer-20261016.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-custody-20261016.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-read-replay-fence-20261016.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/work-purpose-compaction-provenance-20261016.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan7-contains-ACADEMY-ROOT-SOURCE-READ-ONCE1.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-ROOT-SOURCE-READ-ONCE1.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-BUN-CURRENTNESS.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-SOURCE-INDEPENDENT-REVIEW.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/MONTH-END-PRESELECTION-ANALYSIS.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/work.json"
+      ]
+    },
+    "exactFindingFix": {
+      "baseHead": "d32e6d9a20bb2832f2700dc3b8b3e3fabda730c1",
+      "filesChanged": 8,
+      "insertions": 251,
+      "deletions": 23,
+      "paths": [
+        "packages/work-continuity/src/git-work/git-work.test.ts",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/academy-root-source-read-once1-observation.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/fences/academy-root-source-read-once1-fence.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-read-replay-fence-20261016.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/work-purpose-compaction-provenance-20261016.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan7-contains-ACADEMY-ROOT-SOURCE-READ-ONCE1.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-ROOT-SOURCE-READ-ONCE1.json",
+        "work/codex-harness-engineering/ontology-driven-harness-operation/work.json"
+      ]
+    },
+    "meaning": "Entire original outcome/Bun decision delta and exact successor finding fix independently reviewed. Only preexisting Work routing purpose/fence links and regression test changed; implementation code, package manifests, lockfiles, workflow files, provider registrations and source guards are unchanged."
+  },
+  "findingDisposition": [
+    {
+      "id": 4289648012,
+      "severity": "P1",
+      "sourceDisposition": "addressed-in-exact-reviewed-source",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json",
+      "proof": "Exact d32 GHA-22 CLI read independently reproduces held REQUIRED_CONTEXT_OUTPUT_LIMIT with exit 1. Exact successor default CLI reads GHA-22/GHA-27/WSL2 and five source Tasks with exit 0 and no hold reasons. Default/max budget remains 24000. Prior purpose equals immutable provenance priorPurpose and resolves via its exact prior Git commit; current routing summary equals provenance currentPurpose. All accepted decisions/original answer bindings and Spec7/Plan7 remain.",
+      "remoteThreadResolvedByReview": false
+    },
+    {
+      "id": 4289648017,
+      "severity": "P2",
+      "sourceDisposition": "addressed-in-exact-reviewed-source",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/fences/academy-root-source-read-once1-fence.json",
+      "proof": "Work now directly links the new fence containing exact completed SOURCE Task ID ACADEMY-ROOT-SOURCE-READ-ONCE1. Completed source-only Task has no occurrence/runtimeId/effect IDs, observation evidence resolves to unchanged custody snapshot, and Plan7 contains relation resolves. Source fence receipt/intent hashes match unchanged custody input. Exact CLI source Task context has relevantCompletedIds containing the Task, combined64 completed/2 uncertain and custody/fence source routes. Independently executed synthetic replan regression rejects COMPLETED_EFFECT_REPLAY:ACADEMY-ROOT-SOURCE-READ-ONCE1.",
+      "remoteThreadResolvedByReview": false
+    }
+  ],
+  "assessment": {
+    "originalAnswer": "Accepted Bun answer and distinct selection-context question exactly equal their original source snapshot fragments and remain source-reachable in every checked context. Capture does not authenticate native message IDs or confer activation/domain/evaluation/replay authority.",
+    "purpose": "Original purpose is preserved without semantic text loss in immutable source-addressable provenance, including all eleven success criteria, four in-scope and five out-of-scope clauses. Mutable compact summary explicitly routes to provenance and keeps the same pinned Spec7/Plan7. Prior/current purpose equality was asserted independently; prior Git source route was resolved.",
+    "originalOutcomes": "The four original additional Tasks retain SOURCE-only semantics, original logical Work/Issue/Spec7/Plan7, separate pending verification/shared audit/formal completion and empty native-effect IDs. Existing running review metadata remains historical source state, not a claim that this review allocated or executed that native Task.",
+    "consumedRead": "Retrospective source representation of the already consumed one-shot Root read only. No private Root body, 29-field/236-pin values or PG authority contents are in new Git records. Actual private custody observations remain source-owner-reported metadata and were not repeated or privately requalified.",
+    "replay": "Completed SOURCE Task ID reuses existing reader/validator replay semantics. This establishes source graph reachability and replan refusal, not a new native runtime occurrence, global dispatch fence or private gate approval."
+  },
+  "preservation": {
+    "originalWorkFiles": 177,
+    "byteIdenticalExistingWorkFiles": 176,
+    "originalDecisions": 47,
+    "currentDecisions": 48,
+    "oldCompleted": 63,
+    "oldUncertain": 2,
+    "combinedCompleted": 64,
+    "combinedUncertain": 2,
+    "priorPurposeExact": true,
+    "currentPurposeExact": true,
+    "priorPurposeGitRouteResolved": true,
+    "oldWorkBlob": "b3a1109bb4b77943601adb81813ec795521dc1c1",
+    "changedExisting": [
+      "work/codex-harness-engineering/ontology-driven-harness-operation/work.json"
+    ]
+  },
+  "actualChecks": [
+    {
+      "command": "bun run check:git-work",
+      "exitCode": 0,
+      "passed": 91,
+      "failed": 0,
+      "assertions": 1746,
+      "files": 4,
+      "includes": "Real canonical Work default budget and synthetic completed SOURCE Task replay refusal; no-lazy-fetch and runtime-docs tests included."
+    },
+    {
+      "command": "bun run check:handoff",
+      "exitCode": 0,
+      "passed": 39,
+      "failed": 0,
+      "assertions": 223
+    },
+    {
+      "command": "bun run check:imports",
+      "exitCode": 0,
+      "legacyAndCanonicalSameModule": true,
+      "modelCalls": 0,
+      "sourceSha256": "8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a"
+    },
+    {
+      "command": "bun run harness validate <exact HEAD snapshot>",
+      "exitCode": 0,
+      "result": {
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      }
+    },
+    {
+      "command": "bun run harness transition <exact d32 snapshot> <exact HEAD snapshot>",
+      "exitCode": 0,
+      "result": {
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      }
+    },
+    {
+      "command": "bun run harness context <exact HEAD snapshot and default context request>",
+      "exitCode": 0,
+      "maxCharsOverrideSupplied": false,
+      "contexts": [
+        {
+          "taskId": "GHA-22",
+          "characters": 23874,
+          "headroom": 126,
+          "status": "source-qualified",
+          "path": "/tmp/common-source-outcomes-independent-GHA-22-context-20261016.json",
+          "sha256": "6d5bada7e286b965fb7506e88e30c1977a44dc34b8057955a2b812945d74cc79"
+        },
+        {
+          "taskId": "GHA-27",
+          "characters": 23885,
+          "headroom": 115,
+          "status": "source-qualified",
+          "path": "/tmp/common-source-outcomes-independent-GHA-27-context-20261016.json",
+          "sha256": "155b0b1fa59b7718664e2c29b57da20712f512d32b1abe5609a5bc8cd006a43b"
+        },
+        {
+          "taskId": "WSL2-LEAD-HANDOFF",
+          "characters": 23932,
+          "headroom": 68,
+          "status": "source-qualified",
+          "path": "/tmp/common-source-outcomes-independent-WSL2-LEAD-HANDOFF-context-20261016.json",
+          "sha256": "a241a8d882ab342e6cdadbec107f05ee97916f741f1109d99c3e8f42fffb9284"
+        },
+        {
+          "taskId": "ACADEMY-ROOT-SOURCE-READ-ONCE1",
+          "characters": 17406,
+          "headroom": 6594,
+          "status": "source-qualified",
+          "path": "/tmp/common-source-outcomes-independent-ACADEMY-ROOT-SOURCE-READ-ONCE1-context-20261016.json",
+          "sha256": "4236b6fc319d29b970d740a94ab16caa0be755a28620048b76e19f657663ff6d"
+        },
+        {
+          "taskId": "EDUCATION-BUN-CURRENTNESS",
+          "characters": 17119,
+          "headroom": 6881,
+          "status": "source-qualified",
+          "path": "/tmp/common-source-outcomes-independent-EDUCATION-BUN-CURRENTNESS-context-20261016.json",
+          "sha256": "ea309528534a8c804a6ef66a9f3a73072c09e91437a8b0138c2227cdb6296856"
+        },
+        {
+          "taskId": "EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS",
+          "characters": 17153,
+          "headroom": 6847,
+          "status": "source-qualified",
+          "path": "/tmp/common-source-outcomes-independent-EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS-context-20261016.json",
+          "sha256": "0dd732d146f231507f7b6af80fa33242683deea2c5f8402404998a9323122c18"
+        },
+        {
+          "taskId": "EDUCATION-SOURCE-INDEPENDENT-REVIEW",
+          "characters": 17126,
+          "headroom": 6874,
+          "status": "source-qualified",
+          "path": "/tmp/common-source-outcomes-independent-EDUCATION-SOURCE-INDEPENDENT-REVIEW-context-20261016.json",
+          "sha256": "f9f0ed35aac25c36f29dc1697d43ebec33cb79a8d53ce66251c7d56c47dd9c00"
+        },
+        {
+          "taskId": "MONTH-END-PRESELECTION-ANALYSIS",
+          "characters": 17113,
+          "headroom": 6887,
+          "status": "source-qualified",
+          "path": "/tmp/common-source-outcomes-independent-MONTH-END-PRESELECTION-ANALYSIS-context-20261016.json",
+          "sha256": "a3c0989c50aabc7052cca71d7f0f4260d396a938841571ffccdb9d6ef03ae190"
+        }
+      ]
+    },
+    {
+      "command": "bun run harness context <exact d32 GHA-22 snapshot and default context request>",
+      "exitCode": 1,
+      "expectedFailure": true,
+      "status": "held",
+      "holdReasons": [
+        "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+      ],
+      "meaning": "Read-only prior-defect reproduction, not a privileged Root source read or completed-effect replay."
+    },
+    {
+      "command": "bun scripts/verify-common-work.ts . 1e853cb2051e64ca9ca1620f2aa1402ea5e66ed2",
+      "exitCode": 0,
+      "result": {
+        "schema": "agent-platform.common-work-verification.v1",
+        "status": "pass",
+        "verificationClass": "committed-common-source-only",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "1e853cb2051e64ca9ca1620f2aa1402ea5e66ed2",
+        "records": 190,
+        "actualDecisions": 48,
+        "completedHistoricalEffects": 63,
+        "uncertainHistoricalEffects": 2,
+        "contextRecords": 34,
+        "contextSources": 47,
+        "runtimeDocumentationRoutes": 84,
+        "comparisonBaseCommit": "d32e6d9a20bb2832f2700dc3b8b3e3fabda730c1",
+        "transitionValidated": true,
+        "runtimeActivationEstablished": false,
+        "wholeWorkAcceptanceEstablished": false,
+        "nativePermissionGranted": false
+      }
+    },
+    {
+      "command": "bun --no-env-file /tmp/common-source-outcomes-independent-check-20261016.ts",
+      "exitCode": 0,
+      "checks": "Exact purpose/source-fragment equality, baseline byte identity, decision/fence counts, source-only Task/evidence/Plan relation, native CLI validate/transition/eight contexts and worktree identity."
+    },
+    {
+      "command": "git diff --check 3cb565efdcf9634b057fa77948f4222b93255604 HEAD",
+      "exitCode": 0
+    },
+    {
+      "command": "git status --porcelain=v1; git rev-parse HEAD HEAD^{tree}",
+      "exitCode": 0,
+      "workingTreeClean": true,
+      "headAndTreeUnchanged": true
+    }
+  ],
+  "manifestDerivation": {
+    "method": "Canonical deriveReviewedSourceManifest over exact git ls-tree -r -t -z --full-tree entries, including trees and blobs.",
+    "entryCount": 704,
+    "blobCount": 578,
+    "validatorSha256": "d4795b86a387b126face7039f0c6dcdfb5ca6034c05e6233bf2d848d7a208986"
+  },
+  "materialLimit": {
+    "defaultMaxCharacters": 24000,
+    "maximumRequiredContextCharacters": 23932,
+    "minimumRequiredContextHeadroom": 68,
+    "meaning": "Only 68 characters of margin remain in the current WSL2 default context. Any later governing-context growth requires exact default-context regression checks and a reviewed bounded representation; this pass does not establish future growth capacity."
+  },
+  "capturedRemoteEvidence": {
+    "runId": 38829319342,
+    "headSha": "d32e6d9a20bb2832f2700dc3b8b3e3fabda730c1",
+    "conclusion": "failure",
+    "canonicalJobId": 116744149643,
+    "prospectiveMergeJobId": 116744149472,
+    "bothSameDefaultContextFailure": true,
+    "capturedReviewThreadUnresolvedCount": 2,
+    "newRemoteObservationPerformed": false,
+    "meaning": "Captured old CI failures and unresolved threads remain historical actual evidence. Source-level closure in this artifact neither changes them nor predicts successor remote CI/status."
+  },
+  "evidence": [
+    {
+      "path": "/tmp/common-source-outcomes-independent-check-20261016.ts",
+      "sha256": "93f5016084d8ddba3ed2d6e06cdcfcf2341757ce165a46bb258698645dab925b"
+    },
+    {
+      "path": "/tmp/common-source-outcomes-independent-check-20261016.json",
+      "sha256": "03ad5de25e5d99b813a390e1e5aaf65845f8c3749b578bceb1360a6bb2401692"
+    },
+    {
+      "path": "/tmp/common-source-outcomes-independent-git-work-20261016.log",
+      "sha256": "c40b8e4f1976f01c7ac5bb73919ec52f22cd5681260d0e4f96004c7992f36b58"
+    },
+    {
+      "path": "/tmp/common-source-outcomes-independent-handoff-20261016.log",
+      "sha256": "ba2ed2654312cab3fab326d922ce4626beb0e9e0bf7c0e6810390c8f2881d418"
+    },
+    {
+      "path": "/tmp/common-source-outcomes-independent-imports-20261016.log",
+      "sha256": "ef89f7a3c1c44c4197ae9e70dc7e2bbdf28687a1c8c9a63dc8053651ff4898ae"
+    },
+    {
+      "path": "/tmp/common-source-outcomes-independent-validate-20261016.json",
+      "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb"
+    },
+    {
+      "path": "/tmp/common-source-outcomes-independent-transition-20261016.json",
+      "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb"
+    },
+    {
+      "path": "/tmp/common-source-outcomes-independent-common-work-20261016.json",
+      "sha256": "6f5865711d7536a5eede5440a0c11d42d8cb75961f626d627837831e1ef92c4a"
+    },
+    {
+      "path": "/tmp/common-source-outcomes-independent-old-GHA22-context-20261016.json",
+      "sha256": "e3a49fe64648746888357550f0e00faf697d00a3f9914220e50b431380b436a7"
+    },
+    {
+      "path": "/tmp/common-pr18-ci-failure-diagnosis-20261016.json",
+      "sha256": "dbb20334f2474327d1c54a8c3b32b260aff1c9bf280258bff319ed6071096cc9"
+    },
+    {
+      "path": "/tmp/common-pr18-source-findings-fix-receipt-20261016.json",
+      "sha256": "4b01d06c22760c3b22c4b8a98a36905f580cf010188611ae4921b774c0477634"
+    },
+    {
+      "path": "/tmp/common-pr18-source-findings-fix-20261016.patch",
+      "sha256": "fdddbc7fa7012e55ce21d7004e88cef236e1f5dcde40e5c11d6985e77222e6fb"
+    },
+    {
+      "path": "/tmp/common-pr18-run-38829319342.json",
+      "sha256": "b98a6e2b407e8ecea2da903c4396c6bf820d539a2167df979d3752a641cfaab4"
+    },
+    {
+      "path": "/tmp/common-pr18-current-run-jobs.json",
+      "sha256": "0f8cf26ec5cea9221dc2e4981c1b5f1ccc12eb0185d97bfdf94a71e92e4e0c80"
+    },
+    {
+      "path": "/tmp/common-pr18-current-review-threads.json",
+      "sha256": "6fc1c4db53d6e0309c41392820ae18e030683d8d5b153505ead49841390e5698"
+    },
+    {
+      "path": "/tmp/common-pr18-canonical-job-116744149643.log",
+      "sha256": "2057dc2831c63f1410c44ae9c7e4ff538c9a79a6cd79172825e169c119d6da2d"
+    },
+    {
+      "path": "/tmp/common-pr18-merge-job-116744149472.log",
+      "sha256": "42553bbf615408be3da866fbcfa4e443ab14a6d3e36ee232623d519e7c4a6843"
+    },
+    {
+      "path": "/home/palantirkc/operations/harness-continuation-20261016/completed-reviewers-20261016/common-source-outcomes-d32-review-result-20261016.json",
+      "sha256": "f82412538b28c8620ef7a1414e2041298c8d6008e9c1dee5fdf16a0a6bb6bb1f"
+    }
+  ],
+  "limits": [
+    "Pass binds only this exact common source HEAD/tree/manifest. No authenticated status was published, remote review thread resolved, push/PR/merge/rerun performed or remote main state freshly observed.",
+    "Only local existing dependencies and synthetic temporary test fixtures were used. No install, native session/cache/trust/auth/config mutation, native Task allocation/admission, SSH, DB/SQL, model suite, excluded-domain effect or Goal operation occurred.",
+    "Private Root body, private intent/receipt/reconciliation and PG authority paths were not followed. Source custody fields are reviewed as reported source metadata; their private gates were not independently requalified.",
+    "Tests prove bounded source reader/record semantics, not native runtime consumption, behavioral activation, PostgreSQL qualification, integrated private delivery or human/teacher satisfaction.",
+    "The original47 decisions/63completed/2uncertain fence is preserved; current48 decisions/64combined completed/2uncertain includes one retrospective source-only completion, not an additional native effect.",
+    "The whole Work, native activation, private gates, evaluation admission and Lead/teacher/human Acceptance remain outside this review. No AcceptanceDecision or permission follows."
+  ],
+  "verdict": "PASS0 actionable findings for the exact reviewed common source delta. Both captured source findings are corrected while original semantics, boundaries and no-replay fences remain preserved.",
+  "AcceptanceDecision": null,
+  "nativePermissionGranted": false,
+  "semanticAcceptanceEstablished": false,
+  "reviewReuse": {
+    "recordClass": "AccountableLeadReviewedTreeSuccessorBinding",
+    "boundBy": "/root",
+    "boundAtUtc": "2026-10-16T01:37:33.346Z",
+    "independentReviewedHead": "1e853cb2051e64ca9ca1620f2aa1402ea5e66ed2",
+    "independentResultSha256": "465c592d59fd9173b001ec7873d219edcdb26cf08142e4b9ad87b2ec63defd9f",
+    "mergedMain": "74f14f7e04d6d1aa83b42657fc7fac4a8e2f151c",
+    "identicalTree": "5dbdde6c159f7b3f845e5d466dafa71954cb19ca",
+    "identicalManifest": "4d39023148fb434d813d9b35efe6ed0f8a22539aaced8f378b6c554fbc2d3a27",
+    "currentUnresolvedFindings": 0,
+    "paginationComplete": true,
+    "reviewerRerun": false,
+    "meaning": "Actual independent native child reviewed exact1e853; Lead binds identical merged main tree after current0finding check. No fresh independent code execution/runtime qualification/Acceptance claimed."
+  }
+}
