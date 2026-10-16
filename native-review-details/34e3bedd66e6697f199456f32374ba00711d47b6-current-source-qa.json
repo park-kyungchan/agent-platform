@@ -1,0 +1,147 @@
+{
+  "schema": "hrr.current-affected-source-qa.v1",
+  "head": "34e3bedd66e6697f199456f32374ba00711d47b6",
+  "tree": "6737f5fe45787264da784d148114aa923d0d43fc",
+  "quality": {
+    "status": "pass",
+    "checks": [
+      {
+        "id": "mutation-policy",
+        "status": "pass"
+      },
+      {
+        "id": "scope",
+        "status": "pass"
+      },
+      {
+        "id": "source-snapshot",
+        "status": "pass"
+      },
+      {
+        "id": "source-identity",
+        "status": "pass"
+      },
+      {
+        "id": "build-public-ontology-package",
+        "status": "pass"
+      },
+      {
+        "id": "architecture",
+        "status": "pass"
+      },
+      {
+        "id": "format",
+        "status": "pass"
+      },
+      {
+        "id": "typed-lint-and-explicit-any-audit",
+        "status": "pass"
+      },
+      {
+        "id": "workflow-correctness-and-security",
+        "status": "pass"
+      },
+      {
+        "id": "dependency-vulnerabilities",
+        "status": "pass"
+      },
+      {
+        "id": "maintained-source-secrets",
+        "status": "pass"
+      },
+      {
+        "id": "quality-negative-fixtures",
+        "status": "pass"
+      },
+      {
+        "id": "source-currentness",
+        "status": "pass"
+      },
+      {
+        "id": "architecture-currentness",
+        "status": "pass"
+      }
+    ]
+  },
+  "affected": [
+    {
+      "command": [
+        "bun",
+        "test",
+        "packages/native-codex-adapter/src/native",
+        "--timeout",
+        "30000"
+      ],
+      "exitCode": 0
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "check:handoff"
+      ],
+      "exitCode": 0
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "check:imports"
+      ],
+      "exitCode": 0
+    }
+  ],
+  "logs": [
+    {
+      "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/after-install-affected-0.log",
+      "sha256": "5e2bd64b18b89b3477433d030724748675035da91f7e3da2da47a64e55e8c5d4",
+      "bytes": 8872,
+      "pass": 66,
+      "fail": 0,
+      "assertions": 569
+    },
+    {
+      "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/after-install-affected-1.log",
+      "sha256": "672d8b5aa6477c0e5132a5292494a608fe41f0c3e86a45b8a84b253879d8a43a",
+      "bytes": 4978,
+      "pass": 39,
+      "fail": 0,
+      "assertions": 223
+    },
+    {
+      "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/after-install-affected-2.log",
+      "sha256": "ba154bc9205200749d12133779dbd131b53933fdeee5239addcfade56aad1de2",
+      "bytes": 613,
+      "pass": 0,
+      "fail": 0,
+      "assertions": 0
+    }
+  ],
+  "qualityLog": {
+    "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/after-install-quality.log",
+    "bytes": 200951,
+    "sha256": "5df8404b224c6959fc61b1d96c84ae57f59405aea395130af9d3a6539e2ce70b"
+  },
+  "initialDirectRun": {
+    "status": "failed-correct-source-gate",
+    "tests": "53pass/13fail",
+    "cause": "Own older installed file:Work projection lacked canonical codec API; fresh sourceCI/scoped/owner458 QA passed",
+    "retainedLog": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/affected-0.log",
+    "retainedLogSha256": "b7a27fd929a84c1b967e8922ba73ec7621ebd350884b7f2d1e5198abbed64c61",
+    "sourceEditedToPass": false
+  },
+  "ownDependencyRefresh": {
+    "command": "bun install --force --frozen-lockfile --ignore-scripts --backend=copyfile --cache-dir .private/root-qa-34e3/refresh-bun-cache",
+    "sourceCorrespondencePath": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/install-correspondence.json",
+    "sourceCorrespondenceSha256": "601ef38828602a4c7a670fdf102f9176445e99d9dfcb63ec7324369ea47199a8",
+    "all7CurrentWorkSourceFilesByteIdentical": true,
+    "copyfileStillSameInodeHardlinks": true,
+    "nativeInstallationQualified": false,
+    "sharedOrNativeCachesPurged": false,
+    "foreignStateChanged": false
+  },
+  "newWorkValidation": "Rootcanonicalvalidate/transitionc04->34ePASS; nativefinalreview rechecks",
+  "trackedStatus": "",
+  "wholeWorkAcceptance": false,
+  "nativeActivation": false
+}

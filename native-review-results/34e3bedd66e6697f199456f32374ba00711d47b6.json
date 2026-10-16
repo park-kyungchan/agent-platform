@@ -1,0 +1,854 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "reviewStatus": "complete",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "34e3bedd66e6697f199456f32374ba00711d47b6",
+  "reviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+  "reviewedSourceManifestSha256": "b68687bb59f97734f280f786a996044c4f11b4956756d6076d03a905f521d7e2",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a144db-2ddf-7990-9fba-3a175265e424"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14419-af50-72d3-b918-cc32a50a1913"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "completedAtUtc": "2026-10-16T14:16:17.140Z",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "harness-reliability-reprioritization-20261016",
+    "issueId": "HRR-ISSUE-20261016",
+    "specId": "HRR-SPEC",
+    "specRevision": 1,
+    "planId": "HRR-PLAN",
+    "planRevision": 2,
+    "taskId": "HRR-RECOVERY-SOURCE-REVIEW"
+  },
+  "selectedSnapshot": {
+    "repositoryId": "park-kyungchan/agent-platform",
+    "repositoryRoot": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054",
+    "headSha": "34e3bedd66e6697f199456f32374ba00711d47b6",
+    "treeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+    "checkpoint": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v12.json",
+    "checkpointSha256": "7978aa9dd17633c5ccf5a396581ae7a92eb8c7e2d7bff211ea3d92986de758e7"
+  },
+  "baseline": {
+    "localMainCommit": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+    "mergeBaseCommit": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+    "remoteFreshnessInferred": false
+  },
+  "manifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+    "entryCount": 799,
+    "blobCount": 663,
+    "sha256": "b68687bb59f97734f280f786a996044c4f11b4956756d6076d03a905f521d7e2",
+    "derivation": {
+      "module": "ci/quality/receipt-validator.ts",
+      "function": "deriveReviewedSourceManifest",
+      "input": "Complete git ls-tree -r -t -z; includes all blob/tree entries",
+      "moduleSha256": "d4795b86a387b126face7039f0c6dcdfb5ca6034c05e6233bf2d848d7a208986"
+    }
+  },
+  "reviewCoverage": {
+    "freshExactCombinedTreeReview": true,
+    "sourceReviewObservations": {
+      "schema": "hrr.fresh-final-combined-source-review-observations.v1",
+      "headSha": "34e3bedd66e6697f199456f32374ba00711d47b6",
+      "reviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+      "baseline": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+      "observer": {
+        "runtime": "native-codex",
+        "taskId": "01a144db-2ddf-7990-9fba-3a175265e424"
+      },
+      "meaning": "Independent reviewer retention of newly received scoped internal reviews of this exact current combined tree; no native-authorship authentication is inferred from task paths",
+      "reviews": [
+        {
+          "agent": "/root/common_review",
+          "currentFindings": [],
+          "scope": "Fresh complete common Git Work context traversal, compact constructor/decoder, record/transition validation, contracts/types/exports, tests and verify-common-work against main; current Work/Spec1/Plan2/Task and native callers",
+          "observations": "Task-first union preserves all reached governing/historical originals. Source bindings, historical revisions, authored next action, consumed inventory and replay holds remain intact; required overflow clears usable contracts.",
+          "testsRunThisFinalReview": false
+        },
+        {
+          "agent": "/root/codex_review",
+          "currentFindings": [],
+          "scope": "Fresh current complete hooks/Home source, changed tests, shared codec/export integration, CI capability probe and skill source changes against main",
+          "observations": "Original duplicate-ID finding closed. Insertion-order Set preserves Task order and appends a distinct explicit decision; common codec retains all other reached originals. Both-event shared/distinct regression verifies order, qualified state, empty holds and payload privacy.",
+          "testsRunThisFinalReview": false
+        },
+        {
+          "agent": "/root/hermes_review",
+          "currentFindings": [],
+          "scope": "Fresh all eleven changed Hermes platform-current-work source/tests, common integration, installed dependency correspondence, physical importer guards and finite compiler input closure against main",
+          "observations": "45 Hermes registry source pins match current bytes. Explicit v2 budgets, v1 compatibility, historical Task contracts, exact native tuples and closed diagnostics preserved. Hermes and common bytes unchanged from c04; no broad Hermes suite rerun.",
+          "testsRunThisFinalReview": false
+        }
+      ],
+      "parentScope": "Whole-tree/source and owner closure, current QA and finding reconciliation, current selected Work/transition, retained actual recovery/effect proof, exact full-tree manifest, immutable original-report preservation and final canonical result",
+      "priorComponentReportsUsedAsCombinedApproval": false
+    },
+    "allRegistryPackagePinsChecked": 145,
+    "codeOwnerAndSemanticOwnerBoundariesPreserved": true,
+    "firstImportGuardsUnweakened": true,
+    "nativeAndSourceAuthorityRemainDistinct": true,
+    "historicalSourceMilestonesAndOntologyReleasesPreserved": true,
+    "immutableOntologyArchivesChecked": 8,
+    "retainedFiniteOwnerFixturePinsChecked": 8
+  },
+  "findingDispositions": [
+    {
+      "findingId": "HRR-RECOVERY-P2-DUPLICATE-DECISION",
+      "previousHead": "c04ae1c8c3e3f443ce04e9ffbeed900f9bd21eb7",
+      "status": "resolved-in-current-exact-composition",
+      "correctionCommit": "e6fc703e0e676d13e7db213b95a091d0ac4a3321",
+      "serializedRootSourceCommit": "93ee2a2",
+      "serializedRootRegistryCommit": "3d21624",
+      "currentHooksSha256": "c1e0e3b226860248c6d410fa0ae3b0179fb5e22c9019024aca7185f17891c045",
+      "currentHooksTestSha256": "f95c4e06cf96b5e099adffa07670fef5dc79a553e4c370abb7400611cecaff6a",
+      "independentlyVerified": "Exact correction bytes equal current source; fresh original and current Plan2 Task+same decision both events; distinct/nonlexical order and independent original bindings preserved",
+      "historicalC04HoldRemainsValidForItsOwnTree": true
+    }
+  ],
+  "sourceOwnerClosure": {
+    "registrySha256": "41ed34d20b4246fed088ea103b300df5367b1410cf23753ea9712f0b6d0e7955",
+    "sourceProviders": [
+      {
+        "id": "codex-context",
+        "registration": "../codex-harness-engineering/architecture/context-provider.json",
+        "ownerGuard": "../codex-harness-engineering/src/legacy/harness/owner-context-loader.ts",
+        "meaning": "Context provider exact source resolution and first-import drift refusal."
+      },
+      {
+        "id": "codex-native-source",
+        "registration": "../codex-harness-engineering/architecture/native-codex-provider.json",
+        "ownerGuard": "../codex-harness-engineering/src/native/provider-closure.ts",
+        "meaning": "Reviewed owner hook facade verifies fixed provider source before first common import and before/after every event once adopted; source proof and native definition trust remain distinct."
+      },
+      {
+        "id": "hermes-context-source",
+        "registration": "../hermes-harness-engineering/architecture/hermes-context-provider.json",
+        "ownerGuard": "../hermes-harness-engineering/src/ontology-driven/provider-source.ts",
+        "meaning": "Exact SOURCE/build provenance before/after native compilation; no native permission attestation."
+      }
+    ],
+    "ownerCommit": "ccef48306f1a3149ba6587ca61cc680c53da329c",
+    "ownerTree": "d0a343edb1b1f9707eb312d977bcfda617bf92c2",
+    "immutableRegistrationsAndMarkers": [
+      {
+        "commit": "ccef48306f1a3149ba6587ca61cc680c53da329c",
+        "path": "architecture/context-provider.json",
+        "sha256": "90f683497ad6e7c9793a796e35bc032a1c4d6ecb75d8f13bc88f1c70d00b2228",
+        "marker": "src/continuity/index.ts",
+        "markerSha256": "aa08c54977f5d9fd5cef885d67adc198cf3530db33a8672ab5eab98623f17f58",
+        "sourcePinsMatched": 22
+      },
+      {
+        "commit": "ccef48306f1a3149ba6587ca61cc680c53da329c",
+        "path": "architecture/native-codex-provider.json",
+        "sha256": "922565261391cb54cc3720fbfea78ca95492eb986e37b9388685e767b2fb0b83",
+        "marker": "src/native/hooks.ts",
+        "markerSha256": "c013484f9255190f6330c8a17d4d983ebffb9e5123ab99c933c5c5d8b8d427e8",
+        "sourcePinsMatched": 6
+      }
+    ],
+    "all22ContextAnd6NativePinsMatchCurrentGitBytes": true,
+    "ownerReport": {
+      "retainedInput": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-owner-review-ccef483.json",
+      "inputSha256": "03b84d240c25fca671206713c94ff046f144f3ff71e1d88c0e1e3bf1478b58bf",
+      "declaredOriginalSha256": "47e8178ccfd2309a8bc141ce3438b143c1d221f24076b1df02f5892f88a7c1ed",
+      "originalWhitespaceSerializationUnspecified": true,
+      "sourceHashCorrespondenceIndependentlyVerified": true,
+      "retainedSourceQaClaims": {
+        "ownerTests": 458,
+        "assertions": 2646,
+        "failures": 0,
+        "observedContextClosurePins": 31,
+        "observedNativeClosurePins": 16,
+        "sourceComboBothEventChars": 11759
+      },
+      "meaning": "Retained independently reviewed fictional owner source QA; code/provider-byte correspondence verified against current H. No native/shared install or admission claim."
+    }
+  },
+  "verification": {
+    "rootCurrentDirectAffected": {
+      "commands": [
+        {
+          "command": [
+            "bun",
+            "test",
+            "packages/native-codex-adapter/src/native",
+            "--timeout",
+            "30000"
+          ],
+          "exitCode": 0
+        },
+        {
+          "command": [
+            "bun",
+            "run",
+            "check:handoff"
+          ],
+          "exitCode": 0
+        },
+        {
+          "command": [
+            "bun",
+            "run",
+            "check:imports"
+          ],
+          "exitCode": 0
+        }
+      ],
+      "native": {
+        "pass": 66,
+        "fail": 0,
+        "assertions": 569
+      },
+      "handoff": {
+        "pass": 39,
+        "fail": 0,
+        "assertions": 223
+      },
+      "imports": {
+        "status": "pass",
+        "legacyAndCanonicalSameModule": true
+      },
+      "performedBy": "Root after its own isolated dependency refresh; completed logs read and bound by independent reviewer"
+    },
+    "rootCurrentQuality": {
+      "status": "pass",
+      "finishedAt": "2026-10-16T14:10:40.306Z",
+      "sourceIdentity": {
+        "actualCheckoutSha": "34e3bedd66e6697f199456f32374ba00711d47b6",
+        "githubEventSha": null,
+        "sourceRegistrySha256": "41ed34d20b4246fed088ea103b300df5367b1410cf23753ea9712f0b6d0e7955",
+        "lockSha256": "f5723aae95044787653d1eb76c932c0c1c4ddf734966a782989e7399b7f69ffb",
+        "workingTreeHasChanges": false
+      },
+      "checks": [
+        {
+          "id": "mutation-policy",
+          "status": "pass"
+        },
+        {
+          "id": "scope",
+          "status": "pass"
+        },
+        {
+          "id": "source-snapshot",
+          "status": "pass"
+        },
+        {
+          "id": "source-identity",
+          "status": "pass"
+        },
+        {
+          "id": "build-public-ontology-package",
+          "status": "pass"
+        },
+        {
+          "id": "architecture",
+          "status": "pass"
+        },
+        {
+          "id": "format",
+          "status": "pass"
+        },
+        {
+          "id": "typed-lint-and-explicit-any-audit",
+          "status": "pass"
+        },
+        {
+          "id": "workflow-correctness-and-security",
+          "status": "pass"
+        },
+        {
+          "id": "dependency-vulnerabilities",
+          "status": "pass"
+        },
+        {
+          "id": "maintained-source-secrets",
+          "status": "pass"
+        },
+        {
+          "id": "quality-negative-fixtures",
+          "status": "pass"
+        },
+        {
+          "id": "source-currentness",
+          "status": "pass"
+        },
+        {
+          "id": "architecture-currentness",
+          "status": "pass"
+        }
+      ],
+      "sourceSnapshot": {
+        "files": 242,
+        "contentSha256": "8f3a1c7b83368b6443fb1e27530a3578ccd16f262772c5157e11b84db6b9ca83",
+        "scopeSha256": "5b112ea3553b91da18b41622a3e04536b3d47efd24e66518a704b43fef751a2f",
+        "everyFileComparedWithSelectedGitBlob": true
+      }
+    },
+    "reviewerCurrentCanonicalSourceQa": {
+      "exactCurrentCanonicalNativeSource": {
+        "tests": 66,
+        "assertions": 569,
+        "failures": 0,
+        "testImportsTransportedToCanonicalSource": true,
+        "priorToRootRefresh": true
+      },
+      "behavioralCombos": {
+        "tests": 3,
+        "assertions": 270,
+        "failures": 0,
+        "cases": [
+          "Original valid Task+same Decision both events",
+          "Distinct/associated explicit IDs with nonlexical Task order and independent originals",
+          "Current Plan2 recovery Task+same Decision both events, 68/3 fences, two inventory routes and current next action"
+        ]
+      },
+      "selectedWork": {
+        "context": "source-qualified",
+        "validation": "pass",
+        "transitionFrom": "c04ae1c8c3e3f443ce04e9ffbeed900f9bd21eb7",
+        "transition": "pass"
+      }
+    },
+    "selectedWork": {
+      "contextCommand": "bun run harness context .private/hrr-recovery/final34e3/context-request.json",
+      "status": "source-qualified",
+      "validateCommand": "bun run harness validate .private/hrr-recovery/final34e3/snapshot.json",
+      "validation": {
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      },
+      "transitionCommand": "bun run harness transition .private/hrr-recovery/final34e3/before-snapshot.json .private/hrr-recovery/final34e3/snapshot.json",
+      "transitionFrom": "c04ae1c8c3e3f443ce04e9ffbeed900f9bd21eb7",
+      "transition": {
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      }
+    },
+    "unaffectedSourceQaBinding": {
+      "sourceHead": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+      "selectedHead": "34e3bedd66e6697f199456f32374ba00711d47b6",
+      "excludedChangedInputs": [
+        "architecture/capability-source-owners.json",
+        "packages/native-codex-adapter/src/native/hooks.ts",
+        "packages/native-codex-adapter/src/native/hooks.test.ts"
+      ],
+      "unchangedNonWorkBlobs": 321,
+      "unchangedNonWorkBlobManifestSha256": "245dc4269cf6682c995b033ca51e5aa591516dd2dc3b687561df4a0c8365d224",
+      "allOtherSourceAndCheckInputsByteIdentical": true,
+      "meaning": "Retained713pass/7skip source QA is background only for unchanged modules/check inputs. Changed hook/test/registry require current affected source QA, quality, pin checks and fresh review. No blanket/fresh713-test claim.",
+      "rootQaInputSha256": "516edab30f8b22a9124b0b0c499decb368987668eb7718664a569c27eea5a19e"
+    },
+    "noFresh713TestOrRepeatedBroadHermesSuiteClaim": true,
+    "initialLocalInstalledFailure": {
+      "native": {
+        "pass": 53,
+        "fail": 13,
+        "assertions": 388
+      },
+      "status": "correctly held against stale installed projection",
+      "classification": "Own worktree dependency prerequisite, not canonical-source regression; no source fix applied",
+      "staleArchiveSha256": "ec020ee71ce975b6764a923756ab7a9c19de78fccef9249a5d1122743a2d66db",
+      "repairOwner": "Root only after reviewer quiescence",
+      "noNativeOrSharedInstallationQualification": true
+    },
+    "postRefreshLocalInstalledSourceCorrespondence": {
+      "sources": [
+        {
+          "path": "git-work/index.ts",
+          "sha256": "ab434da3902838cc03b8e1ac96603071f93a47f11dff03aaabcc18d5b37fcb09",
+          "sameInode": true,
+          "canonicalNlink": 2,
+          "installedNlink": 2
+        },
+        {
+          "path": "git-work/source.ts",
+          "sha256": "63463dd2b134078bb5de4c846780fee3f048e273c5cb0ab40c7b347c1463992b",
+          "sameInode": true,
+          "canonicalNlink": 2,
+          "installedNlink": 2
+        },
+        {
+          "path": "git-work/records.ts",
+          "sha256": "8054265ca54243a7ad22619af85ae39cd66f1385a202a2e6ae4925d8de616806",
+          "sameInode": true,
+          "canonicalNlink": 2,
+          "installedNlink": 2
+        },
+        {
+          "path": "git-work/context.ts",
+          "sha256": "e9f01f5c15b558ce9f6dd72880f0428903d17bd75450f424046aedca7aa739b7",
+          "sameInode": true,
+          "canonicalNlink": 2,
+          "installedNlink": 2
+        },
+        {
+          "path": "git-work/types.ts",
+          "sha256": "5de1a8c30ae224da1492b23cea239de684d19b36d5657a85e1a62cddb2d8960d",
+          "sameInode": true,
+          "canonicalNlink": 2,
+          "installedNlink": 2
+        },
+        {
+          "path": "logical-identity.ts",
+          "sha256": "9be1b608f1058fd7a64207110c7e4d06531f96a2060811eb2f32e5619b65f84e",
+          "sameInode": true,
+          "canonicalNlink": 2,
+          "installedNlink": 2
+        },
+        {
+          "path": "operational-state.ts",
+          "sha256": "6bda838562d3f2375e0110d334545afa78fab3cb90649cf9c1e80ae4c9d74c63",
+          "sameInode": true,
+          "canonicalNlink": 2,
+          "installedNlink": 2
+        }
+      ],
+      "allSevenCanonicalBytesMatch": true,
+      "compactAndDecodeFunctionsPresent": true,
+      "sourceCorrespondenceOnly": true,
+      "sameInodeHardlinksObserved": true,
+      "independentInstallationQualified": false,
+      "nativeInstallationQualified": false
+    },
+    "rootFinalSummary": {
+      "presentAtRead": true,
+      "value": {
+        "schema": "hrr.current-affected-source-qa.v1",
+        "head": "34e3bedd66e6697f199456f32374ba00711d47b6",
+        "tree": "6737f5fe45787264da784d148114aa923d0d43fc",
+        "quality": {
+          "status": "pass",
+          "checks": [
+            {
+              "id": "mutation-policy",
+              "status": "pass"
+            },
+            {
+              "id": "scope",
+              "status": "pass"
+            },
+            {
+              "id": "source-snapshot",
+              "status": "pass"
+            },
+            {
+              "id": "source-identity",
+              "status": "pass"
+            },
+            {
+              "id": "build-public-ontology-package",
+              "status": "pass"
+            },
+            {
+              "id": "architecture",
+              "status": "pass"
+            },
+            {
+              "id": "format",
+              "status": "pass"
+            },
+            {
+              "id": "typed-lint-and-explicit-any-audit",
+              "status": "pass"
+            },
+            {
+              "id": "workflow-correctness-and-security",
+              "status": "pass"
+            },
+            {
+              "id": "dependency-vulnerabilities",
+              "status": "pass"
+            },
+            {
+              "id": "maintained-source-secrets",
+              "status": "pass"
+            },
+            {
+              "id": "quality-negative-fixtures",
+              "status": "pass"
+            },
+            {
+              "id": "source-currentness",
+              "status": "pass"
+            },
+            {
+              "id": "architecture-currentness",
+              "status": "pass"
+            }
+          ]
+        },
+        "affected": [
+          {
+            "command": [
+              "bun",
+              "test",
+              "packages/native-codex-adapter/src/native",
+              "--timeout",
+              "30000"
+            ],
+            "exitCode": 0
+          },
+          {
+            "command": [
+              "bun",
+              "run",
+              "check:handoff"
+            ],
+            "exitCode": 0
+          },
+          {
+            "command": [
+              "bun",
+              "run",
+              "check:imports"
+            ],
+            "exitCode": 0
+          }
+        ],
+        "logs": [
+          {
+            "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/after-install-affected-0.log",
+            "sha256": "5e2bd64b18b89b3477433d030724748675035da91f7e3da2da47a64e55e8c5d4",
+            "bytes": 8872,
+            "pass": 66,
+            "fail": 0,
+            "assertions": 569
+          },
+          {
+            "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/after-install-affected-1.log",
+            "sha256": "672d8b5aa6477c0e5132a5292494a608fe41f0c3e86a45b8a84b253879d8a43a",
+            "bytes": 4978,
+            "pass": 39,
+            "fail": 0,
+            "assertions": 223
+          },
+          {
+            "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/after-install-affected-2.log",
+            "sha256": "ba154bc9205200749d12133779dbd131b53933fdeee5239addcfade56aad1de2",
+            "bytes": 613,
+            "pass": 0,
+            "fail": 0,
+            "assertions": 0
+          }
+        ],
+        "qualityLog": {
+          "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/after-install-quality.log",
+          "bytes": 200951,
+          "sha256": "5df8404b224c6959fc61b1d96c84ae57f59405aea395130af9d3a6539e2ce70b"
+        },
+        "initialDirectRun": {
+          "status": "failed-correct-source-gate",
+          "tests": "53pass/13fail",
+          "cause": "Own older installed file:Work projection lacked canonical codec API; fresh sourceCI/scoped/owner458 QA passed",
+          "retainedLog": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/affected-0.log",
+          "retainedLogSha256": "b7a27fd929a84c1b967e8922ba73ec7621ebd350884b7f2d1e5198abbed64c61",
+          "sourceEditedToPass": false
+        },
+        "ownDependencyRefresh": {
+          "command": "bun install --force --frozen-lockfile --ignore-scripts --backend=copyfile --cache-dir .private/root-qa-34e3/refresh-bun-cache",
+          "sourceCorrespondencePath": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/root-qa-34e3/install-correspondence.json",
+          "sourceCorrespondenceSha256": "601ef38828602a4c7a670fdf102f9176445e99d9dfcb63ec7324369ea47199a8",
+          "all7CurrentWorkSourceFilesByteIdentical": true,
+          "copyfileStillSameInodeHardlinks": true,
+          "nativeInstallationQualified": false,
+          "sharedOrNativeCachesPurged": false,
+          "foreignStateChanged": false
+        },
+        "newWorkValidation": "Rootcanonicalvalidate/transitionc04->34ePASS; nativefinalreview rechecks",
+        "trackedStatus": "",
+        "wholeWorkAcceptance": false,
+        "nativeActivation": false
+      },
+      "meaning": "Completed exact-head logs above are directly verified; a separately authored summary is auxiliary"
+    }
+  },
+  "recovery": {
+    "scope": "Actual NEW native session ordinary-engineering manual canonical-reader recovery of the SAME unfinished logical Task Spec1/Plan2",
+    "newNativeThread": "01a144db-2ddf-7990-9fba-3a175265e424",
+    "oldNativeThread": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+    "leadThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+    "sourceOwnedSessionBoundaryAndLeadVerificationRetained": true,
+    "sameLogicalTaskAndPurposePreserved": true,
+    "originalAnswerQuestionPairs": 5,
+    "completedFenceOccurrences": 68,
+    "uncertainFenceOccurrences": 3,
+    "consumedMetadataActions": 2,
+    "currentAuthoredNextActionRestored": true,
+    "genuineDelegatedResult": {
+      "originalBytes": 13305,
+      "originalSha256": "40347d0812b7e2d00623ee737769f1c0b2e6d586854bc0f386291bdbbfad2dae",
+      "retainedSourceSha256": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5",
+      "nativeAuthorshipVerified": false
+    },
+    "retainedProofs": [
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-decision-fix-review-e6fc703.json",
+          "fragment": "#/content/report",
+          "sha256": "b3a87006c706058b04f26274065ee2e1a42d9d252ec67af56899bdff5781e05c"
+        },
+        "inputSha256": "b3a87006c706058b04f26274065ee2e1a42d9d252ec67af56899bdff5781e05c",
+        "declaredOriginalSha256": "6e67bbf7a1fda08da3b9b6c97d133be298a82591b89304de5e7ed6660b1d75f5",
+        "canonicalJsonValueSha256": "6e67bbf7a1fda08da3b9b6c97d133be298a82591b89304de5e7ed6660b1d75f5",
+        "canonicalSerializationMatchesOriginal": true
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-owner-review-ccef483.json",
+          "fragment": "#/content/report",
+          "sha256": "03b84d240c25fca671206713c94ff046f144f3ff71e1d88c0e1e3bf1478b58bf"
+        },
+        "inputSha256": "03b84d240c25fca671206713c94ff046f144f3ff71e1d88c0e1e3bf1478b58bf",
+        "declaredOriginalSha256": "47e8178ccfd2309a8bc141ce3438b143c1d221f24076b1df02f5892f88a7c1ed",
+        "canonicalJsonValueSha256": "ae716c798dce656017c4207830bfb8cccbd60562ba2a6857e36574d0d1548efe",
+        "canonicalSerializationMatchesOriginal": false
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-process-v1.json",
+          "fragment": "#/content/observation",
+          "sha256": "634f66297b8be424f90bd05e3990ac0e1be2fb75bed2a81d5c6e51c89da43e10"
+        },
+        "inputSha256": "634f66297b8be424f90bd05e3990ac0e1be2fb75bed2a81d5c6e51c89da43e10",
+        "declaredOriginalSha256": "bebf7324b4b975970526c90b3fb597eac78361f2a8344dcb75ed7e021988f092",
+        "canonicalJsonValueSha256": "bebf7324b4b975970526c90b3fb597eac78361f2a8344dcb75ed7e021988f092",
+        "canonicalSerializationMatchesOriginal": true
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-readback-v1.json",
+          "fragment": "#/content/report",
+          "sha256": "3ff90a662dde1fc88ef87e8914375e3f6dcb810428ca93e5b6e131618995f741"
+        },
+        "inputSha256": "3ff90a662dde1fc88ef87e8914375e3f6dcb810428ca93e5b6e131618995f741",
+        "declaredOriginalSha256": "b30269b59174ae4fbfae3107af3651a450063361c57d780d939d537194a1d7b1",
+        "canonicalJsonValueSha256": "b30269b59174ae4fbfae3107af3651a450063361c57d780d939d537194a1d7b1",
+        "canonicalSerializationMatchesOriginal": true
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-review-c04.json",
+          "fragment": "#/content/report",
+          "sha256": "a747670b887a55f20a4aa823895d5c5f8fe905ed0a379345d0e9a0bf5845d665"
+        },
+        "inputSha256": "a747670b887a55f20a4aa823895d5c5f8fe905ed0a379345d0e9a0bf5845d665",
+        "declaredOriginalSha256": "95dc42c0b977653f2343fecaec86580af3cfe4c5b49fb9fdd3f54f1e27b4ea61",
+        "canonicalJsonValueSha256": "95dc42c0b977653f2343fecaec86580af3cfe4c5b49fb9fdd3f54f1e27b4ea61",
+        "canonicalSerializationMatchesOriginal": true
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/lead-scoped-recovery-verification-v1.json",
+          "fragment": "#/content/report",
+          "sha256": "1755f9c6bf820ed43ebddedbc8462c1db761cead2a8442379fd92e97330c8822"
+        },
+        "inputSha256": "1755f9c6bf820ed43ebddedbc8462c1db761cead2a8442379fd92e97330c8822",
+        "declaredOriginalSha256": "ef2b94d93e68c30401daa94d2b6713a3b63b73ff50aca6aa4a64f44edc0b9e4d",
+        "canonicalJsonValueSha256": "ef2b94d93e68c30401daa94d2b6713a3b63b73ff50aca6aa4a64f44edc0b9e4d",
+        "canonicalSerializationMatchesOriginal": true
+      }
+    ],
+    "formalTaskCompletionWrittenByReviewer": false,
+    "wholeWorkAcceptanceEstablished": false
+  },
+  "historicalReports": [
+    {
+      "path": ".private/hrr-recovery/recovered-source-review.json",
+      "sha256": "95dc42c0b977653f2343fecaec86580af3cfe4c5b49fb9fdd3f54f1e27b4ea61",
+      "preservedByteForByte": true
+    },
+    {
+      "path": ".private/hrr-reviews/codex-decision-e6fc703.json",
+      "sha256": "6e67bbf7a1fda08da3b9b6c97d133be298a82591b89304de5e7ed6660b1d75f5",
+      "preservedByteForByte": true
+    }
+  ],
+  "remainingHolds": [
+    "Native 1500-token/v2 hook admission, actual global Home/profile consumption and native activation remain unqualified",
+    "Source-ready grants no native permission, credential/config/trust change or fresh model-evaluation budget",
+    "Original candidate/current-v2 proposal/preparation and all completed/consumed/uncertain no-replay fences remain held",
+    "Local copyfile refresh produced shared hardlink inodes; independent/shared/native installation qualification is not established",
+    "Root separately validates and publishes immutable result/evidence plus authenticated status before PR; accountable Lead controls expected-head merge",
+    "Each native Lead separately verifies and explicitly activates any merged source; whole Goal/Work Acceptance remains separate",
+    "Month-end and paused predecessor/native Goal boundaries remain intact"
+  ],
+  "effects": {
+    "reviewerTrackedSourceChanges": false,
+    "reviewerDependencyRepairsOrInstalls": false,
+    "reviewerCachePurge": false,
+    "rootAuthorizedOwnIsolatedDependencyRefreshSeparatelyRecorded": true,
+    "sharedOrNativeTrustConfigProfileCredentialsServicesMutation": false,
+    "nativePriorHistoryRead": false,
+    "goalCreatedCopiedResumedOrCompleted": false,
+    "historicalEffectReplay": false,
+    "candidatePreparation": false,
+    "nativeHookActivation": false,
+    "modelEvaluationSuiteRun": false,
+    "publicationPushStatusPrOrMerge": false,
+    "boundedPrivateReviewQaOutputsOnly": true
+  },
+  "evidence": [
+    {
+      "path": ".private/root-qa-34e3/after-install-quality.log",
+      "bytes": 200951,
+      "sha256": "5df8404b224c6959fc61b1d96c84ae57f59405aea395130af9d3a6539e2ce70b"
+    },
+    {
+      "path": ".private/root-qa-34e3/after-install-affected-checks.json",
+      "bytes": 362,
+      "sha256": "3901f4a18cea2a2fccd013e46087674998a2e9187ba35bdea673bd249e4c4393"
+    },
+    {
+      "path": ".private/root-qa-34e3/after-install-affected-0.log",
+      "bytes": 8872,
+      "sha256": "5e2bd64b18b89b3477433d030724748675035da91f7e3da2da47a64e55e8c5d4"
+    },
+    {
+      "path": ".private/root-qa-34e3/after-install-affected-1.log",
+      "bytes": 4978,
+      "sha256": "672d8b5aa6477c0e5132a5292494a608fe41f0c3e86a45b8a84b253879d8a43a"
+    },
+    {
+      "path": ".private/root-qa-34e3/after-install-affected-2.log",
+      "bytes": 613,
+      "sha256": "ba154bc9205200749d12133779dbd131b53933fdeee5239addcfade56aad1de2"
+    },
+    {
+      "path": ".private/root-qa-34e3/affected-checks.json",
+      "bytes": 164,
+      "sha256": "cb42c320ca397ce121abda630524795482136886b3f93c070d1ea31afbd2aa81"
+    },
+    {
+      "path": ".private/root-qa-34e3/affected-0.log",
+      "bytes": 19865,
+      "sha256": "b7a27fd929a84c1b967e8922ba73ec7621ebd350884b7f2d1e5198abbed64c61"
+    },
+    {
+      "path": ".private/root-qa-34e3/stale-file-work-projection.tar.gz",
+      "bytes": 109360,
+      "sha256": "ec020ee71ce975b6764a923756ab7a9c19de78fccef9249a5d1122743a2d66db"
+    },
+    {
+      "path": ".private/root-qa-34e3/install-correspondence.json",
+      "bytes": 2381,
+      "sha256": "601ef38828602a4c7a670fdf102f9176445e99d9dfcb63ec7324369ea47199a8"
+    },
+    {
+      "path": ".private/root-qa-34e3/final-summary.json",
+      "bytes": 4322,
+      "sha256": "b03b551b3eff0ae525a616f99f1d1fad2ed93b3846f87e82e254fad5963dc30f"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/affected-source.log",
+      "bytes": 8836,
+      "sha256": "a9d912da3c642dc90ddc820263e1d99d166f1d8c50e8da8c9741e98349def8ef"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/independent-combos.log",
+      "bytes": 538,
+      "sha256": "df7702c9f52cf4068e6ef9d5d6b2a29a81c503e2ebae4dd902f7fe29e9c493e2"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/qa-transport.json",
+      "bytes": 3206,
+      "sha256": "15f18e9c87d31372ef6b56a8c481beb11979bc14d1f3252a40c9f61a6db6ee45"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/actual-original-combo.json",
+      "bytes": 5148,
+      "sha256": "3a20b911706b852b32ba121020add672bf532bee384e63679b99b148e5e4c489"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/current-recovery-source-combo.json",
+      "bytes": 5154,
+      "sha256": "b2b0a9b54137fbf0ab6e5d496ecea228dc0482c576ada0d550632fe45eb8dbfd"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/independent-order-direction.json",
+      "bytes": 633,
+      "sha256": "e0ced4c51622aec119391d57987802db52e030662f4038d84bf5069caf66ea06"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/independent-order-outside-b.json",
+      "bytes": 717,
+      "sha256": "06234531f539789efc0a6b165ae37558f935249249bd07d724d3969e28a1148d"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/work-validation.json",
+      "bytes": 139,
+      "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/work-transition.json",
+      "bytes": 139,
+      "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/context.json",
+      "bytes": 15484,
+      "sha256": "323702f78731aeeda5239baa48ce08d2b8ad25ea3326e73a8eb7ded276b013e3"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/handoff.log",
+      "bytes": 4971,
+      "sha256": "2b6eeeffdaf24f7dac0304861b23039ad7fc4098158565540d737be962bb7f22"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/imports.log",
+      "bytes": 613,
+      "sha256": "ba154bc9205200749d12133779dbd131b53933fdeee5239addcfade56aad1de2"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/source-integrity.json",
+      "bytes": 89508,
+      "sha256": "2fc55018e3096fbd69dbdf56871fd5ac1158509964bc5efe2e57e34e76d5f27e"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/readonly-pause.json",
+      "bytes": 1519,
+      "sha256": "8e1f5ca28ec2775ddd9b561af6add3193fabf1a96f206bce37498801e8bdd824"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/qa-binding.json",
+      "bytes": 15790,
+      "sha256": "0f5bd9f3a711eed62a9f32a8b85f6c7a8e928bec1020677d5436ff21243f2364"
+    },
+    {
+      "path": ".private/hrr-recovery/final34e3/fresh-review-observations.json",
+      "bytes": 2686,
+      "sha256": "a63603fe2320815d2ed5dc2118f46bfde62b4714bcbfcd9f0897b80e3246aafd"
+    }
+  ],
+  "authority": "None from source serialization; current source readiness PASS only",
+  "nativePermissionGranted": false,
+  "semanticAcceptanceEstablished": false,
+  "resultMeaning": "Actual complete fresh independent review of exact final combined H/T/full-tree manifest with zero current source findings and current checks. This source verification is distinct from authenticated shared delivery, native adoption/admission, formal Task completion and whole-Work Acceptance."
+}

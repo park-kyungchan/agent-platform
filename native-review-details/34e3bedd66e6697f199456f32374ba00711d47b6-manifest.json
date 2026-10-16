@@ -1,0 +1,4804 @@
+{
+  "schema": "agent-platform.reviewed-source-manifest.v1",
+  "reviewedTreeSha": "6737f5fe45787264da784d148114aa923d0d43fc",
+  "entryCount": 799,
+  "blobCount": 663,
+  "sha256": "b68687bb59f97734f280f786a996044c4f11b4956756d6076d03a905f521d7e2",
+  "sourceHeadSha": "34e3bedd66e6697f199456f32374ba00711d47b6",
+  "entries": [
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "584300ef13963b6259e7b09e655c72fc0ee98d4b",
+      "path": ".editorconfig"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "499aa635b5b75a502b502ba4a1ed5075efdad2c7",
+      "path": ".github"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "408ec4abc113549a3e6a091530d6e5d598d5c8ff",
+      "path": ".github/CODEOWNERS"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "867a8c0a4564897d26b741507cfe7ae2b469f313",
+      "path": ".github/dependabot.yml"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b703e1f2305aeee7d743a5e0d145871c90aa27d5",
+      "path": ".github/workflows"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "99112ab9a1226d7095bd8779751a471bb6c7120b",
+      "path": ".github/workflows/source.yml"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e5724842d05f45ec5471eb0aafe27a321d7afcc2",
+      "path": ".gitignore"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f87c8a1bb9959af5e2c925f5dc08869dedb8e0ad",
+      "path": ".prettierignore"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "32474fc70c01278ec9fdfcbfed14414065e3d09a",
+      "path": ".prettierrc.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cfc9863b84b3b1065ef040cb2d5cc2f065888e80",
+      "path": "AGENTS.md"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2b6c61a8f376fe8ea0df6a0bd48f0950d13e71d4",
+      "path": "README.md"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ebcaa2c4fce2b919d2ac9bec1d394d097a1dafa8",
+      "path": "architecture"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f24671900a6a551ceca0873af35e9dbc20d34f80",
+      "path": "architecture/capability-source-owners.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0e30a895e3735052d1d91f47170a4adc14510757",
+      "path": "architecture/common-git-harness.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "47bdbd94e1b22468feb8cafadc8ba91ae543a88b",
+      "path": "architecture/connector-policy.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4e5101a320757815573d4b8c5a9b76dfb533ec7e",
+      "path": "architecture/hermes-new-source-successor.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "744052c431874f9df636d41f8d7ec641e0a405ff",
+      "path": "architecture/hermes-platform-source-admission.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "164512b81019ae8947a5d5b30c92c804d9366657",
+      "path": "architecture/hermes-semantic-projection.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5e044a7cab0e6f1e74d7cba8ee0afe1de03da9e7",
+      "path": "architecture/public-contract-retirement.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5af6331bd54574d8eea78533f464cb55ad5c1135",
+      "path": "architecture/quality-policy.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "57299c00fff665bdd34c708e9ffb1c952d49172c",
+      "path": "architecture/runtime-documentation-routing"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc4da97f23d5e43b44ff64c3f1eba991636f57a5",
+      "path": "architecture/runtime-documentation-routing/host-pointer-recipe.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1458b162eb4d10d1ffc4ab93360ed2ae4a8fc254",
+      "path": "architecture/runtime-documentation-routing/registry.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d2337fe99da709ca788637d24b13ce619f28572",
+      "path": "architecture/runtime-filesystem-contract.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a58be4505d53d5ac1b3a3a3074308756e5e7fd63",
+      "path": "bun.lock"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9e8c4e256791d57b39e20bc5bef4ea58bbb95c34",
+      "path": "ci"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d6ea9882fb68b71b3db14675ae2dca719267bfb4",
+      "path": "ci/quality"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9834a67537598a1d29228e0ed8871da0c87c27a8",
+      "path": "ci/quality/any-baseline.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3208365b13cc1d235d0b40f381babde49a304005",
+      "path": "ci/quality/architecture-quality.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62e7e736a9cc0af8dca35651852611c5d6d41e3e",
+      "path": "ci/quality/architecture-quality.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2ec5c0edf6bda9d22c44d9605921c5e8bdaf097b",
+      "path": "ci/quality/boundaries.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac82149f6fef8610af868fceedba8407bdd24605",
+      "path": "ci/quality/compatibility.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "40d709b30d7d5ac17563fc3e322afa1273ecf80b",
+      "path": "ci/quality/native-tools.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f22c7a6e47e1810e7066e613af2054f587a90907",
+      "path": "ci/quality/ontology-build.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "54a94e51b3b40a80e9cd5ba87ac683cecf338149",
+      "path": "ci/quality/receipt-validation-gate.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "abbf81145562352498ad768fcc1eb8971f793ad6",
+      "path": "ci/quality/receipt-validator.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "be7f9a0c58509d4bfd65d80677ab09ed0b2a767d",
+      "path": "ci/quality/receipt-validator.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fc35f9be302ab93a6a753ae58b125a6d946bff54",
+      "path": "ci/quality/run.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "513410f4be3175b76d2c30a5ef620dbe29bfef10",
+      "path": "ci/quality/scope.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "667dcda17c2c71ab15b90e41c22ade1eba549944",
+      "path": "ci/quality/secret-check.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eed4ba7403b54d65ce4e1fec8937e4ec29b4ed65",
+      "path": "ci/quality/secret-check.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "54edb5ff276b60b5ed25a67b00afe54448a12dbd",
+      "path": "ci/quality/source-runtime.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e3f5225fb2657aac0622a861679351d31a84ae70",
+      "path": "ci/quality/source-runtime.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "07e7a01b36cd6f1f90b3ca6a9fbf4c6784212246",
+      "path": "ci/quality/source-snapshot.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f11d6c4a2f0bc222ba40ce49f648c8da1e705d0",
+      "path": "ci/quality/tool-pins.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e6f43b2d476bbc1dbd2d764d140bd9f962f3f54",
+      "path": "ci/quality/tooling.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "700abaefa0ead8daee01c7d4a4b50ce05a68f0a2",
+      "path": "ci/quality/tsconfig.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ef23a8a377f99050bccce2c75a1ddb69c3860162",
+      "path": "ci/source-check.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "717000bb766d3d93bfb466503da37145334d39d4",
+      "path": "ci/verify-runtime-layout.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ddd693c84924eacdf018841672a25eb76a42b7fd",
+      "path": "ci/verify-runtime-layout.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c1a1636c3661a9cd87c3a1d8104fa5b634ad1192",
+      "path": "compatibility"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ee55dcaf09145436644b65d2f193097936599ea5",
+      "path": "compatibility/codex-harness-engineering"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c82acbb76760545c3b74352929cb915babf7e488",
+      "path": "compatibility/codex-harness-engineering/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c282c1871c9bd428ff1717820de40d20a0af48d4",
+      "path": "compatibility/codex-harness-engineering/src/workspace"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "006cbb89c16b842baf079c622174a88b8283753f",
+      "path": "compatibility/codex-harness-engineering/src/workspace/handoff.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "126cc0a249c5d3d62ae384a6b4b2c8235e72f424",
+      "path": "compatibility/codex-harness-engineering/tests"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e61a2e23150d38f7a135010cc80f9d468ee8cba4",
+      "path": "compatibility/codex-harness-engineering/tests/handoff.test.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ae33163743220e8dd7c57785ffaa77a54a589365",
+      "path": "docs"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ad508f5fa28b3a3b77eb152402359983018d500f",
+      "path": "docs/git-work.md"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "60260e3bd83b7b6c73b183fb5e98b09993f2a69f",
+      "path": "docs/runtime-documentation-routing.md"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "cb83aabee5e89c83d93248435a8bbd153d17b0e9",
+      "path": "history"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "350c8509af5ab6f85f6b84f088b9f4b75943ffe1",
+      "path": "history/public-contracts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c9319c8bb32a714e477ae8b4af531a43520031f6",
+      "path": "history/public-contracts/README.md"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4aaa95847aeb769eaf543e444a59ff3a40e7c2fd",
+      "path": "history/public-contracts/bundles"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "446b1ed6c5bd1bf3e93080566d91eb13d8905e7a",
+      "path": "history/public-contracts/bundles/hermes-profile-dc-context.bundle"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c1501d8fecc68efe9cf80f968be20d0c1fc2d8b8",
+      "path": "history/public-contracts/bundles/hermes-profile-dc-contract-audit.bundle"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "64bff93a1b040b93da158d70f8aaa98632e22225",
+      "path": "history/public-contracts/bundles/hermes-profile-dc-review.bundle"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fd438634f167af8ba00c1997cc93b1e61734403d",
+      "path": "history/public-contracts/bundles/hermes-profile-ontology-platform.bundle"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "06b7ad9e9bc3e712b92e14984072fa2bc8990d28",
+      "path": "history/public-contracts/custody.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6f45ec51c3a1be86309ac5359bbcfbef6f647406",
+      "path": "history/public-contracts/integration.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ea0ea2da3c4354f8aa8aef2f4ec47dd06d67eccc",
+      "path": "history/public-contracts/snapshots"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ded916c4662719777a09f87a7795b578b81ef32",
+      "path": "history/public-contracts/snapshots/hermes-profile-dc-context-3cb238d352b3ace3f94e653e3f4e1590b194a323.tar.gz"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "77c49d7a2a924f9a24e4879bc26cdcd00517ecd6",
+      "path": "history/public-contracts/snapshots/hermes-profile-dc-contract-audit-3ab5d8d8e4876b2d74b60e39879cec98d810f0a4.tar.gz"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4a0815b609d12e1b7b3fb5df3991f7b543f11334",
+      "path": "history/public-contracts/snapshots/hermes-profile-dc-review-69ed6d9a0266066c83789c322c4b4521810333ec.tar.gz"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7d2ced4a654a03e4ebb636a9b60a984bb2ecb5f1",
+      "path": "history/public-contracts/snapshots/hermes-profile-ontology-platform-796cd709f356344210aa73f02ca2c8407103cc28.tar.gz"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "15bc73a84b33fe7ea5567632032996bcf3a03d10",
+      "path": "history/public-contracts/verify-custody.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "923a053923bd43814cab932fc80c50138a5873c3",
+      "path": "ontology-pin.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b8f1e6dc16467d2663c8d4a7a1c8da814d68c9f9",
+      "path": "owner-fixture"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c1a55ecc0a786959de7d868c0fb3df351110a452",
+      "path": "owner-fixture/codex-harness-engineering"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "495200210638cf9e64fe2d21290eb86527029ce9",
+      "path": "owner-fixture/codex-harness-engineering/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "089dcbda7aacd43c5a709862e98785def8c486cf",
+      "path": "owner-fixture/codex-harness-engineering/src/legacy"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "82dfc604da6728be3f5bd2c773a4d183c23077c3",
+      "path": "owner-fixture/codex-harness-engineering/src/legacy/harness"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "40cd94b84fb5cbf6589026613f6af677543a5b9d",
+      "path": "owner-fixture/codex-harness-engineering/src/legacy/harness/owner-context-loader.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3933e1bbe90b30d078caaa804ca4b7d6bab15f87",
+      "path": "owner-fixture/codex-harness-engineering/src/legacy/harness/provider-closure.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a0a66ff8797e5f51864caff757c862e8ff0ed101",
+      "path": "owner-fixture/codex-harness-engineering/src/native"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "00dc4e552c24d17c5e0eeaf62bf740048985e941",
+      "path": "owner-fixture/codex-harness-engineering/src/native/evaluation-ledger.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8b988e8f0a85fe52ef1243589c3930c3c3dcade5",
+      "path": "owner-fixture/codex-harness-engineering/src/native/home-context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5128f0568db5bc691997ee6c042e62e88e28f1be",
+      "path": "owner-fixture/codex-harness-engineering/src/native/hook-cli.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "25524352602d82605437fc1297754271d6e676b7",
+      "path": "owner-fixture/codex-harness-engineering/src/native/hooks.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d32d1ab1e4de25165a5747419b1295b87cc95630",
+      "path": "owner-fixture/codex-harness-engineering/src/native/provider-closure.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9106aa83b144e19f3504a57694e23e7b80c5c5df",
+      "path": "owner-fixture/hermes-harness-engineering"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "37de9291d53a27dc82f546ab26ccc32fee927a71",
+      "path": "owner-fixture/hermes-harness-engineering/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3e380dbcc14c8751f67809efdbaba4408c62c18b",
+      "path": "owner-fixture/hermes-harness-engineering/src/ontology-driven"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6730c048acf9fe112fcc64f692b728c64a9fb233",
+      "path": "owner-fixture/hermes-harness-engineering/src/ontology-driven/provider-source.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ed6e885a5c3045b4accedc3272922a1ab9086f95",
+      "path": "owner-fixture/manifest.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6a46d917f6a892c2699c147f944e83f4e9c2933b",
+      "path": "owner-fixture/native-hook-bootstrap.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46e9f1e741b6170432358e75e94efcbb63464929",
+      "path": "owner-fixture/refresh-contract.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e10cf2eb4e5ff3fe2a573f11d4ce71d153f06550",
+      "path": "owner-fixture/review-gate.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "da761a8a29e9d999cca92050e83023e956483e8a",
+      "path": "package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fb0c6ba1ce21decae7995448fedeb2223ea773ac",
+      "path": "packages"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "7797335ed428379b23ff09b53de39bb2369d329c",
+      "path": "packages/evidence-foundry"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "353be4d092c9799b2f3d9ceb9e1b59013a5ac87f",
+      "path": "packages/evidence-foundry/AGENTS.md"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3b96c078c5ddd521a95dabbe229ed81bcd6c6dff",
+      "path": "packages/evidence-foundry/package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+      "path": "packages/evidence-foundry/releases"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1230455dc156a8d69184e2dff5c89c328d3ae5b1",
+      "path": "packages/evidence-foundry/releases/palantirkc-ontology-0.2.0.tgz"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "16fe0084284525bba3a54e172e1e290189412257",
+      "path": "packages/evidence-foundry/schemas"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7d374ed71d6e8176da8ab6c899d3a71a558bebc4",
+      "path": "packages/evidence-foundry/schemas/storage.schema.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bbbd922677260fddcd7688ebd56ee34010456a48",
+      "path": "packages/evidence-foundry/scripts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c37116ed240b888ac68c3e3faca13999210e50f1",
+      "path": "packages/evidence-foundry/scripts/generate.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "00c75c7f408d3f1de3cdb73b2473e31ec448d3b8",
+      "path": "packages/evidence-foundry/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a7afc2334eca4537d69e56b5a0a53b9ac893572f",
+      "path": "packages/evidence-foundry/src/adapters"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "10e0e19e3c37921134a677abbaa7fa2609d901f4",
+      "path": "packages/evidence-foundry/src/adapters/capture-policy.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f6c115d1842223666fc6ed98c59a4488989846b",
+      "path": "packages/evidence-foundry/src/adapters/legacy-receipts.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c49591ddcdfc66041abceaa18753b23b292db308",
+      "path": "packages/evidence-foundry/src/adapters/native-codex.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e39c76350130d53d3f8ebad50aecb50244aeade",
+      "path": "packages/evidence-foundry/src/api.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c2f10274dbc1e3506e411cad210eda320261f207",
+      "path": "packages/evidence-foundry/src/generated"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "525e3937b0e346236e25244c794234a25dea2faa",
+      "path": "packages/evidence-foundry/src/generated/client.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7b68a22cc237cc3464265edea98f4fb08042704",
+      "path": "packages/evidence-foundry/src/generated/storage.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "093ac4dbe0f59bd9b9d182ab5e9e067ff03eff1a",
+      "path": "packages/evidence-foundry/src/index.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "144fd9595f0e75f946190b7cefc30e56b95ef204",
+      "path": "packages/evidence-foundry/src/modules"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2b610fa4d7e8eee98732cde81da59d9b7861f9eb",
+      "path": "packages/evidence-foundry/src/modules/claims"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "af2fc7a8207c0ce3d903188a5a300b4421bba186",
+      "path": "packages/evidence-foundry/src/modules/claims/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dfe005c7f64b9637f7331fc3a4813f216986b378",
+      "path": "packages/evidence-foundry/src/modules/claims/verification.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a952073c415eeb4c019e5f6d68b27541ba47f212",
+      "path": "packages/evidence-foundry/src/modules/evals"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e4332be3196fa4acd145147d07e7cb2a64e4086b",
+      "path": "packages/evidence-foundry/src/modules/evals/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "78a6c66f30ac25d99633b65c8b3c126a9f00da27",
+      "path": "packages/evidence-foundry/src/modules/evals/runner.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0c60d9d95cf24cbbe7cff20a6f394f3c458c965a",
+      "path": "packages/evidence-foundry/src/modules/evals/types.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e61b4204ed8838bad3b800f02b36f73f7c4b9ac0",
+      "path": "packages/evidence-foundry/src/modules/ontology"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c915f0b714b8531d93d7a596cb97172c365e48e",
+      "path": "packages/evidence-foundry/src/modules/ontology/registry.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "30ba405b0071c0b83e8221387caf5611f7e28d61",
+      "path": "packages/evidence-foundry/src/modules/storage"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aee714c63c859954dfa01bc131e4275154620821",
+      "path": "packages/evidence-foundry/src/modules/storage/store.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e14f1e3b72ef1cd8fc9cac0cc20a33eb7b712504",
+      "path": "packages/evidence-foundry/src/service.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "436f4b580bb4db7c70af03fd5342c24be9e5c3e2",
+      "path": "packages/evidence-foundry/tests"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cdc21a6bcf1759603d953fcb4fcae19df08478ab",
+      "path": "packages/evidence-foundry/tests/evals.test.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fc9b2008b86c0753ce89c923b6b7c50a343b8f6b",
+      "path": "packages/evidence-foundry/tests/fixtures"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a7ce10f7f1776abe24f8d21b5eb46a6097e5ff61",
+      "path": "packages/evidence-foundry/tests/fixtures/writer.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b52535d7049e768707fe3691fc9076c385b287d9",
+      "path": "packages/evidence-foundry/tests/owner-policy-fixture.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "be7760780006cab0cf167c55b4a485dad9695afd",
+      "path": "packages/evidence-foundry/tests/storage.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7f71fb4ea8d5e80df0f1a3e31b3bbea8403b222",
+      "path": "packages/evidence-foundry/tsconfig.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "04764657cdd2f5d1d2b3c9f651198b57e75c6a57",
+      "path": "packages/infrastructure-operations"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "25d00a29498e45ee7bea64d42f56b6c7c6b14383",
+      "path": "packages/infrastructure-operations/AGENTS.md"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f72b6fb01a9be5c2998830adca04290112b539b8",
+      "path": "packages/infrastructure-operations/package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+      "path": "packages/infrastructure-operations/releases"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1230455dc156a8d69184e2dff5c89c328d3ae5b1",
+      "path": "packages/infrastructure-operations/releases/palantirkc-ontology-0.2.0.tgz"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "828f6650eb1b08fbe3f0b6ee8f78a25166754378",
+      "path": "packages/infrastructure-operations/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "27faa45a48e19d6906695f06037fe12981a213cb",
+      "path": "packages/infrastructure-operations/src/domain"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aeec41183bf6e99444a988cceb1e9c66fc2d66ea",
+      "path": "packages/infrastructure-operations/src/domain/evaluate.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "40a0986362af976a5d4b481bd848b002ac8dde0c",
+      "path": "packages/infrastructure-operations/src/domain/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "15a6722cbaddcabad33602b530a4a7ca7c84940a",
+      "path": "packages/infrastructure-operations/src/domain/registry.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "814c950983e0cf1aa4b07f2fabd3ebda3a9e4bdc",
+      "path": "packages/infrastructure-operations/src/domain/schemas.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "13f61e175edd50f89de0218106de01a1dc033be2",
+      "path": "packages/infrastructure-operations/src/domain/types.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "051d340f866ae7cdbc7b212afe95b462d42dff67",
+      "path": "packages/infrastructure-operations/src/domain/validation.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "614aa8f7b19f209aebf7a5f5b89ccc2402edf463",
+      "path": "packages/native-codex-adapter"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b137d72b5e12bae3ad41068678f4e65ec3673c81",
+      "path": "packages/native-codex-adapter/AGENTS.md"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5d6d50083143325a607d217d760e55fafb5f2a09",
+      "path": "packages/native-codex-adapter/package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2e7eb51a1b59f97539b949fc26ef4164439a294e",
+      "path": "packages/native-codex-adapter/skills"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bc350212b70921a5a1586d5d707c40b5c20bdeb9",
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a306ed40aa1fbe75051de0217bf421f001bf81f1",
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/SKILL.md"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "50a59ae0d6c9891d5ff511f117757a9631e025da",
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "60c0b52cc6ae803f10104de2d89002b562d9edc4",
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/checkpoint-contract.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3ae33f6f16dcc50416c0de8f54277845ce74ef1f",
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/home-routing.candidate.md"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1731cef35547f305243896dd32c36677b2bc3a95",
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/standing-user-decision.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "682108c3e63dab8bf34816c45b8896f12a5812b0",
+      "path": "packages/native-codex-adapter/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b60b76b8f5c6c8a5a54281db9837c053ddeca208",
+      "path": "packages/native-codex-adapter/src/native"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c3cdcc7d5aa49954d6892f352a3b9e96f8501cef",
+      "path": "packages/native-codex-adapter/src/native/evaluation-ledger.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a99e47c5f3117ea335ee66fa01b68aa83a715120",
+      "path": "packages/native-codex-adapter/src/native/home-context.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d05569bd8c256f0a4e09f16663445e4a030a1b66",
+      "path": "packages/native-codex-adapter/src/native/home-context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "94391b430913efde40914adee20d10dd539722f9",
+      "path": "packages/native-codex-adapter/src/native/hooks.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "11a4622ba610baae6a0e90e702ec0d9cc927577c",
+      "path": "packages/native-codex-adapter/src/native/hooks.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "808942f3003d88fe5fdd2875af867acbdd03f571",
+      "path": "packages/native-codex-adapter/src/native/legacy-selection.test.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6474332dee9d2a5defd1c12cd329d22f1ea27808",
+      "path": "packages/native-hermes-adapter"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b49cac730798196796dd8f5fae5364f684d74073",
+      "path": "packages/native-hermes-adapter/AGENTS.md"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ca42a8949b2de596fd0528208dc365e9b1931abd",
+      "path": "packages/native-hermes-adapter/native"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6192642ef1dee3d885d2609ff33d56a084739ec2",
+      "path": "packages/native-hermes-adapter/native/plugins"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3751a66fdcba2cc2bd24c001e18dd5ff380e4b24",
+      "path": "packages/native-hermes-adapter/native/plugins/native-task-controls"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4077df0d23ffa1c505a3d5dd9f7980930c533302",
+      "path": "packages/native-hermes-adapter/native/plugins/native-task-controls/__init__.py"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "75e36624a9725f40b2359173dea1a9e3376054bd",
+      "path": "packages/native-hermes-adapter/native/plugins/native-task-controls/plugin.yaml"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "eb1365fbbbf3e3eee19cd8d1f34f02134e084897",
+      "path": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5fa43f52ec9b3ed4b70484bf1c35bffc4e991aeb",
+      "path": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/__init__.py"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "219749fa6826edd811b31b6a4d36565eb0ace062",
+      "path": "packages/native-hermes-adapter/native/plugins/ocp-readonly-review/plugin.yaml"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "48ae4394b0ec5789de6e717ccce88937701fa28b",
+      "path": "packages/native-hermes-adapter/native/plugins/source-review-readonly"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6a4a076002968e01fb79288d0910cf8eeb82ffd3",
+      "path": "packages/native-hermes-adapter/native/plugins/source-review-readonly/__init__.py"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ec0c366e4ef450e382d4a4bd1de593562a4ae5c7",
+      "path": "packages/native-hermes-adapter/native/plugins/source-review-readonly/plugin.yaml"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8df91870b70e24992005db3e7b21171bfff49d6f",
+      "path": "packages/native-hermes-adapter/package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+      "path": "packages/native-hermes-adapter/releases"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1230455dc156a8d69184e2dff5c89c328d3ae5b1",
+      "path": "packages/native-hermes-adapter/releases/palantirkc-ontology-0.2.0.tgz"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1a658fccfdd99f798462f3ee7cd39ab90637f9c2",
+      "path": "packages/native-hermes-adapter/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8c43ae2c2531da655046485c0be7a53d79be5aa0",
+      "path": "packages/native-hermes-adapter/src/adoption"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fbf9865f0ebf0ad174f85af4a308d6ddca7c2594",
+      "path": "packages/native-hermes-adapter/src/adoption/evaluation-budget.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c5a0e05f1f197ea6944f0c8a6b07c45e01847b4a",
+      "path": "packages/native-hermes-adapter/src/adoption/semantic-context.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c9e446167510d452018d8c514bedbfdf14c13285",
+      "path": "packages/native-hermes-adapter/src/ontology-driven"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f3d0c08df50e51e5dd024d1147621c33cf417d2",
+      "path": "packages/native-hermes-adapter/src/ontology-driven/audit-adapter.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "28ff52f5b09424889be5a6128bfbdc7c334a5669",
+      "path": "packages/native-hermes-adapter/src/ontology-driven/contracts.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0a339d5b1e9755bf28b6cb6b152c8e6183c60f58",
+      "path": "packages/native-hermes-adapter/src/ontology-driven/current-intent.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7a78f17faa4787893504ef2ff1f0b6492fe1e5dc",
+      "path": "packages/native-hermes-adapter/src/ontology-driven/domain-context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ee58899eba2e902405dce007931ede8b3b9db150",
+      "path": "packages/native-hermes-adapter/src/ontology-driven/pinned-reader.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "db88adc88770c4e8d180fe8ecd70d3abbbf05cfd",
+      "path": "packages/native-hermes-adapter/src/ontology-driven/role-registry.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "843318493d71b8f71d76f813cd7eadf2fc63f9a0",
+      "path": "packages/native-hermes-adapter/src/ontology-driven/work-context.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "54a802bc4231c729bb74d666a6b534314cf6b38a",
+      "path": "packages/native-hermes-adapter/src/platform-current-work"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "46c3c8df4ec226b8fb3645a959f3dc392446d90f",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/build.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9df4d52d2872f1bdb83398b703712e810d244a5b",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/context.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1172d93fe8c2e9705929a847ed1e5c98ad69eb7",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0823436be080c36b30e9114c4c99f5a09a877135",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/diagnostics.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "171311e62ffd2cd4efb9591716d73a820b68667f",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/diagnostics.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c111967c28b8ddd59b4df4ebffe956a15457696d",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93ae4b9eba950441bf13cdedff3f36d50f7924c5",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "49c493c9f5de50e0b60361a0169495cc5ac421e8",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/output-policy.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7f8dded2215746451d9a8f6695bb00cd214094aa",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/provider.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ea09e55c03b2f8127b5e618b02c64cff8359e58b",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/provider.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93bcc41d774ff1ccdb0855955360de9bd7b2ee32",
+      "path": "packages/native-hermes-adapter/src/platform-current-work/read-current-work.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bd92df898325fcc243965d47b3a8faf8530de98e",
+      "path": "packages/native-hermes-adapter/src/platform-governance"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c17297bed819ac0187ce815a040d81362d608190",
+      "path": "packages/native-hermes-adapter/src/platform-governance/bot-correlation.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8e876ae35d131caff1bc4a6748d8b2d008c29de",
+      "path": "packages/native-hermes-adapter/src/platform-governance/boundary-custody.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "09c5ae2761268857d0d762dc5970b7873a850534",
+      "path": "packages/native-hermes-adapter/src/platform-governance/contracts.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "47ef8bc7c836b05f51a6ed7b5441b12026c43daa",
+      "path": "packages/native-hermes-adapter/src/platform-governance/evaluation-budget.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6c5a5fdf0e3e7653e195029603aa278ad9798c54",
+      "path": "packages/native-hermes-adapter/src/platform-governance/governance.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d189e3b2167e0d201d588eb0f74b13fbdc5df1ff",
+      "path": "packages/native-hermes-adapter/src/platform-governance/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3058eef89c91225cf0b30f7d44fb691486aebca3",
+      "path": "packages/native-hermes-adapter/src/platform-governance/native-bindings.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a3068f3d70199cfff7e6edadaab85019e0704b87",
+      "path": "packages/native-hermes-adapter/src/platform-governance/policy.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "47d18271a7c8d8804041536c37c813c1f2aa8d40",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1fd02b5c2ed95d21606712d5e80d9f745e5d3e63",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/input.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f1cf553c5fd5624452573b95264324cfc7e7501c",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/native-hook.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc657b61f0b79b871d1a553b05091143e6aa3751",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/owner-readers.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f977d2f8c0a0405c7d6ad2a4e1e943012c140817",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/read-context-privacy.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f977cdf0402c3ada78913dd97b1bf311b7db99a1",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/read-context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "196da2424124f82faff9909685b6f80d3057e37b",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/review-reader.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "60256ff9f1623e96a7d7958f0cf7c830d156d667",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-continuity.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "35c064bc39b899ea7b5b66eadf7fe0425f88ce91",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity-contracts.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b6047a2415e3b34d214499b78f4ce8c0b2b4a3c2",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b82d4f7a2ee17110e00859307724ea1fbb96779",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-reader.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e23fcc74ed3665969fc5061df1791426a4899b2b",
+      "path": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "b4fa38cf0331e752d72f4abbb189e9cc6532e1fa",
+      "path": "packages/native-hermes-adapter/src/source-provider"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b759151d09d7627ebf2689ee24e15b28119b6819",
+      "path": "packages/native-hermes-adapter/src/source-provider/delivery.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "68d1efd71844defa6fb5e90ba0fdd9295d1dbd71",
+      "path": "packages/native-hermes-adapter/src/source-provider/delivery.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "75313b6e3f35ff7d36fa3b660c65f828676a37ac",
+      "path": "packages/native-hermes-adapter/src/source-provider/dependency-closure.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fa8ddc7f9f59e0f93701e219bd6aa7ae969940dc",
+      "path": "packages/native-hermes-adapter/src/source-provider/generate.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0ce12cb7ae7b6d8c29b6b207d9fa46a227c26eba",
+      "path": "packages/native-hermes-adapter/src/source-provider/guard.template.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a11169865598e6ac6f2d77c104513dcaffa9811a",
+      "path": "packages/native-hermes-adapter/src/source-provider/source-provider.test.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2dc7e7e0bb958f164e7c0c248fa2809d0429d076",
+      "path": "packages/ontology"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5a5cf5d39b798b43806d422baafe0de5ce1bb57e",
+      "path": "packages/ontology/AGENTS.md"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "654ee43a7d7e09507fe4fba59090ff5a2e85d83c",
+      "path": "packages/ontology/dist"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8d3f7b49ee465f2a2a43f23bacc74465b6318a0f",
+      "path": "packages/ontology/dist/contracts.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b89f42030bafba091ea8745b12a6feabcb14ab68",
+      "path": "packages/ontology/dist/contracts.js"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9a7f297652dbec0ccba805c57e1d51e523886f71",
+      "path": "packages/ontology/dist/domains"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d9450ea3740fb8db5fb28394d96803c03722cfa7",
+      "path": "packages/ontology/dist/domains/evidence.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df4e658a4a92c1ba06b9a8581f8d66f30ebb46e8",
+      "path": "packages/ontology/dist/domains/evidence.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "25052c7972044d62990fd827ae517370afe19b86",
+      "path": "packages/ontology/dist/domains/native-harness.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dd22a1bf077850ae114447b6635f0979c2b008f0",
+      "path": "packages/ontology/dist/domains/native-harness.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f7c00243300eee302a21732494ca182a665f0eb6",
+      "path": "packages/ontology/dist/domains/research.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "96f726c202e96cd2264eb05b39e255e67e62c357",
+      "path": "packages/ontology/dist/domains/research.js"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8e6a3100ed94aeb4d56b9c70d7176bacd78d2f06",
+      "path": "packages/ontology/dist/generated"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f1ef05c1f6499a1b0959f6604d60dcb053d92b0",
+      "path": "packages/ontology/dist/generated/contracts.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e2679b8f75d7bb83abd12201f4d1d5ce03a328c1",
+      "path": "packages/ontology/dist/generated/contracts.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "496054a1b2859786703fee91b7fbfb988187afdc",
+      "path": "packages/ontology/dist/generated/evidence.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "84f950e89bfaa74460ca638eb88237f3188f6d45",
+      "path": "packages/ontology/dist/generated/evidence.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f9524d41d7994c027c55222873efd08f3357849d",
+      "path": "packages/ontology/dist/generated/operational.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "db617c8679891b4d0662c91ea867e368accb4617",
+      "path": "packages/ontology/dist/generated/operational.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bbb8741e739662dbdb6ea0a19b65981974c41648",
+      "path": "packages/ontology/dist/index.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "279830fdfb4b20981ec61248363a785d501d0474",
+      "path": "packages/ontology/dist/index.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8975577bb4d8c1bdb5be4cf29a3913166cffa457",
+      "path": "packages/ontology/dist/json-validation.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0b7515db931aa1624e34fd361128831c1c3304e0",
+      "path": "packages/ontology/dist/json-validation.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6a9440e8ef0e6f5a4426fc378a7f02ce1a586439",
+      "path": "packages/ontology/dist/operational-validation.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7ec06b7f5c877a7563c08b354067925be54a8419",
+      "path": "packages/ontology/dist/operational-validation.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac38bab54ce25b6ed6e55ad77ebf6be16cc5284f",
+      "path": "packages/ontology/dist/operational.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0a8c32835f697fc7c360b6c9ac8a8505437e6b39",
+      "path": "packages/ontology/dist/operational.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e074153061ee8e686ac611aa79f028853aefc5bb",
+      "path": "packages/ontology/dist/schema.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1ca48b665e5689817a0c22343ee7bfed2d0882c",
+      "path": "packages/ontology/dist/schema.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e942f35faaf37b96c21723f8f5d1a651c25c30c",
+      "path": "packages/ontology/dist/upper.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0d8db9024dbf51022d9080f0b5eb42d80f79cd99",
+      "path": "packages/ontology/dist/upper.js"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "765bec2cfec5af9f92c06a7729ce12d7dc3bbcea",
+      "path": "packages/ontology/dist/validation.d.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb0bf8f5e3383ec01c9601a76a792ca2bc8c2563",
+      "path": "packages/ontology/dist/validation.js"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bc45be9f9fde45ff31e1be92eb066b3fe57ce263",
+      "path": "packages/ontology/ontology"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2980fcbd98ec3b546153ae7a023006114700dfec",
+      "path": "packages/ontology/ontology/domains"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e0ced5ed00db3c070a325b1379b905872c6c6774",
+      "path": "packages/ontology/ontology/domains/evidence"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "76a77a3a2a921638d4f4fcaa37a926c837c7b7ce",
+      "path": "packages/ontology/ontology/domains/evidence/registry.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "84dc1c6b3b6938909f7ed1251bc8e5615aa35e20",
+      "path": "packages/ontology/ontology/domains/evidence/vocabulary.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "92e310841818f09d00cde892d33dffdb14596c38",
+      "path": "packages/ontology/ontology/domains/native-harness"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1834b6687639f77b08e7830136da8b1b2a2bf091",
+      "path": "packages/ontology/ontology/domains/native-harness/vocabulary.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0aeed5a2aaa3a5ae0f22ae2b4d269d848b110b08",
+      "path": "packages/ontology/ontology/domains/research"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1192a861e12fcb3da65f7f0492d7c369110414d6",
+      "path": "packages/ontology/ontology/domains/research/vocabulary.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4c6489f6b9fa5cd7c0c29a883720903e481c4235",
+      "path": "packages/ontology/ontology/upper"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62d8fe8429dd058a0377018757667f7582177cfb",
+      "path": "packages/ontology/ontology/upper/vocabulary.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "000c5c2c3a21cd91a7e1a43c2c97c0cc88271fac",
+      "path": "packages/ontology/package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "3b97a898d53a10beda514069c7bbdb1da50e27ac",
+      "path": "packages/ontology/releases"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "82c7fe882389470eecbc488b256569711c3514e0",
+      "path": "packages/ontology/releases/palantirkc-ontology-0.1.0.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "18eede6cfa65b0eec7ce7a2bbf9c9836f3fd29f5",
+      "path": "packages/ontology/releases/palantirkc-ontology-0.1.0.tgz"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a357fda121f1be579ace40fd93d7ff44097df36b",
+      "path": "packages/ontology/releases/palantirkc-ontology-0.2.0.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1230455dc156a8d69184e2dff5c89c328d3ae5b1",
+      "path": "packages/ontology/releases/palantirkc-ontology-0.2.0.tgz"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "7471a633a0625bce6be6d099fc8197d33c5d0066",
+      "path": "packages/ontology/schemas"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3fbee68b94e081e9b7c94d686134ee1aef12e32f",
+      "path": "packages/ontology/schemas/artifact.schema.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8a5752ad693c8d7306f024fadcacabcd84060f1e",
+      "path": "packages/ontology/schemas/evidence.schema.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8ac23bf7d246a5d9cba264506aafa2824af2960c",
+      "path": "packages/ontology/schemas/operational.schema.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d6794316a2762aa22389f6369cfa20b4f7523794",
+      "path": "packages/ontology/scripts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6ce02f7b3f732bcd9ca95203a0eb887f7b306858",
+      "path": "packages/ontology/scripts/generate.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "99c9cad1b377ce5482dae59ebdc8ab42081bc156",
+      "path": "packages/ontology/src"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8d3f7b49ee465f2a2a43f23bacc74465b6318a0f",
+      "path": "packages/ontology/src/contracts.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "160524d47309bf5c733592b56c8d4b1fddda800c",
+      "path": "packages/ontology/src/domains"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4af9021441a47e2ef4f80c7fd9692b660c14a351",
+      "path": "packages/ontology/src/domains/evidence.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "26faab926479b2a1d912f69a2f0cc0b261ac4a83",
+      "path": "packages/ontology/src/domains/native-harness.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "09450f1f8de8e4b8cc2268eb3785fd3a4a3b07ab",
+      "path": "packages/ontology/src/domains/research.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "84a0264333b58f4cc837608baf58a4991c016fac",
+      "path": "packages/ontology/src/generated"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "27136ee0e8bd87d9b24e58fb4d5d24948cfef978",
+      "path": "packages/ontology/src/generated/contracts.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a74449f2623d52f5aaa5504fc649870139703163",
+      "path": "packages/ontology/src/generated/evidence.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a41ae7fe177cc1e5001b56fee585c07f879541bc",
+      "path": "packages/ontology/src/generated/operational.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f7b2b8c64d4d6efa802e3977e5f635125c496da6",
+      "path": "packages/ontology/src/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ab26bb8be24a37752ed7f0cc373ee1a106fefb4e",
+      "path": "packages/ontology/src/json-validation.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "be0b0e8c9dc9b91dd9e8461e253f09532e2b6d71",
+      "path": "packages/ontology/src/operational-validation.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6b73e58f4fb7911774c407afa1186844e40c12ba",
+      "path": "packages/ontology/src/operational.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1ca48b665e5689817a0c22343ee7bfed2d0882c",
+      "path": "packages/ontology/src/schema.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "45a12076c35ca66d6da479785ec158ece90f3d21",
+      "path": "packages/ontology/src/upper.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "60867d216a65eb1981a21d7b9b6eac89a57bee69",
+      "path": "packages/ontology/src/validation.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6fcb6a800c07554c186ef417091fd05f3fa40df0",
+      "path": "packages/ontology/tests"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "21df649d3ef2bbc1443e37850273acf5ea73a336",
+      "path": "packages/ontology/tests/contracts.test.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4ff3c12a408f47989603bb85eca83b9ab25fb5ab",
+      "path": "packages/ontology/tests/fixtures"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "5a921e8f97cd13ee4886480a05657c7bbcdfa4b2",
+      "path": "packages/ontology/tests/fixtures/invalid"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bef344d10962d54c2532e25f7c5f1c5a9b467296",
+      "path": "packages/ontology/tests/fixtures/invalid/decision.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8f5ff212ad88e4d2fe1f8438b9830f09f73f7a3d",
+      "path": "packages/ontology/tests/fixtures/invalid/evidence.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1dc1f77ae9c307dd4476c311f6a7fcb3a7edb51b",
+      "path": "packages/ontology/tests/fixtures/invalid/project.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a1ec1eb5203eab00d4a827b1a7d591ea2a8a1dbe",
+      "path": "packages/ontology/tests/fixtures/invalid/proposal.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "84fc37f35be869c6d6b831be49a073f0a920b54d",
+      "path": "packages/ontology/tests/fixtures/invalid/run.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d9c997c878ee3dbb62f9a014fe17fb62424217cf",
+      "path": "packages/ontology/tests/fixtures/invalid/task.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6fc5ae8ba8d41cbc8c2a2c5eb4d80f61924424f4",
+      "path": "packages/ontology/tests/fixtures/invalid/unsupported-version.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1ea9f9e4358e23b40468973f6519795b73c08c8",
+      "path": "packages/ontology/tests/fixtures/invalid/verification.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a514f4572f649883fb0c2333772a2c92a0ff30de",
+      "path": "packages/ontology/tests/fixtures/valid-set.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9a3922d61aa7e308b018905020d53027c822354c",
+      "path": "packages/ontology/tests/operational.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f949c1aefea8fd5317e941a15a81708d2b57ecd7",
+      "path": "packages/ontology/tsconfig.build.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3fd1242e6b6cf6f3a0d23d2e0ca0b478a31f1d24",
+      "path": "packages/ontology/tsconfig.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d854b2fe316671ddab2b7931d1c4d35d3018e63f",
+      "path": "packages/operational-context"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7d16d30ee55c3cb6ad235a738582ce5d386be83f",
+      "path": "packages/operational-context/AGENTS.md"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4fd6fb6162ceabfac80572c7942d1b0afd98b57e",
+      "path": "packages/operational-context/lead-evaluation.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d9077b2d56a00dd8f61a20cb94dbefaec24ad2c5",
+      "path": "packages/operational-context/package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4e35b07a642ec9ed03e7dd7bdcd9085422d10375",
+      "path": "packages/operational-context/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1cf48f114db031ef9864e337cfcca434d175f2c8",
+      "path": "packages/operational-context/src/backend"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2115621dc64c3dd903dc8ba0f60a05d31966a9bb",
+      "path": "packages/operational-context/src/backend/intent-context"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8958a185b46bf8360870e51fc5367c4927ae4c12",
+      "path": "packages/operational-context/src/backend/intent-context/contract.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a3aaea50dc4555610e55806766488be787aece7a",
+      "path": "packages/operational-context/src/backend/intent-context/json-ingress.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f8efb0b7f28c8ca53ab64068df556d2c1f37317",
+      "path": "packages/operational-context/src/backend/intent-context/resolve.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "dc433bcd48bf9163203592e240d10b90e9d5425b",
+      "path": "packages/operational-context/src/backend/review"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d24cea94178339ad8c2e1d0d5495d6f0d22f609",
+      "path": "packages/operational-context/src/backend/review/data-snapshot.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3426e7f9f86ea5a3e89af27a51fd2399ebe3010b",
+      "path": "packages/operational-context/src/backend/review/handoff-contract.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2db2fd1cb399724423569dbaa0ee4d89ce4d2e48",
+      "path": "packages/operational-context/src/backend/review/native-trace.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "edb2b275d6526e7daa226f91b79da43aa7079a84",
+      "path": "packages/operational-context/src/backend/review/result-contract.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "65588c26cf0de6ff681503d901d6489172386982",
+      "path": "packages/operational-context/src/backend/review/review-evidence.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bdd17b5fd652db972fa283d6611c086b24d4ed4a",
+      "path": "packages/operational-context/src/backend/review/source-coverage.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2ccc75f5db25216832f0324cb59373e3493459b3",
+      "path": "packages/operational-context/src/backend/work-artifacts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "68d24e812aea9c4a93660813ccc879097a5e09e8",
+      "path": "packages/operational-context/src/backend/work-artifacts/contract.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f842c0418852c43d2b63d7672f5852a7213b92d",
+      "path": "packages/operational-context/src/backend/work-artifacts/lead-evaluation.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b03056b39152b995f88f684c3d696beaad78c93e",
+      "path": "packages/operational-context/src/backend/work-artifacts/lead-protocol.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "50c4819ff9e12806879801b6f76e14f5c315543f",
+      "path": "packages/operational-context/src/backend/work-artifacts/operating-context.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "96174ec69d4b8c8dc17f7150bf0ac8e620816377",
+      "path": "packages/operational-context/src/shared-wiki"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "baa5da187c7b22ec06a7fec9e12f2a09194ce071",
+      "path": "packages/operational-context/src/shared-wiki/v1"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e1566161d58ee8c72c67fd0d703664cd4ba4468",
+      "path": "packages/operational-context/src/shared-wiki/v1/contract.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "eb075c5072e4bb5d5cf4a0770a81537dfe29534d",
+      "path": "packages/operational-context/tests"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "1392560ad927072dd00cfd35dd8ee3854383829a",
+      "path": "packages/operational-context/tests/public-contracts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7b079578175a558b0cf57979e46b39ae470b862e",
+      "path": "packages/operational-context/tests/public-contracts/context-fixture.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1943a7340ad55932b8313bde0f114a000a1bec02",
+      "path": "packages/operational-context/tests/public-contracts/integration.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c7876c31a3cfd216da977f8a76d7adc5b3e72bb8",
+      "path": "packages/operational-context/tests/public-contracts/intent-r2.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7cafc0f7502d3fed9401d7a661741439471d71f2",
+      "path": "packages/operational-context/tests/public-contracts/intent-r5.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3cbc53c23c694907eca696e2f2d47f54b834e4dd",
+      "path": "packages/operational-context/tests/public-contracts/intent-r6.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8eaa4854c0f0053414cc55c9bbfcff99b555ed95",
+      "path": "packages/operational-context/tests/public-contracts/negative.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8abf9bf12bb9a1f3c77646dcc6d9a173f3dc364f",
+      "path": "packages/operational-context/tests/public-contracts/positive.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e7d3decb08ef232a4aa5bf7a7bd8ba8020781c59",
+      "path": "packages/operational-context/tests/public-contracts/review-fixture.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "347003db17690fc4663e052deecc80022c38da0d",
+      "path": "packages/operational-context/tests/public-contracts/review-r2.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bbc4a1bb5748b308202efbcc199c980dcca7eed1",
+      "path": "packages/operational-context/tests/public-contracts/review-r4.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8551d97913734a8468c4104a06690ffa3771b9ee",
+      "path": "packages/operational-context/tests/public-contracts/review-r5.test.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "f64a7ba52d5a85a0a51a43ab72e1170ecbf5e363",
+      "path": "packages/research-capture"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a66850fd289711a04aedc508568e2c31535b4b91",
+      "path": "packages/research-capture/AGENTS.md"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f47523eef4a42e9c5147adb0724a4533ffcd467",
+      "path": "packages/research-capture/package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d6060b9d048975784865bae3730b00820fd1f9d2",
+      "path": "packages/research-capture/releases"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "18eede6cfa65b0eec7ce7a2bbf9c9836f3fd29f5",
+      "path": "packages/research-capture/releases/palantirkc-ontology-0.1.0.tgz"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e3d717b7a8f45cf5afca7dd1a1d7158e4999ae0b",
+      "path": "packages/research-capture/schemas"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ce89fc5af36efaf815ec4a667e0ed6ffd65de5b",
+      "path": "packages/research-capture/schemas/capture-bundle.schema.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8c923974817760b19fdba2dbc5d9b769256d54d",
+      "path": "packages/research-capture/schemas/research-request.schema.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "4d68770b7d61361fc6b554b5a1eb1273a6a7c500",
+      "path": "packages/research-capture/src"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3279778a8efed3aaee12ea883af68c327db8761a",
+      "path": "packages/research-capture/src/bundle.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8fc11bd259976c622088429ae6af3fb6d91b04fb",
+      "path": "packages/research-capture/src/capture.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a906d82cc68426e5a18fac196aa6e17d4b06cc23",
+      "path": "packages/research-capture/src/generated"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "45eb15c8e85d4899322ec53b4bdb541851259452",
+      "path": "packages/research-capture/src/generated/capture-bundle.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "719739d99ce7e840ec4fc72b1e1a02cde33fc93c",
+      "path": "packages/research-capture/src/generated/research-request.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f931f668032561aa81084845a10bb53753eda981",
+      "path": "packages/research-capture/src/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dc98fc20595681d385dc12ba8ed50b49ab991493",
+      "path": "packages/research-capture/src/upstream.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8f3d7ce1b2be55ae3bc7a52d8399631001876f52",
+      "path": "packages/research-capture/tsconfig.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "77cfc3866a3bc8523f606417c1852e746775a12e",
+      "path": "packages/work-continuity"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f6dea9bfd5a8df435e861bc798b7e2b593862e09",
+      "path": "packages/work-continuity/package.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+      "path": "packages/work-continuity/releases"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1230455dc156a8d69184e2dff5c89c328d3ae5b1",
+      "path": "packages/work-continuity/releases/palantirkc-ontology-0.2.0.tgz"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "866b0f3b4d8ff7ca28a755edcce1b43f407bbe37",
+      "path": "packages/work-continuity/src"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "74f75675fd7bdf5e6173da73225cdb8804909716",
+      "path": "packages/work-continuity/src/context"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a2828faa819a2e5ad3d3a49a43c2badd9fb244c5",
+      "path": "packages/work-continuity/src/context/boundary.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a804705db69ad62855b637468f5fada8c95c4424",
+      "path": "packages/work-continuity/src/context/context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5fe81a3c0856e7ac8c7e61ae62316d04226aef59",
+      "path": "packages/work-continuity/src/context/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d47ce8195aa6daf5919a714c4bbefb417188068",
+      "path": "packages/work-continuity/src/context/sections.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "707f43ee260efa71388441bf255a7d5a09be21a5",
+      "path": "packages/work-continuity/src/context/source.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d2eab294293b9e555e8a41de644c4753ba357465",
+      "path": "packages/work-continuity/src/context/store.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e6f3974e65350fa50b9916ffd839ad322e100cef",
+      "path": "packages/work-continuity/src/context/types.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e380d4d1e0202f2971e0d041ac9be6eda2bfe4af",
+      "path": "packages/work-continuity/src/context/validation.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "aafd7f5d3e6482101d76677744da4e234690235e",
+      "path": "packages/work-continuity/src/git-work"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1376780102d4f2745c97d6f463933c95d05f01fb",
+      "path": "packages/work-continuity/src/git-work/context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8ef305e2786cfcc0564a665a8ba1b0c114852fa4",
+      "path": "packages/work-continuity/src/git-work/git-work.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5324e60532015bfb8722285c951380c3fb1953b6",
+      "path": "packages/work-continuity/src/git-work/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "808ea334ae496b3ac814dc7d0a6737b070ce47dd",
+      "path": "packages/work-continuity/src/git-work/no-lazy-fetch.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d6b56deb78d72c45ab7db14a8bb4101bddf8d0f0",
+      "path": "packages/work-continuity/src/git-work/provenance.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e47ec2a2c3da06c668e032873945972a3cff1cdb",
+      "path": "packages/work-continuity/src/git-work/records.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "70dbae8470c40c1cfa767d1f330ca86f4521fabd",
+      "path": "packages/work-continuity/src/git-work/source.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8cf52ccec522bedba5e540d91b6d0fe9b55a6ab9",
+      "path": "packages/work-continuity/src/git-work/types.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a11da336576539280e855b2bdf904efea90eb952",
+      "path": "packages/work-continuity/src/handoff.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c3bb181340e3aa90aa140bcf95f4dfb250514a6f",
+      "path": "packages/work-continuity/src/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7d97e6e9303b9b7a4a7fde44661bbf26ca7c5ad3",
+      "path": "packages/work-continuity/src/logical-identity.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bb433c6d71539c7704acb6326a4069fec5e66c49",
+      "path": "packages/work-continuity/src/operational-state.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ec4d96a93c86bf53778141dd28f1a4c564aba986",
+      "path": "packages/work-continuity/src/runtime-docs"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a91079ad105bb988516960e7e11a7ff530ae28f9",
+      "path": "packages/work-continuity/src/runtime-docs/index.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "324a3a5caf6a9c3dad6fc6877831d4e5225b3e4f",
+      "path": "packages/work-continuity/src/runtime-docs/runtime-docs.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ef4b28eefbd30616f78482a7ef776d70285c36d2",
+      "path": "packages/work-continuity/src/runtime-docs/types.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0d7ff80ba66a48faa0e82d7b0a6a50e66951261e",
+      "path": "packages/work-continuity/src/runtime-docs/validation.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0f66f23bff96950b90ad976c2f8693da318bb2ea",
+      "path": "packages/work-continuity/src/runtime-index.test.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2d2dd4fb04936730d07a60494085a4d815d61304",
+      "path": "packages/work-continuity/src/runtime-index.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "e0abe3aee0c45a928d74079d3fa91142ac641b49",
+      "path": "packages/work-continuity/src/workspace"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a0a9a084062d46033335a7f2d080fabf77bb4927",
+      "path": "packages/work-continuity/src/workspace/lexical-recall.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "30217cbfdb52d050c133cb64595cdbbe75af0e49",
+      "path": "packages/work-continuity/src/workspace/memory.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e5c3e1bdb144d60c74b6bc5c87deab2d561a2208",
+      "path": "packages/work-continuity/src/workspace/original-producer.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "877968fbd63f6fdabe3cbf6c06673e80fe7c389e",
+      "path": "packages/work-continuity/src/workspace/qualification.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "890e0596ddf6b4ecc113c3727614ac42b5d0b88e",
+      "path": "packages/work-continuity/src/workspace/recall-request.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e6b45c714e8d75906b897cf1b51a7da71156412",
+      "path": "packages/work-continuity/src/workspace/recovery.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "738d1c78c19bbba8df3476e4460cd274ec5ec877",
+      "path": "project.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+      "path": "releases"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1230455dc156a8d69184e2dff5c89c328d3ae5b1",
+      "path": "releases/palantirkc-ontology-0.2.0.tgz"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2ad226b435778e1388126145876512e94384a4a6",
+      "path": "scripts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "12b3d751f88e180248462295ac99750e2061664e",
+      "path": "scripts/generate-hermes-semantic-context.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0575df102e8bb6564385b6416718f142eb670ac2",
+      "path": "scripts/harness.ts"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "74e40f96a07fc1e980887db3959a63c56e901d76",
+      "path": "scripts/verify-common-work.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "625a76bfa328a7dcf11de9da0b5e56df3f79f559",
+      "path": "verification"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "96c8e6e0f706ba6d0dd01b156a649f7e5621faa8",
+      "path": "verification/package-import-check.ts"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "84ce230da4bd1a46112225b5ece923aa2299ddba",
+      "path": "work"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "42a371c15d0895f919b45434a3f421458c84c6d4",
+      "path": "work/codex-harness-engineering"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "96c421f9d29fac7a299fb7b3d5fc144c1a7e2759",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ac3a4875745988ec3537a0d680fd9cc483ef1830",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/decisions"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "be2f7338303370e58d1a0746155e6d4888b9780b",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/decisions/HRR-INTERVIEW-1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f119e9137bd2a812b238a5a53693a218f2dda24",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/decisions/HRR-INTERVIEW-2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f7519243078fb1109fcdbb62d046aa9c1fbee217",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/decisions/HRR-INTERVIEW-3.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d0c7b63747fb30dc84b14c5b30cd6e0cccfa9003",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/decisions/HRR-INTERVIEW-4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3638c3e70e937236d70aab4250945aa565001802",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/decisions/HRR-INTERVIEW-5.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6d20c2f0e3513505154879016a30f6bc09d49fc7",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/evidence"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9c404acea60a13e6164694f4fbc03b4473f3a65e",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/evidence/HRR-CODEX-CANDIDATE-RETAINED-RESULT.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "09f5f3353d17b5479d7bc0a3f7ee90ccfd553cb0",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/fences"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bcda744612d07996aad4d9d1c3d531e560b40542",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/fences/predecessor-effects.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "eeb9f039b2a12fa8af66f1961c543222d925eca6",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1385bc1e09903c4ac87c4130bc6022bf18c43af3",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "250300fecf3c9aa6ce3ad16d449780f44458b696",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v10.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8c7f6092979ed90e30431e9eb0454e0ad75c510",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v11.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6ca52b4bec1e994a11e634738eb961daec6d9c79",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v12.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d828d81e5f8bd5f468ff325b939a5be097a1fbb5",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5dbe6ec746d6ce87a6822cc7f2ea835db74ea7d",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v3.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "869863166ee10959cdbedc69b62e33340d56e7b0",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "218df0d269c55005ed80bfa620c80ed843d72ebb",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v5.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "40ed5207c14c447a4d88a5a82af1b318489f621a",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v6.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6435f334899a76af71a96b0b6baa4353754780f2",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v7.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a621981d3271839356765b1161ff16cf0a8f6cf9",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v8.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0c786ada8d261daf1f897239094f736d7be426a6",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v9.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0eba05ad0161a2cbfa1ca92b8a95bc5ffbae1539",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-candidate-source-result-1033d6f.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "08991a344587c9bdfdf5bf4afc542a0e569bfdc9",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-context-review-A1d4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "90c6a932e50f608d8dcaa2a824fa67a46d750b43",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-decision-fix-review-e6fc703.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "db13e339dca7a3dc912d82153803a7009388a3c7",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-final-data-2e64.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d89c0d90d347f0ee39dabb3ee3d32c8b38922756",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-owner-review-6a4c185.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "902aa39261bfba4289c0c1d92b8f92a68fe81a91",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-owner-review-7410706.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c76f82939db99772f7475d93d5f2a85f8de9b1bd",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-owner-review-ccef483.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a3c5ba995f6cfef2fb5bfdb601da4c88879640d4",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/common-review-1d4b1b4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "556ef3a85cf68cb7ec145552c4335b5bab53cd4f",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/common-review-f642938.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "058dd0e80e23649dc505f76ba931caac04988d74",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/hermes-context-review-A1d4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "98e5e3809df1ceb64c33026543856b9e74ec7e22",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/hermes-final-data-2e64.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb98c159f756f3334f43b1366e6adc0b2947a773",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "79a5463b593e59d0b5836e0f69c53819308c79ea",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/interview-answers-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6dfcf533b08b587e0d273a2d4fa4c427abac415a",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/interview-questions-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b4a800592ab27704da988c65ca9ac8707c322a54",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/lead-scoped-recovery-verification-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "72424fe0df0122f8f4ac1a2fcdd064c1578a8653",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/native-recovery-midpoint-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d496b01af86ebeecde7a9fde0f9383da93cff37a",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/native-recovery-owned-exit-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e72759919f59a51c27bb8ac4d77dd62fbcb3bef0",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/native-recovery-pre-process-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ff405c6e915060f778c7fad77cdcf21824840d6d",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/native-v2-context-delivery-policy.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0cfd5c60aa63759f8c6d11491e7f072337f948f8",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-process-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "44fc67a3670289ecc7fdb9bd0ec34b56124f463c",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-readback-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eef7975c2ff33a8d2d167cc8550629b03fc65acd",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/new-native-recovery-review-c04.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1e58704e9e52770baab0f7593e28b931061d7424",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/normative-purpose-capture-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d429ea04d26055f983c117a6545879cbeb22bdce",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/predecessor-effect-custody.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3b843a023cd598da772b198e930c9e83366b100d",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/review-A-98206df.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f63973643ff45d75bf5c45c7654e4a03eb83cda0",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/review-A-f206e59.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "afd47b8dc4df5fcb32df1af0542f05f8df6ad85b",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/review-B-7bd9a2d.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5de5877c9f59a7af00b14ac60a9a63c949c6e354",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/review-C-1033d6f.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "193e63829754d5bda69ed81a721c5a46b16a1512",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/review-codex-context-8563fef.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fc971e8b52a151ac5d40bf24eb7c066b4c4f58b8",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/review-hermes-c5c67dc.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8b41e0d34578ae8719d3ed2afcdcc53126c25056",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/review-skill-681c5e5.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "444679c665341f2bba907a56c123fb9701e2b45d",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/review-vps-4943f05.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c57224f6fd87565d2d756af2cc9c366b7e8ece56",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/root-qa-2e64.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9d4f5debb9723d12cde30a82c7c78d83c674d060",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/separate-dc-pr32-review-boundary.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e5748c5fef3593857527afc46ec42936b27bbe89",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/skill-route-readback-cd0d0f2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6043990339423d61bfbbe7a010aede228c6a4362",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/successor-lineage.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f91554ad665a186139cc4bfb619389d05e1ea66a",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/vps-diagnostics-review-d0501dd.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "938becae4e6d500184a54bffa5d16a6e75661c54",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/vps-diagnostics-source-result-d0501dd.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8acdd92295b252feccad450708b33f32dc5dc6a4",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/plans"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e189840cca4f5a0575bfa4e1f6241de075af4e29",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/plans/HRR-PLAN@1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2917250288fcb08c802bace3b111df4e1b924462",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/plans/HRR-PLAN@2.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d17a6a7e5cf2bc4335e39824eec012a275210261",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/relations"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "838ad6103470190369168d51bcca34c54bf9a01b",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/relations/plan2-supersedes-plan1.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "fbeeecc53632bd62fd66e2d666e81135ccf9131b",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/specs"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cc56bbfbaf0cc3afbb37dd7e9f48299ce72edc30",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/specs/HRR-SPEC@1.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ead2bf99c6676d89afb3d0ea7037dd6188b34ba9",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2b8593f92e3bc7a830a0ed2c4df648a1b0c65a7b",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-A-CONTEXT-EFFECT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "05073339ceb6eef3c0ca2ac19fbc976f3526a7f5",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-B-ADAPTER-DIAGNOSTICS.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1dea29bbdc0123b1e7d7085a8aceedb2e69ed16b",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-B-CODEX-CANDIDATE.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "dade082e8b479444a428e25161f50f4a8d6b06e4",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-B-CODEX-CONTEXT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9f33a83b1d95722aa4a2f7d690ca0c389c19024a",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-B-HERMES-QUALIFICATION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "363531220a9db5b0943352591ff2bb72ab76eae1",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-C-HERDR-RECOVERY.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "18adf02c3bf8c52d3a6c6e236274e0de2376734a",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-INTEGRATION-REVIEW.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0c8d2756112189215bc04f641a6beb6e4ce5dab1",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-REAL-RECOVERY-ACCEPTANCE.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1a36c6ab27f82c8fd418ad83db2aac7650828fa2",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-RECOVERY-SOURCE-REVIEW.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "720d4acee22dc50d30dbcb3e821ccfa68c9cb274",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/work.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "640bafe5afd75343d563a6be7fb7faf8f62370c6",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "6250ddb3835099adb52662f0667a9e48166beb92",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/decisions"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4989e7d7ed88af02fad7062a163be0b69cbee90a",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/decisions/HRI-DECISION-CONTINUITY.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e1dbbfaf82d648189abe95084c6fde3e03960467",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/decisions/HRI-DECISION-GOAL.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9930ddd9d2119cba52d00935043122f15e279287",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/decisions/HRI-DECISION-PERMISSIONS.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "118b87647de8b6926fe9f0544edf43325e76cbe9",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/decisions/HRI-DECISION-SCOPE.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "40159e66000fd1ac543d61981d7f3fc0d780f6b0",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c8341eea89c4a7f174f3d8fb55f1e0f5c68dd1cc",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-03-herdr-compatibility-alias.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "88686405f9ce1101e05fff1383181cf494e90519",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-03-herdr-directory.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d8c4517e6a8b5cfd9a3ca4cfae55f2f2117256d3",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-03-herdr-projection-sync.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "888e0a77fd27a009a4e99fdb11cfcd7616d6e273",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-03-retire-herdr-runtime-network-ready.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d1a862d18e80509dd8ac6898b01d3bac855a4783",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-03-retire-network-ready.sh.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9f0c641b7da5012491b9ab7b8971e0b53916c1da",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-03-workspace-bind-declaration.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fef5a59965eade9596c0a9ee205ce82be9d7cc5f",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-05-common-reviewed-source-publication.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b6cfd74e24ca1ca4c9bd61d5284bdbbcfd4265b",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-05-native-main-protection.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e0b905e7a13422cd2267683427e552d03e6c1249",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-05-private-native-source-publication.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3bb0c5350e4294464c1857ee057f54ca3f3afdea",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-05-reviewed-source-activation.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e9ae6a46f4fff7feb6537ead0da601090cbf4ae7",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-06-blank-orchestrator-start-and-restart.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6fd8cbf8074e5e823256b1e1d66e92d397a9d9de",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-06-container-codex-permissions.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d739c0bb992a41bc6ca9ec8bcfacea89cefe2e5a",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-07-cross-host-receipts-and-pointers.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "df6e7d55a64873e0d49b3401f7b455122e8a4637",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/effects/HRI-07-owned-state-directory-permissions.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "d05db5d38e0880ce9e15923a29b6b2343af2888b",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7f08a3833a9b0c805a3aab3115f3cdbc68e51e8d",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/HRI-03-NATIVE-EXECUTION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c83edfb2952bc1ece2509ad9177f7a22d17dfce",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/HRI-05-NATIVE-EXECUTION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "259429b796937b4ada4240528b275127fe46c286",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/HRI-06-NATIVE-EXECUTION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7a60f19f7088f084fff24f8c987e304391154bc2",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/HRI-07-NATIVE-EXECUTION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f455ce7c6286b2fa636eaeaf3760fe0b84bbc82",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Aevidence%3Aherdr-runtime-integration%3Ahri-01-source-readback.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f875e7227319c95643c15b39ad290d7e38a4a87a",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Aevidence%3Aherdr-runtime-integration%3Ahri-02-source-readback.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "66d9b2394e5ed1dd25a7cb7e2539f73e1f279148",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Aevidence%3Aherdr-runtime-integration%3Ahri-03-owner-readback.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ef52e521de0ce2096175dc8bf7182dfb7a6f7ce",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Aevidence%3Aherdr-runtime-integration%3Ahri-04-source-readback.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9bed41569a5899f3ebd2ea502d1890004bcc14c2",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Aevidence%3Aherdr-runtime-integration%3Ahri-05-owner-readback.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e1e5cb98099f13bab2588d48bd35f6c89132da04",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Aevidence%3Aherdr-runtime-integration%3Ahri-06-owner-readback.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6bfc46bf19dd5533e589fd12819c91216d9b3777",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Aevidence%3Aherdr-runtime-integration%3Ahri-07-owner-readback.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2743649e1e49b7fddb69b3bc90c1ae1c7e918cf2",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Averification%3Aherdr-runtime-integration%3Ahri-01.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6b39c5973e75113bc5716a8074009777ba302d4e",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Averification%3Aherdr-runtime-integration%3Ahri-02.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fcb889bd76203af2860859985e04f99fce8b3d3e",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Averification%3Aherdr-runtime-integration%3Ahri-03.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "45e9590985a7fedf181793d7d1fb4284bbe52f55",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Averification%3Aherdr-runtime-integration%3Ahri-04.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7a6dee137999282d05c7fa000ca9aba5efcaccea",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Averification%3Aherdr-runtime-integration%3Ahri-05.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4cebdf6ad7d91a5edeb52af8ee2dce32bd91a4cb",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Averification%3Aherdr-runtime-integration%3Ahri-06.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b6977ff73ad21a84538dfcd931f0a32cf6d7f1f3",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/evidence/codex-harness-engineering%3Averification%3Aherdr-runtime-integration%3Ahri-07.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "2db4f09779243b6407a93a4ff308c6867159296f",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "de2255deb4ce6da3b4db4bd5c78859654bcb29bd",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-01-READBACK.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2eb8d301a6914ed91e46e4d2b1242e8bb40e2f7a",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-01-VERIFICATION-INPUT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "408c9e26816dc4b229fbb08af9a9d94a19bb2f10",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-02-READBACK.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f918405eb106213105fd5726b2c052229f94f619",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-02-VERIFICATION-INPUT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3552dd4107b5bd67f9d71bc1afe0f25de04133d4",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-03-EXECUTION-INTENT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "36e6b8c55e314226c9d1fff0b948f092e2f41b59",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-03-EXECUTION-RECEIPT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7169dfa2ace7d4c2610945bb819a287fcdc91c61",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-03-OWNER-RESULT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "803e82b0d8f774acfbea0b15489aa896ff2868ee",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-03-VERIFICATION-INPUT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5271e759f0bd32524f26ff98a72b2179a837022",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-04-READBACK.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fd4bf3e90c732e0d37e0c95c7775d660594a0991",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-04-VERIFICATION-INPUT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "649a539aa50e5d5b569f1f2b6621d6ee7b2ce54a",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-05-EXECUTION-INTENT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "019aeae3b7e45d513bbc6f5aebb372ee6028cd2c",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-05-EXECUTION-RECEIPT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "12633b333429fa05930b5cd4e58dcae664153be0",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-05-OWNER-RESULT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "207bdc8337154c0bb129abe38302db70d8248786",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-05-VERIFICATION-INPUT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b073017c9bab4f2610729d1ea19a655fb30684cb",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-06-EXECUTION-INTENT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d9f58d572d748b444ba09e3943f78b7bfa8abc5f",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-06-EXECUTION-RECEIPT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b86255c9c070c3609278294a2b8d946b00bef178",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-06-OWNER-RESULT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "725c5521499cabbd8860dd3177e4a3b7b39f861f",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-06-VERIFICATION-INPUT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cf944c531b4de4c6dde10a94701bd8ddaa2cca4f",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-07-EXECUTION-INTENT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2b4958a1917b9ab4d01c558a8ec7553e35625bb9",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-07-EXECUTION-RECEIPT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4b102609ad71029f1125bd65f8c400660e2f9062",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-07-OWNER-RESULT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "85e488ec88a1eb09f41b136915e865663d4caf67",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-07-VERIFICATION-INPUT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc3ac7dfa6db01434b92005459aa4244c33c31bb",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-INPUT-CONTINUITY.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb47790f57466230acb321c8f4948adc2135dc9f",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-INPUT-GOAL.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "34805ecefe9d48fefaa4623130fc4f46110074ea",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-INPUT-OWNERSHIP.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8196a54fb01187be98bb87dfce5bf9d6b9851d69",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-INPUT-PERMISSIONS.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4e8c64bd71ddc49c62fc03a941f3f6e634df04a1",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-INPUT-SCOPE.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f53d8c5fcd3400e2245b7acce81464c72b7e415c",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-PERMISSIONS-SELECTION-CONTEXT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "413a955f2a8e3c2b98ab90a896f753e479ce3881",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-PRESERVED-EFFECTS.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d718b49ce27a9c6e70d885ef21715d1b9f3981d2",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/inputs/HRI-SHARED-RESULT-DELIVERY.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "26661d56625ebf4bef0d8488bedb2dbbf4c47446",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/plans"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93af6eb24d68b5e5e3ff69404aee6b210abf1c30",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/plans/HRI-PLAN@1.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c0a76c7d7ff1edab19334925c6a4466d995390ad",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/specs"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "602e9a00777e1c2b0dabfac5b1a916f203d47771",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/specs/HRI-SPEC@1.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "8afcaa89295dfd12cdf4c4c78a506b65bfd92500",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a89b7d086905de9f0d7877b7cee83f09070159bb",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-01.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5fe791eb1542d6340c6731b7bfa284b15430f43f",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-02.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "466c297a2815e7b0511a3104196cb244b2d5b17b",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-03.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e559c449bdba58911f100335093e8cd10d031221",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-04.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61ac3f055345040e502fdd957606b84eb6bf9778",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-05.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "03859a44a240af995215dfe1c7bb010e9ee3796d",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-06.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ebde2c92b090683cc9b5ac7bc33432954174c8f4",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-07.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3dd402efa016a14e53311082f94d10d83b5542b9",
+      "path": "work/codex-harness-engineering/herdr-runtime-integration/work.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "bc3214a0a85a23266bc927d2bc6a968e33286e15",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "a11f276b3d76325af9a7765c2aac622f4e975720",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b06b4d748f18adc64e0dfcbb37c48147469d656e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "18110c32d77dda0e55c0f7884662b8c5a20c348e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U10.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f376347d5a32141d9156726fd2f119edc1dec315",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U11.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "be12feea0591697cef2a3112c7b16da7f664f7d7",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U12.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "72b0dcec50605e8fcccc129abef2a80e09ba2041",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U13.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "25597a769dcb15638eadcb74d978b2d193369571",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U14.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b34e3c7a1d3cbc093c85771dd6e1ac5931277793",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U15.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f0c903adb397c91c2bfc6d248446350627c59f60",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U16.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a156c0ee161757c166cf8abfd2fc192acf5c57fd",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U17.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fc4bfe95cf42300c5576ad5831aadd0888c7538d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U18.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb853a70abd013a55b38df6d8d5d2df249afd6c9",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U19.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1731076c1864256a1297700ea1e9a402600674c6",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7751f6fd43086a6d1724b6e8570b5ea8d0d50720",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U20.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b588e9b3bb0aa7cb980fe88d30998d6ac8a62f05",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U21.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ac978221170665c14847de841749c7419a15ff7e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U22.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bda91d1e2347ccd8cb6da7c635420eff1ce2cb4e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U23.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b5156e7343c4a543a3bf37073b9bbf1ad1fe414d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U24.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "76cff418f15254aef69520fbf48578e0ef257a07",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U25.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7166c12817d7a4770ccc2f3c36ad85369a7b08ee",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U26.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "678e5ef8387641a5f8b3a47fa4dc0635e227a3be",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U27.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3518495c19d38e0ec9e71c02da3dedf29581631a",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U28.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "95235303c8671b96d9acc1cf9d5b7b6bb609fcae",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U3.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3e0d0af4192a8cc547539b339640f17fe965e8df",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d957757e7047917997b98993cd26c1e4e75f3ef",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U5.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "03f9a5fb8abf090aae8306e4c198fc9c6264366f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U6.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6be6cdc0ea8fd94c3c398b7e02c5d11c10a68e43",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U7.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c7844c70c7d7453ad1f823129c8b76f2b63c5088",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U8.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb835bb57baa3094c748da6d327aa275618c9f61",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/U9.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ef2133ffa5669c3534006204e4c41146100d58d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/academy-product-operational-backlog-included-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e96b961f79244374d7736eaf196c64f589115d11",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/autonomous-common-goal-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "661082cb958aa1b2b2bef90ea8cc18a86b426691",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/broad-engineering-authority-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b9b8b297c663e2f0959fedd7be386daf3a91fcf4",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/common-first-implementation-explicit-publication-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e0b7ca0853aa103b8d4bd6315618e6695ae9d4f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/complete-interviews-before-autonomous-goal-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b0a92179acc2b5fffa9a49e85fea972a700e3943",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/delegated-evidence-based-lead-acceptance-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "faed7ce94dcfd607dc3a7fe2378ff1c72d82578e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/explicit-lead-native-harness-activation-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2ab7db3125346dde93c14e0092cfda91290c0d3b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/fresh-native-evaluation-suite-budget-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2eeed6692a56283a9dcdf82dfa3f0519eb452806",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/git-canonical-common-records-design-review-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c6a3e38e1d85daa0ed4d763f64a3a34c330556ee",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/github-canonical-latest-main-start-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b30bbfe662b7750a3547adf789ee463f938db18f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/independent-reviewable-task-prs-within-work-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "23329a4e2232d2840ea1b3e2c91792d3e1a39ebf",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/integrated-purpose-and-success-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0081037e6720ba544ca69abfe596c1f64e4d8146",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/latest-bun-vps-agent-defaults-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9fb33a51859b8959a66b1dae32c1364b03d21b21",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/no-automatic-merge-explicit-lead-integration-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4a364060ec398a24bf6aba6ac8f96bdc613e05ef",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/private-by-default-reorganization-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "07335f91a2740cc2111e859058ad2c118f22fdf8",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/resume-with-monthly-preselection-boundary-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e6e13b7cbdcf560e77b58ed91910f4260ee977e0",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/review-reuse-identical-tree-current-state-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a8778692d08f59f2100cf9b0b96a9a59df281a8c",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/single-repository-common-runtime-harness-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a385f427410e89dd08283509e3def272e0d957f0",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/single-work-branch-recording-no-separate-decision-lane-20261014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f63bc60bd9c1a6cf9c2d2627fc420f87f1b85efd",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/whole-lens-unfinished-delivery-cleanup-20261015.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "200c591dcd762f9b5f2410542da8819e46310f46",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3970d4cc632a0b040b354c2eb968120b5b08003f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/academy-root-source-read-once1-observation.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1c9efa153329d9257d3ad262361e682cb2788d56",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Aevidence%3Aontology-driven-harness-operation%3Aacademy-context-independent-review-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "e49c1c66e33e8202ed3400542a0ee39394c9ebe1",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Aevidence%3Aontology-driven-harness-operation%3Acompleted-source-review-gha-23.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "393fb50772852d72e220aa7c8fd39fce9711c2ca",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Aevidence%3Aontology-driven-harness-operation%3Acompleted-source-review-gha-24.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "62deaabaa6da612aea35cc5e9ba90ff9f88dcd25",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Aevidence%3Aontology-driven-harness-operation%3Acompleted-source-review-gha-25.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "43add31cb66b01e52fce93f98ab2c1c5d9279d31",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Aevidence%3Aontology-driven-harness-operation%3Acompleted-source-review-gha-26.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b61b9730c9ab9773f380ac03bb9257b2c8df0604",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Averification%3Aacademy-context-review-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "da003f47a48fd90f071e81537d8584a27aba99d9",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Averification%3Aontology-driven-harness-operation%3Asource-preparation-gha-23.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4877693b37a1096957b9714f08802f123603231a",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Averification%3Aontology-driven-harness-operation%3Asource-preparation-gha-24.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ebaafcfc4eb023ca4483ed542a06ee7efd2a0a94",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Averification%3Aontology-driven-harness-operation%3Asource-preparation-gha-25.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f69823d54ddc2b4d633a2ae312f7d0165bda7caa",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/codex-harness-engineering%3Averification%3Aontology-driven-harness-operation%3Asource-preparation-gha-26.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "10f6fbbc68cabd58d23224d0a9589a4ab0e5f962",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/evidence/reviewed-common-plan-source.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "0d5ce076adf311d4b97f7e8ffe1119f696e327e0",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/fences"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d24c5f55eaddd8edbecff39ea76b4fc390cf10ce",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/fences/academy-root-source-read-once1-fence.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a987f6b436c19a0fefacd947e1908de8c6b20466",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/fences/checkpoint-56-historical-effect-fence.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "c634573f070c40eb878b3c9db6e873b0fc0a99af",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d96a974d63c770312c720cf02dbb1ab0a136ff18",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-context-review-result-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f055bb01c6541d0d58cf032b34edc1d36e7a49e8",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-context-review-verification-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eef0a65be75c445f2df6a69eada0bc0a9898a986",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-opening-delivery-receipt-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3d9cda90f7a79a1c1d64eaf89e6e72ec0d78cb11",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-manifest-20261016-v2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "eb9689dd98b2f64773eddf5027fa918823e6ffcf",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-manifest-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c4cfbd8cc5c833e92312b159de86980785a7faca",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-plan-20261016-v2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0d6062c5f85e28b4f674c50a0bc8eccab9e5a5fc",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-plan-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d020196f5081028213c0797d8e3424441c836422",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/academy-release-phase-sources-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c4d7d1dce3665fd600d4c4ba481536ba49baa53d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/autonomous-goal-direction.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8eedd1b2367450ea283b7206adc0fc6d7b4610f8",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/checkpoint-56-history.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "cbdc3118c0f6109942c91c923eb4a851b5bcf09f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/common-first-direction.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a418ec63f6ceb2c0fdb05442d370f53f2b2149be",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7f5cde92e51e8bf2a619d789ab5c931d7216b035",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v3.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "13654b1935555b009b8efb406ce7ad7e65c2cefa",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fc7d931b801c45abf15811e252e605b0ebe6f56d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v5.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "23ff8f3c62c2c7f31ee66615f791570299e345b8",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v6.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8f8b7fafc81b60424626e4ec6acb6e8dd771b12c",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v7.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "30c9a8094eb831635b03a2ba102f2b3d1f0f05af",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "820b1d795fc9806a4de8859e7bf7d07170caa22d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9e153d9afdcf0202ee419969ddbdc463c16b9303",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2caa2913726b4a51f7dc81b88bbb0f663d66bb14",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-3.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b05fdcc1875edc4e3b9dbda77f3157e51383e84d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-supplement-20261016-4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9418e0fc94fb276c0e324a4d870eced74a5ab874",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-v4-schema-verification-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7c016ed7a3507d3b35d94cdcfd21a37dbfacce1b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v2-utf8-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b296f68a08f8d1c8f720880401c87944fa2a19a6",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-original-v3-utf8-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "964f5b34bf7d5167ca081f8266bc2d9becab8c23",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-session-original-answer-20261015-1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1ed0c4ac3ae5c512870259dbe479f6be5887a0e5",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-session-original-answer-20261015-2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0ad4d8366973bcc62fa016eb167d6fd72b87615f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-vps-bun-user-answer-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "322ea1d41e22b3a231eeb75b0934620c6fdacd77",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2639d805bb18738e02f319474fef686265de7fdc",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1b20b8a629910682da7386bbefe5e0fa0d8eb079",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-3.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6e5772d23117b84cca9a9b576531fd52f86612ba",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-4.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "87242894d02b093f08d9a1dfb3272a460cff4548",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-5.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc2760390ac6c0e06b75f1fd6bb63ac639778d78",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-6.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b5ea3b3e01a890ca8eb0cd3194cef611dce7976e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-7.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "16a803a58a9490a028be9b9393213dffedce1f7b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/git-answer-8.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "533183ccd0e6009ae4306075e2de98c9de6a86c6",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/integrated-program-original-answer-20261015-1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2f793db7746e473dce1d965a1214edf8c47c2a1b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/integrated-program-original-answer-20261015-2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "77da1e2cee241a1e2053ef543c90948ac350f3ef",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/integrated-program-original-answer-20261015-3.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a1890a1f47210d1c54e53dc2c7f2ae31d6b500a6",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7fa19589fc3170bbff11720837b0c8d69e8eebe",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-002.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c05efdbb8a6eccc1749a744e5bc6e6e5a0e5a9c6",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-003.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c9e9ae4507624c922df075b0f7ae24b295c7991d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-004.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7bcbd4f5e5b898b1cb421e01a94eb2c6c320868c",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a21afd63ab0d7df1f2f87fd4f122370e1660a771",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-006.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c8b4325d88810d9bd14b1f4ce4521f24014f107b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-007.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8956a1d993a35a24dc6df2283aa356c4675fa4ff",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-008.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "802418060285527baa6256af82e51613fd6701d1",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-009.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1d229fa9dc98b2e87708556afb868488dda28ed7",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-010.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "674d610a040f0c09e870ce4c49434de2b8420834",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-011.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "43946fe24d37e90aac1fcddc8082b10be3205c94",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-012.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "966448c1446126fea366cdf778d99d3cb2d820fa",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-013.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "53477a3668992e3be6a2af3b8768bcbfd8e588fd",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-014.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "395e4e109a5c5d4dbb2e4188b75659475fe10a99",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ed55389bc5b603cdbb00757715a29757cd56dee3",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1ef410b724557aa14adacbf12aa5e2dcc5f9ffe3",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-017.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c90c991eb2226b9b2570521cf28e952c202aaefd",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-018.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d10d946c56cdc0d98a64fc47b396bfd2c39a9b2d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-019.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2aef3d31e4a0ba7451286b83d30a4497ec8d598e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-020.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "201c60a81fc48a5e7fa13ac8df06a78a6f92b5f3",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-021.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c6db0f3bfdb8c11db5bcc1263aae29b0447720b4",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-022.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "67c7d2a59af03e079cc70342ed566e8c35af575b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-user-answer-023.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4133b95a5bdafd6d6a252e55edb7a48285905dbb",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/native-interview-selection-context-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "143514838707473589bb89d9fbc8f1b8ec8181e7",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/post-goal-orchestrator-interview-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5c82a8c1e8ac90f5cc41a06e26e476e49dbbf0d5",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-custody-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "83cc2fa301b1b7d0a5b23c23d03f9eb047c917e4",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-read-replay-fence-20261016.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "191dffa892955168e6b1a06748a96583e9fe6bbc",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/recovery-user-instructions-20261015.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d0c49c016b22cd7f908d2cf4c57b0b9dcd128c7a",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/reviewed-common-plan.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7705ee19300f1e038f390baaa45b86b85abfac6e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/source-GHA-23.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0cba6e5159e4180ee421e79aa122eb946a99f92c",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/source-GHA-24.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "28cd0f5e1ab36206bff4b508607fccac75ef6b1e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/source-GHA-25.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d4d397ff2da203941b27384f17eeb30e035645f1",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/source-GHA-26.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "93baa1579b423ecbf115ad3f514eb14ad8096c1c",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/topology-question-context.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "671832d578391ed6675ba9d2e1a65f39bfc9b184",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/verification-input-GHA-23.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4ed2d6c8226610583ff43342ccef81c96f31a832",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/verification-input-GHA-24.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a6198a547e9d4039d111ebaa5f0f8dc26190f973",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/verification-input-GHA-25.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "be90d3e12be5da493cd4d4acc165663eec744a5b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/verification-input-GHA-26.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a68d953703b11640ca09a1029a50de5ed72a7b22",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/work-purpose-compaction-provenance-20261016.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "9c718a51c69b7d8ecb00c058f1375adec868afaf",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/plans"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5198e9beacc271a3bfdb28ad5f23c568fbed2da6",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/plans/ontology-driven-harness-operation%3Aplan%3Agit-harness-adversarial-20261014@5.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "476863861358d3e9115fe1b42edc399d1ff1ffbe",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/plans/ontology-driven-harness-operation%3Aplan%3Agit-harness-adversarial-20261014@6.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f83edb51f4965012b216afc32b41ed11d900d68f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/plans/ontology-driven-harness-operation%3Aplan%3Agit-harness-adversarial-20261014@7.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "27e41f00e36802ddd974570d20ff92f2415f5514",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "4f8b63ab7fe8617c4337d4b10176a386db65d815",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/academy-release-phase-manifest-v2-supersedes-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7825c284dd6f095f6a1a42d7408f6da21e707db6",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/academy-release-phase-plan-v2-source-grounding.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1f4baf380c2b1eec866acf14a4fa1a407f3ba5bf",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/academy-release-phase-plan-v2-supersedes-v1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f03a94e98d3a920328ef163ca787453926f4199a",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/academy-release-selection-preparation-source-plan-v2.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "377026f4f344c41aad9184e41e74f9130161129f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/academy-release-selection-preparation-source-plan.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f2528e4c5fbcf4eb7da9ec1ba02296ff70dd3f2b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan-contains-GHA-22.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "565a1c2f1a4fa6eccd12addeaa6c71a55b583b7c",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan-contains-GHA-27.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "78a608f6051c13c6a3c298d87114c97d0f7d1977",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan-contains-GHA-28.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1d7b656bc45e6602e8bf1e42a7711bd8e4fdffa1",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan-contains-GHA-29.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1ae0c4f8eb4dba7771fd72df233a0c0df1a64142",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan-contains-GHA-30.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "951d6f4b8c15464f30823f078225ca77a58c344d",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan-contains-VPS-LEAD-HANDOFF.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b8520fdb54d0d988737670f29861502b35342675",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan-contains-WSL2-LEAD-HANDOFF.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b22cc166d003f0eadbaf96a64a655063383b83e1",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan-source-grounding.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "33325dd4099525249d8c886d6f488e090adc9776",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan7-contains-ACADEMY-RELEASE-SELECTION-PREPARATION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b6f3695c93bfe5941bda9a726113b2838bc15d79",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/plan7-contains-ACADEMY-ROOT-SOURCE-READ-ONCE1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "709c54747730cf45fb892887070619bfbe6b748f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/recovery-plan-revision7-supersedes6.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e28d4142b34837af2455f056a1874a649a0007b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/recovery-spec-revision7-supersedes6.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6b1710f06d592cca4d4365437a82ef7972de7b87",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/relations/work-implements-common-spec.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "ab6d26c1b2e97090ec85c4e7240fe98610c85561",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/specs"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "24e9cc86be522181f0899b81aa2ce213a8a82cdb",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/specs/ontology-driven-harness-operation%3Aspec%3Agit-harness-adversarial-20261014@5.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "64150626b764549f06d43fa16ccae93d1289f619",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/specs/ontology-driven-harness-operation%3Aspec%3Agit-harness-adversarial-20261014@6.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bc173e1c23a23afb9667101d124963b202011101",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/specs/ontology-driven-harness-operation%3Aspec%3Agit-harness-adversarial-20261014@7.json"
+    },
+    {
+      "mode": "040000",
+      "type": "tree",
+      "sha": "633762cda3966aab39ee827a0ac9dc4e86b8c948",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7e4f56803ff469f15b30304c1ba36c0c24aa470a",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-CONTEXT-REVALIDATION-REVIEW.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d9ebc6d37f69387de967323b41b0606b544f6fef",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-RELEASE-SELECTION-PREPARATION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "32e53b7732696d188a8902ca9140029140105dcc",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-RETAINED-OWNER-RUNTIME.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0bab39ed801b8ece9de0209707d5d2c5b39fb318",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/ACADEMY-ROOT-SOURCE-READ-ONCE1.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f27846071ed6f899a81e6249903f79e9343543a7",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/CODEX-EXPLICIT-SESSION-WORK-CONTEXT.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ee6e5f59a20e9adb8b1508cff30595c47a5f34b8",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/CODEX-HOME-CONTEXT-BUDGET-FIX.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5a40e59921d89f02c1251d01f4834c35620f9f5b",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/CODEX-NATIVE-ADOPTION-RECOVERY.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8c6f842b844e4a143d737b6bedb5d2a9fd9b492e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-BUN-CURRENTNESS.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9b7421ed95cadbc177570ec54e3fa7e619719083",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "142fbce37e5618518f8ba8e8b2d135200624019f",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-SOURCE-INDEPENDENT-REVIEW.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f591eb4a6c8c3a846a57b4ab136f1b16f7091a61",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-22.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5efefe834bead937a9a737e76e328e6ab04b1177",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-23.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "3ef438cda4f137ecb36292e78ce2364589739098",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-24.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "b027a92a50f8ad3f9c7f02fc1f0d289b46193552",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-25.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "19a5150c1ba08efb0c159d5cd830aeb0e00be409",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-26.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ffef62f599a4702270e0577c1298177bd8716956",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-27.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "fb8b7b0835cacc02174d7a57a0998db93cbed24e",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-28.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ca4f38a0c4d1794f2d08aa21141678a3010ae448",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-29.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ae1a7903d9c2083b56844b7f4d3dbc61adc13649",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-30.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "377b98d4fa0031d0f8057bef3dbc960321c70346",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/GHA-31.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d5e7bd5e5ea01d4fe2c484ebb10d8f26aad2a727",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/HERMES-CURRENT-WORK-SOURCE.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5e162975f6d419e914f38e24d816e2281adae5d5",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/HERMES-NATIVE-ADOPTION-RECOVERY.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a94f2dbbeecc4612c20cd357230ddb71ec403176",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/INTEGRATED-SCOPE-RECONCILIATION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a578a46ede7d3ce1b3836e38d43a5efe238ff8a2",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/INTERRUPTION-RECOVERY-AND-PRESELECTION.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "72322740bb6d2c9248f615addf0eef3e282453e8",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/MONTH-END-PRESELECTION-ANALYSIS.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "c258ef6971ca64f7336347ddd5db50d0760169ce",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/VPS-LEAD-HANDOFF.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7089b7b9a35a8f9881261ef412fcaa1c839b625",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/WSL2-LEAD-HANDOFF.json"
+    },
+    {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d7ef3a1efceb8e50ebf61a9d303c341992c66650",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "schema": "hrr.common-source-author-custody.v1",
+  "sourceHead": "34e3bedd66e6697f199456f32374ba00711d47b6",
+  "sourceTree": "6737f5fe45787264da784d148114aa923d0d43fc",
+  "observedAtUtc": "2026-10-16T14:17:47.950698Z",
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14419-af50-72d3-b918-cc32a50a1913",
+    "meaning": "Root own native Goal thread and named variable were observed equal; source authorship is not authenticated by Git author name alone."
+  },
+  "components": [
+    {
+      "scope": "common A/codecdedup",
+      "nativeTaskPath": "/root/common_contract",
+      "sourceCommits": [
+        "98206dfb3d8951366b9ceab617af39e0fcbc04cd",
+        "f206e59fb88d155d0cd6416142501643ccb18139",
+        "1d4b1b4b33d00049f61bd8aee16b7a7731963d93",
+        "f642938f4196b3ff99314f91cd0d6080d7dd46f1",
+        "e6fc703e0e676d13e7db213b95a091d0ac4a3321"
+      ]
+    },
+    {
+      "scope": "native Codex source",
+      "nativeTaskPath": "/root/codex_context",
+      "sourceCommit": "8563fefe3ae7d62458e74a5debf03a8c04cbe7bf"
+    },
+    {
+      "scope": "native Hermes source",
+      "nativeTaskPath": "/root/hermes_qualification",
+      "sourceCommits": [
+        "250344dbab7f5393d94b0b62f251efe85207ddf6",
+        "c5c67dcf225f1fba8f0fdf4e1329a0d821057150"
+      ]
+    },
+    {
+      "scope": "HomeAPI/registry/skill/currentWork/recoverycustody/CI exactAPIproof",
+      "nativeTaskPath": "/root",
+      "meaning": "Root authored and serialized exact reviewed source; no child UUID inferred from inherited env."
+    }
+  ],
+  "finalIndependentReviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a144db-2ddf-7990-9fba-3a175265e424",
+    "herdrAgent": "hrr-recovered",
+    "pane": "w3:pN",
+    "currentNativePid": 644911,
+    "meaning": "Root observed current owned process, actual dispatch/output correlation, reviewer named self-variable and matching open-file name metadata only; no native transcript/store contents copied."
+  },
+  "knownCurrentSourceState": "Fresh final exact34e native canonical review complete/PASS0, Root observed owned agent completion_seq238 and exactresult hash/readback; current required source/quality/owner checks passed with scopes preserved",
+  "nativeActivation": false,
+  "modelEvaluationSuiteRun": false,
+  "wholeWorkAcceptance": false,
+  "codeCurrentnessCasVerified": true,
+  "sharedCheckoutsSynced": false,
+  "finalNativeResultSha256": "3ae50495e0444103496676846fd44f3d60e934972b410b52d99fd41b26705633"
+}
