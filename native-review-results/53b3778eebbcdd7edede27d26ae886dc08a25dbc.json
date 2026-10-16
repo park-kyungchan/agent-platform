@@ -1,0 +1,588 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "reviewStatus": "complete",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "53b3778eebbcdd7edede27d26ae886dc08a25dbc",
+  "reviewedTreeSha": "41ac79f6e9fb56737ddb82e245bb455a60e81897",
+  "reviewedSourceManifestSha256": "2875b5cc07e72ed52e16d6a200151db10c60a88b56e33a9d722247e412645a7c",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a144db-2ddf-7990-9fba-3a175265e424"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14419-af50-72d3-b918-cc32a50a1913"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "completedAtUtc": "2026-10-16T23:09:37.301178Z",
+  "selectedSource": {
+    "repository": "park-kyungchan/agent-platform",
+    "repositoryRoot": "/home/palantirkc/code/worktrees/common-custody-correction-20261017",
+    "parentHeadSha": "bb6dd1a550839ad28038b1e30bed1b341a40726b",
+    "baseHeadSha": "e8ac3d820b97fa1e850317b8fb556ac9bde02081",
+    "baseTreeSha": "82aad84ada5d2d67df1f609c1084811752d7c6b9",
+    "changedPathCountAgainstBase": 23,
+    "changedPathsAgainstBase": [
+      ".github/workflows/source.yml",
+      "architecture/capability-source-owners.json",
+      "bun.lock",
+      "history/source-successors/repository-closeout-20261017/coordination-proof.json",
+      "history/source-successors/repository-closeout-20261017/hermes-v1-successor.tar.gz",
+      "package.json",
+      "packages/evidence-foundry/package.json",
+      "packages/ontology/package.json",
+      "packages/operational-context/package.json",
+      "packages/research-capture/package.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/evidence/HRR-SCOPED-ENGINEERING-OBSERVATION.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/evidence/HRR-SCOPED-ENGINEERING-VERIFICATION.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v13.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/checkpoint-v14.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/remaining-goal-audit-v1.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/repository-closeout-source-custody-v1.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/scoped-engineering-observation-v1.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/scoped-engineering-verification-v1.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/source-publication-readback-v1.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-C-HERDR-RECOVERY.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-INTEGRATION-REVIEW.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-REAL-RECOVERY-ACCEPTANCE.json",
+      "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/tasks/HRR-RECOVERY-SOURCE-REVIEW.json"
+    ],
+    "frozenHeadTreeAndTrackedCleanObservedAtEntryAndExit": true,
+    "reviewMethod": "Fresh exact complete combined-tree source review, with actual full Work validation/transition and explicit source-byte-bound finite QA reuse; no whole-tree approval transferred from the predecessor HOLD"
+  },
+  "identityEvidence": {
+    "selfObservedNamedVariable": "CODEX_THREAD_ID",
+    "selfObservedThreadId": "01a144db-2ddf-7990-9fba-3a175265e424",
+    "nativeReviewerIdentityInferenceFromChildrenOrProcessRoles": false,
+    "authorIdentitySource": "Assigning user explicitly identified the actual native Root author UUID",
+    "independence": "Reviewer authored none of this common successor or underlying common/Codex source. Separate Education/MCP authorship does not overlap these trees.",
+    "gitAndOriginMetadataAuthenticateNativeAuthorship": false
+  },
+  "fullSourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "41ac79f6e9fb56737ddb82e245bb455a60e81897",
+    "entryCount": 812,
+    "blobCount": 674,
+    "sha256": "2875b5cc07e72ed52e16d6a200151db10c60a88b56e33a9d722247e412645a7c",
+    "canonicalFunction": "deriveReviewedSourceManifest",
+    "canonicalSource": "ci/quality/receipt-validator.ts",
+    "canonicalSourceSha256": "d9b4492a08e3e801107fd17ba8a8ee3cc39cf875767e5b111635de18b394a725",
+    "method": "Complete git ls-tree -r -t -z of exact tree, including all tree and blob entries, passed to the maintained canonical function with truncated:false; no exclusions or subset digest",
+    "completeInput": {
+      "path": "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/full-tree.json",
+      "sha256": "979d1818ef9ceaef2bbc9e58adee8a20defad70bfc53f549c59c51f06d908289",
+      "bytes": 168516
+    }
+  },
+  "predecessorFindingClosure": {
+    "findingId": "COMMON-CLOSEOUT-P1-CUSTODY-BREAKS-CANONICAL-WORK-READER",
+    "historicalHeadSha": "bb6dd1a550839ad28038b1e30bed1b341a40726b",
+    "historicalReview": {
+      "path": "/home/palantirkc/operations/repository-closeout-20261016-211321/common-closeout-native-review-bb6dd1a.json",
+      "sha256": "7feb06e0006e75e06390e9b316bb1f7efac507b604e39f87ce7ebfe02c955546",
+      "bytes": 26042
+    },
+    "historicalConclusion": "hold",
+    "historicalUnresolvedFindings": 1,
+    "currentDisposition": "resolved on this successor only",
+    "proof": [
+      "Raw proof and tar moved outside the canonical Work subtree with the same regular Git blob IDs and byte hashes.",
+      "Existing custody filename/ID now contains the maintained common.git-work.v1 source-owner Input envelope with exact native-harness/codex-harness-engineering/Work identity and declared real Root source-capture origin.",
+      "Updated repository-relative proof/archive paths resolve to the retained exact content and digests.",
+      "Actual unmodified canonical reader successfully reads the Input and content fragment, reads and digest-checks the relocated JSON proof, and lists all 80 current canonical records without exclusions.",
+      "Fresh bun run harness validate and transition from exact base e8ac both exit 0, valid true, findings []. No diagnostic facade or filtered record set was used."
+    ],
+    "readerSchemaGuardOrProductCodeChanged": false,
+    "historicalReportAndSourcePreserved": true
+  },
+  "coverage": [
+    "Read current owner AGENTS/project/registry boundaries, the complete successor correction diff and the current combined 23-path scope over merged API main e8ac.",
+    "Only two 100%-identical relocations and one typed custody Input correction differ from bb6. Content comparison proves only the two source locators and explicit correction metadata changed inside the preserved custody payload.",
+    "Recomputed all 145 registry source/package hashes against exact current Git blobs: zero mismatches. Workflow, package/lock, canonical sources, reader/schema/guards, merged review API, project metadata and immutable releases remain byte-identical to bb6.",
+    "Rechecked all 22 context and 6 native Codex source pins against current 53 source. The existing 3ac review remains unchanged and is not retagged; this is a separate exact common-source correspondence observation.",
+    "Read the relocated 14-file Hermes archive in memory only. All 14 source pins and 18 canonical input hashes match current common bytes; static canonical-template composition reproduces the archived guard bytes exactly. No archived code, installed native closure or runtime guard was executed.",
+    "All 12 integrated historical continuity files byte-match both bb6 and 394affa; original Work/Spec/Plan/decisions, recovery evidence, historical c04 HOLD, effect fences and completed/uncertain no-replay history are retained.",
+    "The typed custody Input preserves source-only staged successors versus delivery/activation, blocked Goal, paused old Lead/WSL, full interview before Goal/plan, unfinished naming/layout, and engineering verification versus formal delivery/whole-Work Acceptance.",
+    "Current complete selected Work validates and its transition from e8ac validates without changing the maintained reader or excluding any path."
+  ],
+  "freshCurrentChecks": {
+    "fullCanonicalReader": {
+      "inputIdentity": {
+        "schema": "common.git-work.v1",
+        "kind": "input",
+        "id": "repository-closeout-source-custody-v1",
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "harness-reliability-reprioritization-20261016",
+        "inputKind": "source-owner-record",
+        "origin": {
+          "ownerId": "native-codex-lead",
+          "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/repository-closeout-source-custody",
+          "kind": "source-owner-capture"
+        }
+      },
+      "inputSource": {
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/repository-closeout-source-custody-v1.json",
+        "blobOid": "0234b5617837f75f8e1510bac413db327a5f9e0a",
+        "sha256": "04b7e6c108693b96641a6959470b6c7de54199d163813acf8642dbdcae9494da",
+        "byteLength": 5031,
+        "verificationClass": "git-object-source-only",
+        "nativeAuthorshipVerified": false
+      },
+      "fullCanonicalRecordCount": 80,
+      "fullListRecordsSucceededWithoutExclusion": true,
+      "proofSource": {
+        "path": "history/source-successors/repository-closeout-20261017/coordination-proof.json",
+        "blobOid": "1f031be825af779fc661555303331a4e6e56c488",
+        "sha256": "e3860b725268d347a1e57ca194e5f48fef73e18832586df8b7cef1d90e026a9e",
+        "byteLength": 2398,
+        "verificationClass": "git-object-source-only",
+        "nativeAuthorshipVerified": false
+      },
+      "archiveSource": {
+        "path": "history/source-successors/repository-closeout-20261017/hermes-v1-successor.tar.gz",
+        "sha256": "668a1bccca8a0bfddb413dcfc8a8c240f13177ab13fc74dbd69a06942b345939",
+        "byteLength": 41092,
+        "verificationClass": "regular-git-blob-byte-integrity-only",
+        "evaluated": false
+      }
+    },
+    "canonicalCommands": [
+      {
+        "command": [
+          "bun",
+          "run",
+          "harness",
+          "validate",
+          "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/after.json"
+        ],
+        "cwd": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017",
+        "selectedRepositoryRoot": "/home/palantirkc/code/worktrees/common-custody-correction-20261017",
+        "selectedCommit": "53b3778eebbcdd7edede27d26ae886dc08a25dbc",
+        "exitCode": 0,
+        "stdout": "{\n  \"valid\": true,\n  \"findings\": [],\n  \"authority\": \"none\",\n  \"nativePermissionGranted\": false,\n  \"semanticAcceptanceEstablished\": false\n}\n",
+        "stderr": "$ bun scripts/harness.ts validate \"/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/after.json\"\n",
+        "elapsedMs": 1180,
+        "logPath": "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/current-validate.json",
+        "logSha256": "7021cd7239c9531c8c631712334d88cb57aa76065966fbb061450be7d5ac6369"
+      },
+      {
+        "command": [
+          "bun",
+          "run",
+          "harness",
+          "transition",
+          "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/before.json",
+          "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/after.json"
+        ],
+        "cwd": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017",
+        "selectedRepositoryRoot": "/home/palantirkc/code/worktrees/common-custody-correction-20261017",
+        "selectedCommit": "53b3778eebbcdd7edede27d26ae886dc08a25dbc",
+        "exitCode": 0,
+        "stdout": "{\n  \"valid\": true,\n  \"findings\": [],\n  \"authority\": \"none\",\n  \"nativePermissionGranted\": false,\n  \"semanticAcceptanceEstablished\": false\n}\n",
+        "stderr": "$ bun scripts/harness.ts transition \"/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/before.json\" \"/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/after.json\"\n",
+        "elapsedMs": 1846,
+        "logPath": "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/current-transition.json",
+        "logSha256": "3458ddf86feb367e46aeac47cf2d46bc2c892d6503df6c7d702b6d1b55bb7d34"
+      }
+    ],
+    "executionSourceBinding": {
+      "sourceRoot": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017",
+      "sourceHeadSha": "bb6dd1a550839ad28038b1e30bed1b341a40726b",
+      "canonicalReaderAndEntrypointAndDependenciesSourceByteIdenticalToSelectedHead": true,
+      "sourceChanges": "",
+      "existingIsolatedDependenciesReadOnly": true,
+      "installedOrConfiguredByReviewer": false,
+      "meaning": "The successor has no local node_modules. The exact maintained unmodified reader/CLI from the existing isolated bb6 QA worktree was used with the new repositoryRoot and immutable 53 commit. All executable/source/schema/package/lock inputs are byte-identical to selected 53. No dependencies were installed or resolution guards modified.",
+      "sourceObjectBindings": [
+        {
+          "path": "AGENTS.md",
+          "previousGitObject": "cfc9863b84b3b1065ef040cb2d5cc2f065888e80",
+          "currentGitObject": "cfc9863b84b3b1065ef040cb2d5cc2f065888e80",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "project.json",
+          "previousGitObject": "738d1c78c19bbba8df3476e4460cd274ec5ec877",
+          "currentGitObject": "738d1c78c19bbba8df3476e4460cd274ec5ec877",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "package.json",
+          "previousGitObject": "3b57e006017417e8d72fdf753c7b209de5147f12",
+          "currentGitObject": "3b57e006017417e8d72fdf753c7b209de5147f12",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "bun.lock",
+          "previousGitObject": "30530998d620e7d80199318611026d046a805eb8",
+          "currentGitObject": "30530998d620e7d80199318611026d046a805eb8",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": ".github/workflows/source.yml",
+          "previousGitObject": "cde7f50b0572b54e99a45b694aa83270fd69df0f",
+          "currentGitObject": "cde7f50b0572b54e99a45b694aa83270fd69df0f",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "architecture",
+          "previousGitObject": "1ec6477deda2389fb03edfde8c223810afdfa48e",
+          "currentGitObject": "1ec6477deda2389fb03edfde8c223810afdfa48e",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "packages",
+          "previousGitObject": "f86520507b9220975d56f7951b1b0d5bed795422",
+          "currentGitObject": "f86520507b9220975d56f7951b1b0d5bed795422",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "compatibility",
+          "previousGitObject": "c1a1636c3661a9cd87c3a1d8104fa5b634ad1192",
+          "currentGitObject": "c1a1636c3661a9cd87c3a1d8104fa5b634ad1192",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "ci",
+          "previousGitObject": "b89a5746175c502ffd35de738e3f08f049d16384",
+          "currentGitObject": "b89a5746175c502ffd35de738e3f08f049d16384",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "scripts",
+          "previousGitObject": "2ad226b435778e1388126145876512e94384a4a6",
+          "currentGitObject": "2ad226b435778e1388126145876512e94384a4a6",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "verification",
+          "previousGitObject": "625a76bfa328a7dcf11de9da0b5e56df3f79f559",
+          "currentGitObject": "625a76bfa328a7dcf11de9da0b5e56df3f79f559",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "releases",
+          "previousGitObject": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+          "currentGitObject": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        },
+        {
+          "path": "schemas",
+          "previousGitObject": null,
+          "currentGitObject": null,
+          "byteIdentical": true,
+          "absentInBothTrees": true
+        },
+        {
+          "path": "owner-fixture",
+          "previousGitObject": "b8f1e6dc16467d2663c8d4a7a1c8da814d68c9f9",
+          "currentGitObject": "b8f1e6dc16467d2663c8d4a7a1c8da814d68c9f9",
+          "byteIdentical": true,
+          "absentInBothTrees": false
+        }
+      ]
+    },
+    "fullRecordSetWithoutExclusions": true,
+    "freshRegistryPinCount": 145,
+    "freshCodexContextPins": 22,
+    "freshCodexNativePins": 6,
+    "freshHermesSourcePins": 14,
+    "freshHermesCanonicalInputs": 18,
+    "freshCompositionEvidence": {
+      "path": "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/composition-checks.json",
+      "sha256": "11ab8db65ecde149735d64797d00038af050e4d6bd8291796dd3c5994a5ff36a",
+      "bytes": 46107
+    }
+  },
+  "finiteQaReuseBindings": {
+    "classification": "Source-code-byte-identical finite QA reuse only; not whole-tree review/approval reuse",
+    "originalExecutedHeadSha": "bb6dd1a550839ad28038b1e30bed1b341a40726b",
+    "originalExecutedTreeSha": "0c124850fa9789a538b40610ebc71afa7d340a50",
+    "newHeadSha": "53b3778eebbcdd7edede27d26ae886dc08a25dbc",
+    "newTreeSha": "41ac79f6e9fb56737ddb82e245bb455a60e81897",
+    "sourceAndCheckInputs": [
+      {
+        "path": "AGENTS.md",
+        "previousGitObject": "cfc9863b84b3b1065ef040cb2d5cc2f065888e80",
+        "currentGitObject": "cfc9863b84b3b1065ef040cb2d5cc2f065888e80",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "project.json",
+        "previousGitObject": "738d1c78c19bbba8df3476e4460cd274ec5ec877",
+        "currentGitObject": "738d1c78c19bbba8df3476e4460cd274ec5ec877",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "package.json",
+        "previousGitObject": "3b57e006017417e8d72fdf753c7b209de5147f12",
+        "currentGitObject": "3b57e006017417e8d72fdf753c7b209de5147f12",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "bun.lock",
+        "previousGitObject": "30530998d620e7d80199318611026d046a805eb8",
+        "currentGitObject": "30530998d620e7d80199318611026d046a805eb8",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": ".github/workflows/source.yml",
+        "previousGitObject": "cde7f50b0572b54e99a45b694aa83270fd69df0f",
+        "currentGitObject": "cde7f50b0572b54e99a45b694aa83270fd69df0f",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "architecture",
+        "previousGitObject": "1ec6477deda2389fb03edfde8c223810afdfa48e",
+        "currentGitObject": "1ec6477deda2389fb03edfde8c223810afdfa48e",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "packages",
+        "previousGitObject": "f86520507b9220975d56f7951b1b0d5bed795422",
+        "currentGitObject": "f86520507b9220975d56f7951b1b0d5bed795422",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "compatibility",
+        "previousGitObject": "c1a1636c3661a9cd87c3a1d8104fa5b634ad1192",
+        "currentGitObject": "c1a1636c3661a9cd87c3a1d8104fa5b634ad1192",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "ci",
+        "previousGitObject": "b89a5746175c502ffd35de738e3f08f049d16384",
+        "currentGitObject": "b89a5746175c502ffd35de738e3f08f049d16384",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "scripts",
+        "previousGitObject": "2ad226b435778e1388126145876512e94384a4a6",
+        "currentGitObject": "2ad226b435778e1388126145876512e94384a4a6",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "verification",
+        "previousGitObject": "625a76bfa328a7dcf11de9da0b5e56df3f79f559",
+        "currentGitObject": "625a76bfa328a7dcf11de9da0b5e56df3f79f559",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "releases",
+        "previousGitObject": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+        "currentGitObject": "435e7c20c93ace08e93aef3313fb8cbf2f18e21f",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      },
+      {
+        "path": "schemas",
+        "previousGitObject": null,
+        "currentGitObject": null,
+        "byteIdentical": true,
+        "absentInBothTrees": true
+      },
+      {
+        "path": "owner-fixture",
+        "previousGitObject": "b8f1e6dc16467d2663c8d4a7a1c8da814d68c9f9",
+        "currentGitObject": "b8f1e6dc16467d2663c8d4a7a1c8da814d68c9f9",
+        "byteIdentical": true,
+        "absentInBothTrees": false
+      }
+    ],
+    "reusedChecks": [
+      {
+        "name": "handoff",
+        "command": [
+          "bun",
+          "run",
+          "check:handoff"
+        ],
+        "exitCode": 0,
+        "durationMs": 424,
+        "logPath": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/.private/independent-review-bb6dd1a/handoff.log",
+        "sha256": "20b25544a3223e0d8dd4e1b1e3d53c9a0d25306722d88f790021ff69269e6d8b",
+        "bytes": 4966,
+        "tail": "\"partialStateRetained\":true,\"blindRetryRejected\":true}\n(pass) receiver final all-file scan rejects earlier replacement mutation during later readback and retains partial state [12.64ms]\n{\"status\":\"earlier-file-mutation-rejected\",\"race\":\"missing\",\"injected\":true,\"firstReadbackClosed\":true,\"returnedSuccess\":false,\"stage\":\"readback\",\"partialStateRetained\":true,\"blindRetryRejected\":true}\n(pass) receiver final all-file scan rejects earlier missing mutation during later readback and retains partial state [16.20ms]\n(pass) unpublished action and lock release failures retain both causes and preserve canonical bytes [9.86ms]\n\n 39 pass\n 0 fail\n 223 expect() calls\nRan 39 tests across 1 file. [411.00ms]\n"
+      },
+      {
+        "name": "imports",
+        "command": [
+          "bun",
+          "run",
+          "check:imports"
+        ],
+        "exitCode": 0,
+        "durationMs": 28,
+        "logPath": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/.private/independent-review-bb6dd1a/imports.log",
+        "sha256": "bb55f6a6e5d4834b77f75714c51e250adbf5a1fd199b930bcb2ad1f49715f0d9",
+        "bytes": 608,
+        "tail": "$ bun ./verification/package-import-check.ts\n{\"schema\":\"workspace.full-source-package-import-readback.v1\",\"resolvedCanonicalPath\":\"/home/palantirkc/code/worktrees/common-repository-closeout-20261017/packages/work-continuity/src/handoff.ts\",\"legacyAndCanonicalSameModule\":true,\"exports\":[\"HandoffPublicationUncertainError\",\"HandoffReceiveUncertainError\",\"initializeCanonicalHandoff\",\"mutateCanonicalHandoff\",\"packHandoff\",\"readCanonicalHandoff\",\"receiveHandoff\",\"validateHandoff\"],\"sha256\":\"8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a\",\"modelCalls\":0,\"canonicalIssueStateMutation\":false}\n"
+      },
+      {
+        "name": "ontology-types",
+        "command": [
+          "bun",
+          "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/node_modules/typescript/bin/tsc",
+          "--noEmit",
+          "-p",
+          "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/packages/ontology/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "durationMs": 3691,
+        "logPath": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/.private/independent-review-bb6dd1a/ontology-types.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "tail": ""
+      },
+      {
+        "name": "evidence-foundry-types",
+        "command": [
+          "bun",
+          "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/node_modules/typescript/bin/tsc",
+          "--noEmit",
+          "-p",
+          "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/packages/evidence-foundry/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "durationMs": 7008,
+        "logPath": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/.private/independent-review-bb6dd1a/evidence-foundry-types.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "tail": ""
+      },
+      {
+        "name": "research-capture-types",
+        "command": [
+          "bun",
+          "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/node_modules/typescript/bin/tsc",
+          "--noEmit",
+          "-p",
+          "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/packages/research-capture/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "durationMs": 2954,
+        "logPath": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/.private/independent-review-bb6dd1a/research-capture-types.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "tail": ""
+      }
+    ],
+    "evidence": {
+      "path": "/home/palantirkc/code/worktrees/common-repository-closeout-20261017/.private/independent-review-bb6dd1a/finite-qa.json",
+      "sha256": "5105dfce0efe061655697bc001219a7592f1cae3c3c47abd6e091e5aa4b10c53",
+      "bytes": 4357
+    },
+    "checksActuallyExecutedEarlier": [
+      "Handoff: 39 pass, 0 fail, 223 assertions",
+      "Canonical/compatibility package imports: pass, modelCalls 0",
+      "Ontology TypeScript noEmit: exit 0",
+      "Evidence-foundry TypeScript noEmit: exit 0",
+      "Research-capture TypeScript noEmit: exit 0"
+    ],
+    "rerunOnThisSuccessor": false,
+    "changedInputCoverage": "Custody data and relocated sources were freshly read and checked, and the actual whole selected Work validate/transition were freshly executed. The prior failed bb6 gates and excluded-path diagnostic were not reused as current PASS.",
+    "broadSuitesRerun": false
+  },
+  "retainedCodexReview": {
+    "report": {
+      "path": "/home/palantirkc/operations/repository-closeout-20261016-211321/codex-pins-native-review-3ac7059.json",
+      "sha256": "e4f7725330ff4e05836cd06baea506ba87cfbedd13d7fe522b3f2ed1a9c7b3e8",
+      "bytes": 11030
+    },
+    "headSha": "3ac7059b8499d871887f112e99534812d2d643e1",
+    "reviewedTreeSha": "a00b35d8376e70d10f385949666915daffeb9ac3",
+    "conclusion": "pass",
+    "unresolvedFindings": 0,
+    "reportModifiedOrRetagged": false,
+    "currentCommonCorrespondence": "All 22+6 provider source pins match exact 53 frozen source; active delivery and native qualification remain separate"
+  },
+  "independentStaticAssistance": [
+    {
+      "taskId": "/root/hermes_review",
+      "scope": "Exact correction, Input/origin/locator semantics and preservation of current startup/owner/effect holds",
+      "reportedCurrentFindings": 0,
+      "testsOrReaderExecuted": false
+    },
+    {
+      "taskId": "/root/common_review",
+      "scope": "Unchanged source composition, historical preservation and byte-bound QA applicability",
+      "reportedCurrentFindings": 0,
+      "testsOrReaderExecuted": false
+    }
+  ],
+  "evidence": [
+    {
+      "path": "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/review-check-results.json",
+      "sha256": "3840aa25c1503cc161a90000715e1d47a516d40180ee11346543548ffd2eb6da",
+      "bytes": 5339
+    },
+    {
+      "path": "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/composition-checks.json",
+      "sha256": "11ab8db65ecde149735d64797d00038af050e4d6bd8291796dd3c5994a5ff36a",
+      "bytes": 46107
+    },
+    {
+      "path": "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/review-checks.ts",
+      "sha256": "0e79b237413c973b8a87334981719a25e3915c661bcbc0955e9f6f4fe544c8c6",
+      "bytes": 7103
+    },
+    {
+      "path": "/home/palantirkc/code/worktrees/common-custody-correction-20261017/.private/independent-review-53b3778/composition-checks.py",
+      "sha256": "fe733c78eaa48bb9ee3817d8fb539a90b723b952ec7a229b57a13fe458e97ed1",
+      "bytes": 6896
+    }
+  ],
+  "sourceReadiness": "Independent exact-composition canonical-source-ci-quality PASS with zero current findings. Publication/current-main CAS/required hosted CI/explicit merge remain pending with Root.",
+  "limits": [
+    "No source edits, commits, installs, global/shared configuration, native trust/profile/credentials/caches/stores/services, DB/business effects, model calls/evaluations, publication/status/PR/push/merge, Goal/plan mutation, pane control or historical effect replay were performed.",
+    "The reader proves source integrity and typed Work validity only. Its source reads explicitly report nativeAuthorshipVerified:false and nativePermissionGranted:false; source capture metadata is not independent native authorship authentication.",
+    "Hermes raw archive and staged Codex registrations remain source-only custody. No installed/native first-import, source delivery, owner runtime admission, active/shared drift, independent-install shape or native activation is qualified.",
+    "Native recovery remains manual source engineering. Native v2 hook/1500-token admission, candidate preparation/activation and fresh model-evaluation budgets remain separately held; no whole-Work or Goal Acceptance follows.",
+    "Old native Goal remains blocked; old Lead/WSL stay paused. Completed, consumed and uncertain effects are no-replay. A new Orchestrator must complete the full current user interview before create_goal/update_plan; naming/layout consistency is still unfinished.",
+    "Historical source/QA evidence retains its original target and limits. This new complete source review is not an identical-tree successor binding or fabricated rerun of the bb6 review.",
+    "Root must separately perform current-main CAS, immutable result/evidence publication, authenticated current status, required CI and explicit expected-head integration. Later native adoption requires its own owner order and authorization."
+  ],
+  "effects": {
+    "trackedSnapshotChanged": false,
+    "installs": false,
+    "sharedOrNativeEffects": false,
+    "publication": false,
+    "goalOrPlanMutation": false,
+    "effectReplay": false,
+    "writes": "Bounded private source QA/readback and this actual native reviewer result only"
+  },
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "wholeWorkAcceptanceEstablished": false
+}
