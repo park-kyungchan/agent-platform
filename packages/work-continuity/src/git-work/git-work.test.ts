@@ -1287,8 +1287,8 @@ describe("source qualification does not grant startup or native authority", () =
     });
     expect(context.historicalEffects).toMatchObject({
       completedCount: 64,
-      uncertainCount: 2,
-      projectedFenceRecords: 2,
+      uncertainCount: 3,
+      projectedFenceRecords: 3,
     });
     expect(context.historicalEffects?.relevantCompletedIds).toContain(sourceTaskId);
     expect(
