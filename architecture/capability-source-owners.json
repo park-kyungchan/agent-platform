@@ -775,7 +775,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/generate.ts",
-          "sha256": "a10a2a77f9b8025caa5c5848c06d67969e073f473288c75d48b5a8f9cdb3e01f",
+          "sha256": "846360cf4b5eb224309d06c68c41d257ed0bac2ba2d77c69ad47b092eba7f0c9",
           "relativePath": "packages/native-hermes-adapter/src/source-provider/generate.ts"
         },
         {
@@ -787,6 +787,11 @@
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
           "relativePath": "packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
           "sha256": "30c2931c14c85a3ebc42df429403cc6f06ce32638d251beb4169d172e00f093e"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/delivery.ts",
+          "relativePath": "packages/native-hermes-adapter/src/source-provider/delivery.ts",
+          "sha256": "8b63427ac82b9731e307f059533330530bfb3d647c3b3b09e3aa14f1310f6c19"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
@@ -814,7 +819,12 @@
         "activeOwnerRegistrationChanged": false,
         "nativePermissionGranted": false,
         "dependencyObserver": "packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
-        "existingDataContentAttested": false
+        "existingDataContentAttested": false,
+        "delivery": {
+          "entrypoint": "packages/native-hermes-adapter/src/source-provider/delivery.ts",
+          "scope": "Explicit NEWsource initial absence-only14 source files and fixed common package link; reviewed-plan CAS, no replacement or native activation",
+          "actualPublication": "held"
+        }
       }
     },
     {

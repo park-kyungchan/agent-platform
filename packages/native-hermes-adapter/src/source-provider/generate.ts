@@ -8,7 +8,7 @@ import { captureInstalledRuntimeClosure } from "./dependency-closure.ts";
 
 const canonicalRoot = resolve(import.meta.dir, "../../../..");
 const packagePath = "packages/native-hermes-adapter";
-export const modules = [
+export const modules = Object.freeze([
   "ontology-driven/work-context",
   "ontology-driven/contracts",
   "ontology-driven/current-intent",
@@ -18,21 +18,21 @@ export const modules = [
   "ontology-driven/pinned-reader",
   "adoption/semantic-context",
   "adoption/evaluation-budget",
-] as const;
-export const sourcePaths = [
+] as const);
+export const sourcePaths = Object.freeze([
   "package.json",
   "bun.lock",
   "releases/palantirkc-ontology-0.2.0.tgz",
   packagePath + "/package.json",
   packagePath + "/releases/palantirkc-ontology-0.2.0.tgz",
   ...modules.map((name) => packagePath + "/src/" + name + ".ts"),
-] as const;
-const generationPaths = [
+] as const);
+export const generationPaths = Object.freeze([
   packagePath + "/src/source-provider/generate.ts",
   packagePath + "/src/source-provider/guard.template.ts",
   "architecture/hermes-new-source-successor.json",
   packagePath + "/src/source-provider/dependency-closure.ts",
-];
+]);
 const sha = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 const json = (value: unknown) => JSON.stringify(value, null, 2) + "\n";
 async function exact(path: string, max = 2 * 1024 * 1024) {
@@ -244,6 +244,80 @@ export async function verifySourceFixture(fixture: SourceFixture) {
     throw Error("SOURCE_FIXTURE_CLOSURE_CHANGED");
   return manifest;
 }
+/** Single canonical composer shared by fictional QA and separately reviewed NEWsource delivery. */
+export async function composeHermesSourceProjection(
+  inputs: ReadonlyMap<string, Buffer>,
+  codeOwnerRoot: string,
+  providerRoot: string,
+  packageBytes: Buffer,
+  lockBytes: Buffer,
+): Promise<Map<string, Buffer>> {
+  if (providerRoot !== resolve(codeOwnerRoot, "../agent-platform"))
+    throw Error("FIXED_ADJACENT_PROVIDER_REQUIRED");
+  const files = new Map<string, Buffer>([
+    ["package.json", packageBytes],
+    ["bun.lock", lockBytes],
+  ]);
+  for (const name of modules)
+    files.set(
+      "src/" + name + ".ts",
+      Buffer.from("export * from '@palantirkc/native-hermes-adapter/" + name + "';\n"),
+    );
+  const registrationBytes = json({
+    schema: "hermes.context-source-provider.v1",
+    consumerRoot: codeOwnerRoot,
+    providerRoot,
+    packageName: "@palantirkc/native-hermes-adapter",
+    sourcePins: sourcePaths.map((path) => ({ path, sha256: sha(inputs.get(path)!) })),
+    authority: "none",
+    nativePermissionGranted: false,
+  });
+  files.set("architecture/hermes-context-provider.json", Buffer.from(registrationBytes));
+  const successorBytes = json({
+    schema: "hermes.new-source-generated-projection.v1",
+    originalSourceRestored: false,
+    codeOwner: "agent-platform",
+    semanticOwners: ["ontology-platform", "hermes-harness-engineering"],
+    nativeAndDataOwnersRetained: true,
+    nativePermissionGranted: false,
+    authority: "none",
+    lineage: "architecture/hermes-new-source-successor.json",
+    inputs: [...inputs].map(([path, bytes]) => ({ path, sha256: sha(bytes) })),
+    runtimeDependencies: await captureInstalledRuntimeClosure(
+      providerRoot,
+      exact,
+      sha,
+      false,
+      modules.map((name) => join(providerRoot, packagePath, "src", name + ".ts")),
+    ),
+  });
+  files.set("source-successor.json", Buffer.from(successorBytes));
+
+  const template = inputs.get(generationPaths[1])!.toString();
+  const inlineMarker = "// __INLINE_CANONICAL_DEPENDENCY_CLOSURE__";
+  if (template.split(inlineMarker).length !== 2)
+    throw Error("EXACT_DEPENDENCY_PROJECTION_REQUIRED");
+  const composed = template.replace(
+    inlineMarker,
+    inputs.get(generationPaths[3])!.toString() +
+      "\ncaptureDependencies = captureInstalledRuntimeClosure;\n",
+  );
+  const marker = 'const expectedRegistrationSha256 = "' + "0".repeat(64) + '";';
+  const lineageMarker = 'const expectedSuccessorSha256 = "' + "0".repeat(64) + '";';
+  if (composed.split(marker).length !== 2 || composed.split(lineageMarker).length !== 2)
+    throw Error("EXACT_TEMPLATE_SUBSTITUTION_REQUIRED");
+  files.set(
+    "src/ontology-driven/provider-source.ts",
+    Buffer.from(
+      composed
+        .replace(marker, 'const expectedRegistrationSha256 = "' + sha(registrationBytes) + '";')
+        .replace(lineageMarker, 'const expectedSuccessorSha256 = "' + sha(successorBytes) + '";'),
+    ),
+  );
+
+  return files;
+}
+
 /** No output path parameter: this entrypoint cannot publish to an actual native owner location. */
 export async function generateHermesSourceFixture(): Promise<SourceFixture> {
   if ((await realpath(canonicalRoot)) !== canonicalRoot || Bun.version !== "1.4.3")
@@ -337,60 +411,15 @@ export async function generateHermesSourceFixture(): Promise<SourceFixture> {
     join(providerRoot, packagePath),
     join(codeOwnerRoot, "node_modules/@palantirkc/native-hermes-adapter"),
   );
-  for (const name of modules)
-    await put(
-      join(codeOwnerRoot, "src/" + name + ".ts"),
-      "export * from '@palantirkc/native-hermes-adapter/" + name + "';\n",
-    );
-  const registrationBytes = json({
-    schema: "hermes.context-source-provider.v1",
-    consumerRoot: codeOwnerRoot,
+  const projection = await composeHermesSourceProjection(
+    inputs,
+    codeOwnerRoot,
     providerRoot,
-    packageName: "@palantirkc/native-hermes-adapter",
-    sourcePins: sourcePaths.map((path) => ({ path, sha256: sha(inputs.get(path)!) })),
-    authority: "none",
-    nativePermissionGranted: false,
-  });
-  await put(join(codeOwnerRoot, "architecture/hermes-context-provider.json"), registrationBytes);
-  const successorBytes = json({
-    schema: "hermes.new-source-generated-projection.v1",
-    originalSourceRestored: false,
-    codeOwner: "agent-platform",
-    semanticOwners: ["ontology-platform", "hermes-harness-engineering"],
-    nativeAndDataOwnersRetained: true,
-    nativePermissionGranted: false,
-    authority: "none",
-    lineage: "architecture/hermes-new-source-successor.json",
-    inputs: [...inputs].map(([path, bytes]) => ({ path, sha256: sha(bytes) })),
-    runtimeDependencies: await captureInstalledRuntimeClosure(
-      providerRoot,
-      exact,
-      sha,
-      false,
-      modules.map((name) => join(providerRoot, packagePath, "src", name + ".ts")),
-    ),
-  });
-  await put(join(codeOwnerRoot, "source-successor.json"), successorBytes);
-
-  const template = inputs.get(generationPaths[1])!.toString();
-  const inlineMarker = "// __INLINE_CANONICAL_DEPENDENCY_CLOSURE__";
-  if (template.split(inlineMarker).length !== 2)
-    throw Error("EXACT_DEPENDENCY_PROJECTION_REQUIRED");
-  const composed = template.replace(
-    inlineMarker,
-    inputs.get(generationPaths[3])!.toString() +
-      "\ncaptureDependencies = captureInstalledRuntimeClosure;\n",
+    await exact(join(codeOwnerRoot, "package.json")),
+    await exact(join(codeOwnerRoot, "bun.lock")),
   );
-  const marker = 'const expectedRegistrationSha256 = "' + "0".repeat(64) + '";';
-  const lineageMarker = 'const expectedSuccessorSha256 = "' + "0".repeat(64) + '";';
-  if (composed.split(marker).length !== 2 || composed.split(lineageMarker).length !== 2)
-    throw Error("EXACT_TEMPLATE_SUBSTITUTION_REQUIRED");
-  await put(
-    join(codeOwnerRoot, "src/ontology-driven/provider-source.ts"),
-    composed
-      .replace(marker, 'const expectedRegistrationSha256 = "' + sha(registrationBytes) + '";')
-      .replace(lineageMarker, 'const expectedSuccessorSha256 = "' + sha(successorBytes) + '";'),
-  );
+  for (const [path, bytes] of projection)
+    if (!["package.json", "bun.lock"].includes(path)) await put(join(codeOwnerRoot, path), bytes);
 
   const historicalQa = JSON.parse(
     (await exact(join(canonicalRoot, "owner-fixture/manifest.json"))).toString(),
