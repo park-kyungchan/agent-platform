@@ -1,0 +1,20 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "spec",
+  "id": "HRR-SPEC",
+  "revision": 1,
+  "outcome": "One source-owned common continuity contract and qualified native owner adapters support real user task interruption, new-session recovery and delegated-result retrieval without losing original purpose, answers or no-replay fences.",
+  "criteria": [
+    "Every normative purpose/Spec/Plan clause and original user answer remains typed, source-addressable and reachable in bounded native context; required omissions hold.",
+    "Completed, consumed and uncertain effect occurrences remain reachable and reject replay across interruption and successor Work.",
+    "Correct Codex candidate runtime validation and owner binding; qualify actual installed importer/dependency shape before native consumption.",
+    "Current source/install/native consumption/activation/user outcomes are independently observed; source proof never grants native permission.",
+    "Use native loops and Herdr panes for independent work with durable task/result/receiver records; no scheduler, session-store clone or fixed pane-count claims.",
+    "First user acceptance: recover a useful real task in a NEW native session after interruption, preserve purpose/original answers/fences/next action and retrieve a genuine delegated result.",
+    "Independent exact-commit/tree review, current zero-unresolved findings and required checks precede authenticated publication, PR and explicit expected-head Lead integration.",
+    "Month-end remains independently owned; integration discussion starts after first acceptance. Original question-selection and teacher/human decision boundaries remain."
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "successor-lineage",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/successor-start",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "predecessorLogicalWork": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-harness-operation",
+      "SpecRevision": 7,
+      "PlanRevision": 7,
+      "nativeThreadId": "01a13f90-74a0-7930-a5bc-9663e9ec9f86"
+    },
+    "predecessorWorkCommit": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+    "predecessorWorkPath": "work/codex-harness-engineering/ontology-driven-harness-operation",
+    "predecessorNativeGoal": "paused; never resumed by successor selection",
+    "newNativeThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+    "sourceStart": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+      "observedAtUtc": "2026-10-16T10:00:30.362346+00:00",
+      "checkedForStartId": "HRR-START-20261016",
+      "synchronized": true,
+      "receipt": "Current Lead native tool observation: git ls-remote origin main and isolated-worktree git fetch --no-tags origin main matched before new Work branch creation."
+    },
+    "branch": "work/harness-reliability-reprioritization-20261016",
+    "userDecisions": [
+      "HRR-INTERVIEW-1",
+      "HRR-INTERVIEW-2",
+      "HRR-INTERVIEW-3",
+      "HRR-INTERVIEW-4",
+      "HRR-INTERVIEW-5"
+    ],
+    "oldV11EightDirtyFiles": "Preserved untouched; archive and live bytes matched during intake.",
+    "handoffCorrection": "PG draft directory actual name includes academy-current-running-pg; old checkpoint shorter locator is a descriptive typo. All twelve actual artifacts remain preserved with exact manifest/source hashes.",
+    "nativePermissionGranted": false
+  }
+}

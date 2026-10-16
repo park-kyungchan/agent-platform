@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "decision",
+  "id": "HRR-INTERVIEW-3",
+  "status": "accepted",
+  "answer": "병행",
+  "meaning": "Run independent common/Codex/Hermes source work in parallel; integrate according to semantic dependencies and A/B/C priorities.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/interview-answers-20261016.json",
+    "fragment": "#/content/answers/3"
+  },
+  "selectionContext": {
+    "text": "진행 순서: 검증 선행조건을 지키면서 현재 VPS Codex 한 경로를 끝까지 완성한 뒤 Hermes로 확장할지, 공통·Codex·Hermes의 독립 작업을 병행할지 선호하십니까?",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/interview-questions-20261016.json",
+      "fragment": "#/content/questions/3"
+    }
+  },
+  "supersedes": []
+}
