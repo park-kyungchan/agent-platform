@@ -1976,6 +1976,49 @@ describe("lossless shared native compact context", () => {
     expect(failed.holdReasons).toContain("COMPACT_CONTEXT_UNAVAILABLE");
     expect(JSON.stringify(failed)).not.toContain(sentinel);
   });
+  test("rejected historical extra bytes never reach held output while validated history survives", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    const sentinel = "PRIVATE_SCHEMA_SENTINEL";
+    const malformed = structuredClone(raw);
+    Object.assign(malformed.historicalEffects!, { privateRaw: sentinel });
+    const rejected = compactGitWorkContext(malformed, { taskId: "a" });
+    expect(rejected.status).toBe("held");
+    expect(rejected.holdReasons).toContain("INVALID_COMPACT_SCHEMA");
+    expect(rejected.historicalEffects).toBeUndefined();
+    expect(JSON.stringify(rejected)).not.toContain("privateRaw");
+    expect(JSON.stringify(rejected)).not.toContain(sentinel);
+    expect(JSON.stringify(malformed)).toContain(sentinel);
+    const held = structuredClone(raw);
+    held.status = "held";
+    held.holdReasons = ["UNCERTAIN_EFFECT_REPLAY:private-detail"];
+    const safeHeld = compactGitWorkContext(held, { taskId: "a" });
+    expect(safeHeld.status).toBe("held");
+    expect(safeHeld.historicalEffects).toEqual(raw.historicalEffects);
+    held.historicalEffects!.relevantCompletedIds.push("mutated-after-return");
+    expect(safeHeld.historicalEffects).toEqual(raw.historicalEffects);
+    const valid = compactGitWorkContext(raw, { taskId: "a" });
+    expect(valid.status).toBe("source-qualified");
+    expect(valid.historicalEffects).toEqual(raw.historicalEffects);
+    for (const field of [
+      "repositoryId",
+      "commit",
+      "projectId",
+      "workId",
+      "sourcePathBase",
+      "latestRelevant",
+    ]) {
+      const invalid = structuredClone(raw);
+      Object.assign(invalid, { [field]: { privateRaw: sentinel } });
+      const result = compactGitWorkContext(invalid, { taskId: "a" });
+      expect(result.status).toBe("held");
+      expect(JSON.stringify(result)).not.toContain(sentinel);
+      expect(JSON.stringify(result)).not.toContain("privateRaw");
+    }
+  });
 });
 
 describe("uncertain legacy source Task-ID fence", () => {

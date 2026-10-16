@@ -421,14 +421,14 @@ export function compactGitWorkContext(
 ): CompactGitWorkContext {
   const result: CompactGitWorkContext = {
     schema: "common.git-work-context.compact.v1",
-    sourcePathBase: context.sourcePathBase,
+    sourcePathBase: "",
     layout: { ...compactLayout },
     status: "held",
-    repositoryId: context.repositoryId,
-    commit: context.commit,
-    projectId: context.projectId,
-    workId: context.workId,
-    latestRelevant: context.latestRelevant ?? "unknown",
+    repositoryId: "",
+    commit: "",
+    projectId: "",
+    workId: "",
+    latestRelevant: "unknown",
     strings: [],
     sources: [],
     normative: [],
@@ -439,15 +439,35 @@ export function compactGitWorkContext(
       purposeSources: [],
       effectInventorySources: [],
     },
-    historicalEffects: structuredClone(context.historicalEffects),
-    holdReasons: Array.isArray(context.holdReasons)
-      ? context.holdReasons.map(compactSourceHold)
-      : [],
+    historicalEffects: undefined,
+    holdReasons: [],
     authority: "none",
     nativePermissionGranted: false,
     semanticAcceptanceEstablished: false,
   };
   try {
+    compactAssert(compactObject(context), "INVALID_COMPACT_CONTEXT");
+    result.holdReasons = Array.isArray(context.holdReasons)
+      ? context.holdReasons.map(compactSourceHold)
+      : [];
+    const { repositoryId, commit, projectId, workId, sourcePathBase, latestRelevant } = context;
+    compactAssert(compactText(repositoryId), "COMPACT_REPOSITORY_REQUIRED");
+    assertCommit(commit);
+    const workPath = gitWorkPath(projectId, workId);
+    compactAssert(sourcePathBase === workPath, "COMPACT_SOURCE_BASE_MISMATCH");
+    compactAssert(
+      ["current", "advanced", "unknown", "unavailable"].includes(latestRelevant),
+      "COMPACT_CURRENTNESS_UNAVAILABLE",
+    );
+    Object.assign(result, {
+      repositoryId,
+      commit,
+      projectId,
+      workId,
+      sourcePathBase,
+      latestRelevant,
+    });
+    result.historicalEffects = copyCompactHistoricalEffects(context.historicalEffects);
     compactAssert(context.status === "source-qualified", "SOURCE_CONTEXT_HELD");
     compactAssert(
       result.holdReasons.length === 0 &&
@@ -459,10 +479,6 @@ export function compactGitWorkContext(
       "INVALID_COMPACT_SOURCE_QUALIFICATION",
     );
     compactAssert(context.latestRelevant === "current", "COMPACT_CURRENTNESS_UNAVAILABLE");
-    assertCommit(context.commit);
-    compactAssert(compactText(context.repositoryId), "COMPACT_REPOSITORY_REQUIRED");
-    const workPath = gitWorkPath(context.projectId, context.workId);
-    compactAssert(context.sourcePathBase === workPath, "COMPACT_SOURCE_BASE_MISMATCH");
     compactAssert(JSON.stringify(context).length <= 24_000, "REQUIRED_COMPACT_INPUT_LIMIT");
     compactAssert(
       Array.isArray(context.records) &&
@@ -870,19 +886,7 @@ export function compactGitWorkContext(
       purposeSources,
       effectInventorySources,
     };
-    const effects = context.historicalEffects;
-    compactAssert(
-      effects &&
-        [effects.completedCount, effects.uncertainCount, effects.projectedFenceRecords].every(
-          (count) => Number.isSafeInteger(count) && count >= 0,
-        ),
-      "INVALID_COMPACT_HISTORICAL_EFFECTS",
-    );
-    compactAssert(
-      texts(effects.relevantCompletedIds).length <= effects.completedCount &&
-        texts(effects.relevantUncertainIds).length <= effects.uncertainCount,
-      "INVALID_COMPACT_RELEVANT_EFFECTS",
-    );
+    compactAssert(result.historicalEffects, "INVALID_COMPACT_HISTORICAL_EFFECTS");
     result.status = "source-qualified";
     validateAndDecodeCompactContext(result);
     return result;
@@ -933,6 +937,41 @@ function compactTexts(value: unknown): string[] {
     "INVALID_COMPACT_TEXT_ARRAY",
   );
   return value;
+}
+
+/** Validate and copy only owned historical fields, including on a held native view. */
+function copyCompactHistoricalEffects(value: unknown): GitWorkContext["historicalEffects"] {
+  if (value === undefined) return undefined;
+  const effects = value as NonNullable<GitWorkContext["historicalEffects"]>;
+  compactShape(effects, [
+    "completedCount",
+    "uncertainCount",
+    "relevantCompletedIds",
+    "relevantUncertainIds",
+    "projectedFenceRecords",
+  ]);
+  compactAssert(
+    effects &&
+      [effects.completedCount, effects.uncertainCount, effects.projectedFenceRecords].every(
+        (count) => Number.isSafeInteger(count) && count >= 0,
+      ),
+    "INVALID_COMPACT_HISTORICAL_EFFECTS",
+  );
+  const completed = compactTexts(effects.relevantCompletedIds),
+    uncertain = compactTexts(effects.relevantUncertainIds);
+  compactAssert(
+    completed.length <= effects.completedCount &&
+      uncertain.length <= effects.uncertainCount &&
+      !completed.some((id) => uncertain.includes(id)),
+    "INVALID_COMPACT_RELEVANT_EFFECTS",
+  );
+  return {
+    completedCount: effects.completedCount,
+    uncertainCount: effects.uncertainCount,
+    relevantCompletedIds: [...completed],
+    relevantUncertainIds: [...uncertain],
+    projectedFenceRecords: effects.projectedFenceRecords,
+  };
 }
 
 /** One finite structural boundary shared by construction and public decoding.
@@ -1237,29 +1276,10 @@ function validateAndDecodeCompactContext(
   for (const value of binding.purposeSources)
     compactAssert(pointer(value)[1].startsWith("#/"), "INVALID_COMPACT_PURPOSE_POINTER");
   for (const value of binding.effectInventorySources) pointer(value);
-  const effects = context.historicalEffects;
-  compactShape(effects, [
-    "completedCount",
-    "uncertainCount",
-    "relevantCompletedIds",
-    "relevantUncertainIds",
-    "projectedFenceRecords",
-  ]);
-  compactAssert(
-    effects &&
-      [effects.completedCount, effects.uncertainCount, effects.projectedFenceRecords].every(
-        (count) => Number.isSafeInteger(count) && count >= 0,
-      ),
-    "INVALID_COMPACT_HISTORICAL_EFFECTS",
-  );
-  const completed = compactTexts(effects.relevantCompletedIds),
-    uncertain = compactTexts(effects.relevantUncertainIds);
-  compactAssert(
-    completed.length <= effects.completedCount &&
-      uncertain.length <= effects.uncertainCount &&
-      !completed.some((id) => uncertain.includes(id)),
-    "INVALID_COMPACT_RELEVANT_EFFECTS",
-  );
+  const effects = copyCompactHistoricalEffects(context.historicalEffects);
+  compactAssert(effects, "INVALID_COMPACT_HISTORICAL_EFFECTS");
+  const completed = effects.relevantCompletedIds,
+    uncertain = effects.relevantUncertainIds;
   let task: DecodedCompactGitWorkContext["task"];
   if (Object.hasOwn(context, "task")) {
     const compact = context.task;
