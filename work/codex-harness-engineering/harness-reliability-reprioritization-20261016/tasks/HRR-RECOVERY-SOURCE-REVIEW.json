@@ -18,10 +18,10 @@
   },
   "title": "Independently verify final source-publication readiness through an owned native interruption and NEW-session recovery.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
+    "execution": "complete",
+    "verification": "unverified",
     "localAudit": "result-durable",
-    "sharedAudit": "pending",
+    "sharedAudit": "unsynchronized",
     "formalCompletion": "pending"
   },
   "executionClass": "source-only",
@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Read inputs/checkpoint-v12.json#/content. ActualNEWsession recovery of this samePlan2Task and usefulc04review are verified; c04HOLD result remains immutable. The discoveredduplicateDecisionP2 is corrected/independentlyscopedreviewed at e6fc703, integratedRoot93ee2a2/registry3d21624 with ownerccef pins. Finishfresh exactcurrentcombinedtree independentcanonical review after affectedchecks; preservealloriginals/fences/result and technicalRecoveryproof. No nativeprepare/activation/evalbudget, historicreplay, oldGoal/WSLresume or publication authority fromGit."
+  "nextAction": "Read inputs/checkpoint-v13.json#/content and source-publication-readback-v1.json#/content. Useful NEW-session recovery/final exact source review and three authenticated source publications/expected-head merges are complete. Preserve original c04 HOLD and all completed/uncertain no-replay fences. Formal task verification/delivery/Acceptance remain separate; current Work v2 source authority awaits user answer, and native preparation/activation/evaluations remain held."
 }

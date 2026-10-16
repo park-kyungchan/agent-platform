@@ -18,10 +18,10 @@
   },
   "title": "Publish independent exact reviewed source evidence/status and explicitly integrate expected heads after current gates.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
-    "sharedAudit": "pending",
+    "execution": "complete",
+    "verification": "unverified",
+    "localAudit": "result-durable",
+    "sharedAudit": "unsynchronized",
     "formalCompletion": "pending"
   },
   "executionClass": "source-only",
@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Review immutable component commits and final combined tree; update exact provider successors; publish authenticated evidence before PR."
+  "nextAction": "Read inputs/checkpoint-v13.json#/content and source-publication-readback-v1.json#/content. Useful NEW-session recovery/final exact source review and three authenticated source publications/expected-head merges are complete. Preserve original c04 HOLD and all completed/uncertain no-replay fences. Formal task verification/delivery/Acceptance remain separate; current Work v2 source authority awaits user answer, and native preparation/activation/evaluations remain held."
 }
