@@ -149,23 +149,25 @@ function safeProfile(value: unknown): ObjectValue {
   });
   return safe;
 }
-function readContract(
+/** Validate a prospective Home value without reading or publishing global/native files. */
+export function readHomeContextContractValue(
+  value: unknown,
   binding: HookBinding,
   cwd: string,
-): { contract: HomeContextContract; sha256: string } {
+): HomeContextContract {
   if (
     !binding.entrypointContextPath ||
     binding.qualificationLedgerPath ||
-    cwd !== realpathSync(cwd) ||
+    pointer(cwd) !== cwd ||
     !binding.entrypointCwds?.includes(cwd) ||
-    binding.root !== realpathSync(binding.root) ||
+    pointer(binding.root) !== binding.root ||
     within(binding.root, cwd)
   )
     throw new Error("Invalid exact Home owner binding");
   const path = binding.entrypointContextPath;
-  if (!within(binding.root, path)) throw new Error("Home contract escapes its project owner");
-  const source = sourceFile(path, 64 * 1024),
-    data = row(source.value),
+  if (pointer(path) !== path || !within(binding.root, path))
+    throw new Error("Home contract escapes its project owner");
+  const data = row(structuredClone(value)),
     route = row(data.projectRoute),
     boundaries = row(data.boundaries),
     policy = row(data.recordPolicy);
@@ -248,7 +250,29 @@ function readContract(
     },
     boundaries,
   };
-  return { contract, sha256: source.sha256 };
+  return contract;
+}
+
+function readContract(
+  binding: HookBinding,
+  cwd: string,
+): { contract: HomeContextContract; sha256: string } {
+  if (
+    !binding.entrypointContextPath ||
+    binding.qualificationLedgerPath ||
+    cwd !== realpathSync(cwd) ||
+    !binding.entrypointCwds?.includes(cwd) ||
+    binding.root !== realpathSync(binding.root) ||
+    within(binding.root, cwd)
+  )
+    throw new Error("Invalid exact Home owner binding");
+  const path = binding.entrypointContextPath;
+  if (!within(binding.root, path)) throw new Error("Home contract escapes its project owner");
+  const source = sourceFile(path, 64 * 1024);
+  return {
+    contract: readHomeContextContractValue(source.value, binding, cwd),
+    sha256: source.sha256,
+  };
 }
 
 export interface SelectedGitWorkView {
