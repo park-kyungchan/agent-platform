@@ -34,7 +34,8 @@
         "src/handoff.ts",
         "src/context/",
         "src/workspace/",
-        "src/runtime-index.ts"
+        "src/runtime-index.ts",
+        "src/git-work/"
       ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
       "nativeEntrypoints": [
@@ -92,17 +93,17 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/context.ts",
-          "sha256": "519a386432c788e5f82a323fc28f29c7884ce483404802e415a03b93fe0dc5d3",
+          "sha256": "e9f01f5c15b558ce9f6dd72880f0428903d17bd75450f424046aedca7aa739b7",
           "relativePath": "packages/work-continuity/src/git-work/context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/index.ts",
-          "sha256": "8c11a0333c112eee58fab5d8cc2fb9dc6340dfdf8b3891231623826020703f5b",
+          "sha256": "ab434da3902838cc03b8e1ac96603071f93a47f11dff03aaabcc18d5b37fcb09",
           "relativePath": "packages/work-continuity/src/git-work/index.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/records.ts",
-          "sha256": "5ab086cb44441ad268116996fe2bd01adf8dd432a57d3931fa95747e0c948b99",
+          "sha256": "8054265ca54243a7ad22619af85ae39cd66f1385a202a2e6ae4925d8de616806",
           "relativePath": "packages/work-continuity/src/git-work/records.ts"
         },
         {
@@ -112,7 +113,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/types.ts",
-          "sha256": "cb70b46d5680b42f09e1e9d38d8eaa9025873adf0a6f78e75ab5f126ccfb97a8",
+          "sha256": "5de1a8c30ae224da1492b23cea239de684d19b36d5657a85e1a62cddb2d8960d",
           "relativePath": "packages/work-continuity/src/git-work/types.ts"
         },
         {
@@ -539,12 +540,12 @@
       "sourcePins": [
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/home-context.ts",
-          "sha256": "3f078a47923b88534d6352b5130b5b5284e27a232fe53e76b538fda7cbb4931a",
+          "sha256": "f370bcd8033ce231925e4740768f02fddec4e001b1551cfed78cecb54fc921c4",
           "relativePath": "packages/native-codex-adapter/src/native/home-context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/src/native/hooks.ts",
-          "sha256": "235f35c94c923ae4619f643e2badf71eb40a5b5d2748efb3bac9e93ccf0d26d8",
+          "sha256": "aba61c8db9105f0ca641fbbd0f605a3219bccdb32a6f9ad49d94f3e2e33519d1",
           "relativePath": "packages/native-codex-adapter/src/native/hooks.ts"
         },
         {
@@ -660,32 +661,32 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/build.ts",
-          "sha256": "b587e902bc7211a2c5220c141b5680573acf301ff7e3b8fb28fab8949a0a3cf2",
+          "sha256": "aaec3edfbf90657f6db06fa57f7be6c54217de8703f52887f1a64297f8f30d21",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/build.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/context.ts",
-          "sha256": "7bf102cf9bfa80a089c6b0c13b2c88a1d0d595d7ad49dd1bb2c2ebe1063bc1e3",
+          "sha256": "2db64c5ba20601d394f80866f392fc52e2e29887a206900815128f1d7d8cb590",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/context.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
-          "sha256": "46c965629162da2603c5d2812f75db003b03c56a15ec04d10c6a2feb962b93e6"
+          "sha256": "fca4602e9eab1c69cc2076ac92c06b4021f677a8bf3d93bf7869b06816f01e97"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
-          "sha256": "2d7e13d67492a71a0c2687fa32a263e0e6523d54dfc220184a223fa243ada551"
+          "sha256": "7955831ff5f4e682a435a291f7c0e83475eaaaef937e5bdee56b4f499bed39c6"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/provider.ts",
-          "sha256": "706b8475fde4bcf7f4771b0cc14e5bed1dfc8f23755b5ff82cd5a573204ef1cb",
+          "sha256": "6c8d74b5d08ea8bf41f6124518c40e289aa490c1d0306f9d1f6d29a8c6f100d0",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/provider.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/read-current-work.ts",
-          "sha256": "2d4eff04ce36ea96ff195d1336aa995d67bba4977582c99f0ff521cd094448e9",
+          "sha256": "3529fcad7c712c9ac572ba4ed5c1f676efe0f01fb382ca8671f9481737fa430f",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/read-current-work.ts"
         },
         {
@@ -792,6 +793,16 @@
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/delivery.ts",
           "relativePath": "packages/native-hermes-adapter/src/source-provider/delivery.ts",
           "sha256": "02a1e03531c3fbb071c54d7d0f09ca31e909677b6dd5b7a2fdc9d044697db30c"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/diagnostics.ts",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/diagnostics.ts",
+          "sha256": "8c5e01916e95cd06ec99545971ad9a8254e1e0a370ba8338d93745d34c97fd25"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-current-work/output-policy.ts",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/output-policy.ts",
+          "sha256": "972616fb87070e4f23949d04dfb8e170512c149d2265a1910160925cb107315a"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
