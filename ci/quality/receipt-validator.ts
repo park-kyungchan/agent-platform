@@ -150,27 +150,16 @@ function validateV2Binding(
   manifestSha256: string,
 ): void {
   const binding = object(receipt.binding);
-  const reviewer = object(receipt.reviewer);
-  const author = object(receipt.author);
-  if (
-    !fullSha(head) ||
-    !fullSha(tree) ||
-    !digest(manifestSha256) ||
-    binding.codeOwner !== "agent-platform" ||
-    binding.evidenceOwner !== "codex-harness-engineering" ||
-    binding.scope !== "canonical-source-ci-quality" ||
-    Object.keys(binding).sort().join("|") !== "codeOwner|evidenceOwner|scope" ||
-    receipt.headSha !== head ||
-    receipt.reviewedTreeSha !== tree ||
-    receipt.reviewedSourceManifestSha256 !== manifestSha256 ||
-    reviewer.runtime !== "native-codex" ||
-    author.runtime !== "native-codex" ||
-    !taskId(reviewer.taskId) ||
-    !taskId(author.taskId) ||
-    reviewer.taskId === author.taskId ||
-    receipt.conclusion !== "pass" ||
-    receipt.unresolvedFindings !== 0
-  ) {
+  try {
+    if (
+      binding.codeOwner !== "agent-platform" ||
+      binding.evidenceOwner !== "codex-harness-engineering" ||
+      binding.scope !== "canonical-source-ci-quality" ||
+      Object.keys(binding).sort().join("|") !== "codeOwner|evidenceOwner|scope"
+    )
+      throw new Error("binding");
+    validateExactNativeReview(receipt, head, tree, manifestSha256);
+  } catch {
     throw new Error(
       "Receipt does not prove the exact v2 ownership, scope, head, tree, manifest and independent native identities",
     );
@@ -279,5 +268,168 @@ export function verifyIndependentReviewResult(
     object(result.author).taskId !== object(value.author).taskId
   ) {
     throw new Error("Immutable independent review result identities differ from its receipt");
+  }
+}
+
+/** Shared exact-source/independence predicate; ownership is checked separately by each schema. */
+function validateExactNativeReview(
+  value: ObjectValue,
+  head: string,
+  tree: string,
+  manifestSha256: string,
+): void {
+  const reviewer = object(value.reviewer),
+    author = object(value.author);
+  if (
+    !fullSha(head) ||
+    !fullSha(tree) ||
+    !digest(manifestSha256) ||
+    value.headSha !== head ||
+    value.reviewedTreeSha !== tree ||
+    value.reviewedSourceManifestSha256 !== manifestSha256 ||
+    reviewer.runtime !== "native-codex" ||
+    author.runtime !== "native-codex" ||
+    !taskId(reviewer.taskId) ||
+    !taskId(author.taskId) ||
+    reviewer.taskId === author.taskId ||
+    value.conclusion !== "pass" ||
+    value.unresolvedFindings !== 0
+  )
+    throw new Error("Review does not prove exact source and independent native identities");
+}
+
+export type OwnerReviewBinding = {
+  repository: string;
+  projectId: string;
+  domainId: string;
+  semanticOwner: string;
+  scope: string;
+};
+export type ReviewPublisher = { id: string; login: string; type: "User" | "Bot" };
+/** Caller supplies reviewed fixed policy, never values copied from an untrusted receipt or env. */
+export type OwnerReviewPolicy = OwnerReviewBinding & {
+  statusContext: "native-independent-review";
+  publisher: ReviewPublisher;
+};
+export type OwnerReviewProof = {
+  binding: OwnerReviewBinding;
+  headSha: string;
+  reviewedTreeSha: string;
+  reviewedSourceManifestSha256: string;
+  reviewer: NativeReviewIdentity;
+  author: NativeReviewIdentity;
+  conclusion: "pass";
+  unresolvedFindings: 0;
+};
+export type OwnerReviewReceipt = OwnerReviewProof & {
+  schema: "owner-scoped-independent-review.v1";
+  provenance: {
+    owner: string;
+    result: ImmutableResult;
+    evidence: ImmutableResult;
+    verification: ImmutableResult;
+    rawNativeResult: ImmutableResult;
+  };
+};
+export type OwnerReviewResult = OwnerReviewProof & {
+  schema: "owner-scoped-independent-review-result.v1";
+  custody: {
+    classification: "source-custody-native-parent-observation";
+    publisher: ReviewPublisher;
+    rawNativeResult: ImmutableResult;
+  };
+};
+/** Emitted by the actual independent native reviewer and retained byte-for-byte; a parent must not fabricate this record. */
+export type OwnerRawNativeReview = OwnerReviewProof & {
+  schema: "owner-scoped-native-review-output.v1";
+  reviewStatus: "complete";
+  findings: [];
+};
+
+export function validateOwnerReviewPolicy(policy: OwnerReviewPolicy): void {
+  if (
+    !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(policy.repository) ||
+    ![policy.projectId, policy.domainId, policy.semanticOwner, policy.scope].every(taskId) ||
+    policy.statusContext !== "native-independent-review" ||
+    !/^[1-9][0-9]*$/.test(policy.publisher.id) ||
+    !taskId(policy.publisher.login) ||
+    !["User", "Bot"].includes(policy.publisher.type)
+  )
+    throw new Error(
+      "Owner review requires explicit reviewed repository, semantic and publisher policy",
+    );
+}
+
+export function validateOwnerReviewProof(
+  value: unknown,
+  policy: OwnerReviewPolicy,
+  head: string,
+  tree: string,
+  manifest: string,
+  identities?: OwnerReviewProof,
+): asserts value is OwnerReviewProof {
+  const proof = object(value),
+    binding = object(proof.binding);
+  const keys = ["repository", "projectId", "domainId", "semanticOwner", "scope"] as const;
+  if (
+    Object.keys(binding).sort().join("|") !== [...keys].sort().join("|") ||
+    keys.some((key) => binding[key] !== policy[key])
+  )
+    throw new Error("Owner review binding differs from fixed owner policy");
+  validateExactNativeReview(proof, head, tree, manifest);
+  if (
+    identities &&
+    (object(proof.reviewer).taskId !== identities.reviewer.taskId ||
+      object(proof.author).taskId !== identities.author.taskId)
+  )
+    throw new Error("Owner review native identities differ across immutable evidence");
+}
+
+/** Exact same-repository role path; no URL normalization, mutable ref or path guessing. */
+export function immutableOwnerReviewTarget(
+  value: unknown,
+  policy: OwnerReviewPolicy,
+  head: string,
+  role: string,
+): ImmutableResult {
+  const reference = object(value),
+    path = `${role}/${head}.json`;
+  if (
+    !fullSha(reference.commit) ||
+    reference.commit === head ||
+    reference.path !== path ||
+    !digest(reference.sha256) ||
+    Object.keys(reference).sort().join("|") !== "commit|path|sha256"
+  )
+    throw new Error("Owner review evidence requires exact immutable role, commit and digest");
+  // Repository ownership is fixed by the reader; a reference has no alternate repository field.
+  validateOwnerReviewPolicy(policy);
+  return { commit: reference.commit, path, sha256: reference.sha256 };
+}
+
+export function immutableOwnerReviewUrl(
+  url: unknown,
+  policy: OwnerReviewPolicy,
+  head: string,
+  role: string,
+): { commit: string; path: string } {
+  if (typeof url !== "string") throw new Error("Owner review immutable URL missing");
+  const prefix = `https://github.com/${policy.repository}/blob/`;
+  const path = `${role}/${head}.json`,
+    suffix = "/" + path;
+  const commit =
+    url.startsWith(prefix) && url.endsWith(suffix) ? url.slice(prefix.length, -suffix.length) : "";
+  if (!fullSha(commit) || commit === head || url !== prefix + commit + suffix)
+    throw new Error("Owner review requires immutable same-repository source URL");
+  return { commit, path };
+}
+
+export function parseOwnerReviewFile(bytes: Uint8Array, expected?: ImmutableResult): unknown {
+  if (expected && hash(bytes) !== expected.sha256)
+    throw new Error("Owner review immutable file digest mismatch");
+  try {
+    return JSON.parse(Buffer.from(bytes).toString("utf8")) as unknown;
+  } catch {
+    throw new Error("Owner review file is not valid JSON");
   }
 }
