@@ -1,0 +1,132 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "d32e6d9a20bb2832f2700dc3b8b3e3fabda730c1",
+  "reviewedTreeSha": "8ab9e7312ecf2c2970d19b685883e07ff5e6689b",
+  "reviewedSourceManifestSha256": "0b8e28d64c91bc780f3a17189d462b20dd6952974aa09b8981e2df169655ceb9",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "EDUCATION-SOURCE-INDEPENDENT-REVIEW"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "INTERRUPTION-RECOVERY-AND-PRESELECTION"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "reviewedAtUtc": "2026-10-15T23:48:07Z",
+  "reviewerContext": {
+    "realNativeSessionID": "unknown",
+    "herdrReviewPane": "w3p6",
+    "identityMeaning": "User-supplied SOURCE logical Task IDs, not native allocations; pane inherited from the continuing review instruction."
+  },
+  "baseline": {
+    "headSha": "3cb565efdcf9634b057fa77948f4222b93255604",
+    "treeSha": "d230c84acc159461d9ee3f16096cd49da7ce4ca4",
+    "networkFetchPerformed": false
+  },
+  "scope": {
+    "filesChanged": 8,
+    "insertions": 242,
+    "deletions": 1,
+    "kind": "Independent COMMON Work outcome-binding source review; no code, package, lock, workflow, native trust or activation changes.",
+    "paths": [
+      "work/codex-harness-engineering/ontology-driven-harness-operation/decisions/latest-bun-vps-agent-defaults-20261016.json",
+      "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-vps-bun-user-answer-20261016.json",
+      "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-custody-20261016.json",
+      "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-BUN-CURRENTNESS.json",
+      "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS.json",
+      "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/EDUCATION-SOURCE-INDEPENDENT-REVIEW.json",
+      "work/codex-harness-engineering/ontology-driven-harness-operation/tasks/MONTH-END-PRESELECTION-ANALYSIS.json",
+      "work/codex-harness-engineering/ontology-driven-harness-operation/work.json"
+    ]
+  },
+  "assessment": {
+    "originalAnswer": "Decision answer and selection-context text exactly match their distinct snapshot JSON fragments. Capture expressly lacks native message IDs and does not authenticate a native store.",
+    "decisionMeaning": "A new accepted source decision records the latest Bun user direction. It neither supersedes original decisions nor creates an AcceptanceDecision, renewed evaluation budget, excluded-domain admission, replay permission or native activation.",
+    "tasks": "Four unique SOURCE Tasks preserve existing Work/Issue/Spec/Plan IDs with Spec7/Plan7. Three record execution complete/result-durable; the continuing review records running/intent-durable. All retain verification/shared audit/formal completion pending, empty effect/evidence lists and no invented native runtime occurrence.",
+    "custody": "Completed read-only custody observation records paths, digests, counts and explicit limits without the private source body or 29-field/236-pin values. Consumed-never-replay remains explicit; no referenced private path was followed. PostgreSQL authority, canonical adoption, private gates and Acceptance remain unestablished."
+  },
+  "preservation": {
+    "originalWorkFiles": 177,
+    "currentWorkFiles": 184,
+    "byteIdenticalExistingWorkFiles": 176,
+    "workJsonOnlyChange": "Append latest-bun-vps-agent-defaults-20261016 to governingDecisionIds; every other parsed field and original array entry/order is unchanged, and raw diff contains only this append.",
+    "originalDecisionsPreserved": 47,
+    "currentDecisions": 48,
+    "completedHistoricalEffectsPreserved": 63,
+    "uncertainHistoricalEffectsPreserved": 2
+  },
+  "actualChecks": [
+    {
+      "command": "bun run check:handoff",
+      "exitCode": 0,
+      "passed": 39,
+      "failed": 0,
+      "assertions": 223
+    },
+    {
+      "command": "bun run check:imports",
+      "exitCode": 0,
+      "legacyAndCanonicalSameModule": true,
+      "sourceSha256": "8052ee2f5072e6589da711c838feb3dfa095e8d75e1ac17ed027e0494e36bb3a",
+      "modelCalls": 0
+    },
+    {
+      "command": "bun --no-env-file --eval <canonical Git Work record, transition, context and preservation verification>",
+      "exitCode": 0,
+      "recordsValid": true,
+      "transitionValid": true,
+      "findings": [],
+      "answerAndSelectionFragmentsExact": true,
+      "tasksSourceOnlySpecPlan7": true,
+      "context": {
+        "status": "source-qualified",
+        "records": 23,
+        "newBunDecisionIncluded": true,
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      }
+    },
+    {
+      "command": "git diff --check 3cb565efdcf9634b057fa77948f4222b93255604 HEAD",
+      "exitCode": 0
+    },
+    {
+      "command": "git status --porcelain; git rev-parse HEAD HEAD^{tree}",
+      "exitCode": 0,
+      "workingTreeClean": true,
+      "headAndTreeUnchanged": true
+    }
+  ],
+  "manifestDerivation": {
+    "method": "Canonical deriveReviewedSourceManifest over git ls-tree -r -t -z --full-tree of the exact reviewed Git tree.",
+    "entryCount": 698,
+    "blobCount": 572,
+    "validatorSha256": "d4795b86a387b126face7039f0c6dcdfb5ca6034c05e6233bf2d848d7a208986"
+  },
+  "currentFindingCount": 0,
+  "findings": [],
+  "verdict": "Pass for this exact COMMON source delta; zero actionable findings. Records preserve original answers and historical fences while separating source outcomes from permission, runtime verification, formal completion and Acceptance.",
+  "educationBindingRetained": {
+    "headSha": "2eb2a1b5aa5398c84992c436c0b055eb1ecdfe8a",
+    "reviewedTreeSha": "98853f1b1970efd828027526a8f691f6db3c2f5d",
+    "artifactPath": "/tmp/education-source-review-2eb2-result-20261016.json",
+    "artifactSha256": "5f1b306128046f42b992ca00c6702a16a65ab01df536d3675ff7e4e8126f05b7",
+    "meaning": "Historical exact Education binding retained for later explicit exact-main binding; no Education merge/main/CI state was queried or inferred by this COMMON review."
+  },
+  "limits": [
+    "Snapshot equality verifies committed source bindings, not independent native-message authenticity. No native transcript/store was opened.",
+    "Custody observation is reviewed as source-owner-reported metadata. Its private intent/receipt/body/reconciliation paths were not followed and their actual private read/control results were not independently revalidated.",
+    "No fresh evaluation budget or authority is inferred. Existing budget decision and all completed/uncertain fences remain unchanged.",
+    "No private Root body/value export, SSH, native business action, database access, network, install, source edit, Goal/evaluation operation, status publication or merge was performed. Tests used local synthetic fixtures only.",
+    "Education/full portfolio Node26.7.0 prerequisite remains unverified; no full integration, canonical adoption, native activation, PostgreSQL qualification or teacher/Lead Acceptance is established.",
+    "The full Goal remains ACTIVE as instructed; this artifact makes no Goal status change. Publication, explicit integration and later exact-main binding remain Root-owned."
+  ]
+}
