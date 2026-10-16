@@ -1,0 +1,666 @@
+{
+  "schema": "harness.checkpoint-v8-independent-exact-review.v1",
+  "recordClass": "IndependentExactCommitSourceReview",
+  "reviewer": "/root/checkpoint_v8_independent_review",
+  "observedAtUtc": "2026-10-16T06:10:33.249Z",
+  "scope": "Source checkpoint/fence and native Git Work reader only; no effect execution, native activation, model evaluation, publication or Git mutation",
+  "baseline": {
+    "commit": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+    "tree": "574f689bac2407145ffc43eab1b04e66061cb871"
+  },
+  "reviewed": {
+    "commit": "953992a8158676811fe6c05084e3a5f888a2a165",
+    "tree": "6ff7643437ffd050fa6696e21525a000abd5b9ce",
+    "priorCandidate": "190f9cc7ccc09d78906c13d91fb37059b1472d79",
+    "priorTree": "0a1c805c7e549be47f5660f6a2839d9d67b59965",
+    "successorDelta": "One checkpoint intent criterion corrects prior/current uncertainty counts; all other bytes unchanged",
+    "worktree": "/home/palantirkc/code/worktrees/harness-checkpoint-v8-20261016",
+    "trackedClean": true
+  },
+  "delta": [
+    {
+      "status": "A",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/fences/p1-once1-20261016.json",
+      "bytes": 502,
+      "sha256": "a6d1fbf2efaee24dc2de2f2c90bac800fc0eea95cd1a295e4ff1a841b846b943"
+    },
+    {
+      "status": "A",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v8.json",
+      "bytes": 16797,
+      "sha256": "02feb7e206b4d7328e979073ab7936e2ac0a4934431d11411f732721f362aa82"
+    },
+    {
+      "status": "A",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/p1-once1-20261016.json",
+      "bytes": 2419,
+      "sha256": "e88655ac51954b37aeafb53ac947fe0e41e78e7c5d4bd66c6a4ca4b4089e8868"
+    },
+    {
+      "status": "A",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/work-purpose-compaction-provenance-20261016-v8.json",
+      "bytes": 3611,
+      "sha256": "edba14fa445b1f672a0ac56bd36dd514a778177d14b3f8813c4bf12f9ba77e19"
+    },
+    {
+      "status": "M",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/work.json",
+      "bytes": 3006,
+      "sha256": "1270565e94038d38b838512c4a68138e575f5aaa0d67ddd9435c7eae90eb4975"
+    }
+  ],
+  "provenance": {
+    "immutableExistingWorkFilesByteIdentical": 191,
+    "priorPurposeExact": true,
+    "successorPurposeExact": true,
+    "onlyPurposeAndAppendedFenceChangedInWork": true,
+    "originalPurposeProvenancePreserved": true,
+    "SpecRevision": 7,
+    "PlanRevision": 7,
+    "verificationScript": {
+      "path": "/tmp/checkpoint-v8-independent-exact-review-20261016.ts",
+      "sha256": "2a56c0c85fb8bf0129ba14c0dd8fb45c08d95be8538c154327683e4b16bd3dda"
+    }
+  },
+  "criteria": {
+    "strictFallbackSchema": {
+      "pass": true,
+      "sha256": "f8e24233dc32ffaaa27b42f8dc3f1459d3e0d749cc291a151c102e4dea51d7a4",
+      "installedRepoAndBaselineExact": true,
+      "options": {
+        "strict": true,
+        "allErrors": true,
+        "coerceTypes": false,
+        "useDefaults": false,
+        "removeAdditional": false
+      },
+      "ajvPath": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/ajv@8.20.0/node_modules/ajv/dist/2020.js",
+      "formatsPath": "/home/palantirkc/code/shared/agent-platform/node_modules/.bun/ajv-formats@3.0.1/node_modules/ajv-formats/dist/index.js",
+      "coreCharacters": 15773,
+      "readableCap": 16000,
+      "negativeChecks": [
+        {
+          "name": "missingDelegationScope",
+          "rejected": true
+        },
+        {
+          "name": "unsupportedAuthority",
+          "rejected": true
+        },
+        {
+          "name": "badTimestamp",
+          "rejected": true
+        },
+        {
+          "name": "replayAllowed",
+          "rejected": true
+        }
+      ],
+      "characterCountDefinition": "JSON.stringify(content, null, 2) plus one trailing newline"
+    },
+    "receiptCorrelation": {
+      "pass": true,
+      "referencedReceipts": [
+        {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/academy-running-p1-read-once1-consumed-unknown-receipt.json",
+          "sha256": "6bd075e268cff521ca27933c34faf5efe8f2d94aad83a3add5e712d1feb044af",
+          "bytes": 2123
+        },
+        {
+          "path": "/tmp/academy-p1-once1-actual-reconciliation-20261016.json",
+          "sha256": "c403e65d41c2f66e78c61c13c11083ab109ed50373d4b3493a03c86be4e8d5a9",
+          "bytes": 15617
+        },
+        {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/common-mainbce-source-ci-reconciliation-receipt.json",
+          "sha256": "a19536f58fb6db0820a26ae482038f9b9c7f5dbe07992d58d1e47fad0e3bf9d8",
+          "bytes": 22909
+        },
+        {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/codex-main2e4-source-publication-completion-20261016.json",
+          "sha256": "b538fdf66d934fd075f58ccb5336ad1b9598a5134a4caef04e3a4b5cf2113377",
+          "bytes": 10931
+        },
+        {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/academy-main2c-source-ci-reconciliation-receipt.json",
+          "sha256": "88e2ab82fff0b58e00ad9242a589a0fe351eab7ddc158bf35b4b00be36c1f052",
+          "bytes": 20099
+        },
+        {
+          "path": "/home/palantirkc/operations/harness-continuation-20261016/hermes-new-facade-prepared-20261016-v2-receipt.json",
+          "sha256": "62202ba8a592f6fe3189a970ff610556488abfb81d016f69fc4c2f61ec33262c",
+          "bytes": 6523
+        }
+      ],
+      "state": "UNKNOWN",
+      "possibleTargetOccurrences": "0_OR_1",
+      "consumed": true,
+      "ownerAPIInvoked": true,
+      "ownerAPIReturned": false,
+      "observationCapture": "ABSENT",
+      "rootCause": "UNKNOWN_NOT_EXPORTED",
+      "ownerTransportCleanupProven": false,
+      "P1Accepted": false
+    },
+    "historicalEffects": {
+      "pass": true,
+      "originalCompleted": 63,
+      "originalUncertain": 2,
+      "previousCombinedCompleted": 64,
+      "previousCombinedUncertain": 2,
+      "currentCombinedCompleted": 64,
+      "currentCombinedUncertain": 3,
+      "previousFencesByteIdentical": true
+    },
+    "nativeReader": {
+      "pass": true,
+      "contextsTested": 28,
+      "sourceQualified": 26,
+      "historicalHeld": 2,
+      "cap": 24000,
+      "maxQualifiedCharacters": 23917,
+      "minQualifiedHeadroom": 83,
+      "contexts": [
+        {
+          "taskId": null,
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 16324,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "ACADEMY-CONTEXT-REVALIDATION-REVIEW",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17452,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "ACADEMY-RELEASE-SELECTION-PREPARATION",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17140,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "ACADEMY-RETAINED-OWNER-RUNTIME",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 18258,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "ACADEMY-ROOT-SOURCE-READ-ONCE1",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17391,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [
+              "ACADEMY-ROOT-SOURCE-READ-ONCE1"
+            ],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "CODEX-EXPLICIT-SESSION-WORK-CONTEXT",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 18283,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "CODEX-HOME-CONTEXT-BUDGET-FIX",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 18249,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "CODEX-NATIVE-ADOPTION-RECOVERY",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17171,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "EDUCATION-BUN-CURRENTNESS",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17104,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17138,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "EDUCATION-SOURCE-INDEPENDENT-REVIEW",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17111,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-22",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 23859,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-23",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 18209,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-24",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 18213,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-25",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 18214,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-26",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 18214,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-27",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 23870,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-28",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 23866,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-29",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 23856,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "GHA-30",
+          "status": "held",
+          "holdReasons": [
+            "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+          ],
+          "omittedRecords": 40,
+          "characters": 509
+        },
+        {
+          "taskId": "GHA-31",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 19188,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "HERMES-CURRENT-WORK-SOURCE",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 18282,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "HERMES-NATIVE-ADOPTION-RECOVERY",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17153,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "INTEGRATED-SCOPE-RECONCILIATION",
+          "status": "held",
+          "holdReasons": [
+            "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+          ],
+          "omittedRecords": 37,
+          "characters": 509
+        },
+        {
+          "taskId": "INTERRUPTION-RECOVERY-AND-PRESELECTION",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17845,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "MONTH-END-PRESELECTION-ANALYSIS",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 17098,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "VPS-LEAD-HANDOFF",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 23914,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        },
+        {
+          "taskId": "WSL2-LEAD-HANDOFF",
+          "status": "source-qualified",
+          "holdReasons": [],
+          "omittedRecords": 0,
+          "characters": 23917,
+          "historicalEffects": {
+            "completedCount": 64,
+            "uncertainCount": 3,
+            "relevantCompletedIds": [],
+            "relevantUncertainIds": [],
+            "projectedFenceRecords": 3
+          }
+        }
+      ],
+      "baselineLegacy": [
+        {
+          "taskId": "GHA-30",
+          "beforeStatus": "held",
+          "beforeHoldReasons": [
+            "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+          ],
+          "logicalSpecRevision": 5
+        },
+        {
+          "taskId": "INTEGRATED-SCOPE-RECONCILIATION",
+          "beforeStatus": "held",
+          "beforeHoldReasons": [
+            "REQUIRED_CONTEXT_OUTPUT_LIMIT"
+          ],
+          "logicalSpecRevision": 6
+        }
+      ],
+      "currentnessNegatives": [
+        {
+          "latest": "advanced",
+          "status": "held",
+          "holdReasons": [
+            "REQUIRED_LATEST_CONTEXT_ADVANCED"
+          ]
+        },
+        {
+          "latest": "unknown",
+          "status": "held",
+          "holdReasons": [
+            "REQUIRED_LATEST_CONTEXT_UNKNOWN"
+          ]
+        },
+        {
+          "latest": "unavailable",
+          "status": "held",
+          "holdReasons": [
+            "REQUIRED_LATEST_CONTEXT_UNAVAILABLE"
+          ]
+        }
+      ],
+      "overCapRejected": true,
+      "replayNegative": {
+        "fixture": "In-memory only; pending new uncertain effect on native-effect task",
+        "rejected": true,
+        "finding": "EFFECT_REPLAY_OR_UNCERTAIN:ACADEMY-RUNNING-P1-READ-ONCE1-20261016"
+      }
+    },
+    "reportedChecksReadback": {
+      "handoff": {
+        "log": "/tmp/checkpoint-v8-handoff-qualified-20261016.log",
+        "sha256": "566672c6e1eced1bc5d4d79ac1efefc146e2fea771c2f29c37061fd12e49fe25",
+        "passed": 39,
+        "failed": 0,
+        "independentlyRerun": false
+      },
+      "imports": {
+        "log": "/tmp/checkpoint-v8-imports-local-links-20261016.log",
+        "sha256": "ef4163dd5b147db05aa83985dd98180762b0e0674a858313279f4c4a4a1aefe9",
+        "canonicalCandidateResolved": true,
+        "independentlyRerun": false,
+        "qualification": "Private ignored dependency links; no installation; common code unchanged"
+      }
+    },
+    "exactSourceValidation": {
+      "snapshot": {
+        "repositoryRoot": "/home/palantirkc/code/worktrees/harness-checkpoint-v8-20261016",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "953992a8158676811fe6c05084e3a5f888a2a165",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-harness-operation",
+        "maxBlobBytes": 1048576,
+        "maxRecords": 2048,
+        "maxTotalBytes": 16777216
+      },
+      "validation": {
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      },
+      "transition": {
+        "valid": true,
+        "findings": [],
+        "authority": "none",
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false
+      },
+      "entrypoint": "bun run harness (same canonical runHarness)",
+      "independentlyRerun": true
+    }
+  },
+  "findings": [],
+  "resolvedFindings": [
+    {
+      "id": "V8-CURRENT-UNCERTAINTY-COUNT",
+      "priorCandidate": "190f9cc7ccc09d78906c13d91fb37059b1472d79",
+      "location": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/continuation-checkpoint-20261016-v8.json#/content/intent/successCriteria/0",
+      "issue": "Prior candidate incorrectly labeled 64/2 current after adding the new uncertainty",
+      "resolution": "Exact successor distinguishes original47/63/2, prior48/64SOURCE/2 and current48/64SOURCE/3",
+      "verified": true
+    }
+  ],
+  "limitations": [
+    "Currentness checks inspect source-declared currentness and local exact receipts; no external source queries or live activation claims.",
+    "CAS/plan-review in-progress values are truthful checkpoint-time observations; later completion requires separate successor evidence.",
+    "Two historical task contexts remain held at unchanged cap and were independently reproduced against baseline.",
+    "Whole Work acceptance and native/domain/evaluation permission are not established."
+  ],
+  "verdict": "PASS_EXACT_SOURCE_ZERO_UNRESOLVED_FINDINGS",
+  "unresolvedFindings": 0,
+  "authority": "none",
+  "nativePermissionGranted": false,
+  "semanticAcceptanceEstablished": false,
+  "AcceptanceDecision": null,
+  "completedAtUtc": "2026-10-16T06:11:11.992Z"
+}
