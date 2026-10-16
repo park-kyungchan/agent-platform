@@ -592,7 +592,8 @@
         "src/platform-governance/",
         "native/plugins/",
         "src/platform-rearchitecture/",
-        "src/platform-current-work/"
+        "src/platform-current-work/",
+        "src/source-provider/"
       ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/code/shared/hermes-harness-engineering",
       "nativeEntrypoints": [
@@ -798,6 +799,16 @@
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts",
           "sha256": "7b0bbb6b8480b0514fd9f7854e094fc6e77b6c17ff9bb4cbf591f48a5ce3db93",
           "relativePath": "packages/native-hermes-adapter/src/platform-rearchitecture/work-records.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/generate.ts",
+          "sha256": "4d63ea1cac5b7ef0d312cb8df51007b3e4917ee5df993ed3bb52bac983520ae7",
+          "relativePath": "packages/native-hermes-adapter/src/source-provider/generate.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/guard.template.ts",
+          "sha256": "de39535914987f870e4b85bb811066b01a32c4fac1906fa39019dc83abb16b50",
+          "relativePath": "packages/native-hermes-adapter/src/source-provider/guard.template.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
@@ -813,6 +824,16 @@
         ],
         "nativeRuntimeOwner": "hermes-harness-engineering",
         "validation": "Exact six source pins and source-only syntax/manifest validation; no native imports or execution admission",
+        "nativePermissionGranted": false
+      },
+      "sourceSuccessorPreparation": {
+        "recordClass": "NewSourceOnlyImplementationProposal",
+        "lineage": "architecture/hermes-new-source-successor.json",
+        "generator": "packages/native-hermes-adapter/src/source-provider/generate.ts",
+        "guardTemplate": "packages/native-hermes-adapter/src/source-provider/guard.template.ts",
+        "outputPolicy": "Exclusive fictional temporary fixtures only; generated outputs are not a second maintained implementation.",
+        "historicalOriginalSourceRestored": false,
+        "activeOwnerRegistrationChanged": false,
         "nativePermissionGranted": false
       }
     },
