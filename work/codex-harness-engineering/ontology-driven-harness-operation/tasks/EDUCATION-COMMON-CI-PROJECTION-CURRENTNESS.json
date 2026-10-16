@@ -1,0 +1,35 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS",
+  "kind": "task",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+    "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+    "specRevision": 7,
+    "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "planRevision": 7,
+    "taskId": "EDUCATION-COMMON-CI-PROJECTION-CURRENTNESS"
+  },
+  "title": "Generate the existing Education CI review projection from exact current common owner source",
+  "state": {
+    "execution": "complete",
+    "verification": "pending",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "dependsOn": [],
+  "decisionIds": [
+    "broad-engineering-authority-20261015",
+    "common-first-implementation-explicit-publication-20261014"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "executionClass": "source-only"
+}

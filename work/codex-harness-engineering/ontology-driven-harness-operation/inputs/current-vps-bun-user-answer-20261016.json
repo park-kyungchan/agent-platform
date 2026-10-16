@@ -1,0 +1,20 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "current-vps-bun-user-answer-20261016",
+  "kind": "input",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "native-lead:01a13f90-74a0-7930-a5bc-9663e9ec9f86:visible-current-user-bun-messages",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "Bun 최신버전으로 향후 모든 에이전트들이 사용할 준비가 완료되면, 세션 리로드 필요하나? 그렇다면 요청해라, 아니면 사용자는 Goal이 Achived 될때까지 더이상 개입하지 않는다.",
+    "previousQuestion": "Bun은 최신버전으로 모두 통일시켜놓으면 안되나? VPS에서 어차피 향후 계속 사용할 것이잖아.",
+    "nativeThreadId": "01a13f90-74a0-7930-a5bc-9663e9ec9f86",
+    "qualification": "Exact visible current user messages captured by the continuing Lead. Native message IDs are not available; this capture does not authenticate a native store or renew historical evaluation budgets."
+  }
+}

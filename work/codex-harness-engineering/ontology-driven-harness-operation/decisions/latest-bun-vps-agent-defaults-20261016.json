@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "latest-bun-vps-agent-defaults-20261016",
+  "kind": "decision",
+  "status": "accepted",
+  "answer": "Bun 최신버전으로 향후 모든 에이전트들이 사용할 준비가 완료되면, 세션 리로드 필요하나? 그렇다면 요청해라, 아니면 사용자는 Goal이 Achived 될때까지 더이상 개입하지 않는다.",
+  "meaning": "Unify maintained VPS agent Bun execution and future provisioning on the verified latest stable version. Continue the selected Goal autonomously; request a session reload only if technically necessary. This does not admit excluded domains, renew a native model evaluation budget, authorize completed-effect replay or grant native activation.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-vps-bun-user-answer-20261016.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "Bun은 최신버전으로 모두 통일시켜놓으면 안되나? VPS에서 어차피 향후 계속 사용할 것이잖아.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/current-vps-bun-user-answer-20261016.json",
+      "fragment": "#/content/previousQuestion"
+    }
+  },
+  "supersedes": []
+}

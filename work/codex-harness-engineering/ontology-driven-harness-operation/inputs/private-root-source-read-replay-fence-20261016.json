@@ -1,0 +1,38 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "private-root-source-read-replay-fence-20261016",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "completed-source-custody:academy-root-source-read-once1",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "CompletedSourceTaskReplayFenceProjection",
+    "completedEffectIds": ["ACADEMY-ROOT-SOURCE-READ-ONCE1"],
+    "uncertainEffectIds": [],
+    "sourceObservation": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-custody-20261016.json",
+      "fragment": "#/content"
+    },
+    "actualOccurrences": 1,
+    "actor": "/root",
+    "actualReceiptObservedAtUtc": "2026-10-15T22:47:46.967Z",
+    "receiptSha256": "856c0998d737c96a785be55a412ed652fee7b09511a31f74c9a28f7f8379d419",
+    "intentSha256": "fcf5e67b50a7aabf70a6a5ffa6043d9c99d3c91e80c78e9d99484e6960d24c41",
+    "intentConsumedNeverReplay": true,
+    "meaning": "Fence the recorded completed SOURCE Task ID using the existing source-Task replay guard. This is retrospective source custody metadata for the existing once-only read, not a new native Task/occurrence, admission, allocation or permission.",
+    "historicalFenceChanged": false,
+    "sourceBodyPublished": false,
+    "PGAuthorityContentsRead": false,
+    "PGQualified": false,
+    "nativePermissionGranted": false,
+    "privateGatesAccepted": false,
+    "AcceptanceDecision": null
+  }
+}
