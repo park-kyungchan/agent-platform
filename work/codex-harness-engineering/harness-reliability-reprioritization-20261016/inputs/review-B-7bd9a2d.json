@@ -1,0 +1,93 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "review-B-7bd9a2d",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "independent-native-source-review",
+    "locator": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-reviews/B-7bd9a2d.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "report": {
+      "schema": "hrr.independent-source-review.v1",
+      "artifact": "B dependency",
+      "repository": "park-kyungchan/agent-platform",
+      "commit": "7bd9a2d3bad6008f73b59aa06cb721927940cc8e",
+      "tree": "c811929cf8fc35f249c920dd332de3ccf08912e0",
+      "base": "f18b8ce2e810ae94be2cf7277a9b375d955b96cd",
+      "sourceMethod": "Exact git-show commit blobs, not the A snapshot HEAD implementation or mutable writer source.",
+      "reviewer": {
+        "observedName": "hrr-review",
+        "observedRuntime": "native Codex CLI",
+        "observedPane": "w3:pN",
+        "observedTerminalId": "term_65df2847433ac17",
+        "nativeThreadId": "unknown",
+        "observation": "Read-only Herdr caller identity. Git report does not authenticate native authorship.",
+        "support": "An internal read-only supporting reviewer inspected B independently. hrr-review inspected the exact diff and source and reran the isolated probe."
+      },
+      "scope": {
+        "work": "native-harness/codex-harness-engineering/harness-reliability-reprioritization-20261016",
+        "classification": "immutable source review only",
+        "nativeActivation": false,
+        "nativePermissionGranted": false,
+        "formalCompletion": false,
+        "acceptanceEstablished": false,
+        "modelEvaluationSuiteRun": false,
+        "authority": "none"
+      },
+      "result": "no-actionable-source-findings",
+      "findingCount": 0,
+      "findings": [],
+      "checks": [
+        {
+          "name": "Exact base, tree and changed-file set",
+          "result": "pass",
+          "detail": "Confirmed parent f18b8ce, tree c811929, only home-context.ts and home-context.test.ts changed; git diff --check passes."
+        },
+        {
+          "name": "Pure API source inspection",
+          "result": "pass",
+          "detail": "readHomeContextContractValue at home-context.ts:153 uses the supplied value/binding/cwd, structuredClone, bounded validators and lexical node:path operations. It performs no file, global, native or credential reads/writes and requires no files to exist."
+        },
+        {
+          "name": "Runtime reader preservation",
+          "result": "pass",
+          "detail": "readContract at home-context.ts:256 retains exact realpath owner/cwd checks and calls the unchanged sourceFile routine. lstat/realpath/regular-file/size constraints and source SHA remain runtime obligations. The prospective API adds lexical canonical path checks without weakening runtime custody."
+        },
+        {
+          "name": "Independent focused Bun probe",
+          "result": "pass",
+          "detail": "Prospective validation before paths exist; normalized detached result; 17 malformed or binding rejection cases; exact valid file projection equality against the base implementation; context/profile source SHA match their bytes; fixture bytes remain unchanged; private sentinel absent; existing, dangling and oversized runtime sources rejected. hrr-review verified base/successor blob hashes and reran the probe."
+        },
+        {
+          "name": "Review snapshot preservation",
+          "result": "pass",
+          "detail": "All probe files are exclusive under the frozen A snapshot .private directory. Tracked source remains clean; no shared/provider/native mutation."
+        }
+      ],
+      "evidence": {
+        "path": "/home/palantirkc/code/worktrees/hrr-review-common-a-20261016/.private/b-independent-kalmn6vu/review.ts",
+        "sha256": "4b6844497c5770630744a87056d7f787ca445a7de3f89452e1a7bd356ccd593b",
+        "baseHomeSourceSha256": "3f078a47923b88534d6352b5130b5b5284e27a232fe53e76b538fda7cbb4931a",
+        "successorHomeSourceSha256": "ef84cf7959059537805b9348cea48934f04a95d1ea18cb290098c2f0ff16d98c",
+        "runtime": "Bun 1.4.3"
+      },
+      "semanticObservations": [
+        "The returned Home contract retains the existing normalized field projection and a detached boundaries value; caller input mutation does not retag the prospective value.",
+        "Schema, owner/route/work binding, budgets, false permission/effect boundaries, text/list limits and relative owner references remain canonical constraints.",
+        "Prospective lexical validation is not filesystem custody, global-profile readback, native admission, authenticity or permission. The existing runtime reader performs its separate real-file observation and preserves source hashes."
+      ],
+      "rootOwnedClosureNeeds": [
+        "Compose the final packages/native-codex-adapter/src/native/home-context.ts pin in architecture/capability-source-owners.json and the native Codex architecture/native-codex-provider.json registration, plus its src/native/hooks.ts registration marker. For exact B alone the Home SHA is ef84cf7959059537805b9348cea48934f04a95d1ea18cb290098c2f0ff16d98c; a later composition requires its own final hash and exact review.",
+        "Run exact provider closure and old-owner checks after Root-owned composition, preserving first-import guards and native caches. Pending pins and unactivated shared bytes are not drift evidence here.",
+        "No package.json, bun.lock, project.json, immutable release, native config or trust changes are in B. Source result delivery is separate from native activation, formal completion and Acceptance."
+      ]
+    },
+    "sha256": "7d8cf37ca4a41b5601b415e4f1f85b706432a3dd52667afe19cf6eaf64d42a26",
+    "receiptMeaning": "Retained immutable source review; Git does not authenticate native authorship; this is not activation/Acceptance."
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "review-A-98206df",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "independent-native-source-review",
+    "locator": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-reviews/A-98206df.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "report": {
+      "schema": "hrr.independent-source-review.v1",
+      "artifact": "A",
+      "repository": "park-kyungchan/agent-platform",
+      "commit": "98206dfb3d8951366b9ceab617af39e0fcbc04cd",
+      "tree": "a2e1e44a0498776db9dd236799b3f34898b2a872",
+      "base": "f18b8ce2e810ae94be2cf7277a9b375d955b96cd",
+      "snapshot": "/home/palantirkc/code/worktrees/hrr-review-common-a-20261016",
+      "reviewer": {
+        "observedName": "hrr-review",
+        "observedRuntime": "native Codex CLI",
+        "observedPane": "w3:pN",
+        "observedTerminalId": "term_65df2847433ac17",
+        "nativeThreadId": "unknown",
+        "observation": "Read-only herdr pane current --current and agent get hrr-review; Git report does not authenticate native authorship.",
+        "support": "An internal read-only supporting reviewer supplied adversarial probes; hrr-review inspected and independently reran the evidence."
+      },
+      "scope": {
+        "work": "native-harness/codex-harness-engineering/harness-reliability-reprioritization-20261016",
+        "task": "HRR-A-CONTEXT-EFFECT",
+        "classification": "immutable source review only",
+        "nativeActivation": false,
+        "nativePermissionGranted": false,
+        "formalCompletion": false,
+        "acceptanceEstablished": false,
+        "modelEvaluationSuiteRun": false,
+        "authority": "none"
+      },
+      "result": "hold-unresolved-finding",
+      "findingCount": 1,
+      "findings": [
+        {
+          "id": "HRR-A-REVIEW-001",
+          "severity": "medium",
+          "priority": "P2",
+          "status": "unresolved",
+          "title": "Apply the consumed uncertain Task-ID fence to planned and running legacy Tasks",
+          "path": "packages/work-continuity/src/git-work/records.ts",
+          "line": 870,
+          "origin": "Preexisting asymmetry left uncovered by this artifact's complete consumed-effect replay scope; not represented as a newly introduced regression.",
+          "criterion": "HRR-SPEC criterion 2 and HRR-A require completed, consumed and uncertain occurrences to reject replay across recovery, including truthful legacy source Task coverage.",
+          "evidence": "In an exclusive Git fixture with an explicit continuity binding, inventory/fence uncertainEffectIds contains 'unknown'. A planned source-only Task with id 'unknown', authored nextAction 'Repeat uncertain legacy source action', and no pendingEffectIds passes validateGitWorkRecords with valid=true/findings=[]; readGitWorkContext returns source-qualified/holdReasons=[] while relevantUncertainIds=['unknown']. The equivalent completed Task-ID fence is rejected by line 870 and the existing real-source test at git-work.test.ts:1305. The pending-ID loop covers both statuses, but these legacy source Tasks deliberately have no fabricated native Effect or pendingEffectIds.",
+          "impact": "A recovery consumer can receive a qualified planned/running legacy source Task whose same once-only action is still uncertain. This violates the source replay hold even though the context correctly grants no native permission.",
+          "requestedChange": "Reject the same planned/running Task ID when it is in either consumed status set. Preserve future distinct pending effect IDs and do not invent native occurrences for source-only Tasks. Add focused uncertain source Task-ID coverage and rerun the exact successor review.",
+          "probe": "/home/palantirkc/code/worktrees/hrr-review-common-a-20261016/.private/a-edge-4gvif9nn/probe.ts",
+          "probeSha256": "3bfb16efe3ca9f9925fdb8ce8b012308e8434ec2c8dba2f36d62cb80e44d90cf",
+          "reviewerRerunEvidence": "/home/palantirkc/code/worktrees/hrr-review-common-a-20261016/.private/hrr-review-a-qa/adversarial-probe.jsonl",
+          "reviewerRerunEvidenceSha256": "75b0e0d0b7fa860ba787f7fa6f582c57cd7521ba468883d4a279d7a8043d110a"
+        }
+      ],
+      "checks": [
+        {
+          "name": "Exact snapshot identity and tracked cleanliness before and after QA",
+          "result": "pass",
+          "detail": "HEAD and tree match assignment; git status --porcelain=v1 empty; git diff --check base..commit passes."
+        },
+        {
+          "name": "Source review",
+          "result": "complete",
+          "detail": "Inspected all six changed files, source reader, dependency/source validation, semantic transition logic, current successor originals/selection decisions and existing Codex/Hermes projection callers."
+        },
+        {
+          "name": "Dependency setup",
+          "result": "pass",
+          "detail": "Bun 1.4.3; frozen-lockfile, ignore-scripts, copyfile dependencies and cache confined to the frozen snapshot; tracked source and lock unchanged."
+        },
+        {
+          "name": "bun run check:git-work",
+          "result": "pass-with-isolated-timeout-retry",
+          "detail": "113 pass; one real canonical Work test exceeded the default 5s timeout. That exact test passed independently with --timeout 30000 (1 pass, 27 assertions, 4.44s). No assertion failure was observed."
+        },
+        {
+          "name": "bun run check:handoff",
+          "result": "pass",
+          "detail": "39 tests, 223 assertions."
+        },
+        {
+          "name": "bun run check:imports",
+          "result": "pass",
+          "detail": "Canonical package and compatibility adapter use the same module; unchanged handoff SHA verified."
+        },
+        {
+          "name": "Affected common native consumer source tests",
+          "result": "pass",
+          "detail": "Codex hooks/Home and Hermes platform-current-work: 35 tests, 327 assertions; isolated fixtures only."
+        },
+        {
+          "name": "Exact common Work verification against assigned base",
+          "result": "pass",
+          "detail": "192 records, 48 actual decisions, original 63 completed/2 uncertain fence baseline, 84 documentation routes, semantic transition validated; oversized historical normative context explicitly held."
+        },
+        {
+          "name": "Adversarial legacy replay probe",
+          "result": "finding",
+          "detail": "Independently reran the uncertain Task-ID case and confirmed source qualification without a replay hold."
+        }
+      ],
+      "semanticObservations": [
+        "Typed purpose, full Spec criteria, optional Plan clauses and authored Task nextAction have exact canonical Git blob addresses; missing required nextAction on a selected bound Task holds.",
+        "Purpose provenance checks Input class, project/domain and exact typed value. Consumed inventories must match reachable status sets; source bindings and old source bytes are protected by transitions.",
+        "Pending known Effects recursively reach producer Tasks and evidence; fresh distinct pending IDs do not require fabricated completed Effects. Record, source and 24000-character limits retain holds; currentness remains caller-declared, never remote-verified.",
+        "Legacy-unbound, legacy-objective-only and unspecified labels avoid inventing historical coverage. Historical GHA-22/GHA-27/WSL selections now hold at the unchanged budget because formerly omitted criteria are included.",
+        "A separate probe showed completed Task nextAction can evolve without transition rejection. It is not elevated to a finding: nextAction is operational recovery guidance and its required immutability after execution completion is not specified independently of remaining audit/delivery work."
+      ],
+      "rootOwnedClosureNeeds": [
+        "Compose successor source pins for packages/work-continuity/src/git-work/context.ts (8bdb2d6a52a1886e0793ad1380689f2f2f7157cd3d893a1e23849df4293329ce), records.ts (f1a9d201d2adf176939c7971d02c61994565e421f3c0b4cd301e29eae241cd72) and types.ts (e487438548ca59b8bbaba9cc0b2d8732c15f569d768dfaaf0869f4b8fd161d6e) in the canonical owner registry and active Codex context-provider closure/index as applicable, using the final corrected composition hashes.",
+        "Current native Codex/Hermes derived pointer projections consume a subset of common context and do not yet carry the new normative/continuity envelopes or explicit nextAction. Qualify the separately reviewed adapter composition for full bounded native reachability, including original answers, inventories and holds.",
+        "Run final exact old-owner/provider closure checks after Root composition. Deliberately unactivated shared bytes and pending Root-owned pins are not drift evidence in this review. Common package.json, bun.lock and project.json were not changed by A.",
+        "Do not integrate with this finding unresolved; any correction requires an exact successor artifact and fresh current finding disposition. Source delivery does not establish native consumption, activation, user acceptance or permission."
+      ]
+    },
+    "sha256": "87615c5adcd0a2b79fa4d50798c014f6380f27d57e7b51967ded8785b46423f4",
+    "receiptMeaning": "Retained immutable source review; Git does not authenticate native authorship; this is not activation/Acceptance."
+  }
+}

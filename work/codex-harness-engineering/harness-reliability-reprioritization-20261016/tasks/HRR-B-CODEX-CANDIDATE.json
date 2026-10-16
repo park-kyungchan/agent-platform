@@ -18,9 +18,9 @@
   },
   "title": "Correct the three current Codex candidate findings with canonical runtime readers and complete owner binding.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "unverified",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -35,5 +35,5 @@
   ],
   "effectIds": [],
   "verificationEvidenceIds": [],
-  "nextAction": "Consume canonical prospective Home validator7bd9a2d in finite QA and finish the three current candidate corrections."
+  "nextAction": "Wait for independent exact-commit/tree review of1033d6f and canonical HomeAPI7bd9a2d; correct current findings before publication. Native prepare/activation remains separately gated."
 }

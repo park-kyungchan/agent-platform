@@ -1,0 +1,82 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "vps-diagnostics-review-d0501dd",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead-retained-evidence",
+    "locator": "native-internal-independent-review /root/review_vps",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": 1,
+    "kind": "independent-exact-source-review",
+    "task": "HRR-B-ADAPTER-DIAGNOSTICS",
+    "reviewer": "review_vps",
+    "reviewedAtUtc": "2026-10-16T10:31:16.978181+00:00",
+    "repository": "/home/palantirkc/code/shared/vps-operations",
+    "base": "f9cb609298c0b3055a31b087000b8a2863998b65",
+    "head": "d0501ddfcb7c99d0bf1c019a4abad52e52a99310",
+    "tree": "c9f7144b6fd1fc9ceb25c7f2019f759cec183ce9",
+    "sourceOnly": true,
+    "nativeActivation": false,
+    "result": "changes-requested",
+    "findings": [
+      {
+        "id": "HRR-VPS-R1",
+        "severity": "P2",
+        "path": "src/adapters/lifecycle.ts",
+        "line": 86,
+        "title": "Publish the lifecycle result atomically before exposing its final path",
+        "evidence": [
+          "Lines 85-88 open resultPath with wx, then write JSON and fsync it directly. The final path exists while its contents are empty or incomplete.",
+          "Lines 15-19 read and parse an existing result before checking the request lock. A process interruption or partial write after SSH has admitted a native action can therefore leave permanently unparseable canonical result bytes.",
+          "Lines 95-97 correctly retain the lock when persistence is unresolved, preventing replay, but that fence does not make the published JSON complete or recoverable. The subsequent failure is a JSON parse error instead of the structured uncertainty status and original execution-receipt pointer.",
+          "The same patch already uses temporary-file write/fsync, rename and parent-directory fsync for SSH pending and settled execution receipts in ssh.ts:67-75."
+        ],
+        "impact": "Crash recovery after an admitted remote action can lose a usable lifecycle result and structured original-receipt linkage. No automatic replay was demonstrated; the retained lock remains a safety fence.",
+        "requestedChange": "While holding the exact request fence, write and fsync a unique temporary result, publish the complete final JSON atomically, then fsync the state directory before considering it stored or releasing the fence. Preserve all existing result and uncertainty bytes.",
+        "validation": "Add inert fault-injection coverage for interruption or write rejection after transport settlement and before final result publication. The final result must be absent or fully parseable, the request fence must remain when publication is unresolved, and retry must never spawn a second transport."
+      }
+    ],
+    "checks": [
+      {
+        "name": "immutable-identity",
+        "status": "pass",
+        "evidence": "git show -s confirmed exact full head, tree and single expected base parent."
+      },
+      {
+        "name": "scope",
+        "status": "pass",
+        "evidence": "Read exact AGENTS.md, project.json, architecture/update-workflow.json and current local state/latest-operation.json. No historical operation was replayed."
+      },
+      {
+        "name": "exact-source-review",
+        "status": "pass",
+        "evidence": "Read all five changed files from exact Git objects, their diff, all executeRemotePython call sites, CLI run-directory construction, and backend launch/recovery/job polling paths."
+      },
+      {
+        "name": "bounded-transport",
+        "status": "pass-with-limitations",
+        "evidence": "Static review confirms independent stream byte limits, monotonic foreground deadline, directly owned child TERM/KILL and bounded exit/cancel waits, sanitized failure output, conservative uncertain remote outcomes and automaticReplayPermitted=false."
+      },
+      {
+        "name": "caller-budget-compatibility",
+        "status": "pass-static",
+        "evidence": "Hermes observations and lifecycle use 180000 ms. Backend owner handoff uses 600000 ms, other foreground calls use 120000 ms. Existing separate native prepare/deploy job polling budget and policy maximum of six hours remain unchanged; failed or timed-out SSH does not cancel the native job."
+      },
+      {
+        "name": "targeted-tests",
+        "status": "not-run",
+        "evidence": "Reviewed new inert SSH and lifecycle tests from immutable source. Did not execute tests because this review permits only the bounded review artifact as a write destination; lifecycle tests create state/operations records. Writer-reported test results were not independently promoted to verified results."
+      }
+    ],
+    "limitations": [
+      "Static source review does not establish native SSH behavior, active native lifecycle outcomes, serving, installation, activation, evaluation or whole-Work Acceptance.",
+      "No SSH, native services, trust, credentials, configuration or native stores accessed or changed. No source edits, installations, Git status publication, PR, push, merge or Goal."
+    ]
+  }
+}

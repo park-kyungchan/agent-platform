@@ -1,0 +1,135 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "checkpoint-v4",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-1",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "harness.successor-continuity.v1",
+    "version": 4,
+    "updatedAtUtc": "2026-10-16T10:49:23.524195+00:00",
+    "logicalWork": {
+      "schema": "common.git-work.v1",
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "harness-reliability-reprioritization-20261016"
+    },
+    "nativeGoalThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+    "goalStatus": "active; new successor only",
+    "phase": "fix-independent-findings-and-versioned-native-delivery",
+    "plan": [
+      {
+        "step": "Bind original interview decisions, successor lineage, historical fences and fresh main start",
+        "status": "completed"
+      },
+      {
+        "step": "Implement A and independent B owner source fixes with isolated worktrees and useful Herdr panes",
+        "status": "in_progress"
+      },
+      {
+        "step": "Exact source/transition/provider checks and independent immutable review",
+        "status": "pending"
+      },
+      {
+        "step": "Authenticated evidence publication, PR and explicit current expected-head Lead integration",
+        "status": "pending"
+      },
+      {
+        "step": "Current native admission/activation and real interruption/new-session recovery/delegated result verification",
+        "status": "pending"
+      },
+      {
+        "step": "Separate Acceptance; then discuss independent month-end integration",
+        "status": "pending"
+      }
+    ],
+    "runtime": {
+      "server": "srv1873899-herdr",
+      "leadPane": "w3:pJ",
+      "leadTab": "w3:t6",
+      "nativeVersion": "0.163.0",
+      "reasoningEffort": "ultra: current user selected; startup argv high is historical initial selection",
+      "herdrVersion": "0.9.5",
+      "planTool": "not available; bounded source-owned plan retained",
+      "writerNativeThread": "01a1442e-0df2-73e2-ac18-1d3bb2634e5f: writer self-observed named CODEX_THREAD_ID, corroborated owned processFDmetadata membership",
+      "reviewerNativeThread": "01a1443b-6b8b-7751-88c7-583bb902ca13: userreported and owned PID470905 open-file metadata membership; parent self-readback pending"
+    },
+    "delegations": [
+      {
+        "id": "/root/common_contract",
+        "runtime": "native-internal-child",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-common-contract-20261016",
+        "scope": "HRR-A-CONTEXT-EFFECT",
+        "state": "source-writing"
+      },
+      {
+        "id": "/root/hermes_qualification",
+        "runtime": "native-internal-child",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-hermes-context-20261016",
+        "scope": "HRR-B-HERMES-QUALIFICATION",
+        "state": "source-writing"
+      },
+      {
+        "id": "hrr-codex",
+        "runtime": "native-Codex-CLI",
+        "pane": "w3:pM",
+        "tab": "w3:t6",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-codex-candidate-20261016",
+        "scope": "HRR-B-CODEX-CANDIDATE",
+        "state": "sourcecomplete; durable result retained in Work; independent reviewpending",
+        "resultPath": ".private/hrr-task-result.json"
+      },
+      {
+        "id": "/root/vps_diagnostics",
+        "runtime": "native-internal-child",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-vps-diagnostics-20261016",
+        "scope": "HRR-B-ADAPTER-DIAGNOSTICS",
+        "state": "source-writing"
+      },
+      {
+        "id": "hrr-review",
+        "runtime": "native-Codex-CLI",
+        "pane": "w3:pN",
+        "scope": "Independent immutable source review; no writes/effects",
+        "state": "working observed; independent review A/API/Codex"
+      },
+      {
+        "id": "/root/codex_context",
+        "runtime": "native-internal-child",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-codex-context-20261016",
+        "scope": "HRR-B-CODEX-CONTEXT",
+        "state": "sourcewriting; guard-injected commoncompact+decode; no native effects"
+      }
+    ],
+    "effects": {
+      "historicalFence": "fences/predecessor-effects.json",
+      "completedCount": 68,
+      "uncertainCount": 3,
+      "newNativeEffects": [],
+      "replayPolicy": "never replay historical completed/consumed/uncertain occurrence"
+    },
+    "holds": [
+      "No fresh model-qualification suite budget.",
+      "Native trust/config/activation needs exact reviewed current owner gate.",
+      "Source-ready does not establish native consumption or acceptance.",
+      "Historical raw normative GHA-22/GHA-27/WSL selections exceed unchanged24k; lossless compact view under implementation, no silent clause omission.",
+      "Source owner explicitv2 delivery policy12000chars approved for implementation from actual8297/8411+lineage8728 measurement; v1default6000 preserved; native support/admission/activation and model suite budgets remain separately unqualified/held."
+    ],
+    "acceptanceDecision": null,
+    "nextSafeAction": "Finish fixed compact/codecs, review exact source successors and native adapters, serialize provider/registry closure then source publication. Preserve native v1/2 distinction and independent month-end; real recovery acceptance remains unperformed.",
+    "componentCommits": {
+      "commonNormative": "98206df immutable; HRR-A-REVIEW-001 uncertain legacyTaskIDfinding; correction+compact/privacy successor pending",
+      "prospectiveHome": "7bd9a2d; independentzero findings; finalsourceproviderclosure pending",
+      "HermesDiagnostics": "250344dbab7f5393d94b0b62f251efe85207ddf6; independent review pending",
+      "codexCandidate": "1033d6f; independentzero findings; no actualprepare/nativeactivation",
+      "vpsDiagnostics": "4943f05702433042c73ea609e39599e3c4d0fea8 treeb4e872663afa0f39b1ccf28d0ae5dc0d81bc13bb; independentzero findings/HRR-VPS-R1closed; no remoteeffects"
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "native-v2-context-delivery-policy",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "accountable-native-source-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/implementation-delivery-design",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.owner-context-delivery-policy.v1",
+    "recordClass": "SourceImplementationDesignDecisionNotNewUserAnswer",
+    "decidedAtUtc": "2026-10-16T10:41:53.353683+00:00",
+    "authorityBasis": "Accepted user interview HRR-INTERVIEW-1/2/3 authorizes common/native implementation and real recovery outcome. This engineering source-design decision does not create a user preference or native permission.",
+    "measurements": {
+      "sourceCommit": "681c5e553c486a0d15d9b8d8d75f9aeda9610505",
+      "HRR-A": {
+        "rawChars": 12709,
+        "compactChars": 8297,
+        "compactUtf8Bytes": 8301
+      },
+      "HRR-REAL-RECOVERY-ACCEPTANCE": {
+        "rawChars": 12856,
+        "compactChars": 8411,
+        "compactUtf8Bytes": 8415
+      },
+      "normativeStringChars": 4403,
+      "inBandCodecChars": 949,
+      "legacyNativeCapChars": 6000
+    },
+    "decision": {
+      "legacyV1": "Default remains v1 with6000-character cap; no silent budget expansion or weaker semantics.",
+      "explicitV2": "Source-owned opt-in v2 complete normative delivery cap12000characters, with actual chosen cap/policy version in result/build receipt. Codex Home/global v1 obligations remain; complete v2 cannot drop clauses or original pointers to fit.",
+      "common": "Canonical shared lossless compact serializer/decoder; no native budget in common core.",
+      "overflow": "Hold if complete required payload or native metadata cannot fit the explicitly selected cap.",
+      "nativeTokenOrCostEstimate": null
+    },
+    "preservedGates": {
+      "nativeActivationGranted": false,
+      "trustOrConfigWrites": false,
+      "modelEvaluationSuiteBudgetRenewed": false,
+      "nativeAuthorshipInferred": false,
+      "currentExactIndependentReviewRequired": true,
+      "separateRuntimeLeadActivationRequired": true
+    },
+    "limitations": [
+      "Source-only policy until exact review/provider closure/current native admission and behavior readback.",
+      "Character count is not token/billing accounting.",
+      "Manual common-reader consumption, native hook injection and activation remain separate observations."
+    ]
+  }
+}
