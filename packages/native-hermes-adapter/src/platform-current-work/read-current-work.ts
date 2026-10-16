@@ -1,31 +1,44 @@
 import { readJsonRequest } from "../platform-rearchitecture/input.ts";
 import { observeHermesPlatformSource } from "./provider.ts";
+import { currentWorkDiagnostic, type CurrentWorkDiagnosticStage } from "./diagnostics.ts";
 declare const HERMES_PLATFORM_REGISTRATION_SHA256: string;
 declare const HERMES_PLATFORM_PROVIDER_ROOT: string;
 declare const HERMES_PLATFORM_REGISTRATION_PATH: string;
+let stage: CurrentWorkDiagnosticStage = "input";
 try {
   const request = await readJsonRequest();
   if (Object.keys(request).some((key) => !["event", "selection", "runtimeIndex"].includes(key)))
     throw Error("INVALID_CURRENT_WORK_REQUEST");
+  stage = "registration";
   if (
     typeof HERMES_PLATFORM_REGISTRATION_SHA256 !== "string" ||
     typeof HERMES_PLATFORM_PROVIDER_ROOT !== "string" ||
     typeof HERMES_PLATFORM_REGISTRATION_PATH !== "string"
   )
     throw Error("CURRENT_WORK_SOURCE_NOT_REGISTERED");
+  stage = "source";
   const source = await observeHermesPlatformSource(HERMES_PLATFORM_REGISTRATION_PATH, {
     providerRoot: HERMES_PLATFORM_PROVIDER_ROOT,
     registrationSha256: HERMES_PLATFORM_REGISTRATION_SHA256,
   });
+  stage = "implementation";
   const { readHermesCurrentWorkContext } = await import("./context.ts");
+  stage = "context";
   console.log(
     JSON.stringify(
       await readHermesCurrentWorkContext(request.event, request.selection, request.runtimeIndex, {
-        verifySourceClosure: source.verify,
+        verifySourceClosure: async () => {
+          const previous = stage;
+          stage = "source-readback";
+          await source.verify();
+          stage = previous;
+        },
       }),
     ),
   );
 } catch {
-  console.error("CURRENT_WORK_INPUT_OR_SOURCE_FAILED");
+  console.error(
+    JSON.stringify(currentWorkDiagnostic("CURRENT_WORK_INPUT_OR_SOURCE_FAILED", stage)),
+  );
   process.exitCode = 1;
 }

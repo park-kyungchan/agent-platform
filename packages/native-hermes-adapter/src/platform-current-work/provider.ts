@@ -88,9 +88,15 @@ export const platformSourcePaths = [
     "work-records",
     "owner-readers",
   ].map((name) => "packages/native-hermes-adapter/src/platform-rearchitecture/" + name + ".ts"),
-  ...["context", "read-current-work", "provider", "build", "hook-context", "native-hook"].map(
-    (name) => "packages/native-hermes-adapter/src/platform-current-work/" + name + ".ts",
-  ),
+  ...[
+    "context",
+    "read-current-work",
+    "provider",
+    "build",
+    "hook-context",
+    "native-hook",
+    "diagnostics",
+  ].map((name) => "packages/native-hermes-adapter/src/platform-current-work/" + name + ".ts"),
   ...["boundary-custody", "contracts", "bot-correlation"].map(
     (name) => "packages/native-hermes-adapter/src/platform-governance/" + name + ".ts",
   ),

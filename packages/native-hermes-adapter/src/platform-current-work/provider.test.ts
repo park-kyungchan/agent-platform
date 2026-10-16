@@ -241,14 +241,22 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
         expect(JSON.parse(error).error).toBe("NATIVE_BOUNDARY_INPUT_OR_SOURCE_FAILED");
       } else if (name === "read-current-work.js") {
         expect(code).toBe(1);
-        expect(error).toBe("CURRENT_WORK_INPUT_OR_SOURCE_FAILED\n");
+        expect(JSON.parse(error)).toEqual({
+          error: "CURRENT_WORK_INPUT_OR_SOURCE_FAILED",
+          stage: "input",
+          reason: "REQUEST_UNAVAILABLE_OR_INVALID",
+        });
       } else {
         expect(code).toBe(0);
         expect(JSON.parse(out)).toEqual({});
-        expect(error).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+        expect(JSON.parse(error)).toEqual({
+          error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+          stage: "input",
+          reason: "REQUEST_UNAVAILABLE_OR_INVALID",
+        });
       }
     }
-    const invokeNative = async () => {
+    const invokeNative = async (payloadOverride: Record<string, unknown> = {}) => {
       const p = Bun.spawn(
         [compiler, "--no-env-file", join(f.root, "current-work-native-hook.js")],
         {
@@ -259,6 +267,7 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
               session_id: "synthetic-session",
               cwd: "/synthetic/cwd",
               extra: { task_id: "actual-native-task", user_message: marker },
+              ...payloadOverride,
             }),
           ]),
           stdout: "pipe",
@@ -275,11 +284,24 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     expect(unselected.code).toBe(0);
     expect(JSON.parse(unselected.stdout)).toEqual({});
     expect(unselected.stderr).toBe("");
+    const invalidProtocol = await invokeNative({ profile: "", session_id: marker });
+    expect(invalidProtocol.code).toBe(0);
+    expect(JSON.parse(invalidProtocol.stdout)).toEqual({});
+    expect(JSON.parse(invalidProtocol.stderr)).toEqual({
+      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+      stage: "context",
+      reason: "CONTEXT_PROJECTION_FAILED",
+    });
+    expect(invalidProtocol.stdout + invalidProtocol.stderr).not.toContain(marker);
     await writeFile(bindingsPath, bindingsBytes + "\n");
     const mutatedBindings = await invokeNative();
     expect(mutatedBindings.code).toBe(0);
     expect(JSON.parse(mutatedBindings.stdout)).toEqual({});
-    expect(mutatedBindings.stderr).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+    expect(JSON.parse(mutatedBindings.stderr)).toEqual({
+      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+      stage: "bindings",
+      reason: "BINDINGS_UNAVAILABLE_OR_INVALID",
+    });
     expect(mutatedBindings.stdout + mutatedBindings.stderr).not.toContain(marker);
     await writeFile(bindingsPath, bindingsBytes);
     const held = Bun.spawn([compiler, "--no-env-file", join(f.root, "read-current-work.js")], {
@@ -312,11 +334,19 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     ]);
     expect(staleCode).toBe(1);
     expect(staleOut).toBe("");
-    expect(staleError).toBe("CURRENT_WORK_INPUT_OR_SOURCE_FAILED\n");
+    expect(JSON.parse(staleError)).toEqual({
+      error: "CURRENT_WORK_INPUT_OR_SOURCE_FAILED",
+      stage: "source",
+      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
+    });
     const staleNative = await invokeNative();
     expect(staleNative.code).toBe(0);
     expect(JSON.parse(staleNative.stdout)).toEqual({});
-    expect(staleNative.stderr).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+    expect(JSON.parse(staleNative.stderr)).toEqual({
+      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+      stage: "source",
+      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
+    });
   } finally {
     await f.cleanup();
   }
@@ -365,7 +395,11 @@ test("compiled native hook refuses a changed registration before the current Wor
     });
     expect(await p.exited).toBe(0);
     expect(JSON.parse(await new Response(p.stdout).text())).toEqual({});
-    expect(await new Response(p.stderr).text()).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD\n");
+    expect(JSON.parse(await new Response(p.stderr).text())).toEqual({
+      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
+      stage: "source",
+      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
+    });
     expect(await Bun.file(f.markerPath).exists()).toBe(false);
   } finally {
     await f.cleanup();
