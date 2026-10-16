@@ -34,5 +34,6 @@
     "HRR-INTERVIEW-5"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [],
+  "nextAction": "Review immutable component commits and final combined tree; update exact provider successors; publish authenticated evidence before PR."
 }

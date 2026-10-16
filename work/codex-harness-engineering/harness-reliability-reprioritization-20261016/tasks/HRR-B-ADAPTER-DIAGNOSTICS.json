@@ -34,5 +34,6 @@
     "HRR-INTERVIEW-5"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [],
+  "nextAction": "Bound existing SSH transport diagnostics and definitive owned-child cleanup in isolated VPS source; use inert tests only."
 }

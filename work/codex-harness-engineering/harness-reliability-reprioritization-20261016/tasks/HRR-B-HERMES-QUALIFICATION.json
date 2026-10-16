@@ -18,7 +18,7 @@
   },
   "title": "Qualify current Hermes installation/native-adapter prerequisites and safe diagnostic stages without replaying repaired effects.",
   "state": {
-    "execution": "planned",
+    "execution": "running",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",
@@ -34,5 +34,6 @@
     "HRR-INTERVIEW-5"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [],
+  "nextAction": "Consume common compact projection, preserve native v1 compatibility and strict v2 output budget, then independently review source."
 }

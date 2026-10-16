@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "plan",
+  "id": "HRR-PLAN",
+  "revision": 2,
+  "specId": "HRR-SPEC",
+  "specRevision": 1,
+  "objective": "Record successor authority/lineage and current observations; independently implement A common contracts and B owner source fixes in parallel; integrate reviewed A before qualifying B; improve C Herdr result recovery; then independently verify actual interruption/new-session recovery/delegation retrieval and separate Acceptance.",
+  "clauses": [
+    "Prioritize complete common purpose/original/effect continuity before native adoption, then Herdr lifecycle and result recovery.",
+    "Run independent common, Codex, Hermes and VPS source tasks in isolated owner worktrees in parallel; serialize reviewed source integration and provider successors at the Lead.",
+    "Keep original user decisions, paused predecessor lineage, all historical fences and independent month-end Work reachable; never replay old completed or uncertain effects.",
+    "Require current checks, independent exact source review and authenticated review status before PR; explicitly integrate the expected head only after zero unresolved findings.",
+    "Qualify native consumption and activation separately from source/install proof; fresh native model suites require explicit new budgets.",
+    "Verify the first useful task through actual interruption, NEW native-session recovery and delegated result readback with purpose, originals, fences and authored next action intact.",
+    "Discuss month-end integration after that first acceptance; preserve its independent progress and original user question-selection boundary."
+  ]
+}

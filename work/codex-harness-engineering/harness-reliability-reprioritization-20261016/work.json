@@ -37,7 +37,7 @@
   },
   "plan": {
     "id": "HRR-PLAN",
-    "revision": 1
+    "revision": 2
   },
   "governingDecisionIds": [
     "HRR-INTERVIEW-1",
@@ -48,5 +48,22 @@
   ],
   "historicalFenceIds": [
     "predecessor-effects"
-  ]
+  ],
+  "continuity": {
+    "schema": "common.git-work-continuity.v1",
+    "purposeSources": [
+      {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/normative-purpose-capture-v1.json",
+        "fragment": "#/content/purpose"
+      }
+    ],
+    "effectInventorySources": [
+      {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/predecessor-effect-custody.json",
+        "fragment": "#/content"
+      }
+    ]
+  }
 }

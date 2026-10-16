@@ -18,7 +18,7 @@
   },
   "title": "Implement durable Herdr/native task/result recovery recipe and source-owned continuity routing.",
   "state": {
-    "execution": "planned",
+    "execution": "running",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",
@@ -34,5 +34,6 @@
     "HRR-INTERVIEW-5"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [],
+  "nextAction": "Retain correlated task/result source addresses and receiver readback; review canonical long-work skill changes before native projection."
 }

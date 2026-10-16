@@ -18,7 +18,7 @@
   },
   "title": "Correct the three current Codex candidate findings with canonical runtime readers and complete owner binding.",
   "state": {
-    "execution": "planned",
+    "execution": "running",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",
@@ -34,5 +34,6 @@
     "HRR-INTERVIEW-5"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [],
+  "nextAction": "Consume canonical prospective Home validator7bd9a2d in finite QA and finish the three current candidate corrections."
 }
