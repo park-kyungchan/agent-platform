@@ -1,0 +1,35 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "ACADEMY-ROOT-SOURCE-READ-ONCE1",
+  "kind": "task",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-harness-operation",
+    "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
+    "specId": "ontology-driven-harness-operation:spec:git-harness-adversarial-20261014",
+    "specRevision": 7,
+    "planId": "ontology-driven-harness-operation:plan:git-harness-adversarial-20261014",
+    "planRevision": 7,
+    "taskId": "ACADEMY-ROOT-SOURCE-READ-ONCE1"
+  },
+  "title": "Record consumed once-only Root SOURCE read; native and PG gates remain held",
+  "state": {
+    "execution": "complete",
+    "verification": "pending",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "dependsOn": [],
+  "decisionIds": [
+    "academy-product-operational-backlog-included-20261015",
+    "latest-bun-vps-agent-defaults-20261016"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": ["academy-root-source-read-once1-observation"],
+  "executionClass": "source-only"
+}

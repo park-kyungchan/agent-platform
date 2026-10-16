@@ -1,0 +1,15 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "academy-root-source-read-once1-fence",
+  "kind": "effect-fence",
+  "completedEffectIds": ["ACADEMY-ROOT-SOURCE-READ-ONCE1"],
+  "uncertainEffectIds": [],
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-read-replay-fence-20261016.json",
+    "fragment": "#/content"
+  }
+}

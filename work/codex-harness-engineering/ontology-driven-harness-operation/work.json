@@ -8,32 +8,22 @@
   "repositoryId": "park-kyungchan/agent-platform",
   "issueId": "ontology-driven-harness-operation:issue:git-native-harness-friction",
   "purpose": {
-    "objective": "Finish the private integrated common Harness, WSL2/VPS native adoption, portfolio reorganization and Academy backlog under the full pinned Spec.",
+    "objective": "Complete full private Spec7/Plan7.",
     "successCriteria": [
-      "Stable logical identities and Git/native joins without duplicate registration.",
-      "Addressable original Q/A, rationale/history and completed/uncertain effect fences.",
-      "Measured private portfolio topology, ownership, reorganization and verified recovery.",
-      "One typed common/Codex/Hermes source; native/domain/data/evidence owners retained.",
-      "Both native consumers verified and explicitly activated; VPS continuation works PC-off.",
-      "Useful delegation/handoff/resume, Memory, Kanban/Session, concurrency and local/shared receipts.",
-      "Academy seven operational gates and source-grounded teacher/concept workflows; source server read-only.",
-      "Month-end analysis ends before user selects existing items; no agent generation/final membership.",
-      "Exact independent review, private delivery, explicit Lead merge/readback and safe cleanup.",
-      "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero added recurring cost.",
-      "Lead Acceptance after all pinned Spec criteria pass; teacher/human judgment stays separate."
+      "Full Spec7/Plan7 and original purpose in inputs/work-purpose-compaction-provenance-20261016.json.",
+      "Stable IDs/originals/fences; one typed common/native source, retained owners; no duplicate registration.",
+      "Verified native activation/PC-off, full portfolio boundaries/recovery; useful delegation/handoff/resume/Memory/Kanban/Session/concurrency and local/shared receipts.",
+      "Academy seven gates/teacher/concept work; private runtime, source read-only; month-end analysis before user choice.",
+      "Exact review/private delivery/Lead merge/readback/cleanup; separate evidence-based Lead Acceptance.",
+      "Fresh suite <=48 requests/2000000 emitted tokens/8h; zero added recurring cost."
     ],
     "inScope": [
-      "Common Harness and both native runtime engineering, verification and activation",
-      "The complete related repository portfolio, justified module boundaries and recovery",
-      "Academy product/operational backlog in an independent private runtime with read-only source access",
-      "Fresh budgeted native evaluation and delegated evidence-based Lead Acceptance"
+      "Full common/native/related-portfolio/independent-Academy engineering and outcomes."
     ],
     "outOfScope": [
-      "Academy source-server mutation, denied-source access or unrequested physical/third-party effects",
-      "Unrelated excluded domains, credential disclosure, trust bypass or a parallel agent runtime",
-      "Automatic merge, new paid infrastructure, historical effect replay or reused evaluation budgets",
-      "Invented student data, teacher decisions, human satisfaction or unverified whole completion",
-      "Agent-generated month-end papers or autonomous question selection/final membership; user selection remains separate."
+      "Source mutation/denied access, unrequested physical/third-party effects, excluded domains.",
+      "Credential disclosure/trust bypass/parallel runtime; auto-merge/paid infrastructure/replay/reused budgets.",
+      "Invented student/teacher/human outcomes; agent papers/membership. User question choice and teacher/human judgments remain separate."
     ]
   },
   "spec": {
@@ -66,6 +56,7 @@
     "latest-bun-vps-agent-defaults-20261016"
   ],
   "historicalFenceIds": [
-    "checkpoint-56-historical-effect-fence"
+    "checkpoint-56-historical-effect-fence",
+    "academy-root-source-read-once1-fence"
   ]
 }

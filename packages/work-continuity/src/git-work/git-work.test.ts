@@ -1261,12 +1261,52 @@ describe("source qualification does not grant startup or native authority", () =
       projectId: "codex-harness-engineering",
       workId: "ontology-driven-harness-operation",
     });
-    for (const taskId of ["GHA-22", "GHA-27", "WSL2-LEAD-HANDOFF"]) {
+    for (const taskId of [
+      "GHA-22",
+      "GHA-27",
+      "WSL2-LEAD-HANDOFF",
+      "ACADEMY-ROOT-SOURCE-READ-ONCE1",
+    ]) {
       const result = await readGitWorkContext(reader, { taskId, latestRelevant: "current" });
+      expect(result.holdReasons).toEqual([]);
       expect(result.status).toBe("source-qualified");
       expect(result.records.some((row) => row.kind === "task" && row.id === taskId)).toBe(true);
       expect(JSON.stringify(result).length).toBeLessThanOrEqual(24000);
       expect(result.semanticAcceptanceEstablished).toBe(false);
     }
+    const sourceTaskId = "ACADEMY-ROOT-SOURCE-READ-ONCE1";
+    const sourceTask = await reader.readRecord({ kind: "task", id: sourceTaskId });
+    expect(sourceTask.kind).toBe("task");
+    if (sourceTask.kind !== "task") throw Error("Expected consumed source Task");
+    expect(sourceTask.executionClass).toBe("source-only");
+    expect(sourceTask.occurrence).toBeUndefined();
+    expect(sourceTask.effectIds).toEqual([]);
+    const context = await readGitWorkContext(reader, {
+      taskId: sourceTaskId,
+      latestRelevant: "current",
+    });
+    expect(context.historicalEffects).toMatchObject({
+      completedCount: 64,
+      uncertainCount: 2,
+      projectedFenceRecords: 2,
+    });
+    expect(context.historicalEffects?.relevantCompletedIds).toContain(sourceTaskId);
+    expect(
+      context.sources.some(
+        (source) => source.path === "inputs/private-root-source-custody-20261016.json",
+      ),
+    ).toBe(true);
+    expect(
+      context.records.some((record) => record.id === "latest-bun-vps-agent-defaults-20261016"),
+    ).toBe(true);
+    // The new fence uses the existing source-Task guard, never a fabricated native occurrence.
+    await writeFile(
+      join(target, "tasks", sourceTaskId + ".json"),
+      JSON.stringify({ ...sourceTask, state }),
+    );
+    const replayReader = await openGitWork({ ...reader.selection, commit: await commit(root) });
+    expect((await validateGitWorkRecords(replayReader)).findings).toContain(
+      "COMPLETED_EFFECT_REPLAY:" + sourceTaskId,
+    );
   });
 });

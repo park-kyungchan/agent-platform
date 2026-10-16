@@ -1,0 +1,14 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-harness-operation",
+  "id": "academy-root-source-read-once1-observation",
+  "kind": "evidence",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/private-root-source-custody-20261016.json",
+    "fragment": "#/content"
+  }
+}
