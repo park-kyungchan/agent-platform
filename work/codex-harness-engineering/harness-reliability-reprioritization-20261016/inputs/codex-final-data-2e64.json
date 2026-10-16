@@ -1,0 +1,412 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "codex-final-data-2e64",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-8",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.retained-source-artifact.v1",
+    "originalBytes": 15915,
+    "originalSha256": "d79c0407298717fe97105ba8ed0d426fed0e998ed33cdd9fd71596a4fe09852f",
+    "originalSerialization": "JSON.stringify(value,null,2) plus newline; exact reconstruction asserted when original is canonical JSON",
+    "report": {
+      "schema": "hrr.independent-final-data-native-source-measurement.v1",
+      "measuredAtUtc": "2026-10-16T12:55:47.013093+00:00",
+      "reviewer": "/root/review_codex_successor",
+      "result": "complete canonical required Work fits described v2 fictional Home fixture; defaultv1 and larger valid Home wholehold; native qualification not established",
+      "findingCount": 0,
+      "findings": [],
+      "sourceIdentity": {
+        "selectedDataCommit": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+        "selectedDataTree": "c0ddfc2572ab7679a05ef22a8ffb0212b5301276",
+        "selectedRepositoryRoot": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "projectId": "codex-harness-engineering",
+        "workId": "harness-reliability-reprioritization-20261016",
+        "canonicalCommon": "f642938f4196b3ff99314f91cd0d6080d7dd46f1",
+        "nativeConsumer": "8563fefe3ae7d62458e74a5debf03a8c04cbe7bf",
+        "ownerMetadata": "74107060839c3b98402b1d203b1781829c43c4fa",
+        "exclusiveQaCommonComposition": "ca39be3b38ce26cf3cd86d8f229a292fc23b91a7",
+        "exclusiveQaCommonRoot": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform",
+        "correspondence": "Exact Git source directory diff versus Root2e64 empty for commongit-work/nativeCodexadapter. QA contains same target implementation; final Root Hermes/registry/source-record additions do not imply identical complete trees. Existing owner QA identity overlays retained; no writer/Root/shared source changes."
+      },
+      "scope": "Bounded source delivery measurement only. No testsuite rerun, preparation,actual global profile/nativehooks read,RPC/models/Goal/session,service/config/trust/credential/nativeactivation/publication effects.",
+      "command": {
+        "cwd": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform",
+        "exact": "TMPDIR=\"$PWD/.private/final-data-2e64/tmp\" bun .private/final-data-2e64/measure.ts",
+        "result": "exit0",
+        "probe": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/measure.ts",
+          "bytes": 11077,
+          "sha256": "90d21aaeeb82781f5ad00d45f9e092eebfa806674e32658cea4989d8c5b71b29"
+        },
+        "log": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/logs/measure.jsonl",
+          "bytes": 7782,
+          "sha256": "eae66d3f5f0ad6fd38bedf8cf15110b27d03ae3e25cf0a8d9b5b459332da94be"
+        }
+      },
+      "fixture": {
+        "origin": "Unchanged longstanding fictional Home/profile values from prior independent QA; exact selected data/task and isolated artifact path differ. No fixture pruning to force fit. Separate largerHome case explicitly demonstrates safe overflow.",
+        "actualGlobalProfileRead": false,
+        "actualNativeHomeContractRead": false,
+        "fullProfileValue": {
+          "implementation": {
+            "language": "TypeScript",
+            "runtime": "Bun"
+          },
+          "canonicalArtifacts": {
+            "extensions": [
+              ".ts",
+              ".json"
+            ],
+            "language": "English",
+            "nativeRequiredFormatsAllowed": true
+          },
+          "conversation": {
+            "language": "Korean with English technical terms"
+          },
+          "ontology": {
+            "ownership": "shared-upper-ontology",
+            "organization": "domain-modules"
+          },
+          "excludedDomains": [
+            "ministry",
+            "spt",
+            "math-teaching-and-educational-video",
+            "music-production",
+            "hermes-application-workflows",
+            "jev-research-experiments"
+          ],
+          "selectedCapabilities": {},
+          "nativeBinding": {
+            "semanticOwners": [],
+            "projectEntrypoints": []
+          },
+          "privateSentinel": "PRIVATE_PROFILE_SENTINEL"
+        },
+        "fixtureContractValueArtifact": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/contract.fixture.json",
+          "bytes": 2601,
+          "sha256": "928dce9be5d8deb714ce10c04992e4caa441cba0a17a8316e8ff2b91f757c6a0"
+        },
+        "fixtureProfileValueArtifact": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/profile.fixture.json",
+          "bytes": 762,
+          "sha256": "61a8db61a19fb38ea0a0a6c8d5a9bd8e460efc204c0244957e30846041495182"
+        },
+        "runtimeContractCompactBytes": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/owner/architecture/home.json",
+          "bytes": 2332,
+          "sha256": "0fbb3337a176c0a54a8be5e997174a043791f7bc206c7513e6eede9a284efc13"
+        },
+        "runtimeProfileCompactBytes": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/home/.codex/harness/profile.json",
+          "bytes": 601,
+          "sha256": "62ab31b25283c28e3d4a39eaa825bda5940c80f0ddcb92e5787d35b8d73b1841"
+        },
+        "binding": {
+          "projectId": "codex-harness-engineering",
+          "root": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/owner",
+          "workId": "harness-reliability-reprioritization-20261016",
+          "checkpointPath": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/owner/checkpoint.json",
+          "entrypointCwds": [
+            "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/home"
+          ],
+          "entrypointContextPath": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/owner/architecture/home.json",
+          "gitWorkContextVersion": "explicitv2/explicitv1/absent measured separately"
+        },
+        "optionalHomePolicy": "Official projector optionally fits selectedCapabilities,semanticOwners,projectEntrypoints,canonicalSourcePaths,defaultProjectRoute after required payload. For all3 complete v2 outputs only defaultProjectRoute was omitted and explicitly labeled; required selectedWork was never pruned. Baseline profile selectedCapabilities/semanticOwners/projectEntrypoints are fictional empty values, not current user/global preference claims.",
+        "fullContractValueReadPolicy": "Complete exact contract JSON retained in fixtureContractValueArtifact; runtime compact source bytes also retained/hash-bound. All project/home/binding paths are explicit below; full profile value remains inline."
+      },
+      "measurements": [
+        {
+          "taskId": "HRR-RECOVERY-SOURCE-REVIEW",
+          "rawContextChars": 13051,
+          "canonicalCompactChars": 9239,
+          "canonicalCompactBytes": 9243,
+          "selectedTaskPlan": 2,
+          "activeWorkPlan": 2,
+          "normative": [
+            {
+              "kind": "work",
+              "id": "harness-reliability-reprioritization-20261016"
+            },
+            {
+              "kind": "spec",
+              "id": "HRR-SPEC",
+              "revision": 1
+            },
+            {
+              "kind": "plan",
+              "id": "HRR-PLAN",
+              "revision": 2
+            }
+          ],
+          "variants": [
+            {
+              "version": "v2",
+              "status": "current",
+              "frameChars": 11861,
+              "cap": 12000,
+              "requiredEssentialFrameChars": null,
+              "omittedOptionalHome": [
+                "defaultProjectRoute"
+              ],
+              "selectedWorkStatus": "source-qualified",
+              "selectedWorkHoldReasons": [],
+              "completeRequiredWorkDelivered": true
+            },
+            {
+              "version": "v1",
+              "status": "held",
+              "frameChars": 3796,
+              "cap": 6000,
+              "requiredEssentialFrameChars": 16965,
+              "omittedOptionalHome": [],
+              "selectedWorkStatus": "held",
+              "selectedWorkHoldReasons": [
+                "NATIVE_CONTEXT_OUTPUT_LIMIT"
+              ],
+              "completeRequiredWorkDelivered": false
+            }
+          ],
+          "absentBindingVersionStatus": "held",
+          "absentBindingVersionCap": 6000
+        },
+        {
+          "taskId": "HRR-REAL-RECOVERY-ACCEPTANCE",
+          "rawContextChars": 13290,
+          "canonicalCompactChars": 8967,
+          "canonicalCompactBytes": 8971,
+          "selectedTaskPlan": 1,
+          "activeWorkPlan": 2,
+          "normative": [
+            {
+              "kind": "work",
+              "id": "harness-reliability-reprioritization-20261016"
+            },
+            {
+              "kind": "spec",
+              "id": "HRR-SPEC",
+              "revision": 1
+            },
+            {
+              "kind": "plan",
+              "id": "HRR-PLAN",
+              "revision": 2
+            },
+            {
+              "kind": "plan",
+              "id": "HRR-PLAN",
+              "revision": 1
+            }
+          ],
+          "variants": [
+            {
+              "version": "v2",
+              "status": "current",
+              "frameChars": 11589,
+              "cap": 12000,
+              "requiredEssentialFrameChars": null,
+              "omittedOptionalHome": [
+                "defaultProjectRoute"
+              ],
+              "selectedWorkStatus": "source-qualified",
+              "selectedWorkHoldReasons": [],
+              "completeRequiredWorkDelivered": true
+            },
+            {
+              "version": "v1",
+              "status": "held",
+              "frameChars": 3796,
+              "cap": 6000,
+              "requiredEssentialFrameChars": 16980,
+              "omittedOptionalHome": [],
+              "selectedWorkStatus": "held",
+              "selectedWorkHoldReasons": [
+                "NATIVE_CONTEXT_OUTPUT_LIMIT"
+              ],
+              "completeRequiredWorkDelivered": false
+            }
+          ],
+          "absentBindingVersionStatus": "held",
+          "absentBindingVersionCap": 6000
+        },
+        {
+          "taskId": "HRR-A-CONTEXT-EFFECT",
+          "rawContextChars": 13341,
+          "canonicalCompactChars": 9051,
+          "canonicalCompactBytes": 9055,
+          "selectedTaskPlan": 1,
+          "activeWorkPlan": 2,
+          "normative": [
+            {
+              "kind": "work",
+              "id": "harness-reliability-reprioritization-20261016"
+            },
+            {
+              "kind": "spec",
+              "id": "HRR-SPEC",
+              "revision": 1
+            },
+            {
+              "kind": "plan",
+              "id": "HRR-PLAN",
+              "revision": 2
+            },
+            {
+              "kind": "plan",
+              "id": "HRR-PLAN",
+              "revision": 1
+            }
+          ],
+          "variants": [
+            {
+              "version": "v2",
+              "status": "current",
+              "frameChars": 11673,
+              "cap": 12000,
+              "requiredEssentialFrameChars": null,
+              "omittedOptionalHome": [
+                "defaultProjectRoute"
+              ],
+              "selectedWorkStatus": "source-qualified",
+              "selectedWorkHoldReasons": [],
+              "completeRequiredWorkDelivered": true
+            },
+            {
+              "version": "v1",
+              "status": "held",
+              "frameChars": 3796,
+              "cap": 6000,
+              "requiredEssentialFrameChars": 17019,
+              "omittedOptionalHome": [],
+              "selectedWorkStatus": "held",
+              "selectedWorkHoldReasons": [
+                "NATIVE_CONTEXT_OUTPUT_LIMIT"
+              ],
+              "completeRequiredWorkDelivered": false
+            }
+          ],
+          "absentBindingVersionStatus": "held",
+          "absentBindingVersionCap": 6000
+        }
+      ],
+      "preservedSemanticClosure": {
+        "originalRoutes": 5,
+        "originalSelectionContextRoutes": 5,
+        "decisions": "All governing original answer/question pointers preserved even selection.decisionIds=[]; source commits equal exact2e64. Source addresses are immutable routes, not Git-native authentication.",
+        "effectInventoryRoutes": [
+          {
+            "source": {
+              "repositoryId": "park-kyungchan/agent-platform",
+              "commit": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+              "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/predecessor-effect-custody.json",
+              "blobOid": "d429ea04d26055f983c117a6545879cbeb22bdce"
+            },
+            "fragment": "#/content"
+          },
+          {
+            "source": {
+              "repositoryId": "park-kyungchan/agent-platform",
+              "commit": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+              "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json",
+              "blobOid": "eb98c159f756f3334f43b1366e6adc0b2947a773"
+            },
+            "fragment": "#/content"
+          }
+        ],
+        "completedCount": 68,
+        "uncertainCount": 3,
+        "historicalConsumedActionSource": {
+          "sha256": "0c1998291c59968cb9d05d1d7cb946864921bf06ab8e850e5b95048c6e0a5c32",
+          "blobOid": "eb98c159f756f3334f43b1366e6adc0b2947a773",
+          "fragment": "#/content",
+          "observedRecordedNativeRPCs": 4,
+          "observedRecordedDependencyMoves": 2,
+          "recordedDependencyUncertainSteps": 0,
+          "classification": "Read captured immutable source metadata only. No original receipt/native store read/replay, cleanup or new action dispatch."
+        },
+        "normativeProof": "Decode values compared with exact reader: Workpurpose,allSpeccriteria/Planclauses,Tasklogical/state/nextAction. NewTaskPlan2/WorkPlan2; historicalREAL/A TaskPlan1 retainsPlan1+activePlan2. No retagging/currentTask inference."
+      },
+      "overflowAndLimits": {
+        "sourcePolicy": "Explicit bindingv2 cap12000; default/absentv1 remains6000 even caller99999. Homev1 contract max6000/nativeTokenLimit1500 remains unchanged. Character caps grant no native token budget or admission.",
+        "defaultV1": "All3 exact complete Work envelopes exceed6000; wholeholds with NATIVE_CONTEXT_OUTPUT_LIMIT, immutable read route and requiredEssentialFrameChars16965/16980/17019. Final held frame3796chars contains no partial normative/semanticContext.",
+        "sourceV2Headroom": {
+          "newRecoveryTask": 139,
+          "historicalReal": 411,
+          "historicalA": 327,
+          "qualification": "For this exact fictional fixture only; longer required Home metadata can hold. Optional omission labels already included."
+        },
+        "largerValidHome": {
+          "changedField": "northStar only;635chars, canonically validated Homev1 value below its1600 limit",
+          "fullValueArtifact": {
+            "path": "/home/palantirkc/code/worktrees/hrr-review-codex-owner-pair-20261016/agent-platform/.private/final-data-2e64/tmp/frame-DJkg8J/contract-larger-valid.fixture.json",
+            "bytes": 3159,
+            "sha256": "559551b7258afd76573771b324cba92994d1e3b2870dd82f3bb5c04918b328c7"
+          },
+          "measurements": [
+            {
+              "taskId": "HRR-RECOVERY-SOURCE-REVIEW",
+              "status": "held",
+              "frameChars": 4356,
+              "requiredEssentialFrameChars": 12407,
+              "cap": 12000,
+              "omittedOptionalHome": [],
+              "requiredWorkPruned": false
+            },
+            {
+              "taskId": "HRR-REAL-RECOVERY-ACCEPTANCE",
+              "status": "held",
+              "frameChars": 4356,
+              "requiredEssentialFrameChars": 12135,
+              "cap": 12000,
+              "omittedOptionalHome": [],
+              "requiredWorkPruned": false
+            },
+            {
+              "taskId": "HRR-A-CONTEXT-EFFECT",
+              "status": "held",
+              "frameChars": 4356,
+              "requiredEssentialFrameChars": 12219,
+              "cap": 12000,
+              "omittedOptionalHome": [],
+              "requiredWorkPruned": false
+            }
+          ],
+          "result": "All3 wholehold at same12000 cap, required sizes12407/12135/12219. No Work clauses/originals removed to fit. Final heldframes4356chars. Baseline runtime contract restored afterward."
+        }
+      },
+      "existingSourceClosure": {
+        "contextPins": 31,
+        "nativePins": 16,
+        "readback": "Existing exact fictional owner QA guards verified before/after finite read. This is not current active shared/native closure. No broad full458 rerun; previous exact741+f642 owner report remains separate.",
+        "ownerReview": {
+          "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-reviews/codex-owner-7410706.json",
+          "sha256": "123de914a13a4ea42df61754be8c4f6409e86cd3fa90ea24b523f28b956a3e2d"
+        }
+      },
+      "sourceHashes": {
+        "packages/work-continuity/src/git-work/context.ts": "e9f01f5c15b558ce9f6dd72880f0428903d17bd75450f424046aedca7aa739b7",
+        "packages/work-continuity/src/git-work/types.ts": "5de1a8c30ae224da1492b23cea239de684d19b36d5657a85e1a62cddb2d8960d",
+        "packages/native-codex-adapter/src/native/home-context.ts": "f370bcd8033ce231925e4740768f02fddec4e001b1551cfed78cecb54fc921c4",
+        "packages/native-codex-adapter/src/native/hooks.ts": "aba61c8db9105f0ca641fbbd0f605a3219bccdb32a6f9ad49d94f3e2e33519d1"
+      },
+      "currentHolds": [
+        "Exact2e64 source only; caller-declaredcurrent is not remote/current-main or native-authorship proof.",
+        "ActualglobalHome/profile/nativehooks/injection/trust/callability/authentication/activation unmeasured. Native1500 does not qualify wholev2; no character/token conversion or modelbudget.",
+        "Final Root combined fresh independent review/publication/integration gates remain; no publication/status/PR/merge.",
+        "Actual useful interruption/NEW-session recovery/delegated result/Acceptance separate. No Goal/session/prepare/effects. Completed/uncertain actions never replay; month-end untouched."
+      ]
+    },
+    "meaning": "Source custody, not native authentication/permission or Acceptance. Actual process/session observation stays explicitly scoped."
+  }
+}

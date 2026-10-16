@@ -1,0 +1,463 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "hermes-final-data-2e64",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-8",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "hrr.retained-source-artifact.v1",
+    "originalBytes": 19292,
+    "originalSha256": "0f5db84a87b9fdb05f89bbe6cceca7820df1cf94b34ad59ec65be5e4f87b5455",
+    "originalSerialization": "JSON.stringify(value,null,2) plus newline; exact reconstruction asserted when original is canonical JSON",
+    "report": {
+      "schema": "hrr.final-hermes-source-envelope-measurement.v1",
+      "recordClass": "ImmutableSourceAndDataEnvelopeMeasurementOnly",
+      "measuredAtUtc": "2026-10-16T12:55:24.333216+00:00",
+      "reviewer": "/root/review_hermes",
+      "exactComposition": {
+        "exclusiveQaRoot": "/home/palantirkc/code/worktrees/hrr-review-hermes-final-data-2e64",
+        "head": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+        "tree": "c0ddfc2572ab7679a05ef22a8ffb0212b5301276",
+        "canonicalA": "f642938f4196b3ff99314f91cd0d6080d7dd46f1",
+        "canonicalATree": "de0532a209c9103cc0a66cfdf5e6b74cba33f91d",
+        "commonWorkContinuitySourceBytesMatchA": true,
+        "hermesNativeSourceCommits": [
+          "250344dbab7f5393d94b0b62f251efe85207ddf6",
+          "c5c67dcf225f1fba8f0fdf4e1329a0d821057150"
+        ],
+        "hermesCurrentWorkSourceBytesUnchanged": true,
+        "hermesNativeFilePins": [
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/build.ts",
+            "bytes": 11301,
+            "sha256": "aaec3edfbf90657f6db06fa57f7be6c54217de8703f52887f1a64297f8f30d21"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/context.test.ts",
+            "bytes": 33177,
+            "sha256": "a82be36872f7eb37c018e14905cbd88f58260e7a6ded1027b49cf8b1e629f98b"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/context.ts",
+            "bytes": 19486,
+            "sha256": "2db64c5ba20601d394f80866f392fc52e2e29887a206900815128f1d7d8cb590"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/diagnostics.test.ts",
+            "bytes": 2259,
+            "sha256": "98cea695279b89d29f92d1b06bc3c9a5229c72b54f5f19664999f68e49650073"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/diagnostics.ts",
+            "bytes": 814,
+            "sha256": "8c5e01916e95cd06ec99545971ad9a8254e1e0a370ba8338d93745d34c97fd25"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
+            "bytes": 4006,
+            "sha256": "fca4602e9eab1c69cc2076ac92c06b4021f677a8bf3d93bf7869b06816f01e97"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
+            "bytes": 3376,
+            "sha256": "7955831ff5f4e682a435a291f7c0e83475eaaaef937e5bdee56b4f499bed39c6"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/output-policy.ts",
+            "bytes": 820,
+            "sha256": "972616fb87070e4f23949d04dfb8e170512c149d2265a1910160925cb107315a"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/provider.test.ts",
+            "bytes": 20685,
+            "sha256": "fc4a01f6cd54c0ee1b66fd3f08a3bd08de5dcfb76cd08b82660b5ae0ed651c34"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/provider.ts",
+            "bytes": 10745,
+            "sha256": "6c8d74b5d08ea8bf41f6124518c40e289aa490c1d0306f9d1f6d29a8c6f100d0"
+          },
+          {
+            "path": "packages/native-hermes-adapter/src/platform-current-work/read-current-work.ts",
+            "bytes": 2312,
+            "sha256": "3529fcad7c712c9ac572ba4ed5c1f676efe0f01fb382ca8671f9481737fa430f"
+          }
+        ],
+        "sourcePinCount": 38,
+        "dependencyPinCount": 624,
+        "sourceRegistration": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-hermes-final-data-2e64/.private/final-source-registration.json",
+          "bytes": 148009,
+          "sha256": "b5b78d74ff080c5d89e604f8c01f31a0e2c94d76905092e493efe64d9562875f"
+        },
+        "sourcePinSetSha256": "b09a11227ff39f6eb5a497c0f06116365eb4388cf75aa03a65ad5c66e7f509de",
+        "installedDependencyPinSetSha256": "faf5a44bd3941e2ae345479cf2269e683a4f05ff843275ad404bbe9a06a94b2a",
+        "trackedStatusAfter": ""
+      },
+      "successorEvidenceBinding": {
+        "previousDependencyReport": {
+          "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-reviews/hermes-A1d-successor.json",
+          "bytes": 17802,
+          "sha256": "69151c9714c27beb66d98c8f059441d4e98bba717e9e1f79047447b64ec610ee"
+        },
+        "previousNativeReport": {
+          "path": "/home/palantirkc/code/worktrees/harness-reprioritization-20261016-092054/.private/hrr-reviews/hermes-c5c67dc.json",
+          "bytes": 16963,
+          "sha256": "1468fff9f93f6be5b2011c47d933fc122cb33b8af640645ae7d3fefac8b995d5"
+        },
+        "purpose": "Only finalf642+fixed2e64 source/data envelope measurement; no reuse of previous execution as fresh33-suite or whole combined review. Prior reports preserved."
+      },
+      "qaNamespace": {
+        "dependenciesDeepCopiedFromExclusiveReview": "/home/palantirkc/code/worktrees/hrr-review-hermes-A1d-20261016",
+        "refresh": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-hermes-final-data-2e64/.private/final-dependency-refresh.json",
+          "bytes": 339,
+          "sha256": "7c89505b713e22d486f2949cfa64591ccd7d9cecaaa10a6c27632802c990cfd5"
+        },
+        "refreshPolicy": "Only exact finalf642 context.ts and git-work.test.ts bytes refreshed in exclusive QA installed Work projection; no shared/writer/native installation changed",
+        "symlinkCount": 355,
+        "escapedSymlinks": 0,
+        "brokenSymlinks": 0,
+        "fixtureNlink1NotActualInstallProof": true
+      },
+      "dataCustody": {
+        "immutableDataCommit": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+        "previousDataCommit": "cd0d0f253792aa251258ecbf3f339163e80c8a8c",
+        "allPreviouslyExistingInputFilesUnchanged": true,
+        "previousInputFileCount": 23,
+        "changedPreviousInputPaths": [],
+        "newMetadataInput": {
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json",
+          "sha256": "0c1998291c59968cb9d05d1d7cb946864921bf06ab8e850e5b95048c6e0a5c32",
+          "blobOid": "eb98c159f756f3334f43b1366e6adc0b2947a773",
+          "bytes": 6083
+        },
+        "inventoryUnion": {
+          "completed": 68,
+          "uncertain": 3
+        },
+        "recordedConsumedMetadata": {
+          "sourceSha256": "0c1998291c59968cb9d05d1d7cb946864921bf06ab8e850e5b95048c6e0a5c32",
+          "sourceBlobOid": "eb98c159f756f3334f43b1366e6adc0b2947a773",
+          "sourceByteLength": 6083,
+          "classification": "Retrospective source custody of already consumed actions; no new native Task or authority",
+          "recordedSuccessfulRPCs": 4,
+          "recordedMethods": [
+            "initialize",
+            "config/read",
+            "config/read",
+            "hooks/list"
+          ],
+          "recordedMoveCommands": 2,
+          "receiptRoutes": [
+            {
+              "custodyTaskId": "CODEX-VPS-NONMODEL-METADATA-ONCE1-20261016",
+              "receipt": {
+                "path": "/home/palantirkc/operations/harness-continuation-20261016/codex-vps-nonmodel-metadata-once1-actual-receipt-20261016.json",
+                "sha256": "68101141cc9fca31eaf8e17376e211948aadf02726770eabbe202acf1e37646b",
+                "bytes": 6764
+              },
+              "consumedMarker": {
+                "path": "/home/palantirkc/operations/harness-continuation-20261016/codex-vps-nonmodel-metadata-once1-consumed-20261016.json",
+                "sha256": "132b5eb63d934cf9c041d96fd46d33b26c5f1d7dbe5966d45c98915dc8d1e727",
+                "bytes": 398
+              },
+              "replayPolicy": "never-replay-recorded-dispatch"
+            },
+            {
+              "custodyTaskId": "COMMON-PROVIDER-SINGLELINK-DEPENDENCY-DIRECTORY-ONCE1-20261016",
+              "receipt": {
+                "path": "/home/palantirkc/operations/harness-continuation-20261016/private/common-provider-singlelink-directory-once1-corrected-actual-receipt.json",
+                "sha256": "48cde65fa4122010ff6b0b3aa442c22eb6dfcfd517ba1f22cc229bfc22970fcd",
+                "bytes": 14539
+              },
+              "consumedMarker": {
+                "path": "/home/palantirkc/operations/harness-continuation-20261016/common-provider-singlelink-directory-once1-attempt.json",
+                "sha256": "adb930515c829e4eb0701a656c31f4da9d0059088021ae8e9fdb4c2db91008de",
+                "bytes": 1029
+              },
+              "replayPolicy": "never-replay-recorded-dispatch"
+            }
+          ],
+          "actualExternalReceiptReobservation": false,
+          "nativePermissionGranted": false
+        }
+      },
+      "measurement": {
+        "command": "bun .private/final-data-preview.ts",
+        "script": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-hermes-final-data-2e64/.private/final-data-preview.ts",
+          "bytes": 7383,
+          "sha256": "db23461d03c627981aeded9b1fbfe7bd4396d29258adf1eea918ad53242634ef"
+        },
+        "evidence": {
+          "path": "/home/palantirkc/code/worktrees/hrr-review-hermes-final-data-2e64/.private/final-data-preview.json",
+          "bytes": 14479,
+          "sha256": "1e819138cf22ae335b3b6a5f24b79f7cda68117211be07af30b628e7f2ffd1c9"
+        },
+        "includesNativeCommonHarnessReader": "Each Task independently invokes bun run harness context with immutable selected snapshot",
+        "sourceClosureReadbacks": 8,
+        "sourceOnlySyntheticNativeReferences": true,
+        "results": [
+          {
+            "taskId": "HRR-RECOVERY-SOURCE-REVIEW",
+            "logicalPlan": 2,
+            "executionClass": "source-only",
+            "state": {
+              "execution": "running",
+              "verification": "pending",
+              "localAudit": "intent-durable",
+              "sharedAudit": "pending",
+              "formalCompletion": "pending"
+            },
+            "harness": {
+              "exitCode": 0,
+              "status": "source-qualified",
+              "jsonChars": 13051,
+              "holdReasons": [],
+              "stderr": "$ bun scripts/harness.ts context .private/harness-HRR-RECOVERY-SOURCE-REVIEW.json\n"
+            },
+            "v1": {
+              "status": "held",
+              "chars": 445,
+              "holdReasons": [
+                "REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"
+              ]
+            },
+            "v2": {
+              "status": "source-qualified",
+              "chars": 9970,
+              "utf8Bytes": 9974,
+              "holdReasons": [],
+              "outputPolicy": {
+                "policyVersion": "hermes.current-work-output.v2",
+                "maxChars": 12000,
+                "capChars": 12000
+              }
+            },
+            "allNormativeFieldsEqualRaw": true,
+            "normative": [
+              {
+                "kind": "work",
+                "id": "harness-reliability-reprioritization-20261016"
+              },
+              {
+                "kind": "spec",
+                "id": "HRR-SPEC",
+                "revision": 1
+              },
+              {
+                "kind": "plan",
+                "id": "HRR-PLAN",
+                "revision": 2
+              }
+            ],
+            "taskLogical": {
+              "domainId": "native-harness",
+              "projectId": "codex-harness-engineering",
+              "workId": "harness-reliability-reprioritization-20261016",
+              "issueId": "HRR-ISSUE-20261016",
+              "specId": "HRR-SPEC",
+              "specRevision": 1,
+              "planId": "HRR-PLAN",
+              "planRevision": 2,
+              "taskId": "HRR-RECOVERY-SOURCE-REVIEW"
+            },
+            "authoredNextActionExact": true,
+            "nextActionChars": 723,
+            "effects": {
+              "completedCount": 68,
+              "uncertainCount": 3,
+              "relevantCompletedIds": [],
+              "relevantUncertainIds": [],
+              "projectedFenceRecords": 1
+            },
+            "inventoryRoutes": [
+              {
+                "repositoryId": "park-kyungchan/agent-platform",
+                "commit": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/predecessor-effect-custody.json",
+                "blobOid": "d429ea04d26055f983c117a6545879cbeb22bdce",
+                "fragment": "#/content",
+                "sha256": "da9364f2290faa74b67f7655ec2d85762811e61b8f62b315adbd892b03d2488a"
+              },
+              {
+                "repositoryId": "park-kyungchan/agent-platform",
+                "commit": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json",
+                "blobOid": "eb98c159f756f3334f43b1366e6adc0b2947a773",
+                "fragment": "#/content",
+                "sha256": "0c1998291c59968cb9d05d1d7cb946864921bf06ab8e850e5b95048c6e0a5c32"
+              }
+            ],
+            "originalRoutes": {
+              "answerCount": 5,
+              "questionCount": 5,
+              "allFiveExactSnapshotBlobAndFragmentRoutesVerified": true,
+              "decisionIds": [
+                "HRR-INTERVIEW-1",
+                "HRR-INTERVIEW-2",
+                "HRR-INTERVIEW-3",
+                "HRR-INTERVIEW-4",
+                "HRR-INTERVIEW-5"
+              ]
+            },
+            "serializedOutput": {
+              "path": "/home/palantirkc/code/worktrees/hrr-review-hermes-final-data-2e64/.private/output-HRR-RECOVERY-SOURCE-REVIEW.json",
+              "bytes": 13741,
+              "sha256": "310ee5d1a319141213609b09161c2e0ff895ebd0961aa2aa3194c245787c9f8f"
+            }
+          },
+          {
+            "taskId": "HRR-REAL-RECOVERY-ACCEPTANCE",
+            "logicalPlan": 1,
+            "executionClass": "native-effect",
+            "state": {
+              "execution": "planned",
+              "verification": "pending",
+              "localAudit": "intent-durable",
+              "sharedAudit": "pending",
+              "formalCompletion": "pending"
+            },
+            "harness": {
+              "exitCode": 0,
+              "status": "source-qualified",
+              "jsonChars": 13290,
+              "holdReasons": [],
+              "stderr": "$ bun scripts/harness.ts context .private/harness-HRR-REAL-RECOVERY-ACCEPTANCE.json\n"
+            },
+            "v1": {
+              "status": "held",
+              "chars": 445,
+              "holdReasons": [
+                "REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"
+              ]
+            },
+            "v2": {
+              "status": "source-qualified",
+              "chars": 9700,
+              "utf8Bytes": 9704,
+              "holdReasons": [],
+              "outputPolicy": {
+                "policyVersion": "hermes.current-work-output.v2",
+                "maxChars": 12000,
+                "capChars": 12000
+              }
+            },
+            "allNormativeFieldsEqualRaw": true,
+            "normative": [
+              {
+                "kind": "work",
+                "id": "harness-reliability-reprioritization-20261016"
+              },
+              {
+                "kind": "spec",
+                "id": "HRR-SPEC",
+                "revision": 1
+              },
+              {
+                "kind": "plan",
+                "id": "HRR-PLAN",
+                "revision": 2
+              },
+              {
+                "kind": "plan",
+                "id": "HRR-PLAN",
+                "revision": 1
+              }
+            ],
+            "taskLogical": {
+              "domainId": "native-harness",
+              "projectId": "codex-harness-engineering",
+              "workId": "harness-reliability-reprioritization-20261016",
+              "issueId": "HRR-ISSUE-20261016",
+              "specId": "HRR-SPEC",
+              "specRevision": 1,
+              "planId": "HRR-PLAN",
+              "planRevision": 1,
+              "taskId": "HRR-REAL-RECOVERY-ACCEPTANCE"
+            },
+            "authoredNextActionExact": true,
+            "nextActionChars": 219,
+            "effects": {
+              "completedCount": 68,
+              "uncertainCount": 3,
+              "relevantCompletedIds": [],
+              "relevantUncertainIds": [],
+              "projectedFenceRecords": 1
+            },
+            "inventoryRoutes": [
+              {
+                "repositoryId": "park-kyungchan/agent-platform",
+                "commit": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/predecessor-effect-custody.json",
+                "blobOid": "d429ea04d26055f983c117a6545879cbeb22bdce",
+                "fragment": "#/content",
+                "sha256": "da9364f2290faa74b67f7655ec2d85762811e61b8f62b315adbd892b03d2488a"
+              },
+              {
+                "repositoryId": "park-kyungchan/agent-platform",
+                "commit": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a",
+                "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json",
+                "blobOid": "eb98c159f756f3334f43b1366e6adc0b2947a773",
+                "fragment": "#/content",
+                "sha256": "0c1998291c59968cb9d05d1d7cb946864921bf06ab8e850e5b95048c6e0a5c32"
+              }
+            ],
+            "originalRoutes": {
+              "answerCount": 5,
+              "questionCount": 5,
+              "allFiveExactSnapshotBlobAndFragmentRoutesVerified": true,
+              "decisionIds": [
+                "HRR-INTERVIEW-1",
+                "HRR-INTERVIEW-2",
+                "HRR-INTERVIEW-3",
+                "HRR-INTERVIEW-4",
+                "HRR-INTERVIEW-5"
+              ]
+            },
+            "serializedOutput": {
+              "path": "/home/palantirkc/code/worktrees/hrr-review-hermes-final-data-2e64/.private/output-HRR-REAL-RECOVERY-ACCEPTANCE.json",
+              "bytes": 13742,
+              "sha256": "c5f5fa0c2162de7a55370c9d80f60e421ec66d1130827fab14e389b52774bbfd"
+            }
+          }
+        ],
+        "budgetMeaning": "JSON.stringify of complete Hermes v2 projection including synthetic native tuple and outputPolicy, measured in JavaScript characters; UTF8 byte lengths reported separately. Pretty persisted artifacts are not the delivered encoding. No token/native permission conversion.",
+        "selectedPolicy": {
+          "v1DefaultCapChars": 6000,
+          "v2ExplicitCapChars": 12000,
+          "noPruning": true,
+          "noCapChange": true
+        }
+      },
+      "findings": [],
+      "unresolvedMeasurementFindings": 0,
+      "conclusion": "Both immutable actual Work selections fit complete explicit sourcev2; defaultv1 correctly holds. Source-only envelope measurements and exact route equality passed.",
+      "limits": [
+        "No33-suite rerun, compiler build, wholeA review or whole combined review was performed here; Root fresh source/quality checks and independent combined review remain distinct and pending as reported at task assignment.",
+        "Source registration proves only this exclusive QA canonical/installed correspondence. No actual native installation shape/importer qualification, configuration, hooks registration, candidate preparation, RPC, model evaluation, activation or user Acceptance was performed.",
+        "Recorded4RPC and2move custody is verified inside the immutable metadata source and its exact raw SHA/blob, with receipt/marker references preserved; referenced external historical receipt files and native stores were not reobserved or replayed.",
+        "New Plan2 source-only Task and historical Plan1 native-effect Task retain their exact logical identities and authored nextAction. Reading historical native-effect Task source grants no execution permission or current candidate admission.",
+        "v2/source12000 characters and complete source route delivery do not qualify native Homev1/max6000/additionalContextLimit1500 or any token/evaluation budget.",
+        "No Root/source/shared/writer implementation bytes, old Inputs, native stores/trust/config/credentials/services, Tasks/Goals or sibling sessions were changed. Only detached exclusive QA files/dependencies and this requested ignored Root report were created.",
+        "No publication, push, status, PR, merge, automatic acceptance, oldGoal resume or completed/uncertain effect replay."
+      ],
+      "nativePermissionGranted": false,
+      "actualInstallationQualified": false,
+      "nativeConsumptionVerified": false,
+      "nativeActivation": false,
+      "combinedReviewComplete": false,
+      "userAcceptanceEstablished": false,
+      "publicationPerformed": false
+    },
+    "meaning": "Source custody, not native authentication/permission or Acceptance. Actual process/session observation stays explicitly scoped."
+  }
+}

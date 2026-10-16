@@ -1,0 +1,283 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "harness-reliability-reprioritization-20261016",
+  "kind": "input",
+  "id": "checkpoint-v8",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14419-af50-72d3-b918-cc32a50a1913/material-boundary-8",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "harness.successor-continuity.v1",
+    "version": 8,
+    "updatedAtUtc": "2026-10-16T13:07:57.161635Z",
+    "logicalWork": {
+      "schema": "common.git-work.v1",
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "harness-reliability-reprioritization-20261016"
+    },
+    "nativeGoalThread": "01a14419-af50-72d3-b918-cc32a50a1913",
+    "goalStatus": "active; new successor only",
+    "phase": "owned-session-midpoint-retained-ready-for-controlled-interruption",
+    "plan": [
+      {
+        "step": "Bind original interview decisions, successor lineage, historical fences and fresh main start",
+        "status": "completed"
+      },
+      {
+        "step": "Implement A and independent B owner source fixes with isolated worktrees and useful Herdr panes",
+        "status": "completed"
+      },
+      {
+        "step": "Exact source/transition/provider checks and independent immutable review",
+        "status": "in_progress"
+      },
+      {
+        "step": "Authenticated evidence publication, PR and explicit current expected-head Lead integration",
+        "status": "pending"
+      },
+      {
+        "step": "Actual ordinary-engineering NEW-session recovery first; native hook admission/activation remain separate current gates",
+        "status": "pending"
+      },
+      {
+        "step": "Separate Acceptance; then discuss independent month-end integration",
+        "status": "pending"
+      }
+    ],
+    "runtime": {
+      "server": "srv1873899-herdr",
+      "leadPane": "w3:pJ",
+      "leadTab": "w3:t6",
+      "nativeVersion": "0.163.0",
+      "reasoningEffort": "ultra: current user selected; startup argv high is historical initial selection",
+      "herdrVersion": "0.9.5",
+      "planTool": "not available; bounded source-owned plan retained",
+      "writerNativeThread": "01a1442e-0df2-73e2-ac18-1d3bb2634e5f: writer self-observed named CODEX_THREAD_ID, corroborated owned processFDmetadata membership",
+      "reviewerNativeThread": "01a1443b-6b8b-7751-88c7-583bb902ca13: userreported and owned PID470905 open-file metadata membership; parent self-readback pending"
+    },
+    "delegations": [
+      {
+        "id": "/root/common_contract",
+        "runtime": "native-internal-child",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-common-contract-20261016",
+        "scope": "HRR-A-CONTEXT-EFFECT",
+        "state": "sourcecompletef642, independent0findings; sourceintegratedlocally"
+      },
+      {
+        "id": "/root/hermes_qualification",
+        "runtime": "native-internal-child",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-hermes-context-20261016",
+        "scope": "HRR-B-HERMES-QUALIFICATION",
+        "state": "sourcecomplete; byte-exactsourceintegratedlocally; finalROOTQA/reviewpending"
+      },
+      {
+        "id": "hrr-codex",
+        "runtime": "native-Codex-CLI",
+        "pane": "w3:pM",
+        "tab": "w3:t6",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-codex-candidate-20261016",
+        "scope": "HRR-B-CODEX-CANDIDATE",
+        "state": "originalcandidate/proposal/prepare/activationheld; separateuserPR32reviewfinishedNOTMERGED/P2, noHarnessresume",
+        "historicalOriginPath": ".private/hrr-task-result.json in original writer worktree",
+        "resultSource": {
+          "evidenceId": "HRR-CODEX-CANDIDATE-RETAINED-RESULT",
+          "source": {
+            "kind": "git",
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "0febc8f76276b2faaeb01ae25e8828f62648d869",
+            "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-candidate-source-result-1033d6f.json",
+            "fragment": "#/content/sourceResult",
+            "sha256": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5"
+          },
+          "blobOid": "0eba05ad0161a2cbfa1ca92b8a95bc5ffbae1539",
+          "retainedInputSha256": "cec6a419734371360b7a1ade35f1c4606dc4cb1c255b756888ebce8b4384a3f5",
+          "originalResultSha256": "40347d0812b7e2d00623ee737769f1c0b2e6d586854bc0f386291bdbbfad2dae",
+          "producerTaskId": "HRR-B-CODEX-CANDIDATE",
+          "producerNativeThreadId": "01a1442e-0df2-73e2-ac18-1d3bb2634e5f",
+          "codeCommit": "1033d6ff417f403e6dc05b003e42df58a947ea9e",
+          "codeTree": "89e3f97df1675108ea797369c4eda151894f0ffe",
+          "nativeAuthorshipVerified": false,
+          "receiptMeaning": "Root readback/source custody only; native authentication, shared publication and Acceptance remain separate.",
+          "sourceOnlyRouting": "Canonical checkpoint typedSource + authored Task.nextAction exactimmutableSource; source-only Task never claims native executionEvidence."
+        }
+      },
+      {
+        "id": "/root/vps_diagnostics",
+        "runtime": "native-internal-child",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-vps-diagnostics-20261016",
+        "scope": "HRR-B-ADAPTER-DIAGNOSTICS",
+        "state": "sourcecomplete4943f05; independentzero; noremoteeffects"
+      },
+      {
+        "id": "hrr-review",
+        "runtime": "native-Codex-CLI",
+        "pane": "w3:pN",
+        "scope": "Independent immutable source review; no writes/effects",
+        "state": "f642independentreviewcomplete0; useful source-review Task preparation pending"
+      },
+      {
+        "id": "/root/codex_context",
+        "runtime": "native-internal-child",
+        "worktree": "/home/palantirkc/code/worktrees/hrr-codex-context-20261016",
+        "scope": "HRR-B-CODEX-CONTEXT",
+        "state": "sourcecomplete; byte-exactsourceintegratedlocally; finalROOTQA/reviewpending"
+      }
+    ],
+    "effects": {
+      "historicalFence": "fences/predecessor-effects.json",
+      "completedCount": 68,
+      "uncertainCount": 3,
+      "newNativeEffects": [],
+      "replayPolicy": "never replay historical completed/consumed/uncertain occurrence"
+    },
+    "holds": [
+      "No fresh model-qualification suite budget.",
+      "Native trust/config/activation needs exact reviewed current owner gate.",
+      "Source-ready does not establish native consumption or acceptance.",
+      "Source owner explicitv2 delivery policy12000chars approved for implementation from actual8297/8411+lineage8728 measurement; v1default6000 preserved; native support/admission/activation and model suite budgets remain separately unqualified/held.",
+      "Finalcombined independent review/authenticatedsourcepublication/PR/expectedheadmerge stillpending; ordinary engineering recovery is distinct from hook/nativeactivation qualification."
+    ],
+    "acceptanceDecision": null,
+    "nextSafeAction": "Lead verifies owned hrr-review/w3:pN is idle/quiescent and exactmidpointretained, then ends only that CLI. Read back actualshell/oldprocessabsence before any new start. Record ownedexit in GitWork, launch NEWCodex0.163/ultra/no-daemon in sameownedpane and give exactcheckpoint/Task only. Receiver must independently read originals/fences/result and finish exacthead/tree combinedsource review. No resume command/native store clone/oldGoal/oldWSL/nativeprepare/activation/evalbudget.",
+    "componentCommits": {
+      "commonNormative": "f642938/tree de0532a209c9103cc0a66cfdf5e6b74cba33f91d; independent0findings; Root aliases07ac026+5a186f3+9326197+6063e65",
+      "prospectiveHome": "7bd9a2d; canonical validator retained in8563/Rootc5a304f",
+      "codexContext": "8563fefe3ae7d62458e74a5debf03a8c04cbe7bf; Rootc5a304f byte-exact; finalcombinedreviewpending",
+      "HermesContext": "250344d+c5c67dc; Roota703b9a+dd49f8e byte-exact; finalcombinedreviewpending",
+      "codexCandidate": "1033d6ff417f403e6dc05b003e42df58a947ea9e; sourceonly3P2fixed; actualprepare/activationheld",
+      "codexOwnerPins": "74107060839c3b98402b1d203b1781829c43c4fa/tree43a9aa8215d2de7b6f006b5544d0adf3b5cb632a; exactsource/pins31+16/full458pass; active sharedownerunchanged",
+      "vpsDiagnostics": "4943f05702433042c73ea609e39599e3c4d0fea8/treeb4e872663afa0f39b1ccf28d0ae5dc0d81bc13bb; independent0; noremoteeffects",
+      "rootCompositionBeforeCheckpoint": "187b6cda6bd92528a92015a5bd9e56eb00fd878b/tree8519840b09a910fcc96d0cce2de2d69402f2e663; registry12updated+2new; package/lock/projectunchanged; finalchecks/reviewpending"
+    },
+    "currentFindings": [],
+    "nativeIdentityObservation": {
+      "ownNamedCODEX_THREAD_ID": "01a14419-af50-72d3-b918-cc32a50a1913",
+      "nativeGoalThreadMatches": true,
+      "ownHerdrAgent": "harness-lead/w3:pJ",
+      "reviewerNamedSelfObservation": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+      "meaning": "Own native Goal and named variable plus owned Herdr dispatch/output correlation; Git metadata alone does not authenticate a native producer."
+    },
+    "sourceReportRoutes": [
+      {
+        "id": "common-review-f642938",
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/common-review-f642938.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "e128f5c1c04ca4ccc9041557d8587c89884adf2a2233d73327d15399d996df52",
+        "originalSha256": "8d4b965cdd938c83d03fea60d414162638c85787a7bafb64ffe38911ddfe5571"
+      },
+      {
+        "id": "codex-owner-review-7410706",
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-owner-review-7410706.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "10524fac2ecefb4d0a6924a7a3064e781ebe12fad2fc0b8bdf50761db770e800",
+        "originalSha256": "123de914a13a4ea42df61754be8c4f6409e86cd3fa90ea24b523f28b956a3e2d"
+      }
+    ],
+    "currentSourceObservations": {
+      "activeHermesGeneratedGuard": {
+        "observedAtUtc": "2026-10-16T12:16:39.017Z",
+        "pins": 19,
+        "result": "pass",
+        "classification": "unchanged active generated source closure only",
+        "activation": false
+      },
+      "commonRemoteMain": {
+        "sha": "bce1fe247b9d1b63d6da295be2982eb3ee74cebb",
+        "meaning": "fresh read-only ls-remote; no shared checkout sync"
+      },
+      "actualRecovery": "not performed; current-Plan source review Task planned, no fresh session created"
+    },
+    "sourceFindingDisposition": "All current A structural/lineage/replay/privacy and source-result-route findings closed for their exact reviewed artifacts. Final ROOT combinedtree still requires fresh independent review; historical PR21/PR2 findings not automatically closed.",
+    "consumedMetadataRoute": {
+      "source": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/historical-consumed-actions-v1.json",
+        "fragment": "#/content"
+      },
+      "inputSha256": "0c1998291c59968cb9d05d1d7cb946864921bf06ab8e850e5b95048c6e0a5c32",
+      "blobOid": "eb98c159f756f3334f43b1366e6adc0b2947a773",
+      "meaning": "Two originalconsumedactions linked through Work.continuity; fourRPC methods/receipts/markers plus dependencyrepair2moves retained. Originalnativeauth/bookkeepingUNKNOWN; no replay/newnativeTask."
+    },
+    "realRecoveryTask": {
+      "taskId": "HRR-RECOVERY-SOURCE-REVIEW",
+      "logicalPlanRevision": 2,
+      "state": "actualPHASE1complete; useful finalcombinedreviewINCOMPLETE; PHASE2HOLD untilownedexit/newsession",
+      "midpoint": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/native-recovery-midpoint-v1.json",
+          "fragment": "#/content/checkpoint"
+        },
+        "inputSha256": "6c2d2a19fabdc3fe6b8a8cf313f20e4c8f82b09f4d396060e28ef431391f660d",
+        "originalSha256": "9daff6158e5ee2fcfe2154c241c4997b2f542fac0df286a5a3fce48236874994",
+        "originalBytes": 15968
+      },
+      "preProcessObservation": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/native-recovery-pre-process-v1.json",
+          "fragment": "#/content/observation"
+        },
+        "inputSha256": "21139e181fbf4d273d24fe3327ad94a7829d57c73aededece3da4f736ed32607",
+        "originalSha256": "ee65c448e155a63425a72b7bae8f3c943204d2fb6504f34646ba07cd86cc1c85",
+        "originalBytes": 2512
+      },
+      "oldReviewerThread": "01a1443b-6b8b-7751-88c7-583bb902ca13",
+      "mode": "ordinary engineering manual canonical-reader consumption, not nativehook/v2injection/admission/evaluation suite",
+      "verifiedBeforeBoundary": "ownWorkpurpose+all5answers/questions+68/3fullfences+2consumedmetadataactions+authorednextAction+genuine13305byte delegatedresult hash40347d...",
+      "quiescence": "reviewer reports priorinternalchildrencomplete, no backgroundcommands/children, allreadsawaited; currentHerdridle andforegroundCLI4709050.163.0 independentlyobserved; notyetstopped",
+      "acceptance": "pending actualownedexit plus NEWnativeidentity/recovereddata plus useful exactcombinedreview completion"
+    },
+    "currentQa": {
+      "root": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/root-qa-2e64.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "516edab30f8b22a9124b0b0c499decb368987668eb7718664a569c27eea5a19e",
+        "originalSha256": "2e70af2e8a7be42dffc4b7b174fc5973841172347ee578f848d1152dde60a381",
+        "originalBytes": 4005
+      },
+      "result": "source713pass/7existingSkip/0fail; qualityall14checksPASS; own selectedWorkvalidate/transitionPASS",
+      "codeSnapshot": "2e64a8c6cc48a60cd1fac38658d7405478b8c32a/treec0ddfc2572ab7679a05ef22a8ffb0212b5301276",
+      "nativeModelCalls": 0,
+      "meaning": "No sourcecode changes after these checks; later source-owned continuity additions require exact transition/readback/current combinedreview."
+    },
+    "finalDataMeasurements": {
+      "codex": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/codex-final-data-2e64.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "3af828c2f853c5f204bd2bcecdb6d0bd5e3c58c7fca7685520c1360a07eaa268",
+        "originalSha256": "d79c0407298717fe97105ba8ed0d426fed0e998ed33cdd9fd71596a4fe09852f",
+        "originalBytes": 15915
+      },
+      "hermes": {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/codex-harness-engineering/harness-reliability-reprioritization-20261016/inputs/hermes-final-data-2e64.json",
+          "fragment": "#/content/report"
+        },
+        "inputSha256": "90325a4902cc86c636ae294b3d38c2293d6ba0903268721462c49e59867686bd",
+        "originalSha256": "0f5db84a87b9fdb05f89bbe6cceca7820df1cf94b34ad59ec65be5e4f87b5455",
+        "originalBytes": 19292
+      },
+      "meaning": "Fictional SOURCE-only fullv2<=12000 orwholehold. NativeadditionalContextLimit1500/actualglobalHome/admission/activation remainunqualified."
+    }
+  }
+}
