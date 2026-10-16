@@ -169,3 +169,59 @@ test("public finite source and target denominators cannot be mutated in-process"
     expect(Reflect.set(paths, 0, "../MUST_NOT_ADMIT")).toBe(false);
   }
 });
+
+test("nested directory parent substitution cannot create foreign directories or claim completed publication", async () => {
+  for (const [parentPath, leaf] of [
+    ["src", "adoption"],
+    ["node_modules", "@palantirkc"],
+  ]) {
+    const script = `
+      import {mock} from 'bun:test';
+      import * as fs from 'node:fs/promises';
+      import {join} from 'node:path';
+      import {generateHermesSourceFixture} from ${JSON.stringify(join(import.meta.dir, "generate.ts"))};
+      const f=await generateHermesSourceFixture();
+      const target=join(f.fixtureRoot,'hermes-parent-substitution');
+      const foreign=join(f.fixtureRoot,'inert-foreign');
+      const detached=join(f.fixtureRoot,'detached-parent');
+      await fs.mkdir(foreign);
+      const originalMkdir=fs.mkdir;let active=false,injected=false;
+      mock.module('node:fs/promises',()=>({...fs,mkdir:async(...args)=>{
+        if(active&&!injected&&typeof args[0]==='string'&&args[0].startsWith('/proc/self/fd/')&&args[0].endsWith('/'+${JSON.stringify(leaf)})){
+          injected=true;await fs.rename(join(target,${JSON.stringify(parentPath)}),detached);
+          await fs.symlink(foreign,join(target,${JSON.stringify(parentPath)}));
+        }
+        return originalMkdir(...args);
+      }}));
+      const api=await import(${JSON.stringify(join(import.meta.dir, "delivery.ts"))});
+      const prepared=await api.prepareHermesSourceDelivery(target);active=true;
+      const receipt=await api.applyHermesSourceDelivery(prepared,prepared.planSha256,'absent');
+      console.log(JSON.stringify({fixtureRoot:f.fixtureRoot,stagingRoot:prepared.stagingRoot,target,injected,foreign:await fs.readdir(foreign),detached:await fs.readdir(detached),receipt}));
+    `;
+    const process = Bun.spawn([Bun.which("bun")!, "-e", script], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [status, stdout, stderr] = await Promise.all([
+      process.exited,
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+    ]);
+    expect({ status, stderr }).toEqual({ status: 0, stderr: "" });
+    const result = JSON.parse(stdout);
+    owned.push(result.fixtureRoot, result.stagingRoot);
+    expect(result.injected).toBe(true);
+    expect(result.foreign).toEqual([]);
+    expect(result.detached).toEqual([leaf]);
+    expect(result.receipt.status).toBe("partial");
+    expect(result.receipt.uncertain).toEqual([join(result.target, parentPath, leaf)]);
+    expect(
+      result.receipt.completed.some(
+        (p: { path: string }) => p.path === join(result.target, parentPath, leaf),
+      ),
+    ).toBe(false);
+    expect(result.receipt.completed.filter((p: { kind: string }) => p.kind === "source")).toEqual(
+      [],
+    );
+  }
+}, 60000);

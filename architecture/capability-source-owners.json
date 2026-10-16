@@ -780,7 +780,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/guard.template.ts",
-          "sha256": "9852852da1611574dfbf26105b03f5be6be5c1c83a0aae80ea5d88b9cb354a18",
+          "sha256": "546f5226f52ca9df2bf51ac61623d07ed64642862c857f6610f925e4aa6a3e2a",
           "relativePath": "packages/native-hermes-adapter/src/source-provider/guard.template.ts"
         },
         {
@@ -791,7 +791,7 @@
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/native-hermes-adapter/src/source-provider/delivery.ts",
           "relativePath": "packages/native-hermes-adapter/src/source-provider/delivery.ts",
-          "sha256": "8b63427ac82b9731e307f059533330530bfb3d647c3b3b09e3aa14f1310f6c19"
+          "sha256": "02a1e03531c3fbb071c54d7d0f09ca31e909677b6dd5b7a2fdc9d044697db30c"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",

@@ -77,6 +77,16 @@ async function directory(path: string) {
     throw error;
   }
 }
+async function sameDirectory(path: string, held: Awaited<ReturnType<typeof directory>>) {
+  const named = await directory(path);
+  try {
+    const [actual, expected] = await Promise.all([named.stat(), held.stat()]);
+    if (actual.dev !== expected.dev || actual.ino !== expected.ino)
+      throw Error("DELIVERY_PARENT_CHANGED");
+  } finally {
+    await named.close();
+  }
+}
 async function exact(path: string, max = 2 * 1024 * 1024) {
   const parent = await directory(dirname(path));
   try {
@@ -446,16 +456,42 @@ export async function applyHermesSourceDelivery(
     const parentStat = await parent.stat();
     if (parentStat.dev !== plan.parentIdentity.dev || parentStat.ino !== plan.parentIdentity.ino)
       throw Error("DELIVERY_PARENT_CHANGED");
-    const base = "/proc/self/fd/" + parent.fd + "/" + basename(plan.targetRoot);
-    try {
-      await mkdir(base);
-      receipt.completed.push({ path: plan.targetRoot, kind: "directory" });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-    }
+    const createDirectory = async (
+      path: string,
+      heldParent: Awaited<ReturnType<typeof directory>>,
+    ) => {
+      await sameDirectory(dirname(path), heldParent);
+      receipt.uncertain.push(path);
+      let created = false;
+      try {
+        // Only a basename may follow a descriptor: nested suffixes can follow substituted symlinks.
+        await mkdir("/proc/self/fd/" + heldParent.fd + "/" + basename(path));
+        created = true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        // An exclusive EEXIST has no effect; an existing directory still requires no-follow readback.
+        receipt.uncertain.pop();
+      }
+      await sameDirectory(dirname(path), heldParent);
+      const child = await directory(path);
+      try {
+        if (created) {
+          await child.sync();
+          await heldParent.sync();
+          await sameDirectory(dirname(path), heldParent);
+          await sameDirectory(path, child);
+        }
+      } finally {
+        await child.close();
+      }
+      if (created) {
+        receipt.completed.push({ path, kind: "directory" });
+        receipt.uncertain.pop();
+      }
+    };
+    await createDirectory(plan.targetRoot, parent);
     root = await directory(plan.targetRoot);
     const identity = await root.stat();
-    const heldRoot = "/proc/self/fd/" + root.fd;
     const recheck = async () => {
       const h = await directory(plan.targetRoot);
       try {
@@ -475,14 +511,14 @@ export async function applyHermesSourceDelivery(
     };
     for (const path of directories) {
       await recheck();
+      const absolute = join(plan.targetRoot, path);
+      const heldParent = await directory(dirname(absolute));
       try {
-        await mkdir(heldRoot + "/" + path);
-        receipt.completed.push({ path: join(plan.targetRoot, path), kind: "directory" });
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        await recheck();
+        await createDirectory(absolute, heldParent);
+      } finally {
+        await heldParent.close();
       }
-      const h = await directory(join(plan.targetRoot, path));
-      await h.close();
     }
     let writes = 0;
     for (const pin of plan.files) {
@@ -490,22 +526,40 @@ export async function applyHermesSourceDelivery(
       await recheck();
       const heldParent = await directory(dirname(join(plan.targetRoot, pin.path)));
       try {
-        const file = await open(
-          "/proc/self/fd/" + heldParent.fd + "/" + basename(pin.path),
-          constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
-          0o600,
-        );
+        await sameDirectory(dirname(join(plan.targetRoot, pin.path)), heldParent);
         receipt.uncertain.push(join(plan.targetRoot, pin.path));
+        let file: Awaited<ReturnType<typeof open>>;
+        try {
+          file = await open(
+            "/proc/self/fd/" + heldParent.fd + "/" + basename(pin.path),
+            constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+            0o600,
+          );
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "EEXIST") receipt.uncertain.pop();
+          throw error;
+        }
         try {
           await file.writeFile(staged.get(pin.path)!);
           await file.sync();
+          await heldParent.sync();
+          await recheck();
+          await sameDirectory(dirname(join(plan.targetRoot, pin.path)), heldParent);
+          const [held, named] = await Promise.all([
+            file.stat(),
+            lstat(join(plan.targetRoot, pin.path)),
+          ]);
+          if (
+            !named.isFile() ||
+            held.dev !== named.dev ||
+            held.ino !== named.ino ||
+            sha(await exact(join(plan.targetRoot, pin.path))) !== pin.sha256
+          )
+            throw Error("DELIVERY_SOURCE_READBACK_FAILED");
+          await sameDirectory(dirname(join(plan.targetRoot, pin.path)), heldParent);
         } finally {
           await file.close();
         }
-        await heldParent.sync();
-        await recheck();
-        if (sha(await exact(join(plan.targetRoot, pin.path))) !== pin.sha256)
-          throw Error("DELIVERY_SOURCE_READBACK_FAILED");
         receipt.completed.push({ path: join(plan.targetRoot, pin.path), kind: "source" });
         receipt.uncertain.pop();
         writes++;
@@ -517,9 +571,19 @@ export async function applyHermesSourceDelivery(
     await recheck();
     const linkParent = await directory(join(plan.targetRoot, "node_modules/@palantirkc"));
     try {
-      await symlink(plan.link.target, "/proc/self/fd/" + linkParent.fd + "/native-hermes-adapter");
+      await sameDirectory(join(plan.targetRoot, "node_modules/@palantirkc"), linkParent);
       receipt.uncertain.push(join(plan.targetRoot, linkPath));
+      try {
+        await symlink(
+          plan.link.target,
+          "/proc/self/fd/" + linkParent.fd + "/native-hermes-adapter",
+        );
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "EEXIST") receipt.uncertain.pop();
+        throw error;
+      }
       await linkParent.sync();
+      await sameDirectory(join(plan.targetRoot, "node_modules/@palantirkc"), linkParent);
     } finally {
       await linkParent.close();
     }
@@ -543,7 +607,14 @@ export async function applyHermesSourceDelivery(
         : "DELIVERY_IO_OR_INPUT_REFUSAL";
     return receipt;
   } finally {
-    await root?.close();
-    await parent?.close();
+    for (const handle of [root, parent]) {
+      try {
+        await handle?.close();
+      } catch {
+        receipt.status =
+          receipt.completed.length || receipt.uncertain.length ? "partial" : "refused";
+        receipt.reason ??= "DELIVERY_DESCRIPTOR_CLOSE_FAILED";
+      }
+    }
   }
 }

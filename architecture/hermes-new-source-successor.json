@@ -77,6 +77,8 @@
     "originalSourceRestored": false,
     "existingPackageOrLockReplacement": false,
     "ownerDataCreated": false,
-    "actualSharedPublication": "held pending separate exact Root admission/review/readback"
+    "actualSharedPublication": "held pending separate exact Root admission/review/readback",
+    "verificationIsolation": "Private immutable source expectations never alias returned public proof pins; public14/19/20 and source/cache refusal contracts retained",
+    "directoryContainment": "Every directory/source/link mutation uses a held immediate parent and basename-only operation; uncertain effects precede syscalls, parent identities/readback/fsync precede completed effects"
   }
 }
