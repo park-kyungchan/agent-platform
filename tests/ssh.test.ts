@@ -1,5 +1,6 @@
 import { afterEach, expect, spyOn, test } from 'bun:test';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import * as fileSystem from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
@@ -16,8 +17,10 @@ const target: HermesTarget = {
 const nativeSpawn = Bun.spawn;
 const roots: string[] = [];
 let restore: (() => void) | undefined;
+let restoreFileSystem: (() => void) | undefined;
 afterEach(async () => {
   restore?.(); restore = undefined;
+  restoreFileSystem?.(); restoreFileSystem = undefined;
   await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true })));
 });
 const limits: RemotePythonLimits = { timeoutMs: 2000, terminationGraceMs: 20, reapTimeoutMs: 500 };
@@ -188,4 +191,62 @@ test('lifecycle keeps its request fence when execution receipt persistence rejec
   expect((await stat(lockPath)).isFile()).toBe(true);
   await expect(applyNativeOperation(boundTarget, request, root)).rejects.toThrow();
   expect(stub).not.toHaveBeenCalled();
+});
+
+test.each(['partial-write', 'sync-rejection'] as const)('post-transport %s leaves a recoverable receipt and no partial final result', async fault => {
+  const root = await directory(), request = operation(); request.idempotencyKey = 'inert-' + randomUUID();
+  const key = createHash('sha256').update(request.hostId + '\0' + request.idempotencyKey).digest('hex');
+  const resultPath = resolve(import.meta.dir, '../state/operations', key + '.json');
+  const lockPath = resolve(import.meta.dir, '../state/operations', key + '.lock'); roots.push(resultPath, lockPath);
+  const receiptPath = join(root, 'native-operation-execution.json');
+  const transport = spyOn(Bun, 'spawn').mockImplementation(() => nativeSpawn([process.execPath, '-e', "process.stdout.write('invalid-json'); process.exit(42);"], { stdout: 'pipe', stderr: 'pipe' }));
+  restore = () => transport.mockRestore();
+  const originalOpen = fileSystem.open;
+  let injected = false;
+  const filesystem = spyOn(fileSystem, 'open').mockImplementation(async (path: any, ...args: any[]) => {
+    const handle = await (originalOpen as any)(path, ...args);
+    // Fault the result destination whether publication uses a temp or the old direct path.
+    if (String(path) === resultPath || String(path).startsWith(resultPath + '.')) {
+      roots.push(String(path)); injected = true;
+      expect(JSON.parse(await readFile(receiptPath, 'utf8'))).toMatchObject({ state: 'settled', remoteOutcome: 'uncertain' });
+      if (fault === 'partial-write') {
+        const write = handle.writeFile.bind(handle);
+        handle.writeFile = async () => { await write('{"partial":'); throw new Error('Injected partial write'); };
+      } else handle.sync = async () => { throw new Error('Injected sync rejection'); };
+    }
+    return handle;
+  });
+  restoreFileSystem = () => filesystem.mockRestore();
+  const boundTarget = { ...target, hostId: request.hostId, gatewayService: request.target.service };
+  await expect(applyNativeOperation(boundTarget, request, root)).rejects.toThrow('Injected');
+  expect(injected).toBe(true);
+  expect(await Bun.file(resultPath).exists()).toBe(false);
+  const fence = JSON.parse(await readFile(lockPath, 'utf8'));
+  expect(fence).toMatchObject({ status: 'uncertain', receiptPath, automaticReplayPermitted: false });
+  expect(JSON.parse(await readFile(fence.receiptPath, 'utf8'))).toMatchObject({ state: 'settled', reason: 'nonzero-exit', remoteOutcome: 'uncertain' });
+  await expect(applyNativeOperation(boundTarget, request, root)).rejects.toThrow('original receipt pointer');
+  expect(transport).toHaveBeenCalledTimes(1);
+});
+
+test('third-state final bytes created after transport admission are preserved and block replay', async () => {
+  const root = await directory(), request = operation(); request.idempotencyKey = 'inert-' + randomUUID();
+  const key = createHash('sha256').update(request.hostId + '\0' + request.idempotencyKey).digest('hex');
+  const resultPath = resolve(import.meta.dir, '../state/operations', key + '.json');
+  const lockPath = resolve(import.meta.dir, '../state/operations', key + '.lock'); roots.push(resultPath, lockPath);
+  const thirdState = '{"foreign":"preserve these exact bytes"}\n';
+  const transport = spyOn(Bun, 'spawn').mockImplementation(() => nativeSpawn([process.execPath, '-e', `await Bun.write(${JSON.stringify(resultPath)}, ${JSON.stringify(thirdState)}); process.exit(42);`], { stdout: 'pipe', stderr: 'pipe' }));
+  restore = () => transport.mockRestore();
+  const originalOpen = fileSystem.open;
+  const filesystem = spyOn(fileSystem, 'open').mockImplementation(async (path: any, ...args: any[]) => {
+    if (String(path).startsWith(resultPath + '.')) roots.push(String(path));
+    return (originalOpen as any)(path, ...args);
+  });
+  restoreFileSystem = () => filesystem.mockRestore();
+  const boundTarget = { ...target, hostId: request.hostId, gatewayService: request.target.service };
+  await expect(applyNativeOperation(boundTarget, request, root)).rejects.toThrow();
+  expect(await readFile(resultPath, 'utf8')).toBe(thirdState);
+  expect(JSON.parse(await readFile(lockPath, 'utf8')).status).toBe('uncertain');
+  await expect(applyNativeOperation(boundTarget, request, root)).rejects.toThrow('different request');
+  expect(transport).toHaveBeenCalledTimes(1);
+  expect(await readFile(resultPath, 'utf8')).toBe(thirdState);
 });

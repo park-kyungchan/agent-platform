@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto';
-import { mkdir, readFile, open, unlink } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdir, readFile, open, link, unlink } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { OperationRequestProperties } from '../domain';
 import { assertOperationRequest } from '../domain';
@@ -20,9 +20,19 @@ export async function applyNativeOperation(target: HermesTarget, request: Operat
     return { ...result, replayed: true };
   }
   const lockPath = join(stateRoot, key + '.lock');
-  const lock = await open(lockPath, 'wx', 0o600);
+  const lock = await open(lockPath, 'wx', 0o600).catch(error => {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new Error('Previous request unresolved; inspect original receipt pointer in ' + lockPath + '; automatic replay prohibited');
+    throw error;
+  });
   let resultStored = false;
   try {
+    // Keep the original receipt discoverable even if interrupted before publication.
+    await lock.writeFile(JSON.stringify({ schemaVersion: 1, requestHash, idempotencyKey: request.idempotencyKey,
+      status: 'uncertain', receiptPath: join(runDirectory, 'native-operation-execution.json'), automaticReplayPermitted: false,
+      verificationStillRequired: true }, null, 2) + '\n');
+    await lock.sync();
+    const fenceDirectory = await open(stateRoot, 'r');
+    try { await fenceDirectory.sync(); } finally { await fenceDirectory.close(); }
     const source = String.raw`
 import json,pathlib,subprocess,os,fcntl,time,datetime,re
 request=json.loads(__REQUEST__); config=json.loads(__CONFIG__); P=pathlib.Path('/proc')
@@ -83,11 +93,18 @@ print(json.dumps({'observedAtUtc':datetime.datetime.now(datetime.timezone.utc).i
       catch { details = { reason: 'invalid-native-result', remoteOutcome: 'uncertain' }; }
     }
     const result = { schemaVersion: 1, requestHash, idempotencyKey: request.idempotencyKey, completedAtUtc: receipt.completedAtUtc, status, receiptPath: join(runDirectory, 'native-operation-execution.json'), details, automaticReplayPermitted: false, verificationStillRequired: true };
-    const resultFile = await open(resultPath, 'wx', 0o600);
+    const temporaryResultPath = `${resultPath}.${randomUUID()}.tmp`;
+    const resultFile = await open(temporaryResultPath, 'wx', 0o600);
     try { await resultFile.writeFile(JSON.stringify(result, null, 2) + '\n'); await resultFile.sync(); }
     finally { await resultFile.close(); }
+    // Publish a complete synced inode without replacing any third-state final bytes.
+    await link(temporaryResultPath, resultPath);
     const stateDirectory = await open(stateRoot, 'r');
-    try { await stateDirectory.sync(); } finally { await stateDirectory.close(); }
+    try {
+      await stateDirectory.sync();
+      await unlink(temporaryResultPath);
+      await stateDirectory.sync();
+    } finally { await stateDirectory.close(); }
     resultStored = true;
     if (status !== 'executed') throw new Error('Native action completion unresolved; original receipt retained at ' + resultPath + '; automatic replay prohibited');
     return result;
