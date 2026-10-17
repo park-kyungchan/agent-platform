@@ -1,0 +1,37 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-reviewed-triple-preparation/successor01/reviewed-compiler.stdout.json#sha256=623daf8b5e557ad39f0f28f5fbd58ab163bc91272a70f905b41050af84f85675"
+  },
+  "id": "ODI-05-MEMORY-COST-REQUEST-G1",
+  "content": {
+    "schema": "common.git-work-memory-request.v1",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "repositoryId": "park-kyungchan/agent-platform",
+    "topicId": "native-harness:topic:governed-agent-platform-operation",
+    "dataset": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-COST-DATASET-G1.json",
+      "fragment": "#/content",
+      "sha256": "4da24d8427065fcab28d31234ae0b1d9d421dd73b34dec02ffae988b1b6b544f"
+    },
+    "policy": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-POLICY-G1.json",
+      "fragment": "#/content",
+      "sha256": "bfd09166f4f7cd5169dc2fe889527c6b4cafc02301b512337e4e1849f5745728"
+    },
+    "query": "구독",
+    "claimKey": "governing.cost",
+    "limit": 6,
+    "maxChars": 8000
+  }
+}
