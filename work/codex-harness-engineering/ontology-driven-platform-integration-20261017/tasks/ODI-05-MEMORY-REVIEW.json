@@ -1,0 +1,47 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05-MEMORY-REVIEW",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-05-MEMORY-REVIEW"
+  },
+  "title": "Independently review the final common and CodexOwner Memory source successors",
+  "nextAction": "Root validates exact final source/checks and actual Work transition/selected dependency with declared companion receiver; then separately admits one native review with existing manual source delivery and observes consumption/result/usage. No completed implementation/parent05, native authorship or model consumption inferred.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "runtimeId": "native-codex:01a14903-d56d-7d83-ab48-86549b09beb1",
+  "dependsOn": [
+    {
+      "taskId": "ODI-04-R",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-R-PREREQUISITE-MEMORY-REVIEW",
+      "receiverEvidenceId": "ODI-05-MEMORY-REVIEW-RECEIVER"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}
