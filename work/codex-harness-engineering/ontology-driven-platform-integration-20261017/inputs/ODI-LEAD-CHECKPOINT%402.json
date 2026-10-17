@@ -1,0 +1,308 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-LEAD-CHECKPOINT@2",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14734-9160-70a2-a10d-df6ea9c50b91/material-boundary/source-delivery-verified",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "codex.continuity.checkpoint.v1",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "root": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017",
+    "owner": {
+      "agentId": "/root",
+      "threadId": "01a14734-9160-70a2-a10d-df6ea9c50b91"
+    },
+    "version": 2,
+    "updatedAt": "2026-10-17T03:12:13.633Z",
+    "purpose": {
+      "objective": "Whole admitted codebase governed semantic+kinetic Ontology; Data/Logic/Action/Security, actual useful native/domain operations and lower measured decision cost. Harness,Memory,repos serve this purpose.",
+      "successCriteria": [
+        "One user-facing native Codex Orchestrator controls actual useful native Hermes0.22 and Codex worker sessions/panes/tabs, recovers useful results and distinct independent review.",
+        "The full useful common flow proves stable topic Memory/current decisions/original Q&A/parent dependencies, logical/native identity, interruption/resume, concurrent reconciliation, PC-off currentness and local/shared/receiver receipts.",
+        "The whole admitted codebase binds governed Data/Logic/Action/Security meaning to actual permitted consumers/actions and evidence, retaining native and domain owners.",
+        "Complete evidence-backed large private GitHub/module integration, split, naming, retirement and policy changes with one canonical implementation/generator, exact pins and actual consumer equivalence/recovery.",
+        "Carry existing accepted product/domain/operational outcomes through the working unified system, reserving human/domain judgments and holds to their actual dependent effects.",
+        "Measure comparable decision correctness/invariant coverage and marginal total tokens; demonstrate declared model and harness portability invariants with actual evidence.",
+        "Every delivered change has current independent exact source review, zero unresolved required findings, required checks, explicit expected-head Lead merge and separate native-owner verification/activation.",
+        "Truthful whole-work Engineering Acceptance and useful operator delivery remain distinct from native execution, Verification, evaluation, shared delivery, formal Task completion and human/domain Acceptance."
+      ],
+      "inScope": [
+        "Runtime engineering under /docker/hermes-agent-2q3y/ and /docker/herdr-runtime/; canonical common/native source and large private GitHub rearchitecture beyond fixed19prepared boundaries.",
+        "Actual common/native Work, Memory/IDs/context trigger/action binding and bounded independent source/runtime/delegated tasks under one Codex Orchestrator.",
+        "Owner-aligned source clusters, domain/product modules, generators/adapters/distributions and existing accepted domain outcomes; shared provider pins/CAS serialized by Root."
+      ],
+      "outOfScope": [
+        "Additional paid costs, new paid services or inferred renewal/replay of a historical evaluation suite.",
+        "Automatic predecessor native Goal resume, old Task retagging, completed/consumed effect replay or uncertain effect retry before observation.",
+        "Native-store/credential transplantation, cache clearing, weakened first-import guards, second loops/schedulers/provider clients/tool registries/credential bridges, unrelated runtime service changes.",
+        "Reopening already-completed month-end preparation or inventing new Bible/housing products or human/math/teacher approvals.",
+        "Automatic merge, source-proof-derived native permissions, unreviewed owner activation or historical immutable0.1.0/0.2.0 release/pin replacement."
+      ]
+    },
+    "userDecisions": [
+      {
+        "id": "ODI-DECISION-FINAL-APPROVAL",
+        "answer": "최종 승인하고 자율작업 시작",
+        "status": "accepted",
+        "source": {
+          "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-FINAL-APPROVAL.json",
+          "sha256": "d5ada559b53ab17b96722389f067d32052ba17817f8b0ae14bbff8fe07e080d9",
+          "role": "user-answer",
+          "kind": "actual-user-answer",
+          "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T09-13-10-01a14734-9160-70a2-a10d-df6ea9c50b91.jsonl:1539"
+        }
+      },
+      {
+        "id": "ODI-DECISION-SUCCESSOR",
+        "answer": "새 통합 successor Work로 연결",
+        "status": "accepted",
+        "source": {
+          "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-SUCCESSOR.json",
+          "sha256": "fd52036855b3b974325f3289c1fcb88451b765a839639558233b74046a28fd4b",
+          "role": "user-answer",
+          "kind": "actual-user-answer",
+          "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T09-13-10-01a14734-9160-70a2-a10d-df6ea9c50b91.jsonl:1130"
+        }
+      },
+      {
+        "id": "ODI-DECISION-COST",
+        "answer": "기존 구독·자원 사용, 추가 결제 0",
+        "status": "accepted",
+        "source": {
+          "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COST.json",
+          "sha256": "b54f13db7aa3415ca7f9c752a5b94e07982f76e63932c9a10f3bb2cf5adee20a",
+          "role": "user-answer",
+          "kind": "actual-user-answer",
+          "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T09-13-10-01a14734-9160-70a2-a10d-df6ea9c50b91.jsonl:204"
+        }
+      },
+      {
+        "id": "ODI-DECISION-USEFUL-NATIVE-FLOW",
+        "answer": "공통하네스부터 시작해서 /docker/hermes-agent-2q3y/ 하네스와 /docker/herdr-runtime/ 하네스 엔지니어링까지 end to end로 완료해서, Hermes와 Codex CLI를 srv1873899-herdr에서 pane 및 tab에서 Orchestrator Session하나로 control하는 것이었는데, 중간에 작업이 계속해서 길어져서 최적화작업에만 수많은 시간을 투입함. 특히 hermes-agent-2q3y는 v0.22.0으로 업데이트까지 했는데 한 번도 사용해보지 못함.",
+        "status": "accepted",
+        "source": {
+          "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-USEFUL-NATIVE-FLOW.json",
+          "sha256": "277c70ea5f1cae81701d89f7174f916c62a6a01a46e047cfaa1918d7a43a45f8",
+          "role": "user-answer",
+          "kind": "actual-user-answer",
+          "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T09-13-10-01a14734-9160-70a2-a10d-df6ea9c50b91.jsonl:956"
+        }
+      },
+      {
+        "id": "ODI-DECISION-FRESH-EVALUATION",
+        "answer": "토큰 10배 늘리고 시간도 4배 늘려라",
+        "status": "accepted",
+        "source": {
+          "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-FRESH-EVALUATION.json",
+          "sha256": "b2f130decbe69ed0b2478ac80239a9710f99ba7910cf37bba8e251698a8968a6",
+          "role": "user-answer",
+          "kind": "actual-user-answer",
+          "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T09-13-10-01a14734-9160-70a2-a10d-df6ea9c50b91.jsonl:956"
+        }
+      }
+    ],
+    "completed": [
+      {
+        "id": "ODI-01",
+        "action": "Source binding verified for063c87; shared/formal pending, no native occurrence. Historical82 completed effects remain fenced in pinned custody; not reexecuted here.",
+        "completedAt": "2026-10-17T02:43:15.600Z",
+        "verificationRefs": [
+          "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-01-SOURCE-READBACK.json"
+        ],
+        "replay": "do-not-repeat"
+      },
+      {
+        "id": "ODI-02",
+        "action": "Source qualification/delivery verified; shared/formal pending. Consumed IDs fenced; native activation/use unverified.",
+        "completedAt": "2026-10-17T03:12:13.633Z",
+        "verificationRefs": [
+          "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-SOURCE-READBACK.json"
+        ],
+        "replay": "do-not-repeat"
+      }
+    ],
+    "pending": [
+      {
+        "id": "ODI-03",
+        "action": "Native metadata/admission",
+        "dependsOn": [
+          "ODI-02"
+        ],
+        "status": "ready"
+      },
+      {
+        "id": "ODI-04-R",
+        "action": "Independent Codex review",
+        "dependsOn": [
+          "ODI-04"
+        ],
+        "status": "blocked"
+      },
+      {
+        "id": "ODI-04",
+        "action": "Useful Hermes task",
+        "dependsOn": [
+          "ODI-03"
+        ],
+        "status": "blocked"
+      },
+      {
+        "id": "ODI-05",
+        "action": "Memory/ID/recovery pilot",
+        "dependsOn": [
+          "ODI-04",
+          "ODI-04-R"
+        ],
+        "status": "blocked"
+      },
+      {
+        "id": "ODI-06",
+        "action": "Consumer/action slices",
+        "dependsOn": [
+          "ODI-05"
+        ],
+        "status": "blocked"
+      },
+      {
+        "id": "ODI-07",
+        "action": "Private repo rearchitecture",
+        "dependsOn": [
+          "ODI-05"
+        ],
+        "status": "blocked"
+      },
+      {
+        "id": "ODI-08",
+        "action": "Accepted domain outcomes",
+        "dependsOn": [
+          "ODI-05"
+        ],
+        "status": "blocked"
+      },
+      {
+        "id": "ODI-09",
+        "action": "Native behavior/cost verification",
+        "dependsOn": [
+          "ODI-05",
+          "ODI-06",
+          "ODI-07",
+          "ODI-08"
+        ],
+        "status": "blocked"
+      },
+      {
+        "id": "ODI-10",
+        "action": "Delivery/Acceptance",
+        "dependsOn": [
+          "ODI-07",
+          "ODI-08",
+          "ODI-09"
+        ],
+        "status": "blocked"
+      }
+    ],
+    "nextAction": {
+      "taskId": "ODI-03",
+      "action": "Reobserve Goal/live Herdr foreground/profile/session/source. Preserve Codexultra and Hermes900k/xhigh. Native activation/context/model unverified; no replay. Whole Ontology/private repo/domain goal remains."
+    },
+    "nativeThreads": [
+      {
+        "threadId": "01a14734-9160-70a2-a10d-df6ea9c50b91",
+        "relation": "owner",
+        "status": "active"
+      }
+    ],
+    "evidenceRefs": [
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-01-SOURCE-READBACK.json",
+        "sha256": "239bcaacadce18dfa8bd882deb46867aede099980acb2b9815a3b19e6568c7c9",
+        "role": "evidence",
+        "kind": "source"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-SOURCE-READBACK.json",
+        "sha256": "c19b7a7be59e2cbae5f2116f202d2c172f042f4204d0af63edb0d71b5f58564c",
+        "role": "evidence",
+        "kind": "source"
+      }
+    ],
+    "sourcePins": [
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-FINAL-APPROVAL.json",
+        "sha256": "d5ada559b53ab17b96722389f067d32052ba17817f8b0ae14bbff8fe07e080d9",
+        "role": "user-answer"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-SUCCESSOR.json",
+        "sha256": "fd52036855b3b974325f3289c1fcb88451b765a839639558233b74046a28fd4b",
+        "role": "user-answer"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COST.json",
+        "sha256": "b54f13db7aa3415ca7f9c752a5b94e07982f76e63932c9a10f3bb2cf5adee20a",
+        "role": "user-answer"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-USEFUL-NATIVE-FLOW.json",
+        "sha256": "277c70ea5f1cae81701d89f7174f916c62a6a01a46e047cfaa1918d7a43a45f8",
+        "role": "user-answer"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-FRESH-EVALUATION.json",
+        "sha256": "b2f130decbe69ed0b2478ac80239a9710f99ba7910cf37bba8e251698a8968a6",
+        "role": "user-answer"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-PREDECESSOR-EFFECT-CUSTODY.json",
+        "sha256": "249aca8e2486fd80b09a50233ba5dec874fc4fe5d4ea84d59022a4d10dad3fff",
+        "role": "evidence"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/work.json",
+        "sha256": "14efa16be311534660c82c5327713c752229cdd2bd1eec5c2738e62e6c5bad91",
+        "role": "purpose"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-01-SOURCE-READBACK.json",
+        "sha256": "239bcaacadce18dfa8bd882deb46867aede099980acb2b9815a3b19e6568c7c9",
+        "role": "evidence"
+      },
+      {
+        "path": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-SOURCE-READBACK.json",
+        "sha256": "c19b7a7be59e2cbae5f2116f202d2c172f042f4204d0af63edb0d71b5f58564c",
+        "role": "evidence"
+      }
+    ],
+    "uncertainEffects": [
+      {
+        "id": "ACADEMY-RUNNING-P1-READ-ONCE1-20261016",
+        "action": "Preserve fence; no replay.",
+        "reason": "Historical uncertainty.",
+        "requiredObservation": "Original correlated evidence and live owner state before any separately admitted retry."
+      },
+      {
+        "id": "codex-harness-engineering:effect:ods-20261012-original-parent-inflight-usage",
+        "action": "Preserve fence; no replay.",
+        "reason": "Historical uncertainty.",
+        "requiredObservation": "Original correlated evidence and live owner state before any separately admitted retry."
+      },
+      {
+        "id": "codex-harness-engineering:effect:ods-20261012-unexpected-local-hermes-bootstrap",
+        "action": "Preserve fence; no replay.",
+        "reason": "Historical uncertainty.",
+        "requiredObservation": "Original correlated evidence and live owner state before any separately admitted retry."
+      }
+    ],
+    "uninterpretedInputs": [],
+    "authority": "none",
+    "nativePermissionGranted": false
+  }
+}

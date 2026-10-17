@@ -48,7 +48,8 @@
     "ODI-DECISION-FRESH-EVALUATION"
   ],
   "historicalFenceIds": [
-    "ODI-PREDECESSOR-EFFECTS"
+    "ODI-PREDECESSOR-EFFECTS",
+    "ODI-02-CONSUMED-SOURCE-DELIVERY"
   ],
   "continuity": {
     "schema": "common.git-work-continuity.v1",
@@ -64,6 +65,11 @@
         "kind": "snapshot",
         "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-PREDECESSOR-EFFECT-CUSTODY.json",
         "fragment": "#/content"
+      },
+      {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-SOURCE-READBACK.json",
+        "fragment": "#/content/effectCustody"
       }
     ]
   }

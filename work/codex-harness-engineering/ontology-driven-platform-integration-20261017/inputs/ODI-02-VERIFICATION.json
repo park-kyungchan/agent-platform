@@ -1,0 +1,80 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "git://park-kyungchan/agent-platform@0d33f6fa8c477fa1b6766596ec31ad31100d33b6/work/codex-harness-engineering/ontology-driven-platform-integration-20261017",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:ontology-driven-platform-integration-20261017:odi-02-source-qualification",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-17T03:12:13.633Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:e29465d50fb16eb33b89f39b14e12588255fc2cd596fcfed254b46ccd2d8b559"
+      ],
+      "criteria": [
+        {
+          "id": "no-manufactured-code-repair",
+          "status": "pass",
+          "message": "Current admitted generic common/native Work schemas require no new maintained implementation; independently reviewed exact source successor delivery qualifies the minimal/no-code-change slice.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-02-source-readback"
+          ]
+        },
+        {
+          "id": "actual-source-delivery",
+          "status": "pass",
+          "message": "Actual22-event source-sync journal has valid hash chain, every intent completed, terminal verified source delivery, commonde71/Codexbdd,3changed+11preserved Hermes files and unchanged protected native state.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-02-source-readback"
+          ]
+        },
+        {
+          "id": "coordinated-source-closure",
+          "status": "pass",
+          "message": "All3current registrations match terminal journal and42source pins match actual fixed common files; guard module exact hashes retained. Root separately reported native owner guard verification PASS without model use.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-02-source-readback"
+          ]
+        },
+        {
+          "id": "custody-and-native-limit",
+          "status": "pass",
+          "message": "Actual source/publication completed IDs retained separately with no invented native occurrence; native activation/model/context-auto/adoption and this successor source shared delivery remain unverified.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-02-source-readback"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-SOURCE-READBACK.json",
+          "sha256": "c19b7a7be59e2cbae5f2116f202d2c172f042f4204d0af63edb0d71b5f58564c"
+        }
+      ],
+      "runtime": {
+        "name": "bun-source-harness-cli",
+        "version": "1.4.3"
+      },
+      "details": {
+        "verificationClass": "source-only-minimum-no-code-change-and-actual-source-delivery",
+        "nativeBehaviorVerified": false,
+        "nativeContextAutoInjectionVerified": false,
+        "nativeActivation": false,
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false,
+        "sharedDeliveryConfirmedForThisReadback": false
+      }
+    }
+  }
+}

@@ -17,13 +17,13 @@
     "taskId": "ODI-02"
   },
   "title": "Prepare minimum exact common/native source and caller repairs",
-  "nextAction": "Hold dispatch until this Task's exact declared dependencies and native/source owner qualifications pass; then Reviewed canonical fixes for observed selected-Work/topic/caller/source-path blockers; coordinated owner pins, generated projections and affected checks Verify: Preserve first-import refusal, immutable releases and native/data owners; only blockers to the first useful flow enter this slice. If observation finds no required source repair, successful no-change qualification satisfies this step; do not manufacture changes.",
+  "nextAction": "Minimal/no-code-change source qualification and exact coordinated source delivery verified. Root proceeds to ODI-03 actual native TUI/foreground/profile/session/currentness qualification; native activation, automatic context consumption and model turns remain unverified. Preserve Root/Codexultra and native Hermes default900k/xhigh without override.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [
@@ -40,5 +40,7 @@
     "ODI-DECISION-FRESH-EVALUATION"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:ontology-driven-platform-integration-20261017:odi-02-source-qualification"
+  ]
 }
