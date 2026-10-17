@@ -1,0 +1,32 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-04-R-RECEIVER-C05",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/root-receiver-owner-binding.json"
+  },
+  "content": {
+    "schema": "common.git-receiver-receipt.v1",
+    "receiverRuntimeId": "native-codex:01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+    "producer": {
+      "runtimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+      "attemptId": "native-message:46",
+      "occurrenceId": "native-message:106"
+    },
+    "prerequisiteTaskId": "ODI-04",
+    "payload": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "6dbefda6ff880494bdfbce1b836326a213344d68",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-04-EXECUTION-RECEIPT.json",
+      "fragment": "#/content",
+      "sha256": "81ba48a62a1db55be8a846592921b98ea18f9576c5bdf34736bb34459a3c5674"
+    }
+  }
+}

@@ -17,7 +17,7 @@
     "taskId": "ODI-04-R"
   },
   "title": "Independently review the first Hermes producer result in native Codex",
-  "nextAction": "Hold dispatch until this Task's exact declared dependencies and native/source owner qualifications pass; then Distinct native Codex reviewer Task/Run, exact producer artifact/source snapshot checks, counterexamples/current findings, durable independent review and receiver proof Verify: Reviewer is separate from builder. Dependency requires producer bounded mechanical verification, not this independent review; no cycle. Root receives exact source-correlated result before ODI-05 and current zero unresolved findings before integration.",
+  "nextAction": "Read ODI-04-R-CONCRETE-SCOPE and exact current Work context; actual native reviewer session/companion C05 receipt are bound. After Root fresh positive evaluation admission/owner activation, independently review exact902 code/tree and raw Hermes versus Root test-only lineage; deliver concrete findings/exact source binding. Native model consumption must be observed; no automatic hook or permission claim.04-R remains unstarted here;05/full Goal remain.",
   "state": {
     "execution": "planned",
     "verification": "pending",
@@ -29,7 +29,9 @@
   "dependsOn": [
     {
       "taskId": "ODI-04",
-      "milestone": "execution-and-verification"
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-PREREQUISITE-C05",
+      "receiverEvidenceId": "ODI-04-R-RECEIVER-C05"
     }
   ],
   "decisionIds": [
@@ -40,5 +42,6 @@
     "ODI-DECISION-FRESH-EVALUATION"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [],
+  "runtimeId": "native-codex:01a148ac-3da8-77b3-97d2-f6e14bbb163f"
 }
