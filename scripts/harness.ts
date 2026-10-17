@@ -9,7 +9,10 @@ import {
   type ContextRequest,
   type StartRequest,
 } from "../packages/work-continuity/src/git-work/index.ts";
-import { readDocumentationRegistry } from "../packages/work-continuity/src/runtime-docs/index.ts";
+import {
+  readDocumentationRegistry,
+  type DocumentationObservations,
+} from "../packages/work-continuity/src/runtime-docs/index.ts";
 
 const usage =
   "bun run harness context|validate|start|docs <request.json>; transition <before.json> <after.json>; source <snapshot.json> <relative-path>";
@@ -23,6 +26,43 @@ function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw Error("Request must be a JSON object");
   return value as Record<string, unknown>;
+}
+function documentationFields(value: Record<string, unknown>, allowed: string[]): void {
+  if (Object.keys(value).some((key) => !allowed.includes(key)))
+    throw Error("UNTRUSTED_OR_UNKNOWN_FIELD");
+}
+function documentationText(value: unknown, max: number): void {
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    value.length > max ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  )
+    throw Error("INVALID_DOCUMENTATION_OBSERVATION");
+}
+/** Validate transport shape only; observations remain unchanged caller claims. */
+function documentationObservations(value: unknown): DocumentationObservations {
+  const observations = object(value);
+  documentationFields(observations, ["installedVersion", "cache"]);
+  if (Object.hasOwn(observations, "installedVersion"))
+    documentationText(observations.installedVersion, 120);
+  if (Object.hasOwn(observations, "cache")) {
+    const cache = object(observations.cache);
+    documentationFields(cache, [
+      "canonicalUrl",
+      "bodySha256",
+      "independentlyConfirmedBodySha256",
+      "revalidatedInCurrentTask",
+      "targetVersion",
+    ]);
+    documentationText(cache.canonicalUrl, 2000);
+    documentationText(cache.bodySha256, 64);
+    documentationText(cache.independentlyConfirmedBodySha256, 64);
+    if (typeof cache.revalidatedInCurrentTask !== "boolean")
+      throw Error("INVALID_DOCUMENTATION_OBSERVATION");
+    if (Object.hasOwn(cache, "targetVersion")) documentationText(cache.targetVersion, 120);
+  }
+  return observations as unknown as DocumentationObservations;
 }
 export {
   gitReadEnvironment,
@@ -54,8 +94,17 @@ export async function runHarness(argv: string[]): Promise<unknown> {
     }
     case "start":
       return qualifyGitWorkStart(request as unknown as StartRequest);
-    case "docs":
-      return (await readDocumentationRegistry()).select(request);
+    case "docs": {
+      const reader = await readDocumentationRegistry();
+      if (!Object.hasOwn(request, "request") && !Object.hasOwn(request, "observations"))
+        return reader.select(request);
+      documentationFields(request, ["request", "observations"]);
+      const docsRequest = object(request.request);
+      const observations = Object.hasOwn(request, "observations")
+        ? documentationObservations(request.observations)
+        : undefined;
+      return reader.select(docsRequest, observations);
+    }
     default:
       throw Error(usage);
   }
