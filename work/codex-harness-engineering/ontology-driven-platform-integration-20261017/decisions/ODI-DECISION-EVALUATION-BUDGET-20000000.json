@@ -5,7 +5,7 @@
   "workId": "ontology-driven-platform-integration-20261017",
   "kind": "decision",
   "id": "ODI-DECISION-EVALUATION-BUDGET-20000000",
-  "status": "accepted",
+  "status": "superseded",
   "answer": "누적 2,000만 토큰으로 상향",
   "meaning": "Current explicit user token-cap successor for SAME ODI-EVAL-20261017-FIRSTUSE only: aggregate native-reported tokens20,000,000, maxRuns16, includes children/retries/resume/aux; original startedAt2026-10-17T04:55:31.863Z and deadline12:55:31.863Z/maxDuration28800s unchanged; additional paid cost0. Narrow current override of only the5M token field in immutable Plan1 fresh-evaluation clause. Preserve all prior5M policy/admissions/actual overrun/interrupted usage and unreserved user resume; no retroactive preauthorization, new clock/suite, Goal budget/replacement or new model admission. Active policy was separately Root-CASed; this Git record does not reactivate it.",
   "answerSource": {

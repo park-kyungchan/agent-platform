@@ -1,0 +1,27 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-EVALUATION-BUDGET-DELEGATED-40M32R48H",
+  "status": "accepted",
+  "answer": "내가 더이상 개입하지않고, 너에게 예산 확대 필요하면 늘릴 권한을 줄게, 계속 진행해.",
+  "meaning": "Current delegated owner policy successor for SAME ODI-EVAL-20261017-FIRSTUSE: accountable Root selects necessary maxAggregateTokens40,000,000/maxRuns32/maxDurationSeconds172800 (48h) anchored ORIGINAL2026-10-17T04:55:31.863Z, deadline2026-10-19T04:55:31.863Z, children/retries/resumes/aux included, additional payment0. These numbers are ROOT delegated choice, not a new actual user quote. Existing answerSource is the exact actual user delegation; selectionContext separately labels original question/answer and owner numerical application. Supersedes current20M16run8h envelope only; immutable Plan1 clause and original5M/20M user answers remain historical. Original8h expiry and all prior overrun/unknown/unreserved use/reservations/admission exceptions remain visible; no retroactive authorization, blanket admission, zeroing unknowns, financial finality or suite/start/Goal reset. Canonical unknown-usage guard remains HELD; every future native run needs separate exact one-use actual owner admission and current native authority. This Git record is policy provenance, not operational policy activation, native configuration permission or model dispatch.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-CONTINUE-UNKNOWN-BUDGET-DELEGATION.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "Original user question (verbatim): 중단된 두 모델 스트림은 사용량을 반환하기 전에 취소돼 추가 토큰 수가 미확정입니다. 기존 평가 회계 코드(packages/native-hermes-adapter/src/adoption/evaluation-budget.ts:325)는 미확정 사용량이 있으면 다음 실행을 막습니다. 미확정 두 건을 그대로 보존하고, 2,000만 한도를 ‘native가 보고한 누계’ 기준으로 관리하며 계속 진행할까요? 추가 결제 0·16회·기존 마감은 유지합니다.\nActual user answer (verbatim): 내가 더이상 개입하지않고, 너에게 예산 확대 필요하면 늘릴 권한을 줄게, 계속 진행해.\nDelegated Lead policy choice, NOT a new user quote: accountable Root chooses necessary SAME-suite caps of 40,000,000 native-reported aggregate tokens, 32 runs and 172,800 seconds (48 hours) anchored to original 2026-10-17T04:55:31.863Z, deadline 2026-10-19T04:55:31.863Z. This proposal does not activate policy or admit/dispatch a model. Original 8-hour deadline expired; no claim of retroactive authorization or budget-compliant calls after expiry. Three unknown exposures, all usage/reservations/observations/exceptions and additional payment 0 persist.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-EVALUATION-BUDGET-DELEGATED-40M32R48H.json",
+      "fragment": "#/content/selectionContext"
+    }
+  },
+  "supersedes": [
+    "ODI-DECISION-EVALUATION-BUDGET-20000000"
+  ]
+}
