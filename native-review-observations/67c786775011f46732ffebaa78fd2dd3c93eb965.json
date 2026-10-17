@@ -1,0 +1,236 @@
+{
+  "schema": "odi05.actual-paired-native-parent-custody.v1",
+  "nativeSessionId": "01a14903-d56d-7d83-ab48-86549b09beb1",
+  "nativeTurnId": "01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+  "parentMessageId": "msg_06199e314161c8b4016ad349300d308191a704808938fd5d0c",
+  "fullParentSha256": "9b06714aec822af5111efa6cbabb92feb038044a1626a683275ed9a01cac1042",
+  "fullParentByteLength": 10451,
+  "commonJsonByteSpan": {
+    "start": 0,
+    "end": 10451
+  },
+  "ownerJsonByteSpan": {
+    "start": 6751,
+    "end": 10250
+  },
+  "commonResultSha256": "9b06714aec822af5111efa6cbabb92feb038044a1626a683275ed9a01cac1042",
+  "ownerRawSha256": "43a7ab885f8c756f1f0566951f05e1bfca72e31f5b30ae8c2ce8ef4404b9932a",
+  "extraction": "UNCHANGED_UTF8_BYTE_LITERAL_NO_ADDED_LF_NO_STRINGIFY",
+  "sourceSubrecordIsNotSeparateNativeMessage": true,
+  "nativeTaskId": null,
+  "nativeRunId": null,
+  "completion": {
+    "schema": "odi05.actual-native-completion.projection.v1",
+    "nativeSessionId": "01a14903-d56d-7d83-ab48-86549b09beb1",
+    "nativeTurnId": "01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+    "completed": true,
+    "nativeFinalMessageId": "msg_06199e314161c8b4016ad349300d308191a704808938fd5d0c",
+    "nativeFinalSha256": "9b06714aec822af5111efa6cbabb92feb038044a1626a683275ed9a01cac1042",
+    "actualTerminal": {
+      "type": "task_complete",
+      "atUtc": "2026-10-17T10:09:24.139Z",
+      "ordinalZeroBased": 341,
+      "raw": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/actual-terminal.exact.raw.jsonl",
+        "sha256": "022b08843ba13ee36c157a8d46feee8ecb0a5ba724ac9ee522bfee9408764397",
+        "byteLength": 11095
+      }
+    },
+    "actualResponseItem": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/actual-final.response-item.exact.raw.jsonl",
+      "sha256": "1917a4d4963fa9ee7e9e2a79da6e60425836f2176ae683b82085e87d485a374a",
+      "byteLength": 11528
+    },
+    "actualRootObservation": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/observation.json",
+      "sha256": "5a099dc29b261af8af5953a53e79edb3695f7573afa6de738917f7d522743b27"
+    },
+    "projection": "Existing actual Root native captures; no independently authenticated native process by helper."
+  },
+  "usage": {
+    "schema": "odi05.actual-reported-current-turn-usage.projection.v1",
+    "nativeSessionId": "01a14903-d56d-7d83-ab48-86549b09beb1",
+    "nativeTurnId": "01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+    "uniqueProviderResponses": 5,
+    "usage": {
+      "input_tokens": 1530408,
+      "cached_input_tokens": 1452544,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 13723,
+      "reasoning_output_tokens": 4734,
+      "total_tokens": 1544131
+    },
+    "totalTokens": 1544131,
+    "inputAccounting": "includes-cache",
+    "priorThreadBaselineNotAddedAgain": 2850497,
+    "usageState": "native-reported-complete",
+    "financialFinality": false,
+    "prior05AndUSER06UnknownExposureUnchanged": true,
+    "actualRawUsage": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/actual-api-usage.exact.raw.jsonl",
+      "sha256": "250b73cf3dce27574bfd51baa3afde8caaf30c1e389e6fd5ff00c2c06302639e",
+      "byteLength": 4469
+    },
+    "actualTerminal": {
+      "type": "task_complete",
+      "atUtc": "2026-10-17T10:09:24.139Z",
+      "ordinalZeroBased": 341,
+      "raw": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/actual-terminal.exact.raw.jsonl",
+        "sha256": "022b08843ba13ee36c157a8d46feee8ecb0a5ba724ac9ee522bfee9408764397",
+        "byteLength": 11095
+      }
+    },
+    "RootLedgerSettlement": "Separate Root action, not performed by this projection",
+    "rootActualReconciliation": {
+      "reference": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/actual07-reconciliation-receipt.json",
+        "sha256": "7150df80585e9bf8a63b366f38e3c85b6fd91909e44d144243f658a29d0d7b7c"
+      },
+      "value": {
+        "schema": "odi05.root-actual07-reconciliation-receipt.v1",
+        "atUtc": "2026-10-17T10:10:55.791220+00:00",
+        "oldLedgerSha256": "7fd12c810af2ffbc01997a6a35624d0ebe4dbad77e7c93d20c6d975952cdad87",
+        "activeLedgerSha256": "4bf934e1cddbf489497cc0e6392603ff55d62742f4dc4e4f4c33ad001f41ab57",
+        "canonicalResultSha256": "7ee911403cac06752b833199270395949f51d1fea4ceabb49f38473ed71a7e2a",
+        "combined": {
+          "actualRunsIncludingUnreserved": 7,
+          "unknownsIncludingUnreserved": 2,
+          "knownAggregateFloor": 8566655,
+          "remainingTokensBeforeUnknowns": 11433345
+        },
+        "canonicalAdmissionRemains": "HELD unknown-usage; future user-delegated owner exceptions explicit",
+        "financialFinality": false
+      }
+    },
+    "rootActualReviewAssessment": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/root-actual-review-assessment.json",
+      "sha256": "94c1f4817ee620383d4c981aa66cf51cc7213bb2393fe0efd287ce9a0358b378"
+    }
+  },
+  "inputCorrelation": {
+    "schema": "odi05.actual-input-correlation.projection.v1",
+    "nativeSessionId": "01a14903-d56d-7d83-ab48-86549b09beb1",
+    "nativeTurnId": "01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+    "nativeInputMessageId": "msg_01a14952-f942-78f3-bbce-be0ca9132bc6",
+    "nativeInputSha256": "8d207e7acb6bbf5e67c2a02503ce261037925122f65f6e1e0034bd6029e77c52",
+    "actualModel": "gpt-6.1-sol",
+    "actualEffort": "ultra",
+    "modelEffortBasis": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/actual-startup-identity.json",
+      "sha256": "5ce987dc7e1d9ebab5c57317a17b4160c3ab53c9f95d2790cd1c955639be27c1"
+    },
+    "actualRequestCount": 1,
+    "inputRaw": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/actual-input.exact.raw.jsonl",
+      "sha256": "8258d424e56d938922c9a8fd7449cc923d10c467133065b43cc0b41696a5f202",
+      "byteLength": 4271
+    },
+    "actualDispatchIntent": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/actual-dispatch.intent.json",
+      "sha256": "2460cffcd805f85442c01062cb3b65bc116dde8955702420c67ce5205c20d1c1"
+    },
+    "actualRootObservation": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/observation.json",
+      "sha256": "5a099dc29b261af8af5953a53e79edb3695f7573afa6de738917f7d522743b27"
+    }
+  },
+  "ownerAdmission": {
+    "schema": "odi05.root-one-use-owner-admission-receipt.v1",
+    "atUtc": "2026-10-17T10:05:22.659Z",
+    "policySha256": "bba11f6def5ef3c51eed0c9cb6f0dde9aed018a90d8d8c28b9882418c633a536",
+    "previousLedgerSha256": "de8c8f18fbbfd6b66f254efc942228dfc7f78d20611d0ac137c1f337bb5511b7",
+    "activeLedgerSha256": "7fd12c810af2ffbc01997a6a35624d0ebe4dbad77e7c93d20c6d975952cdad87",
+    "authoritySha256": "3470c52d46d3797565f41fc52b433218629e3292c5774a516313c1cb306f7067",
+    "reviewSha256": "2eaaab6442f4a47ae1e628dac3968b9b5ca1ca1fb2bbef363cc59d7690159a55",
+    "combined": {
+      "canonicalSummary": {
+        "admittedRuns": 6,
+        "completedRuns": 4,
+        "erroredRuns": 0,
+        "unknownUsageRuns": 1,
+        "aggregateTokens": 6594047,
+        "reservedTokens": 4200000,
+        "accountedTokens": 10794047,
+        "elapsedSeconds": 18590.796,
+        "deadlineAtUtc": "2026-10-17T12:55:31.863Z",
+        "remainingRuns": 10,
+        "remainingTokens": 9205953,
+        "admissionBlockedReasons": [
+          "unknown-usage"
+        ],
+        "overrun": {
+          "runs": false,
+          "tokens": false,
+          "duration": false
+        }
+      },
+      "actualExecutionAndReservedRunCount": 7,
+      "unknownUsageRunsIncludingUnreserved": 2,
+      "knownAggregateTokenFloor": 7022524,
+      "reservedTokens": 4200000,
+      "knownFloorPlusReserved": 11222524,
+      "remainingTokensBeforeUnknownExposure": 8777476,
+      "remainingRuns": 9
+    },
+    "canonicalAdmission": "HELD unknown-usage",
+    "ownerException": "ADOPTED one-use07 only",
+    "proposalTimeRetainedHistorical": "2026-10-17T10:02:21.000Z",
+    "actualNativeDispatch": false
+  },
+  "ownerAdmissionIntent": {
+    "schema": "odi05.root-one-use-owner-exception-admission-intent.v1",
+    "atUtc": "2026-10-17T10:05:22.659Z",
+    "expectedPreimageSha256": "de8c8f18fbbfd6b66f254efc942228dfc7f78d20611d0ac137c1f337bb5511b7",
+    "postSha256": "7fd12c810af2ffbc01997a6a35624d0ebe4dbad77e7c93d20c6d975952cdad87",
+    "reviewSha256": "2eaaab6442f4a47ae1e628dac3968b9b5ca1ca1fb2bbef363cc59d7690159a55",
+    "authoritySha256": "3470c52d46d3797565f41fc52b433218629e3292c5774a516313c1cb306f7067",
+    "combined": {
+      "canonicalSummary": {
+        "admittedRuns": 6,
+        "completedRuns": 4,
+        "erroredRuns": 0,
+        "unknownUsageRuns": 1,
+        "aggregateTokens": 6594047,
+        "reservedTokens": 4200000,
+        "accountedTokens": 10794047,
+        "elapsedSeconds": 18590.796,
+        "deadlineAtUtc": "2026-10-17T12:55:31.863Z",
+        "remainingRuns": 10,
+        "remainingTokens": 9205953,
+        "admissionBlockedReasons": [
+          "unknown-usage"
+        ],
+        "overrun": {
+          "runs": false,
+          "tokens": false,
+          "duration": false
+        }
+      },
+      "actualExecutionAndReservedRunCount": 7,
+      "unknownUsageRunsIncludingUnreserved": 2,
+      "knownAggregateTokenFloor": 7022524,
+      "reservedTokens": 4200000,
+      "knownFloorPlusReserved": 11222524,
+      "remainingTokensBeforeUnknownExposure": 8777476,
+      "remainingRuns": 9
+    },
+    "canonicalAdmission": "HELD unknown-usage",
+    "rootOwnerAdmission": "explicit user-authorized one-use exception",
+    "financialFinality": false,
+    "runId": "ODI-EVAL-20261017-CODEX-MEMORY-REVIEW-CONTINUATION-07"
+  },
+  "actualWorkSourcePacket": {
+    "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-paired-review-publication-successor/actual-current-work-source.binding.json",
+    "sha256": "295638d466c89c7949cc4046383531a77e381789ab176188459648d1f38695be"
+  },
+  "actualCommittedQA": [
+    {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-memory-binding-implementation/successor02/root-committed-ci-result.json",
+      "sha256": "7152427ecbb03dcff996d189310d6264f83ad0ffc14b222b0d9a51ce63f1868a"
+    }
+  ],
+  "publisherAuthenticatedOnly": true,
+  "nativeAuthenticationEstablished": false,
+  "nativePermissionGranted": false
+}
