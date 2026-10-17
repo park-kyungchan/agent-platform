@@ -1,0 +1,112 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "9b68b166b6fb575033f9887ce0d6a75799ca9bbb",
+  "reviewedTreeSha": "fbcfd729a32c18dea124fbc533663cbdebe7050e",
+  "reviewedSourceManifestSha256": "97b9bd7722b31be0ed70c522993537e10fc07a524c0f31f51e636f39567eabde",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a14903-d56d-7d83-ab48-86549b09beb1"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14734-9160-70a2-a10d-df6ea9c50b91"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "checks": [
+    "Independently verified both exact HEAD/tree tuples, base ancestry, clean worktrees and successful diff --check. Consumed the complete 128180-byte base-to-final diff across all 18 effective paths, including tests and provenance changes.",
+    "Independently reconstructed both canonical fulltree manifests from Git objects and compared them with the prepared responses: common 819 entries/679 blobs and owner 164 entries/143 blobs; both requested manifest digests match.",
+    "Consumed all three literal transport bundles across the saved review context. Verified transport manifest 608c30da8d3e79217d2afb908ada31ce0beb91f1d3f9bb4838dd7142a72f74aa, original index e06adc1413a3a564f5087745c41aab38eb7ccb9e6bc561f797a11930dfaa3ae4, all 64 member hashes and all 63 required references. Source22's three literal parts reassemble to 26869 characters and SHA256 3d8a7491316b9d8e745bf420f445554c9e61b06e811abedf3f4e0c02691ee095.",
+    "Consumed Work, complete Spec1/Plan1, selected review Task, parent/source-child contracts, current successor02 before historical targets, governing decisions and original answers/questions, complete effect inventories/fences, actual04-R intent/result/verification/receipt and declared receiver. Checked the selected Task's explicit dependency against the captured canonical qualification.",
+    "Read complete raw-source receipt implementation, Git Memory compiler/query, lexical engine, qualification logic, Git record validation/types and relevant unchanged semantic dependencies. Raw-byte receipts require canonical same-process object identity and unchanged object graph/descriptors; returned bytes are defensive copies. Native declarations remain source declarations rather than authenticated authorship.",
+    "F1 is resolved in the reviewed source: literal owning branch validation rejects reflog/revision expressions before resolution. Reviewed the original repro, persisted H1-to-H2 regression and malformed-selector negatives; repeated actual-head observations remain.",
+    "F2 is resolved at the output boundary: full qualification precedes FTS and projection; the Git wrapper supplies actual dataset full-blob metadata after compilation equality. A unique unchanged original row determines its pointer, full-key count and ordered-key digest. Full lineage, exclusions, aliases, conditional review, authority precedence and currentness checks remain intact.",
+    "Independently measured the existing unreviewed draft: every one of six rows retains 67 keys, 18899 UTF-16 characters and ordered-key digest 8eafa2d0c334a174bfcc35ed1df1080c3390830f78f9b2442f7961b6f4b47fad. Inspected fictional cost+구독 and useful-flow+Codex outputs: same-claim hit and authority, 4036/4134 whole-response characters, with 67 source rows retained and exact row/key-list dereference assertions.",
+    "Verified all 18 committed blob SHA256/OID pins, all 25 common pins in the v4 context registration, its owner index marker and all 27 work-continuity capability source pins. Common package, lock, project and package-export bytes are unchanged. Reviewed fixed owner loading, first-import refusal and before/after closure checks.",
+    "Verified pinned QA artifact hashes and inspected the focused log reporting 118 passes, zero failures and 484 assertions; inspected all nine legacy byte-audit cases and their audit implementation. Parsed Root's exact committed CI result and final log record: 27 commands, all exit codes zero. These are separately attributed executions, not tests rerun by this reviewer.",
+    "Read the C11 budget/CLI original postimages, governance successor and actual qualification receipt, plus the later user continuation/delegation capture. Historical limits and unknown usage remain preserved; the continuation exception does not establish canonical accounting-guard PASS.",
+    "Independent static assessment found no actionable defect in the reviewed change. Final source identity remained exact and both worktrees remained clean."
+  ],
+  "limits": [
+    "This is bounded source Verification. No actual owner-reviewed Memory dataset, genuine H1 query, native Memory consumption, native activation, physical PC-off operation, whole-Work completion or Acceptance is established.",
+    "The 24k typed context remains HELD. Required values were consumed through the manual existing-reader transport; this does not establish automatic hooks, typed-context PASS, native authorship or permission.",
+    "Early combined tool outputs were truncated; required original-source and complete diff ranges were subsequently consumed. Discovery output and duplicated CI command listings were not fully consumed; all 27 CI exit codes were separately extracted. Unchanged files outside the stated semantic coverage were not individually reviewed.",
+    "An additional direct reread of Work-data Git objects was unavailable in the inspected code/shared object databases. Original capture-member hashes were verified; C11 was consumed through owner-qualified postimages and its qualification receipt. No fresh native-owner load or independent data adoption is claimed.",
+    "No test suite was executed by this reviewer. Root/author QA and internal review remain evidence assessed independently, not substitutes for this verdict. Hermes19 is fictional generated source QA; the shared facade's UNKNOWN_FACADE_FILE hold remains unqualified.",
+    "The initial failed-access HOLD and aborted05/06 turns remain historical outcomes. Usage is partly unknown; canonical unknown-usage guard remains HELD. Root owns the explicit continuation exception, actual usage accounting and native input/result authentication.",
+    "No source/data/Gitref/config/trust/cache/credential/native-control/Goal/ledger mutation, network request or child model was performed. Root must separately validate both emitted review objects, publish immutable authenticated evidence before PR, explicitly merge the expected head and verify/activate each owner."
+  ],
+  "companionOwnerReview": {
+    "schema": "owner-scoped-native-review-output.v1",
+    "binding": {
+      "repository": "park-kyungchan/codex-harness-engineering",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "semanticOwner": "native-codex",
+      "scope": "native-codex-git-memory-source"
+    },
+    "headSha": "ee9b9f756fa533226b92426a1e8fefa9c277c205",
+    "reviewedTreeSha": "24c6c6774444c71cdc92f31258dfcfb92f53982c",
+    "reviewedSourceManifestSha256": "ba2f27991bb6f3c3a45ff8cc73d2df07b9346a7ec23a590ad238bcfb6fed0d58",
+    "reviewer": {
+      "runtime": "native-codex",
+      "taskId": "01a14903-d56d-7d83-ab48-86549b09beb1"
+    },
+    "author": {
+      "runtime": "native-codex",
+      "taskId": "01a14734-9160-70a2-a10d-df6ea9c50b91"
+    },
+    "conclusion": "pass",
+    "unresolvedFindings": 0,
+    "reviewStatus": "complete",
+    "findings": [],
+    "checks": [
+      "Verified exact owner HEAD/tree, clean worktree, base bdd2962f93349b08d293a14d212924860e8187de ancestry and diff --check. Consumed the entire 74525-byte owner diff covering all 11 changed paths.",
+      "Independently derived the owner fulltree manifest: 164 entries, 143 blobs and exact requested digest. Verified each changed owner's committed blob SHA256/OID against the pinned source binding.",
+      "Reviewed owner project/boundary metadata, complete CLI, provider closure, unchanged owner loader and legacy wrapper, compatibility forwarders, registration/index successor and all affected test diffs.",
+      "The CLI selects the fixed guarded canonical Memory export, requires explicit Work identity and rejects extra routing arguments. Code ownership remains fixed independently of the selected physical data repository.",
+      "Verified the v4 registration's 25 common source pins and matching index marker. Reviewed 26-pin provider and 34-pin loader evidence, historical schema compatibility, Memory preimport refusal and source-drift rejection. No cache clearing or weakened first-import guard was introduced.",
+      "Reviewed real reflog-negative mechanics, 67-source projected row provenance, same-claim cost+구독 authority, exclusions/aliases/unknown-review withholds, stale head/policy/generation handling, original/dataset mutations and CLI source-guard negatives.",
+      "Inspected focused owner fixture logs reporting 118 passes/484 assertions and nine legacy byte comparisons. Common committed CI is separately attributed source QA; no owner CI or native activation is invented.",
+      "No actionable owner-scoped defect was found. Final owner source remained exact and clean."
+    ],
+    "limits": [
+      "Owner review is static and limited to the exact source tuple and stated dependencies. Fixture executions were inspected, not rerun; fictional owner receipts do not establish genuine Memory authority or native use.",
+      "No native trust, permissions, configuration, sessions or credentials were changed. Source proof does not authenticate native authorship or grant production authority.",
+      "The prior HOLD, aborted turns and partially unknown usage remain preserved. Continuation is under the explicit owner exception; canonical accounting qualification is not asserted.",
+      "This is the actual emitted owner review object. The common gate does not validate it; Root must use the existing owner-scoped gate and separately complete authenticated publication, explicit merge and owner activation."
+    ],
+    "nativeTaskId": null,
+    "nativeRunId": null
+  },
+  "nativeTaskId": null,
+  "nativeRunId": null,
+  "identityMeaning": "Historical taskId fields contain observed native SESSION UUIDs only; logical task and unexposed nativeTask/Run remain separate.",
+  "reviewReuse": {
+    "recordClass": "accountable-lead-same-tree-successor-binding",
+    "sourceReviewedHeadSha": "67c786775011f46732ffebaa78fd2dd3c93eb965",
+    "sourceReviewedTreeSha": "fbcfd729a32c18dea124fbc533663cbdebe7050e",
+    "sourceResultRef": "https://github.com/park-kyungchan/agent-platform/blob/052b9df0e11b12e4f9827e0d303210b5542dd1ae/native-review-results/67c786775011f46732ffebaa78fd2dd3c93eb965.json",
+    "sourceResultSha256": "9b06714aec822af5111efa6cbabb92feb038044a1626a683275ed9a01cac1042",
+    "sourceRawRef": "https://github.com/park-kyungchan/agent-platform/blob/052b9df0e11b12e4f9827e0d303210b5542dd1ae/native-review-raw/67c786775011f46732ffebaa78fd2dd3c93eb965.txt",
+    "sourceRawSha256": "9b06714aec822af5111efa6cbabb92feb038044a1626a683275ed9a01cac1042",
+    "sourceNativeSessionId": "01a14903-d56d-7d83-ab48-86549b09beb1",
+    "sourceNativeTurnId": "01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+    "successorHeadSha": "9b68b166b6fb575033f9887ce0d6a75799ca9bbb",
+    "successorTreeSha": "fbcfd729a32c18dea124fbc533663cbdebe7050e",
+    "currentUnresolvedFindings": 0,
+    "nativeReviewRerun": false,
+    "accountableLead": {
+      "runtime": "native-codex",
+      "taskId": "01a14734-9160-70a2-a10d-df6ea9c50b91"
+    },
+    "meaning": "EXPLICIT DERIVED successor verification for identical reviewed tree. Native reviewer executed only67c; this is Root same-tree reuse, not a native rerun or a new native Task/Run."
+  }
+}
