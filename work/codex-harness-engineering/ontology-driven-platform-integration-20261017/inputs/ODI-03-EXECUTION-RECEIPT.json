@@ -1,0 +1,55 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-03-EXECUTION-RECEIPT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14734-9160-70a2-a10d-df6ea9c50b91/turn:01a1476a-2492-7922-94c5-5665dee62602/call:call_3fd95b21a92a4155b427824de0fb5b10",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common.git-prerequisite-receipt.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-03"
+    },
+    "occurrence": {
+      "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+      "attemptId": "01a1476a-2492-7922-94c5-5665dee62602",
+      "occurrenceId": "call_3fd95b21a92a4155b427824de0fb5b10"
+    },
+    "state": {
+      "execution": "complete",
+      "verification": "passed",
+      "localAudit": "result-durable",
+      "sharedAudit": "pending",
+      "formalCompletion": "audit-synchronization-pending"
+    },
+    "intent": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-NATIVE-INTENT.json",
+      "fragment": "#/content"
+    },
+    "result": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-NATIVE-RESULT.json",
+      "fragment": "#/content"
+    },
+    "verification": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-VERIFICATION.json",
+      "fragment": "#/content"
+    }
+  }
+}
