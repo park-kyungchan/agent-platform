@@ -455,6 +455,33 @@ export interface CompactGitWorkContext {
   nativePermissionGranted: false;
   semanticAcceptanceEstablished: false;
 }
+
+/** Lossless metadata packing of the same canonical compact semantics. The
+ * normative string table is unchanged. The canonical decoder expands metadata
+ * before applying the ordinary strict schema and semantic checks.
+ */
+export interface MetadataPackedGitWorkContext {
+  schema: "common.git-work-context.compact.v1";
+  encoding: {
+    version: "metadata.v1";
+    prefixes: string[];
+    decoder: "@palantirkc/work-continuity/git-work#decodeCompactGitWorkContext";
+  };
+  metadata: JsonValue[];
+  status: GitWorkContext["status"];
+  strings: string[];
+  sources: JsonValue[][];
+  normative: JsonValue[][];
+  decisions: JsonValue[][];
+  continuityBinding: JsonValue[];
+  historicalEffects?: JsonValue[];
+  task?: JsonValue[];
+  holdReasons: string[];
+  authority: "none";
+  nativePermissionGranted: false;
+  semanticAcceptanceEstablished: false;
+}
+export type GitWorkCompactOutput = CompactGitWorkContext | MetadataPackedGitWorkContext;
 export interface DecodedCompactGitWorkContext {
   normative: ContextRecordProjection[];
   task?: Omit<CompactTaskContext, "logical" | "state" | "nextAction"> & {

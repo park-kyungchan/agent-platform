@@ -9,7 +9,15 @@ try {
   const request = await readJsonRequest();
   if (
     Object.keys(request).some(
-      (key) => !["event", "selection", "runtimeIndex", "outputVersion", "maxChars"].includes(key),
+      (key) =>
+        ![
+          "event",
+          "selection",
+          "runtimeIndex",
+          "outputVersion",
+          "maxChars",
+          "metadataEncoding",
+        ].includes(key),
     )
   )
     throw Error("INVALID_CURRENT_WORK_REQUEST");
@@ -21,6 +29,11 @@ try {
     throw Error("EXPLICIT_CURRENT_WORK_OUTPUT_VERSION_REQUIRED");
   if (request.maxChars !== undefined && typeof request.maxChars !== "number")
     throw Error("EXPLICIT_CURRENT_WORK_OUTPUT_BUDGET_REQUIRED");
+  if (
+    request.metadataEncoding !== undefined &&
+    (request.metadataEncoding !== "metadata.v1" || request.outputVersion !== "v2")
+  )
+    throw Error("EXPLICIT_CURRENT_WORK_METADATA_ENCODING_REQUIRED");
   stage = "registration";
   if (
     typeof HERMES_PLATFORM_REGISTRATION_SHA256 !== "string" ||
@@ -43,6 +56,7 @@ try {
     JSON.stringify(
       await read(request.event, request.selection, request.runtimeIndex, {
         maxChars: request.maxChars as number | undefined,
+        metadataEncoding: request.metadataEncoding as "metadata.v1" | undefined,
         verifySourceClosure: async () => {
           const previous = stage;
           stage = "source-readback";

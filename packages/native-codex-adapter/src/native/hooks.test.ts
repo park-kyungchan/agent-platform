@@ -918,6 +918,25 @@ test("Git parent and child agent types match exactly and never borrow another tu
   expect(context(result.stdout).value.selectedWork.task.id).toBe("current-task");
 });
 
+test("metadata binding explicitly adopts the composed codec without changing decoded native semantics", async () => {
+  const f = await fixture();
+  const old = context((await handleHook(f.input, { bindings: f.registry }, f.load)).stdout);
+  f.registry.bindings[0]!.gitWorkMetadataEncoding = "metadata.v1";
+  await persistBindings(f);
+  const result = await handleHook(f.input, { bindings: f.registry }, f.load);
+  const packed = context(result.stdout);
+  expect(result.status).toBe("context-injected");
+  expect(packed.text.length).toBeLessThanOrEqual(12000);
+  expect(packed.value.selectedWork.encoding.version).toBe("metadata.v1");
+  expect(gitWork.decodeCompactGitWorkContext(packed.value.selectedWork)).toEqual(
+    gitWork.decodeCompactGitWorkContext(old.value.selectedWork),
+  );
+  expect(packed.value.selectedWork.nativePermissionGranted).toBe(false);
+  delete f.provider.gitWork!.readCompactGitWorkContext;
+  const missing = await handleHook(f.input, { bindings: f.registry }, f.load);
+  expect(missing.status).not.toBe("context-injected");
+});
+
 test("default v1 stays at6000 and carries full shared semantics or holds; explicit v2 never exceeds12000", async () => {
   const f = await fixture();
   const raw = await gitWork.readGitWorkContext(

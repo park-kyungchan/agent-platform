@@ -67,6 +67,7 @@ export const platformEntryPoints = {
     "packages/native-hermes-adapter/src/platform-current-work/read-current-work.ts",
   "current-work-native-hook.js":
     "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
+  "read-memory.js": "packages/native-hermes-adapter/src/platform-current-work/read-memory.ts",
 } as const;
 export const platformSourcePaths = [
   "package.json",
@@ -91,6 +92,7 @@ export const platformSourcePaths = [
   ...[
     "context",
     "read-current-work",
+    "read-memory",
     "provider",
     "build",
     "hook-context",
@@ -108,6 +110,10 @@ export const platformSourcePaths = [
   ),
   "packages/work-continuity/src/logical-identity.ts",
   "packages/work-continuity/src/operational-state.ts",
+  ...["source", "types"].map((name) => "packages/work-continuity/src/context/" + name + ".ts"),
+  ...["recall-request", "lexical-recall", "qualification"].map(
+    (name) => "packages/work-continuity/src/workspace/" + name + ".ts",
+  ),
   "packages/native-hermes-adapter/src/source-provider/dependency-closure.ts",
 ].sort();
 export interface PlatformPin {
@@ -187,6 +193,13 @@ async function verifyInstalledWorkProjection(
     ],
     ["platform-rearchitecture/work-records.ts", [["handoff", "src/handoff.ts"]]],
     ["platform-rearchitecture/work-continuity.ts", [["handoff", "src/handoff.ts"]]],
+    [
+      "platform-current-work/read-memory.ts",
+      [
+        ["git-work", "src/git-work/index.ts"],
+        ["memory/recall-request", "src/workspace/recall-request.ts"],
+      ],
+    ],
   ] as const;
   for (const [path, exports] of importers) {
     const importer = join(root, "packages/native-hermes-adapter/src", path);

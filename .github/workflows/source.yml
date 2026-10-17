@@ -58,7 +58,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: source-quality-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/agent-platform-quality.json
+          path: |
+            ${{ runner.temp }}/agent-platform-quality.json
+            ${{ runner.temp }}/agent-platform-quality.json.progress.json
           if-no-files-found: error
           retention-days: 14
           include-hidden-files: false
@@ -88,7 +90,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: merge-quality-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/agent-platform-merge-quality.json
+          path: |
+            ${{ runner.temp }}/agent-platform-merge-quality.json
+            ${{ runner.temp }}/agent-platform-merge-quality.json.progress.json
           if-no-files-found: error
           retention-days: 14
           include-hidden-files: false
@@ -96,6 +100,8 @@ jobs:
         run: bun ci/source-check.ts
         env:
           COMMON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - name: Verify prospective merge runtime layout and native skill source
+        run: bun ci/verify-runtime-layout.ts
   native-review:
     name: Exact head native independent review
     runs-on: ubuntu-latest
