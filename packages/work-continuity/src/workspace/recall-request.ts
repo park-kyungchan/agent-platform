@@ -1307,6 +1307,18 @@ export async function readGitWorkMemoryRequest(
     },
     {
       query: text(input.query, "query", 500),
+      // Source metadata comes only from the actual pinned Input after full compile/data equality above.
+      hitProjection: {
+        kind: "git-dataset-memory-reference.v1",
+        datasetInput: {
+          repositoryId: dataSource.repositoryId,
+          commit: dataSource.commit,
+          path: dataSource.path,
+          sha256: dataSource.sha256,
+          blobOid: dataSource.blobOid,
+          byteLength: dataSource.byteLength,
+        },
+      },
       ...(compiled.request.limit === undefined ? {} : { limit: compiled.request.limit }),
       ...(compiled.request.maxChars === undefined ? {} : { maxChars: compiled.request.maxChars }),
     },

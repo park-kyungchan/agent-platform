@@ -158,7 +158,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/lexical-recall.ts",
-          "sha256": "5fccb346938751e0983abbed716dae5ac98c85c8b85060605d100b0dd0d2974d",
+          "sha256": "caa9c227d288a7baabab9768bf65438a35172075067783002930343db3679175",
           "relativePath": "packages/work-continuity/src/workspace/lexical-recall.ts"
         },
         {
@@ -178,7 +178,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/recall-request.ts",
-          "sha256": "0b41a7f38e16d1c0353c1c7ff259415865f6a0eb1e94cd9b5974b6a19008a497",
+          "sha256": "87dbcfbc3ca0880e794eef20eb0fdff1ee2017f9e35b1b0329c9ddf1577e07bd",
           "relativePath": "packages/work-continuity/src/workspace/recall-request.ts"
         },
         {
