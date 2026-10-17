@@ -17,13 +17,13 @@
     "taskId": "ODI-05-MEMORY-BINDING"
   },
   "title": "Bind genuine ODI Git Work originals to existing canonical Memory",
-  "nextAction": "Read inputs/ODI-05-MEMORY-BINDING-CONTRACT.json; implement only in Root-supplied isolated source worktrees, present exact candidate/tests/pins. No commits/native/model/data activation; parent05 remains planned.",
+  "nextAction": "Source-only implementation, paired actual native review, requiredCI, explicitmerges and real fixed-owner v4 activation verified locally. Do not reimplement/replay old native effects. Root must separately choose fresh actualH0 after this integration, review genuine originals/per-instancepolicy, compile through fixedCLI, perform actual faithfulness review and adopt/query Memory; shared/formalWorkaudit,parent05 and Acceptance remainpending.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
@@ -43,5 +43,7 @@
     "ODI-DECISION-FRESH-EVALUATION"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:odi05-memory-source"
+  ]
 }

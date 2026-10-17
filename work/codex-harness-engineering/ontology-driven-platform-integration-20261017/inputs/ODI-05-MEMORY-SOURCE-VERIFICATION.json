@@ -1,0 +1,70 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-MEMORY-SOURCE-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-owner-activation/fresh-v4-guard.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:odi05-memory-source",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-17T10:33:17.976Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:a635fcdaf1e29dc9f71812c0df7d9401822376ef1c03ee33661ce8c16d7d5d30"
+      ],
+      "criteria": [
+        {
+          "id": "actual-source-implementation-review-ci",
+          "status": "pass",
+          "message": "Exact canonical implementation+owner source successors passed actual native paired07review/current0findings/committed27commandCI+affectedQA and requiredPRchecks before explicitexpected-head merges.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi05-memory-source-execution"
+          ]
+        },
+        {
+          "id": "actual-paired-source-activation",
+          "status": "pass",
+          "message": "Actual shared common9b68/treefbc and Codexowner0393/tree24 sourceff; fresh realfixedowner v4guard34pins passed10:33:17.976. Originalownerreview reuse remains honest, no fake mergedhead gate/nativeoccurrence.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi05-memory-source-execution"
+          ]
+        },
+        {
+          "id": "source-scope-only",
+          "status": "pass",
+          "message": "Genuine Memory faithfulness/policy/data/H1query/nativeuse, shared/formalWorkaudit,parent05 and Acceptance stillpending. Priorold04Task/effects/unknown/nativeIDs retained unchanged.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi05-memory-source-execution"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-SOURCE-RESULT.json",
+          "sha256": "64ecbac620917ea583b91ab1abdc9b5260f4c720e66a8e6195db440e34efaa42"
+        }
+      ],
+      "runtime": {
+        "name": "accountable-root-source-integration-observation",
+        "version": "source-only"
+      },
+      "details": {
+        "sourceOnly": true,
+        "nativeExecutionClaimed": false,
+        "sourceExecutionComplete": true,
+        "genuineMemoryAdopted": false,
+        "sharedFormalAcceptance": false
+      }
+    }
+  }
+}
