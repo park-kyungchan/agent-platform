@@ -17,9 +17,9 @@ const registry = (await Bun.file(path).json()) as DocumentationRegistry;
 const digest = "a".repeat(64);
 
 describe("portable docs-only Runtime Index", () => {
-  test("selects all84 reviewed routes and their aliases without execution admission", () => {
+  test("selects all86 registered routes and their aliases without execution admission", () => {
     const reader = createDocumentationReader(registry);
-    expect(reader.registry.routes).toHaveLength(84);
+    expect(reader.registry.routes).toHaveLength(86);
     for (const route of registry.routes) {
       for (const topic of [route.topic, ...route.aliases]) {
         const plan = reader.select({ surface: route.surface, topic });
@@ -30,6 +30,116 @@ describe("portable docs-only Runtime Index", () => {
         expect(Object.hasOwn(plan, "execution")).toBe(false);
       }
     }
+  });
+  test("TUI and slash aliases select partial frontend evidence without native admission", () => {
+    const reader = createDocumentationReader(registry);
+    for (const [topic, id, url] of [
+      ["terminal-ui", "hermes.agent.tui", "user-guide/tui"],
+      ["터미널UI".normalize("NFD"), "hermes.agent.tui", "user-guide/tui"],
+      ["slash", "hermes.agent.slash-commands", "reference/slash-commands"],
+      ["슬래시명령".normalize("NFD"), "hermes.agent.slash-commands", "reference/slash-commands"],
+    ]) {
+      const plan = reader.select({ surface: "hermes.agent", topic });
+      expect(plan.status).toBe("SELECTED");
+      expect(plan.primary?.id).toBe(id);
+      expect(plan.primary?.canonicalUrl).toBe(`https://hermes-agent.nousresearch.com/docs/${url}`);
+      expect(plan.primary?.evidenceStatus).toBe("page-opened-limited-content");
+      expect(plan.primary?.documentationVersion).toBeUndefined();
+      expect(plan.primary?.notes).toContain("TUI /sessions lists live sessions");
+      expect(plan.evidenceGaps).toContain("route-body-not-fully-reviewed");
+      expect(plan.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+      expect(plan.executionAuthority).toBe("none");
+      expect(plan.nativePermissionGranted).toBe(false);
+      expect(Object.hasOwn(plan, "execution")).toBe(false);
+      const source = reader.registry.sources[plan.primary!.sourceId!];
+      expect(source?.checkedOn).toBe("2026-10-17");
+      expect(source?.rawBytesVerified).toBe(false);
+      expect(source?.bodySha256).toBeNull();
+    }
+  });
+  test("new route evidence leaves Oct14 capture and family provenance historical", () => {
+    const reader = createDocumentationReader(registry);
+    expect(reader.registry.provenance.sourceDirectory).toBe(
+      "discovery/runtime-documentation-routing/20261014/reviewed",
+    );
+    expect(reader.registry.provenance.sourceArtifacts).toHaveLength(6);
+    expect(reader.registry.provenance.sourceArtifacts[0]).toEqual({
+      path: "routing.json",
+      sha256: "968068af391a6d6948ba047933172fb5030c3fcc430a3a66199a3e4e567ba48a",
+    });
+    expect(reader.registry.captures).toHaveLength(28);
+    expect(
+      reader.registry.captures.some((capture) => capture.retrievedAt.startsWith("2026-10-17")),
+    ).toBe(false);
+    const historical = reader.select({ surface: "hermes.agent", topic: "sessions" }).primary!;
+    expect(historical.checkedOn).toBe("2026-10-14");
+    expect(historical.evidenceStatus).toBe("user-supplied-index-family");
+    expect(historical.sourceId).toBe("hermes-index");
+    expect(reader.registry.sources[historical.sourceId!]!.checkedOn).toBe("2026-10-14");
+    expect(reader.registry.limitations.join(" ")).toContain(
+      "No native Scrapling capture or Evidence Foundry blob admission is claimed",
+    );
+  });
+  test("TUI version observations direct retrieval without certifying documentation compatibility", () => {
+    const reader = createDocumentationReader(registry);
+    expect(
+      reader.select({ surface: "hermes.agent", topic: "tui", freshness: "installed" }).retrieval,
+    ).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+    const installed = reader.select(
+      { surface: "hermes.agent", topic: "slash", freshness: "installed" },
+      { installedVersion: "0.22.0" },
+    );
+    expect(installed.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+    expect(installed.primary?.documentationVersion).toBeUndefined();
+    expect(installed.evidenceGaps).toContain(
+      "confirm-version-matched-release-or-source-if-current-page-cannot-substantiate-this-version",
+    );
+    const conflict = reader.select(
+      { surface: "hermes.agent", topic: "tui", freshness: "installed", targetVersion: "0.22.0" },
+      { installedVersion: "0.21.0" },
+    );
+    expect(conflict.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+    expect(conflict.evidenceGaps).toContain("requested-version-differs-from-installed-version");
+    expect(conflict.nativePermissionGranted).toBe(false);
+  });
+  test("TUI routes do not infer a subject from its host or steal historical aliases", () => {
+    const plan = createDocumentationReader(registry).select({
+      surface: "hermes",
+      topic: "tui",
+      executionHost: "hostinger.container",
+    });
+    expect(plan.status).toBe("NEEDS_DISAMBIGUATION");
+    expect(plan.primary).toBeNull();
+    expect(plan.discovery).toContain("hermes.agent");
+    const collision = structuredClone(registry);
+    collision.routes.find((route) => route.id === "hermes.agent.tui")!.aliases.push("sessions");
+    expect(() => createDocumentationReader(collision)).toThrow("AMBIGUOUS_TOPIC_ALIAS");
+  });
+  test("TUI cache reuse needs this page and current-task revalidation without promoting evidence", () => {
+    const reader = createDocumentationReader(registry);
+    const request = { surface: "hermes.agent", topic: "tui", freshness: "latest" };
+    const cache = {
+      canonicalUrl: reader.select(request).primary!.canonicalUrl,
+      bodySha256: digest,
+      independentlyConfirmedBodySha256: digest,
+      revalidatedInCurrentTask: false,
+    };
+    expect(reader.select(request, { cache }).retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+    expect(
+      reader.select(request, {
+        cache: {
+          ...cache,
+          canonicalUrl: registry.sources["hermes-index"]!.url,
+          revalidatedInCurrentTask: true,
+        },
+      }).retrieval,
+    ).toBe("REVALIDATE_SELECTED_PAGE");
+    const revalidated = reader.select(request, {
+      cache: { ...cache, revalidatedInCurrentTask: true },
+    });
+    expect(revalidated.retrieval).toBe("REUSE_MATCHING_PAGE");
+    expect(revalidated.evidenceGaps).toContain("route-body-not-fully-reviewed");
+    expect(revalidated.primary?.evidenceStatus).toBe("page-opened-limited-content");
   });
   test("normalizes Unicode topic aliases and explicit surface names", () => {
     const reader = createDocumentationReader(registry);
@@ -99,7 +209,7 @@ describe("portable docs-only Runtime Index", () => {
     expect(reader.select({ surface: "codex.cli", topic: "hooks" }).primary?.canonicalUrl).toBe(
       original,
     );
-    expect(reader.registry.routes).toHaveLength(84);
+    expect(reader.registry.routes).toHaveLength(86);
     expect(Object.isFrozen(reader.registry.routes)).toBe(true);
     expect(Object.isFrozen(selected.primary)).toBe(true);
     expect(() =>

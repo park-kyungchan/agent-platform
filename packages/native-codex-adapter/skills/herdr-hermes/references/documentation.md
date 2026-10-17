@@ -1,0 +1,18 @@
+# Runtime Index and official content
+
+Use the existing `@palantirkc/work-continuity` runtime-docs reader or `bun run harness docs`. Do not create another router/index. Canonical implementation is agent-platform/packages/work-continuity/src/runtime-docs; work-continuity semantics and the documentation registry provenance remain codex-harness-engineering. Native Hermes owns its execution adapter/runtime; original capture and immutable blob custody remain scrapling-research/evidence-foundry.
+
+Explicitly name `hermes.agent`, `codex.cli` or `muse.code`; execution host is separate. A host label cannot resolve an ambiguous subject. `SELECTED` chooses a route and can still have `route-body-not-fully-reviewed`. Read actual selected content within the returned limits, then compare installed source/release. Do not promote documentation or a source-provider proof into a command or native permission.
+
+Observed v1 limits are maxPages3/maxDiscoveryRequests2/maxExcerptChars6000 per operation. The reader returns plans and does not fetch or enforce content budgets. The caller must bound retrievals and excerpts, retain complete capture custody separately, and state what was actually reviewed. A captured full body is not a full-body review. Cache observations do not authenticate themselves, and installedVersion is a caller observation, not runtime detection.
+
+The current Hermes routes for architecture, agent-loop, profiles, sessions, hooks and permissions selected official pages but all retained user-supplied-index-family status. TUI/slash commands were missing and returned NEEDS_DISCOVERY. Follow only the returned official index within the remaining page/discovery budget. In this evaluation TUI discovery used the official index plus two pages; repeated retrieval for raw capture was explicitly counted. Do not continue crawling once the budget is spent.
+
+Official pages used:
+
+- [Architecture](https://hermes-agent.nousresearch.com/docs/developer-guide/architecture) and [agent loop](https://hermes-agent.nousresearch.com/docs/developer-guide/agent-loop): reconcile facade versus installed loop modules, retries and tool dispatch.
+- [Profiles](https://hermes-agent.nousresearch.com/docs/user-guide/profiles) and [sessions](https://hermes-agent.nousresearch.com/docs/user-guide/sessions): reconcile home, OAuth sharing, persistence, resume and auxiliary model work.
+- [Hooks](https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks) and [security](https://hermes-agent.nousresearch.com/docs/user-guide/security): distinguish context hooks, plugin/shell tool veto and native approvals.
+- [TUI](https://hermes-agent.nousresearch.com/docs/user-guide/tui) and [slash commands](https://hermes-agent.nousresearch.com/docs/reference/slash-commands): reconcile modern Ink, classic and messaging command meaning against the installed parser. Use full command names.
+
+Current public content is not a version-pinned manual for the installed0.22.0 Docker commit. Installed createSlashHandler.ts and actual packaged entry.js fragments refuse ambiguous prefixes although current Alias Resolution prose described first-match execution. Compare the original build scope: the compiled dist tree matches its receipt, while the relocated directory includes an extra package.json. A directory-scope mismatch is not a different runtime version. Release tag/source evidence is separate from internal bundle integrity. `/sessions` live processes and `/resume` durable transcripts also need explicit surface context. Session storage, CLI flags, cancellation and usage require installed source or observed owned-session evidence in addition to these pages.

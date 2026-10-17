@@ -1,6 +1,6 @@
 # Runtime documentation routing
 
-The common Runtime Index selects official documentation for an explicit subject and topic. Its 84 routes retain the reviewed owner metadata, 28 capture summaries and original artifact hashes. Capture bodies stay with Scrapling/Evidence Foundry. Account snapshots, host paths and execution admission are excluded from the portable registry.
+The common Runtime Index selects official documentation for an explicit subject and topic. Its 86 routes preserve the 84 historical routes, 28 capture summaries and original artifact hashes. Hermes TUI and slash-command routes add separate bounded review evidence without claiming complete body review or native permission. Capture bodies stay with Scrapling/Evidence Foundry. Account snapshots, host paths and execution admission are excluded from the portable registry.
 
 ```ts
 import { readDocumentationRegistry } from "@palantirkc/work-continuity/runtime-docs";
