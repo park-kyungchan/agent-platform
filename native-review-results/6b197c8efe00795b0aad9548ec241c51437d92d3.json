@@ -1,0 +1,41 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "6b197c8efe00795b0aad9548ec241c51437d92d3",
+  "reviewedTreeSha": "bb4062f9b4ba67901a268ae2e2dc6f9488b12865",
+  "reviewedSourceManifestSha256": "d08bdfc6cd0f7e938867c9e16bffd49c931f38d45403a89b441f8f9a3021a425",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a1486e-8168-7e81-9dd7-283f9a376f36"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14734-9160-70a2-a10d-df6ea9c50b91"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "checks": [
+    "Confirmed clean checkout, exact HEAD/tree, 11 changed files, and freshly read remote main de71a8fc3f88632f4d7fd8a5c62bb1da065f33f0.",
+    "Re-derived the supplied manifest: 819 entries and 679 blobs. Every working-tree blob matches.",
+    "Read AGENTS.md, project.json, capability ownership registry and relevant package instructions; reviewed all changed files and native ownership boundaries.",
+    "Verified 145 capability/package pins, 42 active provider source pins, three registration markers and both shared-definition pins.",
+    "All five canonical skill files match successor pins. Original four-file live-use pins remain unchanged; successor audit and validator hashes match.",
+    "Checked recorded prompt, stored session, tool results, final response, usage and shutdown evidence against the bounded live-use claims.",
+    "Confirmed preservation of all 84 historical routes, 20 sources, 28 capture summaries and historical provenance; verified five side-evidence hashes.",
+    "Read-only checks passed: six focused routing tests, runtime layout, package imports, architecture validation and git diff --check.",
+    "Repository formatting passed for 198 governed files. Supplemental Markdown formatting found only table-padding differences outside that scope.",
+    "check-source-committed.log completed successfully: 26 commands and 732 passing tests, including handoff and source-closure probes. Compared all 679 retained QA blobs with this commit; only the expected project-root overlay differs."
+  ],
+  "limits": [
+    "Actual model execution used the original four-file skill; the five-file successor received source review, not another model execution.",
+    "Documentation evidence remains partial and does not establish installed compatibility, native Scrapling capture or Evidence Foundry blob admission.",
+    "Full fixture-writing checks were inspected through the completed target-commit log and retained QA copy; this reviewer ran only read-only checks.",
+    "No source or native-state writes, global installation, runtime activation, publication, PR or merge actions were performed. This verification establishes no native permission or Acceptance."
+  ]
+}
