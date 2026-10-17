@@ -1,0 +1,27 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-MEMORY-POLICY-G2-4D970E70C809",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-g2-actual-v2/reviewed-same-H0-output.actual.json#sha256=42a416b9792f7fcadb8950cedd0de6630b954c79c53604c09c0909f7e24057c5/policy",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "codex.local-memory-policy.v1",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "activeGenerationId": "odi05.genuine.4d970e70c809.g2",
+    "policy": {
+      "revision": "odi05.policy.4d970e70c809.r2",
+      "excludedSourceHashes": [],
+      "excludedFragmentIds": [],
+      "aliases": [],
+      "commonAdmissions": []
+    }
+  }
+}
