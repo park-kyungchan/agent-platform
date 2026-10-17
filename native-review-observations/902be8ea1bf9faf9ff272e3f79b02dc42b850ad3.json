@@ -1,0 +1,303 @@
+{
+  "schema": "odi04r.actual-review-publication-custody.v1",
+  "nativeSessionId": "01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+  "nativeTurnId": "01a148c1-b89b-7c02-892f-5faefb291004",
+  "rawFinalSha256": "bb2eee80793220e54e4db9bf1822f7e76b6ed052f6c76a713290e01b36b94e96",
+  "resultSha256": "2a3ff68bd7635d613e572fcc9fc94c68a72065c0672588e4c5e84007111033e3",
+  "resultMode": "root-normalized-from-actual-native-output",
+  "normalizationExplanation": "Original native final was JSON. Preserve exact original text raw; result only strips outer whitespace and appends oneLF. No JSON fields/content changed.",
+  "completion": {
+    "schema": "odi04r.actual-native-tui-completion-projection.v1",
+    "atUtc": "2026-10-17T07:37:10.444394+00:00",
+    "nativeSessionId": "01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+    "nativeTurnId": "01a148c1-b89b-7c02-892f-5faefb291004",
+    "completed": true,
+    "nativeFinalSha256": "bb2eee80793220e54e4db9bf1822f7e76b6ed052f6c76a713290e01b36b94e96",
+    "resultSha256": "2a3ff68bd7635d613e572fcc9fc94c68a72065c0672588e4c5e84007111033e3",
+    "nativeFinalMessageId": "msg_09f24631e4edef82016ad32414ae748191bdaef879cf88b51c",
+    "nativeFinalOrdinal": 125,
+    "nativeTerminalOrdinal": 128,
+    "nativeTerminalEvent": {
+      "type": "task_complete",
+      "root_turn_id": "01a148c1-b89b-7c02-892f-5faefb291004",
+      "turn_id": "01a148c1-b89b-7c02-892f-5faefb291004",
+      "started_at": 1792222017,
+      "completed_at": 1792222246,
+      "duration_ms": 228746
+    },
+    "source": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/actual-native-final-owner-observation.json",
+      "sha256": "34ecdaab12a5f236063e4d176ff318c9964e31348eaf3cb26d1e282ff9ddfc81",
+      "bytes": 2075
+    },
+    "scope": "Root-derived bounded projection of actual own native completed final and matchingtask_complete, not native authorship authenticated by Git.",
+    "nativeTaskId": null,
+    "nativeRunId": null
+  },
+  "usage": {
+    "schema": "orchestrator.actual-native-codex-settled-usage.v1",
+    "atUtc": "2026-10-17T07:33:28.589643+00:00",
+    "runId": "ODI-EVAL-20261017-CODEX-REVIEW-03",
+    "status": "completed",
+    "usageState": "reported",
+    "nativeSessionId": "01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+    "nativeTurnId": "01a148c1-b89b-7c02-892f-5faefb291004",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "observedUsage": {
+      "inputTokens": 1477310,
+      "outputTokens": 12518,
+      "cacheReadTokens": 1350656,
+      "cacheWriteTokens": 0,
+      "inputAccounting": "includes-cache"
+    },
+    "totalTokens": 1489828,
+    "nativeApiResponseCount": 15,
+    "uniqueNativeResponses": 15,
+    "nativeOwnerTerminalConfirmed": true,
+    "correlatedFinalOrdinal": 125,
+    "terminalOrdinal": 128,
+    "nativeRecordSumEqualsTurnAndThreadAndTokenCount": true,
+    "reasoningTokensSubsetOfOutput": 5081,
+    "billingMeaning": "Existing resources only, no purchase/topup/account/model/credentials change. Native token-reported accounting, not invoice/currency audit.",
+    "coverage": "One actual correlated native turn from preprompt0 through owner task_complete;15response records deduplicated. No observed child or auxiliary/external-model dispatch; not a universal hidden-process/invoice claim.",
+    "nativeSource": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T16-03-30-01a148ac-3da8-77b3-97d2-f6e14bbb163f.jsonl",
+    "records": [
+      {
+        "ordinal": 14,
+        "responseId": "resp_09f24631e4edef82016ad32343f42881919742cbb8f49536bc",
+        "usage": {
+          "input_tokens": 27894,
+          "cached_input_tokens": 12288,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 248,
+          "reasoning_output_tokens": 0,
+          "total_tokens": 28142
+        }
+      },
+      {
+        "ordinal": 21,
+        "responseId": "resp_09f24631e4edef82016ad3234975808191a816faebf6fc9e41",
+        "usage": {
+          "input_tokens": 41144,
+          "cached_input_tokens": 27776,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 682,
+          "reasoning_output_tokens": 392,
+          "total_tokens": 41826
+        }
+      },
+      {
+        "ordinal": 30,
+        "responseId": "resp_09f24631e4edef82016ad32357ce648191846d1bec75689425",
+        "usage": {
+          "input_tokens": 55724,
+          "cached_input_tokens": 40960,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1153,
+          "reasoning_output_tokens": 516,
+          "total_tokens": 56877
+        }
+      },
+      {
+        "ordinal": 38,
+        "responseId": "resp_09f24631e4edef82016ad3236ccd1481918090285d39168088",
+        "usage": {
+          "input_tokens": 71244,
+          "cached_input_tokens": 55552,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 628,
+          "reasoning_output_tokens": 136,
+          "total_tokens": 71872
+        }
+      },
+      {
+        "ordinal": 49,
+        "responseId": "resp_09f24631e4edef82016ad32376a010819196228fa4662a5b42",
+        "usage": {
+          "input_tokens": 86312,
+          "cached_input_tokens": 71040,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 508,
+          "reasoning_output_tokens": 329,
+          "total_tokens": 86820
+        }
+      },
+      {
+        "ordinal": 58,
+        "responseId": "resp_09f24631e4edef82016ad32381c00c8191b2c6400fa61ea0a6",
+        "usage": {
+          "input_tokens": 91415,
+          "cached_input_tokens": 86144,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1320,
+          "reasoning_output_tokens": 406,
+          "total_tokens": 92735
+        }
+      },
+      {
+        "ordinal": 67,
+        "responseId": "resp_09f24631e4edef82016ad32396862c819194ba3c0c53247300",
+        "usage": {
+          "input_tokens": 104765,
+          "cached_input_tokens": 91264,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1352,
+          "reasoning_output_tokens": 516,
+          "total_tokens": 106117
+        }
+      },
+      {
+        "ordinal": 74,
+        "responseId": "resp_09f24631e4edef82016ad323abe68881918d5e57d737b948c0",
+        "usage": {
+          "input_tokens": 106164,
+          "cached_input_tokens": 104576,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 905,
+          "reasoning_output_tokens": 114,
+          "total_tokens": 107069
+        }
+      },
+      {
+        "ordinal": 81,
+        "responseId": "resp_09f24631e4edef82016ad323b8fdb08191a1328cbbd5d5d4c5",
+        "usage": {
+          "input_tokens": 110683,
+          "cached_input_tokens": 105984,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 761,
+          "reasoning_output_tokens": 516,
+          "total_tokens": 111444
+        }
+      },
+      {
+        "ordinal": 88,
+        "responseId": "resp_09f24631e4edef82016ad323c8df208191b801fff2a2c45132",
+        "usage": {
+          "input_tokens": 118364,
+          "cached_input_tokens": 110464,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 527,
+          "reasoning_output_tokens": 252,
+          "total_tokens": 118891
+        }
+      },
+      {
+        "ordinal": 97,
+        "responseId": "resp_09f24631e4edef82016ad323d24fa48191bef45d9a4e295638",
+        "usage": {
+          "input_tokens": 126779,
+          "cached_input_tokens": 118144,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1034,
+          "reasoning_output_tokens": 516,
+          "total_tokens": 127813
+        }
+      },
+      {
+        "ordinal": 104,
+        "responseId": "resp_09f24631e4edef82016ad323e4d4708191816dc490b89b2adf",
+        "usage": {
+          "input_tokens": 132515,
+          "cached_input_tokens": 126592,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 235,
+          "reasoning_output_tokens": 178,
+          "total_tokens": 132750
+        }
+      },
+      {
+        "ordinal": 111,
+        "responseId": "resp_09f24631e4edef82016ad323ec1d388191a6ca8568a38f75cc",
+        "usage": {
+          "input_tokens": 133209,
+          "cached_input_tokens": 132352,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 226,
+          "reasoning_output_tokens": 178,
+          "total_tokens": 133435
+        }
+      },
+      {
+        "ordinal": 118,
+        "responseId": "resp_09f24631e4edef82016ad323f3984c8191850338878eca54bd",
+        "usage": {
+          "input_tokens": 134768,
+          "cached_input_tokens": 132992,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1227,
+          "reasoning_output_tokens": 516,
+          "total_tokens": 135995
+        }
+      },
+      {
+        "ordinal": 126,
+        "responseId": "resp_09f24631e4edef82016ad32409662481919af882dfa002e192",
+        "usage": {
+          "input_tokens": 136330,
+          "cached_input_tokens": 134528,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 1712,
+          "reasoning_output_tokens": 516,
+          "total_tokens": 138042
+        }
+      }
+    ]
+  },
+  "inputCorrelation": {
+    "schema": "orchestrator.actual-native-input-correlated.v1",
+    "atUtc": "2026-10-17T07:27:59.050105+00:00",
+    "sessionId": "01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+    "nativeTurnId": "01a148c1-b89b-7c02-892f-5faefb291004",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "logicalTaskId": "ODI-04-R",
+    "source": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T16-03-30-01a148ac-3da8-77b3-97d2-f6e14bbb163f.jsonl",
+    "nativeRecordOrdinal": 9,
+    "timestamp": "2026-10-17T07:26:59.317Z",
+    "nativeInputSha256": "3158d6a73c52b43474bb167fcd474fe42a3d418847214f4cd48842462f591790",
+    "nativeInputBytes": 5825,
+    "submittedFileSha256": "8750205db6da469078b58181f8ca508033bfa02812f52de7806f2b620390473c",
+    "difference": "TUI strips final newline; actual body equals submittedFile.rstrip(LF)",
+    "actualModel": "gpt-6.1-sol",
+    "actualEffort": "ultra",
+    "firstUsefulPromptCount": 1,
+    "nativeWorkingObserved": true,
+    "notCompletionProof": true
+  },
+  "lineage": {
+    "schema": "odi04.root-checked-native-patch-successor.v1",
+    "rawNativeBase": "a91ef0564997a3a3736564f35a2e8354ae47e47b",
+    "rawNativePatchSha256": "dbb1b6e42df1441bfbbe6c27eb4cffb2c8da00d746914be5ae3307e934256bfc",
+    "checkedCommit": "902be8ea1bf9faf9ff272e3f79b02dc42b850ad3",
+    "checkedTree": "a340759be392942ce5c8a10b9ed7633efff149f8",
+    "accountableIntegrator": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+    "rootChanges": [
+      "Two multi-process CLI test timeouts5000→20000ms after actualRoot timing failures; assertions/product unchanged.",
+      "Repository Prettier formatting of existing test file."
+    ],
+    "nativeProducedFilesRemainUntouchedInNativeWorktree": true,
+    "checkedFiles": [
+      {
+        "path": "scripts/harness.ts",
+        "sha256": "3881bdf85d78de8fcd307e00da719f912d88bb76928627865519edc69fe3585a",
+        "bytes": 4952
+      },
+      {
+        "path": "packages/work-continuity/src/runtime-docs/runtime-docs.test.ts",
+        "sha256": "86426c1b5b8dd3d931a465b05cc93a0cf229b3613620086f62a4c576db8a2fbd",
+        "bytes": 28803
+      },
+      {
+        "path": "docs/runtime-documentation-routing.md",
+        "sha256": "440302d9d17645679acd0f56079ad1f57d6ea22d4d4d029fe4e3463bd47ab10c",
+        "bytes": 5187
+      }
+    ],
+    "attribution": "NativeHermes produced raw3files; Root derivative test-only changes explicitly identified, not falsely attributed toHermes."
+  },
+  "publisherAuthenticatedOnly": true,
+  "nativeAuthenticationEstablishedByGit": false,
+  "nativePermissionGranted": false
+}

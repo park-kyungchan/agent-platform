@@ -1,0 +1,43 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "902be8ea1bf9faf9ff272e3f79b02dc42b850ad3",
+  "reviewedTreeSha": "a340759be392942ce5c8a10b9ed7633efff149f8",
+  "reviewedSourceManifestSha256": "e0f0b977614a7b6ff4fa6b64a54a9a5f3a82e8a8eda54103c64448205a9fc24e",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a148ac-3da8-77b3-97d2-f6e14bbb163f"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14734-9160-70a2-a10d-df6ea9c50b91"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "checks": [
+    "Verified exact HEAD/tree, clean staged and working diffs before and after review, and exactly three changed files against base a91ef0564997a3a3736564f35a2e8354ae47e47b. Git diff --check passed.",
+    "Read applicable AGENTS.md, project.json and relevant capability/source-owner boundaries; checkout metadata matches canonical shared metadata.",
+    "Read local-source-manifest.json and independently rederived its manifest using the canonical manifest function: 819 entries, 679 blobs, matching SHA256 e0f0b977614a7b6ff4fa6b64a54a9a5f3a82e8a8eda54103c64448205a9fc24e.",
+    "Consumed actual C06 captures at 28684689bd560e1e7442a4c9dd6a4839029023a4: qualification and sources 01–37, plus optional source 38. Verified index SHA256 ed9c6ca044957418a8a67fbfb45b66aababb284d7f3fcbee44ce7f7eb3cdd840, all page hashes/byte lengths and source bindings against the index.",
+    "Consumed source-21 receipt SHA256 08ff8720b7ef56efd23057089ee5409b1a14d023ce64dfbe70e679b999cfb520 and all three literal parts in order. Verified chunk pins and complete 30,844-character reassembly SHA256 c228b663b75d219980b62c182f4d562c12af6d6e3487439087839dcf317913af; consumed all completed/uncertain IDs, predecessor sources and replayPolicy.",
+    "Consumed current purpose, original answers, Spec1/Plan1, ODI-04-R contract, producer intent/result/Verification and actual Hermes messages 46→106 prerequisite/receiver payloads. Captured canonical load, validation, transition and selected dependency findings are empty.",
+    "Verified raw Hermes patch SHA256 dbb1b6e42df1441bfbbe6c27eb4cffb2c8da00d746914be5ae3307e934256bfc and reconstructed its files in memory. Implementation/docs match exact HEAD; Root successor changes only test formatting and two finite 20-second timeouts. Verified lineage and mechanical-check receipt hashes.",
+    "Reviewed all changes in scripts/harness.ts, packages/work-continuity/src/runtime-docs/runtime-docs.test.ts and docs/runtime-documentation-routing.md, plus the complete canonical runtime-docs index.ts, types.ts and validation.ts.",
+    "Assessed flat compatibility, envelope discrimination, malformed/unknown inputs, observation types, control characters, string/file limits, canonical version/cache/currentness decisions, caller assertions and permission/provenance boundaries. No actionable defect found.",
+    "Verified pinned Root evidence for 67 tests/1979 assertions, handoff, imports, quality and source CI with 26 successful commands. Reviewed added process-boundary and canonical retrieval assertions; did not rerun the suite."
+  ],
+  "limits": [
+    "Monolithic typed context remains HELD at 27,215 > 24,000 characters. Consumption used the explicit manual existing-reader captures; this establishes neither typed-context PASS, automatic hook injection, native authorship authentication nor native permission.",
+    "The complete manifest binds the tree; unchanged files outside the stated source coverage were not individually reviewed.",
+    "Independent implementation review was static. Root test/check results remain separately attributed evidence, not independently rerun tests. No new common Work import was performed.",
+    "The historical taskId identity fields carry observed native SESSION UUIDs. Native Task/Run IDs remain unexposed/null and distinct from logical ODI-04-R. Hermes produced the raw artifact; the author identity denotes Root's checked successor.",
+    "No source, Git refs, Goal/plan, configuration, permissions, credentials, sessions or existing effects were changed. No delegation, auxiliary model, network request or historical effect replay occurred.",
+    "This is bounded Verification, not whole-Work completion, shared delivery or human Acceptance. Publication/status, explicit expected-head merge and separate runtime-owner verification/activation remain Root-owned subsequent actions."
+  ]
+}
