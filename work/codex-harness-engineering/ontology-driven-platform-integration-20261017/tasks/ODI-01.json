@@ -17,13 +17,13 @@
     "taskId": "ODI-01"
   },
   "title": "Bind successor purpose, originals, decisions and effect custody",
-  "nextAction": "Root qualifies freshly synchronized main, binds exact original/current decision/effect custody sources, commits candidate Work, validates the canonical selected Work and independently reviews exact source before downstream dispatch.",
+  "nextAction": "Source binding and selected context verified for063c87. Shared delivery/formal completion remain pending. Root should qualify ODI-02 minimum/no-change source and coordinated native owner delivery against actual selected Work and exact current source; source results grant no native permission or activation.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -35,5 +35,7 @@
     "ODI-DECISION-FRESH-EVALUATION"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:ontology-driven-platform-integration-20261017:odi-01-source-binding"
+  ]
 }
