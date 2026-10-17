@@ -1,0 +1,119 @@
+{
+  "schema": "agent-platform.contract-maintenance-successor.v1",
+  "id": "agent-platform:maintenance:integrated-contracts:20261017",
+  "recordClass": "current-scoped-maintenance-targets-not-execution-receipt",
+  "preparedAtUtc": "2026-10-17T21:41:07.332208+00:00",
+  "authority": {
+    "currentWorkId": "ontology-driven-platform-integration-20261017",
+    "currentWorkPlan": "ODI-PLAN@2",
+    "decisionId": "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY",
+    "meaning": "User directs common harness alignment and removal of Hermes/profile-specific maintained repositories. Reversible archival of the four integrated contract/example repositories is the accountable Lead choice; this record is not a newly fabricated user answer.",
+    "nativeProfileOrServiceEffectsGranted": false
+  },
+  "maintainedProducer": {
+    "repository": "park-kyungchan/agent-platform",
+    "sourcePaths": [
+      "packages/operational-context/src/backend/intent-context",
+      "packages/operational-context/src/backend/review"
+    ],
+    "integrationRef": "history/public-contracts/integration.json",
+    "historyCustodyRef": "history/public-contracts/custody.json",
+    "alreadyIntegrated": true,
+    "newPortRequired": false
+  },
+  "targets": [
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-context",
+      "repositoryId": 1411493725,
+      "expectedPrivate": true,
+      "defaultBranch": "main",
+      "expectedHead": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+          "type": "commit"
+        }
+      ],
+      "fullHistoryBundle": {
+        "path": "history/public-contracts/bundles/hermes-profile-dc-context.bundle",
+        "sha256": "9b9869ebc61fc39c2e2140714f6c003bb67c4271027e2beae782dfe8180c55da"
+      }
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-contract-audit",
+      "repositoryId": 1411506018,
+      "expectedPrivate": true,
+      "defaultBranch": "main",
+      "expectedHead": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+          "type": "commit"
+        }
+      ],
+      "fullHistoryBundle": {
+        "path": "history/public-contracts/bundles/hermes-profile-dc-contract-audit.bundle",
+        "sha256": "88a79611a678a7dd4abfc19506a6202dc827cf85e0a50a9c5c3177d3b7a86bc4"
+      }
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-review",
+      "repositoryId": 1411547504,
+      "expectedPrivate": true,
+      "defaultBranch": "main",
+      "expectedHead": "69ed6d9a0266066c83789c322c4b4521810333ec",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "69ed6d9a0266066c83789c322c4b4521810333ec",
+          "type": "commit"
+        }
+      ],
+      "fullHistoryBundle": {
+        "path": "history/public-contracts/bundles/hermes-profile-dc-review.bundle",
+        "sha256": "50388b1815bdbea8df8b4f6807353a29d70f19ba17e1dea2172df45046b127cd"
+      }
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-ontology-platform",
+      "repositoryId": 1411598033,
+      "expectedPrivate": true,
+      "defaultBranch": "main",
+      "expectedHead": "796cd709f356344210aa73f02ca2c8407103cc28",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "796cd709f356344210aa73f02ca2c8407103cc28",
+          "type": "commit"
+        }
+      ],
+      "fullHistoryBundle": {
+        "path": "history/public-contracts/bundles/hermes-profile-ontology-platform.bundle",
+        "sha256": "e35c463de8c778f8aa0d9f3732a14650533a4c85726f74071cfaf95186361416"
+      }
+    }
+  ],
+  "effect": {
+    "kind": "archive",
+    "deleteRepository": false,
+    "changeVisibility": false,
+    "removeRefsOrHistoricalSource": false,
+    "relocateNativeProfileDataOrCredentials": false,
+    "changeServiceRoute": false,
+    "reason": "End duplicate maintained writers while retaining current authorized repository/blob/history read paths."
+  },
+  "currentSourceConsumer": "Admitted code uses canonical operational-context. Existing source-navigation URLs are read references; archival preserves their current access rather than requiring another deployment. This is not universal absence of consumers or proof of live deployment parity.",
+  "educationBoundary": "hermes-profile-default/mathCrew and hermes-profile-dc-gang-a-dev/clinic-workbench are Education-owned applications, already integrated under education-platform. They are not these four archive targets, not native profile exports and not another common harness role layer. Their remaining delivery/retirement is consumer-specific.",
+  "historicalPacketRef": "architecture/public-contract-retirement.json",
+  "historicalPacketMeaning": "The October11 deletion candidate, old public labels and old pending gates remain original historical observations. They do not establish current visibility, current archive authority or an archive effect.",
+  "effectOrder": [
+    "Independently review exact source/tree and current zero findings; publish authenticated review status before PR, run required checks, Lead explicitly merges expected head and adopts source.",
+    "Immediately re-read each numeric repository identity, private visibility, default branch and all advertised refs against this target and retained history; verify canonical producer/custody and authorized source read. Refuse any third state.",
+    "Record separate non-replayable archive intent/result for each exact target using the authenticated owner. Do not delete, rename, change visibility or touch native profiles/services.",
+    "Read back archived state, unchanged refs and authorized source/blob access. Keep actual effect receipts with the Work evidence owner; this source record never substitutes for them."
+  ],
+  "effectsPerformedByThisRecord": false,
+  "wholeGoalOrSemanticAcceptanceEstablished": false
+}
