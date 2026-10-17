@@ -1,0 +1,140 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-CONTRACT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-gang-owner-contract/actual-root-prerequisite-read.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi07.gang-owner.planned-source-child-contract.v1",
+    "status": "OPS_PROPOSED_PLANNED_SOURCE_ONLY_CANDIDATE_PREPARED_NOT_COMMITTED",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-07-GANG-OWNER"
+    },
+    "parentTaskId": "ODI-07",
+    "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+    "baseline": {
+      "dataCommit": "a5bda8a94dabcd97d140ec05170726b8f2f4e6b3",
+      "dataTree": "432643d8a86b2ab42ba3d404c6afb3bdaac9582c",
+      "records": 114
+    },
+    "governingDecisionIds": [
+      "ODI-DECISION-FINAL-APPROVAL",
+      "ODI-DECISION-SUCCESSOR",
+      "ODI-DECISION-COST",
+      "ODI-DECISION-USEFUL-NATIVE-FLOW",
+      "ODI-DECISION-EVALUATION-BUDGET-20000000",
+      "ODI-DECISION-CLI-WORKER-DEFAULT",
+      "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION"
+    ],
+    "purpose": "First maintained-source owner cutover without porting code: education module already owns identical Gang implementation; retained standalone CI enforces frozen implementation while allowing only reviewed governance metadata.",
+    "historicalProposal": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-gang-owner-prep/proposal.final.json",
+      "sha256": "ab5388d03c4005e23888b40b177daeb41c48f0643420166be12249ad017f6d17"
+    },
+    "historicalManifest": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-gang-owner-prep/patch-manifest.final.json",
+      "sha256": "50c83a986fe1286d879cdacbc6f8fc6f2f616b28ac4b908dbc7ab95ab92c75ed"
+    },
+    "currentCandidate": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-gang-owner-source-candidate-runtime/candidate-manifest.json",
+      "sha256": "80758e91c2a41793dd2a8866aa72f1d4e087314d245ddff8156f122fcb7a0ed0",
+      "bytes": 7228
+    },
+    "sourceTargets": [
+      {
+        "owner": "education-platform",
+        "path": "architecture/source-map.json",
+        "baseCommit": "39b69e5daae7bb5f35ce76378be8e29cf6f06723",
+        "preimageSha256": "e719cadacc3d186391fa1ff181b6ad845097446144331a812728eab1eefaa6e0",
+        "postimageSha256": "216c6449ae2e7ad07a5b851fc583aa3a9fa64808a8084eff39cc80425063ea4c",
+        "bytes": 7309
+      },
+      {
+        "owner": "gang-a",
+        "path": ".github/workflows/ci.yml",
+        "baseCommit": "7b5cf56dd6f19ffe56d180b61c03d8366f5f98b1",
+        "preimageSha256": "82efb2c45bff0631a38573f1974e71e7db3d2ee4b582ac812471e7bce7a9f294",
+        "postimageSha256": "e92729d4b4e365ed69b8998ea1907c5bf0373ffdd9b1bc25f253e013c673e2b6",
+        "bytes": 7836
+      },
+      {
+        "owner": "gang-a",
+        "path": "README.md",
+        "baseCommit": "7b5cf56dd6f19ffe56d180b61c03d8366f5f98b1",
+        "preimageSha256": "98eff68ccd6fd0f285c74579e11d16199da4456d7fbd6b4a5b29d26da0d92e17",
+        "postimageSha256": "bfd6085f7b51a64009a1537810847fffce16641c65ee6e5c3b5aea5a5a113075",
+        "bytes": 5689
+      }
+    ],
+    "sourceRoots": [
+      {
+        "owner": "education-platform",
+        "path": "/home/palantirkc/code/worktrees/odi07-gang-owner-runtime-20261017T101124954Z/education-platform",
+        "baseCommit": "39b69e5daae7bb5f35ce76378be8e29cf6f06723",
+        "baseTree": "c7ccc58448ad4d3580f7365fe6ef3b70788d9ce3"
+      },
+      {
+        "owner": "gang-a",
+        "path": "/home/palantirkc/code/worktrees/odi07-gang-owner-runtime-20261017T101124954Z/gang-a",
+        "baseCommit": "7b5cf56dd6f19ffe56d180b61c03d8366f5f98b1",
+        "baseTree": "72736bdc69f26a233736f19cff7bfe948ba2226b"
+      }
+    ],
+    "formatSuccessor": "Current Gangworkflow e92729d4... removes exactly3blankline whitespace suffixes from historical606bf4...; parsedYAMLidentical. Historical50c8 is not the current exact workflow postimage.",
+    "boundedSourceScope": "Exactly education architecture/source-map.json +GangREADME.md/.github/workflows/ci.yml; no app/domain/package/lock/original/data/native code changes, no crossprivate checkout/credential bridge/new store/router.",
+    "sourceQA": {
+      "manifest": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-gang-owner-source-candidate-runtime/candidate-manifest.json",
+      "officialBun142": "a83d263767d839e4d2649ca8e35d07159c7afc99afdc96d731ced29e056dda0c",
+      "Gang": "Actual pinned1.4.2 fullvalidate +14freeze-policy selftests PASS; all127non-exempt paths and129tracked denominator preserved.",
+      "education": "Project-privateBun1.4.3/Node26.7.0/npm11.17.0 source-owned setup; status/fullcheck PASS; all existing source-map fields preserved.",
+      "limits": "Uncommitted isolated code; actual source QA is not native/domain/PG/browser/teacher acceptance or remoteCI. Inline current-HEAD guard saw retained7b because no source commit authorized; actual candidate metadata deltas separately pinned."
+    },
+    "actualRootPrerequisiteRead": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-gang-owner-contract/actual-root-prerequisite-read.json",
+      "sha256": "600481b87c56e98c37df13d92c7d64f4bddec16b0b66888f51c1f605d2ed7648",
+      "bytes": 12752
+    },
+    "prerequisite": {
+      "taskId": "ODI-04-R",
+      "milestone": "execution-and-verification",
+      "payload": {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "8f741b60be459a21e411418e9d3d4c0641492ac3",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-04-R-EXECUTION-RECEIPT.json",
+        "fragment": "#/content",
+        "sha256": "e56bd09a487348a837aaaf9ccd944aa18dc2e04695d6d7cc152c8126e27ee351"
+      },
+      "receiverRuntimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+      "meaning": "Actual fixed-owner Root read of externalC07 e56/2092B; declaredRootreceiver/source value consumption, not authenticated native authorship or new model permission."
+    },
+    "parallelism": "Depends ONLY actual04-R execution+verification; source-only child may proceed in parallel05. Parent07 and05 holds/order unchanged; no umbrella reorder or blanket06 prerequisite.",
+    "preserve": "All114historical records, all7current governing decisions, Spec1/Plan1, completed/uncertain effects, accepted domain/native/teacher/original boundaries, d604missing bodies and distinct archive counts, private custody and completed month-end closeout.",
+    "writer": "Only Root may commit the exact candidate AFTER actual durable child contract/qualification. Independent exact source review/authenticated status beforePR; explicit expected-head merge and separate owner adoption. No push/PR/merge/archive/retirement/native activation by helper.",
+    "exit": "Deliver exact3file patches/postimages/sourcechecks to Root. Child stays planned/source-only, no native occurrence/effects, no domain cutover/month-end replay/retirement/Goalcompletion.",
+    "workDiscovery": "Canonical WorkRecord has no taskIds array. Task file append +contains parent07 relation is existing child pattern; work.json/current7governance remain byte-identical. No new task registry.",
+    "authority": "none",
+    "nativePermissionGranted": false,
+    "nativeAuthorshipAuthenticated": false,
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "sourceCommits": 0,
+    "nativeEffects": 0,
+    "GoalComplete": false
+  }
+}
