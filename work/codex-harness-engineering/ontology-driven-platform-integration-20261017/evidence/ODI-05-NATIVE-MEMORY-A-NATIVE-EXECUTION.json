@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-05-NATIVE-MEMORY-A-NATIVE-EXECUTION",
+  "evidenceKind": "native-execution",
+  "source": {
+    "kind": "native",
+    "ownerId": "native-hermes",
+    "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_200344_b1c008/messages/184,185",
+    "receipt": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-NATIVE-MEMORY-A-EXECUTION-RECEIPT.json",
+      "fragment": "#/content"
+    }
+  }
+}

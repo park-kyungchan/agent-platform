@@ -17,13 +17,13 @@
     "taskId": "ODI-05-NATIVE-MEMORY-A"
   },
   "title": "Useful native Memory A: exact education/Gang source review and same-session cold-resume proof",
-  "nextAction": "Read inputs/ODI-05-NATIVE-MEMORY-AB-CONTRACT.json usefulA and ALLrequired original/value closure; await actualRoot budget/source/session admission. First actualmodel/tool must requery genuineg1 at actualcurrenthead; no autohook/consumption claim. Execute only the bounded read-only useful task; return ownOPSproposal/evidence without source/domain/native/remote writes or modeldelegation. Root controls any Ainterrupt/coldresume and preservesB/old04.",
+  "nextAction": "Useful local result and bounded Verification recorded; do not replay consumed occurrences. Shared Git delivery/independent receiver and formal audit pending. Parent05 cross-state/PC-off/recovery acceptance remain open; actual Codex07 review/publication separate.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "native-effect",
   "runtimeId": "native-hermes:odi-platform:20261017_200344_b1c008",
@@ -44,6 +44,16 @@
     "ODI-DECISION-CLI-WORKER-DEFAULT",
     "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION"
   ],
-  "effectIds": [],
-  "verificationEvidenceIds": []
+  "effectIds": [
+    "ODI-05-NATIVE-MEMORY-A-CONTINUATION-10"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:05-native-a"
+  ],
+  "occurrence": {
+    "runtimeId": "native-hermes:odi-platform:20261017_200344_b1c008",
+    "attemptId": "native-message:184",
+    "occurrenceId": "native-message:185"
+  },
+  "executionEvidenceId": "ODI-05-NATIVE-MEMORY-A-NATIVE-EXECUTION"
 }

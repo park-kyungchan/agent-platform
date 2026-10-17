@@ -1,0 +1,72 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-NATIVE-MEMORY-A-INTENT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-hermes",
+    "kind": "source-owner-capture",
+    "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_200344_b1c008/messages/184,185"
+  },
+  "content": {
+    "schema": "odi05.native-memory.actual-intent.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-05-NATIVE-MEMORY-A"
+    },
+    "occurrence": {
+      "runtimeId": "native-hermes:odi-platform:20261017_200344_b1c008",
+      "attemptId": "native-message:184",
+      "occurrenceId": "native-message:185"
+    },
+    "native": {
+      "runtime": "native-hermes",
+      "profileId": "odi-platform",
+      "storedSessionId": "20261017_200344_b1c008",
+      "frontend": "34446ed1",
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    "actualPersistedPrompts": [
+      {
+        "id": 107,
+        "message_uid": "54f7cd9b9ab5477bae7709b3c7057550",
+        "contentSha256": "acc65ba6195b67cd0f3f33c075d2636c20766461a08acd003fd521c746d8122e",
+        "contentBytes": 4984,
+        "literalContent": "You are a native Hermes worker in the existing user-approved whole-platform successor Work ontology-driven-platform-integration-20261017 (Domain native-harness / Project codex-harness-engineering / Issue ODI-ISSUE-20261017 / Spec ODI-SPEC@1 / Plan ODI-PLAN@1). This is bounded useful work controlled by ONE Codex Lead, not a new Goal or a continuation of old Task04. Native Hermes retains its model, tools, loop, retries, sessions and credentials. NativeTask/Run IDs not exposed=null; logical Task, ledger run, frontend ID and stored session key are distinct.\n\nCurrent Work head 0c36a1cfa5b87b4a24cd1a205af32cea5c36ac8c has138 validated records. Root qualified this declared receiver and exact04-R prerequisite. The old installed provider/dataC04/hook are historical; its exacttuple hook does not inject current source into these new sessions. This is explicit manual literal source delivery. Root active code common9b68/owner0393 passed actualV4/34pins and requiredCI. User permits existing subscriptions/resources, additional paid cost0; native evaluation reservations were recorded by Root before your prompt. Canonical unknown-usage guard remains HELD with preserved older unknowns; the user's explicit continuation exceptions are separately adopted, not fake guard PASS.\n\nSOURCE ROOT: /opt/data/runtime/harness/manual-source/odi05-ab-0c36a1c-20261017T1117Z\nFirst read current-memory.json FULL. Root actually queried canonical common Memory through the guarded owner at CURRENT0c36 before/after: 8corpus/1eligible derived costhit+1independentcurrentauthority, selectedValue=\"기존 구독·자원 사용, 추가 결제 0\", all85originalkeys retained. DataH092aadd/Hreview792e/H1c597, generationodi05.genuine.92aadd365f49.g1/policyodi05.policy.92aadd365f49.r1. Derived hit remains unconfirmed inference; authority takes precedence. Explain concretely how that cost authority and whole Ontology purpose change your useful proposal. Cite actual memoryId, dataset fullblob SHA/pointer and85keylineage, not a generic memory claim.\n\nRead required FULL values with native read_file in bounded complete ranges when output limits apply. Batch independent reads when supported to avoid repeated long context; do not silently treat a filename/hash/summary as consumed content. Required shared: README.txt, native-contract.json, shared-core.txt, shared-effects.txt, current-memory.json, your task and receiver files. All literal source values remain complete; manifest.json/source-index.json provide hashes/refs, not authority. Original historical feedback/CLIspelling and immutable Plan1oldbudget clause must be interpreted using supplied current Decisions/meaning; never turn historical never-used statement into current runtime fact or the user's skip typo into an executable flag. Spec describes the whole desired outcome, not achieved Acceptance.\n\nSCOPE: useful READ-ONLY analysis/proposal only. Read the supplied task-specific source files; no filesystem/source/Work/native/profile/config/trust/cache/credential/domain/remote changes, no model delegation or memory-tool writes, no effect replay, no new resources/services/client/registry/loop. Do not run broad suites/install/network, or access Root-local Git paths outside this container. Missing required bytes: identify exact missing material and withhold only dependent conclusion. Do not manufacture native authorship, permission, deployment, teacher or full-Goal Acceptance.\n\nMARKER ODI05-MEMORY-A-20261017-0c36. LogicalTask ODI-05-NATIVE-MEMORY-A; native stored session20261017_200344_b1c008, frontend8ea79fb3 (separate). Root ledger runODI-EVAL-20261017-NATIVE-MEMORY-A-08.\nRead task-A.json,receiver-A.json,A-code.txt FULL andcode-source-provenance.json. Review exact education dcf31408e60b5cf147ea5f5fa9a30fec42fb5461/tree51acc571fd7c7dfc6416c7137ef2e1ddb1af025d architecture/source-map.json and Gang3f0af3f0ab03ffc692e1ff927859d7cfbb383ffc/treed9ed2a709a029dc0c9bf76a5adeddf10318d4344 README.md/.github/workflows/ci.yml. Full files AND complete base-to-final diffs are supplied. Existing committed-source QA: Bun1.4.2 freeze127paths/2allowedmetadata and14negativecases PASS; education fullchecks PASS, evidence separately attributed.\nChallenge at least three concrete ownership/freeze/consumer assumptions, identify actionable defects if present, and produce a useful smallest next change/check recommendation. No source retirement/native parity assumption. Root may deliberately interrupt this OWNED session during the controlled concurrency/recovery proof; never autonomously resume/takeover/replay. A later explicitly new continuation marker will preserve this same logical Task and stored key.\nFinal reply concise Korean with this exact marker/Task/storedkey, actual Memory cost/source citation and its decision impact, consumed/unconsumed source names, concrete findings with path/line or zero actionable findings only if justified, then smallest useful proposal and checks. Preserve uncertainty; no forcedPASS or writes."
+      },
+      {
+        "id": 184,
+        "message_uid": "65eb087602aa47d0a82b327d7847aedb",
+        "contentSha256": "50f916d4e0f41863c343724992c65e879738ed0ab70c9e96108d031c95988c90",
+        "contentBytes": 2510,
+        "literalContent": "ODI05-MEMORY-A-RESUME-10-20261017-34446ed1\nThis is a NEW explicit continuation of the already-consumed read-only source analysis, NOT a resend of the original request or a request to retry any blocked check. Same logical Task ODI-05-NATIVE-MEMORY-A / topic native-harness:topic:governed-agent-platform-operation / Work ontology-driven-platform-integration-20261017 / Spec1/Plan1. Root deliberately interrupted A08 once, closed its settled live view and cold-resumed SAME native stored key 20261017_200344_b1c008. The old frontend8ea79fb3 is closed; actual new frontend34446ed1 is distinct. Root separately admitted evaluation run ODI-EVAL-20261017-NATIVE-MEMORY-A-CONTINUATION-10 before this prompt; older unknown usage stays unknown. No profile/model/permissions change.\n\nUse ONLY literal source and native conversation history ALREADY consumed before interruption. Do NOT invoke ANY tools, terminal commands, probes, file reads/writes, agents, memory writes, network or additional resources. The approval-withdrawn command and explicitly skipped tool are HELD: do not retry, rephrase, simulate, or obtain the same blocked verification outcome another way. Their checks remain unexecuted. Missing retained source is a dependent HOLD, not permission to reread or improvise.\n\nFinish the useful readonly review of the exact education dcf31408e60b5cf147ea5f5fa9a30fec42fb5461 architecture/source-map.json and Gang3f0af3f0ab03ffc692e1ff927859d7cfbb383ffc README.md/.github/workflows/ci.yml from your preserved full files/diffs. Challenge at least three concrete ownership/freeze/consumer assumptions; distinguish actionable defects from explicit limitations. Cite paths/lines and at least two specific literal code details NOT supplied in this continuation, so Root can check restored source continuity. Attribute prior QA to its actual author; never claim your blocked probes passed. Give the smallest useful next action and necessary checks. No deployment, retirement, native parity or whole-Goal Acceptance inference.\n\nIn concise Korean, include this NEW marker plus original ODI05-MEMORY-A-20261017-0c36, sameTask/storedkey/newfrontend, actual Memory cost/source citation (memoryId, dataset fullblob digest/pointer and85-key lineage) and concrete decision impact. Original context head0c36 is still unchanged and qualified; derived inference and separate current authority stay distinct. State consumed/unconsumed or missing retained source and preserve the blocked checks. Return the result now without tools."
+      }
+    ],
+    "meaning": "A contains old actual08 prompt custody plus NEW exact10 continuation, not body replay. Attempt field names actual message row within stored runtime, NOT logical ledger Run or native Task/Run.",
+    "sourceDataCommit": "0c36a1cfa5b87b4a24cd1a205af32cea5c36ac8c",
+    "actualSourceDelivery": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/delivery-package/manifest.json",
+      "sha256": "0be9ab9e624058a629243a8c02c9c03e53d6a086de48e36c30babf03d08da9d0",
+      "bytes": 7529
+    },
+    "actualAdmission": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-A-coldresume-admission-preparation-v1/root-actual-adoption/actual-admission.json",
+      "sha256": "49314995903dc8810a45d07329ea6d30f9a920ba6a3e433f4b52aaa8e6eaee4b",
+      "bytes": 5850
+    },
+    "permittedScope": "Read-only bounded analysis; A10 zero-tool history-only continuation; no autonomous retry of blocked checks.",
+    "authority": "none",
+    "nativePermissionGranted": false
+  }
+}
