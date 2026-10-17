@@ -1047,6 +1047,28 @@ export async function prepareGitWorkMemoryArtifacts(
   };
 }
 
+/** A literal branch address, never Git revision/reflog syntax accepted by rev-parse. */
+function literalOwningHead(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= 256 &&
+    value.startsWith("refs/heads/") &&
+    !/[\u0000-\u0020\u007f~^:?*\[\\]/.test(value) &&
+    !value.includes("..") &&
+    !value.includes("@{") &&
+    !value.includes("//") &&
+    value
+      .split("/")
+      .every(
+        (part) =>
+          part.length > 0 &&
+          !part.startsWith(".") &&
+          !part.endsWith(".") &&
+          !part.endsWith(".lock"),
+      )
+  );
+}
+
 /** Observe a mutable owning local ref; an immutable reader alone cannot establish currentness. */
 export async function readGitWorkMemoryRequest(
   reader: GitWorkReader,
@@ -1068,7 +1090,7 @@ export async function readGitWorkMemoryRequest(
   const witness = structuredClone(ownerSelection);
   if (
     witness.state !== "current" ||
-    !/^refs\/heads\/[^\s~^:?*\[\\]+$/.test(witness.owningRef) ||
+    !literalOwningHead(witness.owningRef) ||
     witness.admittedCommit !== reader.commit
   )
     invalid("Git current owner selection");
