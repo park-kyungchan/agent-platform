@@ -1,0 +1,47 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05-MEMORY-BINDING",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-05-MEMORY-BINDING"
+  },
+  "title": "Bind genuine ODI Git Work originals to existing canonical Memory",
+  "nextAction": "Read inputs/ODI-05-MEMORY-BINDING-CONTRACT.json; implement only in Root-supplied isolated source worktrees, present exact candidate/tests/pins. No commits/native/model/data activation; parent05 remains planned.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+  "dependsOn": [
+    {
+      "taskId": "ODI-04-R",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-R-PREREQUISITE-C07",
+      "receiverEvidenceId": "ODI-05-MEMORY-ROOT-RECEIVER-C07"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}
