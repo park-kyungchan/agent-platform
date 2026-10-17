@@ -1,0 +1,41 @@
+{
+  "schema": "agent-platform.identical-tree-independent-review-reuse.v1",
+  "recordClass": "explicit-successor-binding",
+  "recordedAtUtc": "2026-10-17T21:11:54.132834+00:00",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/hermes_facade_resolution"
+  },
+  "original": {
+    "head": "6ea9309709f1b8eccb2aa160dfeb31ca787e1051",
+    "tree": "8111bbc9cbcfe1780923dc5020d552e582402f44",
+    "manifestSha256": "6c7705b6d15e98f03c40422cc2502e753440567e661dc735cf397fbee2a74fd9",
+    "resultCommit": "1a7e2cabe42f21540161245b40dc32bafdaf72dc",
+    "resultPath": "native-review-results/6ea9309709f1b8eccb2aa160dfeb31ca787e1051.json",
+    "resultSha256": "0e1af6d65a427324f1ed77b84906062edcb4774c13e301f30036d86b8b588d5a",
+    "receiptCommit": "2e35297a63eadea3ebeaba23fe01da1bf954fcd8",
+    "receiptPath": "native-reviews/6ea9309709f1b8eccb2aa160dfeb31ca787e1051.json",
+    "receiptSha256": "d115efdac0cad4872f478ea222d9fedffcc010988237887134baee3296a7c6cd",
+    "authenticatedStatusId": 56607164488
+  },
+  "successor": {
+    "head": "66b59fe1ba7a1c63024935fbb81d6c385205d5cd",
+    "tree": "8111bbc9cbcfe1780923dc5020d552e582402f44",
+    "manifestSha256": "6c7705b6d15e98f03c40422cc2502e753440567e661dc735cf397fbee2a74fd9",
+    "pullRequest": 28,
+    "parents": [
+      "9b68b166b6fb575033f9887ce0d6a75799ca9bbb",
+      "6ea9309709f1b8eccb2aa160dfeb31ca787e1051"
+    ],
+    "resultSha256": "962dab016ec90f2c3de0162682d464b1dacdd50fb2ac3c61d5a387fb2af370ff"
+  },
+  "verification": "Actual independent same-child reverified Git and remote merge/tree, full canonical manifest, original literal byte custody/status and current zero finding state. Entire source tree is identical; no changed code exists to reassess.",
+  "currentUnresolvedFindings": 0,
+  "meaning": "This is my actual independent source review reuse for the merged commit; the original H result remains untouched. It is not a newly emitted native CLI evaluation or invented merged-head execution.",
+  "nativeCliSessionId": null,
+  "nativeTaskId": null,
+  "nativeRunId": null,
+  "nativeAuthenticationEstablished": false,
+  "nativePermissionGranted": false,
+  "acceptanceEstablished": false
+}
