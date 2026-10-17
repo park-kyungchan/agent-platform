@@ -1,0 +1,78 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-LONG-WORK-SKILL-ACTUAL-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/long-work-skill-feedback-improvement-v1/main-rerun-completion.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:odi02-long-work-skill-actual",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-17T21:32:58.805Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:1bca737d416724e565315c4ca2e757255af68386e267562eaf83de7fe54eb8af"
+      ],
+      "criteria": [
+        {
+          "id": "exact-source-review-explicit-merge",
+          "status": "pass",
+          "message": "Actual PR28 expected-head merge to66b59/tree8111; independent identical-tree successor review remains pass0 with published status56607818644.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi02-long-work-skill-actual"
+          ]
+        },
+        {
+          "id": "required-source-checks-terminal-ci",
+          "status": "pass",
+          "message": "Retained exact-source quality report passed; main39069672608 attempt2 completed success on exact merged66b59. Earlier failed attempt is preserved.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi02-long-work-skill-actual"
+          ]
+        },
+        {
+          "id": "separate-global-readback",
+          "status": "pass",
+          "message": "Actual global install receipt observes all4source/global files equal, only SKILL.md changed; global bytes and merged source are separately recorded.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi02-long-work-skill-actual"
+          ]
+        },
+        {
+          "id": "scope-and-historical-truth",
+          "status": "pass",
+          "message": "Forward evaluations remain simulated. Native behavior, shared Work audit, formal completion, Goal/Acceptance are not claimed; original assigned logicalPlan1/currentWorkPlan2 remain distinct.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi02-long-work-skill-actual"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-LONG-WORK-SKILL-ACTUAL-RESULT.json",
+          "sha256": "27714144b095067ef2aca7be5c336ec2dd6a4f2a839147d5aff3c0ecdc4d68db"
+        }
+      ],
+      "runtime": {
+        "name": "accountable-root-receipt-source-observation",
+        "version": "source-only"
+      },
+      "details": {
+        "nativePermissionGranted": false,
+        "semanticAcceptanceEstablished": false,
+        "nativeBehaviorVerified": false,
+        "sharedWorkAuditDelivered": false,
+        "wholeGoalComplete": false
+      }
+    }
+  }
+}
