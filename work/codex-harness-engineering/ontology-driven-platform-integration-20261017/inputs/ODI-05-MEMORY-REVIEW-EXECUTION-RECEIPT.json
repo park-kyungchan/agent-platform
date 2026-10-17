@@ -1,0 +1,55 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-MEMORY-REVIEW-EXECUTION-RECEIPT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/actual-final.literal.txt"
+  },
+  "content": {
+    "schema": "common.git-prerequisite-receipt.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-05-MEMORY-REVIEW"
+    },
+    "occurrence": {
+      "runtimeId": "native-codex:01a14903-d56d-7d83-ab48-86549b09beb1",
+      "attemptId": "native-turn:01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+      "occurrenceId": "native-message:msg_06199e314161c8b4016ad349300d308191a704808938fd5d0c"
+    },
+    "state": {
+      "execution": "complete",
+      "verification": "passed",
+      "localAudit": "result-durable",
+      "sharedAudit": "pending",
+      "formalCompletion": "audit-synchronization-pending"
+    },
+    "intent": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-REVIEW-ACTUAL-RESULT.json",
+      "fragment": "#/content/actualDispatchIntent"
+    },
+    "result": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-REVIEW-ACTUAL-RESULT.json",
+      "fragment": "#/content"
+    },
+    "verification": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-REVIEW-ACTUAL-VERIFICATION.json",
+      "fragment": "#/content"
+    }
+  }
+}

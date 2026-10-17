@@ -1,0 +1,84 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-MEMORY-REVIEW-ACTUAL-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-code-review/continuation07/snapshot03-final/actual-final.literal.txt"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:odi05-memory-review",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-17T10:09:24.139Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:23a5aad867a91d128a6717576168ee093a785c79fc434cd70c75581196637ffb"
+      ],
+      "criteria": [
+        {
+          "id": "actual-paired-source-review",
+          "status": "pass",
+          "message": "Actual07 final_answer338 and task_complete341; both exact source owners emitted native PASS0, Root full-raw assessment admitted bounded static review.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi05-memory-review-execution"
+          ]
+        },
+        {
+          "id": "actual-receiver-values",
+          "status": "pass",
+          "message": "All63 literal source values were returned to same native session in05;07 final explicitly confirms Work/Spec1/Plan1/originals/fences/04-R receipt and counterpart source consumption.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi05-memory-review-receiver"
+          ]
+        },
+        {
+          "id": "historical-and-accounting-preserved",
+          "status": "pass",
+          "message": "04HOLD nullfindings,05abort and USER06 unreserved abort/unknown usage remain separate.07 reported1,544,131 only; combinedfloor8,566,655 and2unknowns, canonical unknown guard stillHELD.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi05-memory-review-execution"
+          ]
+        },
+        {
+          "id": "bounded-scope-and-no-replay",
+          "status": "pass",
+          "message": "Source Verification only; no Memory data/query/native adoption, merge/activation/shared/formal/parent05/wholeAcceptance. Completed and uncertain actual turns fenced against replay.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi05-memory-review-execution"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-REVIEW-ACTUAL-RESULT.json",
+          "sha256": "22004fb99223b5a428707be736e7b34f412f92832886838accc2cd0dc7c51823"
+        }
+      ],
+      "runtime": {
+        "name": "native-codex-actual-source-review/root-observed",
+        "version": "0.163.0"
+      },
+      "details": {
+        "sourceVerificationOnly": true,
+        "sourceMerged": false,
+        "nativeActivated": false,
+        "genuineMemoryOwnerReviewed": false,
+        "actualMemoryQuery": false,
+        "nativeMemoryUse": false,
+        "sharedWorkAuditDelivered": false,
+        "parent05Complete": false,
+        "sourceImplementationTaskComplete": false,
+        "Acceptance": false,
+        "monolithicTypedContext": "HELD REQUIRED_CONTEXT_OUTPUT_LIMIT"
+      }
+    }
+  }
+}

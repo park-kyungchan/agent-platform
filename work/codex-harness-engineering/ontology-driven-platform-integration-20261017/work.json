@@ -54,7 +54,8 @@
     "ODI-02-CONSUMED-SOURCE-DELIVERY",
     "ODI-03-CONSUMED-NATIVE-QUALIFICATION",
     "ODI-04-CONSUMED-NATIVE-PRODUCER",
-    "codex-harness-engineering:effect-fence:04r-consumed"
+    "codex-harness-engineering:effect-fence:04r-consumed",
+    "ODI-05-MEMORY-REVIEW-CONSUMED-REVIEW"
   ],
   "continuity": {
     "schema": "common.git-work-continuity.v1",
@@ -89,6 +90,11 @@
       {
         "kind": "snapshot",
         "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/codex-harness-engineering%3Ainput%3A04r-result.json",
+        "fragment": "#/content/effectCustody"
+      },
+      {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-REVIEW-ACTUAL-RESULT.json",
         "fragment": "#/content/effectCustody"
       }
     ]

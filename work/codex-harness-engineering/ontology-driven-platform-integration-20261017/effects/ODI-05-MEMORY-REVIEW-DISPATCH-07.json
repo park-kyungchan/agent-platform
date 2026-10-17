@@ -1,0 +1,18 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "effect",
+  "id": "ODI-05-MEMORY-REVIEW-DISPATCH-07",
+  "taskId": "ODI-05-MEMORY-REVIEW",
+  "status": "completed",
+  "occurrence": {
+    "runtimeId": "native-codex:01a14903-d56d-7d83-ab48-86549b09beb1",
+    "attemptId": "native-turn:01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+    "occurrenceId": "native-message:msg_06199e314161c8b4016ad349300d308191a704808938fd5d0c"
+  },
+  "evidenceIds": [
+    "codex-harness-engineering:evidence:odi05-memory-review-execution"
+  ]
+}

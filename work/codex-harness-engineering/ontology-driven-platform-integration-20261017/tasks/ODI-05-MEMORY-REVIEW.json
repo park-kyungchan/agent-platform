@@ -17,13 +17,13 @@
     "taskId": "ODI-05-MEMORY-REVIEW"
   },
   "title": "Independently review the final common and CodexOwner Memory source successors",
-  "nextAction": "Read inputs/ODI-05-MEMORY-REVIEW-SOURCE-SUCCESSOR02.json BEFORE the retained C09 review contract: review exact common67c786775011f46732ffebaa78fd2dd3c93eb965/treefbcfd729a32c18dea124fbc533663cbdebe7050e and owner ee9b9f756fa533226b92426a1e8fefa9c277c205/tree24c6c6774444c71cdc92f31258dfcfb92f53982c, complete18path union and observed67source output repair. Root rebinds actual C10 manual capture/guard/dependency checks, then separately positive-admits one native review and observes consumption/result/usage. Source QA/internal review is not native use, authorship, implementation/parent completion or Acceptance.",
+  "nextAction": "Actual native07 paired exact-source review PASS0 recorded locally, historical04HOLD/05/USER06aborts and unknowns preserved; NEVER replay completed/uncertain native turns. Shared/formal audit pending. Root separately publishes exact paired source review, explicitly merges/activates owners, then genuine Memory adoption under fresh H0. Parent05/source implementation Task and whole Goal remain open.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "native-effect",
   "runtimeId": "native-codex:01a14903-d56d-7d83-ab48-86549b09beb1",
@@ -32,7 +32,7 @@
       "taskId": "ODI-04-R",
       "milestone": "execution-and-verification",
       "receiptEvidenceId": "ODI-04-R-PREREQUISITE-MEMORY-REVIEW",
-      "receiverEvidenceId": "ODI-05-MEMORY-REVIEW-RECEIVER"
+      "receiverEvidenceId": "codex-harness-engineering:evidence:odi05-memory-review-receiver"
     }
   ],
   "decisionIds": [
@@ -42,6 +42,16 @@
     "ODI-DECISION-USEFUL-NATIVE-FLOW",
     "ODI-DECISION-FRESH-EVALUATION"
   ],
-  "effectIds": [],
-  "verificationEvidenceIds": []
+  "effectIds": [
+    "ODI-05-MEMORY-REVIEW-DISPATCH-07"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:odi05-memory-review"
+  ],
+  "occurrence": {
+    "runtimeId": "native-codex:01a14903-d56d-7d83-ab48-86549b09beb1",
+    "attemptId": "native-turn:01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+    "occurrenceId": "native-message:msg_06199e314161c8b4016ad349300d308191a704808938fd5d0c"
+  },
+  "executionEvidenceId": "codex-harness-engineering:evidence:odi05-memory-review-execution"
 }
