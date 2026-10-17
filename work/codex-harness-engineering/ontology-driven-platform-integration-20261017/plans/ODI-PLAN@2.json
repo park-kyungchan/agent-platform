@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "plan",
+  "id": "ODI-PLAN",
+  "revision": 2,
+  "specId": "ODI-SPEC",
+  "specRevision": 1,
+  "objective": "Deliver the approved whole Ontology outcome through one maintained common harness and actual native/domain consumers; align source topology and execution priority with current user direction.",
+  "clauses": [
+    "First bind and independently review actual common-harness topology authority and minimum owner-consumer graph. Six Hermes-prefix repos are not six native profiles. Retain Spec1/Plan1 and all historical Task tuples/effects; no retagging.",
+    "Finish requested long-work skill review/checks/publication/explicit merge/global readback; measure CI bottlenecks in parallel. Neither repeated refinements nor CI redesign becomes a universal runtime or migration prerequisite.",
+    "First source-maintenance reduction uses four historical contracts already canonical in operational-context; preserve originals and qualify exact relevant consumers/custody, without re-porting. Default mathCrew and clinic domain apps stay Education-owned. Source-only retirement needs its own oracle, not unrelated live usability.",
+    "In parallel complete real common-harness native caller/current Memory/IDs/recovery/shared-receiver gaps. Preserve consumed native04/A10/11 results; live consumer cutover requires actual equivalence and native owner activation. No fabricated generic profile layer or new runtime/client/credential bridge.",
+    "Propagate owner-aligned integration/split/naming/maintenance and measured CI through full estate beyond19; keep recoverable history/releases/data and thin pinned compatibility only for actual consumers. Domain actions start as their own prerequisites permit, without universal migration wait or month-end redo.",
+    "Verify whole integrated correctness/recovery/portability/comparable total-token decision cost and distinct engineering/operator/human-domain Acceptance. Root serializes Work/source pins/CAS, independent exact-head/tree review and authenticated status before PR, required checks, explicit expected-head merge and separate activation.",
+    "Evaluation remains separate from Goal/ordinary engineering. Preserve original suite start and prior reported/unknown/unreserved history/paid0; operational budget requires explicit current owner successor. Plan2 admits no call, clears no unknown or native fence, and replays no effect."
+  ]
+}
