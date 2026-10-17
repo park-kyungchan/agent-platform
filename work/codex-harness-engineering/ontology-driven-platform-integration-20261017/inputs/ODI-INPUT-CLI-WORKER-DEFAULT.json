@@ -1,0 +1,39 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-INPUT-CLI-WORKER-DEFAULT",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/evaluation-budget-token-successor-20000000/actual-user-cli-worker-default.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "spawn할 때 --dangerously-skip-approvals-and-sandbox 인가? 그 flag 항상 주면 되지않나?",
+    "question": "spawn할 때 --dangerously-skip-approvals-and-sandbox 인가? 그 flag 항상 주면 되지않나?",
+    "verbatim": true,
+    "selectionContextMeaning": "Same actual user utterance is a question/directive about the default flag; no separate assistant elicitation question or user answer is invented.",
+    "actualRootCapture": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/evaluation-budget-token-successor-20000000/actual-user-cli-worker-default.json",
+      "sha256": "1a263ddff55d88a96bd77c822fe7cab94aa5df3152c324befd9b1c3fd53b7ed9",
+      "bytes": 1219
+    },
+    "source": {
+      "kind": "actual-user-message-in-current-conversation",
+      "nativeMessageId": null,
+      "locator": "Current conversation user steering immediately after recovery05 sandbox/budget discussion, preceding user resume question and20MUIapproval. Direct text visible to accountable Root; native store event/authentication not independently captured."
+    },
+    "nativeMessageId": null,
+    "nativeAuthorshipAuthenticated": false,
+    "RootInterpretation": "User requests default sandbox/approval bypass flag for spawned Codex CLI workers. InstalledCodex0.163 --help spells supportedflag --dangerously-bypass-approvals-and-sandbox; the user literal misspelling remains preserved above. Apply at nativeCLIspawn/resume, preservemodel/effort/workscope. Internalspawn_agenthasnoCLIflag/inheritspermissions.",
+    "normalizedSupportedFlag": "--dangerously-bypass-approvals-and-sandbox",
+    "literalUserFlagTypoPreserved": "--dangerously-skip-approvals-and-sandbox",
+    "normalizationBasis": "Root capture reports actual installedCodex0.163 help; helper did not launch nativeCLI/help or authenticate the message.",
+    "applicationScope": "Native Codex CLI spawn/resume only; preserve actual model/effort/current Work effect scope. Internal spawn_agent has no CLI flag and inherits native permissions.",
+    "alreadyAppliedObservation": "Same savedSID01a14903 resumedownedp9 withsupportedflag/--no-daemon/gpt6.1solultra;actual/statusFullAccess. No persistedglobalconfig/trust/cache/service mutation.",
+    "GoalReplacement": false
+  }
+}

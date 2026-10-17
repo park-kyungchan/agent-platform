@@ -5,7 +5,7 @@
   "workId": "ontology-driven-platform-integration-20261017",
   "kind": "decision",
   "id": "ODI-DECISION-FRESH-EVALUATION",
-  "status": "accepted",
+  "status": "superseded",
   "answer": "토큰 10배 늘리고 시간도 4배 늘려라",
   "meaning": "Increase only the freshly admitted evaluation envelope from16requests/500000tokens/2hours to16requests/5000000native-reported-total-tokens/8hours. Additional paid cost0; no Goal token_budget or ordinary engineering cap inferred; closed old suites stay closed.",
   "answerSource": {

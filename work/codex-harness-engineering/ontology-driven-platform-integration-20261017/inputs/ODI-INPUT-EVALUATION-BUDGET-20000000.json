@@ -1,0 +1,55 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-INPUT-EVALUATION-BUDGET-20000000",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/evaluation-budget-token-successor-20000000/actual-user-approval.json#/source/questionItemId",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "누적 2,000만 토큰으로 상향",
+    "question": "[최종 실행계약]의 별도 native 평가 한도는 500만 토큰입니다. 현재 확인된 누계는 최소 659만이며, 방금 사용자 재개분은 별도 정산 중입니다. 추가 결제 0·최대 16회·원래 12:55:31 UTC 마감을 유지하면서 토큰 한도를 어떻게 조정할까요? 전체 개발 Goal은 계속 유지합니다.",
+    "verbatim": true,
+    "questionItemId": "[\"request_user_input_async\",\"call_d0cae00670004d67ac216f6597e05c40\",0]",
+    "questionSourceKind": "actual-user-question-ui-reply",
+    "actualRootCapture": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/evaluation-budget-token-successor-20000000/actual-user-approval.json",
+      "sha256": "f873ac4074b513d9bcbebab34c2cec00e2ba881b5019d5db4a58ee1ae7c8aae4",
+      "bytes": 1546
+    },
+    "nativeMessageId": null,
+    "nativeAuthorshipAuthenticated": false,
+    "previousPolicy": {
+      "maxRuns": 16,
+      "maxAggregateTokens": 5000000,
+      "maxDurationSeconds": 28800,
+      "includesChildRuns": true
+    },
+    "nextPolicy": {
+      "maxRuns": 16,
+      "maxAggregateTokens": 20000000,
+      "maxDurationSeconds": 28800,
+      "includesChildRuns": true
+    },
+    "sameSuiteId": "ODI-EVAL-20261017-FIRSTUSE",
+    "originalStartedAtUtc": "2026-10-17T04:55:31.863Z",
+    "originalDeadlineAtUtc": "2026-10-17T12:55:31.863Z",
+    "additionalPayment": 0,
+    "narrowCurrentOverride": "Only maxAggregateTokens changes5M→20M; retain original Plan1 fresh-evaluation clause as historical text. Current accepted successor is the explicit token-cap override; runs/time/paid0/children unchanged.",
+    "accountingLimit": "Explicit future cap successor only; preserve all priorusage/admissions/interruptions and actual5Moverrun beforeapproval. No Goalbudget/replacement or newnativeprompt fromthisrecord. Userresume06 beforethisapproval remainsobserved-unreserved, notretroactivelypreauthorized.",
+    "policyActivation": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/evaluation-budget-token-successor-20000000/policy-activation-receipt.json",
+      "sha256": "f8bdbe9d886c307815e7a1f2f2d2693a701c88a65e7515705740b85ec716fb09",
+      "bytes": 583
+    },
+    "alreadyActivatedPolicySha256": "bba11f6def5ef3c51eed0c9cb6f0dde9aed018a90d8d8c28b9882418c633a536",
+    "previousPolicySha256": "1269319fde515cb99c94eee1520a7e27a3236d14284da066f7c493703f36362f",
+    "modelDispatchByThisRecord": false,
+    "GoalReplacement": false
+  }
+}
