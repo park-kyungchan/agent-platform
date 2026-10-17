@@ -50,7 +50,8 @@
   "historicalFenceIds": [
     "ODI-PREDECESSOR-EFFECTS",
     "ODI-02-CONSUMED-SOURCE-DELIVERY",
-    "ODI-03-CONSUMED-NATIVE-QUALIFICATION"
+    "ODI-03-CONSUMED-NATIVE-QUALIFICATION",
+    "ODI-04-CONSUMED-NATIVE-PRODUCER"
   ],
   "continuity": {
     "schema": "common.git-work-continuity.v1",
@@ -75,6 +76,11 @@
       {
         "kind": "snapshot",
         "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-NATIVE-RESULT.json",
+        "fragment": "#/content/effectCustody"
+      },
+      {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-04-NATIVE-RESULT.json",
         "fragment": "#/content/effectCustody"
       }
     ]

@@ -1,0 +1,254 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-04-NATIVE-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-hermes",
+    "kind": "source-owner-capture",
+    "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_130701_1c9d3d/messages/46,106"
+  },
+  "content": {
+    "schema": "odi.native04.actual-result-custody.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-04"
+    },
+    "occurrence": {
+      "runtimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+      "attemptId": "native-message:46",
+      "occurrenceId": "native-message:106"
+    },
+    "native": {
+      "runtime": "native-hermes",
+      "profileId": "odi-platform",
+      "sessionId": "20261017_130701_1c9d3d",
+      "agentId": null,
+      "nativeProjectId": null,
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    "observedAtUtc": "2026-10-17T07:09:40.802Z",
+    "occurrenceMeaning": "attemptId and occurrenceId are actual observed SQLite native message row46 and row106 addresses within owned stored session. They are NOT native Task/Run IDs; raw pre_llm payload unobserved.",
+    "sourceDataCommit": "3526c031fc0aa850349ab42d3987aa4c05d636a4",
+    "producerCodeBase": "a91ef0564997a3a3736564f35a2e8354ae47e47b",
+    "actualContext": {
+      "rowId": 46,
+      "promptSha256": "615ddd07834f501a3879ba5fd962d5bced01aa6ea06d32e0057d1aaf318bc9ac",
+      "apiContentSha256": "e499aaf13fc427c2412531b9adcf9d9c779570ea652976679da22172fb891f61",
+      "contextSha256": "d8030a4bced4b4a84b0fe485cd3e23aea53e5bb0b8a6638836a78e08b69ce567",
+      "chars": 11175,
+      "schema": "hermes.current-git-work-context.v2",
+      "status": "source-qualified",
+      "snapshotCommit": "3526c031fc0aa850349ab42d3987aa4c05d636a4",
+      "logicalTaskId": "ODI-04",
+      "nativeTupleInContext": {
+        "runtime": "native-hermes",
+        "profileId": "odi-platform",
+        "sessionId": "20261017_130701_1c9d3d",
+        "agentId": null,
+        "nativeProjectId": null,
+        "nativeTaskId": "20261017_130701_1c9d3d",
+        "nativeRunId": null
+      }
+    },
+    "actualResult": {
+      "rowId": 106,
+      "finishReason": "stop",
+      "contentSha256": "d413bc7c5be3cf93e40c63d7b893b92134bc29a23196f5a40ab35953054bded0",
+      "chars": 2279,
+      "nativeLocator": "/opt/data/profiles/odi-platform/state.db#session/20261017_130701_1c9d3d/messages/46,106",
+      "summary": "Native Hermes delivered docs CLI observations envelope, meaningful CLI-boundary tests and documented example in exactly three source files. Native local67tests/1979assertions and diffcheck were reported; Root exact harvested artifact/mechanical checks now qualified separately."
+    },
+    "artifact": {
+      "nativePatch": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-artifact/producer.patch",
+        "sha256": "dbb1b6e42df1441bfbbe6c27eb4cffb2c8da00d746914be5ae3307e934256bfc",
+        "bytes": 20755
+      },
+      "checkedFiles": [
+        {
+          "relativePath": "scripts/harness.ts",
+          "path": "/home/palantirkc/code/worktrees/odi04-runtime-docs-cli-20261017/scripts/harness.ts",
+          "sha256": "3881bdf85d78de8fcd307e00da719f912d88bb76928627865519edc69fe3585a",
+          "nativeSha256": "3881bdf85d78de8fcd307e00da719f912d88bb76928627865519edc69fe3585a"
+        },
+        {
+          "relativePath": "packages/work-continuity/src/runtime-docs/runtime-docs.test.ts",
+          "path": "/home/palantirkc/code/worktrees/odi04-runtime-docs-cli-20261017/packages/work-continuity/src/runtime-docs/runtime-docs.test.ts",
+          "sha256": "86426c1b5b8dd3d931a465b05cc93a0cf229b3613620086f62a4c576db8a2fbd",
+          "nativeSha256": "cf389687d84826565a436b65c2e9aa8ffcc2085288137833995b50a19de73bde"
+        },
+        {
+          "relativePath": "docs/runtime-documentation-routing.md",
+          "path": "/home/palantirkc/code/worktrees/odi04-runtime-docs-cli-20261017/docs/runtime-documentation-routing.md",
+          "sha256": "440302d9d17645679acd0f56079ad1f57d6ea22d4d4d029fe4e3463bd47ab10c",
+          "nativeSha256": "440302d9d17645679acd0f56079ad1f57d6ea22d4d4d029fe4e3463bd47ab10c"
+        }
+      ],
+      "successorLineage": {
+        "kind": "root-mechanical-fix",
+        "receipt": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-artifact/checked-successor-lineage.json",
+          "sha256": "7e2b18917d5fc34f4e9289fec695334f81a21a79fe6b60d1ea1c0a75a29b071d",
+          "bytes": 1384
+        }
+      },
+      "rootMechanicalChecks": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-artifact/root-mechanical-checks.json",
+        "sha256": "5094ecb50c13c52e02e15f543c042d1104a2b03e8e9ed5cc59cc202661eeef1a",
+        "bytes": 4465
+      },
+      "independent04Review": false,
+      "sourceActivatedByThisRecord": false
+    },
+    "usage": {
+      "evaluationRunId": "ODI-EVAL-20261017-HERMES-PRODUCER-02",
+      "status": "completed",
+      "usageState": "reported",
+      "reportedCombinedTokens": 2307582,
+      "mainTokens": 2304893,
+      "mainApiCalls": 19,
+      "auxiliaryTokens": 2689,
+      "auxiliaryApiCalls": 5,
+      "inputTokens": 83764,
+      "outputTokens": 18890,
+      "cacheReadTokens": 2204928,
+      "cacheWriteTokens": 0,
+      "inputAccounting": "excludes-cache",
+      "reasoningSubsetNotAdded": 7452,
+      "titleGenerationDelta": 0,
+      "nativeBillingMode": "subscription_included",
+      "nullableAuxiliaryBillingMetadataRetained": true,
+      "incrementalPaidCost": 0,
+      "qualification": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-actual-readback/root-settled-usage.json",
+        "sha256": "b1b3f4544eccc5942fbfbbb4b63718c8797b90b888cee05fa1d94b9ce19761f7",
+        "bytes": 2423
+      },
+      "reconciliation": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-actual-readback/reconciliation-receipt.json",
+        "sha256": "1c0bb3d5c6572e29e09c878803a596887b96a72cb7e7426dc646b2de26107a20",
+        "bytes": 1344
+      },
+      "canonicalBudgetSummary": {
+        "admittedRuns": 2,
+        "completedRuns": 2,
+        "erroredRuns": 0,
+        "unknownUsageRuns": 0,
+        "aggregateTokens": 2682199,
+        "reservedTokens": 0,
+        "accountedTokens": 2682199,
+        "elapsedSeconds": 7514.863,
+        "deadlineAtUtc": "2026-10-17T12:55:31.863Z",
+        "remainingRuns": 14,
+        "remainingTokens": 2317801,
+        "admissionBlockedReasons": [],
+        "overrun": {
+          "runs": false,
+          "tokens": false,
+          "duration": false
+        }
+      },
+      "noSuiteRenewal": true
+    },
+    "effectCustody": {
+      "completedEffectIds": [
+        "native-C03-data-import:fd544b9e-a6e3-4b16-9fd3-6941a21d6e68",
+        "native-producer-M-setup:b2a61e3f-5ebd-44e2-92e5-32cc2350a039",
+        "native-C04-data-import:d4007136-2383-442c-98dc-b7e240686060",
+        "native-C04-bound-cas:d4007136-2383-442c-98dc-b7e240686060:current-work-bindings.json",
+        "native-C04-bound-cas:d4007136-2383-442c-98dc-b7e240686060:current-work-native-hook.js",
+        "native-one-time-approval:ODI-PRODUCER-04-20261017-3526c031",
+        "ODI-04-PRODUCER-DISPATCH:native-message:46"
+      ],
+      "uncertainEffectIds": [],
+      "meaning": "Consumed setup/one-time approval/model-loop effect custody; preserve failed source-read/import custody and all historical completed/uncertain fences. No retry/replay/reset implied."
+    },
+    "receipts": {
+      "actualReadback": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-actual-readback/actual-readback-2.json",
+        "sha256": "42f984f12f1811e1a932ce19eee26dbbbd69a71629efcb7868607f0d729a95c8",
+        "bytes": 11778
+      },
+      "finalResult": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-actual-readback/actual-final-result.txt",
+        "sha256": "d413bc7c5be3cf93e40c63d7b893b92134bc29a23196f5a40ab35953054bded0",
+        "bytes": 3024
+      },
+      "rootMechanicalChecks": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-artifact/root-mechanical-checks.json",
+        "sha256": "5094ecb50c13c52e02e15f543c042d1104a2b03e8e9ed5cc59cc202661eeef1a",
+        "bytes": 4465
+      },
+      "settledUsage": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-actual-readback/root-settled-usage.json",
+        "sha256": "b1b3f4544eccc5942fbfbbb4b63718c8797b90b888cee05fa1d94b9ce19761f7",
+        "bytes": 2423
+      },
+      "admission": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-prompt/actual-evaluation-admission.json",
+        "sha256": "5bc50831b9035f98ba746d807368385758cde531f7f0a01c45d051cc1f29d33f",
+        "bytes": 1110
+      },
+      "ownerActivation": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-prompt/explicit-owner-activation.json",
+        "sha256": "368d2e47041336398f5d2b8b641611b65bef2f1b35d2e4700da03d36d098044a",
+        "bytes": 1503
+      },
+      "dispatch": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-prompt/dispatch-journal.jsonl",
+        "sha256": "30f9cc583c0cafd27671082df1f3871086d2dced6a0bd2952a51d107c411c70c",
+        "bytes": 896
+      },
+      "baseline": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-prompt/native-baseline-before-04.json",
+        "sha256": "223d8ae971564699553671227e2e263990567de3866c5ad11bb5397c577ca48b",
+        "bytes": 3141
+      },
+      "oneTimeApproval": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-prompt/native-one-time-approval-decision.json",
+        "sha256": "9c263f68a76fb31e5622841ddad16cedc86e2051d11a48ba38496df257b7fecf",
+        "bytes": 814
+      },
+      "C03Import": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-data-and-producer-recipe/execution-fd544b9e-a6e3-4b16-9fd3-6941a21d6e68/actual-call.json",
+        "sha256": "066253fa54e747609b8380c74a02327b815fa852b64269d204d6e221083b01a7",
+        "bytes": 1260
+      },
+      "C03SourceReceipt": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-data-and-producer-recipe/c03-readonly-completion/execution-0f9eac71-9498-49da-b449-126a5aa1b3a4/returned-read-receipt.json",
+        "sha256": "814442e6b7cde44d821f8391bd87ab5517e817a35923f0f5679eabc587f5b0c1",
+        "bytes": 15780
+      },
+      "producerSetup": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-producer-source-proposal/execution-b2a61e3f-5ebd-44e2-92e5-32cc2350a039/receipt.json",
+        "sha256": "f10bbbb47884676f0adc9d52c523b22bab520bc7f91cb6bcb8affd6780a51660",
+        "bytes": 1100
+      },
+      "C04SourceBinding": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-c04-native-binding-proposal/generated-3526c031fc0aa850349ab42d3987aa4c05d636a4/execution-d4007136-2383-442c-98dc-b7e240686060/receipt.json",
+        "sha256": "60612f20a37b4523f2156df99b86f64d0d9bb95e2e518974295741061c28cc50",
+        "bytes": 2319
+      }
+    },
+    "limits": [
+      "Only useful04 execution, bounded mechanical verification and local result durability completed.",
+      "04-R independent native Codex review, shared publication/runtime adoption,05/private repository/domain outcomes/formal completion/Acceptance remain pending.",
+      "Native own loops/tools/profiles/credentials retained; Git and source evidence do not authenticate authorship or grant permission."
+    ],
+    "authority": "none",
+    "nativePermissionGranted": false,
+    "semanticAcceptanceEstablished": false
+  }
+}

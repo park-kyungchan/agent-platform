@@ -17,13 +17,13 @@
     "taskId": "ODI-04"
   },
   "title": "Execute and deliver the first useful native Hermes result",
-  "nextAction": "Read inputs/ODI-04-CONCRETE-SCOPE.json: implement docs CLI flat or {request,observations} transport at producer sourceM using canonical select. Actual C03 receiver is recorded; still require reviewed current C04 delivery/binding/oracle, native owner activation and fresh evaluation reservation before dispatch. Return exact three-file patch and mechanical checks to Lead;04-R independent review and05/full Goal remain. Do not replay03 or manufacture native Task/Run IDs.",
+  "nextAction": "04 local passed; see inputs/ODI-04-NATIVE-RESULT.json. Next04-R; no replay.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "native-effect",
   "dependsOn": [
@@ -41,7 +41,18 @@
     "ODI-DECISION-USEFUL-NATIVE-FLOW",
     "ODI-DECISION-FRESH-EVALUATION"
   ],
-  "effectIds": [],
-  "verificationEvidenceIds": [],
-  "runtimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d"
+  "effectIds": [
+    "ODI-04-PRODUCER-DISPATCH:native-message:46"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:04"
+  ],
+  "runtimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+  "occurrence": {
+    "runtimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+    "attemptId": "native-message:46",
+    "occurrenceId": "native-message:106"
+  },
+  "executionEvidenceId": "ODI-04-NATIVE-EXECUTION",
+  "pendingEffectIds": []
 }
