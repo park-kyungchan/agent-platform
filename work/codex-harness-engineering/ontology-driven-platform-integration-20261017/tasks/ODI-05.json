@@ -29,11 +29,15 @@
   "dependsOn": [
     {
       "taskId": "ODI-04",
-      "milestone": "execution-and-verification"
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-PREREQUISITE-C05",
+      "receiverEvidenceId": "ODI-05-ROOT-RECEIVER-C05"
     },
     {
       "taskId": "ODI-04-R",
-      "milestone": "execution-and-verification"
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-R-PREREQUISITE-C07",
+      "receiverEvidenceId": "ODI-05-MEMORY-ROOT-RECEIVER-C07"
     }
   ],
   "decisionIds": [
@@ -44,5 +48,6 @@
     "ODI-DECISION-FRESH-EVALUATION"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [],
+  "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91"
 }
