@@ -1,3 +1,27 @@
+import { isDeepStrictEqual } from "node:util";
+import {
+  openGitWork,
+  resolveGitWorkSelection,
+  gitRecordPath,
+  verifiedOriginalBytes,
+} from "../git-work/source.ts";
+import {
+  assertRecord,
+  recordKey,
+  recordDependencies,
+  effectInventory,
+  validateRecordSources,
+  validateRecordSet,
+  dependencyFindings,
+} from "../git-work/records.ts";
+import type {
+  GitWorkReader,
+  GitWorkRecord,
+  RecordReference,
+  ResolvedSource,
+  SourceReference,
+  ExternalGitSource,
+} from "../git-work/types.ts";
 import { constants } from "node:fs";
 import { open, realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve } from "node:path";
@@ -5,6 +29,7 @@ import { sha256 } from "../context/source";
 import { lexicalRecall, type LexicalRecallResult } from "./lexical-recall";
 import {
   qualifySourceClosure,
+  qualifyMemory,
   sourceKey,
   type AuthoritativeClaim,
   type AuthoritativeClaimReceipt,
@@ -617,4 +642,722 @@ export async function readLocalRecallRequest(
     if (error instanceof Error && error.message.startsWith("Invalid local Recall ")) throw error;
     throw Error("Local Recall request is unavailable or invalid");
   }
+}
+
+// Git Work binding. Code selection remains the native owner's fixed provider;
+// these addresses select data only. All review inputs remain conditional owner declarations.
+interface GitMemoryDescriptor {
+  topicId: string;
+  generationId: string;
+  taskId: string;
+  receiptTaskIds: string[];
+  claims: Array<{ key: string; record: RecordReference }>;
+  inputIds: { request: string; dataset: string; policy: string };
+  query: string;
+  claimKey: string;
+  limit?: number;
+  maxChars?: number;
+  policy: PolicyFile;
+}
+interface GitSourceBinding {
+  source: PortableSource;
+  origin: ExternalGitSource;
+  blobOid: string;
+  declarations: SourceReference[];
+}
+function gitDescriptor(value: unknown, reader: GitWorkReader): GitMemoryDescriptor {
+  const row = object(
+    value,
+    [
+      "topicId",
+      "generationId",
+      "taskId",
+      "receiptTaskIds",
+      "claims",
+      "inputIds",
+      "query",
+      "claimKey",
+      "policy",
+      "limit",
+      "maxChars",
+    ],
+    "Git descriptor",
+  );
+  const ids = object(row.inputIds, ["request", "dataset", "policy"], "Git Input identities");
+  for (const [key, minimum, maximum] of [
+    ["limit", 1, 20],
+    ["maxChars", 1024, 16000],
+  ] as const)
+    if (
+      row[key] !== undefined &&
+      (!Number.isSafeInteger(row[key]) || Number(row[key]) < minimum || Number(row[key]) > maximum)
+    )
+      invalid("Git Recall budget");
+  const result: GitMemoryDescriptor = {
+    topicId: text(row.topicId, "topic"),
+    generationId: text(row.generationId, "generation"),
+    taskId: text(row.taskId, "selected Task"),
+    receiptTaskIds: strings(row.receiptTaskIds, "receipt Tasks"),
+    claims: array(row.claims, "selected claims").map((value) => {
+      const item = object(value, ["key", "record"], "selected claim");
+      const ref = object(item.record, ["kind", "id", "revision"], "claim record");
+      const reference = { ...ref } as unknown as RecordReference;
+      gitRecordPath(reader.selection.projectId, reader.selection.workId, reference);
+      if (!["decision", "spec"].includes(reference.kind)) invalid("claim record class");
+      return { key: text(item.key, "claim key"), record: reference };
+    }),
+    inputIds: {
+      request: text(ids.request, "request Input"),
+      dataset: text(ids.dataset, "dataset Input"),
+      policy: text(ids.policy, "policy Input"),
+    },
+    query: text(row.query, "query", 500),
+    claimKey: text(row.claimKey, "claim key"),
+    ...(row.limit === undefined ? {} : { limit: Number(row.limit) }),
+    ...(row.maxChars === undefined ? {} : { maxChars: Number(row.maxChars) }),
+    policy: policy(row.policy, reader.selection.projectId, reader.selection.workId),
+  };
+  if (
+    !result.claims.length ||
+    !result.receiptTaskIds.length ||
+    result.policy.activeGenerationId !== result.generationId ||
+    result.policy.policy.commonAdmissions.length ||
+    new Set(Object.values(result.inputIds)).size !== 3
+  )
+    invalid("Git descriptor closure");
+  identities(result.claims, (row) => row.key);
+  identities(result.receiptTaskIds, (row) => row);
+  if (!result.claims.some((row) => row.key === result.claimKey)) invalid("selected claim key");
+  return result;
+}
+function same(value: unknown, other: unknown): boolean {
+  return isDeepStrictEqual(value, other);
+}
+function originalAddress(source: ResolvedSource): ExternalGitSource {
+  return {
+    kind: "git",
+    repositoryId: source.repositoryId,
+    commit: source.commit,
+    path: source.path,
+    sha256: source.sha256,
+    fragment: source.reference.fragment ?? "#",
+  };
+}
+function portableOriginal(source: ResolvedSource): PortableSource {
+  verifiedOriginalBytes(source);
+  return portable({
+    repositoryId: source.repositoryId,
+    revision: `git:${source.commit}`,
+    relativePath: source.path,
+    sha256: source.sha256,
+    byteLength: source.byteLength,
+  });
+}
+function withinWork(source: ResolvedSource, reader: GitWorkReader): void {
+  verifiedOriginalBytes(source);
+  if (
+    source.repositoryId !== reader.selection.repositoryId ||
+    (source.reference.kind === "snapshot" && source.commit !== reader.commit) ||
+    !source.path.startsWith(reader.workPath + "/")
+  )
+    invalid("Git original scope");
+  const record = assertRecord(source.document);
+  if (
+    record.projectId !== reader.selection.projectId ||
+    record.workId !== reader.selection.workId ||
+    record.domainId !== reader.work.domainId
+  )
+    invalid("Git original record scope");
+}
+function reviewBinding(value: {
+  descriptor: GitMemoryDescriptor;
+  episodes: Episode[];
+  memories: DerivedMemory[];
+  authoritativeClaims: AuthoritativeClaim[];
+  sourceBindings: GitSourceBinding[];
+  originalsCommit: string;
+}): string {
+  return sha256(JSON.stringify(value));
+}
+async function gitReview(reader: GitWorkReader, ref: SourceReference | undefined, binding: string) {
+  if (!ref)
+    return {
+      receipts: [] as DerivationReceipt[],
+      authoritativeReceipts: [] as AuthoritativeClaimReceipt[],
+      owner: null as string | null,
+    };
+  const resolved = await reader.readSource(ref);
+  withinWork(resolved, reader);
+  const input = assertRecord(resolved.document);
+  const row = object(
+    resolved.value,
+    ["schema", "ownerId", "bindingSha256", "status", "receipts", "authoritativeReceipts"],
+    "Git owner review",
+  );
+  if (
+    input.kind !== "input" ||
+    input.inputKind !== "source-owner-record" ||
+    row.schema !== "common.git-work-memory-owner-review.v1" ||
+    row.ownerId !== input.origin.ownerId ||
+    row.bindingSha256 !== binding ||
+    row.status !== "reviewed"
+  )
+    invalid("Git owner review binding");
+  const receipts = array(row.receipts, "review receipts").map(receipt);
+  const authoritativeReceipts = array(
+    row.authoritativeReceipts,
+    "review authoritative receipts",
+  ).map(authoritativeReceipt);
+  identities(receipts, (row) => row.memoryId);
+  identities(authoritativeReceipts, (row) => JSON.stringify([row.sourceKey, row.key]));
+  return { receipts, authoritativeReceipts, owner: text(row.ownerId, "review owner") };
+}
+/** Pure deterministic source projection, not LLM Reflect, owner attestation or a writer. */
+export async function prepareGitWorkMemoryArtifacts(
+  reader: GitWorkReader,
+  value: unknown,
+  ownerReview?: SourceReference,
+) {
+  if (reader.commit !== reader.selection.commit) invalid("Git reader selection binding");
+  const descriptor = gitDescriptor(value, reader);
+  if (Buffer.byteLength(JSON.stringify(descriptor)) > maxFileBytes)
+    invalid("Git descriptor byte budget");
+  if (!reader.work.continuity?.purposeSources.length) invalid("Git purpose originals missing");
+  const records = new Map<string, GitWorkRecord>();
+  const resolved: ResolvedSource[] = [];
+  // The wrapper captures every canonical validation read, including nested prerequisite receipts.
+  const capture: GitWorkReader = {
+    ...reader,
+    readSource: async (ref) => {
+      const result = await reader.readSource(ref);
+      withinWork(result, reader);
+      resolved.push(result);
+      return result;
+    },
+  };
+  const queue: RecordReference[] = [
+    { kind: "work", id: reader.selection.workId },
+    { kind: "task", id: descriptor.taskId },
+    ...descriptor.receiptTaskIds.map((id) => ({ kind: "task" as const, id })),
+    ...descriptor.claims.map((row) => row.record),
+  ];
+  let existingEffects: Set<string> | undefined;
+  const includeExistingEffects = async (ids: string[]) => {
+    if (!ids.length) return;
+    existingEffects ??= new Set(
+      (await reader.listRecords()).filter((row) => row.kind === "effect").map((row) => row.id),
+    );
+    for (const id of ids) if (existingEffects.has(id)) queue.push({ kind: "effect", id });
+  };
+  while (queue.length) {
+    const ref = queue.shift()!,
+      key = recordKey(ref);
+    if (records.has(key)) continue;
+    if (records.size >= maxItems) invalid("Git record budget");
+    const record = await reader.readRecord(ref);
+    const original = await capture.readSource({
+      kind: "snapshot",
+      path: gitRecordPath(reader.selection.projectId, reader.selection.workId, ref),
+    });
+    if (
+      !same(record, original.document) ||
+      (record.kind === "work" && !same(reader.work, original.document))
+    )
+      invalid("Git record proof binding");
+    records.set(key, record);
+    queue.push(...recordDependencies(record));
+    await validateRecordSources(record, capture);
+    if (record.kind === "task") await includeExistingEffects(record.pendingEffectIds ?? []);
+    if (record.kind === "work" && record.continuity)
+      for (const ref of record.continuity.effectInventorySources) {
+        const inventory = effectInventory((await capture.readSource(ref)).value);
+        await includeExistingEffects([
+          ...inventory.completedEffectIds,
+          ...inventory.uncertainEffectIds,
+        ]);
+      }
+  }
+  const validation = await validateRecordSet(records, capture);
+  if (!validation.valid) invalid("Git record/source closure");
+  const selected = records.get(recordKey({ kind: "task", id: descriptor.taskId }));
+  if (selected?.kind !== "task") invalid("Git selected Task");
+  for (const dependency of selected.dependsOn)
+    if ((await dependencyFindings(selected, dependency, records, capture)).length)
+      invalid("Git prerequisite closure");
+  for (const id of descriptor.receiptTaskIds) {
+    const task = records.get(recordKey({ kind: "task", id }));
+    if (
+      task?.kind !== "task" ||
+      (task.executionClass === "native-effect" && !task.executionEvidenceId) ||
+      !task.verificationEvidenceIds.length ||
+      task.state.execution !== "complete" ||
+      task.state.verification !== "passed"
+    )
+      invalid("Git receipt Task closure");
+    if (!selected.dependsOn.some((row) => row.taskId === id)) invalid("Git unrelated receipt Task");
+  }
+  const bindings = new Map<string, GitSourceBinding>();
+  const fragments = new Map<string, Set<string>>();
+  let total = 0;
+  for (const result of resolved) {
+    const source = portableOriginal(result),
+      key = sourceKey(source);
+    const declaration = result.declaredNativeSource ?? result.reference;
+    const fragment = JSON.stringify([key, result.reference.fragment ?? "#"]);
+    let binding = bindings.get(key);
+    if (!binding) {
+      total += source.byteLength;
+      if (total > maxOriginalBytes) invalid("aggregate original byte budget");
+      binding = {
+        source,
+        origin: originalAddress(result),
+        blobOid: result.blobOid,
+        declarations: [],
+      };
+      bindings.set(key, binding);
+      fragments.set(key, new Set());
+    }
+    if (!binding.declarations.some((row) => same(row, declaration)))
+      binding.declarations.push(structuredClone(declaration));
+    fragments.get(key)!.add(fragment);
+  }
+  const sourceBindings = [...bindings.values()].sort((a, b) =>
+    sourceKey(a.source) < sourceKey(b.source)
+      ? -1
+      : sourceKey(a.source) > sourceKey(b.source)
+        ? 1
+        : 0,
+  );
+  const episode: Episode = {
+    id: `git-episode:${sha256(JSON.stringify([descriptor.topicId, descriptor.generationId, sourceBindings]))}`,
+    provenance: "source-linked",
+    sources: sourceBindings.map((row) => ({
+      source: row.source,
+      fragmentIds: [...fragments.get(sourceKey(row.source))!].sort(),
+    })),
+  };
+  const authoritativeClaims: AuthoritativeClaim[] = descriptor.claims.map((row) => {
+    const record = records.get(recordKey(row.record))!;
+    if (record.kind === "decision" && !record.selectionContext)
+      invalid("Git Decision question original missing");
+    if (
+      record.kind === "decision" &&
+      (record.status !== "accepted" || !reader.work.governingDecisionIds.includes(record.id))
+    )
+      invalid("Git claim is not a current governing Decision");
+    if (
+      record.kind === "spec" &&
+      (record.id !== reader.work.spec.id || record.revision !== reader.work.spec.revision)
+    )
+      invalid("Git claim is not the bound Spec");
+    const path = gitRecordPath(reader.selection.projectId, reader.selection.workId, row.record);
+    const binding = sourceBindings.find(
+      (binding) => binding.origin.commit === reader.commit && binding.origin.path === path,
+    )!;
+    return authoritativeClaim({
+      key: row.key,
+      value:
+        record.kind === "decision" ? record.answer : record.kind === "spec" ? record.outcome : "",
+      recordClass: record.kind,
+      status: "adopted-current",
+      source: binding.source,
+    });
+  });
+  if (
+    2 * descriptor.claims.length + 2 * sourceBindings.length + 1 > maxItems ||
+    Buffer.byteLength(JSON.stringify(episode.sources.map((row) => sourceKey(row.source)))) *
+      descriptor.claims.length >
+      maxFileBytes
+  )
+    invalid("Git dataset item/lineage budget");
+  const memories = authoritativeClaims.map((row) =>
+    memory({
+      id: `git-memory:${sha256(JSON.stringify([descriptor.topicId, row.key, descriptor.generationId]))}`,
+      episodeId: episode.id,
+      generationId: descriptor.generationId,
+      policyRevision: descriptor.policy.policy.revision,
+      text: row.value,
+      contentHash: sha256(row.value),
+      sourceKeys: episode.sources.map((row) => sourceKey(row.source)),
+      scope: { kind: "repository", repositoryId: reader.selection.repositoryId },
+      claim: { key: row.key, value: row.value },
+    }),
+  );
+  const candidate = {
+    descriptor,
+    episodes: [episode],
+    memories,
+    authoritativeClaims,
+    sourceBindings,
+    originalsCommit: reader.commit,
+  };
+  const bindingSha256 = reviewBinding(candidate);
+  const review = await gitReview(reader, ownerReview, bindingSha256);
+  const dataset = {
+    schema: "common.git-work-memory-dataset.v1" as const,
+    projectId: reader.selection.projectId,
+    workId: reader.selection.workId,
+    repositoryId: reader.selection.repositoryId,
+    ...candidate,
+    receipts: review.receipts,
+    authoritativeReceipts: review.authoritativeReceipts,
+    ownerReview: ownerReview ? structuredClone(ownerReview) : null,
+    reviewBindingSha256: bindingSha256,
+  };
+  if (
+    Buffer.byteLength(JSON.stringify(dataset)) > maxFileBytes ||
+    dataset.receipts.length +
+      dataset.authoritativeReceipts.length +
+      2 * descriptor.claims.length +
+      2 * sourceBindings.length +
+      1 >
+      maxItems
+  )
+    invalid("Git dataset byte/item budget");
+  const pin = (id: string) => ({
+    kind: "snapshot" as const,
+    path: gitRecordPath(reader.selection.projectId, reader.selection.workId, { kind: "input", id }),
+    fragment: "#/content",
+  });
+  return {
+    request: {
+      schema: "common.git-work-memory-request.v1" as const,
+      projectId: reader.selection.projectId,
+      workId: reader.selection.workId,
+      repositoryId: reader.selection.repositoryId,
+      topicId: descriptor.topicId,
+      dataset: pin(descriptor.inputIds.dataset),
+      policy: pin(descriptor.inputIds.policy),
+      query: descriptor.query,
+      claimKey: descriptor.claimKey,
+      ...(descriptor.limit === undefined ? {} : { limit: descriptor.limit }),
+      ...(descriptor.maxChars === undefined ? {} : { maxChars: descriptor.maxChars }),
+    },
+    policy: descriptor.policy,
+    dataset,
+    diagnostics: {
+      kind: "deterministic-source-projection" as const,
+      reviewOwnerDeclared: review.owner,
+      reviewBindingSha256: bindingSha256,
+      requestPinsRequireOwnerPublication: true,
+      nativeAuthorshipAuthenticated: false,
+      nativePermissionGranted: false,
+      writesPerformed: false,
+    },
+  };
+}
+
+/** A literal branch address, never Git revision/reflog syntax accepted by rev-parse. */
+function literalOwningHead(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length <= 256 &&
+    value.startsWith("refs/heads/") &&
+    !/[\u0000-\u0020\u007f~^:?*\[\\]/.test(value) &&
+    !value.includes("..") &&
+    !value.includes("@{") &&
+    !value.includes("//") &&
+    value
+      .split("/")
+      .every(
+        (part) =>
+          part.length > 0 &&
+          !part.startsWith(".") &&
+          !part.endsWith(".") &&
+          !part.endsWith(".lock"),
+      )
+  );
+}
+
+/** Observe a mutable owning local ref; an immutable reader alone cannot establish currentness. */
+export async function readGitWorkMemoryRequest(
+  reader: GitWorkReader,
+  requestRef: SourceReference,
+  ownerSelection: {
+    owningRef: string;
+    admittedCommit: string;
+    policyRevision: string;
+    activeGenerationId: string;
+    state: "current" | "unknown" | "publishing";
+  },
+) {
+  if (reader.commit !== reader.selection.commit) invalid("Git reader selection binding");
+  object(
+    ownerSelection,
+    ["owningRef", "admittedCommit", "policyRevision", "activeGenerationId", "state"],
+    "Git owner selection",
+  );
+  const witness = structuredClone(ownerSelection);
+  if (
+    witness.state !== "current" ||
+    !literalOwningHead(witness.owningRef) ||
+    witness.admittedCommit !== reader.commit
+  )
+    invalid("Git current owner selection");
+  const observeHead = async () => {
+    const actual = await resolveGitWorkSelection({
+      ...reader.selection,
+      commit: witness.owningRef,
+    });
+    if (actual.commit !== witness.admittedCommit) invalid("Git owning head advanced");
+    return actual;
+  };
+  await observeHead();
+  const fresh = await openGitWork(reader.selection);
+  const triple: ResolvedSource[] = [];
+  const readInput = async (ref: SourceReference) => {
+    object(ref, ["kind", "path", "sha256", "fragment"], "Git Input pin");
+    if (ref.kind !== "snapshot" || !ref.sha256 || ref.fragment !== "#/content")
+      invalid("Git full Input pin");
+    digest(ref.sha256, "Git Input hash");
+    const result = await fresh.readSource(ref);
+    withinWork(result, fresh);
+    const record = assertRecord(result.document);
+    if (
+      record.kind !== "input" ||
+      record.inputKind !== "source-owner-record" ||
+      result.path !==
+        gitRecordPath(fresh.selection.projectId, fresh.selection.workId, {
+          kind: "input",
+          id: record.id,
+        })
+    )
+      invalid("Git Input class/path");
+    triple.push(result);
+    return result;
+  };
+  const requestSource = await readInput(requestRef);
+  const input = object(
+    requestSource.value,
+    [
+      "schema",
+      "projectId",
+      "workId",
+      "repositoryId",
+      "topicId",
+      "dataset",
+      "policy",
+      "query",
+      "claimKey",
+      "limit",
+      "maxChars",
+    ],
+    "Git request",
+  );
+  if (
+    input.schema !== "common.git-work-memory-request.v1" ||
+    input.projectId !== fresh.selection.projectId ||
+    input.workId !== fresh.selection.workId ||
+    input.repositoryId !== fresh.selection.repositoryId
+  )
+    invalid("Git request identity");
+  const dataSource = await readInput(input.dataset as SourceReference),
+    policySource = await readInput(input.policy as SourceReference);
+  const data = object(
+    dataSource.value,
+    [
+      "schema",
+      "projectId",
+      "workId",
+      "repositoryId",
+      "descriptor",
+      "episodes",
+      "memories",
+      "authoritativeClaims",
+      "sourceBindings",
+      "originalsCommit",
+      "receipts",
+      "authoritativeReceipts",
+      "ownerReview",
+      "reviewBindingSha256",
+    ],
+    "Git dataset",
+  );
+  if (
+    data.schema !== "common.git-work-memory-dataset.v1" ||
+    data.projectId !== input.projectId ||
+    data.workId !== input.workId ||
+    data.repositoryId !== input.repositoryId
+  )
+    invalid("Git dataset identity");
+  const current = policy(policySource.value, fresh.selection.projectId, fresh.selection.workId);
+  if (
+    current.policy.revision !== witness.policyRevision ||
+    current.activeGenerationId !== witness.activeGenerationId
+  )
+    invalid("Git policy/generation advanced");
+  const originals = await openGitWork({
+    ...fresh.selection,
+    commit: text(data.originalsCommit, "originals commit"),
+  });
+  const compiled = await prepareGitWorkMemoryArtifacts(
+    originals,
+    data.descriptor,
+    (data.ownerReview ?? undefined) as SourceReference | undefined,
+  );
+  if (
+    !same(compiled.dataset, data) ||
+    !same(compiled.policy, current) ||
+    input.topicId !== compiled.request.topicId ||
+    input.query !== compiled.request.query ||
+    input.claimKey !== compiled.request.claimKey ||
+    input.limit !== compiled.request.limit ||
+    input.maxChars !== compiled.request.maxChars
+  )
+    invalid("Git compiled source/review binding");
+  for (const [index, id] of [
+    compiled.dataset.descriptor.inputIds.request,
+    compiled.dataset.descriptor.inputIds.dataset,
+    compiled.dataset.descriptor.inputIds.policy,
+  ].entries())
+    if (
+      triple[index]!.path !==
+      gitRecordPath(fresh.selection.projectId, fresh.selection.workId, { kind: "input", id })
+    )
+      invalid("Git selected Input identities");
+  const observeOriginals = async (currentReader: GitWorkReader) => {
+    const observations: SourceObservation[] = [];
+    for (const binding of compiled.dataset.sourceBindings) {
+      const historical = await originals.readSource(binding.origin);
+      const present = await currentReader.readSource({
+        kind: "snapshot",
+        path: binding.origin.path,
+        fragment: binding.origin.fragment,
+      });
+      if (
+        historical.blobOid !== binding.blobOid ||
+        historical.sha256 !== present.sha256 ||
+        historical.blobOid !== present.blobOid
+      )
+        invalid("Git original is no longer current");
+      // Every native/receipt declaration remains part of the source binding, not native authentication.
+      for (const declaration of binding.declarations)
+        verifiedOriginalBytes(await originals.readSource(declaration));
+      observations.push({
+        repositoryId: binding.source.repositoryId,
+        revision: binding.source.revision,
+        relativePath: binding.source.relativePath,
+        status: current.policy.excludedSourceHashes.includes(binding.source.sha256)
+          ? "denied"
+          : "available",
+        bytes: verifiedOriginalBytes(historical),
+        canonicalPathVerified: true,
+        access: "original",
+      } as SourceObservation);
+    }
+    if (compiled.dataset.ownerReview) {
+      const oldReview = await originals.readSource(compiled.dataset.ownerReview);
+      const now = await currentReader.readSource({
+        kind: "snapshot",
+        path: oldReview.path,
+        fragment: oldReview.reference.fragment,
+      });
+      if (oldReview.sha256 !== now.sha256 || oldReview.blobOid !== now.blobOid)
+        invalid("Git owner review advanced");
+    }
+    return observations;
+  };
+  const observations = await observeOriginals(fresh),
+    grants = new Set([fresh.selection.repositoryId]);
+  const readableMemoryIds = new Set(
+    compiled.dataset.memories
+      .filter((memory) => {
+        const episode = compiled.dataset.episodes.find((row) => row.id === memory.episodeId)!;
+        return (
+          qualifySourceClosure(
+            episode.sources.map((row) => row.source),
+            observations,
+            grants,
+          ).status === "verified"
+        );
+      })
+      .map((row) => row.id),
+  );
+  const context = {
+    repositoryId: fresh.selection.repositoryId,
+    explicitlySharedRepositoryIds: new Set<string>(),
+    commonEnabled: false,
+    applicability: fresh.selection.workId,
+    currentPolicyRevision: current.policy.revision,
+    policyHead: "current" as const,
+    activeGenerationId: current.activeGenerationId,
+    readableMemoryIds,
+  };
+  // Claims depend on the selected Episode too: an excluded or inaccessible original
+  // cannot be dropped while retaining an authoritative projection of that Episode.
+  const fullLineageEligible = compiled.dataset.memories.every(
+    (memory) =>
+      qualifyMemory(
+        memory,
+        compiled.dataset.episodes.find((row) => row.id === memory.episodeId),
+        current.policy,
+        context,
+        compiled.dataset.receipts,
+      ).status === "eligible",
+  );
+  const result = lexicalRecall(
+    {
+      ...compiled.dataset,
+      authoritativeClaims: fullLineageEligible ? compiled.dataset.authoritativeClaims : [],
+      policy: current.policy,
+      context,
+      observations,
+      originalRepositoryGrants: grants,
+      claimKey: text(input.claimKey, "claim key"),
+    },
+    {
+      query: text(input.query, "query", 500),
+      // Source metadata comes only from the actual pinned Input after full compile/data equality above.
+      hitProjection: {
+        kind: "git-dataset-memory-reference.v1",
+        datasetInput: {
+          repositoryId: dataSource.repositoryId,
+          commit: dataSource.commit,
+          path: dataSource.path,
+          sha256: dataSource.sha256,
+          blobOid: dataSource.blobOid,
+          byteLength: dataSource.byteLength,
+        },
+      },
+      ...(compiled.request.limit === undefined ? {} : { limit: compiled.request.limit }),
+      ...(compiled.request.maxChars === undefined ? {} : { maxChars: compiled.request.maxChars }),
+    },
+  );
+  await observeHead();
+  const after = await openGitWork(await observeHead());
+  for (const before of triple) {
+    const now = await after.readSource(before.reference);
+    if (
+      now.sha256 !== before.sha256 ||
+      now.blobOid !== before.blobOid ||
+      !same(now.value, before.value)
+    )
+      invalid("Git selected triple advanced");
+  }
+  await observeOriginals(after);
+  await observeHead();
+  const output = {
+    ...result,
+    gitWork: {
+      topicId: input.topicId,
+      originalsCommit: originals.commit,
+      admittedCommit: fresh.commit,
+      owningRef: witness.owningRef,
+      observedHeadBefore: fresh.commit,
+      observedHeadAfter: after.commit,
+      triple: triple.map(originalAddress),
+      policyRevision: current.policy.revision,
+      activeGenerationId: current.activeGenerationId,
+      reviewOwnerDeclared: compiled.diagnostics.reviewOwnerDeclared,
+      sourceBindingSha256: compiled.dataset.reviewBindingSha256,
+      currentness: "optimistic-local-ref-and-byte-observation" as const,
+      limits:
+        "No remote head, native permission, native authorship or receipt authenticity attested.",
+    },
+  };
+  output.outputChars = JSON.stringify(output).length;
+  output.outputChars = JSON.stringify(output).length;
+  if (output.outputChars > (compiled.request.maxChars ?? 8000))
+    invalid("Git Recall output character budget");
+  return output;
 }

@@ -108,7 +108,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/git-work/source.ts",
-          "sha256": "63463dd2b134078bb5de4c846780fee3f048e273c5cb0ab40c7b347c1463992b",
+          "sha256": "9dfc1b8d9a17dcc896bd015f9702b2c4585b01a4477aa3dc9febca3bd18ef8c1",
           "relativePath": "packages/work-continuity/src/git-work/source.ts"
         },
         {
@@ -158,7 +158,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/lexical-recall.ts",
-          "sha256": "5fccb346938751e0983abbed716dae5ac98c85c8b85060605d100b0dd0d2974d",
+          "sha256": "caa9c227d288a7baabab9768bf65438a35172075067783002930343db3679175",
           "relativePath": "packages/work-continuity/src/workspace/lexical-recall.ts"
         },
         {
@@ -178,7 +178,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/workspace/recall-request.ts",
-          "sha256": "854677ea78e44a31015f69bb8869147c7377fbeb7ac7dc6b52ab5916ebe73e5f",
+          "sha256": "87dbcfbc3ca0880e794eef20eb0fdff1ee2017f9e35b1b0329c9ddf1577e07bd",
           "relativePath": "packages/work-continuity/src/workspace/recall-request.ts"
         },
         {

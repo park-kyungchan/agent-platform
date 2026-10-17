@@ -11,7 +11,7 @@
     {
       "owner": "codex-harness-engineering",
       "path": "src/legacy/harness/provider-closure.ts",
-      "sha256": "1f8f07de32863916bc41c1f399f774e8ce8d6603d9d074f0566c40fc622ec628",
+      "sha256": "da27bc4b899f76654e27e9a2b490d7862ac7c116bf5f6856c824bd661b3318d5",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {
