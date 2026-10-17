@@ -1,0 +1,64 @@
+{
+  "schema": "agent-platform.identical-tree-independent-review-reuse.v1",
+  "recordClass": "explicit-successor-binding",
+  "recordedAtUtc": "2026-10-17T22:50:10.281Z",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/harness_successor_independent_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root/github_workflow_delivery"
+  },
+  "original": {
+    "head": "ccd4d213d06bdd845bb58f1421bed249ac82f9b3",
+    "tree": "d0e9de3bfd8d5ba14075d4e2e9a26142666269d8",
+    "manifestSha256": "b30cd9c14bf0bb1c7ebfc98b095aed728c9deab27ed3a0f6b0f9da0d008d8b32",
+    "literalPath": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/canonical-harness-source-successor-v1/independent-review/successor-budget-fix-v2/result.json",
+    "resultSha256": "0ceb794557168b6cf7be63a11ec51990d9b96c9acf1b515e6fb3565a086c8da6",
+    "resultCommit": "ce783545d148fad4b3cc60fb6e2f42dcd91cc39b",
+    "resultPath": "native-review-results/ccd4d213d06bdd845bb58f1421bed249ac82f9b3.json",
+    "receiptCommit": "b14a119057181ab6b0dc6c4291afc944d29deb18",
+    "receiptPath": "native-reviews/ccd4d213d06bdd845bb58f1421bed249ac82f9b3.json",
+    "receiptSha256": "d58d578705c3eb8b65ff8844c9df3d644ce4bcf5f308b4c27dbb72c4fb59728c",
+    "authenticatedStatusId": 56609942160
+  },
+  "successor": {
+    "head": "3b242ac37046ada7d6351f27934ed08bb617c391",
+    "tree": "d0e9de3bfd8d5ba14075d4e2e9a26142666269d8",
+    "manifestSha256": "b30cd9c14bf0bb1c7ebfc98b095aed728c9deab27ed3a0f6b0f9da0d008d8b32",
+    "pullRequest": 31,
+    "parents": [
+      "66b59fe1ba7a1c63024935fbb81d6c385205d5cd",
+      "ccd4d213d06bdd845bb58f1421bed249ac82f9b3"
+    ],
+    "resultSha256": "f3ed30c01f7d96c89382f97a745d277ca27eec69d5b320cc0997a86eecb3ea8e"
+  },
+  "verification": "Actual same independent reviewer explicitly reuses its completed assessment after verifying identical Git trees, zero H-to-M diff, canonical full manifest, preserved prior literal, Root merge/publication/current-finding readbacks and clean shared M. No changed code exists to reassess.",
+  "evidence": [
+    {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/canonical-harness-budget-pair-successor-v2/publication-preparation/explicit-merge-once.actual.json",
+      "sha256": "6e20a18395c40afa1cd2955523fd9e98253489e1e01e2893ac6ed1043f676fe8"
+    },
+    {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/canonical-harness-budget-pair-successor-v2/publication-preparation/common-source-adoption-once.actual.json",
+      "sha256": "911c68bea234c1c3707a2fe67b45d2ef1feada0dae52144e90c9eaf449331dd1"
+    },
+    {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/canonical-harness-budget-pair-successor-v2/publication-preparation/current-findings-readonly-01.actual.json",
+      "sha256": "b38312e490b1f360f6223971f547e33d51e78e16cefe194db8b47fdb5b2e9235"
+    },
+    {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/canonical-harness-budget-pair-successor-v2/publication-preparation/actual-publication.json",
+      "sha256": "d778363ecc22d3f2d5aaef479b9303d8616354916bdff3d51bb08b91995a5fce"
+    }
+  ],
+  "currentUnresolvedFindings": 0,
+  "meaning": "My actual independent merged-source review reuse; not a new native CLI evaluation, invented merged-head execution or native authorship authentication.",
+  "nativeCliSessionId": null,
+  "nativeTaskId": null,
+  "nativeRunId": null,
+  "nativeAuthenticationEstablished": false,
+  "nativePermissionGranted": false,
+  "acceptanceEstablished": false
+}
