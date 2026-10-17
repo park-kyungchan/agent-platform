@@ -113,16 +113,6 @@ const nativeCodexPaths = [
   "packages/native-codex-adapter/package.json",
   ...nativeCodexModules.map((name) => `packages/native-codex-adapter/src/native/${name}.ts`),
 ];
-const hermesPaths = [
-  "package.json",
-  "bun.lock",
-  "releases/palantirkc-ontology-0.2.0.tgz",
-  "packages/native-hermes-adapter/package.json",
-  "packages/native-hermes-adapter/releases/palantirkc-ontology-0.2.0.tgz",
-  ...hermesModules.map((name) => `packages/native-hermes-adapter/src/ontology-driven/${name}.ts`),
-  "packages/native-hermes-adapter/src/adoption/semantic-context.ts",
-  "packages/native-hermes-adapter/src/adoption/evaluation-budget.ts",
-];
 
 const nativePluginNames = ["source-review-readonly", "ocp-readonly-review", "native-task-controls"];
 const nativePluginPaths = nativePluginNames
@@ -316,7 +306,7 @@ async function prepareQaTree() {
   project.payload.details.sourceOwnerRoot = common;
   await writeJson(join(common, "project.json"), project);
   await run(common, [process.execPath, "install", "--frozen-lockfile", "--ignore-scripts"]);
-  for (const owner of ["codex-harness-engineering", "hermes-harness-engineering"]) {
+  for (const owner of ["codex-harness-engineering"]) {
     const root = join(qaBase, owner);
     await mkdir(join(root, "releases"), { recursive: true });
     await cp(
@@ -325,16 +315,8 @@ async function prepareQaTree() {
     );
     const dependencies = {
       "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",
-      ...(owner.startsWith("codex")
-        ? {
-            "@palantirkc/work-continuity": "file:../agent-platform/packages/work-continuity",
-            "@palantirkc/native-codex-adapter":
-              "file:../agent-platform/packages/native-codex-adapter",
-          }
-        : {
-            "@palantirkc/native-hermes-adapter":
-              "file:../agent-platform/packages/native-hermes-adapter",
-          }),
+      "@palantirkc/work-continuity": "file:../agent-platform/packages/work-continuity",
+      "@palantirkc/native-codex-adapter": "file:../agent-platform/packages/native-codex-adapter",
     };
     await writeJson(join(root, "package.json"), {
       name: owner + "-source-ci-fixture",
@@ -346,8 +328,7 @@ async function prepareQaTree() {
     await run(root, [process.execPath, "install", "--ignore-scripts"]);
     await run(root, [process.execPath, "install", "--frozen-lockfile", "--ignore-scripts"]);
   }
-  const codex = join(qaBase, "codex-harness-engineering"),
-    hermes = join(qaBase, "hermes-harness-engineering");
+  const codex = join(qaBase, "codex-harness-engineering");
   const context = {
     schema: "codex.context-provider-source-closure.v4",
     consumerRoot: codex,
@@ -390,40 +371,51 @@ async function prepareQaTree() {
         sha(await readFile(join(codex, "architecture/native-codex-provider.json"))),
     ),
   );
-  const hermesRegistration = {
-    schema: "hermes.context-source-provider.v1",
-    consumerRoot: hermes,
-    providerRoot: common,
-    packageName: "@palantirkc/native-hermes-adapter",
-    sourcePins: await sourcePins(common, hermesPaths),
-    authority: "none",
-    nativePermissionGranted: false,
+  // The admitted Hermes image is the canonical generated guard. Rebuild only
+  // fictional QA identities/lineage through its existing composer, never by
+  // editing that guard or relaxing its facade/dependency/first-import checks.
+  const { generateHermesSourceFixture, verifySourceFixture } = (await import(
+    join(common, "packages/native-hermes-adapter/src/source-provider/generate.ts")
+  )) as typeof import("../packages/native-hermes-adapter/src/source-provider/generate.ts");
+  const hermesFixture = await generateHermesSourceFixture();
+  await verifySourceFixture(hermesFixture);
+  const guardPath = "src/ontology-driven/provider-source.ts";
+  const guardBody = (bytes: string) => {
+    for (const name of ["expectedRegistrationSha256", "expectedSuccessorSha256"]) {
+      const marker = new RegExp(`const ${name} = "[a-f0-9]{64}";`, "gu");
+      if ([...bytes.matchAll(marker)].length !== 1)
+        throw Error("EXACT_GENERATED_QA_GUARD_MARKERS_REQUIRED");
+      bytes = bytes.replace(marker, `const ${name} = "${"0".repeat(64)}";`);
+    }
+    return bytes;
   };
-  await writeJson(join(hermes, "architecture/hermes-context-provider.json"), hermesRegistration);
-  const hermesGuard = join(hermes, "src/ontology-driven/provider-source.ts");
-  await writeFile(
-    hermesGuard,
-    (await readFile(hermesGuard, "utf8")).replace(
-      /const expectedRegistrationSha256 = "[a-f0-9]{64}";/,
-      `const expectedRegistrationSha256 = "${sha(await readFile(join(hermes, "architecture/hermes-context-provider.json")))}";`,
-    ),
-  );
-  for (const name of hermesModules)
-    await writeFile(
-      join(hermes, `src/ontology-driven/${name}.ts`),
-      `export * from '@palantirkc/native-hermes-adapter/ontology-driven/${name}';\n`,
-    );
-  for (const name of ["semantic-context", "evaluation-budget"]) {
-    const path = join(hermes, `src/adoption/${name}.ts`);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, `export * from '@palantirkc/native-hermes-adapter/adoption/${name}';\n`);
-  }
-  return { qaBase, common, codex, hermes };
+  if (
+    guardBody(await readFile(join(hermesFixture.codeOwnerRoot, guardPath), "utf8")) !==
+    guardBody(
+      await readFile(join(common, "owner-fixture/hermes-harness-engineering", guardPath), "utf8"),
+    )
+  )
+    throw Error("ADMITTED_HERMES_GUARD_DIFFERS_FROM_CANONICAL_GENERATOR");
+  return {
+    qaBase,
+    common,
+    codex,
+    hermes: hermesFixture.codeOwnerRoot,
+    hermesProviderRoot: hermesFixture.providerRoot,
+    hermesQaLineage: {
+      fixtureRoot: hermesFixture.fixtureRoot,
+      manifestSha256: hermesFixture.manifestSha256,
+      verificationClass: "canonical-generated-source-qa-only",
+      admittedGuardBodyPreserved: true,
+      nativePermissionGranted: false,
+    },
+  };
 }
 async function sourceChecks() {
   await liveOwnerFixtureCheck();
   await nativePluginSourceCheck(sourceRoot);
-  const { qaBase, common, codex, hermes } = await prepareQaTree();
+  const { qaBase, common, codex, hermes, hermesProviderRoot, hermesQaLineage } =
+    await prepareQaTree();
   // Resolve the scope from the installed QA tree; a clean checkout needs no root dependencies.
   const { readQualityScope, readTrackedMarkdown, testFile } = (await import(
     join(common, "ci/quality/scope.ts")
@@ -635,7 +627,7 @@ console.log(JSON.stringify({recordClass:'source-only-git-work-source-drift-refus
         ]),
       ...hermesModules.map((name) => [
         join(hermes, `src/ontology-driven/${name}.ts`),
-        join(common, `packages/native-hermes-adapter/src/ontology-driven/${name}.ts`),
+        join(hermesProviderRoot, `packages/native-hermes-adapter/src/ontology-driven/${name}.ts`),
       ]),
     ])};\nfor(const [oldPath,newPath]of cases){const old=await import(oldPath),current=await import(newPath);if(await realpath(newPath)!==newPath||Object.keys(old).sort().join('|')!==Object.keys(current).sort().join('|')||Object.keys(current).some(key=>old[key]!==current[key]))throw Error('Canonical module identity differs: '+newPath);}\nconsole.log(JSON.stringify({recordClass:'source-only-same-module-identity',modulePairs:cases.length}));\n`,
   );
@@ -657,6 +649,7 @@ console.log(JSON.stringify({recordClass:'source-only-git-work-source-drift-refus
       stagedSourceFilesExcluded: scope.exclusions.stagedSources.length,
       stagedTestsExcluded: scope.exclusions.stagedTests,
       packageTestExecution,
+      hermesQaLineage,
       commands: commandEvidence,
     }),
   );
