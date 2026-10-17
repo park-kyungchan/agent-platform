@@ -1,0 +1,76 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-INPUT-CONTINUE-UNKNOWN-BUDGET-DELEGATION",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/continuation-budget-delegation-successor/actual-user-authority-capture.json#/source/questionItemId",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "내가 더이상 개입하지않고, 너에게 예산 확대 필요하면 늘릴 권한을 줄게, 계속 진행해.",
+    "question": "중단된 두 모델 스트림은 사용량을 반환하기 전에 취소돼 추가 토큰 수가 미확정입니다. 기존 평가 회계 코드(packages/native-hermes-adapter/src/adoption/evaluation-budget.ts:325)는 미확정 사용량이 있으면 다음 실행을 막습니다. 미확정 두 건을 그대로 보존하고, 2,000만 한도를 ‘native가 보고한 누계’ 기준으로 관리하며 계속 진행할까요? 추가 결제 0·16회·기존 마감은 유지합니다.",
+    "verbatim": true,
+    "questionItemId": "[\"request_user_input_async\",\"call_dec11259854c47118beb34884b706590\",0]",
+    "actualRootForwardedCapture": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/continuation-budget-delegation-successor/actual-user-authority-capture.json",
+      "sha256": "3470c52d46d3797565f41fc52b433218629e3292c5774a516313c1cb306f7067",
+      "bytes": 2311
+    },
+    "source": {
+      "kind": "actual-user-question-ui-reply-forwarded-by-accountable-Root",
+      "questionItemId": "[\"request_user_input_async\",\"call_dec11259854c47118beb34884b706590\",0]",
+      "locator": "Current conversation second unknown-accounting question/reply, exact full question and answer forwarded by accountable Root to this helper.",
+      "nativeMessageId": null,
+      "nativeEventTimestamp": null,
+      "nativeAuthorshipAuthenticated": false
+    },
+    "currentEnvelope": {
+      "suiteId": "ODI-EVAL-20261017-FIRSTUSE",
+      "maxAggregateTokens": 20000000,
+      "maxRuns": 16,
+      "originalStartedAtUtc": "2026-10-17T04:55:31.863Z",
+      "originalDeadlineAtUtc": "2026-10-17T12:55:31.863Z",
+      "additionalPayment": 0
+    },
+    "currentNumericPolicyChangedByThisRecord": false,
+    "unknownAccounting": {
+      "unknownRowCount": 2,
+      "unknownRowIds": null,
+      "unknownUsagePreserved": true,
+      "fabricatedUsageOrReconciliation": false,
+      "reportedNativeCumulative": null,
+      "meaning": "Continue under explicit user-approved owner exception using actual native-reported cumulative observations. Missing tokens remain unknown, not zero or provider invoice evidence; Root binds actual row IDs/counters separately."
+    },
+    "delegation": {
+      "accountableActor": "Lead",
+      "necessaryBudgetExpansionAuthorized": true,
+      "immediateExpansion": false,
+      "futureRule": "Record explicit owner successor only when needed, identifying old/new values, reason/scope and source authority; preserve original start/same suite/prior usage/unknown rows/paid0. Current20M/16/originaldeadline remain until that action."
+    },
+    "canonicalGuard": {
+      "path": "packages/native-hermes-adapter/src/adoption/evaluation-budget.ts",
+      "userQuestionLine": 325,
+      "unchanged": true,
+      "wouldStillReport": "unknown-usage",
+      "exceptionIsGuardPass": false,
+      "codeWeakening": false
+    },
+    "ownerException": {
+      "class": "explicit-user-approved-continuation-despite-unknown-accounting",
+      "sourceQuestionItemId": "[\"request_user_input_async\",\"call_dec11259854c47118beb34884b706590\",0]",
+      "status": "AUTHORITY_CAPTURED_NOT_A_NEW_NATIVE_ADMISSION",
+      "actualNewAdmissionOrReservation": false,
+      "RootResponsibility": "Preserve/report both unknown rows and actual native cumulative evidence; label continuation owner exception rather than canonical admission PASS; do not fabricate tokens or retroactively authorize old overrun/unreserved resume."
+    },
+    "additionalPayment": 0,
+    "newPaidAPIModelBillingPermission": false,
+    "newGoalOrClockOrSuite": false,
+    "nativeMessageId": null,
+    "nativeAuthorshipAuthenticated": false
+  }
+}
