@@ -2088,15 +2088,59 @@ describe("composed canonical compact context", () => {
     expect(result.normative).toEqual([]);
   });
 
+  test("all composed serialized statuses fit the requested budget or explicitly reject it", async () => {
+    const { rows } = repeatedContracts();
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const statuses = new Set<string>();
+    for (const encoding of [undefined, "metadata.v1"] as const) {
+      for (const maxChars of [1024, 1600, 2048, 12000, 24000]) {
+        for (const latestRelevant of ["current", "advanced", "unavailable"] as const) {
+          const request = { taskId: "a", latestRelevant, maxChars };
+          let result: Awaited<ReturnType<typeof readCompactGitWorkContext>>;
+          try {
+            result = encoding
+              ? await readCompactGitWorkContext(reader, request, { taskId: "a" }, encoding)
+              : await readCompactGitWorkContext(reader, request, { taskId: "a" });
+          } catch (error) {
+            expect(error instanceof Error).toBe(true);
+            const message = (error as Error).message;
+            expect(message).toBe("COMPACT_CONTEXT_OUTPUT_BUDGET_TOO_SMALL");
+            expect(message.length).toBeLessThanOrEqual(maxChars);
+            continue;
+          }
+          statuses.add(result.status);
+          expect(JSON.stringify(result).length).toBeLessThanOrEqual(maxChars);
+          expect(result.nativePermissionGranted).toBe(false);
+          if (result.status === "held") {
+            expect(result.normative).toEqual([]);
+            expect(() => decodeCompactGitWorkContext(result)).toThrow();
+          } else {
+            expect(decodeCompactGitWorkContext(result).task?.id).toBe("a");
+          }
+        }
+      }
+    }
+    expect([...statuses].sort()).toEqual(["held", "source-qualified"]);
+  });
+
   test("composed output and request budgets still refuse rather than truncate", async () => {
     const { rows } = repeatedContracts();
     const { root, oid } = await fixture(rows);
     const reader = await open(root, oid);
+    await expect(
+      readCompactGitWorkContext(
+        reader,
+        { taskId: "a", latestRelevant: "current", maxChars: 1024 },
+        { taskId: "a" },
+      ),
+    ).rejects.toThrow("COMPACT_CONTEXT_OUTPUT_BUDGET_TOO_SMALL");
     const compact = await readCompactGitWorkContext(
       reader,
-      { taskId: "a", latestRelevant: "current", maxChars: 1024 },
+      { taskId: "a", latestRelevant: "current", maxChars: 2048 },
       { taskId: "a" },
     );
+    expect(JSON.stringify(compact).length).toBeLessThanOrEqual(2048);
     expect(compact.status).toBe("held");
     expect(compact.holdReasons).toContain("REQUIRED_CONTEXT_OUTPUT_LIMIT");
     expect(compact.normative).toEqual([]);
@@ -2198,7 +2242,7 @@ describe("composed canonical compact context", () => {
     const reading = readCompactGitWorkContext(reader, request, selection, "metadata.v1");
     request.maxChars = 24000;
     selection.taskId = "b";
-    expect((await reading).status).toBe("held");
+    await expect(reading).rejects.toThrow("COMPACT_CONTEXT_OUTPUT_BUDGET_TOO_SMALL");
   });
 });
 

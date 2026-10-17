@@ -886,3 +886,37 @@ test("metadata adoption refuses v1 or missing composed provider and retains fina
   expect(small.context).toBeNull();
   expect(JSON.stringify(small).length).toBeLessThanOrEqual(1024);
 });
+
+test("native v1/v2 ordinary and metadata responses honor every supported serialized budget", async () => {
+  const statuses = new Set<string>();
+  for (const criteria of [
+    ["Preserve the original"],
+    Array.from({ length: 4 }, (_, i) => `${i}:` + "meaning ".repeat(300)),
+  ]) {
+    const f = await fixture({ criteria });
+    for (const variant of ["v1", "v2", "metadata.v1"] as const) {
+      const read = variant === "v1" ? readHermesCurrentWorkContext : readHermesCurrentWorkContextV2;
+      const cap = variant === "v1" ? 6000 : 12000;
+      for (const maxChars of [1024, 2048, cap]) {
+        const value = await read(event, f.selected, f.index, {
+          ...f.provider,
+          maxChars,
+          ...(variant === "metadata.v1" ? { metadataEncoding: "metadata.v1" as const } : {}),
+        });
+        statuses.add(value.status);
+        expect(JSON.stringify(value).length).toBeLessThanOrEqual(maxChars);
+        expect(value.nativePermissionGranted).toBe(false);
+        if (value.status === "source-qualified") {
+          if (!value.context) throw Error("Qualified native context is missing");
+          const semantic =
+            "semanticContext" in value.context ? value.context.semanticContext : value.context.work;
+          expect(
+            gitWork.decodeCompactGitWorkContext(semantic).normative.find((r) => r.kind === "spec")
+              ?.criteria,
+          ).toEqual(criteria);
+        }
+      }
+    }
+  }
+  expect([...statuses].sort()).toEqual(["held", "source-qualified"]);
+});

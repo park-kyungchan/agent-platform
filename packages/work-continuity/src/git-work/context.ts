@@ -409,9 +409,15 @@ export async function readCompactGitWorkContext(
   const ordinary = encodeCompactGitWorkContext(context, selection, false);
   const compact =
     encoding && ordinary.status === "source-qualified" ? packCompactMetadata(ordinary) : ordinary;
-  return JSON.stringify(compact).length > (request.maxChars ?? 24000)
-    ? compactGitWorkContext(outputLimit(context, requiredRecords), selection)
-    : compact;
+  const maxChars = request.maxChars ?? 24000;
+  if (JSON.stringify(compact).length <= maxChars) return compact;
+  const held = compactGitWorkContext(outputLimit(context, requiredRecords), selection);
+  // The existing HOLD wire includes required metadata too. A valid request
+  // budget may be too small even for that refusal; never return oversized data
+  // or invent a weaker compact representation to make it fit.
+  if (JSON.stringify(held).length > maxChars)
+    throw new CompactContextError("COMPACT_CONTEXT_OUTPUT_BUDGET_TOO_SMALL");
+  return held;
 }
 
 const compactObject = (value: unknown): value is Record<string, unknown> =>
