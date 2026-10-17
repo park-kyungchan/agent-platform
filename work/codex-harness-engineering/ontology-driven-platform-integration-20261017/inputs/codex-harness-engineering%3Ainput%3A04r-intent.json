@@ -1,0 +1,63 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "codex-harness-engineering:input:04r-intent",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T16-03-30-01a148ac-3da8-77b3-97d2-f6e14bbb163f.jsonl:126"
+  },
+  "content": {
+    "schema": "odi04r.actual-intent.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-04-R"
+    },
+    "dataCommit": "28684689bd560e1e7442a4c9dd6a4839029023a4",
+    "codeCommit": "902be8ea1bf9faf9ff272e3f79b02dc42b850ad3",
+    "codeTree": "a340759be392942ce5c8a10b9ed7633efff149f8",
+    "native": {
+      "runtime": "native-codex",
+      "sessionId": "01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+      "turnId": "01a148c1-b89b-7c02-892f-5faefb291004",
+      "model": "gpt-6.1-sol",
+      "effort": "ultra",
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    "actualInputSha256": "3158d6a73c52b43474bb167fcd474fe42a3d418847214f4cd48842462f591790",
+    "actualInputBytes": 5825,
+    "usefulPurpose": "Distinct native Codex independently reviews actual Hermes producer/code902 test-only successor, semantic edge cases and original-source/effect/dependency context before05.",
+    "receipts": {
+      "input": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/actual-native-input-correlation.json",
+        "sha256": "e0ac1cc15720ec6d24432f8caeb492991e830534ff90037e6fcb22965d48c8cf",
+        "bytes": 958
+      },
+      "admission": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/actual-evaluation-admission.json",
+        "sha256": "3fa0789d3a98b815630d33ad2fc6abe984ab381c1838ce32d0fed481948cee81",
+        "bytes": 1113
+      },
+      "activation": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/explicit-owner-activation.json",
+        "sha256": "6abacf00ff8f8d896ff7b7647259a5e4ea6e6bb54c8c40f7999b64fddd2abe95",
+        "bytes": 1703
+      }
+    },
+    "manualContext": "Existing guarded canonical source pages; monolithic typed context remains HELD27215>24000. No automatic hook or typed-context PASS inferred.",
+    "authority": "none",
+    "nativePermissionGranted": false
+  }
+}

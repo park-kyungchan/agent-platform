@@ -1,0 +1,256 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "codex-harness-engineering:input:04r-result",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T16-03-30-01a148ac-3da8-77b3-97d2-f6e14bbb163f.jsonl:126"
+  },
+  "content": {
+    "schema": "odi04r.actual-result-custody.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-04-R"
+    },
+    "sourceDataCommit": "28684689bd560e1e7442a4c9dd6a4839029023a4",
+    "nativeObservation": {
+      "sessionId": "01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+      "turnId": "01a148c1-b89b-7c02-892f-5faefb291004",
+      "finalMessageId": "msg_09f24631e4edef82016ad32414ae748191bdaef879cf88b51c",
+      "finalOrdinalZeroBased": 125,
+      "terminalOrdinalZeroBased": 128,
+      "terminalEventType": "task_complete",
+      "model": "gpt-6.1-sol",
+      "effort": "ultra",
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "commonOccurrence": {
+        "runtimeId": "native-codex:01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+        "attemptId": "native-turn:01a148c1-b89b-7c02-892f-5faefb291004",
+        "occurrenceId": "native-message:msg_09f24631e4edef82016ad32414ae748191bdaef879cf88b51c"
+      },
+      "occurrenceMeaning": "Common labels reference actually observed native turn and final message; not logical-ID substitution or invented native Task/Run."
+    },
+    "independentReview": {
+      "schema": "agent-platform.independent-review-result.v1",
+      "recordClass": "verification",
+      "binding": {
+        "codeOwner": "agent-platform",
+        "evidenceOwner": "codex-harness-engineering",
+        "scope": "canonical-source-ci-quality"
+      },
+      "headSha": "902be8ea1bf9faf9ff272e3f79b02dc42b850ad3",
+      "reviewedTreeSha": "a340759be392942ce5c8a10b9ed7633efff149f8",
+      "reviewedSourceManifestSha256": "e0f0b977614a7b6ff4fa6b64a54a9a5f3a82e8a8eda54103c64448205a9fc24e",
+      "reviewer": {
+        "runtime": "native-codex",
+        "taskId": "01a148ac-3da8-77b3-97d2-f6e14bbb163f"
+      },
+      "author": {
+        "runtime": "native-codex",
+        "taskId": "01a14734-9160-70a2-a10d-df6ea9c50b91"
+      },
+      "conclusion": "pass",
+      "unresolvedFindings": 0,
+      "findings": [],
+      "checks": [
+        "Verified exact HEAD/tree, clean staged and working diffs before and after review, and exactly three changed files against base a91ef0564997a3a3736564f35a2e8354ae47e47b. Git diff --check passed.",
+        "Read applicable AGENTS.md, project.json and relevant capability/source-owner boundaries; checkout metadata matches canonical shared metadata.",
+        "Read local-source-manifest.json and independently rederived its manifest using the canonical manifest function: 819 entries, 679 blobs, matching SHA256 e0f0b977614a7b6ff4fa6b64a54a9a5f3a82e8a8eda54103c64448205a9fc24e.",
+        "Consumed actual C06 captures at 28684689bd560e1e7442a4c9dd6a4839029023a4: qualification and sources 01–37, plus optional source 38. Verified index SHA256 ed9c6ca044957418a8a67fbfb45b66aababb284d7f3fcbee44ce7f7eb3cdd840, all page hashes/byte lengths and source bindings against the index.",
+        "Consumed source-21 receipt SHA256 08ff8720b7ef56efd23057089ee5409b1a14d023ce64dfbe70e679b999cfb520 and all three literal parts in order. Verified chunk pins and complete 30,844-character reassembly SHA256 c228b663b75d219980b62c182f4d562c12af6d6e3487439087839dcf317913af; consumed all completed/uncertain IDs, predecessor sources and replayPolicy.",
+        "Consumed current purpose, original answers, Spec1/Plan1, ODI-04-R contract, producer intent/result/Verification and actual Hermes messages 46→106 prerequisite/receiver payloads. Captured canonical load, validation, transition and selected dependency findings are empty.",
+        "Verified raw Hermes patch SHA256 dbb1b6e42df1441bfbbe6c27eb4cffb2c8da00d746914be5ae3307e934256bfc and reconstructed its files in memory. Implementation/docs match exact HEAD; Root successor changes only test formatting and two finite 20-second timeouts. Verified lineage and mechanical-check receipt hashes.",
+        "Reviewed all changes in scripts/harness.ts, packages/work-continuity/src/runtime-docs/runtime-docs.test.ts and docs/runtime-documentation-routing.md, plus the complete canonical runtime-docs index.ts, types.ts and validation.ts.",
+        "Assessed flat compatibility, envelope discrimination, malformed/unknown inputs, observation types, control characters, string/file limits, canonical version/cache/currentness decisions, caller assertions and permission/provenance boundaries. No actionable defect found.",
+        "Verified pinned Root evidence for 67 tests/1979 assertions, handoff, imports, quality and source CI with 26 successful commands. Reviewed added process-boundary and canonical retrieval assertions; did not rerun the suite."
+      ],
+      "limits": [
+        "Monolithic typed context remains HELD at 27,215 > 24,000 characters. Consumption used the explicit manual existing-reader captures; this establishes neither typed-context PASS, automatic hook injection, native authorship authentication nor native permission.",
+        "The complete manifest binds the tree; unchanged files outside the stated source coverage were not individually reviewed.",
+        "Independent implementation review was static. Root test/check results remain separately attributed evidence, not independently rerun tests. No new common Work import was performed.",
+        "The historical taskId identity fields carry observed native SESSION UUIDs. Native Task/Run IDs remain unexposed/null and distinct from logical ODI-04-R. Hermes produced the raw artifact; the author identity denotes Root's checked successor.",
+        "No source, Git refs, Goal/plan, configuration, permissions, credentials, sessions or existing effects were changed. No delegation, auxiliary model, network request or historical effect replay occurred.",
+        "This is bounded Verification, not whole-Work completion, shared delivery or human Acceptance. Publication/status, explicit expected-head merge and separate runtime-owner verification/activation remain Root-owned subsequent actions."
+      ]
+    },
+    "actualConsumption": {
+      "requiredPages01through37AllObserved": true,
+      "optional38Observed": true,
+      "completeSource21LiteralReassemblySha256": "c228b663b75d219980b62c182f4d562c12af6d6e3487439087839dcf317913af",
+      "independentlyChecked": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/independent-actual-result-consumption-usage-review.json",
+        "sha256": "3fda872ac826de6c83b6969da0a5f8a2e8391061e61b4f0637bbc55463512f7d",
+        "bytes": 35003
+      },
+      "monolithicTypedContext": "HELD27215>24000 unchanged; actual explicit manual source consumption observed, no typedPASS/autohook/nativeAuth claim"
+    },
+    "usage": {
+      "inputTokens": 1477310,
+      "outputTokens": 12518,
+      "cacheReadTokens": 1350656,
+      "cacheWriteTokens": 0,
+      "inputAccounting": "includes-cache",
+      "totalTokens": 1489828,
+      "reasoningSubsetOfOutput": 5081,
+      "uniqueResponseCount": 15,
+      "state": "completed/reported",
+      "reconciliation": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/reconciliation-receipt.json",
+        "sha256": "764b927c0abc18495662463142195304d562772100d1d02bf04f5d45c8fc0943",
+        "bytes": 1023
+      },
+      "suite": {
+        "completedRuns": 3,
+        "accountedTokens": 4172027,
+        "remainingRuns": 13,
+        "remainingTokens": 827973,
+        "deadlineAtUtc": "2026-10-17T12:55:31.863Z",
+        "unknownUsageRuns": 0,
+        "reset": false
+      },
+      "meaning": "Input includes cached tokens; count input+output once, do not add cache/reasoning. Native-reported usage, not invoice/hidden-process proof; existing admission classification unchanged."
+    },
+    "publication": {
+      "sourceHead": "902be8ea1bf9faf9ff272e3f79b02dc42b850ad3",
+      "sourceTree": "a340759be392942ce5c8a10b9ed7633efff149f8",
+      "resultCommit": "a0309fb91985caf817c7d02880ca8e5441f450bd",
+      "receiptCommit": "0b4307f510ce52e788bc89cbc4f072bac08b9a82",
+      "receiptSha256": "85d3da7bad4a0ede4af9582fe2e5833d8a1af22c257e661409b3657187268309",
+      "statusId": 56585510500,
+      "publishedAtUtc": "2026-10-17T07:39:12.745Z",
+      "sourcePR": {
+        "number": 26,
+        "url": "https://github.com/park-kyungchan/agent-platform/pull/26",
+        "createdAtUtc": "2026-10-17T07:40:00Z",
+        "observedState": "open"
+      },
+      "publishedBeforePr": true,
+      "scope": "Actual code review publication/authenticated status, NOT Work Task sharedAudit/formal completion or merge/native activation."
+    },
+    "effectCustody": {
+      "completedEffectIds": [
+        "codex-harness-engineering:effect:04r-dispatch"
+      ],
+      "uncertainEffectIds": [],
+      "replayPolicy": "do-not-repeat; prior C06 completed/uncertain effects and original IDs retained unchanged"
+    },
+    "receipts": {
+      "input": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/actual-native-input-correlation.json",
+        "sha256": "e0ac1cc15720ec6d24432f8caeb492991e830534ff90037e6fcb22965d48c8cf",
+        "bytes": 958
+      },
+      "final": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/actual-native-final-owner-observation.json",
+        "sha256": "34ecdaab12a5f236063e4d176ff318c9964e31348eaf3cb26d1e282ff9ddfc81",
+        "bytes": 2075
+      },
+      "result": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/actual-review-result.json",
+        "sha256": "2a3ff68bd7635d613e572fcc9fc94c68a72065c0672588e4c5e84007111033e3",
+        "bytes": 4620
+      },
+      "usage": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/root-settled-usage.json",
+        "sha256": "d393d8b69d89168f48a455bd5482ca3a1749efd7f72e5ecbe78731171bd23a08",
+        "bytes": 6621
+      },
+      "reconcile": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/reconciliation-receipt.json",
+        "sha256": "764b927c0abc18495662463142195304d562772100d1d02bf04f5d45c8fc0943",
+        "bytes": 1023
+      },
+      "independent": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/independent-actual-result-consumption-usage-review.json",
+        "sha256": "3fda872ac826de6c83b6969da0a5f8a2e8391061e61b4f0637bbc55463512f7d",
+        "bytes": 35003
+      },
+      "pr": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/source-pr-create-result.json",
+        "sha256": "e7fdcdd9b6bfa089b8b9f307ee99587a783e23c61ddb4230bee2454e5ca218a2",
+        "bytes": 20272
+      },
+      "progress": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/settled-progress.json",
+        "sha256": "7092dfa097af4aa55882a192efd1ea0955c3bfe97c98f0daff2a404e28762674",
+        "bytes": 4234
+      },
+      "admission": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/actual-evaluation-admission.json",
+        "sha256": "3fa0789d3a98b815630d33ad2fc6abe984ab381c1838ce32d0fed481948cee81",
+        "bytes": 1113
+      },
+      "activation": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/explicit-owner-activation.json",
+        "sha256": "6abacf00ff8f8d896ff7b7647259a5e4ea6e6bb54c8c40f7999b64fddd2abe95",
+        "bytes": 1703
+      },
+      "publication": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-r-publication-proposal/execution-2f2016c4-405e-4145-b27f-3f93edaffdf1/review-publication.json",
+        "sha256": "d1e1964b3f6ca6d592f324e447e5458fa976a8f9b900924abfbe46b964da27b5",
+        "bytes": 1782
+      },
+      "state22": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/interview-state.json",
+        "sha256": "2a5c7595998ca2d891974b59ff1aa41b36659d8a6dece701d17ab20047ab61d5",
+        "bytes": 15107
+      },
+      "lineage": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-producer-artifact/checked-successor-lineage.json",
+        "sha256": "7e2b18917d5fc34f4e9289fec695334f81a21a79fe6b60d1ea1c0a75a29b071d",
+        "bytes": 1384
+      },
+      "manualQualification": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-r-manual-source-packet/capture-28684689-actual/canonical-source-dependency.actual.json",
+        "sha256": "468c2cff2b296719e7f1f18439740f96927a3d3fa9a95fdb09dc25149a8981d0",
+        "bytes": 1894
+      },
+      "manualIndex": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-r-manual-source-packet/capture-28684689-actual/index.json",
+        "sha256": "ed9c6ca044957418a8a67fbfb45b66aababb284d7f3fcbee44ce7f7eb3cdd840",
+        "bytes": 50121
+      },
+      "literalInventory": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-r-manual-source-packet/capture-28684689-actual/source21-followup/receipt.json",
+        "sha256": "08ff8720b7ef56efd23057089ee5409b1a14d023ce64dfbe70e679b999cfb520",
+        "bytes": 2240
+      }
+    },
+    "latestContinuity": {
+      "settledProgress": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-codex-review/settled-progress.json",
+        "sha256": "7092dfa097af4aa55882a192efd1ea0955c3bfe97c98f0daff2a404e28762674",
+        "bytes": 4234
+      },
+      "contextVersion22AtCapture": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/interview-state.json",
+        "sha256": "2a5c7595998ca2d891974b59ff1aa41b36659d8a6dece701d17ab20047ab61d5",
+        "bytes": 15107
+      },
+      "referenceMeaning": "Bounded references only; active22 path is a captured version/hash, Root retains its historical bytes when advancing. Do not copy/rewrite Goal/history or treat stale phrases in older progress as current publication state.",
+      "resources": "unusedreviewpane w7:p7 CLOSED actualnative sessionsaved; rootw7:p1focus and importantHermesw7:p2 retained; no reloadrequired.",
+      "next": "PR26 required checks/explicit expected-head Root merge/separate owner activation remain;05 actual Memory/IDs/recovery then wholeOntology/privateGitHub/domain/adoption/Acceptance. Goal remains active incomplete."
+    },
+    "limitations": [
+      "Actual bounded independent review and local result durability only; shared/formal pending actual Work audit delivery.",
+      "Native-authorship/permission not established by Git, source pages, publication or this closure. Runtime component Task/Run remain null.",
+      "Source merge and activation not claimed; no05runtime allocated or new evaluation admitted."
+    ],
+    "authority": "none",
+    "nativePermissionGranted": false,
+    "semanticAcceptanceEstablished": false
+  }
+}
