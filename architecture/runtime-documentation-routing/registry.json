@@ -1,6 +1,6 @@
 {
   "schema": "work-continuity.documentation-registry.v1",
-  "generatedOn": "2026-10-14",
+  "generatedOn": "2026-10-17",
   "provenance": {
     "sourceOwner": "codex-harness-engineering",
     "sourceDirectory": "discovery/runtime-documentation-routing/20261014/reviewed",
@@ -76,6 +76,20 @@
     }
   },
   "sources": {
+    "hermes-tui-side-review-20261017": {
+      "url": "https://hermes-agent.nousresearch.com/docs/user-guide/tui",
+      "status": "page-opened-limited-content",
+      "checkedOn": "2026-10-17",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "hermes-slash-side-review-20261017": {
+      "url": "https://hermes-agent.nousresearch.com/docs/reference/slash-commands",
+      "status": "page-opened-limited-content",
+      "checkedOn": "2026-10-17",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
     "openai-index": {
       "url": "https://learn.chatgpt.com/docs/llms.txt",
       "status": "content-read",
@@ -1236,6 +1250,38 @@
       "freshnessPolicy": "revalidate"
     },
     {
+      "id": "hermes.agent.tui",
+      "surface": "hermes.agent",
+      "topic": "tui",
+      "aliases": ["terminal-ui", "tui-interface", "터미널UI"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/tui",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/tui",
+      "fallbackUrl": null,
+      "evidenceStatus": "page-opened-limited-content",
+      "sourceId": "hermes-tui-side-review-20261017",
+      "checkedOn": "2026-10-17",
+      "notes": "Bounded side review: operations/herdr-hermes-independent-20261017T0433Z/runtime-eval/hermes-tui-guide.read-excerpt.txt sha256 473afc6eee87ef12e5f6c12bd0705abdf38430bfd4dc78731ca05cce92c55fa3. TUI /sessions lists live sessions in this process; use explicit /resume for saved transcripts. Gateway URL documentation describes dashboard wiring, not general remote attach. Full captures and installed source comparisons do not certify full body review, documentationVersion, installed compatibility or native permission.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/tui",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.slash-commands",
+      "surface": "hermes.agent",
+      "topic": "slash-commands",
+      "aliases": ["slash", "slash-reference", "슬래시명령"],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/reference/slash-commands",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/reference/slash-commands",
+      "fallbackUrl": null,
+      "evidenceStatus": "page-opened-limited-content",
+      "sourceId": "hermes-slash-side-review-20261017",
+      "checkedOn": "2026-10-17",
+      "notes": "Bounded side review: operations/herdr-hermes-independent-20261017T0433Z/runtime-eval/hermes-slash-commands.read-excerpt.txt sha256 d644d0d94b909b14086aa66270790955363597847ee31fc96c68c36412f51549. Select the applicable frontend: TUI /sessions lists live sessions, while saved transcripts use /resume. Documentation describes first-prefix matching; the inspected packaged TUI refuses ambiguous matches. Use full commands and verify the installed command registry. No documentationVersion or native execution permission is certified.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "reference/slash-commands",
+      "freshnessPolicy": "revalidate"
+    },
+    {
       "id": "codex.cli.overview",
       "surface": "codex.cli",
       "topic": "overview",
@@ -1962,6 +2008,8 @@
   },
   "limitations": [
     "Index membership is not a complete body reachability sweep.",
+    "The unchanged Oct14 sourceDirectory/sourceArtifacts, sources and captures retain historical provenance; Oct17 route additions do not promote their evidence or dates.",
+    "Oct17 route-only side evidence remains at operations/herdr-hermes-independent-20261017T0433Z: docs-content/capture-manifest.json sha256 5dfc1f6d6c1867589db911a783d62f3dd1fe11956edfa8f64a43b587dc885c6f; docs-content/read-manifest.json sha256 63d22d86ea058dca294475a19051125facbcaa861449fb5ea0d85103258d7e0f; runtime-eval/summary.json sha256 aa153ec3454319993ccf3a2ef212dc8ce47a49d6169522eb9e6fd6427ce7b9c1. No native Scrapling capture or Evidence Foundry blob admission is claimed; their ownership remains unchanged. New sources leave rawBytesVerified false and bodySha256 null; existing side captures are not copied into another maintained body store.",
     "Source documentation is not installed runtime, authenticated capability or behavior verification.",
     "Two expected-predicate misses retain complete original bodies and separate readback results in the source-owned review."
   ]

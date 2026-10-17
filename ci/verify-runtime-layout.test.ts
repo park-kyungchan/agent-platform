@@ -55,22 +55,24 @@ async function fixture(): Promise<{
       module.packagePath + "/package.json",
       JSON.stringify({ name: module.packageName }),
     );
-  const skill = contract.skills[0];
-  for (const member of skill.files)
-    await put(root, skill.path + "/" + member, member.endsWith(".json") ? "{}" : "Reference.\n");
-  await put(
-    root,
-    skill.path + "/SKILL.md",
-    [
-      "---",
-      "name: " + skill.id,
-      "description: Inspect the selected source without runtime dispatch.",
-      "---",
-      "[Checkpoint](references/checkpoint-contract.json)",
-      "[Decision](references/standing-user-decision.json)",
-      "",
-    ].join("\n"),
-  );
+  for (const skill of contract.skills) {
+    for (const member of skill.files)
+      await put(root, skill.path + "/" + member, member.endsWith(".json") ? "{}" : "Reference.\n");
+    await put(
+      root,
+      skill.path + "/SKILL.md",
+      [
+        "---",
+        "name: " + skill.id,
+        "description: Inspect the selected source without runtime dispatch.",
+        "---",
+        ...skill.files
+          .filter((member) => member !== "SKILL.md")
+          .map((member) => `[Reference](${member})`),
+        "",
+      ].join("\n"),
+    );
+  }
   await save();
   return { root, contract, save };
 }
@@ -88,7 +90,8 @@ test("a standalone canonical source fixture reports explicit unverified native b
     verificationClass: "source-layout-only",
     nativePermissionGranted: false,
     modules: 3,
-    skillFiles: 4,
+    skills: 2,
+    skillFiles: 9,
     nativeDeploymentSource: "not-inspected",
   });
   expect(result.residuals.length).toBeGreaterThan(0);
