@@ -1,4 +1,5 @@
 import { validateReceiptWithEvidence } from "./quality/receipt-validation-gate";
+import { runIndependentPackageTests } from "./package-tests";
 export { validateIndependentReviewReceipt } from "./quality/receipt-validator";
 import { createHash } from "node:crypto";
 import {
@@ -21,9 +22,16 @@ const writeJson = async (path: string, value: unknown) => {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(value, null, 2) + "\n");
 };
-const commandEvidence: { command: string[]; durationMs: number; exitCode: number }[] = [];
+const commandEvidence: {
+  command: string[];
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  exitCode: number;
+}[] = [];
 async function run(cwd: string, argv: string[]): Promise<void> {
   const started = performance.now();
+  const startedAt = new Date().toISOString();
   const child = Bun.spawn(argv, {
     cwd,
     stdout: "inherit",
@@ -33,6 +41,8 @@ async function run(cwd: string, argv: string[]): Promise<void> {
   const exitCode = await child.exited;
   commandEvidence.push({
     command: argv.slice(1),
+    startedAt,
+    finishedAt: new Date().toISOString(),
     durationMs: Math.round(performance.now() - started),
     exitCode,
   });
@@ -476,14 +486,31 @@ async function sourceChecks() {
     "bun-types",
     ...tsFiles,
   ]);
-  for (const entry of await readdir(join(common, "packages"), { withFileTypes: true })) {
+  const packageChecks: (() => Promise<void>)[] = [];
+  const packageDirectories = await readdir(join(common, "packages"), { withFileTypes: true });
+  for (const entry of packageDirectories.sort((left, right) =>
+    left.name.localeCompare(right.name),
+  )) {
     if (!entry.isDirectory()) continue;
     const packageRoot = join(common, "packages", entry.name);
     const tests = scope.testFiles
       .filter((path) => path.startsWith(`packages/${entry.name}/`))
       .map((path) => join(common, path));
-    if (tests.length) await run(packageRoot, [process.execPath, "test", ...tests]);
+    if (tests.length)
+      packageChecks.push(() => run(packageRoot, [process.execPath, "test", ...tests]));
   }
+  const packageStarted = performance.now();
+  const packageStartedAt = new Date().toISOString();
+  await runIndependentPackageTests(packageChecks);
+  const packageTestExecution = {
+    concurrency: 2,
+    packages: packageChecks.length,
+    startedAt: packageStartedAt,
+    finishedAt: new Date().toISOString(),
+    durationMs: Math.round(performance.now() - packageStarted),
+    durationMeaning:
+      "Elapsed package phase wall time; overlapping command durations are not summed.",
+  };
   const qualityTests = scope.lintFiles.filter((path) => path.startsWith("ci/") && testFile(path));
   if (qualityTests.length)
     await run(common, [
@@ -629,6 +656,7 @@ console.log(JSON.stringify({recordClass:'source-only-git-work-source-drift-refus
       qualityTestFiles: qualityTests.length,
       stagedSourceFilesExcluded: scope.exclusions.stagedSources.length,
       stagedTestsExcluded: scope.exclusions.stagedTests,
+      packageTestExecution,
       commands: commandEvidence,
     }),
   );
