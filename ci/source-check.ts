@@ -82,6 +82,9 @@ const gitWorkPaths = [
   "packages/work-continuity/src/logical-identity.ts",
   "packages/work-continuity/src/operational-state.ts",
 ];
+const memoryPaths = ["recall-request", "lexical-recall", "qualification"].map(
+  (name) => `packages/work-continuity/src/workspace/${name}.ts`,
+);
 const contextPaths = [
   "project.json",
   "ontology-pin.json",
@@ -92,6 +95,7 @@ const contextPaths = [
   ...contextModules.map((name) => `packages/work-continuity/src/context/${name}.ts`),
   "packages/work-continuity/releases/palantirkc-ontology-0.2.0.tgz",
   ...gitWorkPaths,
+  ...memoryPaths,
 ];
 const nativeCodexPaths = [
   "package.json",
@@ -335,7 +339,7 @@ async function prepareQaTree() {
   const codex = join(qaBase, "codex-harness-engineering"),
     hermes = join(qaBase, "hermes-harness-engineering");
   const context = {
-    schema: "codex.context-provider-source-closure.v3",
+    schema: "codex.context-provider-source-closure.v4",
     consumerRoot: codex,
     providerRoot: common,
     providerProjectId: "agent-platform",
@@ -508,6 +512,7 @@ const registrationPath=join(root,'architecture/context-provider.json'),module=jo
 const original=JSON.parse(await readFile(registrationPath,'utf8'));
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const gitPaths=${JSON.stringify(gitWorkPaths)};
+const memoryPaths=${JSON.stringify(memoryPaths)};
 async function proof(change,overlays=new Map(),driftPath){
  const value=structuredClone(original);change(value,overlays);
  for(const pin of value.sourcePins)if(overlays.has(join(provider,pin.path)))pin.sha256=hash(overlays.get(join(provider,pin.path)));
@@ -519,12 +524,14 @@ async function proof(change,overlays=new Map(),driftPath){
 }
 const current=await proof(()=>{});
 assert.equal(current.gitWorkModulePath,join(provider,'packages/work-continuity/src/git-work/index.ts'));
-assert.equal(current.pins.length,23);
-const v2=await proof(value=>{value.schema='codex.context-provider-source-closure.v2';delete value.gitWorkModulePath;value.sourcePins=value.sourcePins.filter(pin=>!gitPaths.includes(pin.path));});
+assert.equal(current.pins.length,26);
+const v3=await proof(value=>{value.schema='codex.context-provider-source-closure.v3';value.sourcePins=value.sourcePins.filter(pin=>!memoryPaths.includes(pin.path));});
+assert.equal(v3.pins.length,23);
+const v2=await proof(value=>{value.schema='codex.context-provider-source-closure.v2';delete value.gitWorkModulePath;value.sourcePins=value.sourcePins.filter(pin=>!gitPaths.includes(pin.path)&&!memoryPaths.includes(pin.path));});
 assert.equal(v2.gitWorkModulePath,undefined);assert.equal(v2.pins.length,16);
 const v1=await proof((value,overlays)=>{
  value.schema='codex.context-provider-source-closure.v1';delete value.gitWorkModulePath;
- value.sourcePins=value.sourcePins.filter(pin=>!gitPaths.includes(pin.path)&&pin.path!=='packages/work-continuity/releases/palantirkc-ontology-0.2.0.tgz');
+ value.sourcePins=value.sourcePins.filter(pin=>!gitPaths.includes(pin.path)&&!memoryPaths.includes(pin.path)&&pin.path!=='packages/work-continuity/releases/palantirkc-ontology-0.2.0.tgz');
  const pkgPath=join(provider,'packages/work-continuity/package.json'),rootPath=join(provider,'package.json');
  const pkg=JSON.parse(${JSON.stringify(await readFile(join(common, "packages/work-continuity/package.json"), "utf8"))}),rootPkg=JSON.parse(${JSON.stringify(await readFile(join(common, "package.json"), "utf8"))});
  delete pkg.dependencies['@palantirkc/ontology'];pkg.peerDependencies={'@palantirkc/ontology':'0.2.0'};
@@ -546,7 +553,7 @@ await assert.rejects(()=>proof((value,overlays)=>{
  pkg.exports['./git-work']='./src/context/index.ts';overlays.set(path,Buffer.from(JSON.stringify(pkg)));
 }),/immutable owner\/package\/Ontology/);
 await assert.rejects(()=>proof(()=>{},new Map(),join(provider,'packages/work-continuity/src/git-work/source.ts')),/changed during read/);
-console.log(JSON.stringify({recordClass:'source-only-context-provider-v3-adversarial-proof',legacySchemasPreserved:2,rejectedCases:8,nativePermissionGranted:false}));
+console.log(JSON.stringify({recordClass:'source-only-context-provider-v4-adversarial-proof',legacySchemasPreserved:3,rejectedCases:8,nativePermissionGranted:false}));
 `,
   );
   await run(common, [process.execPath, providerProbe]);
@@ -561,6 +568,17 @@ console.log(JSON.stringify({recordClass:'source-only-git-work-first-import-refus
 `,
   );
   await run(common, [process.execPath, firstImportProbe]);
+  const memoryFirstImportProbe = join(qaBase, "memory-first-import-probe.ts");
+  await writeFile(
+    memoryFirstImportProbe,
+    String.raw`import {strict as assert} from 'node:assert';
+await import(${JSON.stringify(join(common, "packages/work-continuity/src/workspace/recall-request.ts"))});
+const {loadCodexOwnerContext}=await import(${JSON.stringify(join(codex, "src/legacy/harness/owner-context-loader.ts"))});
+await assert.rejects(()=>loadCodexOwnerContext(),/imported before its observed source closure/);
+console.log(JSON.stringify({recordClass:'source-only-memory-first-import-refusal',nativePermissionGranted:false}));
+`,
+  );
+  await run(common, [process.execPath, memoryFirstImportProbe]);
   const gitDriftProbe = join(qaBase, "git-work-source-drift-probe.ts");
   await writeFile(
     gitDriftProbe,

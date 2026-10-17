@@ -32,6 +32,12 @@ export const gitWorkProviderRelativeSources = [
   "packages/work-continuity/src/logical-identity.ts",
   "packages/work-continuity/src/operational-state.ts",
 ] as const;
+export const memoryProviderRelativeSources = [
+  "packages/work-continuity/src/workspace/recall-request.ts",
+  "packages/work-continuity/src/workspace/lexical-recall.ts",
+  "packages/work-continuity/src/workspace/qualification.ts",
+] as const;
+const memoryModuleRelativePath = memoryProviderRelativeSources[0];
 const legacyContextProviderRelativeSources = contextProviderRelativeSources.filter(
   (path) => path !== "packages/work-continuity/releases/palantirkc-ontology-0.2.0.tgz",
 );
@@ -55,9 +61,12 @@ export async function readRegisteredContextProvider(
   if (registration.bytes.byteLength > 2097152 || registration.pin.sha256 !== match[1])
     throw Error("Pinned context provider registration changed");
   const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(registration.bytes));
-  const version3 = value?.schema === "codex.context-provider-source-closure.v3";
+  const version4 = value?.schema === "codex.context-provider-source-closure.v4";
+  const version3 = version4 || value?.schema === "codex.context-provider-source-closure.v3";
   const version2 = version3 || value?.schema === "codex.context-provider-source-closure.v2";
-  const requiredSources = version3
+  const requiredSources = version4
+    ? [...contextProviderRelativeSources, ...gitWorkProviderRelativeSources, ...memoryProviderRelativeSources]
+    : version3
     ? [...contextProviderRelativeSources, ...gitWorkProviderRelativeSources]
     : version2
       ? contextProviderRelativeSources
@@ -81,6 +90,7 @@ export async function readRegisteredContextProvider(
       "codex.context-provider-source-closure.v1",
       "codex.context-provider-source-closure.v2",
       "codex.context-provider-source-closure.v3",
+      "codex.context-provider-source-closure.v4",
     ].includes(value.schema) ||
     value.consumerRoot !== root ||
     value.providerRoot !== resolve(root, "../agent-platform") ||
@@ -136,6 +146,7 @@ export async function readRegisteredContextProvider(
     pkg.name !== packageName ||
     pkg.exports?.["./context"] !== "./src/context/index.ts" ||
     (version3 && pkg.exports?.["./git-work"] !== "./src/git-work/index.ts") ||
+    (version4 && pkg.exports?.["./memory/recall-request"] !== "./src/workspace/recall-request.ts") ||
     rootPackage.dependencies?.["@palantirkc/ontology"] !==
       "file:releases/palantirkc-ontology-0.2.0.tgz" ||
     (version2
@@ -163,6 +174,9 @@ export async function readRegisteredContextProvider(
     Bun.resolveSync(packageName + "/git-work", dirname(module)) !== gitWorkModulePath
   )
     throw Error("Git Work provider package resolves outside registered canonical module");
+  if (version4 && Bun.resolveSync(packageName + "/memory/recall-request", dirname(module)) !==
+      resolve(value.providerRoot, memoryModuleRelativePath))
+    throw Error("Memory provider package resolves outside registered canonical module");
   await recheckContextProvider({ pins }, readSource);
   return {
     pins,

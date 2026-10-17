@@ -96,6 +96,77 @@ function freeze<T>(value: T): T {
   return value;
 }
 
+// Deliberately internal: metadata, serialized proofs and object copies are not byte receipts.
+const originalBytes = new WeakMap<
+  ResolvedSource,
+  {
+    bytes: Uint8Array;
+    serialized: string;
+    objects: object[];
+    descriptors: PropertyDescriptorMap[];
+    prototypes: object[];
+  }
+>();
+function objectGraph(value: unknown, result: object[] = [], seen = new Set<object>()): object[] {
+  if (value !== null && typeof value === "object" && !seen.has(value)) {
+    seen.add(value);
+    result.push(value);
+    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(value)))
+      if ("value" in descriptor) objectGraph(descriptor.value, result, seen);
+  }
+  return result;
+}
+function enrollOriginal(result: ResolvedSource, bytes: Uint8Array): ResolvedSource {
+  const objects = objectGraph(result);
+  originalBytes.set(result, {
+    bytes: bytes.slice(),
+    serialized: JSON.stringify(result),
+    objects,
+    descriptors: objects.map((value) => Object.getOwnPropertyDescriptors(value)),
+    prototypes: objects.map((value) => Object.getPrototypeOf(value)),
+  });
+  return result;
+}
+/** Same-process canonical reader receipt only, with defensive full-blob bytes. */
+export function verifiedOriginalBytes(source: ResolvedSource): Uint8Array {
+  const proof = originalBytes.get(source);
+  if (!proof) throw Error("VERIFIED_ORIGINAL_RECEIPT_REQUIRED");
+  const objects = objectGraph(source);
+  if (
+    objects.length !== proof.objects.length ||
+    objects.some((value, index) => {
+      if (
+        value !== proof.objects[index] ||
+        Object.getPrototypeOf(value) !== proof.prototypes[index]
+      )
+        return true;
+      const descriptors = Object.getOwnPropertyDescriptors(value),
+        expected = proof.descriptors[index]!;
+      return (
+        Reflect.ownKeys(descriptors).length !== Reflect.ownKeys(expected).length ||
+        Reflect.ownKeys(expected).some((key) => {
+          const actual = Object.getOwnPropertyDescriptor(value, key),
+            prior = Object.getOwnPropertyDescriptor(proof.objects[index]!, key);
+          const saved = expected[key as string];
+          return (
+            !actual ||
+            !prior ||
+            !saved ||
+            ["value", "get", "set", "writable", "enumerable", "configurable"].some(
+              (field) =>
+                actual[field as keyof PropertyDescriptor] !==
+                saved[field as keyof PropertyDescriptor],
+            )
+          );
+        })
+      );
+    }) ||
+    JSON.stringify(source) !== proof.serialized
+  )
+    throw Error("VERIFIED_ORIGINAL_RECEIPT_REQUIRED");
+  return proof.bytes.slice();
+}
+
 export function gitReadEnvironment(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
@@ -216,7 +287,11 @@ export async function openGitWork(input: GitWorkSelection): Promise<GitWorkReade
         !["snapshot", "git"].includes(reference.receipt.kind)
       )
         throw Error("INVALID_NATIVE_SOURCE_REFERENCE");
-      return { ...(await source(reference.receipt)), declaredNativeSource: reference };
+      const receipt = await source(reference.receipt);
+      return enrollOriginal(
+        { ...receipt, declaredNativeSource: reference },
+        verifiedOriginalBytes(receipt),
+      );
     }
     if (!["snapshot", "git"].includes(reference.kind)) throw Error("INVALID_SOURCE_REFERENCE");
     assertGitPath(reference.path);
@@ -283,19 +358,22 @@ export async function openGitWork(input: GitWorkSelection): Promise<GitWorkReade
     const sha256 = digest(cached.bytes);
     if (reference.sha256 !== undefined && reference.sha256 !== sha256)
       throw Error("SOURCE_CONTENT_MISMATCH");
-    return {
-      reference: structuredClone(reference),
-      repositoryId,
-      commit,
-      path: reference.path,
-      blobOid: cached.blobOid,
-      byteLength: cached.bytes.byteLength,
-      sha256,
-      document: structuredClone(cached.document),
-      value: structuredClone(selectFragment(cached.document, reference.fragment)),
-      verificationClass: "git-object-source-only",
-      nativeAuthorshipVerified: false,
-    };
+    return enrollOriginal(
+      {
+        reference: structuredClone(reference),
+        repositoryId,
+        commit,
+        path: reference.path,
+        blobOid: cached.blobOid,
+        byteLength: cached.bytes.byteLength,
+        sha256,
+        document: structuredClone(cached.document),
+        value: structuredClone(selectFragment(cached.document, reference.fragment)),
+        verificationClass: "git-object-source-only",
+        nativeAuthorshipVerified: false,
+      },
+      cached.bytes,
+    );
   }
   async function readRecord(reference: RecordReference): Promise<GitWorkRecord> {
     reference = freeze(structuredClone(reference));
