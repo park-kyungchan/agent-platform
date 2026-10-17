@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-FINAL-APPROVAL",
+  "status": "accepted",
+  "answer": "최종 승인하고 자율작업 시작",
+  "meaning": "Explicit current approval of final-readback-packet SHA2130fb6cd5d6755f16bfb7ed1157a6dc61f3e3ac127d2cb5d47821fdb81f97a5 and linked whole-scope contract; per-change checks, review, explicit merge and separate native-owner activation remain.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-FINAL-APPROVAL.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "[최종 실행 패킷](/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/final-readback-packet.json)의 계약으로 장시간 자율작업을 시작할까요? 새 Work는 ontology-driven-platform-integration-20261017이며, 전체 Ontology 통합 → 하나의 Codex Orchestrator에서 실제 Hermes·Codex 사용과 공통 Memory/ID/복구 흐름 검증 → 소유권에 맞춘 대규모 private GitHub 통합·분리·명명·폐기와 기존 승인 도메인 성과 → 실제 채택·검증·Acceptance까지 포함합니다. runtime 변경은 지정된 두 Docker 루트, 추가 결제는 0입니다. 신규 평가만 16 requests·native 보고 총 500만 tokens·8시간으로 제한합니다. 변경마다 독립 검토·필수 검사·명시적 merge·owner 활성화를 지킵니다. 처음 요청하신 ‘인터뷰 후 최종 승인’을 확인하는 단계이며, 승인하면 Herdr/long-work skill을 적용하고 native Goal을 생성해 진행합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-FINAL-APPROVAL.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

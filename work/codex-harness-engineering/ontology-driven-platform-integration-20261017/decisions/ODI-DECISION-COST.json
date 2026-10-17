@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-COST",
+  "status": "accepted",
+  "answer": "기존 구독·자원 사용, 추가 결제 0",
+  "meaning": "Existing subscriptions/resources only; additional paid cost zero.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COST.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "최대 범위 자율작업에서 추가 유료 API·모델 평가·외부 서비스 비용의 상한은 어떻게 정할까요? 기존 구독의 Codex 작업과 새 과금은 구분하겠습니다. 금액을 직접 적어도 됩니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COST.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

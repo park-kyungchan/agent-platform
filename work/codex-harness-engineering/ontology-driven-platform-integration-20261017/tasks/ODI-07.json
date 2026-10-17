@@ -1,0 +1,44 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-07",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-07"
+  },
+  "title": "Execute large GitHub repository and module rearchitecture",
+  "nextAction": "Hold dispatch until this Task's exact declared dependencies and native/source owner qualifications pass; then Evidence-backed integration/split/naming/retirement with canonical/generator/adapter/distribution ownership, imports/build/docs/pins/CI and actual consumer equivalence Verify: Read-only target analysis may run earlier; disruptive migration follows proven owners/consumers/recovery. Current19boundaries are not final; preserve native/data/source custody and public-release dependencies.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    {
+      "taskId": "ODI-05",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

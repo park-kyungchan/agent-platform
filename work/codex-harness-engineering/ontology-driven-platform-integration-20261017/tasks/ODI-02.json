@@ -1,0 +1,44 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-02",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-02"
+  },
+  "title": "Prepare minimum exact common/native source and caller repairs",
+  "nextAction": "Hold dispatch until this Task's exact declared dependencies and native/source owner qualifications pass; then Reviewed canonical fixes for observed selected-Work/topic/caller/source-path blockers; coordinated owner pins, generated projections and affected checks Verify: Preserve first-import refusal, immutable releases and native/data owners; only blockers to the first useful flow enter this slice. If observation finds no required source repair, successful no-change qualification satisfies this step; do not manufacture changes.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    {
+      "taskId": "ODI-01",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-INPUT-FRESH-EVALUATION",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex",
+    "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T09-13-10-01a14734-9160-70a2-a10d-df6ea9c50b91.jsonl:956",
+    "kind": "native-user-message"
+  },
+  "content": {
+    "text": "토큰 10배 늘리고 시간도 4배 늘려라",
+    "question": "추가 비용 0을 유지하면서, 별도 native 모델 평가 suite의 한도를 어떻게 정할까요? 실제 업무 수행과 동작·비용 측정은 어느 선택에서도 포함됩니다. 이 한도는 별도 평가에만 적용됩니다.",
+    "verbatim": true,
+    "nativeRecordedAt": "2026-10-17T01:11:41.038Z",
+    "nativeMessage": "1-\"공통하네스부터 시작해서 /docker/hermes-agent-2q3y/ 하네스와 /docker/herdr-runtime/ 하네스 엔지니어링까지 end to end로 완료해서, Hermes와 Codex CLI를 srv1873899-herdr에서 pane 및 tab에서 Orchestrator Session하나로 control하는 것이었는데, 중간에 작업이 계속해서 길어져서 최적화작업에만 수많은 시간을 투입함. 특히 hermes-agent-2q3y는 v0.22.0으로 업데이트까지 했는데 한 번도 사용해보지 못함.\"\n2-\"토큰 10배 늘리고 시간도 4배 늘려라\"",
+    "captureLimitation": "Source-owned capture of observed native user text. Git source validation does not authenticate native authorship or permission.",
+    "originalQuestionOptions": [
+      "별도 suite 없이 실제 업무를 관측·측정",
+      "기존 구독 내 최대 16회·50만 token·2시간 평가",
+      "새 평가 한도를 직접 지정"
+    ],
+    "originalQuestionCallId": "call_b8831be0e46446c3bca306762a445e48",
+    "fullQuestionNativeLocator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T09-13-10-01a14734-9160-70a2-a10d-df6ea9c50b91.jsonl:941"
+  }
+}

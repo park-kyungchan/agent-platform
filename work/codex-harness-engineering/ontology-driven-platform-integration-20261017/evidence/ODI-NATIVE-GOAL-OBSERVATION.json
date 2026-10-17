@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-NATIVE-GOAL-OBSERVATION",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "native",
+    "ownerId": "native-codex",
+    "locator": "codex-thread:01a14734-9160-70a2-a10d-df6ea9c50b91/native-goal/create_goal/1792203972",
+    "receipt": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-NATIVE-GOAL-OBSERVATION.json",
+      "fragment": "#/content/nativeGoalReceipt"
+    }
+  }
+}

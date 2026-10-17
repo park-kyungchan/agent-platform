@@ -1,0 +1,44 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-04-R",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-04-R"
+  },
+  "title": "Independently review the first Hermes producer result in native Codex",
+  "nextAction": "Hold dispatch until this Task's exact declared dependencies and native/source owner qualifications pass; then Distinct native Codex reviewer Task/Run, exact producer artifact/source snapshot checks, counterexamples/current findings, durable independent review and receiver proof Verify: Reviewer is separate from builder. Dependency requires producer bounded mechanical verification, not this independent review; no cycle. Root receives exact source-correlated result before ODI-05 and current zero unresolved findings before integration.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-04",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

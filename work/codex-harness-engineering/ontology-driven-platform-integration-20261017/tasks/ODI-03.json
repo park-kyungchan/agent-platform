@@ -1,0 +1,44 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-03",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-03"
+  },
+  "title": "Qualify explicit native adoption and current execution routes",
+  "nextAction": "Hold dispatch until this Task's exact declared dependencies and native/source owner qualifications pass; then Exact installed source/profile/tool/currentness/permission readback and separately admitted owner activation, with fresh evaluation envelope/ledger Verify: Qualify actual Herdr/pane foreground, Codex executable+ultra arguments, Hermes selected profile/fresh session guards; native auth/model use not inferred from files.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-02",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}
