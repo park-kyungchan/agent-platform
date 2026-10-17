@@ -1,0 +1,47 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05-NATIVE-MEMORY-CALLER",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-05-NATIVE-MEMORY-CALLER"
+  },
+  "title": "Use current canonical Memory in a useful fresh native Hermes task",
+  "nextAction": "After reviewed code/owner activation and current G2 qualification, admit one fresh Hermes turn: invoke canonical read-memory CLI with per-instance policy, use its source-attributed result for the bounded common-harness/repository investigation, and return useful findings. Correlate native-created stored key, marker, tool argv/stdout, durable response and usage; retain current authority/originals, unknown-usage exception and effect fences. Deliver independent verification and actual shared/receiver receipts separately; no old occurrence/G1 reuse or uncertain dispatch replay. Detailed existing contract pins and pre-dispatch checks: OPS odi05-native-memory-caller-task-record-preparation-v1/contract-binding.PROPOSAL.json.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-05-MEMORY-BINDING",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-EVALUATION-BUDGET-DELEGATED-40M32R48H",
+    "ODI-DECISION-CLI-WORKER-DEFAULT",
+    "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION",
+    "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}
