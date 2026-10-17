@@ -25,6 +25,7 @@ import {
   compareQualitySources,
   type QualitySourceSnapshot,
 } from "./source-snapshot";
+import { writeQualityProgress, type QualityProgressObserver } from "./progress";
 
 export interface AnyDebt {
   path: string;
@@ -240,7 +241,11 @@ export async function checkTypedLint(scope: QualityScope): Promise<{
 export type QualityMode =
   "all" | "format" | "format:write" | "lint" | "workflows" | "architecture" | "baseline:any";
 
-export async function runQuality(rootPath: string, mode: QualityMode): Promise<QualityReport> {
+export async function runQuality(
+  rootPath: string,
+  mode: QualityMode,
+  observe?: QualityProgressObserver,
+): Promise<QualityReport> {
   const started = performance.now(),
     startedAt = new Date().toISOString(),
     root = resolve(rootPath);
@@ -248,31 +253,45 @@ export async function runQuality(rootPath: string, mode: QualityMode): Promise<Q
   let scope: QualityScope | undefined;
   let sourceIdentity: QualityReport["sourceIdentity"];
   let sourceSnapshot: QualitySourceSnapshot | undefined;
+  const progress = async (currentCheck: string | null, complete = false): Promise<void> => {
+    await observe?.({
+      schema: "agent-platform.quality-progress.v1",
+      status: complete ? "complete" : "running",
+      mode,
+      startedAt,
+      updatedAt: new Date().toISOString(),
+      currentCheck,
+      checks: checks.map(({ id, status, durationMs }) => ({ id, status, durationMs })),
+    });
+  };
   const perform = async (
     id: string,
     callback: () => Promise<unknown>,
     successful: (result: unknown) => boolean = () => true,
   ): Promise<boolean> => {
+    await progress(id);
     const phase = performance.now();
+    let pass = false;
     try {
-      const details = await callback(),
-        pass = successful(details);
+      const details = await callback();
+      pass = successful(details);
       checks.push({
         id,
         status: pass ? "pass" : "fail",
         durationMs: Math.round(performance.now() - phase),
         details: metadataOnlyCommandOutput(details),
       });
-      return pass;
     } catch (error) {
+      pass = false;
       checks.push({
         id,
         status: "fail",
         durationMs: Math.round(performance.now() - phase),
         details: { error: error instanceof Error ? error.message : String(error) },
       });
-      return false;
     }
+    await progress(null);
+    return pass;
   };
   const allowed = await perform("mutation-policy", async () => {
     if (process.env.GITHUB_ACTIONS === "true" && ["format:write", "baseline:any"].includes(mode))
@@ -471,6 +490,7 @@ export async function runQuality(rootPath: string, mode: QualityMode): Promise<Q
       (result) => (result as { status: string }).status === "pass",
     );
   }
+  await progress(null, true);
   return {
     schema: "agent-platform.quality-report.v1",
     status: checks.some((check) => check.status !== "pass") ? "fail" : "pass",
@@ -549,7 +569,12 @@ if (import.meta.main) {
         "Custom-root or mutating source quality requires Bun 1.4.3; automatic preparation is unavailable",
       );
     }
-    report = await runQuality(root, mode);
+    report = await runQuality(root, mode, async (progress) => {
+      // Emit bounded metadata before expensive work so a stalled phase is observable.
+      console.error(JSON.stringify(progress));
+      if (process.env.QUALITY_REPORT_PATH)
+        await writeQualityProgress(process.env.QUALITY_REPORT_PATH + ".progress.json", progress);
+    });
   }
   const reportPath = process.env.QUALITY_REPORT_PATH;
   if (reportPath) {

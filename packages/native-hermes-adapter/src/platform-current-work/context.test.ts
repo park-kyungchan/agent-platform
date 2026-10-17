@@ -843,3 +843,46 @@ test("selected Task keeps its historical contract when Work active revisions adv
   expect(value.context?.work.strings).toContain("Retain originals");
   expect(value.context?.work.strings).toContain("New active criterion remains distinct");
 });
+
+test("explicit metadata adoption preserves the decoded v2 contract and wrapper cap", async () => {
+  const f = await fixture({ clauses: ["Preserve every original and criterion"] });
+  const old = await readHermesCurrentWorkContextV2(event, f.selected, f.index, f.provider);
+  const packed = await readHermesCurrentWorkContextV2(event, f.selected, f.index, {
+    ...f.provider,
+    metadataEncoding: "metadata.v1",
+  });
+  expect(old.status).toBe("source-qualified");
+  expect(packed.status).toBe("source-qualified");
+  expect(JSON.stringify(packed).length).toBeLessThanOrEqual(12000);
+  expect(packed.context?.work).toHaveProperty("encoding.version", "metadata.v1");
+  expect(gitWork.decodeCompactGitWorkContext(packed.context!.work)).toEqual(
+    gitWork.decodeCompactGitWorkContext(old.context!.work),
+  );
+  expect(packed.nativePermissionGranted).toBe(false);
+});
+
+test("metadata adoption refuses v1 or missing composed provider and retains final-cap HOLD", async () => {
+  const f = await fixture();
+  const badVersion = await readHermesCurrentWorkContext(event, f.selected, f.index, {
+    ...f.provider,
+    metadataEncoding: "metadata.v1",
+  });
+  expect(badVersion.holdReasons).toContain("INVALID_STARTUP_CONTEXT_ENCODING");
+  expect(f.counters()).toEqual({ reads: 0, checks: 0 });
+  const incomplete = { ...f.provider.gitWork! };
+  delete incomplete.readCompactGitWorkContext;
+  const missing = await readHermesCurrentWorkContextV2(event, f.selected, f.index, {
+    ...f.provider,
+    gitWork: incomplete,
+    metadataEncoding: "metadata.v1",
+  });
+  expect(missing.holdReasons).toContain("COMPOSED_CONTEXT_PROVIDER_REQUIRED");
+  const small = await readHermesCurrentWorkContextV2(event, f.selected, f.index, {
+    ...f.provider,
+    metadataEncoding: "metadata.v1",
+    maxChars: 1024,
+  });
+  expect(small.status).toBe("held");
+  expect(small.context).toBeNull();
+  expect(JSON.stringify(small).length).toBeLessThanOrEqual(1024);
+});

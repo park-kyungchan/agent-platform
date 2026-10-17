@@ -24,6 +24,7 @@ export interface PlatformBuildRequest {
   /** Explicit version selection; omission preserves the existing v1 wire consumer. */
   currentWorkOutputVersion?: "v1" | "v2";
   currentWorkMaxChars?: number;
+  currentWorkMetadataEncoding?: "metadata.v1";
 }
 async function compilerPin(path: string) {
   if (resolve(path) !== path || (await realpath(path)) !== path)
@@ -107,6 +108,12 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
   );
   if (!outputPolicy.valid) throw Error("INVALID_CURRENT_WORK_OUTPUT_BUDGET");
   if (
+    request.currentWorkMetadataEncoding !== undefined &&
+    (request.currentWorkMetadataEncoding !== "metadata.v1" ||
+      request.currentWorkOutputVersion !== "v2")
+  )
+    throw Error("EXPLICIT_CURRENT_WORK_METADATA_ENCODING_REQUIRED");
+  if (
     !/^[a-f0-9]{64}$/u.test(request.compiler.sha256) ||
     !/^[a-f0-9]{64}$/u.test(request.legacyManifestSha256)
   )
@@ -185,6 +192,12 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
         "--define",
         "HERMES_CURRENT_WORK_MAX_CHARS=" + JSON.stringify(outputPolicy.policy.maxChars),
       ];
+      if (request.currentWorkMetadataEncoding)
+        argv.push(
+          "--define",
+          "HERMES_CURRENT_WORK_METADATA_ENCODING=" +
+            JSON.stringify(request.currentWorkMetadataEncoding),
+        );
       const child = Bun.spawn(argv, {
         cwd: request.providerRoot,
         stdin: "ignore",
@@ -282,6 +295,9 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
       nativeActivation: false as const,
       currentWorkOutputVersion: request.currentWorkOutputVersion ?? "v1",
       currentWorkOutputPolicy: outputPolicy.policy,
+      ...(request.currentWorkMetadataEncoding
+        ? { currentWorkMetadataEncoding: request.currentWorkMetadataEncoding }
+        : {}),
       authority: "none" as const,
       nativePermissionGranted: false as const,
     };

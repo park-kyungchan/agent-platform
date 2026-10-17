@@ -4,8 +4,10 @@ import {
   assertLogicalIdentity,
   compactGitWorkContext,
   type CompactGitWorkContext,
+  type GitWorkCompactOutput,
   openGitWork,
   readGitWorkContext,
+  readCompactGitWorkContext,
   resolveGitWorkSelection,
   type ContextSourceProjection,
   type DecisionRecord,
@@ -98,7 +100,7 @@ export interface HermesCompactWorkResult extends Omit<
   "schema" | "context"
 > {
   schema: "hermes.current-git-work-context.v2";
-  context: { native: HermesCurrentWorkEvent; work: CompactGitWorkContext } | null;
+  context: { native: HermesCurrentWorkEvent; work: GitWorkCompactOutput } | null;
   outputPolicy: CurrentWorkOutputPolicy;
 }
 type HermesWorkOutputVersion = "v1" | "v2";
@@ -107,12 +109,15 @@ type HermesWorkResult = HermesCurrentWorkResult | HermesCompactWorkResult;
 export type HermesCurrentWorkGitApi = Pick<
   typeof import("@palantirkc/work-continuity/git-work"),
   "resolveGitWorkSelection" | "openGitWork" | "readGitWorkContext"
->;
+> &
+  Partial<Pick<typeof import("@palantirkc/work-continuity/git-work"), "readCompactGitWorkContext">>;
 export interface HermesCurrentWorkOptions {
   /** The owning loader verifies its exact source closure before and after reading. */
   verifySourceClosure: () => Promise<void>;
   gitWork?: HermesCurrentWorkGitApi;
   maxChars?: number;
+  /** Explicit owner adoption; no change to callers that omit it. */
+  metadataEncoding?: "metadata.v1";
 }
 type Row = Record<string, unknown>;
 const nativeKeys = [
@@ -264,7 +269,7 @@ function selection(value: unknown): HermesCurrentWorkSelection {
 }
 function result(
   reasons: string[],
-  context: HermesCurrentWorkView | null = null,
+  context: HermesCurrentWorkView | HermesCompactWorkResult["context"] = null,
   outputVersion: HermesWorkOutputVersion = "v1",
   maxChars = 6000,
 ): HermesWorkResult {
@@ -280,7 +285,9 @@ function result(
     holdReasons: [...new Set(reasons)],
     context:
       context && outputVersion === "v2"
-        ? { native: context.native, work: context.semanticContext }
+        ? "work" in context
+          ? context
+          : { native: context.native, work: context.semanticContext }
         : context,
     projection: "bounded-derived-pointer-view",
     currentness: "caller-declared-not-remote-verified",
@@ -387,6 +394,11 @@ async function readHermesCurrentWorkContextInternal(
   let selected: HermesCurrentWorkSelection;
   let event: HermesCurrentWorkEvent;
   if (!selectedPolicy.valid) return output(["INVALID_STARTUP_CONTEXT_BUDGET"]);
+  if (
+    options?.metadataEncoding !== undefined &&
+    (options.metadataEncoding !== "metadata.v1" || outputVersion !== "v2")
+  )
+    return output(["INVALID_STARTUP_CONTEXT_ENCODING"]);
   if (!options || typeof options.verifySourceClosure !== "function")
     return output(["SOURCE_CLOSURE_VERIFIER_REQUIRED"]);
   try {
@@ -400,7 +412,12 @@ async function readHermesCurrentWorkContextInternal(
   const scope: NativeReferenceScope = { ...selected.native, logical: selected.logical };
   const reference = selectRuntimeReference(runtimeIndex, scope);
   if (reference.status !== "matched") return output(reference.holdReasons);
-  const api = options.gitWork ?? { resolveGitWorkSelection, openGitWork, readGitWorkContext };
+  const api = options.gitWork ?? {
+    resolveGitWorkSelection,
+    openGitWork,
+    readGitWorkContext,
+    readCompactGitWorkContext,
+  };
   try {
     await options.verifySourceClosure();
     try {
@@ -413,6 +430,39 @@ async function readHermesCurrentWorkContextInternal(
         reader.work.issueId !== selected.logical.issueId
       )
         return output(["CURRENT_WORK_LOGICAL_CONTRACT_MISMATCH"]);
+      if (options.metadataEncoding) {
+        if (typeof api.readCompactGitWorkContext !== "function")
+          return output(["COMPOSED_CONTEXT_PROVIDER_REQUIRED"]);
+        const task = await reader.readRecord({ kind: "task", id: selected.logical.taskId });
+        if (task.kind !== "task" || !sameLogical(task.logical, selected.logical))
+          return output(["CURRENT_TASK_LOGICAL_CONTRACT_MISMATCH"]);
+        const semanticContext = await api.readCompactGitWorkContext(
+          reader,
+          {
+            taskId: task.id,
+            latestRelevant: selected.latestRelevant,
+            maxChars: 24000,
+            maxRecords: 256,
+          },
+          { taskId: task.id, decisionIds: task.decisionIds },
+          "metadata.v1",
+        );
+        const reasons = safeReasons(semanticContext.holdReasons);
+        if (semanticContext.status === "held" && !reasons.length)
+          reasons.push("REQUIRED_COMPACT_CONTEXT_UNAVAILABLE");
+        const after = await api.resolveGitWorkSelection(selected.snapshot);
+        if (after.commit !== snapshot.commit)
+          reasons.push("SELECTED_LOCAL_REF_ADVANCED_DURING_READ");
+        const wrapped = result(
+          reasons,
+          { native: selected.native, work: semanticContext },
+          "v2",
+          maxChars,
+        );
+        return JSON.stringify(wrapped).length <= maxChars
+          ? wrapped
+          : output(["REQUIRED_STARTUP_CONTEXT_OUTPUT_LIMIT"]);
+      }
       const context = await api.readGitWorkContext(reader, {
         taskId: selected.logical.taskId,
         latestRelevant: selected.latestRelevant,

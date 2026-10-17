@@ -15,6 +15,7 @@ export {
 } from "./records.ts";
 export {
   readGitWorkContext,
+  readCompactGitWorkContext,
   compactGitWorkContext,
   decodeCompactGitWorkContext,
   qualifyGitWorkStart,
