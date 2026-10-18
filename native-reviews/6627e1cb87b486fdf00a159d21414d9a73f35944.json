@@ -1,0 +1,52 @@
+{
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "6627e1cb87b486fdf00a159d21414d9a73f35944",
+  "reviewedTreeSha": "a73339e4c76b93a40b601da90c6e9ae08d2f1483",
+  "reviewedSourceManifestSha256": "792f3dc3471db0834a2e5c96780d52e599ea847d1331d96431115546a331e22a",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15006-eaef-7f23-bcb8-c3440a03b7dc"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15003-9cee-7662-bbc2-7c1990379b30"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "schema": "native-independent-review.v2",
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/0e1cd0412018700b79debf5059400888527930af/native-review-results/6627e1cb87b486fdf00a159d21414d9a73f35944.json",
+    "sha256": "b8c88c9ff1612ad02adb5f6d24d17884bd34a608c9f8e323216703ded36bb60a"
+  },
+  "identitySemantics": {
+    "legacyReviewActorField": "Existing ReviewV2 taskId is used here as an explicitly namespaced actual native actor identifier. native-thread:<UUID> correlates the actor to the actual native stored thread/session header; it is not a native Task occurrence ID.",
+    "reviewerAgentPath": "/root/handoff_recovery",
+    "reviewerNativeStoredSessionId": "01a15006-eaef-7f23-bcb8-c3440a03b7dc",
+    "authorNativeThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "observedLineage": {
+      "sourceKind": "subagent.thread_spawn",
+      "metadataLineSha256": "b2617f5ac68145d2c59b187f6f4f7c88704b8512d8f48107e26518340fe34bee",
+      "originator": "codex-tui",
+      "cliVersion": "0.163.0",
+      "headerTimestamp": "2026-10-18T17:19:53.071Z"
+    },
+    "receipt": {
+      "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/owned-root-subagents-metadata.actual.json",
+      "sha256": "35adfd475b8d117451997f07f8f86d8abc71b599bcfe135fea0e2189894e046a",
+      "bytes": 2419
+    },
+    "custody": "Read only the existing allowlisted owned session_meta receipt. No native messages, transcripts or session bodies read/copied. Runtime-issued /root/handoff_recovery maps to this stored actor independently of Root author. No unexposed allocation invented.",
+    "contractCheck": "ci/quality/receipt-validator.ts NativeReviewIdentity and exact review predicate accept nonempty distinct native-codex actor strings <=256 without whitespace. Both actual namespaced identifiers satisfy it; no source guard/schema change was required."
+  },
+  "relatedImmutableEvidence": {
+    "sourceReview": "https://github.com/park-kyungchan/agent-platform/blob/0e1cd0412018700b79debf5059400888527930af/native-review-details/6627e1cb87b486fdf00a159d21414d9a73f35944.json",
+    "nativeActorCustody": "https://github.com/park-kyungchan/agent-platform/blob/0e1cd0412018700b79debf5059400888527930af/native-review-identities/6627e1cb87b486fdf00a159d21414d9a73f35944.json"
+  }
+}
