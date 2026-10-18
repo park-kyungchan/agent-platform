@@ -17,11 +17,11 @@
     "taskId": "ODI-HOST-CODEX-ADMISSION"
   },
   "title": "Deliver actual host native Codex current Work admission",
-  "nextAction": "Implement exact host source registrations/markers and source-only candidate/promotion/session admission through the existing owner. Verify actual native current Work caller after reviewed delivery; no config/auth/permission changes.",
+  "nextAction": "Source implementation and four focused repairs received at Input ODI-HOST-CODEX-SOURCE-RESULT; do not repeat completed dispatch. Root must finish coordinated provider/marker/fixture currentness, full checks and independent final review/publication; actual host native application/readback, shared/formal/Acceptance remain pending.",
   "state": {
-    "execution": "planned",
+    "execution": "complete",
     "verification": "pending",
-    "localAudit": "intent-durable",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
