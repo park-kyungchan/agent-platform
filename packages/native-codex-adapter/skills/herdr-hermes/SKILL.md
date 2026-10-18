@@ -9,6 +9,8 @@ User instructions and existing authorization take precedence. Dated restrictions
 
 Read [control.md](references/control.md) for Hermes launch, correlation, interruption and recovery. Read [deployment.md](references/deployment.md) when selecting local/native versus SSH/Docker control. Read [documentation.md](references/documentation.md) when using Runtime Index routes or reconciling documentation with the installed release.
 
+For post-turn self-improvement, background skill/memory writes or source-pinned skill drift, read [native-learning.json](references/native-learning.json). It separates official guidance, version-qualified behavior and required native observations; Herdr adds no Memory engine.
+
 ## Essential decisions
 
 - Reconcile inherited IDs against live inventory and foreground argv. Use the verified explicit pane ID or live agent name; stale caller context is not an authority. Preserve user focus. Control only resources authorized for this task, and never treat read access to another session as permission to send input.

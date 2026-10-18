@@ -655,12 +655,20 @@ console.log(JSON.stringify({recordClass:'source-only-git-work-source-drift-refus
   );
 }
 
-export async function reviewGate() {
-  const repository = process.env.GITHUB_REPOSITORY,
-    head = process.env.REVIEW_HEAD_SHA,
-    token = process.env.GITHUB_TOKEN;
-  const expectedCreator = process.env.NATIVE_REVIEW_STATUS_CREATOR_ID,
-    expectedLogin = process.env.NATIVE_REVIEW_STATUS_CREATOR_LOGIN;
+export interface ReviewGateOptions {
+  env?: NodeJS.ProcessEnv;
+  readApi?: (path: string) => Promise<unknown>;
+  now?: () => number;
+  delay?: (milliseconds: number) => Promise<void>;
+}
+
+export async function reviewGate(options: ReviewGateOptions = {}) {
+  const env = options.env ?? process.env;
+  const repository = env.GITHUB_REPOSITORY,
+    head = env.REVIEW_HEAD_SHA,
+    token = env.GITHUB_TOKEN;
+  const expectedCreator = env.NATIVE_REVIEW_STATUS_CREATOR_ID,
+    expectedLogin = env.NATIVE_REVIEW_STATUS_CREATOR_LOGIN;
   if (
     !repository ||
     !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) ||
@@ -685,8 +693,62 @@ export async function reviewGate() {
     if (!response.ok) throw Error("Native review API read failed: " + response.status);
     return (await response.json()) as any;
   }
-  const statuses = await api(`commits/${head}/statuses?per_page=100`);
-  if (!Array.isArray(statuses)) throw Error("Exact-head native review statuses unavailable");
+  const readApi = options.readApi ?? api;
+  const now = options.now ?? (() => performance.now());
+  const delay =
+    options.delay ??
+    ((milliseconds) => new Promise<void>((done) => setTimeout(done, milliseconds)));
+  const deadline = now() + 60_000;
+  const trustedMainPush =
+    env.GITHUB_ACTIONS === "true" &&
+    env.GITHUB_EVENT_NAME === "push" &&
+    env.GITHUB_REF === "refs/heads/main" &&
+    env.GITHUB_REF_PROTECTED === "true" &&
+    env.GITHUB_SHA === head;
+  let statuses = await readApi(`commits/${head}/statuses?per_page=100`);
+  let waitingAnnounced = false;
+  for (;;) {
+    if (
+      !Array.isArray(statuses) ||
+      statuses.length > 100 ||
+      statuses.some((value: unknown) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return true;
+        const entry = value as Record<string, unknown>;
+        return typeof entry.context !== "string" || !entry.context;
+      })
+    )
+      throw Error("Exact-head native review statuses unavailable or malformed");
+    // A present status always proceeds to the unchanged validation below, including holds.
+    if (
+      statuses.some(
+        (value: { context: string }) => value.context === "native-independent-review",
+      ) ||
+      !trustedMainPush
+    )
+      break;
+    if (statuses.length === 100)
+      throw Error("Exact-head review absence cannot be established from a full status page");
+    if (
+      statuses.some(
+        (entry: Record<string, unknown>) =>
+          !Number.isSafeInteger(entry.id) ||
+          Number(entry.id) <= 0 ||
+          !["success", "pending", "failure", "error"].includes(String(entry.state)),
+      )
+    )
+      throw Error("Exact-head native review absence response is malformed");
+    const remaining = deadline - now();
+    if (remaining <= 0) break;
+    if (!waitingAnnounced) {
+      console.log(
+        "Exact-head review status absent on protected main push; waiting up to 60 seconds for publication",
+      );
+      waitingAnnounced = true;
+    }
+    await delay(Math.min(5000, remaining));
+    if (now() >= deadline) break;
+    statuses = await readApi(`commits/${head}/statuses?per_page=100`);
+  }
   const status = statuses.find((value: any) => value.context === "native-independent-review");
   if (
     !status ||
@@ -715,7 +777,7 @@ export async function reviewGate() {
   const receiptCommit = target.pathname.slice(prefix.length, -suffix.length);
   if (!/^[a-f0-9]{40}$/.test(receiptCommit) || receiptCommit === head)
     throw Error("Native review receipt requires immutable full commit SHA");
-  const content = await api(`contents/native-reviews/${head}.json?ref=${receiptCommit}`);
+  const content = await readApi(`contents/native-reviews/${head}.json?ref=${receiptCommit}`);
   if (
     content.type !== "file" ||
     content.encoding !== "base64" ||
@@ -726,11 +788,11 @@ export async function reviewGate() {
   )
     throw Error("Native review receipt is not a bounded repository file");
   const receipt = JSON.parse(Buffer.from(content.content, "base64").toString("utf8"));
-  const commit = await api("git/commits/" + head);
+  const commit = await readApi("git/commits/" + head);
   if (commit.sha !== head) throw Error("GitHub API returned another commit");
   await validateReceiptWithEvidence(receipt, head, commit.tree?.sha, repository, {
-    readTree: async (treeSha) => api(`git/trees/${treeSha}?recursive=1`),
-    readFile: async (path, ref) => api(`contents/${path}?ref=${ref}`),
+    readTree: async (treeSha) => readApi(`git/trees/${treeSha}?recursive=1`),
+    readFile: async (path, ref) => readApi(`contents/${path}?ref=${ref}`),
   });
   console.log(
     JSON.stringify({
