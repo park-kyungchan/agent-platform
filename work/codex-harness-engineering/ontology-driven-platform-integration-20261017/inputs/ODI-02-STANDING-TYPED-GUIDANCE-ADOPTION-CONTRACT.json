@@ -1,0 +1,282 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-CONTRACT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-worker:packet_result_adjudication",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install.preparation.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi.standing-typed-guidance-native-owner-order.v1",
+    "status": "planned-contract-candidate-no-execution",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 2,
+      "taskId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION"
+    },
+    "contractOwner": "Root accountable Lead",
+    "preparationProducer": "/root/packet_result_adjudication",
+    "effectDecisionOwner": "/root",
+    "nativeIdentity": {
+      "intendedRuntimeId": "native-codex:01a14dce-388e-7162-ae22-757566401de7",
+      "nativeThreadId": "01a14dce-388e-7162-ae22-757566401de7",
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "occurrence": null,
+      "meaning": "Intended current Root runtime, not observed dispatch or native execution identity."
+    },
+    "purpose": {
+      "choice": "Approved meaningful typed engineering topology/hierarchy/structure and relationships across future Leads/agents/threads/Hermes through existing owners.",
+      "relationships": [
+        "purpose/owner/dependency/hierarchy",
+        "stable identity/original answer/rationale/revision",
+        "source lineage/state boundaries"
+      ],
+      "nativeFormats": "Both Codex CLI and Hermes Backend unavoidable native-generated/modified Markdown retain native owners; SKILL.md and required native formats retained.",
+      "language": "Historical English technical-artifact answer applies to Hermes only; no new global English rule.",
+      "proportionality": "No new Goal/Work/Plan/Memory admission or whole Acceptance inferred."
+    },
+    "authority": {
+      "actualUserCapture": {
+        "id": "current-user",
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z/global-typed-memory-user-input.actual.json",
+        "sha256": "5795f4fa26df90da95b5784285fccc8c49fdb31df424b4aa4a7a6b67d7d1e8a3",
+        "byteLength": 2560,
+        "fragment": "#/originalText",
+        "classification": "actual-current-user-message-capture; native authentication not independently recreated",
+        "nativeThreadId": "01a14cae-4ac1-7cb1-ac35-27060c49037b",
+        "nativeMessageId": null,
+        "nativeAuthorshipIndependentlyAuthenticated": false
+      },
+      "existingDecisionId": "ODI-DECISION-GLOBAL-TYPED-ENGINEERING",
+      "clarificationDecisionId": "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION",
+      "canonicalStandingSourceDecision": {
+        "commit": "fe591ffe113aef092f3f526cadcd7c575c579881",
+        "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
+        "sha256": "bc46b6a65f90716d5d4a729b374951e228adb66aaf003e977e052c0ceed77038"
+      },
+      "RootScope": "Separate Root logical child Task/owner order under later actual standing instruction. This source-owner engineering contract is not a new user answer or permission grant.",
+      "historicalExclusion": "Old ODI-02-NATIVE-GLOBAL-USE/fullProcedure excludes SKILL/long-work edits and targets old paused SID/common666b/owner5754; preserve all bytes/history and never replay/use it as this successor installation procedure."
+    },
+    "sourcePair": {
+      "common": "fe591ffe113aef092f3f526cadcd7c575c579881",
+      "codexOwner": "14fde3d172e9f944b6655105298b1eab925d6d24",
+      "bothActuallyAdoptedClean": true
+    },
+    "candidatePreparation": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install.preparation.actual.json",
+      "sha256": "7d5339d3749db6165adf44b23886d269ea386dbf998d4493846e753d31974ac6"
+    },
+    "candidateIndependentReview": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install.independent-review.actual.json",
+      "sha256": "2c43d08d429d844b94c96f310b13664eb250130c3fb708314209be03e66d6ab3",
+      "requiredFindingCount": 0,
+      "unresolvedRequiredFindings": 0,
+      "meaning": "Exact candidate review only; source proof is not native permission/loading."
+    },
+    "exactFiveFiles": [
+      {
+        "source": {
+          "commit": "fe591ffe113aef092f3f526cadcd7c575c579881",
+          "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/SKILL.md",
+          "blob": "57cc380d929cb8b7e9144870b5244f50e0374b51"
+        },
+        "candidate": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install-001/candidate/herdr-codex-long-work/SKILL.md",
+          "sha256": "44538b53c65973f42b8b1c635af6a98ffb2b6ad67355b33f1017e6f74496f6c8",
+          "bytes": 11349
+        },
+        "target": "/home/palantirkc/.agents/skills/herdr-codex-long-work/SKILL.md",
+        "preimage": {
+          "exists": true,
+          "sha256": "2b052b4a3fd663e11f8275fd6cc9f50bf8582ea4d3e767de2b20c62767abef4f",
+          "bytes": 10816,
+          "mode": "0o644",
+          "uid": 1000,
+          "gid": 1000,
+          "symlink": false,
+          "inode": 610541,
+          "resolved": "/home/palantirkc/.agents/skills/herdr-codex-long-work/SKILL.md"
+        },
+        "parentPreimage": {
+          "exists": true,
+          "mode": "0o755",
+          "uid": 1000,
+          "gid": 1000,
+          "symlink": false
+        },
+        "installMetadata": {
+          "uid": 1000,
+          "gid": 1000,
+          "mode": "0o644"
+        }
+      },
+      {
+        "source": {
+          "commit": "fe591ffe113aef092f3f526cadcd7c575c579881",
+          "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
+          "blob": "a7e738ed30191e3db02ce91c6dcb4ac237ab1596"
+        },
+        "candidate": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install-001/candidate/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
+          "sha256": "bc46b6a65f90716d5d4a729b374951e228adb66aaf003e977e052c0ceed77038",
+          "bytes": 17532
+        },
+        "target": "/home/palantirkc/.agents/skills/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
+        "preimage": {
+          "exists": false
+        },
+        "parentPreimage": {
+          "exists": true,
+          "mode": "0o755",
+          "uid": 1000,
+          "gid": 1000,
+          "symlink": false
+        },
+        "installMetadata": {
+          "uid": 1000,
+          "gid": 1000,
+          "mode": "0o644"
+        }
+      },
+      {
+        "source": {
+          "commit": "fe591ffe113aef092f3f526cadcd7c575c579881",
+          "path": "packages/native-codex-adapter/skills/herdr-hermes/SKILL.md",
+          "blob": "87ea002928c98969c516b8488613d28f469a1a17"
+        },
+        "candidate": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install-001/candidate/herdr-hermes/SKILL.md",
+          "sha256": "9f07a45d13e1730c1cee5334d8ae75c678d41a4b55c39eac3e42a5c568c02e01",
+          "bytes": 4136
+        },
+        "target": "/home/palantirkc/.agents/skills/herdr-hermes/SKILL.md",
+        "preimage": {
+          "exists": true,
+          "sha256": "c2c014becf8cf76ebeaa9b8135ef56a0d9ca140d66cd3b21bd4051c0132068e4",
+          "bytes": 3858,
+          "mode": "0o644",
+          "uid": 1000,
+          "gid": 1000,
+          "symlink": false,
+          "inode": 1929461,
+          "resolved": "/home/palantirkc/.agents/skills/herdr-hermes/SKILL.md"
+        },
+        "parentPreimage": {
+          "exists": true,
+          "mode": "0o755",
+          "uid": 1000,
+          "gid": 1000,
+          "symlink": false
+        },
+        "installMetadata": {
+          "uid": 1000,
+          "gid": 1000,
+          "mode": "0o644"
+        }
+      },
+      {
+        "source": {
+          "commit": "fe591ffe113aef092f3f526cadcd7c575c579881",
+          "path": "packages/native-codex-adapter/skills/herdr-hermes/references/native-learning.json",
+          "blob": "d2f9c8205b087250253d1694f2ac422c8225d66c"
+        },
+        "candidate": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install-001/candidate/herdr-hermes/references/native-learning.json",
+          "sha256": "6e17438f0acd55fdc3b513dbd6f466ea3650c6abfc33cafca8afd24def100cbe",
+          "bytes": 4461
+        },
+        "target": "/home/palantirkc/.agents/skills/herdr-hermes/references/native-learning.json",
+        "preimage": {
+          "exists": false
+        },
+        "parentPreimage": {
+          "exists": true,
+          "mode": "0o755",
+          "uid": 1000,
+          "gid": 1000,
+          "symlink": false
+        },
+        "installMetadata": {
+          "uid": 1000,
+          "gid": 1000,
+          "mode": "0o644"
+        }
+      },
+      {
+        "source": {
+          "commit": "14fde3d172e9f944b6655105298b1eab925d6d24",
+          "module": "src/native/global-guidance.ts",
+          "function": "renderStandingEngineeringGuidance",
+          "sha256": "91db35f25107bcc9c2676fddae589695fceaf3f9bb4dca6879eeba907956bfda"
+        },
+        "candidate": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install-001/global-agents.candidate.md",
+          "sha256": "394a1436915d26544d881cea9aad8a2e7554fd8892a3af35e3979f63aaeadbae",
+          "bytes": 1147
+        },
+        "target": "/home/palantirkc/.codex/AGENTS.md",
+        "preimage": {
+          "exists": false
+        },
+        "installMetadata": {
+          "mode": "0o644",
+          "uid": 1000,
+          "gid": 1000
+        },
+        "renderInput": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install-001/standing-guidance-render.input.json",
+          "sha256": "defb62635a692c35487d1bb495d56e8fdb8f959f8c60c9e3dbc60f15569e649b"
+        },
+        "qualification": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install-001/render-qualification.actual.json",
+          "sha256": "7958afb0578854f5739b52ee3ead5ba39a108c8301f93ecdd989c5f8a43ff7ca"
+        }
+      }
+    ],
+    "otherFiles": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/global-typed-guidance-install-001/preserved-other-files.inventory.actual.json",
+      "sha256": "759f530983ade237f88486ed965858a214beeb82e59c2a96647b19d2fb674384"
+    },
+    "otherFilesCount": 11,
+    "ownerOrder": [
+      "Root personally checks applicable later authority/current findings/exact coherent commonM-ownerM source closures, complete original preimages and independent five-file review.",
+      "Immediately before any write exact byte/absence/mode/uid/gid/parent CAS; drift HOLD and preserve third-state bytes, no blind rollback.",
+      "ONLY two support JSONs first, reviewed existing owner operation and metadata; verify each hash.",
+      "ONLY two SKILL.md files next after support bytes present; preserve all other11 files including explain-code-clearly.",
+      "ONLY standing-only global AGENTS pointer last, actual public-owner render over entire original bytes; reject altered/duplicate managed blocks.",
+      "Read back actual installed hashes/modes/owners and preservation inventory. Record native effects and verification separately; later observe native automatic loading/reload separately."
+    ],
+    "futureVerificationCriteria": [
+      "All5 installed bytes equal exact reviewed hashes and metadata; support-first order evidenced.",
+      "Other11 inventory/preimages/third-state bytes preserved.",
+      "Existing context34/native16/source/render preimages current at effect boundary, no first-import weakening or cache clear.",
+      "Actual owner-native effects/receipts distinct; nativeTask/Run unknown unless observed.",
+      "Installation, native loading/reload, Memory admission, formal completion and Acceptance remain distinct; no fabricated passed evidence."
+    ],
+    "exclusions": [
+      "No other files/profile/hooks/trust/cache/config/credentials/native stores",
+      "No harnessapply/general renderer/new installer/framework/global Memory admission",
+      "No model call/evaluation/payment/Goal or old effect replay"
+    ],
+    "effects": {
+      "dispatched": false,
+      "effectIds": [],
+      "installed": false,
+      "nativeLoadingObserved": false,
+      "MemoryAdmitted": false,
+      "Acceptance": null
+    }
+  }
+}
