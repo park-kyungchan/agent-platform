@@ -1,3 +1,7 @@
+import {
+  preflightQualityImprovement,
+  compareQualityImprovement,
+} from "../packages/evidence-foundry/src/modules/evals/quality-improvement.ts";
 import { readFile } from "node:fs/promises";
 import {
   preflightImprovement,
@@ -19,7 +23,7 @@ import {
 } from "../packages/work-continuity/src/runtime-docs/index.ts";
 
 const usage =
-  "bun run harness context|validate|start|docs|improvement-preflight|improvement-compare <request.json>; transition <before.json> <after.json>; source <snapshot.json> <relative-path>";
+  "bun run harness context|validate|start|docs|improvement-preflight|improvement-compare|quality-preflight|quality-compare <request.json>; transition <before.json> <after.json>; source <snapshot.json> <relative-path>";
 async function readRequest(path: string | undefined): Promise<unknown> {
   if (!path) throw Error(usage);
   const bytes = await readFile(path);
@@ -78,6 +82,10 @@ export async function runHarness(argv: string[]): Promise<unknown> {
     throw Error(usage);
   const request = object(await readRequest(path));
   switch (command) {
+    case "quality-preflight":
+      return preflightQualityImprovement(request);
+    case "quality-compare":
+      return compareQualityImprovement(request);
     case "improvement-preflight":
       return preflightImprovement(request);
     case "improvement-compare":

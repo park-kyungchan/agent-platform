@@ -33,6 +33,7 @@ import type {
 
 export * from "./types";
 export * from "./improvement";
+export * from "./quality-improvement";
 
 export interface EvalDatasetProperties extends PersistedDatasetProperties {
   revision?: string;
