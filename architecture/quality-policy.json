@@ -117,6 +117,18 @@
       "sha256": "40c5e87f935697962f205ba7c1c3612e2fcfb2a6293099e6842d380b356c4137",
       "capabilityId": "native-codex-source",
       "reason": "Exact common-owned Herdr long-work skill reference; source definition and captured standing user decision only, without native permission, runtime activation or acceptance."
+    },
+    {
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
+      "sha256": "bc46b6a65f90716d5d4a729b374951e228adb66aaf003e977e052c0ceed77038",
+      "capabilityId": "native-codex-source",
+      "reason": "Exact common-owned standing typed engineering decision and attributed historical rationale; existing user, Memory and native owners retained. Source definition only; no global Recall admission, native permission or activation."
+    },
+    {
+      "path": "packages/native-codex-adapter/skills/herdr-hermes/references/native-learning.json",
+      "sha256": "6e17438f0acd55fdc3b513dbd6f466ea3650c6abfc33cafca8afd24def100cbe",
+      "capabilityId": "native-codex-source",
+      "reason": "Exact common-owned Herdr-Hermes native-learning knowledge reference; partial official guidance, version-qualified implementation and required actual evidence stay distinct. Source definition only; no native permission or activation."
     }
   ],
   "stagedSources": [

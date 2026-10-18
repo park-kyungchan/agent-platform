@@ -21,6 +21,7 @@ import type {
   ResolvedSource,
   SourceReference,
   ExternalGitSource,
+  SnapshotSource,
 } from "../git-work/types.ts";
 import { constants } from "node:fs";
 import { open, realpath } from "node:fs/promises";
@@ -646,10 +647,29 @@ export async function readLocalRecallRequest(
 
 // Git Work binding. Code selection remains the native owner's fixed provider;
 // these addresses select data only. All review inputs remain conditional owner declarations.
+/** A bounded source-owner preference view; every original is explicitly pinned. */
+export interface GitPreferenceDescriptor {
+  schema: "common.git-work-standing-preference.v1";
+  applicability: string;
+  revision: string;
+  inputId: string;
+  nodeIds: string[];
+  nodes: SnapshotSource;
+  relations: SnapshotSource;
+  sources: Array<{ id: string; source: SnapshotSource | ExternalGitSource }>;
+}
+/** Explicit native-owner selection, not a caller flag or a grant to the consumer's Work. */
+export interface GitCommonPreferenceSelection {
+  topicId: string;
+  claimKey: string;
+  applicability: string;
+  descriptorSha256: string;
+  consumer: { repositoryId: string; workId?: string };
+}
 interface GitMemoryDescriptor {
   topicId: string;
   generationId: string;
-  taskId: string;
+  taskId?: string;
   receiptTaskIds: string[];
   claims: Array<{ key: string; record: RecordReference }>;
   inputIds: { request: string; dataset: string; policy: string };
@@ -658,6 +678,7 @@ interface GitMemoryDescriptor {
   limit?: number;
   maxChars?: number;
   policy: PolicyFile;
+  preference?: GitPreferenceDescriptor;
 }
 interface GitSourceBinding {
   source: PortableSource;
@@ -680,6 +701,7 @@ function gitDescriptor(value: unknown, reader: GitWorkReader): GitMemoryDescript
       "policy",
       "limit",
       "maxChars",
+      "preference",
     ],
     "Git descriptor",
   );
@@ -696,7 +718,7 @@ function gitDescriptor(value: unknown, reader: GitWorkReader): GitMemoryDescript
   const result: GitMemoryDescriptor = {
     topicId: text(row.topicId, "topic"),
     generationId: text(row.generationId, "generation"),
-    taskId: text(row.taskId, "selected Task"),
+    ...(row.preference === undefined ? { taskId: text(row.taskId, "selected Task") } : {}),
     receiptTaskIds: strings(row.receiptTaskIds, "receipt Tasks"),
     claims: array(row.claims, "selected claims").map((value) => {
       const item = object(value, ["key", "record"], "selected claim");
@@ -716,19 +738,273 @@ function gitDescriptor(value: unknown, reader: GitWorkReader): GitMemoryDescript
     ...(row.limit === undefined ? {} : { limit: Number(row.limit) }),
     ...(row.maxChars === undefined ? {} : { maxChars: Number(row.maxChars) }),
     policy: policy(row.policy, reader.selection.projectId, reader.selection.workId),
+    ...(row.preference === undefined
+      ? {}
+      : { preference: gitPreferenceDescriptor(row.preference, reader) }),
   };
   if (
     !result.claims.length ||
-    !result.receiptTaskIds.length ||
+    (!result.preference && !result.receiptTaskIds.length) ||
     result.policy.activeGenerationId !== result.generationId ||
-    result.policy.policy.commonAdmissions.length ||
+    (!result.preference && result.policy.policy.commonAdmissions.length) ||
     new Set(Object.values(result.inputIds)).size !== 3
   )
     invalid("Git descriptor closure");
   identities(result.claims, (row) => row.key);
   identities(result.receiptTaskIds, (row) => row);
   if (!result.claims.some((row) => row.key === result.claimKey)) invalid("selected claim key");
+  if (
+    result.preference &&
+    (row.taskId !== undefined ||
+      result.receiptTaskIds.length ||
+      result.claims.length !== 1 ||
+      result.claims[0]!.record.kind !== "decision")
+  )
+    invalid("Git preference-only descriptor");
   return result;
+}
+
+function preferenceSource(value: unknown): SnapshotSource | ExternalGitSource {
+  const row = object(
+    value,
+    ["kind", "path", "fragment", "sha256", "repositoryId", "commit"],
+    "preference source",
+  );
+  const common = {
+    path: text(row.path, "preference source path", 4096),
+    fragment: text(row.fragment, "preference source fragment", 1024),
+    sha256: digest(row.sha256, "preference source hash"),
+  };
+  if (!common.fragment.startsWith("#/")) invalid("preference source fragment");
+  if (row.kind === "snapshot" && row.repositoryId === undefined && row.commit === undefined)
+    return { kind: "snapshot", ...common };
+  if (
+    row.kind !== "git" ||
+    typeof row.commit !== "string" ||
+    !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(row.commit)
+  )
+    invalid("preference source address");
+  return {
+    kind: "git",
+    ...common,
+    repositoryId: text(row.repositoryId, "preference source repository"),
+    commit: row.commit,
+  };
+}
+function gitPreferenceDescriptor(value: unknown, reader: GitWorkReader): GitPreferenceDescriptor {
+  const row = object(
+    value,
+    ["schema", "applicability", "revision", "inputId", "nodeIds", "nodes", "relations", "sources"],
+    "preference descriptor",
+  );
+  if (row.schema !== "common.git-work-standing-preference.v1") invalid("preference schema");
+  const inputId = text(row.inputId, "preference Input");
+  const inputPath = gitRecordPath(reader.selection.projectId, reader.selection.workId, {
+    kind: "input",
+    id: inputId,
+  });
+  const nodes = preferenceSource(row.nodes),
+    relations = preferenceSource(row.relations);
+  if (
+    [nodes, relations].some((ref) => ref.kind !== "snapshot" || ref.path !== inputPath) ||
+    nodes.sha256 !== relations.sha256
+  )
+    invalid("preference projection Input");
+  const nodeIds = strings(row.nodeIds, "preference node IDs");
+  const sources = array(row.sources, "preference sources").map((value) => {
+    const source = object(value, ["id", "source"], "preference source binding");
+    return { id: text(source.id, "preference source ID"), source: preferenceSource(source.source) };
+  });
+  if (!nodeIds.length || nodeIds.length > 12 || !sources.length || sources.length > 12)
+    invalid("preference projection budget");
+  identities(nodeIds, (value) => value);
+  identities(sources, (value) => value.id);
+  return {
+    schema: row.schema,
+    applicability: text(row.applicability, "preference applicability"),
+    revision: text(row.revision, "preference revision"),
+    inputId,
+    nodeIds,
+    nodes: nodes as SnapshotSource,
+    relations: relations as SnapshotSource,
+    sources,
+  };
+}
+
+function withinPreference(
+  source: ResolvedSource,
+  reader: GitWorkReader,
+  descriptor: GitMemoryDescriptor,
+): void {
+  verifiedOriginalBytes(source);
+  const preference = descriptor.preference!;
+  const inputPath = gitRecordPath(reader.selection.projectId, reader.selection.workId, {
+    kind: "input",
+    id: preference.inputId,
+  });
+  const decisionPath = gitRecordPath(
+    reader.selection.projectId,
+    reader.selection.workId,
+    descriptor.claims[0]!.record,
+  );
+  const primary =
+    source.repositoryId === reader.selection.repositoryId &&
+    source.commit === reader.commit &&
+    (source.path === decisionPath ||
+      (source.path === inputPath && source.sha256 === preference.nodes.sha256));
+  const declared = preference.sources.some(
+    ({ source: ref }) =>
+      source.path === ref.path &&
+      source.sha256 === ref.sha256 &&
+      source.repositoryId ===
+        (ref.kind === "git" ? ref.repositoryId : reader.selection.repositoryId) &&
+      source.commit === (ref.kind === "git" ? ref.commit : reader.commit),
+  );
+  const record = assertRecord(source.document);
+  if (
+    (!primary && !declared) ||
+    source.repositoryId !== reader.selection.repositoryId ||
+    record.domainId !== reader.work.domainId ||
+    record.projectId !== reader.work.projectId ||
+    (record.kind !== "input" &&
+      !(primary && source.path === decisionPath && record.kind === "decision"))
+  )
+    invalid("preference original scope");
+  if (
+    source.path !==
+    gitRecordPath(record.projectId, record.workId, { kind: record.kind, id: record.id })
+  )
+    invalid("preference canonical record path");
+}
+
+async function compilePreference(
+  reader: GitWorkReader,
+  capture: GitWorkReader,
+  descriptor: GitMemoryDescriptor,
+) {
+  const preference = descriptor.preference!;
+  const workSource = await reader.readSource({
+    kind: "snapshot",
+    path: reader.workPath + "/work.json",
+  });
+  withinWork(workSource, reader);
+  if (workSource.path !== reader.workPath + "/work.json" || !same(reader.work, workSource.document))
+    invalid("Git preference Work proof binding");
+  const ref = descriptor.claims[0]!.record;
+  const record = await reader.readRecord(ref);
+  const proof = await capture.readSource({
+    kind: "snapshot",
+    path: gitRecordPath(reader.selection.projectId, reader.selection.workId, ref),
+  });
+  if (
+    !same(record, proof.document) ||
+    record.kind !== "decision" ||
+    record.status !== "accepted" ||
+    !record.selectionContext ||
+    !reader.work.governingDecisionIds.includes(record.id)
+  )
+    invalid("Git preference current Decision");
+  await validateRecordSources(record, capture);
+  const inputPath = gitRecordPath(reader.selection.projectId, reader.selection.workId, {
+    kind: "input",
+    id: preference.inputId,
+  });
+  if (record.answerSource.path !== inputPath || record.selectionContext.source.path !== inputPath)
+    invalid("Git preference original answer binding");
+  const nodesSource = await capture.readSource(preference.nodes);
+  const relationsSource = await capture.readSource(preference.relations);
+  const allNodes = array(nodesSource.value, "preference nodes").map((value) => {
+    const node = object(
+      value,
+      ["id", "kind", "meaning", "sources", "appliesTo"],
+      "preference node",
+    );
+    return {
+      id: text(node.id, "preference node ID"),
+      kind: choice(node.kind, ["preference", "direct-why", "derived-why"], "preference node class"),
+      meaning: text(node.meaning, "preference node meaning", 1600),
+      sources: strings(node.sources, "preference node sources"),
+      ...(node.appliesTo === undefined
+        ? {}
+        : { appliesTo: text(node.appliesTo, "preference applicability", 256) }),
+    };
+  });
+  identities(allNodes, (node) => node.id);
+  if (allNodes.length > 32) invalid("preference node budget");
+  const nodes = preference.nodeIds.map((id) => {
+    const node = allNodes.find((node) => node.id === id);
+    if (!node || !node.sources.length) invalid("preference selected node");
+    identities(node.sources, (source) => source);
+    return node;
+  });
+  const requiredSources = new Set(nodes.flatMap((node) => node.sources));
+  if (
+    !nodes.some((node) => node.kind === "preference") ||
+    !nodes.some((node) => node.kind === "direct-why") ||
+    requiredSources.size !== preference.sources.length ||
+    preference.sources.some((source) => !requiredSources.has(source.id))
+  )
+    invalid("preference full selected lineage");
+  const relations = array(relationsSource.value, "preference relations")
+    .map((value) => {
+      const edge = object(value, ["from", "type", "to", "appliesTo"], "preference relation");
+      return {
+        from: text(edge.from, "preference relation source"),
+        type: text(edge.type, "preference relation type", 64),
+        to: text(edge.to, "preference relation target"),
+        ...(edge.appliesTo === undefined
+          ? {}
+          : { appliesTo: text(edge.appliesTo, "preference relation applicability") }),
+      };
+    })
+    .filter(
+      (edge) => preference.nodeIds.includes(edge.from) && preference.nodeIds.includes(edge.to),
+    );
+  const reached = new Set([nodes.find((node) => node.kind === "preference")!.id]);
+  for (let count = 0; count < nodes.length; count++)
+    for (const edge of relations) if (reached.has(edge.from)) reached.add(edge.to);
+  if (reached.size !== nodes.length || relations.some((edge) => edge.from === edge.to))
+    invalid("preference meaningful topology");
+  const acyclic = (id: string, ancestors = new Set<string>()): boolean => {
+    if (ancestors.has(id)) return false;
+    const next = new Set([...ancestors, id]);
+    return relations.filter((edge) => edge.from === id).every((edge) => acyclic(edge.to, next));
+  };
+  if (relations.length > 32 || nodes.some((node) => !acyclic(node.id)))
+    invalid("preference cyclic topology");
+  const originals = [];
+  for (const source of preference.sources) {
+    const resolved = await capture.readSource(source.source);
+    const original = assertRecord(resolved.document);
+    if (original.kind !== "input" || original.inputKind !== "actual-user-answer")
+      invalid("preference actual original class");
+    const originalText = text(resolved.value, "preference original text", 12_000);
+    originals.push({
+      id: source.id,
+      source: originalAddress(resolved),
+      ...(originalText === record.answer ? {} : { text: originalText }),
+      originKind: original.origin.kind,
+      nativeAuthorshipVerified: false,
+    });
+  }
+  const projection = {
+    schema: "common.standing-preference-projection.v1",
+    topicId: descriptor.topicId,
+    revision: preference.revision,
+    applicability: preference.applicability,
+    decision: {
+      id: record.id,
+      answer: record.answer,
+      meaning: record.meaning,
+      selectionContext: record.selectionContext,
+    },
+    nodes,
+    relations,
+    originals,
+  };
+  const projectionText = JSON.stringify(projection);
+  if (projectionText.length > 6000) invalid("preference projection text budget");
+  return { records: new Map([[recordKey(record), record]]), text: projectionText };
 }
 function same(value: unknown, other: unknown): boolean {
   return isDeepStrictEqual(value, other);
@@ -822,25 +1098,33 @@ export async function prepareGitWorkMemoryArtifacts(
   const descriptor = gitDescriptor(value, reader);
   if (Buffer.byteLength(JSON.stringify(descriptor)) > maxFileBytes)
     invalid("Git descriptor byte budget");
-  if (!reader.work.continuity?.purposeSources.length) invalid("Git purpose originals missing");
-  const records = new Map<string, GitWorkRecord>();
+  if (!descriptor.preference && !reader.work.continuity?.purposeSources.length)
+    invalid("Git purpose originals missing");
+  let records = new Map<string, GitWorkRecord>();
   const resolved: ResolvedSource[] = [];
   // The wrapper captures every canonical validation read, including nested prerequisite receipts.
   const capture: GitWorkReader = {
     ...reader,
     readSource: async (ref) => {
       const result = await reader.readSource(ref);
-      withinWork(result, reader);
+      if (descriptor.preference) withinPreference(result, reader, descriptor);
+      else withinWork(result, reader);
       resolved.push(result);
       return result;
     },
   };
-  const queue: RecordReference[] = [
-    { kind: "work", id: reader.selection.workId },
-    { kind: "task", id: descriptor.taskId },
-    ...descriptor.receiptTaskIds.map((id) => ({ kind: "task" as const, id })),
-    ...descriptor.claims.map((row) => row.record),
-  ];
+  const preference = descriptor.preference
+    ? await compilePreference(reader, capture, descriptor)
+    : undefined;
+  if (preference) records = preference.records;
+  const queue: RecordReference[] = preference
+    ? []
+    : [
+        { kind: "work", id: reader.selection.workId },
+        { kind: "task", id: descriptor.taskId! },
+        ...descriptor.receiptTaskIds.map((id) => ({ kind: "task" as const, id })),
+        ...descriptor.claims.map((row) => row.record),
+      ];
   let existingEffects: Set<string> | undefined;
   const includeExistingEffects = async (ids: string[]) => {
     if (!ids.length) return;
@@ -877,24 +1161,27 @@ export async function prepareGitWorkMemoryArtifacts(
         ]);
       }
   }
-  const validation = await validateRecordSet(records, capture);
-  if (!validation.valid) invalid("Git record/source closure");
-  const selected = records.get(recordKey({ kind: "task", id: descriptor.taskId }));
-  if (selected?.kind !== "task") invalid("Git selected Task");
-  for (const dependency of selected.dependsOn)
-    if ((await dependencyFindings(selected, dependency, records, capture)).length)
-      invalid("Git prerequisite closure");
-  for (const id of descriptor.receiptTaskIds) {
-    const task = records.get(recordKey({ kind: "task", id }));
-    if (
-      task?.kind !== "task" ||
-      (task.executionClass === "native-effect" && !task.executionEvidenceId) ||
-      !task.verificationEvidenceIds.length ||
-      task.state.execution !== "complete" ||
-      task.state.verification !== "passed"
-    )
-      invalid("Git receipt Task closure");
-    if (!selected.dependsOn.some((row) => row.taskId === id)) invalid("Git unrelated receipt Task");
+  if (!preference) {
+    const validation = await validateRecordSet(records, capture);
+    if (!validation.valid) invalid("Git record/source closure");
+    const selected = records.get(recordKey({ kind: "task", id: descriptor.taskId! }));
+    if (selected?.kind !== "task") invalid("Git selected Task");
+    for (const dependency of selected.dependsOn)
+      if ((await dependencyFindings(selected, dependency, records, capture)).length)
+        invalid("Git prerequisite closure");
+    for (const id of descriptor.receiptTaskIds) {
+      const task = records.get(recordKey({ kind: "task", id }));
+      if (
+        task?.kind !== "task" ||
+        (task.executionClass === "native-effect" && !task.executionEvidenceId) ||
+        !task.verificationEvidenceIds.length ||
+        task.state.execution !== "complete" ||
+        task.state.verification !== "passed"
+      )
+        invalid("Git receipt Task closure");
+      if (!selected.dependsOn.some((row) => row.taskId === id))
+        invalid("Git unrelated receipt Task");
+    }
   }
   const bindings = new Map<string, GitSourceBinding>();
   const fragments = new Map<string, Set<string>>();
@@ -976,10 +1263,12 @@ export async function prepareGitWorkMemoryArtifacts(
       episodeId: episode.id,
       generationId: descriptor.generationId,
       policyRevision: descriptor.policy.policy.revision,
-      text: row.value,
-      contentHash: sha256(row.value),
+      text: preference?.text ?? row.value,
+      contentHash: sha256(preference?.text ?? row.value),
       sourceKeys: episode.sources.map((row) => sourceKey(row.source)),
-      scope: { kind: "repository", repositoryId: reader.selection.repositoryId },
+      scope: descriptor.preference
+        ? { kind: "common" }
+        : { kind: "repository", repositoryId: reader.selection.repositoryId },
       claim: { key: row.key, value: row.value },
     }),
   );
@@ -1079,12 +1368,20 @@ export async function readGitWorkMemoryRequest(
     policyRevision: string;
     activeGenerationId: string;
     state: "current" | "unknown" | "publishing";
+    commonPreferences?: GitCommonPreferenceSelection;
   },
 ) {
   if (reader.commit !== reader.selection.commit) invalid("Git reader selection binding");
   object(
     ownerSelection,
-    ["owningRef", "admittedCommit", "policyRevision", "activeGenerationId", "state"],
+    [
+      "owningRef",
+      "admittedCommit",
+      "policyRevision",
+      "activeGenerationId",
+      "state",
+      "commonPreferences",
+    ],
     "Git owner selection",
   );
   const witness = structuredClone(ownerSelection);
@@ -1195,6 +1492,40 @@ export async function readGitWorkMemoryRequest(
     data.descriptor,
     (data.ownerReview ?? undefined) as SourceReference | undefined,
   );
+  const preferenceDescriptor = compiled.dataset.descriptor.preference;
+  let preferenceSelection: GitCommonPreferenceSelection | undefined;
+  if (preferenceDescriptor || witness.commonPreferences !== undefined) {
+    const selected = object(
+      witness.commonPreferences,
+      ["topicId", "claimKey", "applicability", "descriptorSha256", "consumer"],
+      "common preference owner selection",
+    );
+    const consumer = object(
+      selected.consumer,
+      ["repositoryId", "workId"],
+      "common preference consumer",
+    );
+    preferenceSelection = {
+      topicId: text(selected.topicId, "common preference topic"),
+      claimKey: text(selected.claimKey, "common preference claim"),
+      applicability: text(selected.applicability, "common preference applicability"),
+      descriptorSha256: digest(selected.descriptorSha256, "common preference descriptor hash"),
+      consumer: {
+        repositoryId: text(consumer.repositoryId, "common preference consumer repository"),
+        ...(consumer.workId === undefined
+          ? {}
+          : { workId: text(consumer.workId, "common preference consumer Work") }),
+      },
+    };
+    if (
+      !preferenceDescriptor ||
+      preferenceSelection.topicId !== compiled.request.topicId ||
+      preferenceSelection.claimKey !== compiled.request.claimKey ||
+      preferenceSelection.applicability !== preferenceDescriptor.applicability ||
+      preferenceSelection.descriptorSha256 !== sha256(JSON.stringify(compiled.dataset.descriptor))
+    )
+      invalid("common preference owner binding");
+  }
   if (
     !same(compiled.dataset, data) ||
     !same(compiled.policy, current) ||
@@ -1217,6 +1548,13 @@ export async function readGitWorkMemoryRequest(
       invalid("Git selected Input identities");
   const observeOriginals = async (currentReader: GitWorkReader) => {
     const observations: SourceObservation[] = [];
+    if (
+      preferenceDescriptor &&
+      !currentReader.work.governingDecisionIds.includes(
+        compiled.dataset.descriptor.claims[0]!.record.id,
+      )
+    )
+      invalid("common preference authority is no longer current");
     for (const binding of compiled.dataset.sourceBindings) {
       const historical = await originals.readSource(binding.origin);
       const present = await currentReader.readSource({
@@ -1276,8 +1614,8 @@ export async function readGitWorkMemoryRequest(
   const context = {
     repositoryId: fresh.selection.repositoryId,
     explicitlySharedRepositoryIds: new Set<string>(),
-    commonEnabled: false,
-    applicability: fresh.selection.workId,
+    commonEnabled: preferenceSelection !== undefined,
+    applicability: preferenceSelection?.applicability ?? fresh.selection.workId,
     currentPolicyRevision: current.policy.revision,
     policyHead: "current" as const,
     activeGenerationId: current.activeGenerationId,
@@ -1349,6 +1687,18 @@ export async function readGitWorkMemoryRequest(
       policyRevision: current.policy.revision,
       activeGenerationId: current.activeGenerationId,
       reviewOwnerDeclared: compiled.diagnostics.reviewOwnerDeclared,
+      ...(preferenceSelection
+        ? {
+            commonPreferences: {
+              topicId: preferenceSelection.topicId,
+              claimKey: preferenceSelection.claimKey,
+              applicability: preferenceSelection.applicability,
+              revision: preferenceDescriptor!.revision,
+              consumer: preferenceSelection.consumer,
+              consumerWorkChanged: false,
+            },
+          }
+        : {}),
       sourceBindingSha256: compiled.dataset.reviewBindingSha256,
       currentness: "optimistic-local-ref-and-byte-observation" as const,
       limits:
