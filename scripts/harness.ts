@@ -12,6 +12,7 @@ import {
   resolveGitWorkSelection,
   qualifyGitWorkStart,
   readGitWorkContext,
+  readCompactGitWorkContext,
   validateGitWorkRecords,
   validateGitWorkTransition,
   type ContextRequest,
@@ -91,8 +92,21 @@ export async function runHarness(argv: string[]): Promise<unknown> {
     case "improvement-compare":
       return compareImprovement(request);
     case "context": {
+      const outputVersion = request.outputVersion ?? "v1";
+      if (outputVersion !== "v1" && outputVersion !== "v2")
+        throw Error("EXPLICIT_CONTEXT_OUTPUT_VERSION_REQUIRED");
+      if (
+        request.metadataEncoding !== undefined &&
+        (outputVersion !== "v2" || request.metadataEncoding !== "metadata.v1")
+      )
+        throw Error("EXPLICIT_CONTEXT_METADATA_ENCODING_REQUIRED");
       const reader = await openGitWork(await resolveGitWorkSelection(request.snapshot));
-      return readGitWorkContext(reader, object(request.context) as unknown as ContextRequest);
+      const context = object(request.context) as unknown as ContextRequest;
+      if (outputVersion === "v2")
+        return request.metadataEncoding === "metadata.v1"
+          ? readCompactGitWorkContext(reader, context, { taskId: context.taskId }, "metadata.v1")
+          : readCompactGitWorkContext(reader, context, { taskId: context.taskId });
+      return readGitWorkContext(reader, context);
     }
     case "validate":
       return validateGitWorkRecords(await openGitWork(await resolveGitWorkSelection(request)));
@@ -128,7 +142,11 @@ export async function runHarness(argv: string[]): Promise<unknown> {
 if (import.meta.main) {
   try {
     const result = await runHarness(process.argv.slice(2));
-    console.log(JSON.stringify(result, null, 2));
+    const compactContext =
+      result !== null &&
+      typeof result === "object" &&
+      (result as Record<string, unknown>).schema === "common.git-work-context.compact.v1";
+    console.log(JSON.stringify(result, null, compactContext ? undefined : 2));
     if (result && typeof result === "object") {
       const value = result as Record<string, unknown>;
       if (
