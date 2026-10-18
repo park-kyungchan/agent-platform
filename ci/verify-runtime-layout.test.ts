@@ -19,36 +19,51 @@ async function put(root: string, path: string, content: string): Promise<void> {
   await writeFile(join(root, path), content);
 }
 
-async function fixture(): Promise<{
-  root: string;
-  contract: RuntimeFilesystemContract;
-  save: () => Promise<void>;
-}> {
+async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "runtime-layout-"));
   roots.push(root);
-  const contract = structuredClone(contractShape);
-  const save = () =>
-    put(root, "architecture/runtime-filesystem-contract.json", JSON.stringify(contract));
+  const contract: RuntimeFilesystemContract = structuredClone(contractShape);
   for (const path of contract.sourcePolicy.ownedPaths)
     await put(root, path, "Source-only fixture.\n");
   await put(root, "package.json", JSON.stringify({ name: contract.commonPackage }));
-  await put(
-    root,
-    contract.sourceRegistry,
-    JSON.stringify({
-      capabilities: contract.modules.map((module) => ({
-        id: module.capabilityId,
-        packagePath: module.packagePath,
-        packageName: module.packageName,
-        semanticOwner: module.semanticOwner,
-        nativeAdapterOwnerRoot:
-          "/fixture/" +
-          contract.nativeSourceProjects.find((project) =>
-            module.semanticOwner.includes(project.id),
-          )!.homeRelativeRoot,
-      })),
-    }),
-  );
+  const registry = {
+    schema: "agent-platform.capability-source-owners.v1",
+    id: "agent-platform:architecture:capability-source-owners",
+    status: "current-source-owner-registry",
+    codeOwner: "agent-platform",
+    capabilities: contract.modules.map((module) => ({
+      id: module.capabilityId,
+      packagePath: module.packagePath,
+      packageName: module.packageName,
+      semanticOwner: module.semanticOwner,
+      nativeAdapterOwnerRoot: contract.nativeSourceProjects.find(
+        (project) => project.id === module.nativeSourceProjectId,
+      )!.sourceRoot,
+      packageManifest: {
+        path: contract.commonSourceRoot + "/" + module.packagePath + "/package.json",
+      },
+    })),
+  };
+  const project = {
+    kind: "project",
+    id: "agent-platform:project:manifest",
+    projectId: "agent-platform",
+    domainId: "native-harness",
+    payload: {
+      details: {
+        sourceOwnerRoot: contract.commonSourceRoot,
+        intendedCanonicalRoot: contract.commonSourceRoot,
+        capabilitySourceRegistry: contract.sourceRegistry,
+      },
+    },
+  };
+  const save = async () => {
+    await Promise.all([
+      put(root, "architecture/runtime-filesystem-contract.json", JSON.stringify(contract)),
+      put(root, contract.sourceRegistry, JSON.stringify(registry)),
+      put(root, "project.json", JSON.stringify(project)),
+    ]);
+  };
   for (const module of contract.modules)
     await put(
       root,
@@ -74,7 +89,7 @@ async function fixture(): Promise<{
     );
   }
   await save();
-  return { root, contract, save };
+  return { root, contract, registry, project, save };
 }
 
 test("a standalone canonical source fixture reports explicit unverified native boundaries", async () => {
@@ -95,6 +110,156 @@ test("a standalone canonical source fixture reports explicit unverified native b
     nativeDeploymentSource: "not-inspected",
   });
   expect(result.residuals.length).toBeGreaterThan(0);
+});
+
+test("current host source identities verify outside their declared checkout and native HOME", async () => {
+  const f = await fixture();
+  expect(f.root.startsWith(f.contract.commonSourceRoot)).toBe(false);
+  expect(f.registry.capabilities.map((item) => item.nativeAdapterOwnerRoot)).toEqual([
+    "/home/palantirkc/projects/codex-harness-engineering",
+    "/home/palantirkc/projects/hermes-harness-engineering",
+    "/home/palantirkc/projects/vps-operations",
+  ]);
+  expect((await verifyRuntimeLayout(f.root, { trackedPaths: [] })).status).toBe("pass");
+  expect(
+    f.contract.classes.find((item) => item.id === "native-private-state")!.locations,
+  ).toContain("$HOME/.codex/");
+  expect(f.contract.deploymentProjection.persistentMounts[0]).toEqual({
+    source: "/docker/herdr-runtime/home",
+    target: "/home/palantirkc",
+    class: "service-data",
+  });
+});
+
+test.each([
+  "/foreign/home/palantirkc/projects/codex-harness-engineering",
+  "/home/palantirkc/code/shared/codex-harness-engineering",
+  "/root/projects/codex-harness-engineering",
+  "/home/palantirkc/projects/foreign-owner",
+  "/home/palantirkc/projects/hermes-harness-engineering",
+  "/home/palantirkc/projects/codex-harness-engineering/../codex-harness-engineering",
+  "/home/palantirkc/projects/codex-harness-engineering/",
+])("registry native owner root requires exact current identity: %s", async (sourceRoot) => {
+  const f = await fixture();
+  f.registry.capabilities[0].nativeAdapterOwnerRoot = sourceRoot;
+  await f.save();
+  await expect(verifyRuntimeLayout(f.root, { trackedPaths: [] })).rejects.toThrow(
+    "module ownership",
+  );
+});
+
+test.each([0, 1, 2])(
+  "matching contract and registry cannot admit a foreign root for owner %i",
+  async (index) => {
+    const f = await fixture();
+    const sourceRoot = "/foreign" + f.contract.nativeSourceProjects[index].sourceRoot;
+    f.contract.nativeSourceProjects[index].sourceRoot = sourceRoot;
+    f.registry.capabilities[index].nativeAdapterOwnerRoot = sourceRoot;
+    await f.save();
+    await expect(verifyRuntimeLayout(f.root, { trackedPaths: [] })).rejects.toThrow(
+      "reviewed explicit owner root",
+    );
+  },
+);
+
+test.each([
+  ["nativeSourceProjectId", "hermes-harness-engineering"],
+  ["semanticOwner", "foreign-codex-harness-engineering"],
+  ["packagePath", "packages/native-hermes-adapter"],
+  ["packageName", "@foreign/native-codex-adapter"],
+] as const)("fixed module identity refuses coordinated %s replacement", async (field, value) => {
+  const f = await fixture();
+  f.contract.modules[0][field] = value;
+  if (field !== "nativeSourceProjectId") f.registry.capabilities[0][field] = value;
+  await f.save();
+  await expect(verifyRuntimeLayout(f.root, { trackedPaths: [] })).rejects.toThrow(
+    "fixed native/domain owner identity",
+  );
+});
+
+test("common project, package and registry identities cannot redirect source ownership", async () => {
+  for (const kind of [
+    "project",
+    "project-root",
+    "intended-root",
+    "registry",
+    "common-root",
+    "package",
+  ]) {
+    const f = await fixture();
+    if (kind === "project") f.project.projectId = "foreign-project";
+    if (kind === "project-root")
+      f.project.payload.details.sourceOwnerRoot = "/root/projects/agent-platform";
+    if (kind === "intended-root")
+      f.project.payload.details.intendedCanonicalRoot = "/foreign/agent-platform";
+    if (kind === "registry") f.registry.codeOwner = "foreign-owner";
+    if (kind === "common-root") {
+      f.contract.commonSourceRoot = "/foreign/agent-platform";
+      f.project.payload.details.sourceOwnerRoot = f.contract.commonSourceRoot;
+      f.project.payload.details.intendedCanonicalRoot = f.contract.commonSourceRoot;
+      for (const module of f.registry.capabilities)
+        module.packageManifest.path =
+          f.contract.commonSourceRoot + "/" + module.packagePath + "/package.json";
+    }
+    if (kind === "package") await put(f.root, "package.json", '{"name":"@foreign/agent-platform"}');
+    await f.save();
+    await expect(verifyRuntimeLayout(f.root, { trackedPaths: [] })).rejects.toThrow();
+  }
+});
+
+test.each([
+  "missing-owner",
+  "extra-owner",
+  "duplicate-owner",
+  "duplicate-module",
+  "duplicate-capability",
+])("owner and capability identity sets refuse %s", async (kind) => {
+  const f = await fixture();
+  if (kind === "missing-owner") f.contract.nativeSourceProjects.pop();
+  if (kind === "extra-owner")
+    f.contract.nativeSourceProjects.push({
+      ...structuredClone(f.contract.nativeSourceProjects[0]),
+      id: "foreign-owner",
+    });
+  if (kind === "duplicate-owner")
+    f.contract.nativeSourceProjects.push(structuredClone(f.contract.nativeSourceProjects[0]));
+  if (kind === "duplicate-module") f.contract.modules.push(structuredClone(f.contract.modules[0]));
+  if (kind === "duplicate-capability")
+    f.registry.capabilities.push(structuredClone(f.registry.capabilities[0]));
+  await f.save();
+  await expect(verifyRuntimeLayout(f.root, { trackedPaths: [] })).rejects.toThrow();
+});
+
+test("module manifest paths cannot use another common root or package", async () => {
+  for (const path of [
+    "/foreign/home/palantirkc/projects/agent-platform/packages/native-codex-adapter/package.json",
+    "/home/palantirkc/code/shared/agent-platform/packages/native-codex-adapter/package.json",
+    "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/package.json",
+  ]) {
+    const f = await fixture();
+    f.registry.capabilities[0].packageManifest.path = path;
+    await f.save();
+    await expect(verifyRuntimeLayout(f.root, { trackedPaths: [] })).rejects.toThrow(
+      "manifest root",
+    );
+  }
+});
+
+test("legacy source roots retain producer history without becoming provider fallback or native HOME", async () => {
+  const f = await fixture();
+  for (const project of f.contract.nativeSourceProjects) {
+    expect(project.historicalSource).toEqual({
+      homeRelativeRoot: "code/shared/" + project.id,
+      namespace: "previous-source-owner-home",
+      classification: "history-only-no-provider-fallback",
+    });
+    expect(project.sourceRoot).not.toBe("/root/" + project.historicalSource.homeRelativeRoot);
+  }
+  f.contract.nativeSourceProjects[0].historicalSource.classification = "current-provider-fallback";
+  await f.save();
+  await expect(verifyRuntimeLayout(f.root, { trackedPaths: [] })).rejects.toThrow(
+    "attributed non-provider classification",
+  );
 });
 
 test("a package moved to another source owner cannot pass an unchanged capability declaration", async () => {

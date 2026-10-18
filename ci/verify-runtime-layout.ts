@@ -21,6 +21,33 @@ export interface LayoutReport {
 }
 
 const contractPath = "architecture/runtime-filesystem-contract.json";
+// Reviewed source identities, independent of the CI checkout and native HOME.
+const admittedModules = [
+  {
+    capabilityId: "native-codex-source",
+    packagePath: "packages/native-codex-adapter",
+    packageName: "@palantirkc/native-codex-adapter",
+    semanticOwner: "codex-harness-engineering",
+    nativeSourceProjectId: "codex-harness-engineering",
+    sourceRoot: "/home/palantirkc/projects/codex-harness-engineering",
+  },
+  {
+    capabilityId: "native-hermes-context",
+    packagePath: "packages/native-hermes-adapter",
+    packageName: "@palantirkc/native-hermes-adapter",
+    semanticOwner: "ontology-platform and hermes-harness-engineering",
+    nativeSourceProjectId: "hermes-harness-engineering",
+    sourceRoot: "/home/palantirkc/projects/hermes-harness-engineering",
+  },
+  {
+    capabilityId: "infrastructure-domain",
+    packagePath: "packages/infrastructure-operations",
+    packageName: "@palantirkc/infrastructure-operations",
+    semanticOwner: "vps-operations",
+    nativeSourceProjectId: "vps-operations",
+    sourceRoot: "/home/palantirkc/projects/vps-operations",
+  },
+] as const;
 const unix = (path: string): string => path.split(sep).join("/");
 function requireValue(condition: unknown, message: string): asserts condition {
   if (!condition) throw Error(message);
@@ -275,7 +302,10 @@ export async function verifyRuntimeLayout(
     contract.schema === "agent-platform.runtime-filesystem-contract.v1" &&
       contract.verificationClass === "source-layout-only" &&
       contract.nativePermissionGranted === false &&
-      contract.canonicalRepository === "park-kyungchan/agent-platform",
+      contract.canonicalRepository === "park-kyungchan/agent-platform" &&
+      contract.commonPackage === "@palantirkc/agent-platform" &&
+      contract.commonSourceRoot === "/home/palantirkc/projects/agent-platform" &&
+      contract.sourceRegistry === "architecture/capability-source-owners.json",
     "Invalid canonical layout contract or native authority claim.",
   );
   const rootPackage = object(await jsonFile(root, "package.json"));
@@ -283,29 +313,82 @@ export async function verifyRuntimeLayout(
     rootPackage.name === contract.commonPackage,
     "Common source package identity differs.",
   );
+  const project = object(await jsonFile(root, "project.json"));
+  const details = object(object(project.payload).details);
+  requireValue(
+    project.kind === "project" &&
+      project.id === "agent-platform:project:manifest" &&
+      project.projectId === "agent-platform" &&
+      project.domainId === "native-harness" &&
+      details.sourceOwnerRoot === contract.commonSourceRoot &&
+      details.intendedCanonicalRoot === contract.commonSourceRoot &&
+      details.capabilitySourceRegistry === contract.sourceRegistry,
+    "Common project identity or declared source owner differs.",
+  );
   const registry = object(await jsonFile(root, contract.sourceRegistry));
-  requireValue(Array.isArray(registry.capabilities), "Missing canonical capability registry.");
+  requireValue(
+    registry.schema === "agent-platform.capability-source-owners.v1" &&
+      registry.id === "agent-platform:architecture:capability-source-owners" &&
+      registry.status === "current-source-owner-registry" &&
+      registry.codeOwner === "agent-platform" &&
+      Array.isArray(registry.capabilities),
+    "Invalid canonical capability registry identity.",
+  );
   requireValue(
     JSON.stringify(contract.modules.map((module) => module.capabilityId).sort()) ===
       JSON.stringify(["infrastructure-domain", "native-codex-source", "native-hermes-context"]),
     "The canonical Codex, Hermes and infrastructure module boundaries are required.",
   );
+  const ids = contract.nativeSourceProjects.map((item) => item.id);
+  requireValue(
+    JSON.stringify([...ids].sort()) ===
+      JSON.stringify(admittedModules.map((item) => item.nativeSourceProjectId).sort()),
+    "The exact native source owners are required without duplicates.",
+  );
+  for (const project of contract.nativeSourceProjects) {
+    const admitted = admittedModules.find((item) => item.nativeSourceProjectId === project.id);
+    requireValue(
+      admitted && absolutePath(project.sourceRoot) && project.sourceRoot === admitted.sourceRoot,
+      "Native source project differs from its reviewed explicit owner root.",
+    );
+    requireValue(
+      project.historicalSource.homeRelativeRoot === "code/shared/" + project.id &&
+        project.historicalSource.namespace === "previous-source-owner-home" &&
+        project.historicalSource.classification === "history-only-no-provider-fallback",
+      "Historical source paths must retain their attributed non-provider classification.",
+    );
+  }
   for (const module of contract.modules) {
     ownedName(module.packagePath, contract);
-    const capability = registry.capabilities
-      .map(object)
-      .find((item) => item.id === module.capabilityId);
+    const admitted = admittedModules.find((item) => item.capabilityId === module.capabilityId);
     requireValue(
-      capability?.packagePath === module.packagePath &&
+      admitted &&
+        module.packagePath === admitted.packagePath &&
+        module.packageName === admitted.packageName &&
+        module.semanticOwner === admitted.semanticOwner &&
+        module.nativeSourceProjectId === admitted.nativeSourceProjectId,
+      "Canonical module differs from its fixed native/domain owner identity.",
+    );
+    const matches = registry.capabilities
+      .map(object)
+      .filter((item) => item.id === module.capabilityId);
+    requireValue(matches.length === 1, "Canonical module registry identity must be unique.");
+    const capability = matches[0];
+    const nativeProject = contract.nativeSourceProjects.find(
+      (project) => project.id === module.nativeSourceProjectId,
+    );
+    requireValue(
+      capability.packagePath === module.packagePath &&
         capability.packageName === module.packageName &&
         capability.semanticOwner === module.semanticOwner &&
-        contract.nativeSourceProjects.some(
-          (project) =>
-            module.semanticOwner.includes(project.id) &&
-            typeof capability.nativeAdapterOwnerRoot === "string" &&
-            capability.nativeAdapterOwnerRoot.endsWith("/" + project.homeRelativeRoot),
-        ),
+        nativeProject &&
+        capability.nativeAdapterOwnerRoot === nativeProject.sourceRoot,
       "Canonical module ownership differs from the admitted capability registry.",
+    );
+    requireValue(
+      object(capability.packageManifest).path ===
+        contract.commonSourceRoot + "/" + module.packagePath + "/package.json",
+      "Canonical module manifest root differs from its declared common source owner.",
     );
     const manifest = object(await jsonFile(root, module.packagePath + "/package.json"));
     requireValue(
@@ -313,15 +396,6 @@ export async function verifyRuntimeLayout(
       "Canonical module package identity differs.",
     );
   }
-  const ids = contract.nativeSourceProjects.map((item) => item.id);
-  requireValue(new Set(ids).size === ids.length, "Duplicate native source owner.");
-  for (const project of contract.nativeSourceProjects)
-    requireValue(
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(project.id) &&
-        safePath(project.homeRelativeRoot) &&
-        project.homeRelativeRoot === "code/shared/" + project.id,
-      "Native source project is outside its existing owner root.",
-    );
   for (const path of contract.sourcePolicy.ownedPaths) {
     ownedName(path, contract);
     await exactFile(root, path);
