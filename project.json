@@ -19,15 +19,15 @@
     },
     "details": {
       "recordClass": "canonical-modular-capability-source-owner",
-      "intendedCanonicalRoot": "/home/palantirkc/code/shared/agent-platform",
+      "intendedCanonicalRoot": "/home/palantirkc/projects/agent-platform",
       "canonicalCutoverPerformed": true,
       "actualUserAdoptionInferred": false,
       "semanticOwner": "Upper Ontology: ontology-foundation; domain meaning: named capability semantic owner.",
       "runtimeLoopOwner": "native Codex and Hermes respectively",
       "existingOwnersAndNativeStoresPreserved": true,
       "canonicalScope": "Admitted common implementation packages for handoff/context/Memory/original/recovery, Ontology/Evidence, research capture, infrastructure domain, native Codex/Hermes context and remote operational contracts; old native readers/data/runtime paths remain source-owned adapters.",
-      "sourceOwnerRoot": "/home/palantirkc/code/shared/agent-platform",
-      "contextDataOwnerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
+      "sourceOwnerRoot": "/home/palantirkc/projects/agent-platform",
+      "contextDataOwnerRoot": "/home/palantirkc/projects/codex-harness-engineering",
       "contextNativePermissionsGranted": false,
       "historicalSourceMilestones": [
         {
@@ -111,6 +111,19 @@
         "planRef": "../hermes-harness-engineering/work/hermes-platform-rearchitecture/plan.json",
         "sourceScope": "Native governance pure adapters and consolidated corrected public intent/review contracts; native stores and semantic owners retained",
         "implementationAcceptance": "not-inferred-from-source-or-tests"
+      },
+      "hostSourceSuccessor": {
+        "classification": "Current host source ownership successor; not runtime/Memory/data-store relocation or native activation",
+        "workspace": "/home/palantirkc/orchestrator",
+        "nativeHome": "/root",
+        "continuingWork": {
+          "repositoryId": "park-kyungchan/agent-platform",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017",
+          "branch": "work/odi-host-continuation-20261018"
+        },
+        "legacySources": "historicalSourceMilestones and currentAdoptionSources retain their original producer namespace/custody. Their historical paths are not automatically redirected to the host checkout.",
+        "nativePermissionGranted": false
       }
     }
   }
