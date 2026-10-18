@@ -57,7 +57,8 @@
     "ODI-04-CONSUMED-NATIVE-PRODUCER",
     "codex-harness-engineering:effect-fence:04r-consumed",
     "ODI-05-MEMORY-REVIEW-CONSUMED-REVIEW",
-    "ODI-05-CALLER-RUN12-CONSUMED"
+    "ODI-05-CALLER-RUN12-CONSUMED",
+    "ODI-07-CONTRACT-ARCHIVE4-CONSUMED"
   ],
   "continuity": {
     "schema": "common.git-work-continuity.v1",
