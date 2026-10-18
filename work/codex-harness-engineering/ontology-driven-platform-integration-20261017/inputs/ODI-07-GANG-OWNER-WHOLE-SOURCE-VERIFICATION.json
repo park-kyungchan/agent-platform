@@ -1,0 +1,138 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-WHOLE-SOURCE-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-odi07-gang-owner-typed-successor-exit.adjudication.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:odi07-gang-owner-whole-source-complete-20261018",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T14:21:56.433Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:8c6020f6cf5bbaeb73958f8a6f3d0741ce8b28a131743e502e7f5e9ae4f5b914"
+      ],
+      "criteria": [
+        {
+          "id": "maintained-owner-and-retained-ci-freeze-purpose",
+          "status": "pass",
+          "message": "Current reviewed typed Education6bc/M8611 and Gang2e6/Mc447 actual SourceMap runtime consumer/owner topology and retained freeze checks fulfill original own source purpose; unchanged actual source facts and Root technical exit bind this conclusion.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-gang-owner-whole-source-complete-20261018",
+            "codex-harness-engineering:evidence:odi07-actual-source-outcome-20261018"
+          ]
+        },
+        {
+          "id": "actual-independent-source-review-proof-explicit-merge-ci",
+          "status": "pass",
+          "message": "Existing immutable exact-H peer/authenticated Git status, explicit expected-head Root merges and Education mainCI attempt2/Gang mainCI attempt1 success are source-qualified by independent1a3; no rerun/re-review/CI/retry/publication.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-actual-source-outcome-20261018"
+          ]
+        },
+        {
+          "id": "explicit-Root-typed-successor-exit",
+          "status": "pass",
+          "message": "Actual Root f2a671 technical source-only verdict accepts typed4file Education+Gang successor; historical exact3file/stays-planned is dated preparation, not a permanent veto or new user answer.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-gang-owner-whole-source-complete-20261018"
+          ]
+        },
+        {
+          "id": "original-04R-prerequisite-source-join",
+          "status": "pass",
+          "message": "Existing canonical dependencyFindings[]; exact immutable04R receipt e56bd09a and receiver0cd25260 retain original logical/runtime/occurrence bindings and source-only authentication limits.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-gang-owner-whole-source-complete-20261018"
+          ]
+        },
+        {
+          "id": "historical-contract-partial-evidence-and-native-review-preserved",
+          "status": "pass",
+          "message": "Original Spec1/Plan1/runtime/04R/originals/contract/partial UNVERIFIED bytes and relations/native REVIEW Task remain unchanged; current OWNER pointer replaced only from planned state with full prior Task raw bytes/hash/reason.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-gang-owner-whole-source-complete-20261018"
+          ]
+        },
+        {
+          "id": "own-local-result-and-boundary",
+          "status": "pass",
+          "message": "Source-only OWNER local complete/passed/result-durable; shared/formal pending, no new occurrence/effect/Goal/nativeReview/activation/human/whole Acceptance inferred.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-gang-owner-whole-source-complete-20261018"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ACTUAL-SOURCE-OUTCOME.json",
+          "sha256": "7bf48a61bb7c39c88d6c5ba73debe831b035a9aba26a09a930af8cf6c09eca84"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ACTUAL-SOURCE-VERIFICATION.json",
+          "sha256": "cd8e10ddd7f5340c180a13742ba69f37c56481d8f77c195744d299377ece4096"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ACTUAL-SOURCE-RESULT.json",
+          "sha256": "f7ea2234c70c1f8b7a07172ff627c6820e69d0a2cdaaa766a982d23642e7c9d8"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION.json",
+          "sha256": "c49e93e470bfb428b2b924b7cfa1694f9a2f4cfcda06f3a9a8162222c409fc4c"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-CONTRACT.json",
+          "sha256": "bcf36e99a214cbce3171bdb1bf831216384895aadb421d4adbe2f8127530fcba"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ROOT-TYPED-SUCCESSOR-EXIT.json",
+          "sha256": "d100ebaaf4a72a24310562c7521d120e080a141f63fbced82aae936c0ac214a2"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-WHOLE-SOURCE-VERIFICATION-HISTORY.json",
+          "sha256": "38443086353df0084ad85e11f296f2123a6fb0c8cb13a9d53a2054ae99d15ec9"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-WHOLE-SOURCE-RESULT.json",
+          "sha256": "7630de7a3f55a2137a5159d365cd3059615fef6bbd1ec9b9a1107412cdc352dd"
+        }
+      ],
+      "runtime": {
+        "name": "Bun bounded existing-owner source-metadata qualification",
+        "version": "1.4.3"
+      },
+      "details": {
+        "scope": "Whole own existing source-only Task purpose, not native/domain/parent07/whole outcome",
+        "taskLogical": {
+          "domainId": "native-harness",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017",
+          "issueId": "ODI-ISSUE-20261017",
+          "specId": "ODI-SPEC",
+          "specRevision": 1,
+          "planId": "ODI-PLAN",
+          "planRevision": 1,
+          "taskId": "ODI-07-GANG-OWNER"
+        },
+        "RootEngineeringDecisionId": "ODI-07-GANG-OWNER-ROOT-TYPED-SUCCESSOR-EXIT",
+        "sourceOnly": true,
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeOccurrence": null,
+        "sharedAudit": "pending",
+        "formalCompletion": "pending",
+        "historicalPartialVerificationRetained": "ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION"
+      }
+    }
+  }
+}

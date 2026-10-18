@@ -1,0 +1,83 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-WHOLE-SOURCE-VERIFICATION-HISTORY",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-odi07-gang-owner-typed-successor-exit.adjudication.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi07.gang-owner.whole-source-verification-history.v1",
+    "reason": "Task remains planned/unverified at7e8; replace only its current unverified partial Verification pointer with own entire source-purpose PASS after explicit accountable Root technical successor exit. Partial Evidence/relations and all old source facts remain immutable history, including native reviewer UNVERIFIED criterion. Not a user answer or native occurrence.",
+    "priorTaskVersions": [
+      {
+        "commit": "a6fdad95559079b4752838c6084934eb47e2d306",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-07-GANG-OWNER.json",
+        "sha256": "4b74b4d426e1f192e25b8ec9f1901a4b1b6b3357abdbbfad2e1088ef3c3efc73",
+        "utf8": "{\n  \"schema\": \"common.git-work.v1\",\n  \"domainId\": \"native-harness\",\n  \"projectId\": \"codex-harness-engineering\",\n  \"workId\": \"ontology-driven-platform-integration-20261017\",\n  \"kind\": \"task\",\n  \"id\": \"ODI-07-GANG-OWNER\",\n  \"logical\": {\n    \"domainId\": \"native-harness\",\n    \"projectId\": \"codex-harness-engineering\",\n    \"workId\": \"ontology-driven-platform-integration-20261017\",\n    \"issueId\": \"ODI-ISSUE-20261017\",\n    \"specId\": \"ODI-SPEC\",\n    \"specRevision\": 1,\n    \"planId\": \"ODI-PLAN\",\n    \"planRevision\": 1,\n    \"taskId\": \"ODI-07-GANG-OWNER\"\n  },\n  \"title\": \"Prepare exact Gang maintained-source owner relation and retained CI freeze\",\n  \"nextAction\": \"Root adopts/qualifies planned child and exact tested3file candidate80758 before source commits; then independently review/publish current exact source/checks beforePR and explicit owner-ordered merge. Preserve native/domain/month-end/retirement holds; no codeport or new store.\",\n  \"state\": {\n    \"execution\": \"planned\",\n    \"verification\": \"pending\",\n    \"localAudit\": \"intent-durable\",\n    \"sharedAudit\": \"pending\",\n    \"formalCompletion\": \"pending\"\n  },\n  \"executionClass\": \"source-only\",\n  \"runtimeId\": \"native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91\",\n  \"dependsOn\": [\n    {\n      \"taskId\": \"ODI-04-R\",\n      \"milestone\": \"execution-and-verification\",\n      \"receiptEvidenceId\": \"ODI-04-R-PREREQUISITE-GANG-OWNER\",\n      \"receiverEvidenceId\": \"ODI-07-GANG-OWNER-ROOT-RECEIVER\"\n    }\n  ],\n  \"decisionIds\": [\n    \"ODI-DECISION-FINAL-APPROVAL\",\n    \"ODI-DECISION-SUCCESSOR\",\n    \"ODI-DECISION-COST\",\n    \"ODI-DECISION-USEFUL-NATIVE-FLOW\",\n    \"ODI-DECISION-EVALUATION-BUDGET-20000000\",\n    \"ODI-DECISION-CLI-WORKER-DEFAULT\",\n    \"ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION\"\n  ],\n  \"effectIds\": [],\n  \"verificationEvidenceIds\": []\n}\n"
+      },
+      {
+        "commit": "7e8f57e16ecd0e6dc66aeac5f6b70d24fbe86733",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-07-GANG-OWNER.json",
+        "sha256": "3f78d68585bc7897356617a3ac8423b9b107debf2248f0307df41cdb79cd9333",
+        "utf8": "{\n  \"schema\": \"common.git-work.v1\",\n  \"domainId\": \"native-harness\",\n  \"projectId\": \"codex-harness-engineering\",\n  \"workId\": \"ontology-driven-platform-integration-20261017\",\n  \"kind\": \"task\",\n  \"id\": \"ODI-07-GANG-OWNER\",\n  \"logical\": {\n    \"domainId\": \"native-harness\",\n    \"projectId\": \"codex-harness-engineering\",\n    \"workId\": \"ontology-driven-platform-integration-20261017\",\n    \"issueId\": \"ODI-ISSUE-20261017\",\n    \"specId\": \"ODI-SPEC\",\n    \"specRevision\": 1,\n    \"planId\": \"ODI-PLAN\",\n    \"planRevision\": 1,\n    \"taskId\": \"ODI-07-GANG-OWNER\"\n  },\n  \"title\": \"Prepare exact Gang maintained-source owner relation and retained CI freeze\",\n  \"nextAction\": \"Consume ODI-07-GANG-OWNER-ACTUAL-SOURCE-OUTCOME and its source-only PASS Verification: exact Education6bc/M8611 and Gang2e6/Mc447 review/proof/explicit integration/source CI milestones are consumed. Do not repeat publication/PR/merge/retry/build/activation. Root must bind a compatible typed successor/exit adjudication for the immutable historical3file contract (which says stays planned) before Task state promotion. Shared audit/native/domain/human/whole Acceptance remain separate.\",\n  \"state\": {\n    \"execution\": \"planned\",\n    \"verification\": \"pending\",\n    \"localAudit\": \"intent-durable\",\n    \"sharedAudit\": \"pending\",\n    \"formalCompletion\": \"pending\"\n  },\n  \"executionClass\": \"source-only\",\n  \"runtimeId\": \"native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91\",\n  \"dependsOn\": [\n    {\n      \"taskId\": \"ODI-04-R\",\n      \"milestone\": \"execution-and-verification\",\n      \"receiptEvidenceId\": \"ODI-04-R-PREREQUISITE-GANG-OWNER\",\n      \"receiverEvidenceId\": \"ODI-07-GANG-OWNER-ROOT-RECEIVER\"\n    }\n  ],\n  \"decisionIds\": [\n    \"ODI-DECISION-FINAL-APPROVAL\",\n    \"ODI-DECISION-SUCCESSOR\",\n    \"ODI-DECISION-COST\",\n    \"ODI-DECISION-USEFUL-NATIVE-FLOW\",\n    \"ODI-DECISION-EVALUATION-BUDGET-20000000\",\n    \"ODI-DECISION-CLI-WORKER-DEFAULT\",\n    \"ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION\"\n  ],\n  \"effectIds\": [],\n  \"verificationEvidenceIds\": [\n    \"ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION\"\n  ]\n}\n"
+      }
+    ],
+    "priorVerificationEvidenceIds": [
+      "ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION"
+    ],
+    "newCurrentVerificationEvidenceIds": [
+      "ODI-07-GANG-OWNER-WHOLE-SOURCE-VERIFICATION"
+    ],
+    "retainedHistoricalSourceBindings": [
+      {
+        "id": "ODI-07-GANG-OWNER-ACTUAL-SOURCE-OUTCOME",
+        "commit": "7e8f57e16ecd0e6dc66aeac5f6b70d24fbe86733",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ACTUAL-SOURCE-OUTCOME.json",
+        "sha256": "7bf48a61bb7c39c88d6c5ba73debe831b035a9aba26a09a930af8cf6c09eca84"
+      },
+      {
+        "id": "ODI-07-GANG-OWNER-ACTUAL-SOURCE-VERIFICATION",
+        "commit": "7e8f57e16ecd0e6dc66aeac5f6b70d24fbe86733",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ACTUAL-SOURCE-VERIFICATION.json",
+        "sha256": "cd8e10ddd7f5340c180a13742ba69f37c56481d8f77c195744d299377ece4096"
+      },
+      {
+        "id": "ODI-07-GANG-OWNER-ACTUAL-SOURCE-RESULT",
+        "commit": "7e8f57e16ecd0e6dc66aeac5f6b70d24fbe86733",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ACTUAL-SOURCE-RESULT.json",
+        "sha256": "f7ea2234c70c1f8b7a07172ff627c6820e69d0a2cdaaa766a982d23642e7c9d8"
+      },
+      {
+        "id": "ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION",
+        "commit": "7e8f57e16ecd0e6dc66aeac5f6b70d24fbe86733",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION.json",
+        "sha256": "c49e93e470bfb428b2b924b7cfa1694f9a2f4cfcda06f3a9a8162222c409fc4c"
+      },
+      {
+        "id": "ODI-07-GANG-OWNER-CONTRACT",
+        "commit": "7e8f57e16ecd0e6dc66aeac5f6b70d24fbe86733",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-CONTRACT.json",
+        "sha256": "bcf36e99a214cbce3171bdb1bf831216384895aadb421d4adbe2f8127530fcba"
+      }
+    ],
+    "RootEngineeringDecision": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-odi07-gang-owner-typed-successor-exit.adjudication.actual.json",
+      "sha256": "f2a6712b50ffeba1e9a3c9cb774ada3f0e212f83af3263bdb4c3b2a8cc9fad95",
+      "inputId": "ODI-07-GANG-OWNER-ROOT-TYPED-SUCCESSOR-EXIT",
+      "classification": "Current accountable Lead engineering source-only decision; not a new user answer, native occurrence, authentication or AcceptanceDecision"
+    },
+    "independentSourceAudit": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/odi07-source-outcome-reconciliation.successor.independent.actual.json",
+      "sha256": "1a3e640088dc557cbdac5cc27adbabaffebfe842cadd1f6f6d46424fc1f99ba0"
+    },
+    "nativeReviewTaskBytePreservedAt": "7e8f57e16ecd0e6dc66aeac5f6b70d24fbe86733",
+    "oldRuntimeIdIsHistoricalDeclaration": true,
+    "noNativeOccurrenceOrEffectAllocated": true
+  }
+}

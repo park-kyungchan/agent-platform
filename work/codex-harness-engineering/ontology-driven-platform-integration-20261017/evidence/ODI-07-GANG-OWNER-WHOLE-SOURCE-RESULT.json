@@ -1,0 +1,15 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-07-GANG-OWNER-WHOLE-SOURCE-RESULT",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-WHOLE-SOURCE-RESULT.json",
+    "fragment": "#/content",
+    "sha256": "7630de7a3f55a2137a5159d365cd3059615fef6bbd1ec9b9a1107412cdc352dd"
+  }
+}

@@ -17,7 +17,7 @@
     "taskId": "ODI-07-GANG-OWNER-REVIEW"
   },
   "title": "Independently review exact education/Gang maintained-source owner and retained freeze successors",
-  "nextAction": "Root independently reviews/adopts exact five bound additions with current0c36/138 CAS, commits/qualifies actual direct04-R dependency, then separately admits one exact native Codex read-only review prompt. Review both immutable educationdcf/Gang3f trees and counterexamples; real findings/HOLD permitted. Native consumption/result pending; no Source07/05 completion, shared audit or publication inferred.",
+  "nextAction": "Original native11 input/turn/final/task_complete recovered and source-correlated; do not redispatch/resume. Read SOURCE-CORRELATION, SOURCE-EXECUTION-RECEIPT and ROOT-ADJUDICATION-PROPOSAL. Exact actual session/turn/message tuple is retained, native Task/Run IDs unexposed. Partial join preserves progress coverage:false and segmented/truncation/count limits. Root explicitly adjudicates original required values and14cases(12negative+2positive) compatible source purpose, then independently reviews any later Task-targeted all-PASS/state/effect successor. This Task remains planned/pending; shared/formal/native authentication/whole Acceptance separate.",
   "state": {
     "execution": "planned",
     "verification": "pending",
@@ -44,6 +44,15 @@
     "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": [],
-  "runtimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9"
+  "verificationEvidenceIds": [
+    "ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION",
+    "ODI-07-GANG-OWNER-REVIEW-SOURCE-PARTIAL-VERIFICATION"
+  ],
+  "runtimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9",
+  "occurrence": {
+    "runtimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9",
+    "attemptId": "native-turn:01a149ba-2065-7101-b55c-e131b8d26bea",
+    "occurrenceId": "native-message:msg_025e4cc173b7bdf5016ad3644eb3408191981dfd55b0c23d2b"
+  },
+  "executionEvidenceId": "ODI-07-GANG-OWNER-REVIEW-SOURCE-EXECUTION-RECEIPT"
 }

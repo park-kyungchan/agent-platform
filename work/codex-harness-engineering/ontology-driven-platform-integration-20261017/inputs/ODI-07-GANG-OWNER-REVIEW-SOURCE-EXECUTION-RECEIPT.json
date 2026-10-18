@@ -1,0 +1,62 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-REVIEW-SOURCE-EXECUTION-RECEIPT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/docker/herdr-runtime/home/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-independent-code-review",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common.git-prerequisite-receipt.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-07-GANG-OWNER-REVIEW"
+    },
+    "occurrence": {
+      "runtimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9",
+      "attemptId": "native-turn:01a149ba-2065-7101-b55c-e131b8d26bea",
+      "occurrenceId": "native-message:msg_025e4cc173b7bdf5016ad3644eb3408191981dfd55b0c23d2b"
+    },
+    "state": {
+      "execution": "planned",
+      "verification": "pending",
+      "localAudit": "intent-durable",
+      "sharedAudit": "pending",
+      "formalCompletion": "pending"
+    },
+    "intent": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-RETAINED-INTENT.json",
+      "fragment": "#/content",
+      "sha256": "077896a9628082687fb94c5fed261fad7b33655a05f328e3457c3dee5529e636"
+    },
+    "result": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-RETAINED-RESULT.json",
+      "fragment": "#/content",
+      "sha256": "f93a9e0f1ada36dc1e6a5968ae7e2cd8b32cb149d9680b3dca02dbd18f74d741"
+    },
+    "verification": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-SOURCE-PARTIAL-VERIFICATION.json",
+      "fragment": "#/content",
+      "sha256": "f9353e2ad202cd2cd7baec051f8c6a6aeed8daf7a19b6432a6ddfa4267a898ca"
+    },
+    "qualification": "Partial source-backed execution join. Native turn completed in retained capture; logical Task still planned/pending and Verification has unverified adjudication criteria. Not a usable completed prerequisite.",
+    "nativeBackendAuthentication": false,
+    "nativeTaskId": null,
+    "nativeRunId": null
+  }
+}

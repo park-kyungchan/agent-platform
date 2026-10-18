@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "relation",
+  "id": "ODI-07-GANG-OWNER-WHOLE-SOURCE-VERIFIED-BY",
+  "relation": "verifiedBy",
+  "from": {
+    "kind": "task",
+    "id": "ODI-07-GANG-OWNER"
+  },
+  "to": {
+    "kind": "evidence",
+    "id": "ODI-07-GANG-OWNER-WHOLE-SOURCE-VERIFICATION"
+  }
+}
