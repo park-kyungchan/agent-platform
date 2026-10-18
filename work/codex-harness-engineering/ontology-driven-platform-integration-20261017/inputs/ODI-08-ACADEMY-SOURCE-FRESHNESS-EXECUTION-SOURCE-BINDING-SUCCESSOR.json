@@ -1,0 +1,108 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-08-ACADEMY-SOURCE-FRESHNESS-EXECUTION-SOURCE-BINDING-SUCCESSOR",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "Explicit reviewed source-owner declaration revision, same Evidence ID and same observed native occurrence; not a new native action"
+  },
+  "content": {
+    "recordedAtUtc": "2026-10-18T11:02:32.224Z",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 2,
+      "taskId": "ODI-08-ACADEMY-SOURCE-FRESHNESS"
+    },
+    "evidenceId": "ODI-08-ACADEMY-SOURCE-FRESHNESS-NATIVE-READ",
+    "evidenceKind": "native-execution",
+    "beforeRecord": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "87074a9f3f140e7c6cac7f0a250cf41c9ef46aaa",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/ODI-08-ACADEMY-SOURCE-FRESHNESS-NATIVE-READ.json",
+      "sha256": "c0eacf39733f34bb54c9fab4fbc1c732292a145c356e861dcf7f9652ad2f2896"
+    },
+    "beforeSource": {
+      "kind": "native",
+      "ownerId": "native-codex",
+      "locator": "thread:01a14734-9160-70a2-a10d-df6ea9c50b91/turn:01a14b88-378d-7021-89c2-da50e6221fc1/mcp:exec-470aa3d9-e3be-40bc-8ddc-204673950836",
+      "receipt": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-08-ACADEMY-SOURCE-FRESHNESS-ACTUAL-RESULT.json",
+        "fragment": "#/content"
+      }
+    },
+    "beforeSourceDeclarationSha256": "d6281c72da7e3edfe0195f404a34f84efcb0bae990b71e73f793cd99e7eb218d",
+    "afterSource": {
+      "kind": "native",
+      "ownerId": "native-codex",
+      "locator": "thread:01a14734-9160-70a2-a10d-df6ea9c50b91/turn:01a14b88-378d-7021-89c2-da50e6221fc1/mcp:exec-470aa3d9-e3be-40bc-8ddc-204673950836",
+      "receipt": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-08-ACADEMY-SOURCE-FRESHNESS-QUALIFIED-EXECUTION-RECEIPT.json",
+        "fragment": "#/content/receipt",
+        "sha256": "e0116d83c3a1def48be915cd4b3a4a7892b139d34f4446545b2496fe36ecf205"
+      }
+    },
+    "afterSourceDeclarationSha256": "ac44ec46fb4528fada7e595f466a68eead5f7323f21b334a5da4476cdf9bf2f8",
+    "declarationEncoding": "Compact JSON UTF-8",
+    "reason": "Explicit source-owner metadata address revision for the SAME observed Academy saved-read occurrence. Legacy evidence pointed to original recovered-result metadata; successor points to qualified common.git-prerequisite-receipt.v1. Original native result/Inputs/effect and old Evidence bytes remain immutable at prior commit, not overwritten or replayed.",
+    "unchanged": {
+      "taskExecutionEvidenceId": "ODI-08-ACADEMY-SOURCE-FRESHNESS-NATIVE-READ",
+      "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+      "occurrence": {
+        "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+        "attemptId": "native-turn:01a14b88-378d-7021-89c2-da50e6221fc1",
+        "occurrenceId": "native-mcp-tool-call:exec-470aa3d9-e3be-40bc-8ddc-204673950836"
+      },
+      "logical": {
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-platform-integration-20261017",
+        "issueId": "ODI-ISSUE-20261017",
+        "specId": "ODI-SPEC",
+        "specRevision": 1,
+        "planId": "ODI-PLAN",
+        "planRevision": 2,
+        "taskId": "ODI-08-ACADEMY-SOURCE-FRESHNESS"
+      },
+      "nativeOwner": "native-codex",
+      "nativeLocator": "thread:01a14734-9160-70a2-a10d-df6ea9c50b91/turn:01a14b88-378d-7021-89c2-da50e6221fc1/mcp:exec-470aa3d9-e3be-40bc-8ddc-204673950836",
+      "completedEffectId": "ODI-08-ACADEMY-SOURCE-FRESHNESS-READ-ONCE1"
+    },
+    "qualifiedReceiptSource": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-08-ACADEMY-SOURCE-FRESHNESS-QUALIFIED-EXECUTION-RECEIPT.json",
+      "fragment": "#/content/receipt",
+      "sha256": "e0116d83c3a1def48be915cd4b3a4a7892b139d34f4446545b2496fe36ecf205"
+    },
+    "scopedVerificationSource": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-08-ACADEMY-SOURCE-FRESHNESS-SAVED-READ-VERIFICATION.json",
+      "fragment": "#/content",
+      "sha256": "0554d8f4f3d588bf942dd61ebcf4fbcb689ae0d035df58e14a5cc3f061b8635a"
+    },
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "nativeAttemptResourceId": null,
+    "nativeAuthorshipAuthenticatedByGit": false,
+    "nativePermissionGranted": false,
+    "nativeCallsPerformed": 0,
+    "nativeReexecution": false,
+    "acceptedUserDecisionCreated": false,
+    "authorization": "Current Root source-owner authorization to prepare explicit binding successor; candidate only, Root independent review/current-old-declaration CAS integration remains separate",
+    "nativeMessageId": null,
+    "sharedReceiverAcknowledged": false,
+    "AcceptanceDecision": null
+  }
+}
