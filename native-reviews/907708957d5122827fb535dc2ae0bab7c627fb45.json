@@ -1,0 +1,47 @@
+{
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "907708957d5122827fb535dc2ae0bab7c627fb45",
+  "reviewedTreeSha": "80d63f6fce5b2d39283ee68a7f7d181fa2331d28",
+  "reviewedSourceManifestSha256": "5c43163578b9d9958e998570fe7412fc9887fa7087dca9909e67cf36539fe85b",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15006-eaef-7f23-bcb8-c3440a03b7dc"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15003-9cee-7662-bbc2-7c1990379b30"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "schema": "native-independent-review.v2",
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/24b1a7a300721728aff4584cabc2390a8e84e63c/native-review-results/907708957d5122827fb535dc2ae0bab7c627fb45.json",
+    "sha256": "24ffa0ccd89f0c95d1b0573b5a3ef66db8f7e7a3605bb6a9f479da0d5da873a4"
+  },
+  "identitySemantics": {
+    "legacyReviewActorField": "Existing ReviewV2 taskId is explicitly namespaced actual native actor reference native-thread:<UUID>; it correlates the stored thread/session, not a native Task occurrence.",
+    "reviewerAgentPath": "/root/handoff_recovery",
+    "reviewerNativeStoredSessionId": "01a15006-eaef-7f23-bcb8-c3440a03b7dc",
+    "authorNativeThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "receipt": {
+      "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/owned-root-subagents-metadata.actual.json",
+      "sha256": "35adfd475b8d117451997f07f8f86d8abc71b599bcfe135fea0e2189894e046a",
+      "bytes": 2419
+    },
+    "metadataLineSha256": "b2617f5ac68145d2c59b187f6f4f7c88704b8512d8f48107e26518340fe34bee",
+    "sourceKind": "subagent.thread_spawn",
+    "custody": "Read only existing allowlisted owned session_meta receipt. No session bodies/messages/transcripts copied or read. Distinct actual native-codex actor strings satisfy unchanged canonical bounded identity predicate; no unexposed Task/Run invented."
+  },
+  "relatedImmutableEvidence": {
+    "layoutDelta": "https://github.com/park-kyungchan/agent-platform/blob/24b1a7a300721728aff4584cabc2390a8e84e63c/native-review-details/907708957d5122827fb535dc2ae0bab7c627fb45.json",
+    "nativeActorCustody": "https://github.com/park-kyungchan/agent-platform/blob/24b1a7a300721728aff4584cabc2390a8e84e63c/native-review-identities/907708957d5122827fb535dc2ae0bab7c627fb45.json",
+    "priorWholeReview": "https://github.com/park-kyungchan/agent-platform/blob/0e1cd0412018700b79debf5059400888527930af/native-review-details/6627e1cb87b486fdf00a159d21414d9a73f35944.json"
+  }
+}
