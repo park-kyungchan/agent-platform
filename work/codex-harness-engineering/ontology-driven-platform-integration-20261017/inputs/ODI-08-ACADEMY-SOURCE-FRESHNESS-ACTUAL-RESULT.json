@@ -8,7 +8,7 @@
   "inputKind": "source-owner-record",
   "origin": {
     "ownerId": "native-codex",
-    "locator": "root-native-read-once/native-trace-recovery-v1/recovery-provenance.actual.json#nativeMcpItemId=exec-470aa3d9-e3be-40bc-8ddc-204673950836",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi08-academy-source-freshness-task-v1/Root-native-read-once/native-trace-recovery-v1/recovery-provenance.actual.json#/nativeMcpItemId",
     "kind": "source-owner-capture"
   },
   "content": {
@@ -115,7 +115,7 @@
         "live Academy freshness",
         "teacher PG/schema/UI/WebMCP parity",
         "student mastery or teacher completion",
-        "independent recovery or production acceptance"
+        "independent empty-target restore/reopen of deployed application state"
       ]
     }
   }
