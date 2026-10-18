@@ -14,11 +14,11 @@
     "fragment": "#/content/text"
   },
   "selectionContext": {
-    "text": "Current bounded immutable checkpoint successor; read current Work contracts and actual later receipts before effects.",
+    "text": "Never rewrite a committed canonical Input. Append a distinct successor, link contains/supersedes and current governing selection. Mutable bounded in-flight projection lives at .private/quality-first-interview-20261018/continuity.actual.json and is not a canonical Input or native authority.",
     "source": {
       "kind": "snapshot",
       "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-INTERVIEW-STATE-V3.json",
-      "fragment": "#/content/continuity"
+      "fragment": "#/content/continuity/canonicalCheckpointRule"
     }
   },
   "supersedes": []
