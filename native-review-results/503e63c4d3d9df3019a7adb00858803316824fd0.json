@@ -1,0 +1,23 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "503e63c4d3d9df3019a7adb00858803316824fd0",
+  "reviewedTreeSha": "ad1bc493f81a5e5ff2f9143c4f221cb99d1ab1ea",
+  "reviewedSourceManifestSha256": "94ff395371a70d81b92db94531a90f634381fdacf6e26945ef82850443fc1cc0",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/combined_global_harness_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": []
+}
