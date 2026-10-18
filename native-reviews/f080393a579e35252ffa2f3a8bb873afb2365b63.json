@@ -1,0 +1,39 @@
+{
+  "schema": "native-independent-review.v2",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "f080393a579e35252ffa2f3a8bb873afb2365b63",
+  "reviewedTreeSha": "5aa1b499fe96703ee60b8641509cb3b469fde765",
+  "reviewedSourceManifestSha256": "f1308f34dfba32712aec75878523fb054a82f748c8688b3fbba6983df8dee3ca",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15007-0a5d-7fc3-af66-cf9c7e5194a8"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15003-9cee-7662-bbc2-7c1990379b30"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/8c493b5b4b60c1d62f4e311f372329b7c8bb678e/native-review-results/f080393a579e35252ffa2f3a8bb873afb2365b63.json",
+    "sha256": "9d28962b20e02c8f7682e186dd5185b86c33f0e05ab6d55f8d0e5f2e487813bf"
+  },
+  "identitySemantics": {
+    "legacyTaskIdMeaning": "Namespaced actual native stored thread actor reference; not a backend native Task or Run.",
+    "reviewerAgentPath": "/root/architecture_context",
+    "reviewerNativeStoredSessionId": "01a15007-0a5d-7fc3-af66-cf9c7e5194a8",
+    "authorNativeThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "evidence": {
+      "path": "owned-root-subagents-metadata.actual.json",
+      "sha256": "35adfd475b8d117451997f07f8f86d8abc71b599bcfe135fea0e2189894e046a",
+      "bytes": 2419
+    }
+  }
+}
