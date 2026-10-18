@@ -1,0 +1,38 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-CANDIDATE-INSTRUCTIONS",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-CANDIDATE-INSTRUCTIONS.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "status": "experiment-treatment-only",
+    "inspiredBy": {
+      "repository": "DietrichGebert/ponytail",
+      "commit": "09c434ab73ca43761c5d8b0c5d341926c2fba710",
+      "source": "skills/ponytail/SKILL.md"
+    },
+    "instructions": [
+      "Before editing, identify the affected canonical owner, callers, tests, fixtures and exports.",
+      "Choose the first complete solution: use an existing canonical helper or command, then the platform or installed dependencies, then the smallest clear implementation.",
+      "Complete every required consumer change. Preserve source guards, validation, error handling, original bindings, historical receipts and effect fences.",
+      "Do not remove an adapter or generated projection without proving its owner and consumer equivalence.",
+      "Run the checks required for the exact changed source. Reuse adequate existing tests; add a focused test for a new failure mode.",
+      "Report a review finding only with a concrete affected case and source evidence. Match completion claims to observed checks."
+    ],
+    "overridesExistingOwnerRules": false,
+    "includesLifecycleHooks": false,
+    "includesGlobalMode": false,
+    "rendering": {
+      "format": "Each instruction prefixed by \"- \", joined with LF, with one final LF.",
+      "encoding": "UTF-8",
+      "sha256": "99116ba7e596d8db17f358f37b26d9b3d892e3ae989c60261977358071aaa149"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "task",
+  "id": "PT-16-EXPLICIT-MERGE",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "issueId": "PT-ISSUE-20261018",
+    "specId": "PT-SPEC",
+    "specRevision": 4,
+    "planId": "PT-PLAN",
+    "planRevision": 4,
+    "taskId": "PT-16-EXPLICIT-MERGE"
+  },
+  "title": "Explicit Merge",
+  "nextAction": "Adversarial readiness confirms scope/ownership; this Lead explicitly merges exact expected head only after current independent evidence and all protected checks, verifies M/tree and explicit identical-tree successor review/status and main CI, then notifies lens-interview with PT-17. Native activation remains separate.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    {
+      "taskId": "PT-15-ADVERSARIAL-MERGE-READINESS",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "PT-DECISION-EXPLICIT-MERGE-20261018"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

@@ -1,0 +1,200 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-GIT-FIRST-THREE-PROBLEMS-V2",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-GIT-FIRST-THREE-PROBLEMS-V2.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common-harness.git-native-boundary-trace.v2",
+    "status": "source-grounded-interview-design-proposal",
+    "userScopeRef": {
+      "kind": "snapshot",
+      "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-GIT-FIRST-BYTE-BOUNDARY-20261018.json",
+      "fragment": "#/content/text"
+    },
+    "primaryScope": "Whole common-harness quality and Git/GitHub use; CI Workflow Agent is one consumer, not primary purpose.",
+    "origin": {
+      "logicalTaskId": "ODI-02-CURRENT-ROOT-EVENT",
+      "actualIntendedFlow": "Root connects its current session and current Work leaf in native owner private bindings; the existing native hook then reads it during a genuine user event.",
+      "nativeTargetPath": "/home/palantirkc/code/shared/codex-harness-engineering/.private/native-hook-adoption/odi-current-M666b-20261018/bindings.json",
+      "recordedOriginalBytes": 601,
+      "recordedCandidateBytes": 1436,
+      "trackedByOwningGit": false,
+      "sourceProjection": {
+        "chars": 11995,
+        "cap": 12000,
+        "meaning": "Dated exact-source fit only, not current native success."
+      },
+      "currentLiveState": "Not reobserved by this Work; other Lead retains its live operation."
+    },
+    "chronologicalEvidence": [
+      {
+        "step": "005",
+        "sourceName": "root-current-normal-binding-cas.preparation.actual.json",
+        "meaning": "Exact one-file read-only preimage/source/candidate checks passed; no verified exclusive writer or atomic compare-replace primitive, mutator remained disabled.",
+        "liveWrites": 0,
+        "source": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/root-current-normal-binding-cas.preparation.actual.json",
+          "sha256": "e386793232fece0dd27e8c3f6825d980b5e95daa3a2ca6af91c4634eee42b1e5",
+          "class": "Dated native-owner source observation/capture; not current effect authority"
+        }
+      },
+      {
+        "step": "006",
+        "sourceName": "root-current-normal-binding-claim.preparation.actual.json",
+        "meaning": "Seven fictional same-filesystem fixtures and12renameat2calls showed no-overwrite namespace properties but writable-FD and parent-path limits. Strong fullCAS/permanent preservation remained held.",
+        "liveWrites": 0,
+        "source": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/root-current-normal-binding-claim.preparation.actual.json",
+          "sha256": "f810562330d31a1106272e22cb0a5ab5689810f10022569f2b045f3c47b73802",
+          "class": "Dated native-owner source observation/capture; not current effect authority"
+        }
+      },
+      {
+        "step": "overengineering-review",
+        "sourceName": "binding-cas-overengineering-scope-review.actual.json",
+        "meaning": "The record did not establish full atomicCAS/permanent byte immutability as a necessary prerequisite for this one-file useful operation or the entire Work.",
+        "source": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/binding-cas-overengineering-scope-review.actual.json",
+          "sha256": "9926281fcf27025ddfb6666db7919ba0a5a8e66534fe40b4fd74d2ec120b143c",
+          "class": "Dated native-owner source observation/capture; not current effect authority"
+        }
+      },
+      {
+        "step": "007-stopped",
+        "sourceName": "root-current-normal-binding-conditional-operator.preparation.actual.json",
+        "meaning": "Further conditional operator preparation stopped by008; no live mutator was built.",
+        "source": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/root-current-normal-binding-conditional-operator.preparation.actual.json",
+          "sha256": "4ed36dd833a8878f9f3dc62743dc5b5ce9846e1836fe72479255d5faf5754157",
+          "class": "Dated native-owner source observation/capture; not current effect authority"
+        }
+      },
+      {
+        "step": "008-git-first",
+        "sourceName": "context-git-first-boundary-handoff.actual.json",
+        "meaning": "Actual user steering stopped low-level expansion and requested Git/worktree/branch solutions across common harness, retaining bounded native-owner residual.",
+        "source": {
+          "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/context-git-first-boundary-handoff.actual.json",
+          "sha256": "94917f190c411cd59fd3ab6a05bc2614b23b2e1bfd52742d7f2559afaf852048",
+          "class": "Dated native-owner source observation/capture; not current effect authority"
+        }
+      }
+    ],
+    "factsVsHypotheses": {
+      "observed": "Private file source metadata and exact candidate checks; fictional open-FD/parent-path/no-overwrite tests; source handoff stopping expansion.",
+      "notObserved": "No observed competing writer or lost update on the live binding, and no proof of all-writer absence. No live binding effect by the worker in these records.",
+      "reasonedOnly": "Additional same-UID entry swaps/aliases/instability were partly reasoned threats, not separately observed live incidents.",
+      "attribution": "The three-protection wording below is the lens-context attributed scope interpretation accompanying literal user text; it is not a separate three-item verbatim user quote."
+    },
+    "threeProblems": [
+      {
+        "id": "PT-GIT-PUBLICATION",
+        "meaning": "Complete-file/artifact publication",
+        "gitOwnedApproach": "Prepare permitted source/configuration proposals, typed Work and evidence as a complete committed tree; review and read exact immutable commit/tree through existing readers; explicit reference publication/integration.",
+        "nativeResidual": "Actual live private configuration selection/apply and reader behavior stay native owner; Git candidate readiness alone is not activation."
+      },
+      {
+        "id": "PT-GIT-CONCURRENCY",
+        "meaning": "Concurrent update/lost-update prevention",
+        "gitOwnedApproach": "Separate branch/worktree per owned change, explicit affected ownership/dependency and semantic transition checks, accountable integration with expected source/ref CAS; preserve independent valid work.",
+        "nativeResidual": "Branches do not themselves govern writers of one shared untracked live pathname or revoke already-open writable FDs. A finite existing native-owner operation requires its own actual scope and observations."
+      },
+      {
+        "id": "PT-GIT-HISTORY",
+        "meaning": "Original-byte/history preservation",
+        "gitOwnedApproach": "Retain original captures, logical IDs, historical Spec/Plan revisions, immutable source/evidence references and effect fences in existing Git custody; preserve reachable refs and release pins under owner policy.",
+        "nativeResidual": "Native original/evidence/session/credential owners and consumed/uncertain effects retain their owners. Git data does not authenticate native authorship or grant replay permission."
+      }
+    ],
+    "retainedChecks": [
+      "Existing native first-import and exact source/dependency closure guards",
+      "Immutable release and consumer pins",
+      "Current native identity/parser/containment/trust vetoes",
+      "Actual original/evidence joins and completed/uncertain fences",
+      "Applicable per-operation owner permission and consumer readback"
+    ],
+    "excludedExpansion": [
+      "A universal full-filesystem CAS/lease/kernel lock system",
+      "Permanent byte immutability against every unknown same-UID/open-FD writer as a common-harness prerequisite",
+      "A second native state store, tool/client registry or credential bridge",
+      "Committing native credentials/private session stores or treating worktree creation as live activation"
+    ],
+    "qualityCriteria": [
+      "Git-owned readers consume a complete intended tree, never an unreviewed partial candidate.",
+      "Late source/ref/dependency changes preserve third states and independent valid work.",
+      "Original meaning and historical contracts survive integration and recovery.",
+      "Correct normal consumer progress is retained; more HOLDs alone are not quality improvement.",
+      "Any remaining native guarantee is stated at the actual owner/operation boundary with evidence and uncertainty.",
+      "Do not confuse a fixture-proven limitation with an observed production failure or a mandatory universal guarantee."
+    ],
+    "nextDesign": "Replay the three Git-owned protections and controls using existing Work/reader/transition/CI mechanisms; scope any remaining live-native observation separately. No current target change or evaluation dispatch is authorized by this trace.",
+    "evidenceRefs": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/root-current-normal-binding-cas.preparation.actual.json",
+        "sha256": "e386793232fece0dd27e8c3f6825d980b5e95daa3a2ca6af91c4634eee42b1e5",
+        "class": "Dated native-owner source observation/capture; not current effect authority"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/root-current-normal-binding-claim.preparation.actual.json",
+        "sha256": "f810562330d31a1106272e22cb0a5ab5689810f10022569f2b045f3c47b73802",
+        "class": "Dated native-owner source observation/capture; not current effect authority"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/binding-cas-overengineering-scope-review.actual.json",
+        "sha256": "9926281fcf27025ddfb6666db7919ba0a5a8e66534fe40b4fd74d2ec120b143c",
+        "class": "Dated native-owner source observation/capture; not current effect authority"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/root-current-normal-binding-conditional-operator.preparation.actual.json",
+        "sha256": "4ed36dd833a8878f9f3dc62743dc5b5ce9846e1836fe72479255d5faf5754157",
+        "class": "Dated native-owner source observation/capture; not current effect authority"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/context-git-first-boundary-handoff.actual.json",
+        "sha256": "94917f190c411cd59fd3ab6a05bc2614b23b2e1bfd52742d7f2559afaf852048",
+        "class": "Dated native-owner source observation/capture; not current effect authority"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/user-git-worktree-common-harness-direction.forwarded.actual.json",
+        "sha256": "f84fc19a7ee915dd795d1ac6ce79f30958940d9462f19b66b071eb7e211decbe"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/normal-context-leaf-preflight-002.actual.json",
+        "sha256": "fbfc48f3cc42644edf01df4f5b4214ccdeba2be4b042c2a77ac575d51a761ccb"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/normal-context-leaf-preflight-003.actual.json",
+        "sha256": "166b6fc7f449f58d8fb5a6fe56de100d4ab9eaeb41fa9fab796137597ca6f99d"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/normal-context-leaf-preflight-004.actual.json",
+        "sha256": "43cd9ae10c8cc10a1bbabe3c266e1df2f83035ca673cc944904d1745e106d5bb"
+      }
+    ],
+    "priorContextQualityFindings": [
+      {
+        "step": "002",
+        "outcome": "Full wrapper12509characters exceeds12000cap.",
+        "class": "actual source-preflight failure, no live native event"
+      },
+      {
+        "step": "003",
+        "outcome": "Full wrapper12056characters exceeds12000cap; P003-F1 says shortened nextAction lost current Lead/event/source/Work/original/boundary/output meaning.",
+        "class": "actual independent source semantic finding, not a mere byte-size issue"
+      },
+      {
+        "step": "004",
+        "outcome": "Restore meaning via explicit existing owner Input reference; full wrapper11995/12000passes without lowering required meaning/cap/codec.",
+        "class": "exact source/decode/size verification, not live native operation or Acceptance"
+      }
+    ]
+  }
+}

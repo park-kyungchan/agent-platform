@@ -1,0 +1,82 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-LEAD-INTERVIEW-CONTEXT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-LEAD-INTERVIEW-CONTEXT.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "source-attributed-interview-context-not-native-runtime-mirror",
+    "currentLead": {
+      "owner": "This user-facing session",
+      "scope": "Current common-harness quality/Evolve Work only",
+      "source": {
+        "kind": "snapshot",
+        "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-LEAD-ROLE-20261018.json",
+        "fragment": "#/content/text"
+      },
+      "nativeThreadId": null,
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    "identity": {
+      "domainId": "native-harness",
+      "projectId": "agent-platform",
+      "workId": "ponytail-harness-evaluation-20261018",
+      "issueId": "PT-ISSUE-20261018",
+      "spec": "PT-SPEC@2",
+      "plan": "PT-PLAN@2",
+      "branch": "work/ponytail-harness-evaluation-20261018T093330Z",
+      "baselineCommit": "7b0c3519638807788e2001d17a4c91ba1ea703fc",
+      "currentChanges": "uncommitted-draft"
+    },
+    "upstream": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "0efa6e64b0d831a2489ca19259af7b7f3519eccd",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "planPath": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/plans/ODI-PLAN@2.json",
+      "reader": "@palantirkc/work-continuity/git-work",
+      "relationship": "Source-linked upstream purpose and transferred backlog, not reownership of its Work/Goal."
+    },
+    "handoff": {
+      "state": "acknowledged by source-owned backlog successor and user-forwarded acknowledgement",
+      "backlogPath": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/backlog.003.actual.json",
+      "sha256": "8268e61751426b4e0ee3d5b1b3ad41c33e9ad28ca02eb33deda79bf63be1bf50",
+      "handoffSha256": "8d5771263687fda27f2ba5a9646f146d73db46f6ed8e9ab3f36cac94c45653d5",
+      "furtherRoutineMessages": false,
+      "otherLeadContinuesPriorities": true
+    },
+    "settledContext": [
+      "Purpose, original decisions and reasons must survive sessions/delegation; technical root cause is not assumed.",
+      "Compact whole-purpose/topology context plus relevant originals, direct dependencies and currentness go to workers.",
+      "Lead interprets relevant semantic changes and integrates against the full purpose; reaffirmations do not reset valid work.",
+      "Workers leave durable results and wait; Lead pulls results by priority.",
+      "Exact review/checks/manual expected-head merge and separate native activation remain distinct.",
+      "Current user makes this Work quality-first, delegates selection of complex verification cases, appoints this Lead and prohibits further commits."
+    ],
+    "openQuestions": [
+      "Concrete quality gain and non-regression criteria for the selected existing complex consumer scenarios",
+      "Evolve target/treatment/evaluator boundaries across the complete common-harness flow",
+      "Handling new ownership/ID/logical dependencies while independent valid work continues",
+      "CI Workflow Agent responsibility inside that broader quality scope",
+      "What qualifies actual consumer/recovery success and which decisions remain accountable Lead/user choices"
+    ],
+    "currentAuthority": {
+      "prepareDrafts": true,
+      "conductInterview": true,
+      "localReadOnlyAndReversibleVerification": true,
+      "commit": false,
+      "push": false,
+      "newNativeEvaluationBudget": false,
+      "nativeActivation": false,
+      "otherWorkMutation": false
+    }
+  }
+}

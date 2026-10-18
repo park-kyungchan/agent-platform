@@ -1,0 +1,224 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-10-WORKER-RESULT-V3",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "/home/palantirkc/code/worktrees/pt10-complex-oracles/.private/task-result.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "captureSha256": "ec845614778afdf25f5ab63b1f6681152059b9a6c06a27f0a5c8c5cc99fdbd9f",
+    "result": {
+      "schema": "native-worker.task-result.v1",
+      "taskId": "PT-10-COMPLEX-ORACLES",
+      "domainId": "native-harness",
+      "projectId": "agent-platform",
+      "workId": "ponytail-harness-evaluation-20261018",
+      "status": "scoped-work-delivered-waiting-for-root",
+      "createdAt": "2026-10-18T11:33:55.769151+00:00",
+      "branch": "task/pt10-complex-oracles",
+      "baseCommit": "03c06b05d86bc7ed00612dd2f9310c36bf04e8fb",
+      "commit": "63fd2b7ca6c06e9a1668b39f688b0106535128b5",
+      "tree": "1ba8e21b0ccfcf806a6e350d30b60707c499fa1c",
+      "nativeIdentity": {
+        "runtime": "native-codex",
+        "sessionId": "01a14eb1-acb3-7963-9c73-14eacd279dbd",
+        "threadId": "01a14eb1-acb3-7963-9c73-14eacd279dbd",
+        "source": "Observed CODEX_SESSION_ID / CODEX_THREAD_ID environment only",
+        "runId": null,
+        "occurrenceId": null,
+        "nativeAuthorshipAuthenticated": false
+      },
+      "scope": {
+        "changedPaths": [
+          "packages/evidence-foundry/quality-scenarios/ci-oracles.test.ts",
+          "packages/evidence-foundry/quality-scenarios/consumer-oracles.test.ts",
+          "packages/evidence-foundry/quality-scenarios/fixtures/consumers.ts",
+          "packages/evidence-foundry/quality-scenarios/fixtures/independent-expectations.json",
+          "packages/evidence-foundry/quality-scenarios/fixtures/work.ts",
+          "packages/evidence-foundry/quality-scenarios/git-oracles.test.ts",
+          "packages/evidence-foundry/quality-scenarios/quality-api-join.test.ts",
+          "packages/evidence-foundry/quality-scenarios/source-oracles.test.ts"
+        ],
+        "productionSourceEdits": false,
+        "metadataPinsRegistryDocsWorkRecordsEdited": false,
+        "otherWorktreesModified": false,
+        "gitConfigurationMutation": false,
+        "modelEvaluations": 0,
+        "nativeActivationEffects": 0,
+        "nativeTrustConfigCredentialEffects": 0,
+        "pushes": 0,
+        "prs": 0,
+        "crossSessionMessages": 0,
+        "goalCreated": false
+      },
+      "oracleFreeze": {
+        "path": ".private/quality-oracles.json",
+        "sha256": "9890396cb18500ec331517384fde823551b8d69494e8af074fb816a846e2bd4e",
+        "committedCopy": "packages/evidence-foundry/quality-scenarios/fixtures/independent-expectations.json",
+        "copySha256": "9890396cb18500ec331517384fde823551b8d69494e8af074fb816a846e2bd4e",
+        "frozenBeforeImplementationTests": true,
+        "candidateAPIImplementationRead": false,
+        "apiInterfaceRead": "/home/palantirkc/code/worktrees/pt09-quality-implementation/.private/quality-interface.json"
+      },
+      "tests": [
+        {
+          "command": "bun test packages/evidence-foundry/quality-scenarios",
+          "status": "pass-with-explicit-join-skip",
+          "pass": 12,
+          "skip": 1,
+          "fail": 0,
+          "assertions": 263,
+          "durationSeconds": 24.5,
+          "log": ".private/quality-scenarios-final-test.log",
+          "logSha256": "0527d2893537f82db2b27a6796433f0e0bd15b48b5cde12ee04fc501055b91ba"
+        },
+        {
+          "command": "bunx --no-install tsc --project .private/quality-tsconfig.json",
+          "status": "pass",
+          "scope": "All new TypeScript tests and fixtures; strict ES2023 moduleResolution Bundler, skipLibCheck, noEmit. Does not enable noUncheckedIndexedAccess across imported preexisting sources.",
+          "log": ".private/quality-types-final.log"
+        },
+        {
+          "command": "createTypedLinter(process.cwd(), .private/quality-tsconfig.json).lintFiles(new quality-scenarios TypeScript files)",
+          "status": "pass",
+          "log": ".private/quality-lint-final.log"
+        },
+        {
+          "command": "bunx --no-install prettier --check packages/evidence-foundry/quality-scenarios",
+          "status": "pass",
+          "log": ".private/quality-format-final.log"
+        },
+        {
+          "command": "git diff --cached --check before scoped commit",
+          "status": "pass"
+        }
+      ],
+      "cases": [
+        {
+          "id": "PT-QC-01",
+          "status": "exercised-source-adapter",
+          "apis": [
+            "@palantirkc/work-continuity/git-work",
+            "@palantirkc/native-codex-adapter/hooks",
+            "@palantirkc/native-hermes-adapter/platform-current-work/context"
+          ],
+          "observed": "Both Codex SessionStart/UserPromptSubmit and Hermes v2 recover exact purpose, both Spec/Plan revisions, historical Task revision1, exact clauses and authored nextAction. Original five Q/A source values and blob bindings are checked. Too-small Hermes output cap withholds complete context. Truncated nextAction and missing selected original are rejected by independent assertions.",
+          "classification": "existing passing behavior plus synthetic payload-corruption controls",
+          "limits": [
+            "Bounded fictional Work preserves 68 completed/3 uncertain inventory, not a replay of full retained HRR production Work.",
+            "Fictional native envelopes and callback injection are source/adapter tests, not native E2E."
+          ]
+        },
+        {
+          "id": "PT-QC-02",
+          "status": "exercised-source-adapter",
+          "observed": "Shared explicit Decision deduplicates; distinct extra explicit Decision retains authored Task/explicit/superseded order on both Codex events. Five original routes remain source-bound. Unsupported Decision holds.",
+          "classification": "current passing historical-repair calibration",
+          "historicalRepair": {
+            "finding": "HRR-RECOVERY-P2-DUPLICATE-DECISION",
+            "badHead": "c04ae1c8c3e3f443ce04e9ffbeed900f9bd21eb7",
+            "correctedHead": "e6fc703e0e676d13e7db213b95a091d0ac4a3321",
+            "evidence": "PT-COMPLEX-QUALITY-SCENARIOS-V2 retained historical record; this worker executes current source calibration only",
+            "historicalBadHeadReexecuted": false
+          },
+          "newBehaviorGain": false
+        },
+        {
+          "id": "PT-QC-03",
+          "status": "exercised-source-adapter-and-semantic-transition",
+          "observed": "Absent old checkpoint/pane remains unused; independent review Task is qualified, durable delegated result hash/value and all five originals are actually read. Completed/uncertain Task-ID replay attempts hold in Work reader, Codex and Hermes. Semantic transition rejects removed fence inventory/original changes.",
+          "classification": "existing passing recovery with seeded invalid replay candidates",
+          "limits": [
+            "Useful action is deterministic source inspection, not a new delegated native execution.",
+            "No completed/uncertain native effect is replayed."
+          ]
+        },
+        {
+          "id": "PT-QC-04",
+          "status": "exercised-owner-facade-source-guard-and-delivery",
+          "observed": "Exact reviewed Codex owner facade/guard accepts valid synthetic payload, withholds late-drift payload/private event/path, and refuses changed first-import canary before execution. Hermes absence-only delivery records bounded partial writes, refuses retry/collision and preserves independent third-state bytes. Generated Hermes guard observes19 pins; actual Hermes Work consumer succeeds with real guard verifier and withholds context when source drifts at second verification.",
+          "classification": "existing guards passing adversarial synthetic fixtures",
+          "limits": [
+            "Codex guarded implementation payload is intentionally fictional; actual hook composition is exercised separately in PT-QC-01/02.",
+            "Hermes generated source owner is exclusive fictional temporary fixture, not recovered/live original owner."
+          ]
+        },
+        {
+          "id": "PT-QC-05",
+          "status": "exercised-git-and-public-work-semantic-transition",
+          "observed": "Individually valid Task branch changes merge cleanly in real temporary Git, combined dependency cycle rejects; removing only affected edge allows integration while both Task files remain. Completed prerequisite retains revision1 under Work revision2. Original/fence/completed logical contract mutation and raw untyped proof in Work reject.",
+          "classification": "existing passing integration with seeded semantic/custody faults",
+          "limits": [
+            "No native owner branch integration or production source custody is changed."
+          ]
+        },
+        {
+          "id": "PT-QC-06",
+          "status": "exercised-offline-ci-public-gate-plus-historical-calibration",
+          "observed": "Injected API/clock fixture drives actual reviewGate through full exact-head/tree v2 receipt/result-manifest chain.15-second evidence arrival succeeds;4072-second arrival remains absent at60-second bound without fetching proof. Wrong publisher, held status, changed tree and unresolved finding reject immediately; valid control still succeeds. All18 unique captured CI-Q-01 incidents have exact SHA/tree, later success status and final success, in bounded45-run/19-main sample.",
+          "classification": "existing passing gate behavior; historical evidence timing calibration",
+          "limits": [
+            "No GitHub requests/reruns/status publication/merge occurred.",
+            "Canonical owner-scoped latest-status race/readback and explicit review-reuse successor chain are left to existing CI suites/Root; new fixture covers v2 chain and supplied unresolved finding, not concurrent post-verification finding publication.",
+            "Captured incidents are dated evidence, not freshly authenticated live observations or18 proven source defects."
+          ]
+        },
+        {
+          "id": "PT-QC-07",
+          "status": "exercised-actual-git-primitives-and-public-work-reader",
+          "observed": "Committed Work tree remains readable/qualified while worktree Work file contains partial malformed candidate. Expected-ref update-ref rejects stale expected head after independent third-state advance, preserving exact newer commit and independent Task. Historical original questions and reviewed tree remain available; valid semantic transition succeeds.",
+          "classification": "existing passing Git publication/concurrency/history protections",
+          "limits": [
+            "No universal filesystemCAS/permanent-bytes guarantee is asserted.",
+            "Live native private binding is neither inspected nor applied."
+          ]
+        }
+      ],
+      "qualityAPIJoin": {
+        "path": "packages/evidence-foundry/quality-scenarios/quality-api-join.test.ts",
+        "status": "explicitly-skipped-until-root-integrates-PT09-module",
+        "expectedModule": "packages/evidence-foundry/src/modules/evals/quality-improvement.ts",
+        "automaticAfterModulePresent": true,
+        "usesDeclaredAPI": [
+          "preflightQualityImprovement",
+          "compareQualityImprovement"
+        ],
+        "usesActualProducer": "evaluateUnit results over actual public Codex/Hermes adapter outputs",
+        "claimLimit": "A deliberately weak synthetic fit-only comparator misses the fixed synthetic nextAction mutation; exact predicate detects it and valid controls pass. This is calibration, not proof the prior production oracle missed a defect and not a new actual harness behavior improvement.",
+        "rootAction": "After joining PT-09 exact source, run bun test packages/evidence-foundry/quality-scenarios; resolve any real contract mismatch under Root integration ownership."
+      },
+      "actualCurrentDefectsObserved": [],
+      "newActualBehaviorImprovementEstablished": false,
+      "actualProductionVerificationGainEstablished": false,
+      "nativeE2EEstablished": false,
+      "acceptanceEstablished": false,
+      "earlierAttemptsAndEnvironment": [
+        "Initial valid fixture omitted durable dependency verification and used incorrect synthetic Home profile path; fixture setup was corrected before claims. Source API refusals were expected validation, not production defects.",
+        "Initial Hermes generator refused local dependency metadata with link count68 (guard max64). Frozen-lockfile ignore-scripts install and copy-backend force install were attempted. Existing installed files retained hardlinks, so only this worktree node_modules regular files were copied to fresh local inodes (6606 files). No shared Bun/native cache, tracked source or other worktree was mutated. Guard constraints remained unchanged.",
+        "First full run hit default Bun5-second timeouts in3 multi-Git/consumer tests under concurrent host load. Explicit30-second bounded test timeouts were added; final run passes in24.50seconds total.",
+        "An initial strict ES2022 typecheck hit existing findLast/findLastIndex library requirements. ES2023 strict check passes. A noUncheckedIndexedAccess experiment exposed5 existing imported-source diagnostics (work-continuity context2, Hermes staged generator3), preserved at .private/quality-types.log; no production fix was attempted.",
+        "Typed lint found4 awaited Bun .rejects.toThrow matchers typed non-thenable; assertions now await actual promises and check captured Error values. Final typed lint passes."
+      ],
+      "remainingRootOwnedChecks": [
+        "PT-09 quality API join",
+        "Full package/common/check:handoff/check:imports/check:quality and exact source-provider closure as appropriate",
+        "Full retained historical Work and canonical CI reuse/current-finding suites",
+        "Independent exact-commit/tree review and all registry/pin/Work/documentation changes",
+        "Separately admitted native runtime qualification/activation"
+      ],
+      "delivery": {
+        "workingTreeCleanAfterCommit": true,
+        "formalTaskRecordUpdated": false,
+        "rootOwnsTaskRecordsAndAcceptance": true,
+        "next": "WAIT; Root reads this durable report. No recurring status prompts."
+      }
+    },
+    "rootReadback": "Root pulled durable result after current priority. Separate native IDs retained as observations only. Scoped commit integrated; final source/quality checks remain Root-owned."
+  }
+}

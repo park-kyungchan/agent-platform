@@ -27,4 +27,6 @@ Pull requests independently verify the authored head and prospective merge, requ
 
 Common Work records now use committed Git source through `@palantirkc/work-continuity/git-work`. Purpose, actual decisions, dependencies and effect fences live in `work/<project>/<work>/`; independent Tasks have separate files. A new Work starts from freshly synchronized main. Continue the same Work on its existing branch with stable logical IDs. See [the Git Work guide](docs/git-work.md) and run `bun run harness` for the bounded reader commands.
 
+For substantial quality or efficiency improvement, [constrained improvement](docs/constrained-improvement.md) binds a useful consumer goal, independent validation and bounded changes to comparable baseline/candidate evidence. Read-only harness preflight/comparison commands propose accept, repair, defer or stop; review, Acceptance and native activation remain separate.
+
 The shared [Runtime Index](architecture/runtime-documentation-routing/registry.json) selects official documentation by runtime subject, topic, version and execution host. It grants no execution authority. Each WSL2/VPS Lead pulls completed main, verifies native consumption and explicitly activates its own revision. Existing native adapters and public legacy APIs remain available during that migration.

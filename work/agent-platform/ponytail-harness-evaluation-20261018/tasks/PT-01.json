@@ -1,0 +1,35 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "task",
+  "id": "PT-01",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "issueId": "PT-ISSUE-20261018",
+    "specId": "PT-SPEC",
+    "specRevision": 1,
+    "planId": "PT-PLAN",
+    "planRevision": 1,
+    "taskId": "PT-01"
+  },
+  "title": "Assess Ponytail and freeze the AIP Evolve-inspired evaluation rubric",
+  "nextAction": "Review the exact candidate commit; publication/authenticated review status, native evaluation admission and owner activation remain separate.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [],
+  "effectIds": [],
+  "verificationEvidenceIds": [
+    "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-01"
+  ]
+}
