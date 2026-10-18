@@ -1,0 +1,228 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "7ec9bb4f313bdd89e4bce1f68f78b23246e16819",
+  "reviewedTreeSha": "7675735dc4419d67823e0c92ffec3ee67a6e71aa",
+  "reviewedSourceManifestSha256": "011e65255642dd27f550de20feea1fd278f111e9dcb745a171d830b607d773ca",
+  "manifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "7675735dc4419d67823e0c92ffec3ee67a6e71aa",
+    "entryCount": 954,
+    "blobCount": 799,
+    "sha256": "011e65255642dd27f550de20feea1fd278f111e9dcb745a171d830b607d773ca"
+  },
+  "baseSha": "fe591ffe113aef092f3f526cadcd7c575c579881",
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14e5a-6ee3-7f53-92de-20c1ca955dae"
+  },
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a14eda-03f5-7661-94c8-de94cb1384a7"
+  },
+  "reviewerTaskIdMeaning": "Legacy proof identity field is observed CODEX_THREAD_ID; actual native task/run identifiers remain separately null.",
+  "nativeIdentity": {
+    "runtime": "native-codex",
+    "threadId": "01a14eda-03f5-7661-94c8-de94cb1384a7",
+    "sessionId": "01a14eda-03f5-7661-94c8-de94cb1384a7",
+    "taskId": null,
+    "runId": null,
+    "occurrenceId": null,
+    "observationSource": "Current process CODEX_THREAD_ID/CODEX_SESSION_ID environment; native task/run/occurrence IDs unexposed. Identity observations do not independently authenticate native authorship.",
+    "nativeAuthorshipAuthenticated": false
+  },
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "taskId": "PT-12-INDEPENDENT-REVIEW"
+  },
+  "recordedAtUtc": "2026-10-18T13:27:03.527Z",
+  "attempt": 5,
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "priorFindingDispositions": [
+    {
+      "id": "PT12-F1",
+      "status": "resolved",
+      "detail": "Fresh public Work validation and semantic transitions from actualtested0bcfc38 and priorreviewed3b714fe to current head pass without findings. Existing Inputs including V2/V3 remain unchanged; distinct new routing observation Input added."
+    },
+    {
+      "id": "PT12-F2",
+      "status": "resolved",
+      "detail": "Repaired diagnostic parser/run.ts is byte-unchanged from reviewed3b714fe; exact frame validation, privacy/bounds/status controls remain. Current focused suite passes4tests/18assertions including original frame controls and new routing anti-omission assertion."
+    }
+  ],
+  "inspectedScope": [
+    "Exact four-path delta against reviewed3b714fe: CI failure-location scope tests, removal of Hermes test from CI source-oracles, package-owned harness-quality.test.ts and distinct PT-CI-OWNER-QA-ROUTING-SUCCESSOR-V1 Input.",
+    "Complete relocated test body and helper/import bindings; Source job/package enumeration/failure propagation/final required gate; actual Source execution report and Hermes case log.",
+    "Test-only explicit Markdown[] admission calls versus unchanged full quality and Source caller Markdown selection; actual scope anti-omission assertions in original and disposable QA context.",
+    "Fresh full-quality completion extracted from final log, matching current source snapshot, manifest, sourceRoot equality, all registry pins, historical Work contracts and exact semantic transitions."
+  ],
+  "routingAssessment": {
+    "conclusion": "Qualified owner execution with mandatory consumer coverage preserved; no skip, weaker criterion or silent affected-consumer exclusion.",
+    "from": "ci/quality/harness-scenarios/source-oracles.test.ts",
+    "to": "packages/native-hermes-adapter/src/source-provider/harness-quality.test.ts",
+    "testBodyByteIdentical": true,
+    "testBodyBytes": 3111,
+    "testBodySha256": "5d354cbbc92d6ef40d4d5b3b93bf6ba09ffb72d86badd3480b8aa827f91d9e4c",
+    "helperAndImports": "Filesystem put helper behavior retained; generator/delivery imports now resolve directly inside canonical Hermes package. Existing Work and consumer fixtures are imported from their CI owner, not copied into a second implementation.",
+    "requiredExecutionChain": [
+      "readQualityScope admits new Hermes test with no staged exclusion",
+      "ci/source-check.ts enumerates every admitted package test into native-hermes Bun command",
+      "runIndependentPackageTests drains children and rethrows any failure",
+      "Canonical source checks job runs source-check without optional condition",
+      "Source and native review gate requires source result success"
+    ],
+    "actualExecution": {
+      "report": "owner-qa-source-final.report.json",
+      "qaBase": "/tmp/agent-platform-source-JYDdxr",
+      "commandStartsWith": "test",
+      "commandIncludes": "/tmp/agent-platform-source-JYDdxr/agent-platform/packages/native-hermes-adapter/src/source-provider/harness-quality.test.ts",
+      "exitCode": 0,
+      "caseLog": "(pass) PT-QC-04 Hermes: partial completion and independent third-state bytes survive source drift and retry refusal [18653.52ms]",
+      "caseSkipped": false,
+      "admittedGuardBodyPreserved": true
+    },
+    "retainedQaBytes": "Relocated test and both changed CI test files match the actually retained disposable QA copies byte-for-byte.",
+    "executionProofClarification": "Input qualification.freshSourceQA.newHermesPackageCommand stores the matching tsc command. That static check is not used as runtime execution proof here; actual Bun test command and named case pass were independently checked in the full source report/log.",
+    "oldFailureAttribution": "Hosted39129371316 localized the Hermes generator invocation but did not reveal low-level guard reason. No Bun/nlink/auth cause asserted. Qualified-lane success does not independently explain the prior checkout refusal.",
+    "newHostedQualificationEstablished": false
+  },
+  "checks": [
+    {
+      "name": "Exact binding/manifest",
+      "status": "pass",
+      "detail": "HEAD7ec9bb4f313bdd89e4bce1f68f78b23246e16819/tree7675735dc4419d67823e0c92ffec3ee67a6e71aa match supplied context. Recursive manifest independently derives954entries/799blobs and exact011e6525 digest. Tracked review checkout clean."
+    },
+    {
+      "name": "Relocated body and no omission",
+      "status": "pass",
+      "detail": "Extracted full original Hermes test expression from reviewed3b714fe and compared3111bytes to new package test: identical SHA5d354cbb. Original CI copy removed, Codex case retained, no skip or criterion edits. Actual scope admits new package test and stagedTestsExcluded is empty."
+    },
+    {
+      "name": "Mandatory owner execution and guard boundary",
+      "status": "pass",
+      "detail": "Inspected source workflow, source-check package test enumeration and independent package executor. Any relocated test failure propagates to Source and required final gate. Fresh Source report lists actual new Hermes Bun package command exit0; case log explicitly passes18.65352seconds, rather than merely relying on enumeration/typechecking. No generator guard/native runtime modification."
+    },
+    {
+      "name": "Focused admission/control tests independently run",
+      "status": "pass",
+      "detail": "Current ci/quality/failure-locations.test.ts passes4tests/18assertions. Independent full/default and TypeScript-only Markdown[] scope reads both admit Hermes test, exclude no staged tests and return identical package test selection. Actual trackedMarkdown count20 and full secret scope contains all20 maintained Markdown files."
+    },
+    {
+      "name": "Disposable QA/current source equality",
+      "status": "pass",
+      "detail": "All363 tracked non-Work files match supplied sourceRoot. Changed Hermes/CI test files match retained finite QA copies. All140 registry source pin hashes match. Production implementation, diagnostic parser, source guards, manifests/locks/registry and original Inputs are unchanged since prior reviewed3b714fe."
+    },
+    {
+      "name": "Fresh SourceQA required checks",
+      "status": "pass-with-scope-limit",
+      "detail": "owner-qa-source-final report status pass,25commands all exit0,35canonical test files,16quality test files,stagedTestsExcluded:[]. Handoff/imports, both adapters, source/provider/first-import/drift/module identity and Work closure pass. NativeModelCalls0; admitted generated Hermes guard body preserved. Source QA has6 preexisting optional native-tool tests skipped in its CI suite; moved Hermes case is explicitly executed, not among those skips. Full-quality lane separately exercises tool-negative controls."
+    },
+    {
+      "name": "Fresh final whole-quality completion",
+      "status": "pass",
+      "detail": "Originally pending process has completed. Independently parsed complete final agent-platform.quality-report.v1 JSON from owner-qa-quality-final.log: status pass,all14checks pass, actualCheckoutSha7ec9bb4f313bdd89e4bce1f68f78b23246e16819,workingTreeHasChanges:false. All278 snapshot file hashes match current review bytes. No pending-quality pass was fabricated."
+    },
+    {
+      "name": "Immutable historical observation and evidence receipts",
+      "status": "pass",
+      "detail": "Routing Input historical freshWholeQualityFinal pending observation is preserved; later actual final pass is independently recorded here. All four Input receipt hashes match actual logs. Initial non-Git Markdown test failure and focused repair remain explicit; full source/quality callers were not changed to omit Markdown."
+    },
+    {
+      "name": "Work history/current semantics",
+      "status": "pass",
+      "detail": "Fresh public validateGitWorkRecords valid/no findings; transitions from actual0bcfc3877670a8d6003cd0f57757a8e56de6c9fd and prior3b714fe3b905240b179cd0c4dfd2c0dab14e366d to current head valid/no findings. Bounded PT12 context source-qualified/no holds. Work current SpecPlan4 and Task9/10/12 historical SpecPlan3 retained."
+    },
+    {
+      "name": "Prior artifacts and whitespace",
+      "status": "pass",
+      "detail": "All four original prior raw/session digest pairs rechecked unchanged. git diff --check base..HEAD passes. Only new attempt5 private outputs are written."
+    }
+  ],
+  "evidenceReceipts": [
+    {
+      "path": ".private/quality-first-interview-20261018/owner-qa-source-final.report.json",
+      "bytes": 36591,
+      "sha256": "4d4163f85af27066e92f79c19bf6a766e596fd0c65abcb0b8de9dfd7971ddc62"
+    },
+    {
+      "path": ".private/quality-first-interview-20261018/owner-qa-source-final.log",
+      "bytes": 149642,
+      "sha256": "9b11d524547b07b0c6e89c0f1efa75694715bdf9302801c6ac331aab92206e26"
+    },
+    {
+      "path": ".private/quality-first-interview-20261018/owner-qa-quality-final.log",
+      "bytes": 239627,
+      "sha256": "1e7e93855a1a4f23a3dce1b4a95150868cdf8b93111e63edb31d9c7c051399a3"
+    },
+    {
+      "path": ".private/quality-first-interview-20261018/owner-qa-quality-final.log",
+      "fragment": "Final complete JSON beginning with agent-platform.quality-report.v1",
+      "extractedReportSha256": "e5d2ce077ca5c61563e412fe16d6e58bcd4b2b970f4fab3b3c046248ecdcdcb8",
+      "status": "pass"
+    }
+  ],
+  "previousAttempts": [
+    {
+      "attempt": 1,
+      "rawResultSha256": "32125f8647fed325099639cfeea894cb0d50d2e0a1aa119b7f05678dba8ace4e",
+      "sessionSha256": "59f7146608db348980b161d76d7158b33c60f8401636275537d79ed699a49d67",
+      "preservedUnchanged": true
+    },
+    {
+      "attempt": 2,
+      "rawResultSha256": "35f5ad9202b86c97d7afb6d486c9c2bd7edf6c77b5bd6e2d8268db7d275a7bca",
+      "sessionSha256": "212b062c29c75680612e3384876b83a70978071194bba347920aa3fd50c2d93e",
+      "preservedUnchanged": true
+    },
+    {
+      "attempt": 3,
+      "rawResultSha256": "99b63915b342483ed8933cca989b637edacceddbf335d8b8670e58d0608d0e98",
+      "sessionSha256": "e7d94d68e4a3ba04d898b445049559661ed70c3aeedaf410ff1c633434af7deb",
+      "preservedUnchanged": true
+    },
+    {
+      "attempt": 4,
+      "rawResultSha256": "ca0bc99c2a4742b79d137402b1389201e7cf1578121239e5916262bec37293f9",
+      "sessionSha256": "3d951031f6880e725577ade030fcfbaca2038fc33cc260a0899be45084318cf9",
+      "preservedUnchanged": true
+    }
+  ],
+  "hostedQualification": {
+    "status": "pending-new-exact-head",
+    "observedPriorRunId": 39129371316,
+    "observedPriorHead": "3b714fe3b905240b179cd0c4dfd2c0dab14e366d",
+    "observedLocation": {
+      "path": "ci/quality/harness-scenarios/source-oracles.test.ts",
+      "line": 153,
+      "column": 19
+    },
+    "lowLevelGuardReason": "unobserved",
+    "newHostedPassEstablished": false,
+    "mergeReady": false
+  },
+  "scopeAssessment": {
+    "qualification": "Exact-source review passes zero current findings. Hermes consumer guard/delivery/drift criterion is preserved and executed in required finite owner QA. Both affected consumer paths remain required; moving execution does not waive native adoption criteria.",
+    "improvementClaim": "Owner-qualified test routing and stronger diagnostics only. No low-level old failure cause, production native gain, causal Ponytail efficacy or native adoption established.",
+    "sourceReuse": "Only independently byte-equal implementation/docs/pins retain prior assessment; current routing and changed tests received fresh exact-head review.",
+    "causalPonytailEfficacyEstablished": false,
+    "nativeAdoptionEstablished": false,
+    "acceptanceEstablished": false
+  },
+  "limitations": [
+    "Actual hosted/prospective merge qualification of7ec9bb4f remains required before merge. Source/quality local pass and owner-qualified test success do not establish a hosted pass or explain prior low-level generator refusal.",
+    "Reviewer independently executed focused4tests and actual scope/Work probes, and inspected hash-bound full Source/quality results with explicit named case execution. Heavy SourceQA/full quality were not redundantly rerun or represented as reviewer executions.",
+    "Input saved matching command is static tsc; actual execution evidence is explicitly the separate Bun command and named pass log. Historical pending-quality Input remains an immutable earlier observation, superseded evidentially by the actual completed final quality result recorded here.",
+    "Native thread/session fields are process observations, not independently authenticated authorship. Native task/run/occurrence identifiers are unexposed and null.",
+    "No production/Work edits, staging/commit, Goal creation, parent/session messages, model evaluation, push/publication/PR/merge, native config/trust/credential/cache effects or activation occurred. Prior files remain unchanged; only new attempt5 raw/session files written.",
+    "This source verification is not AcceptanceDecision, merge permission or native activation. Root retains exact publication/authenticated status ordering, current hosted/protected checks and explicit expected-head merge; native owners retain activation."
+  ]
+}
