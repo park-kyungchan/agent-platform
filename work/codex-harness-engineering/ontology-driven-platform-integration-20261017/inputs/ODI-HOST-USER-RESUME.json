@@ -1,0 +1,18 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-USER-RESUME",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "native-user-message",
+    "locator": "native thread 01a15003-9cee-7662-bbc2-7c1990379b30 current direct continuation after compact; native message ID unexposed"
+  },
+  "content": {
+    "answer": "current-work.json 읽고 장시간 자율작업 진행해라, 사용자는 더이상 개입하지 않는다.",
+    "captureLimitation": "Exact current user content; message ID unexposed. No native authentication inferred from Git."
+  }
+}

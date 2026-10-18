@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-USER-IDENTITY",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "native-user-message",
+    "locator": "/root/.codex/sessions/2026/10/18/rollout-2026-10-18T17-16-16-01a15003-9cee-7662-bbc2-7c1990379b30.jsonl:267"
+  },
+  "content": {
+    "answer": "이 구조로 확정하고 세부 구현은 위임 (권고)",
+    "question": "논리 ID와 위임은 ‘기존 Domain/Project 소유권 유지 → Host Lead가 Work 목적·의존·통합 책임 → 작업자는 그 계약 안에서 Task 분해 → 실제 session/Run ID는 native runtime이 발급’으로 확정할까요? 기존 ID와 원문·효과 이력은 보존합니다.",
+    "nativeSourceRecordSha256": "27b863e1f93ac96eceefb133870c9c880654e79e93990a18bee272e2f2d4657a",
+    "sourceTimestamp": "2026-10-18T17:26:41.375Z",
+    "captureLimitation": "Engineering user-message content capture with original locator/hash; Git does not authenticate native authorship."
+  }
+}

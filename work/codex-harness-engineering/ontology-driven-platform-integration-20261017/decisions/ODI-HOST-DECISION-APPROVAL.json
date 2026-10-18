@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-HOST-DECISION-APPROVAL",
+  "status": "accepted",
+  "answer": "승인하지만, 지금 auto-compact 4% left. 그러므로 \"/compact\"를 수행한 후에 진행할 것이니까, 준비하고 대기해라.",
+  "meaning": "Approve the explained full autonomous plan; immediate compact wait has now been lifted by the subsequent direct user continuation. This does not approve new unrelated effects.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-USER-APPROVAL.json",
+    "fragment": "#/content/answer"
+  },
+  "supersedes": []
+}

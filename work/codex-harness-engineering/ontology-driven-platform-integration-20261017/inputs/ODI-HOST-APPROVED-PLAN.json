@@ -1,0 +1,172 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-APPROVED-PLAN",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/orchestrator/.recovery-20261019/execution-plan.proposed.json"
+  },
+  "content": {
+    "sourceSha256": "199a3c6727a336a070b05f616097913af7f5f8695811f41aeafba4b5cba14882",
+    "plan": {
+      "schemaVersion": 1,
+      "classification": "Proposed whole-program execution plan for final interview; NOT a Goal prompt or native Goal",
+      "updatedAtUtc": "2026-10-18T17:42:17.795661+00:00",
+      "currentAuthority": "current-user-decisions.actual.json",
+      "priority": "Finish actual Jev1.14 application/necessary verification before final plan explanation. After approval, use it actively while completing the full preserved program.",
+      "fixedDecisions": {
+        "lead": "Actual current native gpt-6.1-sol/ultra, existing authentication/permissions",
+        "jev": "typesafe-ai/jev-1.14.0 through existing Gateway native credential owner; cumulative capUS$14",
+        "validation": "No separate model evaluation suite, benchmark or performance comparison gate; retain necessary implementation/connectivity/schema/model/source/target/postcondition checks",
+        "identity": "Existing Domain/Project owners; Lead Work purpose/dependencies/integration; worker Task decomposition; native occurrence/session/Run issuance",
+        "oldGoals": "Remove the two predecessor Goals through their native owners, preserving Work/session/history/effect receipts",
+        "goalTiming": "Author Goal prompt/create_goal only after final actual user approval",
+        "nativeOwners": "Native loops/tools/retries/sessions/profiles/auth remain native; Hermes default Lead retains research/development/Ontology/Wiki and project-internal measurement ownership"
+      },
+      "preApprovalPrerequisite": {
+        "handoff": "Completed444payload exact publication plus9Jevpackfiles and current user originals/interview hierarchy",
+        "sourceReadiness": "20 clean local checkouts matched freshly observed remote defaults; native adoption separate",
+        "jevCaller": "Deploy only exact reviewed thin native caller and pinned upstream source into existing UID10000 /opt/data runtime scope; no default multiagent installer/config/plugin changes",
+        "actualUse": [
+          "One finite known-answer connectivity/schema batch of Noul/Choice/Score",
+          "Use Jev to rank a real sanitized engineering evidence shortlist and consume original referenced evidence; retain mandatory instructions/decisions/effect fences",
+          "Record exact source/target/model/usage/latency/unknown provenance and bounded errors; no efficacy claim"
+        ],
+        "reload": "Current main session actual metadata already confirms requested model/effort. Start with existing shell/CLI calls, not mandatory new MCP registration/TUI reload; any concrete native trust/reload prerequisite must be brought to user now."
+      },
+      "executionPhases": [
+        {
+          "phase": "Native current-work binding and source admission",
+          "dependsOn": [
+            "final-user-approval",
+            "jev-prerequisite"
+          ],
+          "result": "Continue the existing whole-scope ODI Work and retain PT delivered-source dependency, original Specs/Plans/Inputs and consumed effects. Create only necessary new logical Tasks through canonical Git Work owner. Bind actual host cwd/Home/native tuple and reviewed source/registration/marker successors, preserving first-import guards.",
+          "completionEvidence": "Current selected Work/context at actual host caller; exact native identities, positive source/module identity and no fixture substitution. Existing Work IDs remain stable.",
+          "phaseId": "native-current-work-binding"
+        },
+        {
+          "phase": "Useful native orchestration and Jev application",
+          "dependsOn": [
+            "native-current-work-binding"
+          ],
+          "result": "Host Lead operates scoped actual Codex/Hermes SubLeads in Herdr panes/tabs with durable silent results. Use Jev for optional evidence/skill ranking and event-based worker advice; generation/ambiguity/integration stay with Lead.",
+          "completionEvidence": "Actual submitted native operation, returned bounded evidence and receiver readback; advice cannot grant permissions, restart workers, or establish completion. No silence-only watcher or generative Writer.",
+          "phaseId": "useful-native-orchestration"
+        },
+        {
+          "phase": "Context, Memory, original decisions and recovery",
+          "dependsOn": [
+            "native-current-work-binding"
+          ],
+          "parallelWith": [
+            "useful-native-orchestration"
+          ],
+          "result": "Use existing Work/original/Memory owners and topic/currentness contracts to retain purpose, accepted WHY, direct dependencies and revisions across delegation/compaction/concurrency/PC-off recovery. Apply actual common flow at affected callers.",
+          "completionEvidence": "Relevant original/current decision recovery, separate logical/native IDs, actual interruption/resume and concurrent-source reconciliation, preserved unknown/completed effects and local/shared/receiver distinctions. No second Memory store or session replica.",
+          "phaseId": "context-memory-recovery"
+        },
+        {
+          "phase": "Whole source and domain estate integration",
+          "dependsOn": [
+            "native-current-work-binding"
+          ],
+          "parallelWith": [
+            "context-memory-recovery"
+          ],
+          "result": "Finish previously admitted integration/separation/naming/retirement and module/CI policy across the full approved estate, beyond the20preparedcheckouts where original scope requires. Canonical common code/generators stay with owners; native/domain data retain custody; generated Hermes facade stays single-owner.",
+          "completionEvidence": "Actual affected consumers use reviewed current main source; immutable Ontology releases/pins retained; completed domain outcomes not reopened; human/domain decisions remain with their owners.",
+          "phaseId": "whole-source-domain-estate"
+        },
+        {
+          "phase": "Integration, publication and actual delivery",
+          "dependsOn": [
+            "useful-native-orchestration",
+            "context-memory-recovery",
+            "whole-source-domain-estate"
+          ],
+          "result": "Integrate source/metadata/native outcomes through existing Git branches/worktrees and semantic transitions. Required checks and independent exact-source review precede immutable authenticated evidence/PR. Accountable Lead explicitly merges expected head and each native owner verifies/applies source.",
+          "completionEvidence": "Current source/head/base/findings/checks, explicit merge/mainreadback and actual owner activation; frozen/unmerged candidates not treated canonical or blindly replayed.",
+          "phaseId": "integration-publication-delivery"
+        },
+        {
+          "phase": "Whole-scope closeout",
+          "dependsOn": [
+            "integration-publication-delivery"
+          ],
+          "result": "Check every required outcome against actual engineering/native/delivery evidence. Retain unresolved genuine human/domain decisions separately and report actual limits.",
+          "completionEvidence": "The full accepted program is completed with useful native/operator delivery, or a precisely evidenced external/user decision remains; no milestone/test/installation count is treated as whole completion.",
+          "phaseId": "whole-scope-closeout"
+        }
+      ],
+      "subLeadAllocation": {
+        "root": "Whole purpose, current authority, sequencing, shared pins, cost admissions, integration and final acceptance",
+        "lanes": [
+          {
+            "lane": "Common semantics and continuity",
+            "owner": "Existing common source/Work/Memory owners; domain research judgments delegated to actual native owner"
+          },
+          {
+            "lane": "Codex and Herdr native caller",
+            "owner": "Native Codex adapter/config/trust/session owner"
+          },
+          {
+            "lane": "Hermes and Jev native caller",
+            "owner": "Existing Hermes executor/profile/data owner; upstream decision helpers reused"
+          },
+          {
+            "lane": "Estate and domain consumers",
+            "owner": "Existing repository/domain owner; activated after relevant common dependencies"
+          },
+          {
+            "lane": "Independent review",
+            "owner": "Separate qualified reviewer from implementer; exact final source/artifact"
+          }
+        ],
+        "scheduling": "Use independent ready lanes concurrently within actual native quota/capacity. Tasks use isolated Git worktrees; shared source pins/integration serialize at root. A pane is a terminal location, not a Work/Task/Run identity.",
+        "delivery": "Bounded durableEnglishJSON+exact source/check/effect receipts, then WAIT SILENTLY. Root pulls after current priorities and closes only owned idle panes. Use --no-focus; native Codex workers preserve model/auth/permissions with --no-daemon and requestedultra."
+      },
+      "jevOperatingSequence": {
+        "actualFlow": [
+          "Read native facts through current admitted tools",
+          "Construct bounded eligible optional evidence/action candidates",
+          "Ask upstream Jev typed primitive",
+          "Validate schema/options/observed model and material current state",
+          "Native code executes only existing permitted operation",
+          "Observe new result and return evidence or ambiguity to Lead"
+        ],
+        "mandatoryContext": "Never use relevance ranking to discard current authority, accepted decisions, original effect fences or source recovery references. Unjudged/clipped/uncertain items remain explicit.",
+        "workerAdvice": "Use native state/events plus output meaning; deduplicate unchanged inputs; collect means inspect, not complete. No model-only kill/restart.",
+        "browser": "Only for an actual API/CLI gap. Reuse the computer-use structure after correcting pre-effect confidence/target checks and fresh post-action completion. No default image/Box/Omni/desktop/writer stack.",
+        "billing": "No separate paid generative fallback. Root admits finite calls within cumulativeUS$14 and existing owner receipts; unknown spend stays reserved pending reconciliation. Stop only dependent Jev calls at cap; continue independent authorized work."
+      },
+      "continuity": {
+        "updatePlan": "Use genuine native update_plan for phase/current-next-action updates when exposed; currently unavailable in tool catalog, so record that limitation and keep this source-owned hierarchy current. Do not emulate native runtime.",
+        "nativeGoal": "Only after approval, create the full approved native persistent Goal without an invented token budget. No Goal prompt is written here.",
+        "checkpoints": "Keep current-work/START-HERE routes aligned at material boundaries; retain exact originals and review/effect receipts; revalidate source/native liveness after compaction.",
+        "recovery": "Inspect the same correlated native effect before any retry; never replay159Hermesreceive, mergedPR37/rerun or frozen candidate effects."
+      },
+      "remainingInterview": "Only concrete prerequisite auth/reload/ownership conflicts uncovered by actual Jev application; no repeat of settled choices. Explain this plan with explain-code-clearly, then final approval.",
+      "externalPrerequisites": [
+        {
+          "prerequisiteId": "final-user-approval",
+          "meaning": "Actual final user approval after explain-code-clearly full plan explanation; not yet received"
+        },
+        {
+          "prerequisiteId": "jev-prerequisite",
+          "meaning": "Actual required Jev application and necessary checks before final explanation, under explicit current authority"
+        }
+      ],
+      "localLabelsOnly": "phaseId and prerequisiteId values are plan-local labels; not allocated Domain/Project/Work/Task/native occurrence IDs.",
+      "reviewPredecessorSha256": "233dad999ddc5bd22f69373dd9e447ccdeac98bf62ff866d4302accfa462c577"
+    },
+    "approvalDecisionId": "ODI-HOST-DECISION-APPROVAL",
+    "resumeDecisionId": "ODI-HOST-DECISION-RESUME",
+    "stateQualification": "Original proposed filename/status text retained as approved source; approval and continuation are separate exact current user decisions."
+  }
+}

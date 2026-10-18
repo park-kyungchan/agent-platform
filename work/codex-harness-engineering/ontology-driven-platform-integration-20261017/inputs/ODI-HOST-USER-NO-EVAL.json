@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-USER-NO-EVAL",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "native-user-message",
+    "locator": "/root/.codex/sessions/2026/10/18/rollout-2026-10-18T17-16-16-01a15003-9cee-7662-bbc2-7c1990379b30.jsonl:369"
+  },
+  "content": {
+    "answer": "너가 eval하지마, 그냥 제안서대로 진행해. 검증은 이미 된거라고 생각해, 유명한 오픈소스에서 제안한 것이니까. 실제 적용해서 자율 진행해. 세션 리로드 또는 유저에게 부탁할 요청들 지금 전부 해라.",
+    "question": "Jev가 비교 검증을 통과하면, 재승인 없이 shadow에서 실제 자료 선별·작업자 상태 해석에 적용하고 전체 작업을 이어가는 것을 최종 계획에 포함할까요? 효과가 없거나 품질이 떨어지는 기능은 수정·재비교 후 제외하겠습니다. 모델·추론 강도 자동 변경과 Jev만의 완료 선언은 하지 않습니다.",
+    "nativeSourceRecordSha256": "a3ad83624f1165412befdf3cd2cfdf56b2b48ff80a678f5215f00ce3c1e66d84",
+    "sourceTimestamp": "2026-10-18T17:31:56.583Z",
+    "captureLimitation": "Engineering user-message content capture with original locator/hash; Git does not authenticate native authorship."
+  }
+}

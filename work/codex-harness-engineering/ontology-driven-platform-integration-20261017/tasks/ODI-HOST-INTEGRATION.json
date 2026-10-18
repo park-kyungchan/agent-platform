@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-HOST-INTEGRATION",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 3,
+    "taskId": "ODI-HOST-INTEGRATION"
+  },
+  "title": "Integrate and deliver the approved whole host program",
+  "nextAction": "Root serializes shared source pins and canonical transitions, integrates reviewed native/continuity/estate results, verifies actual consumers/operator flow and preserves whole-work acceptance distinctions.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-HOST-DECISION-BUDGET",
+    "ODI-HOST-DECISION-IDENTITY",
+    "ODI-HOST-DECISION-NO-EVAL",
+    "ODI-HOST-DECISION-PANES",
+    "ODI-HOST-DECISION-APPROVAL",
+    "ODI-HOST-DECISION-RESUME"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

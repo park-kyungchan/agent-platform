@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-HOST-COMMON-ADMISSION",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 3,
+    "taskId": "ODI-HOST-COMMON-ADMISSION"
+  },
+  "title": "Separate host native Home, code owner and selected Work context contracts",
+  "nextAction": "Implement the narrow backward-compatible common native Codex home/binding contract successor and meaningful positive/negative checks; preserve source guards and historical bindings.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-HOST-DECISION-BUDGET",
+    "ODI-HOST-DECISION-IDENTITY",
+    "ODI-HOST-DECISION-NO-EVAL",
+    "ODI-HOST-DECISION-PANES",
+    "ODI-HOST-DECISION-APPROVAL",
+    "ODI-HOST-DECISION-RESUME"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

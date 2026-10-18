@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-USER-BUDGET",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "native-user-message",
+    "locator": "/root/.codex/sessions/2026/10/18/rollout-2026-10-18T17-16-16-01a15003-9cee-7662-bbc2-7c1990379b30.jsonl:263"
+  },
+  "content": {
+    "answer": "총 US$14 이내로. 그리고 smoke/shadow/최적화 비교 진행",
+    "question": "무인 실행 중 Jev 유료 사용의 전체 한도를 정해주세요. 신규 유료 서비스·별도 생성 Writer는 추가하지 않고, 한도에 도달하면 Jev 호출만 멈추고 가능한 나머지 작업은 이어가겠습니다.",
+    "nativeSourceRecordSha256": "c954c6fc17186a77fb682b3296fb4e8d7539878bbcaf62a502f7f1da7220ac16",
+    "sourceTimestamp": "2026-10-18T17:26:28.001Z",
+    "captureLimitation": "Engineering user-message content capture with original locator/hash; Git does not authenticate native authorship."
+  }
+}
