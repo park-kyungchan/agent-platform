@@ -1,0 +1,47 @@
+{
+  "classification": "Allowlisted session_meta first headers for3owned Root subagents only; no transcript/message/userdata copied",
+  "atUtc": "2026-10-18T19:48:32.957794+00:00",
+  "rootNativeThread": "01a15003-9cee-7662-bbc2-7c1990379b30",
+  "rows": [
+    {
+      "agentPath": "/root/handoff_recovery",
+      "nativeStoredSessionId": "01a15006-eaef-7f23-bcb8-c3440a03b7dc",
+      "nativeParentThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+      "sourceKind": "subagent.thread_spawn",
+      "metadataSourcePath": "/root/.codex/sessions/2026/10/18/rollout-2026-10-18T17-19-53-01a15006-eaef-7f23-bcb8-c3440a03b7dc.jsonl",
+      "metadataLineSha256": "b2617f5ac68145d2c59b187f6f4f7c88704b8512d8f48107e26518340fe34bee",
+      "timestamp": "2026-10-18T17:19:53.071Z",
+      "originator": "codex-tui",
+      "cliVersion": "0.163.0",
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    {
+      "agentPath": "/root/architecture_context",
+      "nativeStoredSessionId": "01a15007-0a5d-7fc3-af66-cf9c7e5194a8",
+      "nativeParentThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+      "sourceKind": "subagent.thread_spawn",
+      "metadataSourcePath": "/root/.codex/sessions/2026/10/18/rollout-2026-10-18T17-20-01-01a15007-0a5d-7fc3-af66-cf9c7e5194a8.jsonl",
+      "metadataLineSha256": "7880f31515cf3d28cb7d7ce6a43645eda26ccc653f8cc9f55f6f6a053bc47a28",
+      "timestamp": "2026-10-18T17:20:01.118Z",
+      "originator": "codex-tui",
+      "cliVersion": "0.163.0",
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    {
+      "agentPath": "/root/jev_reconcile",
+      "nativeStoredSessionId": "01a15008-ec00-7da3-8db5-80737e1c2ad4",
+      "nativeParentThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+      "sourceKind": "subagent.thread_spawn",
+      "metadataSourcePath": "/root/.codex/sessions/2026/10/18/rollout-2026-10-18T17-22-04-01a15008-ec00-7da3-8db5-80737e1c2ad4.jsonl",
+      "metadataLineSha256": "2e69957a30993a8e5767e92b542e4970dd0b829deb7221c11b7dffa5ba18f3c0",
+      "timestamp": "2026-10-18T17:22:04.417Z",
+      "originator": "codex-tui",
+      "cliVersion": "0.163.0",
+      "nativeTaskId": null,
+      "nativeRunId": null
+    }
+  ],
+  "identityMeaning": "Native stored session IDs and runtime-owned spawn lineage observed; nativeTask/Run remainunexposednull. Review protocol legacy taskId semantics need explicit binding, never infer these sessionIDs are nativeTaskIDs."
+}
