@@ -63,17 +63,13 @@
           },
           {
             "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-RETAINED-RESULT.json",
-            "sha256": "821e13356589fe0e27905e95c7a416566f363c6aadeaf28afba3942de968a946",
-            "bytes": 32335,
-            "kind": "input",
-            "id": "ODI-07-GANG-OWNER-REVIEW-RETAINED-RESULT"
+            "sha256": "f93a9e0f1ada36dc1e6a5968ae7e2cd8b32cb149d9680b3dca02dbd18f74d741",
+            "bytes": 109298
           },
           {
             "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-SOURCE-CORRELATION.json",
-            "sha256": "7031a78acd546b2be62f314db48eab49e25cfdf5e1f9004914d13f97a328cceb",
-            "bytes": 3765,
-            "kind": "input",
-            "id": "ODI-07-GANG-OWNER-REVIEW-SOURCE-CORRELATION"
+            "sha256": "f4f531aff572e75c52c51f6adea11813019fc32bd034321c4b351273e52e7232",
+            "bytes": 4008
           },
           {
             "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-ROOT-ADJUDICATION-PROPOSAL.json",

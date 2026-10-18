@@ -46,13 +46,13 @@
       "kind": "snapshot",
       "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-RETAINED-RESULT.json",
       "fragment": "#/content",
-      "sha256": "821e13356589fe0e27905e95c7a416566f363c6aadeaf28afba3942de968a946"
+      "sha256": "f93a9e0f1ada36dc1e6a5968ae7e2cd8b32cb149d9680b3dca02dbd18f74d741"
     },
     "verification": {
       "kind": "snapshot",
       "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-SOURCE-PARTIAL-VERIFICATION.json",
       "fragment": "#/content",
-      "sha256": "0e5265a05dcde841aa0497cb9c4747729c59fd95db968642137ba1ec51c83601"
+      "sha256": "f9353e2ad202cd2cd7baec051f8c6a6aeed8daf7a19b6432a6ddfa4267a898ca"
     },
     "qualification": "Partial source-backed execution join. Native turn completed in retained capture; logical Task still planned/pending and Verification has unverified adjudication criteria. Not a usable completed prerequisite.",
     "nativeBackendAuthentication": false,

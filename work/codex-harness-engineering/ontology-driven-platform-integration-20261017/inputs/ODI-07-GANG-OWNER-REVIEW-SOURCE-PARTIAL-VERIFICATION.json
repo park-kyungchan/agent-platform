@@ -87,11 +87,11 @@
         },
         {
           "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-RETAINED-RESULT.json",
-          "sha256": "821e13356589fe0e27905e95c7a416566f363c6aadeaf28afba3942de968a946"
+          "sha256": "f93a9e0f1ada36dc1e6a5968ae7e2cd8b32cb149d9680b3dca02dbd18f74d741"
         },
         {
           "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-SOURCE-CORRELATION.json",
-          "sha256": "7031a78acd546b2be62f314db48eab49e25cfdf5e1f9004914d13f97a328cceb"
+          "sha256": "f4f531aff572e75c52c51f6adea11813019fc32bd034321c4b351273e52e7232"
         },
         {
           "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-ROOT-ADJUDICATION-PROPOSAL.json",
@@ -99,7 +99,7 @@
         },
         {
           "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-SOURCE-OBSERVATION.json",
-          "sha256": "21dac73a081ea9c989ac64bb0513d9a50c4a88ed9eb71dad143d4d8712170a5f"
+          "sha256": "1aa37f72b1eeabb1f03438d5a3c030ce2cb79f6b2efbae6a67583e75b6f9b51f"
         },
         {
           "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-CONTRACT.json",
