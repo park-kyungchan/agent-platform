@@ -1,0 +1,141 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "6627e1cb87b486fdf00a159d21414d9a73f35944",
+  "reviewedTreeSha": "a73339e4c76b93a40b601da90c6e9ae08d2f1483",
+  "reviewedSourceManifestSha256": "792f3dc3471db0834a2e5c96780d52e599ea847d1331d96431115546a331e22a",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15006-eaef-7f23-bcb8-c3440a03b7dc"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15003-9cee-7662-bbc2-7c1990379b30"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "reviewStatus": "complete",
+  "recordedAtUtc": "2026-10-18T19:51:13.548530+00:00",
+  "classification": "Direct independent native reviewer publication-ready successor for identity metadata and finished local check readbacks only; no source/tree change or new source review.",
+  "identitySemantics": {
+    "legacyReviewActorField": "Existing ReviewV2 taskId is used here as an explicitly namespaced actual native actor identifier. native-thread:<UUID> correlates the actor to the actual native stored thread/session header; it is not a native Task occurrence ID.",
+    "reviewerAgentPath": "/root/handoff_recovery",
+    "reviewerNativeStoredSessionId": "01a15006-eaef-7f23-bcb8-c3440a03b7dc",
+    "authorNativeThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "observedLineage": {
+      "sourceKind": "subagent.thread_spawn",
+      "metadataLineSha256": "b2617f5ac68145d2c59b187f6f4f7c88704b8512d8f48107e26518340fe34bee",
+      "originator": "codex-tui",
+      "cliVersion": "0.163.0",
+      "headerTimestamp": "2026-10-18T17:19:53.071Z"
+    },
+    "receipt": {
+      "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/owned-root-subagents-metadata.actual.json",
+      "sha256": "35adfd475b8d117451997f07f8f86d8abc71b599bcfe135fea0e2189894e046a",
+      "bytes": 2419
+    },
+    "custody": "Read only the existing allowlisted owned session_meta receipt. No native messages, transcripts or session bodies read/copied. Runtime-issued /root/handoff_recovery maps to this stored actor independently of Root author. No unexposed allocation invented.",
+    "contractCheck": "ci/quality/receipt-validator.ts NativeReviewIdentity and exact review predicate accept nonempty distinct native-codex actor strings <=256 without whitespace. Both actual namespaced identifiers satisfy it; no source guard/schema change was required."
+  },
+  "sourceReviewReuse": {
+    "priorResult": {
+      "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/common-publication.independent-review.actual.json",
+      "sha256": "a51d920db11e0027a48b7ecd8086a42eb93347e5df35321f98df76f6e92df452",
+      "bytes": 15633
+    },
+    "sameHeadTreeManifest": true,
+    "scope": "322 files;43896 insertions/201 deletions.14 non-Work source/metadata/fixture files plus308 records of the existing selected ODI Work.",
+    "baseSha": "0d14e7eeaaf005278436c548a1097055c44a75c2",
+    "baseTree": "7675735dc4419d67823e0c92ffec3ee67a6e71aa",
+    "sourceConclusion": "Exact full common review already complete/pass0findings. All original Work/source/ownership/recovery/effect/cap findings and source manifest binding are retained byte-for-byte in the prior result; no fresh author implementation by reviewer.",
+    "wholeTree": {
+      "entries": 1272,
+      "blobs": 1107,
+      "manifestSha256": "792f3dc3471db0834a2e5c96780d52e599ea847d1331d96431115546a331e22a",
+      "derivation": "Previously independently derived from exact local Git using canonical deriveReviewedSourceManifest; unchanged. Root compares authenticated remote tree before evidence/status."
+    },
+    "preservation": "Prior result and its earlier pending-check/identity observations remain unchanged. This successor updates only native actor correlation and completed local check readbacks."
+  },
+  "checkReadbacks": {
+    "quality": {
+      "status": "pass",
+      "listedChecks": 14,
+      "allListedChecksPass": true,
+      "artifact": {
+        "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/common-integrated-quality.json",
+        "sha256": "2d08d08626d84f49c6814cb630d8fe6b0a9fec5d12de59d16ca15f9e1fff04a6",
+        "bytes": 221045
+      },
+      "finishedAt": "2026-10-18T19:37:39.508Z"
+    },
+    "requiredGitWork": {
+      "status": "pass",
+      "tests": 245,
+      "failures": 0,
+      "assertions": 3355,
+      "files": 4,
+      "artifact": {
+        "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/common-final-git-work.log",
+        "sha256": "3e0a86ed1c231c9bcb58b2bf044f3f94216a593b3955ddb43db92fd381c1ef94",
+        "bytes": 32065
+      }
+    },
+    "sourceSuccessor": {
+      "schema": "agent-platform.source-ci.v1",
+      "status": "pass",
+      "commandCount": 25,
+      "allCommandExitCodesZero": true,
+      "sourceRegistrySha256": "9759c25796946e95c88ab2ed20eaedcec01dc0f52162ea69f6009aa4b7ee3099",
+      "nativeModelCalls": 0,
+      "nativePermissionGranted": false,
+      "artifact": {
+        "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/common-integrated-source-check-successor.log",
+        "sha256": "5b2c34f8c6c2a4b45d06da7588bb8f05e2fbe2a7e3689920533010a072933f45",
+        "bytes": 154097
+      },
+      "processReceipt": "Root reports original exec98731 returned0; reviewer independently read final source-ci pass and every recorded command exitCode0."
+    },
+    "failedFirstAttemptPreserved": {
+      "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/common-integrated-source-check.log",
+      "sha256": "8ab7745713e7f8a3f780bf4041b7c0d1c7a74572aac9cce3398563c35532bf67",
+      "outcome": "Original one unique real Work test timeout at unchanged5000ms retained. Isolated recheck and full successful successor are separate observations; no cap/guard source change."
+    },
+    "reviewerReranSuites": false,
+    "localRequiredChecksStatus": "complete-pass",
+    "remoteChecksStatus": "not independently observed by this reviewer"
+  },
+  "publicationBoundary": {
+    "reviewResultReady": true,
+    "publishedByReviewer": false,
+    "authenticatedRemoteEvidenceEstablished": false,
+    "sourceTreeRecheckRequired": true,
+    "meaning": "Root may publish this directly authored exact native result after its separate authenticated remote/head/tree/currentness checks. Immutable result/receipt/status and PR/expected-head merge stay with accountable Root; no publication or merge performed here."
+  },
+  "acceptanceBoundary": {
+    "nativeOwnerAdoptionEstablished": false,
+    "nativePermissionGranted": false,
+    "WorkFormalCompletionEstablished": false,
+    "semanticAcceptanceEstablished": false,
+    "modelEfficacyEstablished": false,
+    "meaning": "Green source checks and independent source review do not establish native loading/trust/injection, actual caller behavior, domain outcome or full Work Acceptance."
+  },
+  "effects": {
+    "sourceEdits": 0,
+    "configAuthTrustPermissionWrites": 0,
+    "nativeEffects": 0,
+    "GoalCalls": 0,
+    "modelCalls": 0,
+    "nativeSessionBodyReads": 0,
+    "publicationPrMergeEffects": 0,
+    "onlyNewResultFile": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/common-publication.ready.independent-review.actual.json"
+  },
+  "handoff": "WAIT SILENTLY; Root pulls. No completion/status/steering relay."
+}

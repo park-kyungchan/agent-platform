@@ -1,0 +1,262 @@
+{
+ "schema": "agent-platform.independent-review-result.v1",
+ "recordClass": "verification",
+ "binding": {
+  "codeOwner": "agent-platform",
+  "evidenceOwner": "codex-harness-engineering",
+  "scope": "canonical-source-ci-quality"
+ },
+ "headSha": "6627e1cb87b486fdf00a159d21414d9a73f35944",
+ "reviewedTreeSha": "a73339e4c76b93a40b601da90c6e9ae08d2f1483",
+ "reviewedSourceManifestSha256": "792f3dc3471db0834a2e5c96780d52e599ea847d1331d96431115546a331e22a",
+ "reviewer": {
+  "runtime": "native-codex",
+  "taskId": "/root/handoff_recovery"
+ },
+ "author": {
+  "runtime": "native-codex",
+  "taskId": "01a15003-9cee-7662-bbc2-7c1990379b30"
+ },
+ "conclusion": "pass",
+ "unresolvedFindings": 0,
+ "findings": [],
+ "reviewStatus": "complete",
+ "recordedAtUtc": "2026-10-18 19:48:06 UTC",
+ "nativeIdentityEvidence": {
+  "reviewer": "Actual runtime-issued native collaboration task path /root/handoff_recovery in this thread; separate reviewer of Root/nativeC1/architecture_context source. Reviewer authored no implementation or canonical Work change.",
+  "author": "Actual parent native Root author thread01a15003-9cee-7662-bbc2-7c1990379b30 supplied by current runtime/task and current-work source.",
+  "schemaMeaning": "The contract taskId field contains the actually exposed native identity: reviewer collaboration path and author native thread identifier. It does not claim a hidden native Task/Run allocation.",
+  "reviewerNativeThreadId": null,
+  "reviewerNativeTaskId": null,
+  "reviewerNativeRunId": null,
+  "evidenceCustody": "Emitted directly by the independent reviewer; Root may retain these exact bytes and publish authenticated immutable result/receipt/status after its separate checks. No publication performed by reviewer."
+ },
+ "base": {
+  "sha": "0d14e7eeaaf005278436c548a1097055c44a75c2",
+  "tree": "7675735dc4419d67823e0c92ffec3ee67a6e71aa",
+  "currentness": "Current remote main0d14e7ee observation attributed to Root; reviewed diff is exactly this immutable base. No independent remote-API freshness claim; accountable Root must recheck base before expected-head merge."
+ },
+ "scope": {
+  "wholeDiff": "322 files;43896 insertions/201 deletions.14 non-Work source/metadata/fixture files plus308 records of the existing selected ODI Work.",
+  "originalWork": "a6fdad95559079b4752838c6084934eb47e2d306 canonical existing ODI branch, not newly invented Work. Main0d14e7ee lacked this Work.",
+  "sourceRoots": "Actual host /home/palantirkc/projects source successors remain separate from preserved container/runtime/data homes; no credential/session/Goal import or native permission follows.",
+  "sourceOnly": true,
+  "nativePermissionGranted": false,
+  "semanticAcceptanceEstablished": false
+ },
+ "wholeSourceManifest": {
+  "schema": "agent-platform.reviewed-source-manifest.v1",
+  "reviewedTreeSha": "a73339e4c76b93a40b601da90c6e9ae08d2f1483",
+  "entryCount": 1272,
+  "blobCount": 1107,
+  "sha256": "792f3dc3471db0834a2e5c96780d52e599ea847d1331d96431115546a331e22a",
+  "derivation": "Independently read git ls-tree -r -t -z for exact local immutable head; passed all1272 entries through existing ci/quality/receipt-validator.ts#deriveReviewedSourceManifest. Exact match to Root local manifest; safe path/mode/type/uniqueness and4096 bound enforced by canonical function.",
+  "changedManifestRawSha256": "dd06e1604aac0fb91622f618d2c2bf4c5948ca62d72ca00f6acb08041a633cd3",
+  "changedManifestFormat": "git diff --raw --no-abbrev --no-renames -z <base> <head>;322 entries, exact old/new Git object/mode/path binding.",
+  "provenance": "Local Git only. Root must compare authenticated remote recursive tree after push before immutable evidence/status publication. No missing native IDs or fabricated remote observation.",
+  "nonWorkPins": [
+   {
+    "path": "architecture/capability-source-owners.json",
+    "sha256": "9759c25796946e95c88ab2ed20eaedcec01dc0f52162ea69f6009aa4b7ee3099"
+   },
+   {
+    "path": "owner-fixture/codex-harness-engineering/src/native/hook-cli.ts",
+    "sha256": "196fac5cf6675329679a654b7c6130eb8c24065dce5739f59519fc91fc72a500"
+   },
+   {
+    "path": "owner-fixture/codex-harness-engineering/src/native/hooks.ts",
+    "sha256": "ff1f496fb6e1e01b858ada566cac2fa4d9900b3722c96b65740828f3ee745aa8"
+   },
+   {
+    "path": "owner-fixture/hermes-harness-engineering/src/ontology-driven/provider-source.ts",
+    "sha256": "bca7a044412ca5c8bd356399bb3a2b17c3cc273001d2d034986c101d65dc59de"
+   },
+   {
+    "path": "owner-fixture/manifest.json",
+    "sha256": "346652ad87929498f00b77ecafca2aa903f1894a0e6de10916e9687495968bf8"
+   },
+   {
+    "path": "packages/native-codex-adapter/src/native/home-context.test.ts",
+    "sha256": "e32714072354c8e839f46f71495b180e6e9a866fdb0abbb89da12c4ae5840f3b"
+   },
+   {
+    "path": "packages/native-codex-adapter/src/native/home-context.ts",
+    "sha256": "8b850985287a73938323c831e866ebe2ef34162ed8b4e8ba5f4028f9823776a5"
+   },
+   {
+    "path": "packages/native-codex-adapter/src/native/hooks.test.ts",
+    "sha256": "ff7256743bbab5878e535a94a05e016c628dc8de066ed25b6d45556814a68f15"
+   },
+   {
+    "path": "packages/native-codex-adapter/src/native/hooks.ts",
+    "sha256": "9d1f8f3365d8ebc78c03c0365ae555db32a0c2b455f23649564e361d266b2c74"
+   },
+   {
+    "path": "packages/work-continuity/src/git-work/context.ts",
+    "sha256": "6460d178086cf423920d0bc8566ac53bb84e9e12efe85bb39876256e2ff8a4d9"
+   },
+   {
+    "path": "packages/work-continuity/src/git-work/git-work.test.ts",
+    "sha256": "b7bcf409b2558ddfb34c4e846da518507c4b4a944f06381e90ef92d0796f8d96"
+   },
+   {
+    "path": "packages/work-continuity/src/git-work/types.ts",
+    "sha256": "8fbc20bd25886c2cd10663c6a0a0bc8b1b9a4620fd70c56b45f544fca3b55144"
+   },
+   {
+    "path": "project.json",
+    "sha256": "1802978cf89ad57c053e47cf559d5fc3186795ac83968a85e0608ecac39676e6"
+   },
+   {
+    "path": "scripts/harness.ts",
+    "sha256": "ca6d7aa1fc1e7f08646afb5dea9eecd5e51fe9ce14f3b6bf359f4107baa4cdc2"
+   }
+  ]
+ },
+ "review": [
+  {
+   "topic": "Whole existing Work and original effect custody",
+   "evidence": "Immutable a6fdad95 versus6627e1cb object comparison plus admitted canonical Work reader and retained semantic validate/transition.",
+   "finding": "Existing285 records become308.284 original blobs are byte-identical; only original work.json changes. Original purpose is exactly equal. Every historical Input, Decision, Task logical tuple, Spec1, Plan1/2, Effect/evidence/relation/fence record remains unchanged. Work changes only active Plan revision, additional governing decisions, historical fence IDs and continuity inventory pointers. Large historical data/evidence additions are preserved source records, not new executable code or authority."
+  },
+  {
+   "topic": "Accepted host continuation and truthful remaining state",
+   "evidence": "Canonical reader of ODI-PLAN@3, five HOST Tasks and ODI-HOST-CONSUMED-EFFECTS.",
+   "finding": "23 additions are6 current host Decisions,10 Inputs,1 consumed-effect fence,1 Plan3 and5 source-only Tasks. Plan3 preserves Spec1/Plans1-2/effects, actual current approval/resume, no separate eval, cumulativeJev14 and native/runtime/domain owners. It retains PT delivered source, wider estate/Memory/recovery/domain scope and final separate Acceptance. Existing159 receive and smoke001/rank002 are fenced completed; no replay. Common/Codex Tasks record source execution complete with verification/shared/formal pending; integration running and Hermes/estate planned. No native occurrences invented."
+  },
+  {
+   "topic": "Current source roots preserve historical namespaces",
+   "evidence": "Independent recursive JSON comparison of91a9027f->1f8c69f.",
+   "finding": "Exactly3 existing project current-root fields translate to /home/palantirkc/projects, plus an explicit non-authorizing hostSourceSuccessor annotation. All156 registry leaf changes at custody commit are exact current /home/palantirkc/code/shared/ -> /home/palantirkc/projects/ locator translations; no other registry leaf changes. Historical project milestones/currentAdoptionSources, old contracts/effect references, native /opt/data and runtime/data ownership stay intact. Later4 reviewed registry digest successors match actual changed canonical sources."
+  },
+  {
+   "topic": "Home v2 and native route boundaries",
+   "evidence": "Exact C1 source/test hashes and common-final independent review reused, then exact final-tree comparison.",
+   "finding": "Native Codex state Home, orchestrator cwd, fixed code owner and selected Work remain distinct. Only exact qualified selection plus owner-pinned and locally reobserved same-repository checkout produces source route readiness. Foreign tuples/symlinks/wrong branch/commit/drift fail or hold; no code-owner fallback route. Provider/source first-import, before/after closure and native permission/trust ownership remain. Required wrapper semantics fit unchanged explicit v2 cap or hold completely; v1 defaults unchanged."
+  },
+  {
+   "topic": "Provenance versus current normative contracts",
+   "evidence": "Exact unchanged35d17f85 context source and prior98checks/actual equality evidence.",
+   "finding": "Full private Effect->producer Task->exact Spec/Plan/evidence validation remains. Only reverse producer provenance is omitted from normative projection; selected historical Task/explicit transitive prerequisites retain full historical contracts. Purpose/current decisions/original addresses/consumed-uncertain fences/currentness/source/record/output bounds remain. Codec source-role conflicts and unavailable bound contracts hold rather than truncate."
+  },
+  {
+   "topic": "Public CLI, finite providers and fixtures",
+   "evidence": "Exact1ebbdf9 CLI and common-owner-provider-successor review bound to final6627 tree.",
+   "finding": "Explicit v2/metadata.v1 uses canonical composed codec and one minified JSON line; invalid wire choices refuse; default v1 preserved. Root owner1113b5c2 resolves earlier generated-request finding. Exact25context/6native provider denominator pins and digest markers match final common source. Eight existing finite fixtures remain; four refreshed files equal reviewed owner/generated sources and retain guard semantics. No native clients/loops/config/auth grants added."
+  }
+ ],
+ "semanticValidation": {
+  "snapshot": "bbd6d5936d0f12151e024c22c58240abf6bb2061",
+  "relationToReviewedHead": "Work subtree object atbbd6d593 equals exact6627e1cb Work subtree; only finite fixtures changed afterward.",
+  "retainedResults": [
+   "host-odi.codex-repair.validation.json",
+   "host-odi.codex-repair.transition.json",
+   "odi-to-host.semantic-transition.actual.json"
+  ],
+  "observed": "Each valid:true/findings:[]/authority:none/nativePermissionGranted:false/semanticAcceptanceEstablished:false. Original source/recovery/whole-estate audits and hash-pinned author/independent reviews retained.",
+  "reviewerActions": "Read-only immutable object/JSON comparisons and admitted reader; no semantic Work writes, historical retagging or effect replay."
+ },
+ "checks": {
+  "reviewConclusion": "Source review pass with0 material findings; required CI completion remains a separate gate.",
+  "quality": {
+   "status": "pass",
+   "listedChecks": 14,
+   "finishedAt": "2026-10-18T19:37:39.508Z",
+   "sourceContentSha256": "e06c18b0af62890806e3d8f380a394660d5d475c415aefa902213550ae22590e",
+   "sourceScopeSha256": "61760e071e6bab8f01bd7bcac4bb4bed52412e51e3e398a499832b3c80485b44"
+  },
+  "requiredSourceCi": {
+   "status": "pending-reconciliation",
+   "firstRun": "common-integrated-source-check.log exited1; one unique real canonical Work test exceeded unchanged5000ms at5047.68ms, printed once plus failure recap. Original failed log retained.",
+   "isolatedRecheck": "common-current-work-timeout-recheck.log:1pass/0fail/27assertions; case2936.80ms under same5000ms; no cap/guard/source change.",
+   "rerun": "Root reports source CI and required Git Work checks are running sequentially. No full-source green claim from isolated pass or this reviewer."
+  },
+  "independentlyRetained": "Prior66native affected tests/520assertions,98context checks/548assertions, actual5CLI wire checks and exact31provider/8fixture static checks remain attributed in their unchanged-source artifacts. Root48focused integration tests are retained, not rerun by reviewer.",
+  "noNewSuiteRun": true,
+  "noModelEfficacyClaim": true,
+  "publicationReady": false,
+  "mergeAuthorizedByThisReview": false
+ },
+ "evidence": {
+  "root": "/home/palantirkc/orchestrator/.recovery-20261019/continuation",
+  "artifacts": [
+   {
+    "path": "common.reviewed-source-tree.local.json",
+    "sha256": "ce84053a033b1bc73406ecf1539c65ad9311c1d1501d68609a495e91de0f6ec5",
+    "bytes": 281599
+   },
+   {
+    "path": "common.reviewed-source-manifest.local.json",
+    "sha256": "5ba7ab1bdc5fc2307f0341cb41f7419c3c3e5c8a69fb77209b67da655b5a0e2e",
+    "bytes": 249
+   },
+   {
+    "path": "common-final.independent-review.actual.json",
+    "sha256": "b8276dc1b19aa0576b1c284a9e8d2d1fbc5d5050b1bb1a6b35bfc2a95599c7a6",
+    "bytes": 15725
+   },
+   {
+    "path": "common-owner-provider-successor.independent-review.actual.json",
+    "sha256": "c46c4b57a4955ae5bc16828f568c06c6e81126e48c055efcb7399132a699c990",
+    "bytes": 12796
+   },
+   {
+    "path": "context-delivery.independent-review.actual.json",
+    "sha256": "e545e0fb966d13aa2c6c8677c38e6995363ced361d4c910725a30ef83b749f7b",
+    "bytes": 13982
+   },
+   {
+    "path": "host-odi.codex-repair.snapshot.json",
+    "sha256": "5d2c87054eadb07e3b1b5edeeaa1a10b3ee5069ccf89d60e7870324f2a28a669",
+    "bytes": 311
+   },
+   {
+    "path": "host-odi.codex-repair.validation.json",
+    "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb",
+    "bytes": 139
+   },
+   {
+    "path": "host-odi.codex-repair.transition.json",
+    "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb",
+    "bytes": 139
+   },
+   {
+    "path": "odi-to-host.semantic-transition.actual.json",
+    "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb",
+    "bytes": 139
+   },
+   {
+    "path": "common-integrated-quality.json",
+    "sha256": "2d08d08626d84f49c6814cb630d8fe6b0a9fec5d12de59d16ca15f9e1fff04a6",
+    "bytes": 221045
+   },
+   {
+    "path": "common-integrated-source-check.log",
+    "sha256": "8ab7745713e7f8a3f780bf4041b7c0d1c7a74572aac9cce3398563c35532bf67",
+    "bytes": 114891
+   },
+   {
+    "path": "common-current-work-timeout-recheck.log",
+    "sha256": "d6bd3384bec6081850ec802da7461e5ef1c04415df68e15c61029e20bec11194",
+    "bytes": 334
+   }
+  ],
+  "scopeRule": "All source/manifest/check pins are exact observations. Preserve failed attempts and prior reviews; no altered evidence or publication history."
+ },
+ "finalConditions": [
+  "Root completes/reconciles required source/quality/merge checks, compares authenticated remote full tree/manifest, publishes exact immutable independent result plus receipt/status before PR, and explicitly merges only expected current head.",
+  "Any source/tree/base successor requires explicit binding/current zero-findings review; unchanged subset hashes alone do not approve a different whole tree.",
+  "Actual source/native owner installation, trust/loading/callability/current native consumer, Work verification/formal completion and domain Acceptance remain separately pending."
+ ],
+ "effects": {
+  "sourceEdits": 0,
+  "GoalCalls": 0,
+  "nativeEffects": 0,
+  "configAuthPermissionChanges": 0,
+  "credentialSessionUserDataReads": 0,
+  "modelCalls": 0,
+  "pushPrMergeStatusPublication": 0,
+  "resultFileOnly": true
+ },
+ "handoff": "Durable bounded independent result; WAIT SILENTLY. No completion/status/steering relay."
+}
