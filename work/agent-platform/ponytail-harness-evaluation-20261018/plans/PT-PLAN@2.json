@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "plan",
+  "id": "PT-PLAN",
+  "revision": 2,
+  "specId": "PT-SPEC",
+  "specRevision": 2,
+  "objective": "Lead quality-first constrained improvement of the common harness, prepare complex source-grounded evaluation scenarios and conduct the E2E application interview, with CI Workflow Agent as an additional sub-scope.",
+  "clauses": [
+    "Recover actual source-owned decisions and handoff; retain existing independent progress and current Work IDs.",
+    "Select complex baseline scenarios from preserved verification records; distinguish observed production events, passing synthetic fixtures and seeded regressions.",
+    "Prepare quality-first rubric v2 and independent case expectations without converting proposals into accepted criteria.",
+    "Conduct E2E common-harness problem/application interview; include CI Workflow Agent as one sub-scope and do not ask the user to reconstruct already preserved decisions.",
+    "Bind actual answers, affected owners/consumer paths and unresolved choices to the next reviewable design; preserve historical contracts and effects.",
+    "Do not commit or dispatch new native evaluations. Record actual quality/evidence gaps; no test count, scalar speed gain or source readiness claims whole outcome completion.",
+    "Include the user-requested lens-context byte-check/overengineering origin and three Git-first protections across the common harness; keep required source pins/first-import checks and accountable native boundaries."
+  ]
+}

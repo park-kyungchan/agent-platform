@@ -1,0 +1,37 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "task",
+  "id": "PT-14-MERGE-REVIEW-HANDOFF",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "issueId": "PT-ISSUE-20261018",
+    "specId": "PT-SPEC",
+    "specRevision": 3,
+    "planId": "PT-PLAN",
+    "planRevision": 3,
+    "taskId": "PT-14-MERGE-REVIEW-HANDOFF"
+  },
+  "title": "Merge Review Handoff",
+  "nextAction": "Create scoped PR then send lens-interview expected head, evidence, findings, pending native qualification and explicit merge-review/proceed request under PT-14; no automatic merge or activation.",
+  "state": {
+    "execution": "pending",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    "PT-13-REVIEW-PUBLICATION-PR"
+  ],
+  "decisionIds": [
+    "PT-DECISION-EXECUTION-APPROVAL-20261018"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

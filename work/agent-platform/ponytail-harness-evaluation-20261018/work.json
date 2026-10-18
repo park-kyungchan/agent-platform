@@ -8,35 +8,43 @@
   "repositoryId": "park-kyungchan/agent-platform",
   "issueId": "PT-ISSUE-20261018",
   "purpose": {
-    "objective": "Evaluate where Ponytail can improve common-harness work and apply the useful AIP Evolve constrained-improvement methodology through existing canonical Work and Evidence contracts in an isolated branch.",
+    "objective": "Deliver quality-first constrained improvement in the common harness through canonical implementation, independent complex verification, reviewed PR and accountable merge-review handoff; CI is an added scope and Ponytail a candidate.",
     "successCriteria": [
-      "Ponytail and common baseline source are pinned and other sessions remain untouched.",
-      "A source-grounded task-specific rubric fixes meaningful quality and efficiency criteria before candidate outcomes.",
-      "The common harness offers a reusable bounded read-only improvement preflight/comparison using existing evaluation semantics.",
-      "Meaningful tests, required common/package/source-provider checks and independent source review support the candidate.",
-      "The user receives a clear Korean explanation of the fixed rubric and actual execution flow."
+      "Preserve v1 and historical Work contracts, originals and completed/uncertain fences.",
+      "Canonical quality comparison distinguishes behavior gain, verification detection gain, equality and insufficient evidence; no speed/count-only gain.",
+      "Execute independently fixed complex valid/invalid controls and actual producer integration; disclose source/adapter/native evidence classes.",
+      "Use Git branches/worktrees, immutable source and semantic transition for publication/concurrency/history without universal filesystem guarantees.",
+      "Run affected package/common/source closures and both affected consumer adapter paths.",
+      "Independently review exact final source commit/tree; publish immutable evidence and authenticated status before PR.",
+      "Create scoped PR then send lens-interview expected head, evidence, findings, pending native qualification and explicit merge-review/proceed request under PT-14; no automatic merge or activation."
     ],
     "inScope": [
-      "Isolated source analysis and local branch changes",
-      "Existing Wiki methodology research and attributed transfer",
-      "Pure evaluation comparison, bounded CLI, portable Work inputs and documentation",
-      "Ponytail scope/reuse/review treatment and measurement design"
+      "Whole common-harness E2E quality and AIP Evolve application",
+      "Ponytail instruction-treatment and complex verification scenarios",
+      "CI Workflow Agent interview as an additional sub-scope",
+      "Lead-owned logical IDs, source-linked decisions and reviewable uncommitted design",
+      "Approved V3 implementation, independent review/publication, PR and PT-14 merge-review handoff"
     ],
     "outOfScope": [
-      "Unrequested native model evaluation suite or reuse of historical model budgets",
-      "Global plugin/Skill/config changes, native session control or activation",
-      "Changes to another active worktree or shared native stores",
-      "Automatic merge, production deployment, actual Acceptance inferred from evaluation"
+      "CI Workflow Agent as primary purpose",
+      "Other Lead Work/Goal/source/native effects",
+      "New native evaluation budgets, automatic merge/activation/Acceptance"
     ]
   },
   "spec": {
     "id": "PT-SPEC",
-    "revision": 1
+    "revision": 3
   },
   "plan": {
     "id": "PT-PLAN",
-    "revision": 1
+    "revision": 3
   },
-  "governingDecisionIds": [],
+  "governingDecisionIds": [
+    "PT-DECISION-QUALITY-SCOPE-20261018",
+    "PT-DECISION-LEAD-ROLE-20261018",
+    "PT-DECISION-QUALITY-SUCCESS-MODES-20261018",
+    "PT-DECISION-E2E-CONSUMER-SCOPE-20261018",
+    "PT-DECISION-EXECUTION-APPROVAL-20261018"
+  ],
   "historicalFenceIds": []
 }

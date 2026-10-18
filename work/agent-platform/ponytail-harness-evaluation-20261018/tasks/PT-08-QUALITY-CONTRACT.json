@@ -1,0 +1,35 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "task",
+  "id": "PT-08-QUALITY-CONTRACT",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "issueId": "PT-ISSUE-20261018",
+    "specId": "PT-SPEC",
+    "specRevision": 3,
+    "planId": "PT-PLAN",
+    "planRevision": 3,
+    "taskId": "PT-08-QUALITY-CONTRACT"
+  },
+  "title": "Quality Contract",
+  "nextAction": "Preserve v1 and historical Work contracts, originals and completed/uncertain fences.",
+  "state": {
+    "execution": "running",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "PT-DECISION-EXECUTION-APPROVAL-20261018"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

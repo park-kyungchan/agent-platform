@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "decision",
+  "id": "PT-DECISION-QUALITY-SCOPE-20261018",
+  "status": "accepted",
+  "answer": "작업 시간보다는 품질에 더 포커스를 맞추어서 다시 Eval Rubric 작성해서 준비해봐. 이번에는 너 혼자 commit하지말고. Palantir's AIP Evolve를 공통하네스에 어느 부분에 어디에 적용해야하는지에 대해서, 내가 lens-interview session(Orchestrator and Lead Role)의 마지막 plan에 백로그에 계획해놓은 CI WorkFlow Agent 설계에 관한 인터뷰가 있거든? 그것까지 스코프 확장해서 이번에 공통하네스 부분에 대해서 E2E로 인터뷰를 **\"너가 진행하자. Lead Session에 CI WorkFLow Agent 백로그쪽 작업 너가 가져와서 진행한다고 전달하고 그쪽에서는 다른작업 집중하라고해\"**",
+  "meaning": "Quality-first common-harness improvement is primary. Existing complex verification scenarios supply baseline evidence. CI Workflow Agent is an additional sub-scope. Prepare without further commits, native evaluations or publication.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-QUALITY-SCOPE-20261018.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

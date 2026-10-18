@@ -1,0 +1,214 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-INTERVIEW-STATE-V2",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-INTERVIEW-STATE-V2.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common-harness.quality-e2e-interview-state.v2",
+    "status": "approved-executing-v3",
+    "lead": "Current user-facing session per PT-USER-LEAD-ROLE-20261018",
+    "primaryPurpose": "Whole common-harness quality and justified AIP Evolve application; CI Workflow Agent is an additional sub-scope.",
+    "settledAnswers": [
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-QUALITY-SCOPE-20261018.json",
+          "fragment": "#/content/text"
+        },
+        "meaning": "Quality before elapsed time; expand to E2E common harness and transferred CI Agent interview; no commits."
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-QUALITY-SCOPE-20261018.json",
+          "fragment": "#/content/clarification"
+        },
+        "meaning": "Lead selects complex scenarios from existing verification history; preserve primary purpose rather than centering CI."
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-LEAD-ROLE-20261018.json",
+          "fragment": "#/content/text"
+        },
+        "meaning": "This session is accountable Lead and owns continuing hierarchical logical ID preparation."
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-CI-REPEATS-20261018.json",
+          "fragment": "#/content/text"
+        },
+        "meaning": "Delegate broader recent CI repeated-mistake analysis and consume its evidence in the quality scope."
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-ANSWER-QUALITY-SUCCESS-MODES-20261018.json",
+          "fragment": "#/content/text"
+        },
+        "meaning": "Behavior gains and verification-detection gains are eligible separate outcomes; prove each, no count-only improvement."
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-ANSWER-E2E-CONSUMER-SCOPE-20261018.json",
+          "fragment": "#/content/text"
+        },
+        "meaning": "Use affected-consumer E2E scope; common changes through both runtimes; not native execution admission."
+      },
+      {
+        "source": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-LEAD-ORCHESTRATOR-PR-APPROVAL-20261018.json",
+          "fragment": "#/content/text"
+        },
+        "meaning": "Current session retains Lead+Orchestrator and will implement through PR after explain-skill explanation and explicit final user approval; do not merely submit to another Lead."
+      }
+    ],
+    "preparedArtifacts": {
+      "rubric": "inputs/PT-EVAL-RUBRIC-V2.json",
+      "complexScenarios": "inputs/PT-COMPLEX-QUALITY-SCENARIOS-V2.json",
+      "evolveLocations": "inputs/PT-EVOLVE-APPLICATION-MAP-V2.json",
+      "inheritedContext": "inputs/PT-LEAD-INTERVIEW-CONTEXT.json",
+      "currentSpec": "PT-SPEC@2",
+      "currentPlan": "PT-PLAN@2"
+    },
+    "scenarioSelection": "Lead-selected7 complex scenarios:6core harness including Git-first three protections plus1CI sub-scope; v1cases retained.",
+    "outcomeDistinctions": [
+      "Observed harness behavior quality improvement",
+      "Verification detection improvement",
+      "Stronger evidence only",
+      "Observed equal quality",
+      "Unknown/not exercised"
+    ],
+    "currentEvidence": {
+      "newCandidateQualityRuns": 0,
+      "newNativeModelCalls": 0,
+      "newCommits": 0,
+      "documentReview": "Internal read-only draft review:0 current findings in reviewed scope; no authenticated publication or actual quality-gain claim.",
+      "recordedHistoricalGainsAreNotNewCandidateGains": true,
+      "uncommittedDraftReaderQualification": "Record shapes/reference checks only; no claim the committed reader selected the uncommitted v2"
+    },
+    "research": {
+      "ciAnalysisAgent": "/root/ci_repeated_mistakes",
+      "state": "Subagent report returned; source-attributed45run inventory and5patterns integrated as additional scope.",
+      "policy": "No rerun/dispatch/merge/status writes or additional routine Lead messages.",
+      "reportRef": {
+        "kind": "snapshot",
+        "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-CI-REPEATED-MISTAKES-V2.json",
+        "fragment": "#/content"
+      },
+      "gitByteBoundary": {
+        "taskId": "PT-07-GIT-NATIVE-BOUNDARIES",
+        "state": "Exact005/006/007/008origin and overengineering review traced; three-protection Git/native map and QC-07 added.",
+        "userSource": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-GIT-FIRST-BYTE-BOUNDARY-20261018.json",
+          "fragment": "#/content/text"
+        },
+        "resultRef": {
+          "kind": "snapshot",
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-GIT-FIRST-THREE-PROBLEMS-V2.json",
+          "fragment": "#/content"
+        }
+      }
+    },
+    "nextInterviewTopics": [
+      {
+        "order": 1,
+        "topic": "Only final execution approval for explained V3 plan remains; do not repeat settled quality/consumer/role/case-selection questions."
+      }
+    ],
+    "constraints": [
+      "Keep all original v1 contracts/completed Task bindings and evidence.",
+      "Current v2 is a draft, not an accepted scoring policy or a native dispatch admission.",
+      "Other Lead Work/Goal/Task/source/effects remain untouched."
+    ],
+    "currentPhase": "PT-08 contract freeze before two isolated worker panes",
+    "pendingFinalApproval": {
+      "planRef": {
+        "kind": "snapshot",
+        "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-IMPLEMENTATION-PR-PLAN-PROPOSAL-V3.json",
+        "fragment": "#/content"
+      },
+      "received": true
+    },
+    "continuity": {
+      "schema": "common-harness.compaction-checkpoint.v1",
+      "version": 2,
+      "updatedAtUtc": "2026-10-18T11:01:23.492Z",
+      "role": "This session is Lead AND Orchestrator; implement through PR after final approval, do not hand work back to lens-interview.",
+      "nativeGoal": {
+        "threadId": "01a14e5a-6ee3-7f53-92de-20c1ca955dae",
+        "status": "active",
+        "tokenBudget": null,
+        "meaning": "Whole outcome retained; not implementation authority. Reobserve get_goal after compact."
+      },
+      "ownedWorktree": "/home/palantirkc/code/worktrees/ponytail-harness-evaluation-20261018T093330Z/agent-platform",
+      "branch": "work/ponytail-harness-evaluation-20261018T093330Z",
+      "head": "7b0c3519638807788e2001d17a4c91ba1ea703fc",
+      "logical": {
+        "domainId": "native-harness",
+        "projectId": "agent-platform",
+        "workId": "ponytail-harness-evaluation-20261018",
+        "issueId": "PT-ISSUE-20261018"
+      },
+      "contracts": {
+        "currentSpec": "PT-SPEC@3",
+        "currentPlan": "PT-PLAN@3",
+        "proposedAfterApproval": "PT-SPEC@3 / PT-PLAN@3"
+      },
+      "approval": {
+        "explanationDelivered": true,
+        "finalExecutionApprovalReceived": true,
+        "userLatest": "방금 compacted. goal resume and 최종 완료한 후에 PR작성하고 lens-interview(총괄 Lead and Orchestrator) session에 merge 검토하고 진행해달라고 남겨라(이것도 goal prompt or 마지막 run ID(적절한 task ID에)를 부여해줘)",
+        "beforeApproval": "No implementation, new native panes, commits, pushes, review publication or PR. Continuity/recovery preparation allowed.",
+        "afterExplicitApproval": "Freeze contracts/oracles; parallel implementation and independent scenario panes; Root serial integration; separate exact-tree reviewer; owned branch push; immutable review evidence/authenticated status; recheck; PR. No repeat interview for settled answers.",
+        "decisionId": "PT-DECISION-EXECUTION-APPROVAL-20261018"
+      },
+      "readOrder": [
+        "This content.continuity and pendingFinalApproval",
+        "PT-IMPLEMENTATION-PR-PLAN-PROPOSAL-V3.json",
+        "PT-EVAL-RUBRIC-V2.json and actual accepted decisions as needed",
+        "PT-COMPLEX-QUALITY-SCENARIOS-V2.json",
+        "PT-EVOLVE-APPLICATION-MAP-V2.json",
+        "PT-GIT-FIRST-THREE-PROBLEMS-V2.json; PT-CI-REPEATED-MISTAKES-V2.json only relevant scope/cluster first"
+      ],
+      "settled": [
+        "Primary whole common-harness QUALITY; Ponytail candidate and CI Agent additional scope.",
+        "Two eligible gains:actual behavior improvement and verification detection improvement. Equal outcomes/extra tests alone are not gains.",
+        "E2E:all actually affected consumers; common changes Codex+Hermes, runtime-only affected consumer.",
+        "Git-first3protections:complete publication,concurrency/lostupdate,original/history. No universal filesystemCAS/permanentimmutability.",
+        "This session owns stable hierarchical IDs and Lead/Orchestrator through PR.",
+        "No new model evaluation budget, auto-merge, native activation, other Work mutation or historical effect replay."
+      ],
+      "completedPreparation": [
+        "7complex scenarios:6core and1CI. Historical native/source/synthetic evidence distinguished; new candidate runs0.",
+        "45CIrun bounded research;19mainpush/18proof-publication ordering incidents, all later success; distinct skill closure,hostedHEAD,private-dependency cases.",
+        "lens-context005/006/007/008 traced:601byte private binding→1436candidate; unknownFD/permanentbytes overreach stopped; no observed live lostupdate.00212509/00312056overflow+semanticloss;00411995fit/source-only.",
+        "Current v1 quality API still efficiency-only; v2 quality implementation NOT started.",
+        "Internal draft/plan reviews0unresolved after publication-order fix; not authenticated source publication."
+      ],
+      "effects": [
+        {
+          "id": "Lead-CI-interview-handoff",
+          "state": "consumed",
+          "receipt": ".private/quality-first-interview-20261018/lead-handoff.submission.actual.json",
+          "ack": "backlog003 SHA8268e61751426b4e0ee3d5b1b3ad41c33e9ad28ca02eb33deda79bf63be1bf50",
+          "doNotReplay": true
+        }
+      ],
+      "delegations": "Internal research agents returned and artifacts retained. No new native panes were created. Existing lens-interview/other panes and Work remain untouched; no routine messages.",
+      "nextSafeAction": "Execute approved V3; final Task PT-14 sends PR/evidence/expected head to lens-interview for explicit merge review and progression. User will resume native Goal."
+    }
+  }
+}

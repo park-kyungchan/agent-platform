@@ -1,0 +1,38 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "task",
+  "id": "PT-11-INTEGRATED-VERIFICATION",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "issueId": "PT-ISSUE-20261018",
+    "specId": "PT-SPEC",
+    "specRevision": 3,
+    "planId": "PT-PLAN",
+    "planRevision": 3,
+    "taskId": "PT-11-INTEGRATED-VERIFICATION"
+  },
+  "title": "Integrated Verification",
+  "nextAction": "Use Git branches/worktrees, immutable source and semantic transition for publication/concurrency/history without universal filesystem guarantees.",
+  "state": {
+    "execution": "pending",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    "PT-09-QUALITY-IMPLEMENTATION",
+    "PT-10-COMPLEX-ORACLES"
+  ],
+  "decisionIds": [
+    "PT-DECISION-EXECUTION-APPROVAL-20261018"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

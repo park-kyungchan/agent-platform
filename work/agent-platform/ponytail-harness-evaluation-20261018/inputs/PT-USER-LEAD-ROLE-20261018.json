@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-USER-LEAD-ROLE-20261018",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex",
+    "locator": "current-conversation:PT-USER-LEAD-ROLE-20261018",
+    "kind": "native-user-message"
+  },
+  "content": {
+    "text": "지금 작업에 대해서만큼은, 너가 Lead 역할을 해줘야한다. 기존 공통하네스 적용해서 위계화된 ID를 부여해야하고, 이번 Domina ID / Project ID / Work ID(부여되었나?)에 대해서는 너가 진행해줘야한다.",
+    "nativeMessageId": null,
+    "captureLimitation": "Direct current user instruction. Native session/task/run IDs are unexposed and are not replaced by logical Work IDs."
+  }
+}
