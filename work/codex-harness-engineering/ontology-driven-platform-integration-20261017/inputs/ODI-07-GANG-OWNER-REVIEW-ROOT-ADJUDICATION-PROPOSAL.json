@@ -1,0 +1,120 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-REVIEW-ROOT-ADJUDICATION-PROPOSAL",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/docker/herdr-runtime/home/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-independent-code-review",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi07.original-native-review-root-technical-adjudication-proposal.v1",
+    "status": "proposed-not-accepted",
+    "classification": "Worker engineering proposal for accountable Root; not actual-user-answer, accepted Decision, native state or Acceptance",
+    "author": {
+      "agentPath": "/root/handoff_recovery",
+      "nativeStoredThreadId": "01a15006-eaef-7f23-bcb8-c3440a03b7dc",
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    "accountableRootThread": "01a15003-9cee-7662-bbc2-7c1990379b30",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-07-GANG-OWNER-REVIEW"
+    },
+    "originalContract": {
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-CONTRACT.json",
+      "sha256": "08557c2b57b7c6d075939f3f73255e351e041e9278aa0f5cda7515daf2710c30",
+      "required": "Both complete tree manifests, full base-to-head diffs/three changed files, education AGENTS/project/source-map, Gang baseline/CI, owner boundaries and actual committed QA/limits; current whole Work/Spec1/Plan1/seven Decisions/original Q&A/effect inventories, parent and this child,04-R original receipt intent/result/verification and bound receiver.",
+      "counterexamples": [
+        "Challenge127 non-exempt-path freeze and129 tracked denominator, path/mode/add-delete/metadata-only changes; inspect14 negative cases and exact currentworkflow, not historical50c8.",
+        "Challenge whether education owner relation matches already-owned identical implementation while standalone Gang source/domain/native consumers and d604 parity remain distinct.",
+        "Challenge CI baseline/ref selectors, mutable metadata exemption effects and owner/consumer overclaims; actual defects or justified current zero separately per owner."
+      ],
+      "limits": "Read-only review only; no source/data/Work/Git/native/config/trust/cache/network/model-child mutations. Native installed tool permission is owned by native runtime. No forced PASS; genuine findings/HOLD admissible."
+    },
+    "criteria": [
+      {
+        "id": "original-dispatch-input-turn-completion-source-binding",
+        "status": "pass",
+        "message": "Exact source-captured original prompt acknowledgement, native input, turn and task_complete/final-message bytes correlate. This is native CLI source observation, not fresh authenticated completion API.",
+        "evidenceRefs": [
+          "codex-harness-engineering:evidence:odi07-original-native-review-source-observation-20261018"
+        ]
+      },
+      {
+        "id": "original-owner-source-outputs-and-raw-spans",
+        "status": "pass",
+        "message": "Both raw owner records are unchanged literal spans in5125byte native final; originaldcf/3f heads/trees/manifests and fixed policies/actor references bind. Later6bc/2e6 peer is separate.",
+        "evidenceRefs": [
+          "codex-harness-engineering:evidence:odi07-original-native-review-source-observation-20261018"
+        ]
+      },
+      {
+        "id": "original-04r-prerequisite-source-receiver-join",
+        "status": "pass",
+        "message": "Existing canonical dependencyFindings returns[] for exact original04-R receipt and declared native reviewer receiver; no native authentication inferred.",
+        "evidenceRefs": [
+          "codex-harness-engineering:evidence:odi07-original-native-review-source-observation-20261018"
+        ]
+      },
+      {
+        "id": "bounded-prior-root-source-assessment-retained",
+        "status": "pass",
+        "message": "Actual prior Root c9823bf... admits bounded source-only local Verification, retains no-all-unchanged-body/comprehension/Acceptance limits; this is not Task completion adjudication.",
+        "evidenceRefs": [
+          "codex-harness-engineering:evidence:odi07-original-native-review-source-observation-20261018"
+        ]
+      },
+      {
+        "id": "complete-required-source-values-and-segmented-exposure-adjudication",
+        "status": "unverified",
+        "message": "Preserve original progress completeContractConsumptionEstablished:false and segmented/truncated-output limits. Final and prior Root provide positive bounded source evidence; current accountable Root must explicitly adjudicate original required-context/source-value criterion. No silent all-PASS conversion or cognition claim.",
+        "evidenceRefs": [
+          "codex-harness-engineering:evidence:odi07-original-native-review-source-observation-20261018"
+        ]
+      },
+      {
+        "id": "historical-fourteen-negative-label-compatible-source-adjudication",
+        "status": "unverified",
+        "message": "Original counterexample text says14 negative cases; actual native final correctly reports14 cases=12 negative+2 positive. Proposed Root technical interpretation can accept the bounded freeze-purpose check and correct count without new tests/eval; no accepted adjudication exists here.",
+        "evidenceRefs": [
+          "codex-harness-engineering:evidence:odi07-original-native-review-source-observation-20261018"
+        ]
+      },
+      {
+        "id": "current-source-audit-retains-state-effect-and-acceptance-boundaries",
+        "status": "pass",
+        "message": "Task remains planned/pending/intent-durable; shared/formal pending; actual tuple/partial source receipt add no native execution, accepted Decision, canonical completed Effect or whole Acceptance. No replay.",
+        "evidenceRefs": [
+          "codex-harness-engineering:evidence:odi07-original-native-review-source-observation-20261018"
+        ]
+      }
+    ],
+    "proposal": "Root may explicitly accept compatible bounded source-consumption/freeze-purpose interpretation if justified by these preserved engineering values. Do not require review of all unchanged bodies or cognition/native Task/Run IDs; do not infer all required values merely from a false progress coverage flag or native final claim. Until adjudicated keep partial Task state. No new model/source peer/test/eval/native query is proposed.",
+    "proposedEffect": {
+      "notCanonicalEffectRecord": true,
+      "taskId": "ODI-07-GANG-OWNER-REVIEW",
+      "status": "completed-source-observed-original-turn",
+      "occurrence": {
+        "runtimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9",
+        "attemptId": "native-turn:01a149ba-2065-7101-b55c-e131b8d26bea",
+        "occurrenceId": "native-message:msg_025e4cc173b7bdf5016ad3644eb3408191981dfd55b0c23d2b"
+      },
+      "scope": "Original structured native turn completion only; not logical Task verification or native backend authentication"
+    },
+    "currentCandidateBranch": "partial-join-only",
+    "wouldRequireSeparateRootReviewBeforeStatePromotion": true
+  }
+}

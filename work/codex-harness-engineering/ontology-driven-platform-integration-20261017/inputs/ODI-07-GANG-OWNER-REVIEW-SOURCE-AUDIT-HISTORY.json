@@ -1,0 +1,86 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-REVIEW-SOURCE-AUDIT-HISTORY",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/docker/herdr-runtime/home/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-independent-code-review",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi07.original-native-review-source-audit-history.v1",
+    "baseCommit": "153b49534e8a6f3f164c669c922c6e349e3b9a8e",
+    "originalTask": {
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-07-GANG-OWNER-REVIEW.json",
+      "sha256": "6151f68f8a199be9eaa5178b3e88cd774fd092f03c448504a1fbcfbf03377c0d",
+      "bytes": 2059,
+      "value": {
+        "schema": "common.git-work.v1",
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-platform-integration-20261017",
+        "kind": "task",
+        "id": "ODI-07-GANG-OWNER-REVIEW",
+        "logical": {
+          "domainId": "native-harness",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017",
+          "issueId": "ODI-ISSUE-20261017",
+          "specId": "ODI-SPEC",
+          "specRevision": 1,
+          "planId": "ODI-PLAN",
+          "planRevision": 1,
+          "taskId": "ODI-07-GANG-OWNER-REVIEW"
+        },
+        "title": "Independently review exact education/Gang maintained-source owner and retained freeze successors",
+        "nextAction": "Consume ODI-07-GANG-OWNER-ACTUAL-SOURCE-OUTCOME: original native01a149a6 final is genuinely observed complete, but its occurrence/execution receipt join is not recorded here. Do not redispatch. Current exact6bc/2e6 peer/source Git proof/M integration/CI is distinct and cannot replace that native identity or executionEvidence. Root qualifies the original native receipt and exact Task contract; preserve all old fields and no effect replay.",
+        "state": {
+          "execution": "planned",
+          "verification": "pending",
+          "localAudit": "intent-durable",
+          "sharedAudit": "pending",
+          "formalCompletion": "pending"
+        },
+        "executionClass": "native-effect",
+        "dependsOn": [
+          {
+            "taskId": "ODI-04-R",
+            "milestone": "execution-and-verification",
+            "receiptEvidenceId": "ODI-04-R-PREREQUISITE-GANG-OWNER",
+            "receiverEvidenceId": "ODI-07-GANG-OWNER-REVIEW-RECEIVER"
+          }
+        ],
+        "decisionIds": [
+          "ODI-DECISION-FINAL-APPROVAL",
+          "ODI-DECISION-SUCCESSOR",
+          "ODI-DECISION-COST",
+          "ODI-DECISION-USEFUL-NATIVE-FLOW",
+          "ODI-DECISION-EVALUATION-BUDGET-20000000",
+          "ODI-DECISION-CLI-WORKER-DEFAULT",
+          "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION"
+        ],
+        "effectIds": [],
+        "verificationEvidenceIds": [
+          "ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION"
+        ],
+        "runtimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9"
+      }
+    },
+    "changes": [
+      "Add actual source-correlated occurrence and partial execution receipt",
+      "Append new partial Verification; original partial bytes/pointer retained",
+      "Replace stale nextAction with recovered-original/no-replay/adjudication steps"
+    ],
+    "unchanged": [
+      "LogicalSpec1Plan1/runtime/dependencies/decisions/effects/state",
+      "All327 original source records except this planned Task",
+      "All old Inputs/contracts/progressfalse/raw outputs/Goal and effect fences"
+    ],
+    "noStatePromotion": true,
+    "noCanonicalCompletedEffectAdded": true
+  }
+}
