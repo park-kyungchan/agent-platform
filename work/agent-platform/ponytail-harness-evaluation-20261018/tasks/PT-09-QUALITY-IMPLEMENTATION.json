@@ -17,13 +17,13 @@
     "taskId": "PT-09-QUALITY-IMPLEMENTATION"
   },
   "title": "Quality Implementation",
-  "nextAction": "Scoped worker commit integrated; Root must qualify joined final source before verification/closure.",
+  "nextAction": "Integrated source/adapter verification passed; exact independent review/publication remain separate.",
   "state": {
     "execution": "complete",
-    "verification": "pending",
+    "verification": "passed",
     "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [
@@ -36,5 +36,7 @@
     "PT-DECISION-EXECUTION-APPROVAL-20261018"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-integration"
+  ]
 }

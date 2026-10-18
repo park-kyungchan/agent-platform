@@ -17,9 +17,9 @@
     "taskId": "PT-12-INDEPENDENT-REVIEW"
   },
   "title": "Independent Review",
-  "nextAction": "Run affected package/common/source closures and both affected consumer adapter paths.",
+  "nextAction": "Review frozen H/T/manifest, write durable raw result and WAIT silently without source edits or parent steering.",
   "state": {
-    "execution": "planned",
+    "execution": "running",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",

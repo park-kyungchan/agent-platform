@@ -17,13 +17,13 @@
     "taskId": "PT-11-INTEGRATED-VERIFICATION"
   },
   "title": "Integrated Verification",
-  "nextAction": "Use Git branches/worktrees, immutable source and semantic transition for publication/concurrency/history without universal filesystem guarantees.",
+  "nextAction": "Integrated source/adapter verification passed; exact independent review/publication remain separate.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [
@@ -40,5 +40,7 @@
     "PT-DECISION-EXECUTION-APPROVAL-20261018"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-integration"
+  ]
 }
