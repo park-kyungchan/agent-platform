@@ -11,9 +11,12 @@
     "ownerId": "native-hermes",
     "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_200502_0132f4/messages/135,180",
     "receipt": {
-      "kind": "snapshot",
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "9733af27dd9ecc3892edce4d978499569cba70a4",
       "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-NATIVE-MEMORY-B-EXECUTION-RECEIPT.json",
-      "fragment": "#/content"
+      "fragment": "#/content",
+      "sha256": "5772d552cb46e16cf45c4731438fdac20d9d2f1093f3f1111c828b94e99c8c60"
     }
   }
 }

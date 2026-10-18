@@ -22,8 +22,8 @@
     "execution": "complete",
     "verification": "passed",
     "localAudit": "result-durable",
-    "sharedAudit": "pending",
-    "formalCompletion": "audit-synchronization-pending"
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
   },
   "executionClass": "native-effect",
   "runtimeId": "native-hermes:odi-platform:20261017_200502_0132f4",
