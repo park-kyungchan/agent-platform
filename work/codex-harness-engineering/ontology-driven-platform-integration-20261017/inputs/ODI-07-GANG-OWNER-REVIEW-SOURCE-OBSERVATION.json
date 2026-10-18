@@ -1,0 +1,87 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-REVIEW-SOURCE-OBSERVATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/docker/herdr-runtime/home/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-independent-code-review",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "evidence",
+    "id": "codex-harness-engineering:evidence:odi07-original-native-review-source-observation-20261018",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T21:46:28.367Z",
+    "payload": {
+      "claim": "Retained original native CLI engineering input/turn/completion and exact final/raw outputs are source-correlated; original logical Task completion adjudication remains partial.",
+      "method": "retained-native-cli-engineering-source-correlation",
+      "sourceUrl": "urn:sha256:7031a78acd546b2be62f314db48eab49e25cfdf5e1f9004914d13f97a328cceb",
+      "fetchedAt": "2026-10-18T21:46:28.367Z",
+      "upstreamRevision": "msg_025e4cc173b7bdf5016ad3644eb3408191981dfd55b0c23d2b",
+      "result": {
+        "outcome": "success",
+        "processExitCode": null,
+        "contentMatched": true
+      },
+      "attempts": [],
+      "limitations": [
+        "Source-captured native CLI events are not fresh authenticated native API state or comprehension.",
+        "Original progress coverage:false and truncated/segmented exposure limits retained; Task criteria not all adjudicated.",
+        "No native Task/Run entity ID allocated or inferred.",
+        "No current state promotion/shared/formal/native activation/whole Acceptance."
+      ],
+      "details": {
+        "logical": {
+          "domainId": "native-harness",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017",
+          "issueId": "ODI-ISSUE-20261017",
+          "specId": "ODI-SPEC",
+          "specRevision": 1,
+          "planId": "ODI-PLAN",
+          "planRevision": 1,
+          "taskId": "ODI-07-GANG-OWNER-REVIEW"
+        },
+        "occurrence": {
+          "runtimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9",
+          "attemptId": "native-turn:01a149ba-2065-7101-b55c-e131b8d26bea",
+          "occurrenceId": "native-message:msg_025e4cc173b7bdf5016ad3644eb3408191981dfd55b0c23d2b"
+        },
+        "sourceInputs": [
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-RETAINED-INTENT.json",
+            "sha256": "077896a9628082687fb94c5fed261fad7b33655a05f328e3457c3dee5529e636",
+            "bytes": 17035,
+            "kind": "input",
+            "id": "ODI-07-GANG-OWNER-REVIEW-RETAINED-INTENT"
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-RETAINED-RESULT.json",
+            "sha256": "f93a9e0f1ada36dc1e6a5968ae7e2cd8b32cb149d9680b3dca02dbd18f74d741",
+            "bytes": 109298
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-SOURCE-CORRELATION.json",
+            "sha256": "f4f531aff572e75c52c51f6adea11813019fc32bd034321c4b351273e52e7232",
+            "bytes": 4008
+          },
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-ROOT-ADJUDICATION-PROPOSAL.json",
+            "sha256": "22044601af61bc98cb21463effef610f22971ac040510af944ad7445ee2e7826",
+            "bytes": 7575,
+            "kind": "input",
+            "id": "ODI-07-GANG-OWNER-REVIEW-ROOT-ADJUDICATION-PROPOSAL"
+          }
+        ],
+        "nativeTaskId": null,
+        "nativeRunId": null
+      }
+    }
+  }
+}
