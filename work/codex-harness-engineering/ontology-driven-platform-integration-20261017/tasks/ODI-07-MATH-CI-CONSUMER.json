@@ -17,13 +17,13 @@
     "taskId": "ODI-07-MATH-CI-CONSUMER"
   },
   "title": "Adopt existing reusable common CI in the actual Math research consumer",
-  "nextAction": "Read selected Math research owner purpose/AGENTS and actual workflow, qualify native-owner-observed synchronized main before any new source branch. Existing prepared root is historical, not currentness. Reuse maintained agent-platform common CI and verify actual required capability/access/check/consumer equivalence. Prepare ONE minimal exact source patch in the canonical math-research repository Task worktree; never modify shared main or create second common CI implementation. Preserve research/curriculum originals and human holds. No unrelated universal Governance/ODI05 gate; no push/PR/merge/activation before Root exact independent review/current-source adjudication. Return exact tree/commit, changed consumer checks and remaining exception evidence. This does not implement the deferred dedicated CI Agent.",
+  "nextAction": "Source9cb/tree50db independently reviewed/published, PR4 explicitly fast-forward merged and actual main-push39116391150 passed. Preserve source proof/status and all consumed effects; no new M/projection/replay. Work shared/receiver/formal audit, native/domain adoption and whole Acceptance remain separate.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -36,5 +36,7 @@
   ],
   "effectIds": [],
   "pendingEffectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:odi07-math-ci-source-integration"
+  ]
 }

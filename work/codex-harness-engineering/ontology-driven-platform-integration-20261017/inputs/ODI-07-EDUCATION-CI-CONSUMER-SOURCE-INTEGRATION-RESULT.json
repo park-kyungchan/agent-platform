@@ -1,0 +1,141 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-EDUCATION-CI-CONSUMER-SOURCE-INTEGRATION-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "Root-owned exact source result/proof/merge and hosted CI captures; Git does not authenticate native authorship"
+  },
+  "content": {
+    "recordedAtUtc": "2026-10-18T10:22:26.326Z",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 2,
+      "taskId": "ODI-07-EDUCATION-CI-CONSUMER"
+    },
+    "outcome": "SOURCE_INTEGRATION_COMPLETE_VERIFIED_LOCALLY",
+    "facts": {
+      "repository": "park-kyungchan/education-platform",
+      "sourceHead": "fa8f67b045669ff91fb04093eb4f54b2480f2530",
+      "tree": "139fdb3504adf55f6e7bec772c56bb047b7dcd10",
+      "mergedHead": "af61d9707b22b2434fb64db2bc28e25b8985558f",
+      "pullRequest": 13,
+      "automaticMerge": false,
+      "sourceFindingCount": 0,
+      "sourceReviewStatusId": 56625809743,
+      "sourcePinnedGate": "PASS",
+      "publisherAuthenticated": true,
+      "observedRun": {
+        "id": 39118281417,
+        "head": "fa8f67b045669ff91fb04093eb4f54b2480f2530",
+        "event": "pull_request",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      "sourceIntegrationComplete": true,
+      "nativeActivation": false,
+      "wholeAcceptance": false,
+      "mergedMainProof": "Distinct merged-main proof still pending at this captured boundary; Root owns subsequent proof/status and main-push qualification"
+    },
+    "captures": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/education-real-review-publication-prep-result.actual.json",
+        "sha256": "121175ab7a0c7698624c4534276c1adf3531fdd6a4adfceff1268957f84f1842"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-education-review-publication-once-005/actual-publication.json",
+        "sha256": "f0cc0f911eedbe429cc87a95fc8a42346afe8110c1a7fbd9c8ebbc5744e6d86a"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-education-explicit-merge-once-001/actual-merge.json",
+        "sha256": "cfa977aa1ba50d8739661b3fb41918329e1ae0165da27dad576de06d214e6111"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-education-PR13-checks-001/run.current.json",
+        "sha256": "4d7e8bf1868016a7ce7f23c0d897555a9ac1ab6e45e23b22b98e112ed3243465"
+      }
+    ],
+    "originalResultSummary": {
+      "schema": "odi.portable-review-publication-preparation-result.v1",
+      "status": "portable-custody-prepared; authenticated-publication-HOLD",
+      "logicalTaskId": "ODI-07-EDUCATION-CI-CONSUMER"
+    },
+    "evidence": {
+      "schemaVersion": "1.0.0",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-18T10:22:26.326Z",
+      "kind": "evidence",
+      "id": "codex-harness-engineering:evidence:odi07-education-ci-source-integration",
+      "payload": {
+        "claim": "Exact education common-CI source preparation, independent source review, required source checks and explicit Root integration observed",
+        "method": "source-owner-observed-source-integration",
+        "sourceUrl": "https://github.com/park-kyungchan/education-platform/commit/af61d9707b22b2434fb64db2bc28e25b8985558f",
+        "fetchedAt": "2026-10-18T10:22:26.326Z",
+        "upstreamRevision": "af61d9707b22b2434fb64db2bc28e25b8985558f",
+        "result": {
+          "outcome": "success",
+          "processExitCode": null,
+          "contentMatched": true
+        },
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "success"
+          }
+        ],
+        "limitations": [
+          "Source integration and source CI only; no native use, domain/human or whole Work Acceptance.",
+          "Publication is not this Work Task shared/receiver delivery or formal completion.",
+          "Distinct merged-main review proof and main-push readback remain Root-owned; source verification does not clear that hold."
+        ],
+        "details": {
+          "semanticOwner": "codex-harness-engineering",
+          "taskId": "ODI-07-EDUCATION-CI-CONSUMER",
+          "sourceResultOwner": "park-kyungchan/education-platform",
+          "nativeAuthenticationEstablished": false,
+          "nativePermissionGranted": false,
+          "facts": {
+            "repository": "park-kyungchan/education-platform",
+            "sourceHead": "fa8f67b045669ff91fb04093eb4f54b2480f2530",
+            "tree": "139fdb3504adf55f6e7bec772c56bb047b7dcd10",
+            "mergedHead": "af61d9707b22b2434fb64db2bc28e25b8985558f",
+            "pullRequest": 13,
+            "automaticMerge": false,
+            "sourceFindingCount": 0,
+            "sourceReviewStatusId": 56625809743,
+            "sourcePinnedGate": "PASS",
+            "publisherAuthenticated": true,
+            "observedRun": {
+              "id": 39118281417,
+              "head": "fa8f67b045669ff91fb04093eb4f54b2480f2530",
+              "event": "pull_request",
+              "attempt": 1,
+              "status": "completed",
+              "conclusion": "success"
+            },
+            "sourceIntegrationComplete": true,
+            "nativeActivation": false,
+            "wholeAcceptance": false,
+            "mergedMainProof": "Distinct merged-main proof still pending at this captured boundary; Root owns subsequent proof/status and main-push qualification"
+          }
+        }
+      }
+    },
+    "sharedWorkDeliveryConfirmed": false,
+    "formalTaskCompletion": false,
+    "AcceptanceDecision": null
+  }
+}

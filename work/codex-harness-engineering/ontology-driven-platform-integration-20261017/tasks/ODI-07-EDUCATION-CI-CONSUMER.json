@@ -17,13 +17,13 @@
     "taskId": "ODI-07-EDUCATION-CI-CONSUMER"
   },
   "title": "Adopt existing common CI in the actual Education consumer",
-  "nextAction": "Qualify actual education-platform owner purpose/AGENTS/current main, then reuse any already-prepared exact candidate instead of duplicating work. Prepare ONE minimal canonical Education CI consumer successor using existing maintained common Bun action/runner. Preserve setup-versus-execution Bun1.4.2/1.4.3 requirements, domain checks, generated/immutable pins, source originals/human/private holds and actual consumer capability. Use typed TS/JSON CI meaning consumed by existing verification; native GitHub YAML stays native interface. Preserve historical Markdown/candidates; no new authored prose owner. No new CI Agent/framework, global prerequisite, install/push/PR/merge/native activation. Return exact source candidate/base/tree, scoped actual checks and current independent findings; actual hosted private download remains unproven until observed.",
+  "nextAction": "Sourcefa8/tree139f independently reviewed/published with status56625809743, PR13 source checks39118281417 passed and Root explicitly merged M af61 with identical reviewed tree. Distinct merged-main review proof/status and actual main-push qualification remain Root-owned pending work; no source re-review/replay or native activation inferred. Work shared/formal and human/whole Acceptance pending.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -36,5 +36,7 @@
   ],
   "effectIds": [],
   "pendingEffectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:odi07-education-ci-source-integration"
+  ]
 }

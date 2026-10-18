@@ -1,0 +1,42 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-COMMON-HARNESS-GIT-PROTECTION-FORWARDED-INPUT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "Attributed current user architectural forward, source-owner capture only"
+  },
+  "content": {
+    "recordedAtUtc": "2026-10-18T10:22:26.326Z",
+    "forwardedUserCapture": {
+      "schema": "odi.actual-user-direction-forward.v1",
+      "marker": "USER-GIT-WORKTREE-CI-COMMON-HARNESS-20261018",
+      "atUtc": "2026-10-18T09:52:52.020Z",
+      "from": "lens-context w7:pM",
+      "to": "Lead lens-interview w7:pK",
+      "source": "Actual current user message received by lens-context; nativeMessageId unexposed/null",
+      "actualUserText": "너가 제기한 막으려는 문제 3가지에 대해서, Git/GitHub 이용중인데 worktree/branch로 해결이 안되나? 나중에 CI WorkFlow 쪽 에이전트 설계할 것인데, 거기서 해결해주면 되는 것 아닌지 Lead에게 메시지 보내. 이 작업 뿐만 아니라 공통하네스 급의 범위에 적용하려고하는거야",
+      "classification": "Attributed actual-user architectural direction forwarded with explicit communication authority; Root has not independently authenticated a native message ID. Not native execution/permission or CI-Agent interview/design approval."
+    },
+    "captures": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/user-common-harness-git-protection-forward.actual.json",
+        "sha256": "e946761d142a4b6963714cea7e957adff57c6857db0ccb444130549d29ceb238"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/backlog.002.actual.json",
+        "sha256": "37f5cdf68895d427a4f677630043b95eb6d2455d26551c3608fc4dd8cbd251da"
+      }
+    ],
+    "nativeMessageId": null,
+    "attribution": "Actual user direction forwarded by source owner; Root did not independently authenticate a native message ID",
+    "meaning": "Common-harness-wide Git/branches/worktrees/CI and bounded native-owner apply framing; stop further low-level filesystem/permanent-immutability research. Original002 deferred trigger is historical, latest003 takeover captured separately.",
+    "acceptedUserDecisionCreated": false,
+    "nativePermissionGranted": false
+  }
+}

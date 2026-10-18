@@ -1,0 +1,72 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-MATH-CI-CONSUMER-SOURCE-INTEGRATION-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "Actual scoped canonical source Verification derived from pinned Root source captures, not a new native occurrence"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T10:22:26.326Z",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:odi07-math-ci-source-integration",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:9be9b9bfe048b477a838dd5de7ffa3bc9f6d9106b809c23ab3898b63f9ea85d7"
+      ],
+      "criteria": [
+        {
+          "id": "exact-reviewed-source",
+          "status": "pass",
+          "message": "Exact source/tree and actual authenticated pinned-owner proof retained",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-math-ci-source-integration"
+          ]
+        },
+        {
+          "id": "source-consumer-checks",
+          "status": "pass",
+          "message": "Actual captured successful push run39116391150 and Root required source checks observed",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-math-ci-source-integration"
+          ]
+        },
+        {
+          "id": "explicit-source-integration",
+          "status": "pass",
+          "message": "Actual expected-head Root merge observed; no automatic merge, native adoption or Acceptance inferred",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-math-ci-source-integration"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-MATH-CI-CONSUMER-SOURCE-INTEGRATION-RESULT.json",
+          "sha256": "460c22a68aa0c6653dc30afe2709e5afda7b89fcc2387ea7929dfedea1e0f57c"
+        }
+      ],
+      "runtime": {
+        "name": "canonical-git-work-source-result-preparation",
+        "version": "1.4.3"
+      },
+      "details": {
+        "semanticOwner": "codex-harness-engineering",
+        "taskId": "ODI-07-MATH-CI-CONSUMER",
+        "scope": "Source preparation/integration only",
+        "nativeAuthenticationEstablished": false,
+        "nativePermissionGranted": false,
+        "sharedAuditConfirmed": false,
+        "AcceptanceDecision": null
+      }
+    }
+  }
+}
