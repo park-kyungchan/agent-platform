@@ -19,7 +19,7 @@ import {
   runWorkflowTools,
 } from "./native-tools";
 import { runSecretCheck, verifySecretCanary, type VerifiedSecretTool } from "./secret-check";
-import { exactSourceFile, readQualityScope, type QualityScope } from "./scope";
+import { exactSourceFile, readQualityScope, safeSourcePath, type QualityScope } from "./scope";
 import {
   captureQualitySources,
   compareQualitySources,
@@ -81,6 +81,40 @@ export function metadataOnlyCommandOutput(value: unknown): unknown {
       result[key + "Sha256"] = hash(item);
       result[key + "Bytes"] = Buffer.byteLength(item);
     } else result[key] = metadataOnlyCommandOutput(item);
+  }
+  return result;
+}
+
+/** Bounded stack locations in known source tests only; never retain messages or snippets. */
+export function sourceTestFailureLocations(
+  stderr: string,
+  root: string,
+  testFiles: readonly string[],
+): { path: string; line: number; column: number }[] {
+  const result: { path: string; line: number; column: number }[] = [];
+  if (stderr.length > 1_048_576) return result;
+  const seen = new Set<string>();
+  for (const path of testFiles.slice(0, 1024)) {
+    if (!safeSourcePath(path) || path.length > 512 || !/\.(?:test|spec)\.[cm]?tsx?$/.test(path))
+      continue;
+    const marker = resolve(root, path) + ":";
+    let offset = stderr.indexOf(marker);
+    while (offset !== -1) {
+      const match = /^([0-9]{1,7}):([0-9]{1,7})(?:\D|$)/.exec(
+        stderr.slice(offset + marker.length, offset + marker.length + 25),
+      );
+      if (match) {
+        const line = Number(match[1]),
+          column = Number(match[2]);
+        const key = JSON.stringify([path, line, column]);
+        if (line > 0 && column > 0 && !seen.has(key)) {
+          seen.add(key);
+          result.push({ path, line, column });
+          if (result.length === 16) return result;
+        }
+      }
+      offset = stderr.indexOf(marker, offset + marker.length);
+    }
   }
   return result;
 }
@@ -448,8 +482,8 @@ export async function runQuality(
       if (installedSecretTool)
         await perform(
           "quality-negative-fixtures",
-          () =>
-            runNativeCommand(
+          async () => {
+            const result = await runNativeCommand(
               "quality-negative-fixtures",
               [process.execPath, "test", "ci/"],
               root,
@@ -459,7 +493,19 @@ export async function runQuality(
                 GITLEAKS_VERIFY_BINARY: installedSecretTool!.path,
                 GITLEAKS_VERIFY_BINARY_SHA256: installedSecretTool!.binarySha256,
               },
-            ),
+            );
+            return {
+              ...result,
+              failureLocations:
+                result.exitCode === 0
+                  ? []
+                  : sourceTestFailureLocations(
+                      result.stderr,
+                      root,
+                      selected.auxiliaryTypescript.filter((path) => path.startsWith("ci/")),
+                    ),
+            };
+          },
           (result) =>
             (result as { exitCode: number; timedOut: boolean }).exitCode === 0 &&
             !(result as { timedOut: boolean }).timedOut,

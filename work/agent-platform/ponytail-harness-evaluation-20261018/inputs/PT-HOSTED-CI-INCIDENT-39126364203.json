@@ -1,0 +1,115 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-HOSTED-CI-INCIDENT-39126364203",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "Root bounded hosted CI investigation",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common-harness.ci-incident-observation.v1",
+    "repository": "park-kyungchan/agent-platform",
+    "pr": 37,
+    "head": "e9a75670a048155f9819a0546a69523d331ee33d",
+    "runId": 39126364203,
+    "attempt": 1,
+    "incidentCount": 1,
+    "jobs": [
+      {
+        "id": 117672224731,
+        "name": "Quality and architecture checks",
+        "conclusion": "failure"
+      },
+      {
+        "id": 117672225032,
+        "name": "Prospective merge integration",
+        "conclusion": "failure"
+      },
+      {
+        "id": 117672225132,
+        "name": "Exact head native independent review",
+        "conclusion": "success"
+      },
+      {
+        "id": 117672225173,
+        "name": "Canonical source checks",
+        "conclusion": "success"
+      },
+      {
+        "id": 117673172138,
+        "name": "Source and native review gate",
+        "conclusion": "failure"
+      }
+    ],
+    "failure": "quality-negative-fixtures returned1; all other quality checks pass. Existing report retains stdout/stderr hash/size only, so actual failed fixture is unobserved.",
+    "cause": "unknown; do not infer authentication/runtime/cause from incomplete evidence",
+    "reproductions": [
+      {
+        "kind": "Root fullCI withnativecanaryflags",
+        "result": "111pass0fail"
+      },
+      {
+        "kind": "Fresh1.3.14frozeninstall, testsunder1.4.3",
+        "result": "13newscenario tests pass"
+      },
+      {
+        "kind": "Freshworktree mimickedGHAenv + fullCI",
+        "result": "111pass0fail; does not prove actual runner equivalence"
+      },
+      {
+        "kind": "Directold1.3.14tests",
+        "result": "12pass1fail exactBun143guard as designed; not actualhostedcause because hostedlog verifies pinned1.4.3 bootstrap"
+      }
+    ],
+    "scopedNextChange": {
+      "owner": "existing ci/quality/run.ts",
+      "meaning": "Retain only file/line/column for whitelisted CI test stacks, bounded16, alongside existing metadata-only hashes. No raw diagnostics/source/snippets/secrets or generic observer.",
+      "qualification": "Diagnostics stronger evidence only; no claim this by itself fixes or detects a production defect. Actual hostednewhead remains required.",
+      "checks": {
+        "targetedPrivacyAndRealScope": "3pass0fail",
+        "wholeQuality": "pass"
+      }
+    },
+    "reviewService": {
+      "cloudCodeReview": "failed-usage-limit; not completed",
+      "summaryFlagsAsReported": {
+        "has_any_findings": true,
+        "has_unresolved_findings": true,
+        "status": "failed"
+      },
+      "actualReviewsObserved": 0,
+      "actualThreadsObserved": 0,
+      "actualComments": [
+        "Codex review summary failed",
+        "Explicit Codex code-review usage limit notice"
+      ],
+      "nativeIndependentReview": "Separate actual reviewer attempt2 passed0findings; not cloudreview completion"
+    },
+    "nextPublicationOrder": "PR already exists: make new sourceSHA remotelyreachable on unique helper ref; independent immutable review/authstatus first; only then move owned Work PRbranch to trigger synchronized checks. No blind rerun/merge.",
+    "logReceipts": [
+      {
+        "path": ".private/quality-first-interview-20261018/pr37-merge-quality-attempt1.log",
+        "sha256": "4b1ab564cff0e96646e80f931d70d37bf04742d7a220ee0129e6037787812f71"
+      },
+      {
+        "path": ".private/quality-first-interview-20261018/full-quality-fixtures-repro.log",
+        "sha256": "9a433c3134258a442868294326a5e0feab40f2d07a93532d31a627ae7be9c798"
+      },
+      {
+        "path": ".private/quality-first-interview-20261018/diagnostic-quality-final.log",
+        "sha256": "9ac9e3b9c6749746964f48fc7a66253162a40033b9e31f34ffacc278ed511792"
+      },
+      {
+        "path": ".private/quality-first-interview-20261018/diagnostic-targeted.log",
+        "sha256": "97186f148ae08a2b67f77abc683cb93f5e4732b5e7fafa4170f0cbc5619429a2"
+      }
+    ],
+    "nativeActivationEstablished": false,
+    "modelEvaluationBudgetGranted": false
+  }
+}
