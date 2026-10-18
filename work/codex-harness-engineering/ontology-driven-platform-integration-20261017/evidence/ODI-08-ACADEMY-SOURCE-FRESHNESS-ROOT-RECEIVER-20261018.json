@@ -1,0 +1,15 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-08-ACADEMY-SOURCE-FRESHNESS-ROOT-RECEIVER-20261018",
+  "evidenceKind": "receiver",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-08-ACADEMY-SOURCE-FRESHNESS-ROOT-ACK-20261018.json",
+    "fragment": "#/content/receipt",
+    "sha256": "71039b4ad4a99e2b1ee32b34ea5c0cf502b2521d4e8f690084ef188bb34f299a"
+  }
+}

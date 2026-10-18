@@ -17,13 +17,13 @@
     "taskId": "ODI-08-ACADEMY-SOURCE-FRESHNESS"
   },
   "title": "Read protected Academy saved-source freshness through the existing native connector",
-  "nextAction": "Original one-shot Academy saved-source read is locally source/custody verified through qualified existing occurrence; saved_snapshot/live_not_connected/null clocks/no backend attempt is the observed outcome, not live freshness/parity. Preserve original native result/effect and prior shared publication; no connector/recovery/push replay. Shared receiver acknowledgment and formal completion remain pending; teacher UNKNOWN, deployed parity and human/whole Acceptance remain separate. Explicit source-binding successor Input ODI-08-ACADEMY-SOURCE-FRESHNESS-EXECUTION-SOURCE-BINDING-SUCCESSOR preserves prior declaration at87074 and same native owner/locator/occurrence.",
+  "nextAction": "OWN finite saved-source metadata read has qualified immutable published790 receipt, actual distinct Root receiver and bounded formal/source audit. No connector/recovery/push replay. saved_snapshot/live_not_connected/null source clocks/no backend attempt remain the observed outcome; teacher UNKNOWN, parent08/deployed parity/human/whole Acceptance remain separate.",
   "state": {
     "execution": "complete",
     "verification": "passed",
     "localAudit": "result-durable",
-    "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
   },
   "executionClass": "native-effect",
   "dependsOn": [],
