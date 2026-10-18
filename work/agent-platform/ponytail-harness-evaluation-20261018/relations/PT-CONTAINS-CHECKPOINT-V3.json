@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "relation",
+  "id": "PT-CONTAINS-CHECKPOINT-V3",
+  "relation": "contains",
+  "from": {
+    "kind": "work",
+    "id": "ponytail-harness-evaluation-20261018"
+  },
+  "to": {
+    "kind": "input",
+    "id": "PT-INTERVIEW-STATE-V3"
+  }
+}
