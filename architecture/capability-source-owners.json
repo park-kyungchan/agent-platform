@@ -93,7 +93,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/context.ts",
-          "sha256": "eff40e3d1113643b5ca1598a85619b22f5fa488caa882d1de15b3282470d4991",
+          "sha256": "6460d178086cf423920d0bc8566ac53bb84e9e12efe85bb39876256e2ff8a4d9",
           "relativePath": "packages/work-continuity/src/git-work/context.ts"
         },
         {
@@ -113,7 +113,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/types.ts",
-          "sha256": "a4260e9bd1d5e609a8f9c142406f998936b64b0232d1503aadb7df2cd9c4f68b",
+          "sha256": "8fbc20bd25886c2cd10663c6a0a0bc8b1b9a4620fd70c56b45f544fca3b55144",
           "relativePath": "packages/work-continuity/src/git-work/types.ts"
         },
         {
