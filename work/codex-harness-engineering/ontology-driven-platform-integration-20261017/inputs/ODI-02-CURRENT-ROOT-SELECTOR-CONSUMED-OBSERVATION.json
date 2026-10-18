@@ -1,0 +1,85 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-CURRENT-ROOT-SELECTOR-CONSUMED-OBSERVATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root-operation-observation",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-conditional-binding.once/completion.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi.current-root-selector-consumed-observation.v1",
+    "recordedAtUtc": "2026-10-18T12:17:31.319454+00:00",
+    "classification": "Separate attributed native-owner operation fact; not selected-event Task execution",
+    "completion": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-conditional-binding.once/completion.json",
+      "sha256": "b511cf714e3a552efb57e9cd0fa2cc46cc667f5ce9fafc3e7b0ba8be1470f212",
+      "bytes": 1288
+    },
+    "actualRootCallId": "call_d597b0a055824e96a03989f392befd2a",
+    "sourceObservation": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-post-install-native-observation.actual.json",
+      "sha256": "000c84e3cf7d880b0b3531286ea2d9bed23f4706921461048e89cdcf7aa8275d"
+    },
+    "independentVerifier": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/standing-guidance-installation.actual-independent-verification.json",
+      "sha256": "3fbf6b945a31d3b705183902a94285e514d0e33f93c1c38756e2990e7fde0f8e"
+    },
+    "status": "ONE_CONDITIONAL_SELECTOR_INSTALLED_NO_EVENT_OR_ADMISSION_CLAIM",
+    "effectConsumedOnce": true,
+    "replayPolicy": "never-replay-recorded-dispatch",
+    "genuineUserPromptSubmitObserved": false,
+    "agentPropertyPresence": null,
+    "nativeDefinitionTrustObserved": false,
+    "WorkOriginalBoundaryOutputJoinObserved": false,
+    "MemoryAdmissionObserved": false,
+    "selectedTask": "ODI-02-CURRENT-ROOT-EVENT",
+    "selectedTaskContractUnchanged": true,
+    "normalHookQualification": {
+      "cutoffUtc": "2026-10-18T11:51:42.565Z",
+      "binding": {
+        "path": "/home/palantirkc/code/shared/codex-harness-engineering/.private/native-hook-adoption/odi-current-M666b-20261018/bindings.json",
+        "sha256": "6621e34f28458da5002c12c6cee9ed55b4d5811efc44c72bc1c8ecf388ffa09f",
+        "bytes": 1436
+      },
+      "selectedBindingMetadata": [
+        {
+          "schema": "codex.session-git-work-selection.v1",
+          "nativeSessionId": "01a14dce-388e-7162-ae22-757566401de7",
+          "cwd": "/home/palantirkc/code/shared/agent-platform",
+          "ownerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017",
+          "snapshot": {
+            "repositoryRoot": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017",
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "790195d7cd75651ddc395db825cabcb73f05901e",
+            "projectId": "codex-harness-engineering",
+            "workId": "ontology-driven-platform-integration-20261017"
+          },
+          "taskId": "ODI-02-CURRENT-ROOT-EVENT",
+          "latestRelevant": "current"
+        }
+      ],
+      "knownHookOwnedOutputDirectory": "/home/palantirkc/code/shared/codex-harness-engineering/.private/native-hook-events",
+      "knownHookOwnedOutputDirectoryExists": false,
+      "actualUserPromptSubmitSourceObserved": false,
+      "actualNativeAgentIdPropertyPresence": null,
+      "actualNativeAgentTypePropertyPresence": null,
+      "nativeDefinitionTrustObserved": false,
+      "nativeLoadedBindingObserved": false,
+      "sourceWork790OriginalBoundaryOutputJoinObserved": false,
+      "MemoryAdmissionObserved": false,
+      "interpretation": "No qualifying existing hook-owned output artifact or explicit hook event envelope was found in the inspected locations/window. This does not establish that a hook never ran; stdout-only or early-return paths may leave no preserved prompt artifact. Binding selection omissions and AGENTS delivery do not prove actual event property absence.",
+      "staticSourceInspected": [
+        "packages/native-codex-adapter/src/native/hooks.ts: known .private/native-hook-events write path and early-return boundaries",
+        "/home/palantirkc/code/shared/codex-harness-engineering/src/native/hook-cli.ts: stdout return route only"
+      ]
+    },
+    "meaning": "Current selector installed once and protected preimage retained; selection omissions/AGENTS delivery do not prove native event properties, trust, admission or complete context fit. Do not trim source context, change contracts or replay."
+  }
+}

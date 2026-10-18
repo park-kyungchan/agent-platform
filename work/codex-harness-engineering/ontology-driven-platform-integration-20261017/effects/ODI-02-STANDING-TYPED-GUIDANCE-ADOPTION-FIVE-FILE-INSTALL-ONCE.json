@@ -1,0 +1,20 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "effect",
+  "id": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-FIVE-FILE-INSTALL-ONCE",
+  "taskId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION",
+  "status": "completed",
+  "occurrence": {
+    "runtimeId": "native-codex:01a14dce-388e-7162-ae22-757566401de7",
+    "attemptId": "native-turn:01a14eca-7cdb-7d10-a08d-9cd6e80d7863",
+    "occurrenceId": "native-tool-call:call_aa5e22620fc04f858da4e3f4d2485d55"
+  },
+  "evidenceIds": [
+    "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION",
+    "codex-harness-engineering:verification:standing-typed-guidance-installed",
+    "codex-harness-engineering:evidence:standing-typed-guidance-installed"
+  ]
+}
