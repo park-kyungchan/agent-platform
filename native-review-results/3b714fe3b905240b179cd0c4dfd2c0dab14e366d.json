@@ -1,0 +1,279 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "3b714fe3b905240b179cd0c4dfd2c0dab14e366d",
+  "reviewedTreeSha": "fd81419db069d7cd20ca2d0ef99d377098bff5fc",
+  "reviewedSourceManifestSha256": "3c21ce37f534376ade1a1198aa6249b8d488e68982645463ef96b5717f45ea10",
+  "manifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "fd81419db069d7cd20ca2d0ef99d377098bff5fc",
+    "entryCount": 952,
+    "blobCount": 797,
+    "sha256": "3c21ce37f534376ade1a1198aa6249b8d488e68982645463ef96b5717f45ea10"
+  },
+  "baseSha": "fe591ffe113aef092f3f526cadcd7c575c579881",
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14e5a-6ee3-7f53-92de-20c1ca955dae"
+  },
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a14eda-03f5-7661-94c8-de94cb1384a7"
+  },
+  "reviewerTaskIdMeaning": "Legacy proof identity field contains observed CODEX_THREAD_ID. Actual native task/run fields remain separately null.",
+  "nativeIdentity": {
+    "runtime": "native-codex",
+    "threadId": "01a14eda-03f5-7661-94c8-de94cb1384a7",
+    "sessionId": "01a14eda-03f5-7661-94c8-de94cb1384a7",
+    "taskId": null,
+    "runId": null,
+    "occurrenceId": null,
+    "observationSource": "Current process environment CODEX_THREAD_ID/CODEX_SESSION_ID; native task/run/occurrence identifiers unexposed. Observed identity does not independently authenticate native authorship.",
+    "nativeAuthorshipAuthenticated": false
+  },
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "taskId": "PT-12-INDEPENDENT-REVIEW"
+  },
+  "recordedAtUtc": "2026-10-18T12:50:33.123Z",
+  "attempt": 4,
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "priorFindingDispositions": [
+    {
+      "id": "PT12-F1",
+      "status": "resolved",
+      "detail": "Original V2/V3 remain unchanged, current repair adds a distinct failed-review capture Input. Fresh public semantic transitions from actual tested0bcfc38, prior reviewed e9a7567 and failed40570df all pass with zero findings; bounded current PT12 context remains source-qualified."
+    },
+    {
+      "id": "PT12-F2",
+      "status": "resolved",
+      "path": "ci/quality/run.ts",
+      "resolution": "Parser now recognizes complete supported bare/named stack-frame lines, strips bounded SGR formatting, captures the complete absolute filename and performs exact known-file Map lookup. It no longer searches arbitrary stderr substrings.",
+      "evidence": {
+        "reviewedAfterCommit": "3b714fe3b905240b179cd0c4dfd2c0dab14e366d",
+        "independentProbes": [
+          {
+            "name": "valid-named",
+            "stderr": "    at <anonymous> (/fixture/repo/ci/check.test.ts:42:7)",
+            "actual": [
+              {
+                "path": "ci/check.test.ts",
+                "line": 42,
+                "column": 7
+              }
+            ]
+          },
+          {
+            "name": "valid-bare",
+            "stderr": "at /fixture/repo/ci/check.test.ts:42:7",
+            "actual": [
+              {
+                "path": "ci/check.test.ts",
+                "line": 42,
+                "column": 7
+              }
+            ]
+          },
+          {
+            "name": "outside-suffix",
+            "stderr": "    at <anonymous> (/private/fixture/repo/ci/check.test.ts:42:7)",
+            "actual": []
+          },
+          {
+            "name": "prose-only",
+            "stderr": "Example diagnostic says /fixture/repo/ci/check.test.ts:42:7 is relevant",
+            "actual": []
+          },
+          {
+            "name": "colored-valid",
+            "actual": [
+              {
+                "path": "ci/check.test.ts",
+                "line": 42,
+                "column": 7
+              }
+            ]
+          },
+          {
+            "name": "malformed-negative-line",
+            "actual": []
+          },
+          {
+            "name": "outside-bare",
+            "actual": []
+          },
+          {
+            "name": "trailing-prose",
+            "actual": []
+          }
+        ],
+        "probeRoot": "/fixture/repo",
+        "probeWhitelist": [
+          "ci/check.test.ts"
+        ],
+        "allEightExpectedResultsMatched": true,
+        "metadataRedactionProbe": true,
+        "failedStatusRetained": true,
+        "addedTests": {
+          "command": "bun test ci/quality/failure-locations.test.ts",
+          "pass": 3,
+          "fail": 0,
+          "assertions": 16,
+          "independentlyExecuted": true
+        },
+        "retainedActualBunReplay": {
+          "evidenceClass": "Offline parser replay of retained actual Bun GITHUB_ACTIONS-formatted contained synthetic failure; not a new hosted CI occurrence",
+          "knownFileList": "Explicit synthetic .private test whitelist for parser compatibility only",
+          "actual": [
+            {
+              "path": ".private/quality-first-interview-20261018/stack-probe.test.ts",
+              "line": 2,
+              "column": 58
+            }
+          ],
+          "metadataReportContainsNoRawSourceOrAssertionMessage": true,
+          "failedExitCodeRetained": true,
+          "actualCIWhitelistExcludesPrivateProbe": true
+        },
+        "preservedBounds": {
+          "stderrMaxUTF16Units": 1048576,
+          "knownFilesMax": 1024,
+          "pathMaxChars": 512,
+          "locationsMax": 16,
+          "deduplicated": true
+        },
+        "gateMeaning": "Status predicate is unchanged: nonzero exit/timedOut remains failure. Successful command locations remain empty. Source/privacy attribution controls do not explain or repair the old hosted failure."
+      }
+    }
+  ],
+  "inspectedScope": [
+    "Fresh exact three-path delta since rejected40570df: repaired helper in ci/quality/run.ts, added outside/prose/colored controls in ci/quality/failure-locations.test.ts, and distinct PT-INDEPENDENT-REVIEW-ATTEMPT-3 Input preserving exact failed raw UTF8.",
+    "Complete current CI diagnostic helper/integration and metadata-only transformation; actual CI auxiliaryTypescript whitelist wiring; unchanged status predicate and resource bounds.",
+    "Fresh manifest/sourceRoot/report-snapshot/pin equality, public record validation, semantic transitions from actual0bcfc38/prior e9/failed40570df and bounded PT12 context.",
+    "Prior full admitted source assessment remains applicable only to independently byte-equal production source/docs/pins. Changed CI reporter is separately reviewed in this new exact head/tree, not approved by different-tree reuse."
+  ],
+  "checks": [
+    {
+      "name": "Exact frozen head/tree/manifest",
+      "status": "pass",
+      "detail": "HEAD3b714fe3b905240b179cd0c4dfd2c0dab14e366d and treefd81419db069d7cd20ca2d0ef99d377098bff5fc match supplied context. Independently derived952entries/797blobs and exact3c21ce37 digest. Tracked review checkout clean."
+    },
+    {
+      "name": "Current tested source snapshot and sourceRoot equality",
+      "status": "pass",
+      "detail": "All277 diagnostic-frame-quality source snapshot SHA-256 values match current review bytes. All362 tracked non-Work files match supplied sourceRoot. Report records actualCheckoutSha40570df with workingTreeHasChanges:true; exact snapshot equality binds tested bytes to3b714fe, not a fabricated new checkout test occurrence."
+    },
+    {
+      "name": "Unchanged production owner/dependency closure",
+      "status": "pass",
+      "detail": "All140 canonical registry source pins freshly hashed and match. Since e9a7567 only two CI files and two new Work Inputs differ; production packages/native adapters/guards, registry, package manifests/lock, original Inputs and V2/V3 are unchanged. Cross-package oracles remain CI-owned."
+    },
+    {
+      "name": "Independent parser and privacy verification",
+      "status": "pass",
+      "detail": "Added suite independently passes3tests/16assertions. Eight separate frame-boundary probes match expectations, including both prior failing negatives and positive bare/named/colored frames. Redaction suppresses synthetic source/message payload and retains failed status. Outside/prose do not produce source locations."
+    },
+    {
+      "name": "Actual Bun format compatibility",
+      "status": "pass-with-scope-limit",
+      "detail": "Read retained actual-bun-negative-stack.log and independently replayed through current parser with explicit synthetic known-file list: correct2:58 location, no raw-source metadata report, exit1 retained. Supplying actual known CI file instead yields no private-probe location. This is offline format compatibility, not hosted incident diagnosis."
+    },
+    {
+      "name": "Fresh whole-quality evidence",
+      "status": "pass-with-scope-limit",
+      "detail": "Root diagnostic-frame-quality.report.json passes all14checks including negative fixtures/source currentness. All277 snapshot hashes checked. Reviewer did not redundantly rerun heavy suite. Report/log and both targeted logs were read and fingerprinted below."
+    },
+    {
+      "name": "Current canonical Work/history validation",
+      "status": "pass",
+      "detail": "Independent public record validation valid with zero findings. Transitions from actualtested0bcfc3877670a8d6003cd0f57757a8e56de6c9fd, priorreviewede9a75670a048155f9819a0546a69523d331ee33d and failed40570df33e3dbc70c13265dfe77e395330f79e9e to current head all valid/no findings. Bounded PT12 context source-qualified/no holds. Current Work SpecPlan4 and historical Task9/10/12 SpecPlan3 are preserved."
+    },
+    {
+      "name": "Failed attempt3 custody",
+      "status": "pass",
+      "detail": "New canonical PT-INDEPENDENT-REVIEW-ATTEMPT-3 rawResultUtf8 exactly equals original failed bytes and its declared SHA-25699b63915 matches. Original attempt1/2/3 raw/session digests rechecked unchanged. Historical failed conclusion is retained, not replaced with a pass."
+    },
+    {
+      "name": "Whitespace and final tracked state",
+      "status": "pass",
+      "detail": "git diff --check base..HEAD passes. Expected exact head/tree and clean tracked state verified before output writes."
+    }
+  ],
+  "evidenceReceipts": [
+    {
+      "path": ".private/quality-first-interview-20261018/diagnostic-frame-controls.log",
+      "bytes": 434,
+      "sha256": "4463abb1262b27135b5532a46392a6047d15cbc7c1f5bd9a520c8ad32da82fa3"
+    },
+    {
+      "path": ".private/quality-first-interview-20261018/actual-bun-negative-stack.log",
+      "bytes": 1009,
+      "sha256": "fd224d0546a2f6b63730ec0d2c3df497e4fea0909f9381c038e02ce074570c1e"
+    },
+    {
+      "path": ".private/quality-first-interview-20261018/diagnostic-frame-quality.report.json",
+      "bytes": 220272,
+      "sha256": "ee4a31529c09d6d761d45a5bcac342d4321e13e2485e66e23c616c032dad2549"
+    },
+    {
+      "path": ".private/quality-first-interview-20261018/diagnostic-frame-quality.log",
+      "bytes": 238768,
+      "sha256": "080b35a679b60fe3b5d2d173f69fc8efdaf449666268d2e4b17d4d02cec62d53"
+    }
+  ],
+  "previousAttempts": [
+    {
+      "attempt": 1,
+      "rawResultSha256": "32125f8647fed325099639cfeea894cb0d50d2e0a1aa119b7f05678dba8ace4e",
+      "sessionSha256": "59f7146608db348980b161d76d7158b33c60f8401636275537d79ed699a49d67",
+      "preservedUnchanged": true
+    },
+    {
+      "attempt": 2,
+      "rawResultSha256": "35f5ad9202b86c97d7afb6d486c9c2bd7edf6c77b5bd6e2d8268db7d275a7bca",
+      "sessionSha256": "212b062c29c75680612e3384876b83a70978071194bba347920aa3fd50c2d93e",
+      "preservedUnchanged": true
+    },
+    {
+      "attempt": 3,
+      "rawResultSha256": "99b63915b342483ed8933cca989b637edacceddbf335d8b8670e58d0608d0e98",
+      "sessionSha256": "e7d94d68e4a3ba04d898b445049559661ed70c3aeedaf410ff1c633434af7deb",
+      "preservedUnchanged": true
+    }
+  ],
+  "hostedQualification": {
+    "status": "pending-new-exact-head",
+    "priorRunId": 39126364203,
+    "priorRunHead": "e9a75670a048155f9819a0546a69523d331ee33d",
+    "priorFailureCause": "unknown",
+    "priorSourceAndExactNativeReview": "Succeeded according to retained incident evidence, scoped to earlier head",
+    "newHostedPassEstablished": false,
+    "cloudReview": "Prior reported usage-limit failure with unresolved flags and no actual review/threads; no cloud completion/pass claimed",
+    "mergeReady": false
+  },
+  "scopeAssessment": {
+    "qualification": "Current source review passes with zero current actual findings. Diagnostic evidence is now constrained to supported exact known source frames. This pass does not establish new-head hosted qualification or explain the old hosted failure.",
+    "diagnosticGain": "Stronger bounded diagnostics only; no claim that this fixes the old hosted incident or demonstrates deployed production quality gain.",
+    "sourceReuse": "Previous production/source-owner verification applies only through independently established unchanged bytes and exact pins. CI diagnostic changes received fresh review.",
+    "causalPonytailEfficacyEstablished": false,
+    "nativeAdoptionEstablished": false,
+    "acceptanceEstablished": false
+  },
+  "limitations": [
+    "Old hosted run39126364203 actual quality-negative-fixtures cause remains unknown. Local passes, old Bun guard refusal and parser replay do not establish that cause or runner equivalence. Actual new-head hosted/prospective merge checks remain required before merge.",
+    "Full heavy quality/source suites were not independently repeated here; Root fresh report is exact-hash-bound matching evidence, and current targeted tests/probes/transitions were newly independently executed. No invented new hosted or model evaluation occurrence.",
+    "Contained actual Bun failure log uses an explicitly synthetic private fixture whitelist for offline parser compatibility. Production wiring remains CI-only auxiliaryTypescript; this does not add private tests to real CI source scope.",
+    "Native thread/session identity is observed process data rather than independently authenticated native authorship. Native task/run/occurrence IDs remain null when unexposed.",
+    "Only new attempt4 raw/session files were written. No production/Work edits, staging/commits, Goal creation, parent/session messages, native config/trust/credential/cache effects, model evaluations, push/publication/PR/merge or activation occurred. Prior attempts remain unchanged.",
+    "This source verification is not AcceptanceDecision, merge permission or runtime activation. Root retains exact immutable review/status publication ordering, actual current hosted/protected checks and explicit expected-head merge duties; native owners retain activation."
+  ]
+}
