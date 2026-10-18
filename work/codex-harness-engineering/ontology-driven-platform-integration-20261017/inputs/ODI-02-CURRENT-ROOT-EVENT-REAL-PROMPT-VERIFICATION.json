@@ -1,0 +1,99 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-CURRENT-ROOT-EVENT-REAL-PROMPT-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root-real-prompt-observation",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-current-real-prompt-context.finite-adjudication.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:root-real-prompt-context-delivered",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T13:12:53.437288+00:00",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:1741d56854ab0fa66058eafb88955c10d71f0888f063716baa9c2c6fb5c966cb"
+      ],
+      "criteria": [
+        {
+          "id": "actual-human-event",
+          "status": "pass",
+          "message": "Real114byte pane-status question, actual Root thread/turn/user message and existing UserPromptSubmit ownerboundary correlate; no fabricated prompt.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:root-real-prompt-context-delivered"
+          ]
+        },
+        {
+          "id": "complete-wire-decode-fit",
+          "status": "pass",
+          "message": "Actual full native11995-byte/character wrapper<=12000; compact reserialization SHA3fff matches actual wire, formatted16935-byte archive distinguished; canonical decode passes.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:root-real-prompt-context-delivered"
+          ]
+        },
+        {
+          "id": "source-and-current-selected-scope",
+          "status": "pass",
+          "message": "27 real Git blobs/SHA256,4normative records,14Decision records/25source pointers match; selected790scope unchangedat eeff, no claim790islatestwholeWork; sourceM/ownerM34+16 current.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:root-real-prompt-context-delivered"
+          ]
+        },
+        {
+          "id": "original-boundary-output",
+          "status": "pass",
+          "message": "Immutable preserved114byte original matches actualuser/ownerboundary; immediately delivered actual developer projection is Work context, not AGENTS block.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:root-real-prompt-context-delivered"
+          ]
+        },
+        {
+          "id": "Root-receiver-and-finite-judgment",
+          "status": "pass",
+          "message": "Root actualread/own canonicaldecode/use in ordinary work and finiteadjudication qualify bounded delivery; no separate model-effectiveness evaluation.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:root-real-prompt-context-delivered"
+          ]
+        },
+        {
+          "id": "limits-preserved",
+          "status": "pass",
+          "message": "Source-only authoritynone/nativePermissionfalse and rawagent/trust/backendresource/Memory/Hermes/future/wholeAcceptance unknowns preserved; no new permissions.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:root-real-prompt-context-delivered"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-CURRENT-ROOT-EVENT-REAL-PROMPT-RESULT.json",
+          "sha256": "f9fb06ff7888108b7e4b86d73367648714c1653153fcbc02bbef4ce42ccae406"
+        }
+      ],
+      "runtime": {
+        "name": "native-codex-real-prompt-source-observation-qualification",
+        "version": "finite-root-observation-v1"
+      },
+      "details": {
+        "qualificationSha256": "dfdfafaa08890f6b898e946d669b71b274a8d8a6e756672aac81f11568b40e75",
+        "RootConsumptionSha256": "24fc5f9a739a749818c83bf4fa3f9674528a32b077e33117e376e6bf5683dbdb",
+        "RootAdjudicationSha256": "52d506c0b8b45cabd9b15340cf7b496390213c998f061355a65cfb12da8f3b3b",
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeAttemptResourceId": null,
+        "nativeAuthenticationEstablished": false,
+        "nativePermissionGranted": false,
+        "MemoryAdmitted": false,
+        "AcceptanceEstablished": false
+      }
+    }
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-CURRENT-ROOT-EVENT-REAL-PROMPT-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root-real-prompt-observation",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-real-prompt-projection.qualification.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi.current-root-real-prompt-context-qualified-result.v1",
+    "recordedAtUtc": "2026-10-18T13:12:53.437288+00:00",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 2,
+      "taskId": "ODI-02-CURRENT-ROOT-EVENT"
+    },
+    "outcome": "OWN_FINITE_REAL_PROMPT_CONTEXT_DELIVERY_OBSERVED_AND_LOCALLY_VERIFIED",
+    "occurrence": {
+      "runtimeId": "native-codex:01a14dce-388e-7162-ae22-757566401de7",
+      "attemptId": "native-turn:01a14ee7-3d7f-7172-ada5-9f679ab94fba",
+      "occurrenceId": "native-message:msg_01a14f03-5349-7c30-8b08-b6f2fc8ac53e"
+    },
+    "sourceNormalization": {
+      "class": "Source-owned generic occurrence correlation using genuinely observed existing native coordinates",
+      "actualNativeThreadId": "01a14dce-388e-7162-ae22-757566401de7",
+      "actualNativeTurnId": "01a14ee7-3d7f-7172-ada5-9f679ab94fba",
+      "actualResponseUserMessageId": "msg_01a14f03-5349-7c30-8b08-b6f2fc8ac53e",
+      "actualNativeUIUserItemId": "01a14f03-5349-7c30-8b08-b70a3f0475ec",
+      "actualNativeClientId": "b658aea5-d340-4393-ab06-586c184571fc",
+      "actualDeveloperProjectionMessageId": "msg_01a14f03-5371-7232-9325-06bb82560f3f",
+      "ownerBoundary": {
+        "path": "/home/palantirkc/code/shared/codex-harness-engineering/state/continuity/boundaries/2026-10-18T12-36-18-453Z-54b4b7fd-410b-4635-9400-19cc67819790.json",
+        "sha256": "fd331d7d0de42fda27f21d76809627e9a9c500afcfd6c9ee3bdb6be9941ca304",
+        "event": "UserPromptSubmit",
+        "atUtc": "2026-10-18T12:36:18.453Z",
+        "threadId": "01a14dce-388e-7162-ae22-757566401de7",
+        "turnId": "01a14ee7-3d7f-7172-ada5-9f679ab94fba",
+        "pendingPromptHash": "cd10726e42f49a7777d81bee13234d6258f198c30d331797f850fa7a3357a1ad",
+        "nativeTranscriptPath": "/home/palantirkc/.codex/sessions/2026/10/18/rollout-2026-10-18T15-58-42-01a14dce-388e-7162-ae22-757566401de7.jsonl",
+        "authority": "none",
+        "nativePermissionGranted": false
+      },
+      "identityLimit": "UI UserMessage and response message IDs differ, joined by identical114byte prompt hash. Normalized attempt/occurrence are actual turn/message coordinates, not backend resource allocation.",
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "nativeAttemptResourceId": null,
+      "nativeAuthenticationEstablished": false,
+      "actualAgentProperties": null,
+      "explicitTrustUI": null
+    },
+    "sourcePins": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-real-prompt-projection.qualification.actual.json",
+        "sha256": "dfdfafaa08890f6b898e946d669b71b274a8d8a6e756672aac81f11568b40e75"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-real-prompt-projection.actual-consumption.json",
+        "sha256": "24fc5f9a739a749818c83bf4fa3f9674528a32b077e33117e376e6bf5683dbdb"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-current-real-prompt-context.finite-adjudication.actual.json",
+        "sha256": "52d506c0b8b45cabd9b15340cf7b496390213c998f061355a65cfb12da8f3b3b"
+      }
+    ],
+    "actualNativeRecords": {
+      "user": {
+        "kind": "actual-user-pane-question",
+        "atUtc": "2026-10-18T12:36:20.425Z",
+        "recordType": "response_item",
+        "itemType": "message",
+        "role": "user",
+        "itemId": "msg_01a14f03-5349-7c30-8b08-b6f2fc8ac53e",
+        "turnId": null,
+        "byteOffset": 19645900,
+        "rawLineSha256": "b1ec0fa5887e00e9a61e0d578438955926ab5851ca7175b5aaae5fd7dc4e6a87",
+        "textSha256": "cd10726e42f49a7777d81bee13234d6258f198c30d331797f850fa7a3357a1ad",
+        "textBytes": 114
+      },
+      "nativeUserTurnJoin": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-real-prompt-projection-qualification-001/user-turn-correlation.actual.json",
+        "sha256": "c9e95e68c13ec6bc68b5abeb85878cd999f474e9b3e5e32bacc4d9a930db06ed"
+      },
+      "developerProjection": {
+        "kind": "actual-developer-projection",
+        "atUtc": "2026-10-18T12:36:20.465Z",
+        "recordType": "response_item",
+        "itemType": "message",
+        "role": "developer",
+        "itemId": "msg_01a14f03-5371-7232-9325-06bb82560f3f",
+        "turnId": null,
+        "byteOffset": 19648418,
+        "rawLineSha256": "abd6a6801b990ccd31cabd67dc8e033dd2d3d2460e58fcd61a6df42ac6f2d2a0",
+        "textSha256": "3fff24ae09b6ed171cf3057e9f985dd92d0bcaab65948dbea027b7ccdf743064",
+        "textBytes": 11995
+      },
+      "turnCwd": "/home/palantirkc/code/shared/agent-platform"
+    },
+    "realOriginalAndBoundary": {
+      "original": {
+        "path": "/home/palantirkc/code/shared/codex-harness-engineering/.private/native-hook-events/98b80b7c87d76ff7d521daf5b63c89fa-1f3261e3-fd5a-4b66-bbdb-b978ceb3e7b2.prompt.txt",
+        "sha256": "cd10726e42f49a7777d81bee13234d6258f198c30d331797f850fa7a3357a1ad",
+        "bytes": 114,
+        "matchesActualQuestion": true
+      },
+      "boundary": {
+        "path": "/home/palantirkc/code/shared/codex-harness-engineering/state/continuity/boundaries/2026-10-18T12-36-18-453Z-54b4b7fd-410b-4635-9400-19cc67819790.json",
+        "sha256": "fd331d7d0de42fda27f21d76809627e9a9c500afcfd6c9ee3bdb6be9941ca304",
+        "event": "UserPromptSubmit",
+        "atUtc": "2026-10-18T12:36:18.453Z",
+        "threadId": "01a14dce-388e-7162-ae22-757566401de7",
+        "turnId": "01a14ee7-3d7f-7172-ada5-9f679ab94fba",
+        "pendingPromptHash": "cd10726e42f49a7777d81bee13234d6258f198c30d331797f850fa7a3357a1ad",
+        "nativeTranscriptPath": "/home/palantirkc/.codex/sessions/2026/10/18/rollout-2026-10-18T15-58-42-01a14dce-388e-7162-ae22-757566401de7.jsonl",
+        "authority": "none",
+        "nativePermissionGranted": false
+      },
+      "binding": {
+        "path": "/home/palantirkc/code/shared/codex-harness-engineering/.private/native-hook-adoption/odi-current-M666b-20261018/bindings.json",
+        "sha256": "6621e34f28458da5002c12c6cee9ed55b4d5811efc44c72bc1c8ecf388ffa09f",
+        "bytes": 1436
+      },
+      "latestPointer": "Initial matching421-byte latest locator was observed with SHAe29d7f84bed367cf29d80dd7d47fc59384f638848d38c6e7fab0aec76fff0522. It later advanced naturally to subsequent real input; this proof uses immutable first prompt+boundary, not an assertion the mutable latest pointer stayed fixed.",
+      "timing": "Owner capture/boundary12:36:18.453Z; user response-item12:36:20.425Z; native UserMessage completed12:36:20.432Z; developer projection12:36:20.465Z."
+    },
+    "actualProjection": {
+      "schema": "codex.session-git-work.projection.v1",
+      "encoding": "metadata.v1",
+      "sourceStatus": "source-qualified",
+      "entireActualWrapperChars": 11995,
+      "cap": 12000,
+      "remainingChars": 5,
+      "canonicalDecode": "PASS",
+      "completeProjectionNotHeldRefusal": true,
+      "sourceOwnerProjectRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
+      "actualNativeCwd": "/home/palantirkc/code/shared/agent-platform",
+      "snapshot": "790195d7cd75651ddc395db825cabcb73f05901e",
+      "selectedTask": "ODI-02-CURRENT-ROOT-EVENT",
+      "GitSourceBlobsVerified": 27,
+      "computedRawSourceSHA256AndBytes": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-real-prompt-projection-qualification-001/canonical-source-qualification.actual.json",
+        "sha256": "63d0e4d0d15e0d4cdc86254d733907631c9e6d32b6006f3ad796e572c3001f0d"
+      },
+      "normativeRecordsMatched": 4,
+      "actualNormativeKinds": "Work / Spec1 / activePlan2 / historicalPlan1 actual projected fields matched immutable records.",
+      "decisionRecordsMatched": 14,
+      "decisionSourcePointersMatched": 25,
+      "taskNextActionValueMatched": true,
+      "normativeQualification": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-real-prompt-projection-qualification-001/normative-value-qualification.actual.json",
+        "sha256": "c14880449d4f0468dc28ab0dcacbe89337035a1ad1f9cf7d4af432aaeeea68ea"
+      },
+      "authority": "none",
+      "nativePermissionGranted": false,
+      "semanticAcceptanceEstablished": false
+    },
+    "wireVsArchive": {
+      "actualWireSHA256": "3fff24ae09b6ed171cf3057e9f985dd92d0bcaab65948dbea027b7ccdf743064",
+      "actualWireBytes": 11995,
+      "cap": 12000,
+      "formattedArchivePath": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/current-root-real-prompt-projection-qualification-001/projection.exact.json",
+      "formattedArchiveSHA256": "24a14102812e4a2632169428624d2ba5108bb7fb7485dd55abf48285b73916b2",
+      "formattedArchiveBytes": 16935,
+      "compactReserializationHashMatchesActualNativeWire": true,
+      "formattedBytesNotClaimedAsWire": true
+    },
+    "currentness": {
+      "sourcePair": {
+        "common": "fe591ffe113aef092f3f526cadcd7c575c579881",
+        "owner": "14fde3d172e9f944b6655105298b1eab925d6d24"
+      },
+      "freshPublicSourceGuards": {
+        "contextPins": 34,
+        "nativePins": 16,
+        "beforeAfterVerified": true,
+        "cacheClear": false
+      },
+      "localWorkAtQualification": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+      "snapshotIsLatestWholeWork": false,
+      "selectedScope": "All27 referenced790 source blobs,14 Decision records and exact selected Task unchanged at eeff. Currentness qualified for these explicit selected sources, not by pretending790 is latest whole Work.",
+      "broaderState": "Academy/standing updates outside the selected27 sources exist at eeff; no claim every new Work effect/outcome appears in this view."
+    },
+    "RootActualConsumption": {
+      "source": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-real-prompt-projection.actual-consumption.json",
+        "sha256": "24fc5f9a739a749818c83bf4fa3f9674528a32b077e33117e376e6bf5683dbdb"
+      },
+      "meaning": "Actual developer message received/read in currentRoot; own canonicaldecode of exact hash-matched nativeoutput. Full approvedWholeLens purpose/constraints/Spec1/Plan2/historicalPlan1/14decisions/source pointers used while answering narrowpanequestion and continuing critical Work publication/sourceMintegration. Userstatus didnotreplaceGoal.",
+      "scope": "Qualified27 selected790sources unchanged at eeff; newerwholeWorkeeff known separately. No rawwholehistory/allcurrentWorkvisibility claim."
+    },
+    "RootFiniteAdjudication": {
+      "source": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-current-real-prompt-context.finite-adjudication.actual.json",
+        "sha256": "52d506c0b8b45cabd9b15340cf7b496390213c998f061355a65cfb12da8f3b3b"
+      },
+      "decision": "OWN_FINITE_OBSERVED_NORMAL_CONTEXT_DELIVERY_CRITERIA_PASS_FOR_THIS_REAL_EVENT",
+      "criteriaScope": [
+        "Full11995<=12000 actualprojection, canonicaldecoder and27 actualimmutable sources/4normative/14Decisions verified",
+        "790 isnotlatestwholeWork; all27 selectedsources/Task unchangedat eeff, sourceMfe591/owner14fde/34+16guards current",
+        "Actualnativeuser114Bprompt/Rootthread-turn/UserPromptSubmitboundary/developeroutput join, stablefirstevent retained despite laterlatestpointerupdates",
+        "Rootactualcontextconsumption andconsequentialWholeLens steering demonstrated asordinarywork, no newmodel-effectiveness evaluation"
+      ],
+      "nativeVetoInterpretation": "Actualexistingnativeownerroute operationally delivered this event. No assertion about explicit trustUI/hash semantics or rawagent propertypresence is made; those remain unknown. This bounded observation grants no permission, bypass or universal futureadmission. No new capture-every-optional-property prerequisite is inferred."
+    },
+    "preservedUnknowns": [
+      "Full raw native hook event envelope not retained/inspected. Actual agent_id/agent_type property presence unknown; omitted boundary/selector fields and successful route do not prove raw absence/null/wildcard.",
+      "Explicit native definition trust/loaded-command hash/UI confirmation remains unobserved. This event delivered, not universal future admission.",
+      "Root reports receiving/reading/applying purpose/fences; qualifier proves delivery/content/source binding, not a new semantic-effectiveness model evaluation.",
+      "No new global Memory, Hermes activation/all-runtime automatic loading, whole/human Acceptance or Goal action."
+    ],
+    "consumed": {
+      "effectId": "ODI-02-CURRENT-ROOT-EVENT-REAL-PROMPT-20261018T123618",
+      "replayPolicy": "never-replay-recorded-dispatch",
+      "meaning": "This actual first human-prompt event is observed; no synthetic/extra event or native action requested by recording it."
+    },
+    "limits": [
+      "Own finite delivered-source-context observation only; no native authority/permission/globalMemory/Hermes/all-runtime/future admission/whole or human Acceptance.",
+      "No requirement to capture every optional raw field inferred; rawagent/trustUI/backendresource unknowns stay unknown.",
+      "Existing selector/source/purpose/intent/parent dependency/SpecPlan/Decisions/oldGoal/effects remain unchanged; no cap/codec/context shaving."
+    ]
+  }
+}
