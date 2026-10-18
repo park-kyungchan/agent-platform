@@ -31,7 +31,7 @@
       "sha256": "bc46b6a65f90716d5d4a729b374951e228adb66aaf003e977e052c0ceed77038",
       "recordClass": "source-owned-normalization-not-native-permission"
     },
-    "rationaleClassification": "Historical U10 directly states the Memory drift-risk rationale; other derived reasons remain source-attributed inference. Deduplicated original sources are not repeated user confirmations.",
+    "rationaleClassification": "Actual current directive, direct historical user WHY, normalized/source-attributed historical records, and derived engineering inference remain distinct.",
     "historyEvidence": [
       {
         "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z/preference-history-consolidation/memory-admission.compact-candidate.v2.actual.json",
@@ -51,14 +51,10 @@
     ],
     "captureProvenance": "Source-owner record preserving the attributed actual user utterance captured in native thread 01a14cae-4ac1-7cb1-ac35-27060c49037b. This is not a direct new Root user message; nativeMessageId remains null. Parent Root declares it read the originals and adopts the exact meaning. Candidate publication and native activation remain separate.",
     "RootAdoption": {
-      "status": "meaning-adopted-as-declared-by-accountable-Root; exact-Work-postimage-integration-pending",
-      "declaration": {
-        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/global-typed-work-memory-successor-v1/parent-declaration.observation.json",
-        "sha256": "a56511ffa0cd3f573c74d6c0ea8bd6e932f703d8dc1726f167af6184783943e3"
-      },
+      "status": "meaning-accepted-by-accountable-Root",
       "nativeMessageId": null,
-      "nativeAuthorshipIndependentlyAuthenticated": false,
-      "WorkMutationByCandidate": false
+      "canonicalIntegration": "pending separate native Git effect and receipt",
+      "meaning": "Root accepts this exact preserved user instruction and its explicit all-future engineering scope; direct historical reasons retain their source class."
     },
     "directHistoricalWhy": {
       "originalSha256": "f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a",
