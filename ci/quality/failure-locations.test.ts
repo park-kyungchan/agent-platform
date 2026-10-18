@@ -5,7 +5,9 @@ import { resolve } from "node:path";
 
 test("actual CI-owned test scope supplies diagnostic locations without promoting tests to package source", async () => {
   const root = resolve(import.meta.dir, "../..");
-  const scope = await readQualityScope(root);
+  // Only TypeScript admission is under test; finite owner QA intentionally has no source Git root.
+  // The full quality caller separately reads and verifies its actual tracked Markdown.
+  const scope = await readQualityScope(root, undefined, []);
   const path = "ci/quality/failure-locations.test.ts";
   expect(scope.testFiles).not.toContain(path);
   expect(scope.auxiliaryTypescript).toContain(path);
@@ -71,4 +73,12 @@ test("unknown, outside, malformed and excessive diagnostic input stays unqualifi
     (_, i) => `at /fixture/repo/ci/check.test.ts:${i + 1}:1`,
   ).join("\n");
   expect(sourceTestFailureLocations(many, "/fixture/repo", ["ci/check.test.ts"])).toHaveLength(16);
+});
+
+// Prevent relocating the owner integration from silently removing required consumer coverage.
+test("Hermes source integration stays admitted to the required package QA lane", async () => {
+  const scope = await readQualityScope(resolve(import.meta.dir, "../.."), undefined, []);
+  const path = "packages/native-hermes-adapter/src/source-provider/harness-quality.test.ts";
+  expect(scope.testFiles).toContain(path);
+  expect(scope.exclusions.stagedTests.some((row) => row.path === path)).toBe(false);
 });
