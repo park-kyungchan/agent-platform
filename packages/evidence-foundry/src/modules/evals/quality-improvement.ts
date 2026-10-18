@@ -306,7 +306,7 @@ function protocol(input: unknown): QualityProtocol {
   const limits = row(p.limits, ["maxCaseResults", "maxDurationMs", "maxTotalTokens"]);
   integer(limits.maxCaseResults, MAX_RESULTS);
   integer(limits.maxDurationMs);
-  integer(limits.maxTotalTokens);
+  if (limits.maxTotalTokens !== 0) integer(limits.maxTotalTokens);
   const d = row(p.decision, ["ownerId", "reviewRequired"]);
   text(d.ownerId);
   if (d.reviewRequired !== true) fail("INDEPENDENT_REVIEW_REQUIRED");
@@ -447,7 +447,7 @@ function knownStops(input: unknown): string[] {
     if (
       typeof max === "number" &&
       Number.isSafeInteger(max) &&
-      max > 0 &&
+      (max > 0 || (limit === "maxTotalTokens" && max === 0)) &&
       typeof value === "number" &&
       Number.isFinite(value) &&
       value > max

@@ -1,0 +1,54 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-QUALITY-GAIN-OBSERVATIONS-V3",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "Root integrated independent engineering verification",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common-harness.quality-observations.v1",
+    "incidentCount": 1,
+    "actualSourceBehaviorRepair": {
+      "target": "quality-preflight/quality-compare zero-token deterministic evaluation",
+      "baselineSource": "bdcb409",
+      "baselineImplementationSha256": "0e12969b1c96758c8faf4772f6cca3610772d79ce0df3da607dce6ee9fdd6f1f",
+      "frozenIndependentCase": "PT-QC-01 quality API join",
+      "before": "Independent actual-adapter/evaluateUnit protocol uses maxTotalTokens0 with observed0; preflight incorrectly defers. Existing worker package148tests pass on same faulty implementation.",
+      "change": "Allow exactly zero token cap; retain safe integer validation and known STOP for any usage above0, including malformed result envelope. V1 untouched.",
+      "after": "Identical unmodified independent join passes; new zero-budget positive/negative controls pass. Joined68tests pass,0fail,0skip.",
+      "scope": "Actual new common evaluation component behavior, not deployed runtime/Ponytail task-quality improvement."
+    },
+    "verificationDetectionOutcome": {
+      "oldOracle": "PT09 pre-integration package148passed; omitted zero-budget case",
+      "newOracle": "Independent PT10 predeclared adapter/producer join rejects the same faulty preflight at integration; direct boundary controls confirm valid0 and stop1.",
+      "evidence": "One real pre-merge candidate defect detected, separately from synthetic weak-fit calibration. No claim of prior deployed production oracle failure.",
+      "notCountBased": true
+    },
+    "existingSevenCaseResults": "Existing source/adapter/Git/CI behaviors preserved; synthetic faults explicitly labelled. Historical repair not counted as new gain.",
+    "environmentRepair": {
+      "before": "Hermes generator correctly refuses own installed dependencies with nlink>64",
+      "action": "Copy only52 regular installed files above bound to fresh inodes in this Work node_modules; no tracked/other Work/global cache mutation",
+      "after": "Same Hermes source guard/delivery scenario passes; guard unchanged",
+      "behaviorGainClaim": false
+    },
+    "receipts": [
+      {
+        "path": ".private/quality-first-interview-20261018/root-complex-scenarios.log",
+        "sha256": "dafa01e53711d8cdd8a83fe3aaf5f549e3fcbff3e6819d596e54e6782f103857"
+      },
+      {
+        "path": ".private/quality-first-interview-20261018/root-joined-quality.log",
+        "sha256": "ff07c8f9c75410451c2355b65cd53f2648999c17b639f31cc3c035e8259c91af"
+      }
+    ],
+    "causalPonytailEfficacyEstablished": false,
+    "nativeAdoptionEstablished": false,
+    "acceptanceEstablished": false
+  }
+}

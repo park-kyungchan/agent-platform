@@ -18,6 +18,18 @@ const setPass = (r: QualityComparisonRequest["baseline"]["results"][number], pas
   Object.assign(r.properties, { passed, verdict: passed ? "supported" : "refuted" });
 
 describe("quality-first captured evidence", () => {
+  test("offline zero-token budgets allow zero usage and stop any token use even with malformed observations", () => {
+    const r = qualityFixture();
+    r.protocol.limits.maxTotalTokens = 0;
+    expect(preflightQualityImprovement(r.protocol).status).toBe("ready-for-comparison");
+    expect(compareQualityImprovement(r).status).toBe("ready-for-review");
+    r.usage.totalTokens = 1;
+    expect(compareQualityImprovement(r)).toMatchObject({
+      status: "stop",
+      findings: ["OBSERVED_LIMIT_EXCEEDED"],
+    });
+    expect(compareQualityImprovement({ ...r, candidate: null }).status).toBe("stop");
+  });
   test("baseline failure becomes a behavior gain; all mandatory consumer controls pass", () => {
     const r = qualityFixture(),
       before = structuredClone(r);
