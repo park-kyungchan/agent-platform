@@ -357,7 +357,7 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/index.ts",
-          "sha256": "090ca7a9abb6e845c3aeaec706db75ea3ba9f507b44c4c0ac9a1b60d88e0c517",
+          "sha256": "78d9cff69a0fa311d1c801394a0c9e07f95394ec56e5c17d1c188a909d03a2c1",
           "relativePath": "packages/evidence-foundry/src/modules/evals/index.ts"
         },
         {
@@ -409,6 +409,11 @@
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/scripts/generate.ts",
           "sha256": "10a15407c71db1799876438338904ba352a5077e0782c9e385638aecd63dec91",
           "relativePath": "packages/evidence-foundry/scripts/generate.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/quality-improvement.ts",
+          "sha256": "0e12969b1c96758c8faf4772f6cca3610772d79ce0df3da607dce6ee9fdd6f1f",
+          "relativePath": "packages/evidence-foundry/src/modules/evals/quality-improvement.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers."
