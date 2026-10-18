@@ -1,0 +1,40 @@
+{
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "a8ca3af23a695259387fb394a37955dbbe73bfd8",
+  "reviewedTreeSha": "80d63f6fce5b2d39283ee68a7f7d181fa2331d28",
+  "reviewedSourceManifestSha256": "5c43163578b9d9958e998570fe7412fc9887fa7087dca9909e67cf36539fe85b",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15006-eaef-7f23-bcb8-c3440a03b7dc"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15003-9cee-7662-bbc2-7c1990379b30"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "schema": "native-independent-review.v2",
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/96005c05ef4a7d5d214e76918c29eaadd7e3d71e/native-review-results/a8ca3af23a695259387fb394a37955dbbe73bfd8.json",
+    "sha256": "b9e0feb7adfe5eef395c6ecdbdf69c2cbf6a7f9e5b17b242197b4b0ae344f57f"
+  },
+  "identitySemantics": {
+    "legacyReviewActorField": "Existing ReviewV2 taskId is an explicitly namespaced actual native stored thread actor, not a native Task occurrence.",
+    "reviewerAgentPath": "/root/handoff_recovery",
+    "reviewerNativeStoredSessionId": "01a15006-eaef-7f23-bcb8-c3440a03b7dc",
+    "authorNativeThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "receipt": {
+      "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/owned-root-subagents-metadata.actual.json",
+      "sha256": "35adfd475b8d117451997f07f8f86d8abc71b599bcfe135fea0e2189894e046a",
+      "bytes": 2419
+    },
+    "custody": "Same actual runtime-issued /root/handoff_recovery independently authored whole6627/H2 source reviews and this exact-tree reuse result. No source authored; no session body read or Task/Run allocation invented."
+  }
+}
