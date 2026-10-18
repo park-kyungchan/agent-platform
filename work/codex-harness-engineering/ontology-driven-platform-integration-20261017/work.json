@@ -68,7 +68,8 @@
     "codex-harness-engineering:effect-fence:04r-consumed",
     "ODI-05-MEMORY-REVIEW-CONSUMED-REVIEW",
     "ODI-05-CALLER-RUN12-CONSUMED",
-    "ODI-07-CONTRACT-ARCHIVE4-CONSUMED"
+    "ODI-07-CONTRACT-ARCHIVE4-CONSUMED",
+    "ODI-HOST-CONSUMED-EFFECTS"
   ],
   "continuity": {
     "schema": "common.git-work-continuity.v1",
@@ -114,6 +115,11 @@
         "kind": "snapshot",
         "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-CALLER-RUN12-RESULT.json",
         "fragment": "#/content/effectCustody"
+      },
+      {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-CONSUMED-EFFECTS-SOURCE.json",
+        "fragment": "#/content/effectInventory"
       }
     ]
   }
