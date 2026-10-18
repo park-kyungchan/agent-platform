@@ -1,0 +1,46 @@
+{
+  "schema": "odi.root-integrated-identical-tree-review-reuse.v1",
+  "readyForUse": true,
+  "bindingProducer": "/root",
+  "repository": "park-kyungchan/agent-platform",
+  "sourceHead": "8090e7dd82165386f5711d0d1cb62221ad1bb8d9",
+  "mergedHead": "fe591ffe113aef092f3f526cadcd7c575c579881",
+  "tree": "3558b5e68ea51d3819c586bd48a643673bf813f7",
+  "manifestSha256": "7856266fc4f51b6facf27e974dab7b8b90e14bc7e59040b2b415a8d8a2fa910d",
+  "parents": [
+    "6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+    "8090e7dd82165386f5711d0d1cb62221ad1bb8d9"
+  ],
+  "pullRequest": 36,
+  "currentUnresolvedSourceFindings": 0,
+  "sourceChecksSatisfied": true,
+  "rootProjectionOnly": true,
+  "newIndependentReviewPerformed": false,
+  "originalReviewRecordedAtUtc": null,
+  "treeIdentityConfirmed": true,
+  "originalReviewUnchanged": true,
+  "explicitExpectedHeadMerge": true,
+  "automaticMerge": false,
+  "originalStatusId": 56620482071,
+  "originalRaw": {
+    "commit": "f47f6d0d3db1e89444874bb5eb880b0c91517e06",
+    "path": "native-review-results/8090e7dd82165386f5711d0d1cb62221ad1bb8d9.json",
+    "sha256": "5039b1dcdb19229208db3d44e84e9f377909415cdc25354e6ee130f052437d1a"
+  },
+  "originalReceipt": {
+    "commit": "0e09b8810e15c8a5252206e55e8d7c937e5fa05a",
+    "path": "native-reviews/8090e7dd82165386f5711d0d1cb62221ad1bb8d9.json",
+    "sha256": "2efbd3a7b93623f4b71fde501d1bfde5cfd1f15ae427bd36c9faa5b21087a306"
+  },
+  "currentSourceFindingAdjudication": {
+    "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/global-native-harness-adoption-20261018-v1/root-explicit-merge-and-M-proof-preparation-v1/fresh-root-resume-20261018-v1/Root-common-source-adjudication.actual.json",
+    "sha256": "31086e2f5250e59d04b2437e84828e3d314226d073e25548f7df45437ae34d2d"
+  },
+  "actualMergeReceipt": {
+    "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/global-native-harness-adoption-20261018-v1/root-explicit-merge-and-M-proof-preparation-v1/Root-merge-common-once/actual-merge.json",
+    "sha256": "a8d3da847e2c2d9e67bdf01d55153e8bb53ef3bee3439aa43ff657c1d2429eb2"
+  },
+  "approvedAtUtc": "2026-10-18T07:49:39.412Z",
+  "expiresAtUtc": "2026-10-18T08:19:39.412Z",
+  "nativeActivationHeld": true
+}

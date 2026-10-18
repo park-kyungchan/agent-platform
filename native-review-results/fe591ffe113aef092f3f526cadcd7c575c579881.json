@@ -1,0 +1,59 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "fe591ffe113aef092f3f526cadcd7c575c579881",
+  "reviewedTreeSha": "3558b5e68ea51d3819c586bd48a643673bf813f7",
+  "reviewedSourceManifestSha256": "7856266fc4f51b6facf27e974dab7b8b90e14bc7e59040b2b415a8d8a2fa910d",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_native_harness_pair_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "custody": {
+    "nativeThreadId": null,
+    "nativeTaskResourceId": null,
+    "nativeRunResourceId": null,
+    "nativeAuthorshipAuthenticated": false,
+    "publisherAuthenticationPending": true
+  },
+  "nativePermissionGranted": false,
+  "acceptanceEstablished": false,
+  "classification": "root-identical-tree-review-projection",
+  "rootProjectionOnly": true,
+  "reviewReusedForIdenticalTree": true,
+  "newIndependentReviewPerformed": false,
+  "projectionProducer": "/root",
+  "originalHeadSha": "8090e7dd82165386f5711d0d1cb62221ad1bb8d9",
+  "originalResultSha256": "5039b1dcdb19229208db3d44e84e9f377909415cdc25354e6ee130f052437d1a",
+  "originalRawNativeResult": {
+    "commit": "f47f6d0d3db1e89444874bb5eb880b0c91517e06",
+    "path": "native-review-results/8090e7dd82165386f5711d0d1cb62221ad1bb8d9.json",
+    "sha256": "5039b1dcdb19229208db3d44e84e9f377909415cdc25354e6ee130f052437d1a"
+  },
+  "originalReviewReceipt": {
+    "commit": "0e09b8810e15c8a5252206e55e8d7c937e5fa05a",
+    "path": "native-reviews/8090e7dd82165386f5711d0d1cb62221ad1bb8d9.json",
+    "sha256": "2efbd3a7b93623f4b71fde501d1bfde5cfd1f15ae427bd36c9faa5b21087a306"
+  },
+  "originalStatusId": 56620482071,
+  "originalReviewRecordedAtUtc": null,
+  "rootReuseBindingSha256": "3b17b1f8cef23bec6cf2735221bc616ea12e41301752f596db771edd6aa2bad9",
+  "currentSourceFindingAdjudication": {
+    "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/global-native-harness-adoption-20261018-v1/root-explicit-merge-and-M-proof-preparation-v1/fresh-root-resume-20261018-v1/Root-common-source-adjudication.actual.json",
+    "sha256": "31086e2f5250e59d04b2437e84828e3d314226d073e25548f7df45437ae34d2d"
+  },
+  "nativeTaskResourceId": null,
+  "nativeRunResourceId": null,
+  "nativeAuthenticationEstablished": false
+}
