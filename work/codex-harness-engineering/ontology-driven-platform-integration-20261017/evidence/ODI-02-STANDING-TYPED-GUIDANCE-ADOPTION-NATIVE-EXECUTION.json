@@ -11,9 +11,12 @@
     "ownerId": "native-codex",
     "locator": "thread:01a14dce-388e-7162-ae22-757566401de7/turn:01a14eca-7cdb-7d10-a08d-9cd6e80d7863/tool:call_aa5e22620fc04f858da4e3f4d2485d55",
     "receipt": {
-      "kind": "snapshot",
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
       "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION-RECEIPT.json",
-      "fragment": "#/content"
+      "fragment": "#/content",
+      "sha256": "53325c63299856015984391e3711bb202cad6b6e1b3002bf916084569656439b"
     }
   }
 }

@@ -1,0 +1,15 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-ROOT-SHARED-RECEIVER-20261018",
+  "evidenceKind": "receiver",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-ROOT-FORMAL-ACK-20261018.json",
+    "fragment": "#/content/receiverReceipt",
+    "sha256": "a89a25c5bb81c1adb91c67cd2b9e3b874b1ea0f4bae1de5cb799e46b2a79464d"
+  }
+}

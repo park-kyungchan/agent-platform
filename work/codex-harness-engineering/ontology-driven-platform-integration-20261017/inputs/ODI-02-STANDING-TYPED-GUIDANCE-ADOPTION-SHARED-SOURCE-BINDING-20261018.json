@@ -1,0 +1,61 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-SHARED-SOURCE-BINDING-20261018",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/standing-guidance-finite-formal-candidate-001/Root-consumption-ack.actual.json"
+  },
+  "content": {
+    "schema": "odi.standing-guidance-shared-source-and-finite-formal-audit.v1",
+    "priorEvidence": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "e83d65ec724d79e528df2cc471ff5398e6da9775",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION.json",
+      "sha256": "138c589721e18fdd0eab8097cefbc34a890b20db9d6f87a7867b4153639dea72",
+      "utf8": "{\n  \"schema\": \"common.git-work.v1\",\n  \"domainId\": \"native-harness\",\n  \"projectId\": \"codex-harness-engineering\",\n  \"workId\": \"ontology-driven-platform-integration-20261017\",\n  \"kind\": \"evidence\",\n  \"id\": \"ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION\",\n  \"evidenceKind\": \"native-execution\",\n  \"source\": {\n    \"kind\": \"native\",\n    \"ownerId\": \"native-codex\",\n    \"locator\": \"thread:01a14dce-388e-7162-ae22-757566401de7/turn:01a14eca-7cdb-7d10-a08d-9cd6e80d7863/tool:call_aa5e22620fc04f858da4e3f4d2485d55\",\n    \"receipt\": {\n      \"kind\": \"snapshot\",\n      \"path\": \"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION-RECEIPT.json\",\n      \"fragment\": \"#/content\"\n    }\n  }\n}\n"
+    },
+    "priorDeclaredSource": {
+      "kind": "native",
+      "ownerId": "native-codex",
+      "locator": "thread:01a14dce-388e-7162-ae22-757566401de7/turn:01a14eca-7cdb-7d10-a08d-9cd6e80d7863/tool:call_aa5e22620fc04f858da4e3f4d2485d55",
+      "receipt": {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION-RECEIPT.json",
+        "fragment": "#/content"
+      }
+    },
+    "successorDeclaredSource": {
+      "kind": "native",
+      "ownerId": "native-codex",
+      "locator": "thread:01a14dce-388e-7162-ae22-757566401de7/turn:01a14eca-7cdb-7d10-a08d-9cd6e80d7863/tool:call_aa5e22620fc04f858da4e3f4d2485d55",
+      "receipt": {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION-RECEIPT.json",
+        "fragment": "#/content",
+        "sha256": "53325c63299856015984391e3711bb202cad6b6e1b3002bf916084569656439b"
+      }
+    },
+    "reason": "Same Evidence ID explicitly binds exact published eeff receipt consumed by actual Root and independent source reader. Preserve original native owner/locator/occurrence and preimage bytes; no old execution, Verification, output or effect rewritten.",
+    "receiverInputId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-ROOT-FORMAL-ACK-20261018",
+    "receiverEvidenceId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-ROOT-SHARED-RECEIVER-20261018",
+    "proposedTaskState": {
+      "execution": "complete",
+      "verification": "passed",
+      "localAudit": "result-durable",
+      "sharedAudit": "delivery-confirmed",
+      "formalCompletion": "complete"
+    },
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "nativeAuthorshipAuthenticatedByGit": false,
+    "wholeAcceptance": false
+  }
+}

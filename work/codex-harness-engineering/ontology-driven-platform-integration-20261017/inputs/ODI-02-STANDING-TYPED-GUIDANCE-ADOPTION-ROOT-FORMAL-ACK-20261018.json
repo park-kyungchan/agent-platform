@@ -1,0 +1,234 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-ROOT-FORMAL-ACK-20261018",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/standing-guidance-finite-formal-candidate-001/Root-consumption-ack.actual.json"
+  },
+  "content": {
+    "schema": "odi.Root-standing-guidance-shared-consumption-and-finite-formal-adjudication.v1",
+    "atUtc": "2026-10-18T13:42:28.999Z",
+    "taskId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION",
+    "receiverReceipt": {
+      "schema": "common.git-receiver-receipt.v1",
+      "receiverRuntimeId": "native-codex:01a14dce-388e-7162-ae22-757566401de7",
+      "prerequisiteTaskId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION",
+      "producer": {
+        "runtimeId": "native-codex:01a14dce-388e-7162-ae22-757566401de7",
+        "attemptId": "native-turn:01a14eca-7cdb-7d10-a08d-9cd6e80d7863",
+        "occurrenceId": "native-tool-call:call_aa5e22620fc04f858da4e3f4d2485d55"
+      },
+      "payload": {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION-RECEIPT.json",
+        "fragment": "#/content",
+        "sha256": "53325c63299856015984391e3711bb202cad6b6e1b3002bf916084569656439b"
+      },
+      "receivedAt": "2026-10-18T13:42:28.999Z",
+      "meaning": "Current actual Root native-thread owner separately read the exact already-published own receipt/intent/output/all6 Verification/effect through registered reader. Same runtime as producer, new source consumption only. No new native execution or backend resource/authentication claimed.",
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "nativeAttemptResourceId": null,
+      "nativeAuthenticationEstablished": false
+    },
+    "actualRead": {
+      "sharedCommit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+      "intentSha256": "ef0819b9fa18c634918819aa749839779a136eead8c44af2b4b7b11d289380ea",
+      "resultSha256": "8c5846a1b87812bbbec97e8846cce60952e470bff2c6d0d28946751278aca039",
+      "verificationSha256": "920727c9a6a32e84861ec912e55a08c248eecd0cd365637b9f331c433b096af1",
+      "receiptSha256": "53325c63299856015984391e3711bb202cad6b6e1b3002bf916084569656439b",
+      "criterionCount": 6,
+      "criteria": [
+        {
+          "id": "exact-five-files",
+          "status": "pass",
+          "message": "Independent post-effect verifier matched all5 reviewed bytes/modes/owners/source and Root readback.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-guidance-installed"
+          ]
+        },
+        {
+          "id": "support-first-order",
+          "status": "pass",
+          "message": "Exactly5 ordered effects: two support JSONs, two SKILL exchanges, standing-only global AGENTS last;47commands/7guards.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-guidance-installed"
+          ]
+        },
+        {
+          "id": "preservation",
+          "status": "pass",
+          "message": "All11 non-target files including explain-code-clearly and both displaced original SKILL inodes/bytes preserved.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-guidance-installed"
+          ]
+        },
+        {
+          "id": "source-and-render",
+          "status": "pass",
+          "message": "Existing source context34/native16 and exact owner-standing rendering/source closure verified.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-guidance-installed"
+          ]
+        },
+        {
+          "id": "genuine-tool-correlation",
+          "status": "pass",
+          "message": "Frozen native metadata joins actual Root thread/turn/dispatch call/session20058/poll to completed operation; explicitly source normalized, no native resource/authentication claim.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-guidance-installed"
+          ]
+        },
+        {
+          "id": "bounded-consumption-and-holds",
+          "status": "pass",
+          "message": "Actual current Root AGENTS/reference consumption observed separately; native hook/Memory/shared/formal/whole Acceptance not inferred.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-guidance-installed"
+          ]
+        }
+      ],
+      "resultMeaning": {
+        "outcome": "FIVE_FILE_NATIVE_OWNER_INSTALLATION_AND_LOCAL_VERIFICATION_COMPLETE",
+        "installedTargets": [
+          {
+            "path": "/home/palantirkc/.agents/skills/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
+            "actual": {
+              "exists": true,
+              "sha256": "bc46b6a65f90716d5d4a729b374951e228adb66aaf003e977e052c0ceed77038",
+              "bytes": 17532,
+              "mode": "0o644",
+              "uid": 1000,
+              "gid": 1000,
+              "dev": 2049,
+              "inode": 1160684,
+              "symlink": false
+            }
+          },
+          {
+            "path": "/home/palantirkc/.agents/skills/herdr-hermes/references/native-learning.json",
+            "actual": {
+              "exists": true,
+              "sha256": "6e17438f0acd55fdc3b513dbd6f466ea3650c6abfc33cafca8afd24def100cbe",
+              "bytes": 4461,
+              "mode": "0o644",
+              "uid": 1000,
+              "gid": 1000,
+              "dev": 2049,
+              "inode": 1160685,
+              "symlink": false
+            }
+          },
+          {
+            "path": "/home/palantirkc/.agents/skills/herdr-codex-long-work/SKILL.md",
+            "actual": {
+              "exists": true,
+              "sha256": "44538b53c65973f42b8b1c635af6a98ffb2b6ad67355b33f1017e6f74496f6c8",
+              "bytes": 11349,
+              "mode": "0o644",
+              "uid": 1000,
+              "gid": 1000,
+              "dev": 2049,
+              "inode": 1160686,
+              "symlink": false
+            }
+          },
+          {
+            "path": "/home/palantirkc/.agents/skills/herdr-hermes/SKILL.md",
+            "actual": {
+              "exists": true,
+              "sha256": "9f07a45d13e1730c1cee5334d8ae75c678d41a4b55c39eac3e42a5c568c02e01",
+              "bytes": 4136,
+              "mode": "0o644",
+              "uid": 1000,
+              "gid": 1000,
+              "dev": 2049,
+              "inode": 1160687,
+              "symlink": false
+            }
+          },
+          {
+            "path": "/home/palantirkc/.codex/AGENTS.md",
+            "actual": {
+              "exists": true,
+              "sha256": "394a1436915d26544d881cea9aad8a2e7554fd8892a3af35e3979f63aaeadbae",
+              "bytes": 1147,
+              "mode": "0o644",
+              "uid": 1000,
+              "gid": 1000,
+              "dev": 2049,
+              "inode": 1160688,
+              "symlink": false
+            }
+          }
+        ],
+        "currentRootConsumption": {
+          "RootSourceObservation": {
+            "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-standing-guidance.actual-consumption.json",
+            "sha256": "ae4080488231f216495928276d0fad7c0ad123dbe29e8adb28dcbfd3a3b66bb7"
+          },
+          "actualObservedDelivery": {
+            "observation": {
+              "atUtc": "2026-10-18T11:52:23.838Z",
+              "recordType": "response_item",
+              "itemType": "message",
+              "itemId": "msg_01a14edb-181e-7612-93f2-7a2ea074d374",
+              "byteOffset": 17004467,
+              "rawLineSha256": "fdcbd48cc3a663ebf119de4948f50301f7bd6afd15c57cf79d6c36998bb4809a",
+              "nativeTurnId": "01a14eca-7cdb-7d10-a08d-9cd6e80d7863",
+              "role": "user",
+              "textSha256": "66f60d74fa314236f0577410e554500c94a9332852136877b460c8b0e1e9572f",
+              "textBytes": 4864,
+              "AGENTSHeaderPresent": true,
+              "standingPointerPresent": true,
+              "standingExactHashPresent": true,
+              "projectJsonMentionPresent": true
+            },
+            "standingReferenceCurrentFile": {
+              "path": "/home/palantirkc/.agents/skills/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
+              "sha256": "bc46b6a65f90716d5d4a729b374951e228adb66aaf003e977e052c0ceed77038",
+              "bytes": 17532
+            },
+            "meaning": "Actual user-role AGENTS pointer delivery and subsequent reference-read tool output are observed. This is distinct from hook execution, genuine UserPromptSubmit capture, Work context admission, Memory admission, native authority and whole Acceptance. The earlier installation receipt automatic-loading=false remains a historical observation."
+          },
+          "boundary": "Rootae408 records incoming AGENTS block/full17532-byte reference read/applied meaning. Auditor verifies file bytes and retained observation, not injection mechanism, native message identity or authenticated loading. No hook event/all-runtime load/Hermes activation/global Memory admission/human/whole Acceptance established."
+        },
+        "consumed": {
+          "effectId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-FIVE-FILE-INSTALL-ONCE",
+          "replayPolicy": "never-replay-recorded-dispatch",
+          "doNotRollback": "Retain original inodes/bytes and all existing receipts."
+        },
+        "limits": [
+          "Current Root incoming AGENTS/reference consumption observed; native injection mechanism/all-runtime automatic loading not authenticated.",
+          "Native Task/Run/Attempt resource IDs unexposed; normalized turn/tool IDs are source correlations only.",
+          "No genuine UserPromptSubmit/hook trust/event/agent-property/Work-original-boundary-output join or Memory admission established.",
+          "Shared delivery/formal Task completion/whole/human Acceptance remain pending; no Goal action or new evaluation."
+        ]
+      }
+    },
+    "independentSharedReceiver": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/standing-guidance-shared-receiver.independent.actual.json",
+      "sha256": "8bfb9ca620f8ebb94412e5659947c6d4ec9aa5507b3f8b6968dd0e22bff336df",
+      "class": "internal-independent-source-reader",
+      "nativeIdsUnexposed": true
+    },
+    "formalJudgment": "Own finite5-file installation, preservation, exact source/readback and bounded actual Root consumption criteria pass. Actual shared delivery and independent source receiver now exist. Canonical own sharedAudit/formalCompletion synchronization eligible; not whole Engineering or domain/human Acceptance.",
+    "limits": [
+      "No global Memory/all-runtime/Hermes adoption or native trust/agent-field claims",
+      "First real UserPromptSubmit delivery is separate ODI-02-CURRENT-ROOT-EVENT; not retroactively a criterion of this finite installation",
+      "No repeated install/model/dispatch/native receipt Task or old Goal action; source acknowledgment is not authentication"
+    ],
+    "publication": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-work-audit-publish-once-002/actual-publication.json",
+      "sha256": "4c926e53283ff6b47ec7fd685d2474e3cb5200e3b155c8a1903326d4b1386e3e"
+    }
+  }
+}
