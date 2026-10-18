@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "decision",
+  "id": "PT-DECISION-PANE-PULL-MANAGEMENT-20261018",
+  "status": "accepted",
+  "answer": "아, 추가적으로 pane management는 어떻게 하는지 알고있나? 너가 생성한 pane의 Codex/Hermes가 작업 완료해도 따로 보고하지 않고(steering으로 인한 여러가지 risk 방지), 너가 너의 작업 우선순위를 해결한 후에 pane managing 해야돼(내가 lens-interview lead에게는 그렇게 지시했는데, 이것이 기존의 스킬들에 적용되었는지 모르겠네(goal prompt에도 들어가야한다면 명시해줘야한다), 장시간 자율작업이라서 auto-compact risk로 인해서 이 요청이 없어질 수도 있으니까 적절히 조치해라. 유저는 더이상 개입하지 않는다.",
+  "meaning": "Owned Codex/Hermes pane workers persist bounded results/exact commits then WAIT. No automatic completion message, queue, steering or cross-session notification to parent/other Lead. Lead finishes current priority, then pulls durable results and verifies before integrating or closing owned idle panes. Keep model/effort/permissions native; leave unrelated panes untouched. Persist in current Goal-linked checkpoint; no fake Goal objective update or global live skill mutation.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-USER-PANE-PULL-MANAGEMENT-20261018.json",
+    "fragment": "#/content/text"
+  },
+  "supersedes": []
+}

@@ -33,12 +33,7 @@
           "status": "pass",
           "message": "Existing complex evidence, CI research, byte-boundary origin, user decisions, approved quality rubric, independently fixed oracles/interface and source Work shape validation completed. Scope is preparation only; no native efficacy or adoption claim.",
           "evidenceRefs": [
-            "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-EVAL-RUBRIC-V3.json",
-            "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-FROZEN-COMPLEX-ORACLES-V3.json",
-            "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-QUALITY-INTERFACE-V3.json",
-            "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-CI-REPEATED-MISTAKES-V2.json",
-            "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-GIT-FIRST-THREE-PROBLEMS-V2.json",
-            "work/agent-platform/ponytail-harness-evaluation-20261018/decisions/PT-DECISION-EXECUTION-APPROVAL-20261018.json"
+            "agent-platform:evidence:ponytail-harness-evaluation-20261018:preparation"
           ]
         }
       ],
