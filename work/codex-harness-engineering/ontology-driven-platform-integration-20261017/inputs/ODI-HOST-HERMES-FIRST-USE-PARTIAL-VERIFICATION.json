@@ -1,0 +1,135 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-HERMES-FIRST-USE-PARTIAL-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/hermes-first-use-source-preparation/prepare-source.ts"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:host-hermes-first-use:b176789ef3754299a3615f7df426cd53",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T22:19:16.278Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:a8c4da2a72d6328d523d0ce0d7030706cb5e9367592309b3090fd4380965dfed"
+      ],
+      "criteria": [
+        {
+          "id": "one-guarded-source-apply",
+          "status": "pass",
+          "message": "One independently reviewed c0 source apply completed, protected669files+22links/processes unchanged, no uncertain outcome; separate from later model use.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:host-hermes-first-use:b176789ef3754299a3615f7df426cd53"
+          ]
+        },
+        {
+          "id": "actual-complete-current-task-injection",
+          "status": "pass",
+          "message": "Actual stored2553prompt+2LF+complete10335context equals API content; selected Task/Spec1Plan3/purpose/decisions/WHY/fences retained.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:host-hermes-first-use:b176789ef3754299a3615f7df426cd53"
+          ]
+        },
+        {
+          "id": "useful-native-first-use-result",
+          "status": "pass",
+          "message": "Actual final9559/UID348/schema and one native terminal metadata result/exit0 exactly reconcile; independent milestone review has0required findings.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:host-hermes-first-use:b176789ef3754299a3615f7df426cd53"
+          ]
+        },
+        {
+          "id": "identity-accounting-and-non-replay",
+          "status": "pass",
+          "message": "Actual stored session/user/final identifiers source-correlated; native Task/Run/backendturn null; observed8API/7tools and actualcostnull qualified; consumed effects never replay.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:host-hermes-first-use:b176789ef3754299a3615f7df426cd53"
+          ]
+        },
+        {
+          "id": "remaining-common-flow-and-jev-advice",
+          "status": "unverified",
+          "message": "This first-use establishes no direct native Jev advice use or completion of the broader Task title/common-flow outcome. Existing five-call ledger is retained, not attributed anew.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:host-hermes-first-use:b176789ef3754299a3615f7df426cd53"
+          ]
+        },
+        {
+          "id": "current-tuple-and-local-continuity-acceptance",
+          "status": "unverified",
+          "message": "Single H1 current-relevant turn does not establish latest full provider/Work tuple or lifecycle/currentness/shared-receiver completion. Root must qualify remaining bounded local criteria.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:host-hermes-first-use:b176789ef3754299a3615f7df426cd53"
+          ]
+        },
+        {
+          "id": "scope-and-owner-boundaries",
+          "status": "pass",
+          "message": "Default Hermes domain/R&D owners, actual Root adoption and whole Work/domain/human Acceptance remain separate; no source permission or formal completion inferred.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:host-hermes-first-use:b176789ef3754299a3615f7df426cd53"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-HERMES-FIRST-USE-INTENT.json",
+          "sha256": "9ff4b6c51d328dd14bf3a3d92f9badd89e2169b54bf1afa5467b7595c3f979e0"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-HERMES-FIRST-USE-RESULT.json",
+          "sha256": "0d6a4ea3b1b80ac40f61efc58a8484ef602048fea8d4003f66c51201fc7cfec5"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-HERMES-FIRST-USE-TECHNICAL-ASSESSMENT.json",
+          "sha256": "745f5c02f89e607715e9405377e7b074b6f653b35a1dbbb82fbd2aa5086749ee"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-HERMES-FIRST-USE-OBSERVATION.json",
+          "sha256": "af7148f900d8491c088f598013122d4a09d8754379fbb8e839a74f5c754c93f9"
+        }
+      ],
+      "runtime": {
+        "name": "source-owned-native-hermes-milestone-audit",
+        "version": "existing-common-contracts"
+      },
+      "details": {
+        "logical": {
+          "domainId": "native-harness",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017",
+          "issueId": "ODI-ISSUE-20261017",
+          "specId": "ODI-SPEC",
+          "specRevision": 1,
+          "planId": "ODI-PLAN",
+          "planRevision": 3,
+          "taskId": "ODI-HOST-HERMES-ADMISSION"
+        },
+        "occurrence": {
+          "runtimeId": "native-hermes:odi-platform:20261019_055552_f08215",
+          "attemptId": "native-message:b176789ef3754299a3615f7df426cd53",
+          "occurrenceId": "native-message:176828200466438fbcbd2018e6b91277"
+        },
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeBackendTurnId": null,
+        "milestone": "actual-native-first-use-completed",
+        "wholeTaskVerification": "partial-not-passed",
+        "independentReview": {
+          "path": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/hermes-native-first-use.independent-review.actual.json",
+          "bytes": 15119,
+          "sha256": "c7b91a52aa58f9a57c5fad232987bcc5d887da1a1a9e8cb4df59b4202878d9df"
+        }
+      }
+    }
+  }
+}
