@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
 import { fontReadabilityIdentity, validatePolicy, backendImageArguments, backendServiceSelectionPython, backendJobCompleted, backendPrepareMayRetry, correlateBackendTransaction, evaluateBackendSnapshot, preparedCandidateFromSnapshot, type BackendJob, type BackendSnapshot, type BackendTransaction, type BackendUpdatePolicy, type PreparedBackendCandidate } from '../src/adapters/backend-update';
 import { backendIdentity } from '../src/update/cli';
 import type { HermesTarget } from '../src/adapters/ssh';
@@ -301,4 +304,67 @@ describe('opt-in exact font-derived release',()=>{
   expect(()=>preparedCandidateFromSnapshot(variant,font.sha,observed)).not.toThrow();
   candidate.actual_stamp!.dirty=false;expect(()=>preparedCandidateFromSnapshot(variant,font.sha,observed)).toThrow('release version');
  });
+});
+
+
+test('font verification never qualifies metadata without a matching fresh immutable-image proof',()=>{
+ const font=fontReadabilityIdentity,desired:BackendUpdatePolicy={...policy,fontReadability:true,botDesktop:true,releaseTag:font.releaseTag,overlay:{path:`${policy.updaterRoot}/overlays/${font.patchSha256}.patch`,sha256:font.patchSha256}};
+ const observed=snapshot();Object.assign(observed.current!,{sha:font.sha,tag:`hermes-agent:main-${font.sha}-desktop-overlay-${font.patchSha256}`,overlay_sha256:font.patchSha256});
+ for(const c of observed.containers){Object.assign(c,{revision:font.sha,overlaySha256:font.patchSha256,botDesktop:true});Object.assign(c.stamp,{commit:font.sha,overlaySha256:font.patchSha256,dirty:true,displayVersion:'0.22.2'});c.provenance.revision=font.sha;}
+ observed.native!.identify!.code_sha=font.sha;observed.native!.health.commit=font.sha;
+ expect(evaluateBackendSnapshot(target,desired,font.sha,observed).checks.freshImageFontReadability).toBe(false);
+ const proof={schema:1,check:'font-readability',result:'passed',uid:10000,files:10,fresh_container:true,live_data_mounted:false,imageId:image,overlaySha256:font.patchSha256,overlayTreeSha:'a'.repeat(40)} as const;
+ observed.fontReadabilityProof=proof;expect(evaluateBackendSnapshot(target,desired,font.sha,observed).passed).toBe(true);
+ for(const change of [{imageId:'sha256:'+'0'.repeat(64)},{overlayTreeSha:'0'.repeat(40)},{fresh_container:false},{uid:0},{live_data_mounted:true}]){
+  observed.fontReadabilityProof={...proof,...change} as unknown as typeof proof;expect(evaluateBackendSnapshot(target,desired,font.sha,observed).checks.freshImageFontReadability).toBe(false);
+ }
+});
+
+test('actual typed workflow and already-deployed verification require fresh font read without ordinary-route calls',async()=>{
+ const root=resolve(import.meta.dir,'..'),dir=await mkdtemp(join(tmpdir(),'typed-font-verify-'));
+ const font=fontReadabilityIdentity,desired:BackendUpdatePolicy={...policy,parkStandby:false,fontReadability:true,botDesktop:true,releaseTag:font.releaseTag,overlay:{path:`${policy.updaterRoot}/overlays/${font.patchSha256}.patch`,sha256:font.patchSha256}};
+ const derived=snapshot();Object.assign(derived.current!,{sha:font.sha,tag:`hermes-agent:main-${font.sha}-desktop-overlay-${font.patchSha256}`,overlay_sha256:font.patchSha256});
+ for(const c of derived.containers){Object.assign(c,{revision:font.sha,overlaySha256:font.patchSha256,botDesktop:true});Object.assign(c.stamp,{commit:font.sha,overlaySha256:font.patchSha256,dirty:true,displayVersion:'0.22.2'});c.provenance.revision=font.sha;}
+ derived.native!.identify!.code_sha=font.sha;derived.native!.health.commit=font.sha;
+ const file=join(dir,'oracle.ts');
+ const script=`import {mock} from 'bun:test';
+const root=${JSON.stringify(root)},desired=${JSON.stringify(desired)},target=${JSON.stringify(target)},derived=${JSON.stringify(derived)},dir=${JSON.stringify(dir)},scenario=Bun.argv[2];
+const font=${JSON.stringify(font)},calls=[],saved=[];
+let observed=structuredClone(derived);const ordinary=scenario==='ordinary';
+const policy=ordinary?{...desired,fontReadability:false,overlay:undefined}:desired;
+if(scenario==='pristine'||ordinary){observed.current.tag='hermes-agent:main-'+font.sha+'-desktop';observed.current.overlay_sha256=null;for(const c of observed.containers){c.overlaySha256=null;c.stamp.overlaySha256=undefined;c.stamp.dirty=false;}}
+mock.module(root+'/src/adapters/ssh.ts',()=>({executeRemotePython:async(_t,operation,source)=>{
+ operation=operation.startsWith('backend-verify-font-readability-')?'verify-font-readability':operation.startsWith('backend-inspect-')?'inspect':operation.startsWith('backend-verify-')?'verify':operation;
+ calls.push(operation);
+ if(operation==='verify-font-readability'){
+  if(!source.includes('verify-font-readability')||!source.includes(derived.current.image_id)||!source.includes(derived.current.overlay_tree_sha))throw Error('UNBOUND_FONT_PROBE');
+  if(scenario.endsWith('bad'))return {exitCode:7,stdout:'',stderr:'fresh same-image font0600 unreadable'};
+  return {exitCode:0,stdout:JSON.stringify({schema:1,check:'font-readability',result:'passed',uid:10000,files:10,fresh_container:true,live_data_mounted:false,imageId:derived.current.image_id,overlaySha256:font.patchSha256,overlayTreeSha:derived.current.overlay_tree_sha})};
+ }
+ if(operation!=='inspect'&&operation!=='verify')throw Error('UNEXPECTED_NATIVE_OPERATION:'+operation);
+ return {exitCode:0,stdout:JSON.stringify(observed)};
+}}));
+const native=await import(root+'/src/adapters/backend-update.ts'),{backendIdentity}=await import(root+'/src/update/cli.ts'),{runUpdate}=await import(root+'/src/update/workflow.ts');
+const candidate={...derived.current,status:'prepared',source_verified:true,helperSha256:desired.helperSha256};
+let status;
+try{
+ if(scenario.startsWith('deploy-')){const out=await native.deployBackend(target,policy,candidate,dir,{authorization:'owned synthetic source-only test'});status=out.verification.passed?'complete':'failed';}
+ else{const out=await runUpdate({id:'source-only-typed-font-oracle',mode:'backend-only',apply:true,backendSha:font.sha},{
+ inspectBackend:async()=>backendIdentity(observed,policy),resolveMain:async()=>{throw Error('UNEXPECTED_MAIN')},inspectDesktop:async()=>{throw Error('UNEXPECTED_DESKTOP')},updateDesktop:async()=>{throw Error('UNEXPECTED_DESKTOP')},
+ prepareBackend:async()=>{calls.push('prepare');if(scenario!=='pristine')throw Error('UNEXPECTED_PREPARE');return candidate;},
+ deployBackend:async()=>{calls.push('deploy');observed=structuredClone(derived);await native.deployBackend(target,policy,candidate,dir,{authorization:'owned synthetic source-only test'});},
+ verifyBackend:async()=>backendIdentity(await native.verifyBackend(target,policy,font.sha,dir),policy),save:async(s)=>saved.push(s)});status=out.status;}
+}catch(error){status='failed';if(!scenario.endsWith('bad'))throw error;}
+console.log(JSON.stringify({scenario,status,calls,completeCheckpoint:saved.some(s=>s.phase==='complete'),lastStatus:saved.at(-1)?.status,nativeTransport:'mock-only-no-SSH-Docker-systemd'}));`;
+ try{
+  await writeFile(file,script);
+  for(const scenario of ['derived-good','derived-bad','deploy-good','deploy-bad','pristine','ordinary']){
+   const p=Bun.spawn([process.execPath,file,scenario],{cwd:root,stdout:'pipe',stderr:'pipe'});const [out,err,code]=await Promise.all([new Response(p.stdout).text(),new Response(p.stderr).text(),p.exited]);expect({scenario,code,err}).toMatchObject({scenario,code:0});const result=JSON.parse(out);
+   expect(result.status).toBe(scenario.endsWith('bad')?'failed':'complete');
+   expect(result.calls.includes('verify-font-readability')).toBe(scenario!=='ordinary');
+   expect(result.completeCheckpoint).toBe(!scenario.endsWith('bad')&&!scenario.startsWith('deploy-'));
+   if(scenario==='pristine'){expect(result.calls).toContain('prepare');expect(result.calls).toContain('deploy');}
+   else{expect(result.calls).not.toContain('prepare');expect(result.calls).not.toContain('deploy');}
+  }
+ }finally{await rm(dir,{recursive:true,force:true});}
 });

@@ -263,3 +263,14 @@ deploy_candidate(){ printf 'FONT_DEPLOY:%s:%s:%s:%s\\n' "$FONT_READABILITY" "$BO
  const update=await f.run(['update',...args,'--approve-deploy']);expect(update.code).toBe(0);expect(update.stdout).toContain('FONT_DEPLOY:1:1:v0.22.2:'+FONT_PATCH);
  await writeFile(patchPath,fontPatch+'\n');const drift=await f.run(['start','--action','prepare',...args]);expect(drift.code).toBe(1);expect(drift.stderr).toContain('SHA256');
 });
+
+
+test('readonly font verification joins exact image/tree and creates no updater directories or receipts',async()=>{
+ const f=await fixture({...fontOptions,images:{...fontOptions.images,[ID]:ID}});const overlays=join(f.root,'.main-updater/overlays');await mkdir(overlays,{recursive:true});const patchPath=join(overlays,FONT_PATCH+'.patch');await writeFile(patchPath,fontPatch);
+ const args=['verify-font-readability','--sha',FONT_SHA,'--bot-desktop','--font-readability','--release-tag','v0.22.2','--overlay-file',patchPath,'--overlay-sha256',FONT_PATCH,'--probe-image-id',ID,'--probe-overlay-tree',TREE];
+ const good=await f.run(args);expect({code:good.code,stderr:good.stderr}).toMatchObject({code:0});expect(JSON.parse(good.stdout)).toMatchObject({imageId:ID,overlaySha256:FONT_PATCH,overlayTreeSha:TREE,fresh_container:true,uid:10000});
+ expect(await readdir(join(f.root,'.main-updater'))).toEqual(['overlays']);
+ await f.configure({fontMode:0o600});const bad=await f.run(args);expect(bad.code).toBe(1);expect(bad.stderr).toContain('fresh UID10000');
+ const writer=await f.run([...args,'--approve-deploy']);expect(writer.code).toBe(1);expect(writer.stderr).toContain('no writer options');
+ expect(await readdir(join(f.root,'.main-updater'))).toEqual(['overlays']);
+});

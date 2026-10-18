@@ -73,3 +73,12 @@ container and opens/hashes/copies the ten fixed public font assets without live
 profile/data mounts. A repair in a running container's upper layer is not proof
 that a fresh container from that image is readable. No PM sync/GC, profile,
 credential or service action follows from checking this source.
+
+
+Typed final verification also invokes that same probe through the native
+helper's read-only `verify-font-readability` action. This action emits joined
+image/tree/patch proof on stdout and skips all updater directory/lock/receipt
+writes. Healthy same-SHA and already-deployed paths may avoid lifecycle work,
+but cannot complete verification from metadata alone when the font option is
+selected. A missing, mismatched or unreadable fresh-image proof fails the final
+verification. Ordinary default-off verification invokes no font probe.

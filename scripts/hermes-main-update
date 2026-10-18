@@ -114,8 +114,12 @@ MIN_FREE_GIB="${HERMES_UPDATE_MIN_FREE_GIB:-16}"
 ANOMALY_BYTES="${HERMES_DISK_ANOMALY_BYTES:-5368709120}"
 CANARY_URL="${HERMES_CANARY_URL:-https://srv1873899.tail68ea8d.ts.net/hermes/api/status}"
 
+# The verification-only action reads an immutable image; it must not create or
+# chmod updater state, logs or locks. Every writer retains the existing setup.
+if [[ "${1:-}" != verify-font-readability ]]; then
 mkdir -p "$UPDATER" "$OVERLAY_DIR" "$WORKTREES" "$REPORTS" "$RECEIPTS" "$LOGS" "$COMPOSE_BACKUPS" "$TRANSACTIONS" "$JOBS"
 chmod 700 "$UPDATER" "$OVERLAY_DIR" "$WORKTREES" "$REPORTS" "$RECEIPTS" "$LOGS" "$COMPOSE_BACKUPS" "$TRANSACTIONS" "$JOBS"
+fi
 
 die() {
   printf 'ERROR: %s\n' "$*" >&2
@@ -901,16 +905,30 @@ with tempfile.TemporaryDirectory(prefix="font-read-") as tmp:
   assert hashlib.sha256(destination.read_bytes()).hexdigest()==digest,"Font copy differs"
 print(json.dumps({"schema":1,"check":"font-readability","result":"passed","uid":10000,"files":len(expected),"fresh_container":True,"live_data_mounted":False},sort_keys=True))
 '
+fresh_font_readability_probe() {
+  local expected_id="$1" image_id output
+  image_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" || return 1
+  [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ && "$image_id" == "$expected_id" ]] || return 1
+  output="$(timeout 60s docker run --rm --network none --read-only --user 10000:10000 \
+    --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777 \
+    --entrypoint /opt/hermes/.venv/bin/python "$image_id" -I -B -c "$FONT_SMOKE_PY")" || return 1
+  python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d=={"schema":1,"check":"font-readability","result":"passed","uid":10000,"files":10,"fresh_container":True,"live_data_mounted":False} else 1)' <<<"$output" || return 1
+  [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$image_id" ]] || return 1
+  python3 -c 'import json,sys; d=json.load(sys.stdin); d.update(imageId=sys.argv[1],overlaySha256=sys.argv[2],overlayTreeSha=sys.argv[3]); print(json.dumps(d,sort_keys=True))' "$image_id" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" <<<"$output"
+}
 run_font_readability_diagnostic() {
   local output="$1" image_id
   image_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" || return 1
-  [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
-  timeout 60s docker run --rm --network none --read-only --user 10000:10000 \
-    --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777 \
-    --entrypoint /opt/hermes/.venv/bin/python "$image_id" -I -B -c "$FONT_SMOKE_PY" >"$output" 2>&1 || return 1
-  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); raise SystemExit(0 if d=={"schema":1,"check":"font-readability","result":"passed","uid":10000,"files":10,"fresh_container":True,"live_data_mounted":False} else 1)' "$output" || return 1
-  [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$image_id" ]] || return 1
+  fresh_font_readability_probe "$image_id" >"$output" 2>&1 || return 1
   chmod 600 "$output"
+}
+verify_font_readability_command() {
+  [[ "$FONT_READABILITY" == 1 && "$APPROVE_DEPLOY" == 0 && "$FORCE_REBUILD" == 0 && -z "$ADOPT_IMAGE_ID" && -z "$JOB_ACTION" && -z "$REQUESTED_UNIT" && "$JSON_OUTPUT" == 0 ]] || die "font verification accepts no writer options"
+  font_request_valid "$REQUESTED_SHA" "$OVERLAY_SHA256" || die "font verification tuple differs"
+  [[ "$PROBE_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ && "$PROBE_OVERLAY_TREE" =~ ^[0-9a-f]{40}$ ]] || die "font verification requires exact image and overlay tree"
+  CANDIDATE_SHA="$REQUESTED_SHA"; OVERLAY_TREE_SHA="$PROBE_OVERLAY_TREE"; set_candidate_tag
+  candidate_image_valid "$PROBE_IMAGE_ID" || die "font verification image source/stamp differs"
+  fresh_font_readability_probe "$PROBE_IMAGE_ID" || die "fresh UID10000 font verification failed"
 }
 
 validation_key() {
@@ -1908,8 +1926,9 @@ Dockerfile overlays remain restricted to reviewed dependency-cache changes.
 The opt-in --font-readability exception requires exactly v0.22.2/d923a5e,
 --bot-desktop and the reviewed d9d7d4 font patch. It uses a distinct
 -desktop-overlay- tag and dirty=true overlay stamp, never a pristine release.
-No other Bot Screen or release overlay is accepted. Every font candidate check
-uses a fresh network-disabled UID10000 container even on diagnostic cache hits.
+No other Bot Screen or release overlay is accepted. The readonly verify-font-readability action accepts exact --probe-image-id and
+--probe-overlay-tree, emits joined proof on stdout, and never creates updater state.
+Every font candidate or typed final verification check uses a fresh network-disabled UID10000 container even on diagnostic cache hits.
 Built candidates are durably recorded before runtime validation. A retry reuses
 their immutable image without fetching source or rebuilding. Only prepared
 candidates can deploy. Diagnostic reuse requires the same image ID, updater
@@ -1943,6 +1962,8 @@ BOT_DESKTOP=0
 FONT_READABILITY=0
 RELEASE_TAG=""
 ADOPT_IMAGE_ID=""
+PROBE_IMAGE_ID=""
+PROBE_OVERLAY_TREE=""
 REQUESTED_SHA=""
 REQUESTED_OVERLAY_FILE=""
 REQUESTED_OVERLAY_SHA256=""
@@ -1963,6 +1984,10 @@ while (($#)); do
   case "$1" in
     --approve-deploy) APPROVE_DEPLOY=1 ;;
     --force-rebuild) FORCE_REBUILD=1 ;;
+    --probe-image-id|--probe-overlay-tree)
+      probe_option="$1"; shift; (($#)) || die "font verification option needs a value"
+      if [[ "$probe_option" == --probe-image-id ]]; then PROBE_IMAGE_ID="$1"; else PROBE_OVERLAY_TREE="$1"; fi
+      ;;
     --font-readability) FONT_READABILITY=1 ;;
     --bot-desktop) BOT_DESKTOP=1 ;;
     --release-tag)
@@ -2005,13 +2030,14 @@ while (($#)); do
   esac
   shift
 done
+if [[ "$COMMAND" != verify-font-readability && ( -n "$PROBE_IMAGE_ID" || -n "$PROBE_OVERLAY_TREE" ) ]]; then die "font probe identity belongs only to verification"; fi
 if [[ "$FONT_READABILITY" == 1 ]]; then
   font_tuple_valid "$REQUESTED_SHA" "$BOT_DESKTOP" "$RELEASE_TAG" "$REQUESTED_OVERLAY_SHA256" && [[ -n "$REQUESTED_OVERLAY_FILE" ]] || die "font readability requires the exact reviewed release/Desktop/overlay tuple"
 fi
 if [[ "$BOT_DESKTOP" == 1 || -n "$RELEASE_TAG" ]]; then
   [[ "$FONT_READABILITY" == 1 || ( -z "$REQUESTED_OVERLAY_FILE" && -z "$REQUESTED_OVERLAY_SHA256" ) ]] || die "Bot Screen and release-tag options require pristine official source; overlays are excluded"
   case "$COMMAND" in
-    prepare|deploy|update) ;;
+    prepare|deploy|update|verify-font-readability) ;;
     start) [[ "$JOB_ACTION" == prepare || "$JOB_ACTION" == deploy || "$JOB_ACTION" == update ]] || die "source variant options require a prepare, deploy, or update job" ;;
     *) die "source variant options are only valid with prepare, deploy, or update" ;;
   esac
@@ -2026,7 +2052,7 @@ if [[ -n "$ADOPT_IMAGE_ID" ]]; then
 fi
 if [[ "$OVERLAY_MODE" == 1 ]]; then
   case "$COMMAND" in
-    prepare|deploy|update) ;;
+    prepare|deploy|update|verify-font-readability) ;;
     start)
       [[ "$JOB_ACTION" == prepare || "$JOB_ACTION" == deploy || "$JOB_ACTION" == update ]] || die "overlay arguments are only valid for prepare, deploy, or update jobs"
       ;;
@@ -2035,6 +2061,7 @@ if [[ "$OVERLAY_MODE" == 1 ]]; then
 fi
 
 case "$COMMAND" in
+  verify-font-readability) verify_font_readability_command ;;
   stage-overlay) stage_overlay_command ;;
   status) status_command ;;
   prepare) prepare_latest ;;

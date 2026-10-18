@@ -71,7 +71,14 @@ export interface BackendContainer {
   stamp: { commit?: string; overlaySha256?: string; overlayTreeSha?: string; dirty?: boolean; displayVersion?: string | null };
   provenance: { revision?: string };
 }
+export interface FontReadabilityProof {
+  schema: 1; check: 'font-readability'; result: 'passed'; uid: 10000; files: 10;
+  fresh_container: true; live_data_mounted: false;
+  imageId: string; overlaySha256: string; overlayTreeSha: string;
+}
 export interface BackendSnapshot {
+  /** Native helper stdout from a fresh immutable-image probe in this verification invocation. */
+  fontReadabilityProof?: FontReadabilityProof;
   schemaVersion: 1;
   observedAtUtc: string;
   hostId: string;
@@ -296,7 +303,7 @@ export function evaluateBackendSnapshot(target: HermesTarget, policy: BackendUpd
   const native = snapshot.native;
   const activeAdapters = (native?.adapters ?? []).filter(adapter => adapter.configured !== false);
   const requiredAdapters = new Set([...(policy.requiredActiveAdapters ?? ['api_server']), ...(native?.configuredActiveAdapters ?? [])]);
-  const checks = {
+  const checks: Record<string,boolean> = {
     currentObservation: Number.isFinite(Date.parse(snapshot.observedAtUtc)) && Date.now() - Date.parse(snapshot.observedAtUtc) <= 60_000 && Date.now() - Date.parse(snapshot.observedAtUtc) >= -5000,
     targetScope: snapshot.hostId === target.hostId && snapshot.project === target.project,
     helperIdentity: snapshot.helperSha256 === policy.helperSha256,
@@ -320,6 +327,12 @@ export function evaluateBackendSnapshot(target: HermesTarget, policy: BackendUpd
     fullHealthCommit: native?.health.code === 200 && native.health.commit === sha,
     ownerIncarnationPreserved: snapshot.ownerPreserved === true,
   };
+  if (policy.fontReadability) {
+    checks.freshImageFontReadability = !!snapshot.fontReadabilityProof &&
+      snapshot.fontReadabilityProof.schema === 1 && snapshot.fontReadabilityProof.check === 'font-readability' && snapshot.fontReadabilityProof.result === 'passed' &&
+      snapshot.fontReadabilityProof.uid === 10000 && snapshot.fontReadabilityProof.files === 10 && snapshot.fontReadabilityProof.fresh_container === true && snapshot.fontReadabilityProof.live_data_mounted === false &&
+      snapshot.fontReadabilityProof.imageId === intended?.imageId && snapshot.fontReadabilityProof.overlaySha256 === policy.overlay?.sha256 && snapshot.fontReadabilityProof.overlayTreeSha === snapshot.current?.overlay_tree_sha;
+  }
   return { passed: Object.values(checks).every(Boolean), checks };
 }
 
@@ -358,7 +371,7 @@ except Exception as exc:health={'code':getattr(exc,'code',0),'commit':None}
 print(json.dumps({'identify':identity,'nativeServing':owner is not None,'nativeOwnerPid':owner.pid if owner else None,'profiles':profiles,'status':{k:status[k] for k in ['gateway_state','desired_state','answering_pid'] if k in status},'health':health,'adapters':adapters,'configuredActiveAdapters':sorted(name for name,enabled in configured.items() if enabled)}))
 `;
 export async function verifyBackend(target: HermesTarget, policy: BackendUpdatePolicy, sha: string, runDir: string): Promise<BackendSnapshot> {
-  validateSha(sha);
+  validatePolicy(target, policy); validateSha(sha); backendImageArguments(policy, sha);
   const source = pythonContext(target, policy) + snapshotPython + `\nnative_code=${JSON.stringify('import json\nrequest=' + literal(target) + '\n' + nativeProbePython)}\n` + String.raw`
 owner=out['gatewayOwner'];assert owner is not None,'Exactly one native gateway owner required'
 assert owner['uid']==target['nativeUid'],'Owner UID differs from the configured native UID'
@@ -372,6 +385,18 @@ out['observedAtUtc']=datetime.datetime.now(datetime.timezone.utc).isoformat()
 print(json.dumps(out))
 `;
   const snapshot = await remote<BackendSnapshot>(target, 'verify', source, runDir);
+  if (policy.fontReadability) {
+    const current = snapshot.current;
+    if (!current || current.sha !== sha || current.tag !== imageTag(policy, sha) || !imagePattern.test(current.image_id) || !shaPattern.test(current.overlay_tree_sha ?? '') || current.overlay_sha256 !== policy.overlay?.sha256 || snapshot.containers.some(c => c.imageId !== current.image_id)) throw new Error('Font verification current image tuple differs');
+    const argv = [policy.helperPath, 'verify-font-readability', ...backendImageArguments(policy, sha), '--probe-image-id', current.image_id, '--probe-overlay-tree', current.overlay_tree_sha!];
+    snapshot.fontReadabilityProof = await remote<FontReadabilityProof>(target, 'verify-font-readability', pythonContext(target, policy) + helperGuard(policy) + `\nargv=${literal(argv)}\n` + String.raw`
+import subprocess
+result=subprocess.run(argv,text=True,capture_output=True,timeout=90)
+assert result.returncode==0,'Fresh font verification failed; do not accept metadata or replay an unknown writer'
+assert len(result.stdout.encode())<=4096,'Font verification output exceeds bound'
+print(json.dumps(json.loads(result.stdout)))
+`, runDir);
+  }
   snapshot.verification = evaluateBackendSnapshot(target, policy, sha, snapshot);
   await saveJson(join(runDir, `backend-verification-${randomUUID()}.json`), snapshot);
   return snapshot;
