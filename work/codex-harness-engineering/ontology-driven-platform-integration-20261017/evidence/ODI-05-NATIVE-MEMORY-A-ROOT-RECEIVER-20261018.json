@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-05-NATIVE-MEMORY-A-ROOT-RECEIVER-20261018",
+  "evidenceKind": "receiver",
+  "source": {
+    "kind": "native",
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-native-memory-existing-shared-read-once/Root-consumption-ack.actual.json#/receiverReceipts/0",
+    "receipt": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-NATIVE-MEMORY-AB-ROOT-ACK-20261018.json",
+      "fragment": "#/content/receiverReceipts/0"
+    }
+  }
+}
