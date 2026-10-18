@@ -1,0 +1,164 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "f080393a579e35252ffa2f3a8bb873afb2365b63",
+  "reviewedTreeSha": "5aa1b499fe96703ee60b8641509cb3b469fde765",
+  "reviewedSourceManifestSha256": "f1308f34dfba32712aec75878523fb054a82f748c8688b3fbba6983df8dee3ca",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15007-0a5d-7fc3-af66-cf9c7e5194a8"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15003-9cee-7662-bbc2-7c1990379b30"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "reviewStatus": "independent-exact-composite-source-review-complete-current-required-checks-pass",
+  "recordedAtUtc": "2026-10-18T22:27:39.151670+00:00",
+  "identitySemantics": {
+    "legacyTaskIdMeaning": "Namespaced actual native stored thread actor reference; not a backend native Task or Run.",
+    "reviewerAgentPath": "/root/architecture_context",
+    "reviewerNativeStoredSessionId": "01a15007-0a5d-7fc3-af66-cf9c7e5194a8",
+    "authorNativeThreadId": "01a15003-9cee-7662-bbc2-7c1990379b30",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "evidence": {
+      "path": "owned-root-subagents-metadata.actual.json",
+      "sha256": "35adfd475b8d117451997f07f8f86d8abc71b599bcfe135fea0e2189894e046a",
+      "bytes": 2419
+    }
+  },
+  "independence": "Direct result from actual architecture_context reviewer. I did not author new Home, metadata153/09, Root fixture markers or f080 testdata move. My old context35 source is unchanged within previously authenticated Ma8ca; that accepted base is explicitly reused, not independently recertified here.",
+  "fullSourceTreeManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "5aa1b499fe96703ee60b8641509cb3b469fde765",
+    "entryCount": 1305,
+    "blobCount": 1138,
+    "sha256": "f1308f34dfba32712aec75878523fb054a82f748c8688b3fbba6983df8dee3ca"
+  },
+  "manifestEvidence": {
+    "path": "common-f080393-review-checks/full-source-manifest.actual.json",
+    "sha256": "3e2ad755a22e7bfe9e9ffacba9f3633342759070348bfb03781c76fe747ba324",
+    "bytes": 249
+  },
+  "exactCompositionEvidence": {
+    "path": "common-f080393-review-checks/composition.actual.json",
+    "sha256": "16f4900938ae3d8f28ebdafe8dc2c4fa99e00ee9a1e2366796388aeaa6434174",
+    "bytes": 11300
+  },
+  "componentReviewReuse": [
+    {
+      "path": "publication-common-merge-a8ca3af/source-review-result.snapshot.json",
+      "sha256": "b9e0feb7adfe5eef395c6ecdbdf69c2cbf6a7f9e5b17b242197b4b0ae344f57f",
+      "bytes": 9433
+    },
+    {
+      "path": "publication-common-merge-a8ca3af/canonical-remote-gate.actual.json",
+      "sha256": "4396d48cff6a08d0641fb50adb4613be052bf3aba533e2d6f2db5263bb69078f",
+      "bytes": 409
+    },
+    {
+      "path": "codex-home-wire-guard-repair.independent-review.actual.json",
+      "sha256": "6824bd62306368766c312f5dadee8ff3d4bacffdec09261f0bf53891285cfe52",
+      "bytes": 7547
+    },
+    {
+      "path": "frozen-current-successor.native-independent-review.actual.json",
+      "sha256": "feccd804dee9088536c0547c9790bf91e33141baab777f27f169f5ca6a55f0eb",
+      "bytes": 14315
+    },
+    {
+      "path": "odi07-audit.native-independent-review.actual.json",
+      "sha256": "3551413500aee6e717c7e0a575187bd2f698e2fce564fca71be4884313438a19",
+      "bytes": 14809
+    },
+    {
+      "path": "common-composite-preliminary-review.actual.json",
+      "sha256": "efcfd0e0032c70b96f99c9fb5420e9a0330c4ce28d6082d88f24845d6f096ce1",
+      "bytes": 7190
+    }
+  ],
+  "reviewMethod": "Immutable Git blob/tree comparison against accepted Ma8ca and exact component review heads. Entire338-record Work subtree equals reviewed09; owner-fixture equals reviewed26; capability registry equals Homea18. Only post4584 delta is byte-identical testdata relocation and one test import. Canonical full-tree manifest derived using unchanged maintained receipt-validator.ts. No new broad tests, model calls or native effects.",
+  "requiredChecks": {
+    "state": "all-current-required-checks-passed",
+    "head": "f080393a579e35252ffa2f3a8bb873afb2365b63",
+    "sourceClean": true,
+    "operation": {
+      "path": "common-f080393-required-checks/operation.actual.json",
+      "sha256": "4962cc6b00b0a9940b47d84320ba2cda12d98fb4737bd624511a9aea4a4273c9",
+      "bytes": 1287
+    },
+    "commands": [
+      {
+        "name": "source",
+        "exitCode": 0,
+        "durationSeconds": 247.687
+      },
+      {
+        "name": "quality",
+        "exitCode": 0,
+        "durationSeconds": 41.167
+      },
+      {
+        "name": "runtime-layout",
+        "exitCode": 0,
+        "durationSeconds": 0.046
+      }
+    ],
+    "source25ChildCommandsAllZero": true,
+    "quality14ChecksAllPass": true,
+    "logs": [
+      {
+        "path": "common-f080393-required-checks/source.stdout.log",
+        "sha256": "4a8e2ecf85d3e2f4079385457ad63857d53cfaef173487b240215b50c927c92e",
+        "bytes": 39535
+      },
+      {
+        "path": "common-f080393-required-checks/source.stderr.log",
+        "sha256": "938fa93484c44c26ee65e418e3ed23af28871d0c18b5e6b2c132bae15e7e8fbd",
+        "bytes": 119666
+      },
+      {
+        "path": "common-f080393-required-checks/quality.stdout.log",
+        "sha256": "e5e171a8bb5fab968af2cbd4590e428fc0ae35dac21e48ff8a7f2902022af294",
+        "bytes": 221032
+      },
+      {
+        "path": "common-f080393-required-checks/quality.stderr.log",
+        "sha256": "36878867f449735ba6fd286e4315e56cbd8be2359c26c03f39feece5697d1167",
+        "bytes": 19249
+      },
+      {
+        "path": "common-f080393-required-checks/runtime-layout.stdout.log",
+        "sha256": "3eb199bbc1eacc5efa4f43db1d0a757da20a5eb1adba4ca57f8b700c7a10e700",
+        "bytes": 623
+      },
+      {
+        "path": "common-f080393-required-checks/runtime-layout.stderr.log",
+        "sha256": "ee7d6e7fa99713d95f50496904adfd769d66c4a1c2d64e4e13ec45453b090339",
+        "bytes": 767
+      }
+    ]
+  },
+  "semanticLimits": "Homee186 lossless overflow-only v2 codec, ordinaryv2/v1 wire,12000cap/1500native tokens,6pin closure and first-import/native authority guards remain. Full selectedWork/roles/WHY/original pointers/Plan bindings/fences remain. Metadata source-only completion and REVIEW planned/pending/intent-durable state,5pass/2unverified criteria, partial audit and shared/formal holds retain their meaning; nativeTask/Run remain null.",
+  "history": "Old4584 SOURCE0/QUALITY1 architecture classification failure and pending drafts preserved; disposition marks old4584 unpublishable. f080 corrects testdata ownership without changing architecture policy or executable source pins.",
+  "publicationBoundary": "Source pass is current at this exact head/tree. Root must publish immutable exact result/receipt, authenticate same-repository source tree/manifest/result/receipt bytes and status creator with existing CommonV2 gate before PR; explicitly merge expected head after current remote required checks. No publication/authentication/adoption claimed by local result.",
+  "nativePermissionGranted": false,
+  "formalWorkCompletion": false,
+  "acceptanceDecision": null,
+  "effects": {
+    "sourceGitWrites": 0,
+    "GitHubWrites": 0,
+    "nativeCalls": 0,
+    "modelCalls": 0,
+    "GoalCalls": 0,
+    "privateReviewArtifactsOnly": true
+  }
+}
