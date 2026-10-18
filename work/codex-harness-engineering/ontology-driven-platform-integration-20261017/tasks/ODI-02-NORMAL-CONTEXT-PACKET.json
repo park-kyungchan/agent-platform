@@ -16,14 +16,14 @@
     "planRevision": 2,
     "taskId": "ODI-02-NORMAL-CONTEXT-PACKET"
   },
-  "title": "Prepare the bounded current Root event context packet",
-  "nextAction": "Prepare complete existing-reader native projection and selection candidate for the actual bounded leaf ODI-02-CURRENT-ROOT-EVENT, rather than the broad historical parent. Keep whole Work/Spec/Plan purpose and all required dependency/fence semantics. First measure this appropriate Task scope under unchanged12000 v2 cap; avoid new codecs/frameworks/cap increases or source edits if data/scope suffices. Preserve prior12031-byte parent proof. Genuine native agent fields/trust remain unobserved: an optional-fields-omitted qualification candidate is only an exact-undefined subset, never a claim that actual fields are absent or wildcard admission; existing parser/selector must refuse present/null/foreign fields. Root alone may decide/apply a separately reviewed one-file current-byte CAS and attempt one native event under runtime veto. No effects/config/trust/cache/install/Goal actions by worker. Prepare bounded typed result with complete rendered size, canonical decode check, source/Work clocks and exact remaining holds.",
+  "title": "Prepare current Root context selection and guarded source handoff",
+  "nextAction": "Source preparation integrity is complete under explicit source-owner Input ODI-02-PACKET-CONTRACT-CLARIFICATION under existing post-interview execution authority. The f954 complete-projection contract was NOT fulfilled; its result remains preserved. Verified conditional exact-undefined selection, original bindings, parser/refusal/containment/source checks and truthful HOLD. Full qualified projection/decode/12000 fit remain unknown and MUST pass existing ODI-02-CURRENT-ROOT-EVENT source preflight at exact successor Work before any separately reviewed Root CAS/native event. No native/config/trust/cache/install/Goal effects; shared/formal/Acceptance pending.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -36,5 +36,7 @@
   ],
   "effectIds": [],
   "pendingEffectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:odi02-normal-packet-preparation"
+  ]
 }
