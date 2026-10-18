@@ -51,8 +51,8 @@
     ],
     "continuity": {
       "schema": "common-harness.compaction-checkpoint.v1",
-      "version": 4,
-      "updatedAtUtc": "2026-10-18T11:16:00Z",
+      "version": 5,
+      "updatedAtUtc": "2026-10-18T11:35:34.426927+00:00",
       "nativeGoal": {
         "threadId": "01a14e5a-6ee3-7f53-92de-20c1ca955dae",
         "lastObservedStatus": "active",
@@ -65,7 +65,7 @@
         "projectId": "agent-platform",
         "workId": "ponytail-harness-evaluation-20261018"
       },
-      "phase": "PT-09/PT-10 executing after frozen independent contracts; Root preparing docs and current merge authority.",
+      "phase": "PT09 and PT10 scoped commits integrated; current source HEAD4a5b4b9; root complex test and final checks pending.",
       "workers": [
         {
           "taskId": "PT-09-QUALITY-IMPLEMENTATION",
@@ -108,14 +108,20 @@
           "receipts": ".private/quality-first-interview-20261018/pt-quality-*.dispatch.json"
         }
       ],
-      "nextAction": "Read worker durable reports when produced, integrate scoped commits, root pins/docs/Work records, required checks, freeze independent native review. No replay or status-only workers.",
+      "nextAction": "Pull root-complex-scenarios log/session70929; require13pass/0skip. Then full integrated quality/source checks, exact native review, immutable publication/authenticated status before PR, explicit qualified merge and successor proof/main checks, PT17notification.",
       "historicalTask14": "V3 handoff-only proposal replaced by PT15/16/17. Retain original binding; no dispatch.",
       "paneManagement": {
         "authority": "PT-DECISION-PANE-PULL-MANAGEMENT-20261018",
         "policy": "Workers write Task result file/scoped commit, WAIT silently; no automatic completion report, cross-session message, queue or parent steering. Lead pulls results after current priority, checks source/hash/status, integrates then manages only owned idle panes. No status-only worker or repeated status prompts.",
         "existingSkills": "Long-work already requires durable Task result address and Lead pull; this actual user direction overrides any preference for unsolicited native completion notifications in this Work. Global skill changes are not needed and would affect other active sessions.",
         "enforcedBy": "Worker dispatches already say durable .private/task-result.json then WAIT, no cross-session messages. New/reviewer dispatches must include explicit no steering. Goal already points to this current entrypoint; native objective has no callable edit tool."
-      }
+      },
+      "sourceHeadAtObservation": "4a5b4b9",
+      "workerResults": {
+        "PT09": "inputs/PT-09-WORKER-RESULT-V3.json",
+        "PT10": "inputs/PT-10-WORKER-RESULT-V3.json"
+      },
+      "delegations": "Both native workers delivered durable result and scoped commit; reobserve idleness before pane closure/control. No completion messages/parent steering allowed."
     }
   }
 }

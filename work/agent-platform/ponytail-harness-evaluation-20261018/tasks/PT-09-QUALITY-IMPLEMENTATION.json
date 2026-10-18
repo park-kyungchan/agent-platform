@@ -17,11 +17,11 @@
     "taskId": "PT-09-QUALITY-IMPLEMENTATION"
   },
   "title": "Quality Implementation",
-  "nextAction": "Canonical quality comparison distinguishes behavior gain, verification detection gain, equality and insufficient evidence; no speed/count-only gain.",
+  "nextAction": "Scoped worker commit integrated; Root must qualify joined final source before verification/closure.",
   "state": {
-    "execution": "planned",
+    "execution": "complete",
     "verification": "pending",
-    "localAudit": "intent-durable",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },

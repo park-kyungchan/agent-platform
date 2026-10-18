@@ -17,11 +17,11 @@
     "taskId": "PT-10-COMPLEX-ORACLES"
   },
   "title": "Complex Oracles",
-  "nextAction": "Execute independently fixed complex valid/invalid controls and actual producer integration; disclose source/adapter/native evidence classes.",
+  "nextAction": "Scoped worker commit integrated; Root must qualify joined final source before verification/closure.",
   "state": {
-    "execution": "planned",
+    "execution": "complete",
     "verification": "pending",
-    "localAudit": "intent-durable",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },

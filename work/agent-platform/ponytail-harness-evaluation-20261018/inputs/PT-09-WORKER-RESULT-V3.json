@@ -1,0 +1,234 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-09-WORKER-RESULT-V3",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "/home/palantirkc/code/worktrees/pt09-quality-implementation/.private/task-result.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "captureSha256": "a854aecefb6a33022259ecee331056426d8f3058081d1a6b52e231cc66df1804",
+    "result": {
+      "schema": "bounded-native-worker.task-result.v1",
+      "domainId": "native-harness",
+      "projectId": "agent-platform",
+      "workId": "ponytail-harness-evaluation-20261018",
+      "taskId": "PT-09-QUALITY-IMPLEMENTATION",
+      "status": "scoped-implementation-committed-awaiting-root-integration",
+      "writtenAt": "2026-10-18T11:31:49.496426+00:00",
+      "cwd": "/home/palantirkc/code/worktrees/pt09-quality-implementation",
+      "branch": "task/pt09-quality-implementation",
+      "baseCommit": "03c06b05d86bc7ed00612dd2f9310c36bf04e8fb",
+      "commit": "dad88969cef0be205fc6d74de00859b94282a602",
+      "tree": "873339cfbf581bc742b9f7a205ee0b5405df66d3",
+      "nativeIdentity": {
+        "runtime": "codex",
+        "threadId": "01a14eb1-b600-7381-911e-adecbf8a669c",
+        "sessionId": "01a14eb1-b600-7381-911e-adecbf8a669c",
+        "source": "environment variables CODEX_THREAD_ID and CODEX_SESSION_ID; not an authorship or permission attestation",
+        "occurrenceId": null
+      },
+      "interface": {
+        "path": ".private/quality-interface.json",
+        "sha256": "fe83a704d9fe3f3d763feb907bf6024a5a9d4cc3547ecf9ebe30d4ff664abf5c",
+        "rootBinding": "PT-QUALITY-INTERFACE-V3 (observed Root steering)"
+      },
+      "changedFiles": [
+        {
+          "path": "packages/evidence-foundry/src/modules/evals/index.ts",
+          "sha256": "78d9cff69a0fa311d1c801394a0c9e07f95394ec56e5c17d1c188a909d03a2c1"
+        },
+        {
+          "path": "packages/evidence-foundry/src/modules/evals/quality-improvement.ts",
+          "sha256": "0e12969b1c96758c8faf4772f6cca3610772d79ce0df3da607dce6ee9fdd6f1f"
+        },
+        {
+          "path": "packages/evidence-foundry/tests/fixtures/quality.ts",
+          "sha256": "2baa926bd3df3768a5663b7cd05ce29b15cd894ab3c0aa764896854a2f419e0f"
+        },
+        {
+          "path": "packages/evidence-foundry/tests/quality-improvement.test.ts",
+          "sha256": "690da33e03b65a06a3bdffd3c2190e32515275cebde899a9e7f8d1b7bd1093e5"
+        },
+        {
+          "path": "scripts/harness-quality.test.ts",
+          "sha256": "ee24f9e3df138dbce966032177563427d8dd8c4aa197d5484eda6e24852a8649"
+        },
+        {
+          "path": "scripts/harness.ts",
+          "sha256": "6e668134e422f9d077ef099f07b631f360fcca6bc8ae3bdcb8b4da8c99becfbb"
+        }
+      ],
+      "changes": [
+        "Added pure unknown-input preflightQualityImprovement and compareQualityImprovement with strict bounded JSON transport and two existing-harness commands quality-preflight / quality-compare.",
+        "Bound declared source targets, frozen dataset/expected behavior/input/context/environment, consumer/version, case, criterion, iteration, evaluator/version and effective objective/threshold fields; require eligibility and provenance/output/exposure evidence declarations.",
+        "Preserved each criterion and its evidence class/scope, including fail-to-pass behavior gains, independently fixed defect detection gains with the same passing valid controls, passing equivalence, genuine regressions, unchanged failures and insufficient evidence.",
+        "All criteria mandatory; no time improvement gate, score, weighting, compensation, hidden acceptance, runner, store, native permission or activation.",
+        "Explicit authority/effect breaches and known scope/usage excess remain STOP even when observations or the request envelope are malformed. Unknown or incomparable evidence defers.",
+        "Added actual runSuite-produced CaseResult integration for unit overrides, suite overrides, evaluator fallback and default versions; preserved producer effective fields and metric versions without confusing original evaluatorSnapshot with suite override.",
+        "Left improvement.ts/v1, metadata, registry pins, Work records, native owners, guards and immutable releases unchanged."
+      ],
+      "checks": [
+        {
+          "command": "bun install --frozen-lockfile",
+          "status": "pass",
+          "trackedManifestOrLockChanges": false
+        },
+        {
+          "command": "bun run check:handoff",
+          "status": "pass",
+          "log": ".private/check-handoff.log"
+        },
+        {
+          "command": "bun run check:imports",
+          "status": "pass",
+          "log": ".private/check-imports.log"
+        },
+        {
+          "command": "bunx --no-install tsc --noEmit -p packages/evidence-foundry/tsconfig.json",
+          "status": "pass",
+          "log": ".private/quality-final-typecheck.log"
+        },
+        {
+          "command": "bun test packages/evidence-foundry/tests/quality-improvement.test.ts scripts/harness-quality.test.ts packages/evidence-foundry/tests/improvement.test.ts scripts/harness-improvement.test.ts",
+          "status": "pass",
+          "testsPassed": 113,
+          "testsFailed": 0,
+          "expectCalls": 187,
+          "log": ".private/quality-final-targeted.log"
+        },
+        {
+          "command": "bun run --cwd packages/evidence-foundry check",
+          "status": "pass",
+          "testsPassed": 148,
+          "testsFailed": 0,
+          "expectCalls": 394,
+          "includes": [
+            "generator --check",
+            "tsc --noEmit",
+            "complete Evidence package tests"
+          ],
+          "log": ".private/quality-final-package.log"
+        },
+        {
+          "command": "bunx --no-install prettier --check <six scoped paths>",
+          "status": "pass-before-last-guard-change",
+          "log": ".private/quality-final-format.log",
+          "note": "Last guard change was formatted with the same pinned Prettier; no later format-only check rerun yet."
+        },
+        {
+          "command": "git diff --cached --check",
+          "status": "pass"
+        },
+        {
+          "command": "bun run check:architecture",
+          "status": "expected-root-pin-integration-required",
+          "exitCode": 1,
+          "errors": [
+            {
+              "code": "source-pin-drift",
+              "path": "packages/evidence-foundry/src/modules/evals/index.ts"
+            },
+            {
+              "code": "unclassified-source",
+              "path": "packages/evidence-foundry/src/modules/evals/quality-improvement.ts"
+            }
+          ],
+          "log": ".private/quality-final-architecture.log"
+        },
+        {
+          "command": "bun run check:quality",
+          "status": "interrupted-after-architecture-failure-and-format-pass",
+          "exitCode": 143,
+          "log": ".private/check-quality.log",
+          "remaining": [
+            "typed lint",
+            "remaining full quality checks",
+            "final source snapshot validation"
+          ],
+          "note": "Bounded worker stopped its own process group; no external worker process was stopped."
+        },
+        {
+          "command": "bun run check:source",
+          "status": "interrupted-incomplete",
+          "exitCode": 143,
+          "log": ".private/check-source.log",
+          "note": "Source-only temporary fixture check progressed through generation/import/type/source tests; no final exact source-provider closure established. Root must rerun after integrated pins. Worker stopped only its own process group."
+        }
+      ],
+      "failedAttempts": [
+        {
+          "log": ".private/quality-direct-tests.log",
+          "description": "Initial empty-array test.each fixture was interpreted as callback arguments by Bun; corrected fixture wrapping and final targeted runs pass."
+        },
+        {
+          "log": ".private/check-evidence-package.log",
+          "description": "First package run during simultaneous broad checks had 9 existing-test timeouts and 8 subsequent cleanup errors (139 passing). Complete final package rerun passed all 148; environment/resource sensitivity is an inference, not an established source defect."
+        }
+      ],
+      "limits": [
+        "Caller pins, eligibility, independence, provenance and exposure remain supplied evidence declarations. The helper compares their contracts and bindings; it does not authenticate source bytes, native permission, authorship, actual exposure or a native consumer occurrence.",
+        "Actual runSuite integration is deterministic offline producer compatibility with captured synthetic target outputs, not an observed production repair or native E2E benefit.",
+        "Both declared consumer identities are covered in direct transport tests; actual Codex/Hermes source adapter scenario qualification belongs to PT-10/Root integration. No native model evaluations or activations occurred.",
+        "Full exact source-provider/old-owner closure, source admission, typed lint and final whole quality checks remain Root integration obligations. Registry/index pins intentionally untouched.",
+        "No push, PR, merge, cross-session message, native settings/trust/configuration/credential mutation, cache clearing, Goal creation or other-worktree edits."
+      ],
+      "rootNextSteps": [
+        "Integrate exact scoped commit using expected-head review/CAS under Root ownership.",
+        "Admit new quality-improvement.ts and successor index.ts pins in the canonical registry, with required owner/source closure order; no package.json/bun.lock changes were made.",
+        "Join the frozen quality interface with independently frozen PT-10 oracles and run source/adapter and final integrated package/quality/provider checks.",
+        "Keep exact review evidence, accountable delivery/merge decisions and native activation separate."
+      ],
+      "workingTreeStatus": "",
+      "awaiting": "Root reads durable result; worker waits without recurring status prompts",
+      "logs": [
+        {
+          "path": ".private/check-handoff.log",
+          "sha256": "6e62ac1f3f655fb91496fead528df5ca3b96487c8b4f610f10e3275560321edd"
+        },
+        {
+          "path": ".private/check-imports.log",
+          "sha256": "940e175e9dc3eb8230b2aa6d348d9fab355e9d33d183497a7f6df3db95634ab6"
+        },
+        {
+          "path": ".private/quality-final-targeted.log",
+          "sha256": "a4ee96530cb652dbd89b59da0279401552dc8ba2e02fa4977a96876db39a9ffd"
+        },
+        {
+          "path": ".private/quality-final-typecheck.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": ".private/quality-final-package.log",
+          "sha256": "ea4e94cb35a0db112c00ff77fae7263e3dacc8df2c23b8b83be5a8fcfc31e00c"
+        },
+        {
+          "path": ".private/quality-final-format.log",
+          "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+        },
+        {
+          "path": ".private/quality-final-architecture.log",
+          "sha256": "766d4d393b10dcc69045ebb52a000eab58bfb24f86e1085820fd8c86cda356e2"
+        },
+        {
+          "path": ".private/check-quality.log",
+          "sha256": "827ac7c193034d59f33ea8f46b955fd38a5adc8e6deefa874dc64705db0703a2"
+        },
+        {
+          "path": ".private/check-source.log",
+          "sha256": "f9f013c09890923e78929929383bf54aeeee4f4c634879a07a72f48545ea4c89"
+        },
+        {
+          "path": ".private/check-evidence-package.log",
+          "sha256": "f7b91055aaa41aadf1fcfc3851ebc2fdfa269c910641d317c76d1da5a1565502"
+        }
+      ]
+    },
+    "rootReadback": "Root pulled durable result after current priority. Separate native IDs retained as observations only. Scoped commit integrated; final source/quality checks remain Root-owned."
+  }
+}
