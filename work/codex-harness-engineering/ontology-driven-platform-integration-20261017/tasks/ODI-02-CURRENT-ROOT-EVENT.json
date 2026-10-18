@@ -1,0 +1,43 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-02-CURRENT-ROOT-EVENT",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-02-CURRENT-ROOT-EVENT"
+  },
+  "title": "Observe current Root native Work context",
+  "nextAction": "Root-only finite context qualification: after reviewed complete packet/current-byte selection CAS, observe ONE genuine current Lead UserPromptSubmit with existing native command and unchanged12000 cap. Correlate actual native event/source/Work/original/boundary/output. Strictly preserve optional native-field presence and parser checks, foreign safe-noop, runtime trust veto and all prior effects. No synthetic hook/replay/global profile/standing Memory admission/Goal action. A missing match/trust/output remains HOLD; retain any original/boundary effects and inspect before another distinct admission.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-02-NORMAL-CONTEXT-PACKET",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": []
+}

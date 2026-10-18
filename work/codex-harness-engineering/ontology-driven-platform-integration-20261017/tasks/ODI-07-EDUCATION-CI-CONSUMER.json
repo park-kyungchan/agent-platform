@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-07-EDUCATION-CI-CONSUMER",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-07-EDUCATION-CI-CONSUMER"
+  },
+  "title": "Adopt existing common CI in the actual Education consumer",
+  "nextAction": "Qualify actual education-platform owner purpose/AGENTS/current main, then reuse any already-prepared exact candidate instead of duplicating work. Prepare ONE minimal canonical Education CI consumer successor using existing maintained common Bun action/runner. Preserve setup-versus-execution Bun1.4.2/1.4.3 requirements, domain checks, generated/immutable pins, source originals/human/private holds and actual consumer capability. Use typed TS/JSON CI meaning consumed by existing verification; native GitHub YAML stays native interface. Preserve historical Markdown/candidates; no new authored prose owner. No new CI Agent/framework, global prerequisite, install/push/PR/merge/native activation. Return exact source candidate/base/tree, scoped actual checks and current independent findings; actual hosted private download remains unproven until observed.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+    "ODI-DECISION-GLOBAL-TYPED-ENGINEERING",
+    "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": []
+}

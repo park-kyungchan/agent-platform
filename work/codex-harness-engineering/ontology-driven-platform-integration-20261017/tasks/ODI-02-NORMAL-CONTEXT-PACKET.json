@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-02-NORMAL-CONTEXT-PACKET",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-02-NORMAL-CONTEXT-PACKET"
+  },
+  "title": "Prepare the bounded current Root event context packet",
+  "nextAction": "Prepare complete existing-reader native projection and selection candidate for the actual bounded leaf ODI-02-CURRENT-ROOT-EVENT, rather than the broad historical parent. Keep whole Work/Spec/Plan purpose and all required dependency/fence semantics. First measure this appropriate Task scope under unchanged12000 v2 cap; avoid new codecs/frameworks/cap increases or source edits if data/scope suffices. Preserve prior12031-byte parent proof. Genuine native agent fields/trust remain unobserved: an optional-fields-omitted qualification candidate is only an exact-undefined subset, never a claim that actual fields are absent or wildcard admission; existing parser/selector must refuse present/null/foreign fields. Root alone may decide/apply a separately reviewed one-file current-byte CAS and attempt one native event under runtime veto. No effects/config/trust/cache/install/Goal actions by worker. Prepare bounded typed result with complete rendered size, canonical decode check, source/Work clocks and exact remaining holds.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+    "ODI-DECISION-GLOBAL-TYPED-ENGINEERING",
+    "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": []
+}
