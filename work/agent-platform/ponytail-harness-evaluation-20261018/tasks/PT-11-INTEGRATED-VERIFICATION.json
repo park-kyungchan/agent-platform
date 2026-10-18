@@ -19,7 +19,7 @@
   "title": "Integrated Verification",
   "nextAction": "Use Git branches/worktrees, immutable source and semantic transition for publication/concurrency/history without universal filesystem guarantees.",
   "state": {
-    "execution": "pending",
+    "execution": "planned",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",
@@ -27,8 +27,14 @@
   },
   "executionClass": "source-only",
   "dependsOn": [
-    "PT-09-QUALITY-IMPLEMENTATION",
-    "PT-10-COMPLEX-ORACLES"
+    {
+      "taskId": "PT-09-QUALITY-IMPLEMENTATION",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "PT-10-COMPLEX-ORACLES",
+      "milestone": "execution-and-verification"
+    }
   ],
   "decisionIds": [
     "PT-DECISION-EXECUTION-APPROVAL-20261018"

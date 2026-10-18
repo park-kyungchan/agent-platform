@@ -1,0 +1,150 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-EVAL-RUBRIC-V3",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-EVAL-RUBRIC-V2.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common-harness.quality-first-evaluation-rubric.v2",
+    "revision": 3,
+    "status": "accepted-through-explained-v3-execution-approval",
+    "historicalPredecessor": {
+      "kind": "snapshot",
+      "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-EVAL-RUBRIC.json",
+      "fragment": "#/content"
+    },
+    "primaryPurpose": "Improve the quality of complete common-harness consumer outcomes with bounded, source-grounded AIP Evolve methodology; Ponytail is a candidate treatment and CI Workflow Agent is one additional sub-scope.",
+    "userMandates": [
+      "Quality takes priority over task time.",
+      "Lead selects several complex scenarios from existing verification records.",
+      "Improve the actual recorded baseline against independently fixed quality criteria.",
+      "This session owns the E2E interview and hierarchical Work coordination.",
+      "No further commits without user instruction; no changes to other active Work owners."
+    ],
+    "qualityLayers": {
+      "invariantEligibility": [
+        "Evidence provenance and relevant source/version/actual exposure are sufficient for the claim.",
+        "Native/source/data ownership, original decisions/history and completed/uncertain effect fences are preserved.",
+        "Applicable native permissions and admitted resource limits remain with their owners."
+      ],
+      "targetOutcomes": [
+        "Required behavior is correct for the independently declared case.",
+        "The actual consumer path completes the intended task and preserves necessary purpose/meaning.",
+        "Normative originals, Spec/Plan revisions, IDs and dependencies retain their exact relationships.",
+        "Changed producers and consumers interoperate under the real public contracts.",
+        "Interruption, uncertainty and later continuation preserve the next safe action.",
+        "Observed output, verification, evaluator judgment and accountable acceptance remain distinct.",
+        "Use existing Git/GitHub commits,trees,branches,worktrees,semantic transition checks and expected-ref CAS for Git-owned publication/concurrency/history; avoid inventing a universal byte-level filesystem prerequisite. Preserve necessary native source guards and separately scoped native apply."
+      ],
+      "resultPerCriterion": [
+        "satisfied",
+        "violated",
+        "insufficient",
+        "not-applicable-with-prior-rationale"
+      ],
+      "noCompensation": "No time, token, footprint, test count or weighted total can compensate for a mandatory quality violation.",
+      "baselineFailure": "A baseline target-quality failure is retained as a possible improvement opportunity; it does not automatically invalidate a candidate repair. Baseline evidence/admission failures still prevent attribution.",
+      "experimentConductVsTarget": "Real experiment permissions/source/history must remain intact. A contained synthetic baseline failure of a protected-property oracle is an evaluated target failure; it is not permission to execute unsafe native effects."
+    },
+    "comparison": {
+      "requiredInputs": [
+        "Predeclared independent criteria and evidence method",
+        "Same frozen case/input/environment except declared treatment",
+        "Exact baseline/candidate source and treatment versions",
+        "Actual results and limitations for every selected case",
+        "Existing valid-case and invalid-case controls"
+      ],
+      "qualityTransitions": {
+        "violated->satisfied": "observed target-quality improvement if admissible evidence supports it",
+        "satisfied->satisfied": "observed quality preserved, not a demonstrated quality gain",
+        "satisfied->violated": "quality regression requiring repair or stop by violated boundary",
+        "insufficient->any": "uncertainty resolved only within the new evidence's actual scope; not automatically improved target behavior"
+      },
+      "improvementKinds": [
+        "harness-behavior-quality",
+        "verification-detection-quality",
+        "stronger-evidence-only",
+        "observed-equivalence"
+      ],
+      "instructionAttribution": "Local deterministic replay can compare implementations/results and oracle detection. Causal benefit from Ponytail instructions requires separately admitted native task observations.",
+      "preserveFailures": true,
+      "acceptanceThreshold": "Ready-for-review only when admissible pinned evidence shows at least one declared behavior or verification-detection gain and every required candidate criterion/control is satisfied; no automatic Acceptance.",
+      "verificationGainEvidence": [
+        "The prior oracle demonstrably misses an independently fixed relevant defect.",
+        "The candidate oracle detects that same defect.",
+        "Valid independent controls still pass; equivalent valid behavior is not wrongly rejected.",
+        "Record fixture/defect/source/evaluator identity and distinguish synthetic injection from an observed production defect."
+      ]
+    },
+    "secondaryObservations": {
+      "metrics": [
+        "time-to-verified-completion",
+        "native-reported usage/cost when available",
+        "rework and user interventions",
+        "prompt/source footprint"
+      ],
+      "unknown": "null plus reason",
+      "policy": "Time differences alone do not require repair/defer. Existing owner-admitted deadlines, costs and execution limits still apply."
+    },
+    "supersededTimeRulesForThisRevision": [
+      "15 percent time-improvement continuation gate",
+      "Four-of-six time improvements continuation gate",
+      "20 percent and 30 second slowdown alone requires repair"
+    ],
+    "evaluationMethod": {
+      "deterministic": "Executable domain-grounded behavior/identity/transition assertions with independently frozen expected values.",
+      "semantic": "Source-attributed bounded model or human judgment for meaning and answer quality; do not label prose judgment deterministic.",
+      "critical": "Missing material evidence yields insufficient, never a fabricated pass."
+    },
+    "e2eCoverage": [
+      "original user purpose/answers",
+      "interview requirements and quality oracle",
+      "Spec/Plan and hierarchical IDs",
+      "affected owners and Task dependency graph",
+      "native delegation and durable result recovery",
+      "canonical producer/consumer integration",
+      "Git head/tree/semantic transition and CI evidence",
+      "independent review and accountable Lead decision",
+      "separate source merge and native-owner activation",
+      "actual consumer operation and interruption/recovery",
+      "feedback and justified next improvement"
+    ],
+    "implementationStatus": {
+      "rubricIsDraft": false,
+      "nativePilotExecuted": false,
+      "qualityImprovementEstablished": false,
+      "existingComparison": "Current compareImprovement implements efficiency comparison requiring both arms pass and scalar mean delta; it is not the quality-v2 decision engine.",
+      "next": "After interview, reuse canonical Evidence/Work owners for agreed extensions; no second evaluator registry, runtime or schema generator."
+    },
+    "decisionProposal": {
+      "readyForReview": "Admissible evidence shows a declared quality gain with mandatory non-regression criteria satisfied; scope and remaining unknowns are explicit.",
+      "repair": "Candidate has a correctable target-quality regression or omits a required consumer path.",
+      "defer": "Attribution, source/exposure, required evidence or actual outcome is unknown/incomparable.",
+      "stop": "Owner/authority/history/trust boundary or admitted limits are violated.",
+      "acceptance": "No automatic commit, merge, native activation, replay or AcceptanceDecision."
+    },
+    "acceptedQualityOutcomeDecision": {
+      "kind": "snapshot",
+      "path": "work/agent-platform/ponytail-harness-evaluation-20261018/decisions/PT-DECISION-QUALITY-SUCCESS-MODES-20261018.json"
+    },
+    "acceptedConsumerScope": {
+      "decisionRef": {
+        "kind": "snapshot",
+        "path": "work/agent-platform/ponytail-harness-evaluation-20261018/decisions/PT-DECISION-E2E-CONSUMER-SCOPE-20261018.json"
+      },
+      "policy": "All actually affected consumers. Common changes:Codex and Hermes. Runtime-only changes:that actual consumer.",
+      "nativeDispatchAdmitted": false
+    },
+    "acceptedBy": {
+      "kind": "snapshot",
+      "path": "work/agent-platform/ponytail-harness-evaluation-20261018/decisions/PT-DECISION-EXECUTION-APPROVAL-20261018.json"
+    }
+  }
+}

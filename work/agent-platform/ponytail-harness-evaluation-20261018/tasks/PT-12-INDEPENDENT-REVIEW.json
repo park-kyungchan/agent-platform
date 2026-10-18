@@ -19,7 +19,7 @@
   "title": "Independent Review",
   "nextAction": "Run affected package/common/source closures and both affected consumer adapter paths.",
   "state": {
-    "execution": "pending",
+    "execution": "planned",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",
@@ -27,7 +27,10 @@
   },
   "executionClass": "source-only",
   "dependsOn": [
-    "PT-11-INTEGRATED-VERIFICATION"
+    {
+      "taskId": "PT-11-INTEGRATED-VERIFICATION",
+      "milestone": "execution-and-verification"
+    }
   ],
   "decisionIds": [
     "PT-DECISION-EXECUTION-APPROVAL-20261018"

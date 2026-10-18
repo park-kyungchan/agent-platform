@@ -19,7 +19,7 @@
   "title": "Review Publication Pr",
   "nextAction": "Independently review exact final source commit/tree; publish immutable evidence and authenticated status before PR.",
   "state": {
-    "execution": "pending",
+    "execution": "planned",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",
@@ -27,7 +27,10 @@
   },
   "executionClass": "source-only",
   "dependsOn": [
-    "PT-12-INDEPENDENT-REVIEW"
+    {
+      "taskId": "PT-12-INDEPENDENT-REVIEW",
+      "milestone": "execution-and-verification"
+    }
   ],
   "decisionIds": [
     "PT-DECISION-EXECUTION-APPROVAL-20261018"

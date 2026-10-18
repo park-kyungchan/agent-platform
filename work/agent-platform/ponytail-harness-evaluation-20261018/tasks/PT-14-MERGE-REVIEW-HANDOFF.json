@@ -19,7 +19,7 @@
   "title": "Merge Review Handoff",
   "nextAction": "Create scoped PR then send lens-interview expected head, evidence, findings, pending native qualification and explicit merge-review/proceed request under PT-14; no automatic merge or activation.",
   "state": {
-    "execution": "pending",
+    "execution": "planned",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",
@@ -27,7 +27,10 @@
   },
   "executionClass": "source-only",
   "dependsOn": [
-    "PT-13-REVIEW-PUBLICATION-PR"
+    {
+      "taskId": "PT-13-REVIEW-PUBLICATION-PR",
+      "milestone": "execution-and-verification"
+    }
   ],
   "decisionIds": [
     "PT-DECISION-EXECUTION-APPROVAL-20261018"

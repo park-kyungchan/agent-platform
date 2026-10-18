@@ -19,7 +19,7 @@
   "title": "Quality Implementation",
   "nextAction": "Canonical quality comparison distinguishes behavior gain, verification detection gain, equality and insufficient evidence; no speed/count-only gain.",
   "state": {
-    "execution": "pending",
+    "execution": "planned",
     "verification": "pending",
     "localAudit": "intent-durable",
     "sharedAudit": "pending",
@@ -27,7 +27,10 @@
   },
   "executionClass": "source-only",
   "dependsOn": [
-    "PT-08-QUALITY-CONTRACT"
+    {
+      "taskId": "PT-08-QUALITY-CONTRACT",
+      "milestone": "execution-and-verification"
+    }
   ],
   "decisionIds": [
     "PT-DECISION-EXECUTION-APPROVAL-20261018"
