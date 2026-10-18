@@ -1,0 +1,42 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "task",
+  "id": "PT-10-COMPLEX-ORACLES",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "issueId": "PT-ISSUE-20261018",
+    "specId": "PT-SPEC",
+    "specRevision": 3,
+    "planId": "PT-PLAN",
+    "planRevision": 3,
+    "taskId": "PT-10-COMPLEX-ORACLES"
+  },
+  "title": "Complex Oracles",
+  "nextAction": "Integrated source/adapter verification passed; exact independent review/publication remain separate.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    {
+      "taskId": "PT-08-QUALITY-CONTRACT",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "PT-DECISION-EXECUTION-APPROVAL-20261018"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [
+    "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-integration"
+  ]
+}

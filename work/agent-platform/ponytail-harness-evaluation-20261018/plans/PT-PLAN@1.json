@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "plan",
+  "id": "PT-PLAN",
+  "revision": 1,
+  "specId": "PT-SPEC",
+  "specRevision": 1,
+  "objective": "Evaluate where Ponytail can improve common-harness work and apply the useful AIP Evolve constrained-improvement methodology through existing canonical Work and Evidence contracts in an isolated branch.",
+  "clauses": [
+    "Pin native-observed fresh main and upstream in the owned isolated worktree.",
+    "Reuse existing Wiki evidence before official research; distinguish official workflow from local transfer.",
+    "Fix independent validation criteria and actual baseline/candidate exposure before comparing outcomes.",
+    "Put reusable comparison meaning in the canonical Evidence Foundry module; keep execution, policy, storage and acceptance with existing owners.",
+    "Run relevant checks on the exact candidate and obtain independent review; retain uncertainty and any unexecuted pilot."
+  ]
+}

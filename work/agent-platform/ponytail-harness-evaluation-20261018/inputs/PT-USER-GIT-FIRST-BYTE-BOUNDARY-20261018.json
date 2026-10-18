@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-USER-GIT-FIRST-BYTE-BOUNDARY-20261018",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex",
+    "locator": "current-conversation:PT-USER-GIT-FIRST-BYTE-BOUNDARY-20261018",
+    "kind": "native-user-message"
+  },
+  "content": {
+    "text": "추가 확인하고 싶은 것이 있는데, bytes 단위 변경 확인하는 등의 문제가 어디서 발생했었지? 내가 lens-context session에서 overEngineering 가능성에 대해 언급한 것들이 있는데, Git/GitHub 활용 극대화하기 위해서 그 해결하려는 문제 3가지(그리고 더 넓은 공통하네스의 범위에서)에 대해서 worktree/branch를 통해 해결하자고 했었거든. 그것도 이번 범위에 포함되었는지 알아보고 포함시켜.",
+    "nativeMessageId": null,
+    "captureLimitation": "Direct current user request. Original lens-context problem/source still needs exact trace; no guard weakening or whole-filesystem mechanism is inferred."
+  }
+}

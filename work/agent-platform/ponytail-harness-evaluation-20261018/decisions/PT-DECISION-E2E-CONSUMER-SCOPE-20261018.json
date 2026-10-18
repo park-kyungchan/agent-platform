@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "decision",
+  "id": "PT-DECISION-E2E-CONSUMER-SCOPE-20261018",
+  "status": "accepted",
+  "answer": "E2E 질문에 대해서는 추천대로 진행.",
+  "meaning": "Final behavior-quality verification covers every actually affected consumer: common changes through Codex and Hermes; runtime-only changes through that actual consumer. Verification design only; no new native evaluation budget or activation permission.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-ANSWER-E2E-CONSUMER-SCOPE-20261018.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "다음으로 실제 동작 품질 개선의 E2E 합격 범위를 정하겠습니다. 예를 들어 Codex 전용 선택 오류 수정과 Codex·Hermes가 함께 쓰는 context 수정은 영향 범위가 다릅니다. 최종 동작 검증은 어느 범위로 둘까요? 이는 검증 설계 질문이며, 지금 native 평가를 실행한다는 뜻은 아닙니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-ANSWER-E2E-CONSUMER-SCOPE-20261018.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

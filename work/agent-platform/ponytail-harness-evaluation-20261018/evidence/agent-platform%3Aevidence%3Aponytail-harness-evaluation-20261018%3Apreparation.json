@@ -1,0 +1,14 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "evidence",
+  "id": "agent-platform:evidence:ponytail-harness-evaluation-20261018:preparation",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-FROZEN-COMPLEX-ORACLES-V3.json",
+    "fragment": "#/content"
+  }
+}

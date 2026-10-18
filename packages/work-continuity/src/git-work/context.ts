@@ -14,6 +14,8 @@ import {
 import type {
   ContextRecordProjection,
   CompactGitWorkContext,
+  MetadataPackedGitWorkContext,
+  GitWorkCompactOutput,
   CompactGitSourceAddress,
   CompactSourcePointer,
   CompactPurpose,
@@ -22,6 +24,7 @@ import type {
   DecodedCompactGitWorkContext,
   ContextRequest,
   GitWorkContext,
+  GitWorkContinuityBinding,
   GitWorkReader,
   GitWorkRecord,
   JsonValue,
@@ -33,10 +36,10 @@ import type {
   ValidationResult,
 } from "./types.ts";
 
-export async function readGitWorkContext(
+async function buildGitWorkContext(
   reader: GitWorkReader,
   request: ContextRequest,
-): Promise<GitWorkContext> {
+): Promise<{ context: GitWorkContext; requiredRecords: number }> {
   request = structuredClone(request);
   const maxChars = request.maxChars ?? 24000,
     maxRecords = request.maxRecords ?? 256;
@@ -343,25 +346,78 @@ export async function readGitWorkContext(
     nativePermissionGranted: false,
     semanticAcceptanceEstablished: false,
   };
-  if (JSON.stringify(result).length > maxChars) {
-    return {
-      ...result,
-      status: "held",
-      records: [],
-      sources: [],
-      historicalEffects: undefined,
-      normative: { schema: "common.git-work-context.normative.v1", contracts: [] },
-      continuityBinding: {
-        schema: "common.git-work-context.continuity.v1",
-        coverage: "unavailable",
-        purposeSources: [],
-        effectInventorySources: [],
-      },
-      holdReasons: ["REQUIRED_CONTEXT_OUTPUT_LIMIT"],
-      omittedRecords: records.size + omittedRecords,
-    };
-  }
-  return result;
+  return { context: result, requiredRecords: records.size };
+}
+
+function outputLimit(context: GitWorkContext, requiredRecords: number): GitWorkContext {
+  return {
+    ...context,
+    status: "held",
+    records: [],
+    sources: [],
+    historicalEffects: undefined,
+    normative: { schema: "common.git-work-context.normative.v1", contracts: [] },
+    continuityBinding: {
+      schema: "common.git-work-context.continuity.v1",
+      coverage: "unavailable",
+      purposeSources: [],
+      effectInventorySources: [],
+    },
+    holdReasons: ["REQUIRED_CONTEXT_OUTPUT_LIMIT"],
+    omittedRecords: requiredRecords + context.omittedRecords,
+  };
+}
+
+/** The diagnostic raw representation retains its existing 24k output budget. */
+export async function readGitWorkContext(
+  reader: GitWorkReader,
+  request: ContextRequest,
+): Promise<GitWorkContext> {
+  request = structuredClone(request);
+  const { context, requiredRecords } = await buildGitWorkContext(reader, request);
+  return JSON.stringify(context).length > (request.maxChars ?? 24000)
+    ? outputLimit(context, requiredRecords)
+    : context;
+}
+
+/** Compose the one canonical validation pipeline and codec before output sizing.
+ * The unbounded intermediate projection is private, never a caller-supplied
+ * qualified context. Native owners still enforce their wrapper-inclusive caps.
+ */
+export function readCompactGitWorkContext(
+  reader: GitWorkReader,
+  request: ContextRequest,
+  selection: { taskId?: string; decisionIds?: string[] },
+): Promise<CompactGitWorkContext>;
+export function readCompactGitWorkContext(
+  reader: GitWorkReader,
+  request: ContextRequest,
+  selection: { taskId?: string; decisionIds?: string[] },
+  encoding: "metadata.v1",
+): Promise<GitWorkCompactOutput>;
+export async function readCompactGitWorkContext(
+  reader: GitWorkReader,
+  request: ContextRequest,
+  selection: { taskId?: string; decisionIds?: string[] },
+  encoding?: "metadata.v1",
+): Promise<GitWorkCompactOutput> {
+  if (encoding !== undefined && encoding !== "metadata.v1") throw Error("INVALID_COMPACT_ENCODING");
+  request = structuredClone(request);
+  selection = structuredClone(selection);
+  if (selection.taskId !== request.taskId) throw Error("COMPACT_REQUEST_SELECTION_MISMATCH");
+  const { context, requiredRecords } = await buildGitWorkContext(reader, request);
+  const ordinary = encodeCompactGitWorkContext(context, selection, false);
+  const compact =
+    encoding && ordinary.status === "source-qualified" ? packCompactMetadata(ordinary) : ordinary;
+  const maxChars = request.maxChars ?? 24000;
+  if (JSON.stringify(compact).length <= maxChars) return compact;
+  const held = compactGitWorkContext(outputLimit(context, requiredRecords), selection);
+  // The existing HOLD wire includes required metadata too. A valid request
+  // budget may be too small even for that refusal; never return oversized data
+  // or invent a weaker compact representation to make it fit.
+  if (JSON.stringify(held).length > maxChars)
+    throw new CompactContextError("COMPACT_CONTEXT_OUTPUT_BUDGET_TOO_SMALL");
+  return held;
 }
 
 const compactObject = (value: unknown): value is Record<string, unknown> =>
@@ -418,6 +474,16 @@ const compactLayout = {
 export function compactGitWorkContext(
   context: GitWorkContext,
   selection: { taskId?: string; decisionIds?: string[] },
+): CompactGitWorkContext {
+  return encodeCompactGitWorkContext(context, selection, true);
+}
+
+// Only the composed reader above can pass its privately constructed projection
+// without the standalone codec's serialized-input limit. Both use this one codec.
+function encodeCompactGitWorkContext(
+  context: GitWorkContext,
+  selection: { taskId?: string; decisionIds?: string[] },
+  boundedExternalInput: boolean,
 ): CompactGitWorkContext {
   const result: CompactGitWorkContext = {
     schema: "common.git-work-context.compact.v1",
@@ -479,7 +545,10 @@ export function compactGitWorkContext(
       "INVALID_COMPACT_SOURCE_QUALIFICATION",
     );
     compactAssert(context.latestRelevant === "current", "COMPACT_CURRENTNESS_UNAVAILABLE");
-    compactAssert(JSON.stringify(context).length <= 24_000, "REQUIRED_COMPACT_INPUT_LIMIT");
+    compactAssert(
+      !boundedExternalInput || JSON.stringify(context).length <= 24_000,
+      "REQUIRED_COMPACT_INPUT_LIMIT",
+    );
     compactAssert(
       Array.isArray(context.records) &&
         context.records.length <= 2048 &&
@@ -1393,12 +1462,427 @@ function validateAndDecodeCompactContext(
   return { normative, sources, decisions, ...(task ? { task } : {}) };
 }
 
+const packedFragments = [
+  "#",
+  "#/content/text",
+  "#/content/question",
+  "#/content",
+  "#/content/purpose",
+  "#/content/effectCustody",
+  "#/nextAction",
+];
+const packedStates = [
+  "planned",
+  "pending",
+  "intent-durable",
+  "complete",
+  "passed",
+  "result-durable",
+  "delivery-confirmed",
+  "audit-synchronization-pending",
+  "uncertainty-durable",
+  "running",
+];
+// Header metadata stays literal so owners can retain an immutable source pointer
+// even when a later native wrapper has to hold delivery.
+const metadataKeys = [
+  "sources",
+  "normative",
+  "decisions",
+  "continuityBinding",
+  "historicalEffects",
+  "task",
+];
+const metadataMap = (value: JsonValue, change: (text: string) => string): JsonValue =>
+  typeof value === "string"
+    ? change(value)
+    : Array.isArray(value)
+      ? value.map((item) => metadataMap(item, change))
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value).map(([key, item]) => [key, metadataMap(item, change)]),
+          )
+        : value;
+
+/** One opt-in metadata representation; normative text bytes are never rewritten. */
+function packCompactMetadata(context: CompactGitWorkContext): MetadataPackedGitWorkContext {
+  const pointer = (p: CompactSourcePointer): JsonValue[] => {
+    const index = packedFragments.indexOf(p[1]);
+    return [p[0], index < 0 ? p[1] : index, ...(p[2] ? [p[2]] : [])];
+  };
+  const contract = (pair: [string, number], kind: string): number => {
+    const index = context.normative.findIndex(
+      (row) => row[0] === kind && row[1] === pair[0] && row[2] === pair[1],
+    );
+    compactAssert(index >= 0, "COMPACT_BOUND_CONTRACT_UNAVAILABLE");
+    return index;
+  };
+  const normative = context.normative.map((original): JsonValue[] => {
+    const row = structuredClone(original) as JsonValue[];
+    if (original[0] === "work") {
+      row[1] = null;
+      row[3] = 0;
+      row[4] = 0;
+      row[6] = [contract(original[6].spec, "spec"), contract(original[6].plan, "plan")];
+    } else {
+      row[4] = original[0] === "spec" ? 1 : original[5] === "complete" ? 2 : 3;
+      row[5] = original[5] === "complete" ? 0 : 1;
+      if (original[0] === "plan") row[7] = contract(original[7], "spec");
+    }
+    return row;
+  });
+  const task = context.task;
+  const effects = context.historicalEffects;
+  compactAssert(effects, "INVALID_COMPACT_HISTORICAL_EFFECTS");
+  const packed: MetadataPackedGitWorkContext = {
+    schema: context.schema,
+    encoding: {
+      version: "metadata.v1",
+      prefixes: [],
+      decoder: "@palantirkc/work-continuity/git-work#decodeCompactGitWorkContext",
+    },
+    metadata: [
+      context.repositoryId,
+      context.commit,
+      context.projectId,
+      context.workId,
+      context.latestRelevant === "current" ? 0 : context.latestRelevant,
+    ],
+    status: context.status,
+    strings: [...context.strings],
+    sources: context.sources.map(([base, path, oid, ...external]) => [
+      base === "work" ? 0 : 1,
+      path,
+      Buffer.from(oid, "hex").toString("base64url"),
+      ...external.map((value) => value ?? null),
+    ]),
+    normative,
+    decisions: context.decisions.map(([id, status, answer, question]) => [
+      id,
+      status === "accepted" ? 0 : 1,
+      pointer(answer),
+      ...(question ? [pointer(question)] : []),
+    ]),
+    continuityBinding: [
+      context.continuityBinding.coverage === "bound" ? 0 : 1,
+      context.continuityBinding.purposeSources.map(pointer),
+      context.continuityBinding.effectInventorySources.map(pointer),
+    ],
+    historicalEffects: [
+      effects.completedCount,
+      effects.uncertainCount,
+      effects.relevantCompletedIds,
+      effects.relevantUncertainIds,
+      effects.projectedFenceRecords,
+    ],
+    ...(task
+      ? {
+          task: [
+            task.id,
+            pointer(task.source),
+            [
+              contract([task.logical[4], task.logical[5]], "spec"),
+              contract([task.logical[6], task.logical[7]], "plan"),
+            ],
+            task.state.map((state) => {
+              const index = packedStates.indexOf(state);
+              return index < 0 ? state : index;
+            }),
+            task.executionClass === "source-only" ? 0 : 1,
+            task.effectIds,
+            task.pendingEffectIds,
+            task.nextActionCoverage === "authored" ? 0 : 1,
+            ...(task.nextAction ? [[task.nextAction.value, pointer(task.nextAction.source)]] : []),
+          ],
+        }
+      : {}),
+    holdReasons: [],
+    authority: "none",
+    nativePermissionGranted: false,
+    semanticAcceptanceEstablished: false,
+  };
+  const texts: string[] = [];
+  for (const key of metadataKeys)
+    if (Object.hasOwn(packed, key))
+      metadataMap((packed as unknown as Record<string, JsonValue>)[key]!, (text) => {
+        texts.push(text);
+        return text;
+      });
+  const candidates = new Set<string>();
+  // Bound optimization effort independently of source size. Sampling only picks
+  // optional prefixes; every metadata value is still emitted and decoded exactly.
+  const sample = texts.slice(0, 512);
+  for (const text of sample)
+    for (let i = 6; i <= Math.min(text.length, 160); i++)
+      if (candidates.size < 2048 && /[-/:._@]$/.test(text.slice(0, i)))
+        candidates.add(text.slice(0, i));
+  const prefixes: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    let best = "",
+      saving = 12;
+    for (const prefix of candidates) {
+      const count = sample.filter(
+        (text) => !prefixes.some((chosen) => text.startsWith(chosen)) && text.startsWith(prefix),
+      ).length;
+      const benefit = count * (prefix.length - 3) - JSON.stringify(prefix).length - 1;
+      if (benefit > saving) {
+        best = prefix;
+        saving = benefit;
+      }
+    }
+    if (!best) break;
+    prefixes.push(best);
+  }
+  packed.encoding.prefixes = prefixes;
+  for (const key of metadataKeys)
+    if (Object.hasOwn(packed, key))
+      (packed as unknown as Record<string, JsonValue>)[key] = metadataMap(
+        (packed as unknown as Record<string, JsonValue>)[key]!,
+        (text) => {
+          if (text.startsWith("~")) return "~" + text;
+          const index = prefixes.findIndex((prefix) => text.startsWith(prefix));
+          return index < 0 ? text : "~" + index + ":" + text.slice(prefixes[index]!.length);
+        },
+      );
+  // Representation must preserve exactly the already-validated compact meaning.
+  if (JSON.stringify(packed).length <= 24000)
+    compactAssert(
+      JSON.stringify(unpackCompactMetadata(packed)) === JSON.stringify(context),
+      "COMPACT_METADATA_ROUNDTRIP_MISMATCH",
+    );
+  return packed;
+}
+
+function unpackCompactMetadata(value: MetadataPackedGitWorkContext): CompactGitWorkContext {
+  compactAssert(JSON.stringify(value).length <= 24000, "REQUIRED_COMPACT_INPUT_LIMIT");
+  compactShape(
+    value,
+    [
+      "schema",
+      "encoding",
+      "metadata",
+      "status",
+      "strings",
+      "sources",
+      "normative",
+      "decisions",
+      "continuityBinding",
+      "historicalEffects",
+      "holdReasons",
+      "authority",
+      "nativePermissionGranted",
+      "semanticAcceptanceEstablished",
+    ],
+    ["task"],
+  );
+  compactShape(value.encoding, ["version", "prefixes", "decoder"]);
+  compactAssert(
+    value.encoding.version === "metadata.v1" &&
+      value.encoding.decoder === "@palantirkc/work-continuity/git-work#decodeCompactGitWorkContext",
+    "INVALID_COMPACT_ENCODING",
+  );
+  const prefixes = value.encoding.prefixes;
+  compactAssert(
+    Array.isArray(prefixes) &&
+      prefixes.length <= 4 &&
+      new Set(prefixes).size === prefixes.length &&
+      prefixes.every((p) => typeof p === "string" && p.length >= 6 && p.length <= 160),
+    "INVALID_COMPACT_PREFIXES",
+  );
+  const p = structuredClone(value) as unknown as Record<string, JsonValue>;
+  for (const key of metadataKeys)
+    if (Object.hasOwn(p, key))
+      p[key] = metadataMap(p[key]!, (text) => {
+        if (text.startsWith("~~")) return text.slice(1);
+        if (!text.startsWith("~")) return text;
+        const match = /^~([0-3]):([\s\S]*)$/.exec(text);
+        compactAssert(
+          match && Number(match[1]) < prefixes.length,
+          "INVALID_COMPACT_PREFIX_REFERENCE",
+        );
+        return prefixes[Number(match[1])]! + match[2]!;
+      });
+  const tuple = (v: JsonValue | undefined, min: number, max = min): JsonValue[] => {
+    compactTuple(v, min, max);
+    return v as JsonValue[];
+  };
+  const text = (v: JsonValue | undefined): string => {
+    compactAssert(compactText(v), "INVALID_COMPACT_METADATA_TEXT");
+    return v;
+  };
+  const rows = (v: JsonValue | undefined): JsonValue[][] => {
+    compactAssert(Array.isArray(v), "INVALID_COMPACT_METADATA_ROWS");
+    return v.map((r) => tuple(r, 0, 8192));
+  };
+  const enumeration = (v: JsonValue | undefined, choices: string[]): string => {
+    if (typeof v === "string") return v;
+    compactAssert(
+      Number.isSafeInteger(v) && Number(v) >= 0 && Number(v) < choices.length,
+      "INVALID_COMPACT_METADATA_ENUM",
+    );
+    return choices[Number(v)]!;
+  };
+  const meta = tuple(p.metadata, 5),
+    repositoryId = text(meta[0]),
+    commit = text(meta[1]),
+    projectId = text(meta[2]),
+    workId = text(meta[3]);
+  const pointer = (v: JsonValue): CompactSourcePointer => {
+    const row = tuple(v, 2, 3);
+    return [row[0], enumeration(row[1], packedFragments), ...row.slice(2)] as CompactSourcePointer;
+  };
+  const normative = rows(p.normative).map((r) => [...r]);
+  const pair = (index: JsonValue | undefined, kind: string): [string, number] => {
+    compactAssert(
+      Number.isSafeInteger(index) && Number(index) >= 0,
+      "INVALID_COMPACT_CONTRACT_INDEX",
+    );
+    const r = normative[Number(index)];
+    compactAssert(
+      r && r[0] === kind && typeof r[1] === "string" && Number.isSafeInteger(r[2]),
+      "INVALID_COMPACT_CONTRACT_INDEX",
+    );
+    return [r[1], Number(r[2])];
+  };
+  for (const r of normative) {
+    if (r[0] === "work") {
+      compactTuple(r, 8);
+      compactAssert(r[1] === null && r[3] === 0 && r[4] === 0, "INVALID_COMPACT_PACKED_WORK");
+      r[1] = workId;
+      r[3] = {
+        purpose: "#/purpose",
+        spec: "#/spec",
+        plan: "#/plan",
+        domainId: "#/domainId",
+        issueId: "#/issueId",
+      };
+      r[4] = "complete";
+      const refs = tuple(r[6], 2);
+      r[6] = { spec: pair(refs[0], "spec"), plan: pair(refs[1], "plan") };
+    } else if (r[0] === "spec") {
+      compactTuple(r, 7);
+      compactAssert(r[4] === 1 && r[5] === 0, "INVALID_COMPACT_PACKED_SPEC");
+      r[4] = { outcome: "#/outcome", criteria: "#/criteria" };
+      r[5] = "complete";
+    } else {
+      compactTuple(r, 8);
+      compactAssert(
+        r[0] === "plan" && (r[4] === 2 || r[4] === 3) && r[5] === (r[4] === 2 ? 0 : 1),
+        "INVALID_COMPACT_PACKED_PLAN",
+      );
+      const clauses = r[4] === 2;
+      r[4] = {
+        objective: "#/objective",
+        specId: "#/specId",
+        specRevision: "#/specRevision",
+        ...(clauses ? { clauses: "#/clauses" } : {}),
+      };
+      r[5] = clauses ? "complete" : "legacy-objective-only";
+      r[7] = pair(r[7], "spec");
+    }
+  }
+  const work = normative.find((r) => r[0] === "work");
+  compactAssert(work && compactObject(work[7]), "COMPACT_WORK_REQUIRED");
+  const sources = rows(p.sources).map((r) => {
+    compactTuple(r, 3, 5);
+    const encoded = text(r[2]);
+    compactAssert(/^[A-Za-z0-9_-]+$/.test(encoded), "INVALID_COMPACT_PACKED_BLOB");
+    const bytes = Buffer.from(encoded, "base64url");
+    compactAssert(
+      [20, 32].includes(bytes.length) && bytes.toString("base64url") === encoded,
+      "INVALID_COMPACT_PACKED_BLOB",
+    );
+    compactAssert(r[0] === 0 || r[0] === 1, "INVALID_COMPACT_PACKED_SOURCE_BASE");
+    return [
+      r[0] === 0 ? "work" : "repository",
+      r[1],
+      bytes.toString("hex"),
+      ...r.slice(3),
+    ] as CompactGitSourceAddress;
+  });
+  const binding = tuple(p.continuityBinding, 3),
+    effects = tuple(p.historicalEffects, 5);
+  const task = p.task === undefined ? undefined : tuple(p.task, 8, 9);
+  const taskContracts = task ? tuple(task[2], 2) : undefined;
+  const spec = taskContracts ? pair(taskContracts[0], "spec") : undefined,
+    plan = taskContracts ? pair(taskContracts[1], "plan") : undefined;
+  const next = task?.[8] === undefined ? undefined : tuple(task[8], 2);
+  return {
+    schema: value.schema,
+    sourcePathBase: gitWorkPath(projectId, workId),
+    layout: { ...compactLayout },
+    status: value.status,
+    repositoryId,
+    commit,
+    projectId,
+    workId,
+    latestRelevant: enumeration(meta[4], ["current"]) as ContextRequest["latestRelevant"],
+    strings: value.strings,
+    sources,
+    normative: normative as CompactGitWorkContext["normative"],
+    decisions: rows(p.decisions).map((r) => {
+      compactTuple(r, 3, 4);
+      return [
+        r[0],
+        enumeration(r[1], ["accepted", "superseded"]),
+        pointer(r[2]!),
+        ...(r[3] === undefined ? [] : [pointer(r[3])]),
+      ] as CompactGitWorkContext["decisions"][number];
+    }),
+    continuityBinding: {
+      schema: "common.git-work-context.continuity.v1",
+      coverage: enumeration(binding[0], [
+        "bound",
+        "legacy-unbound",
+      ]) as GitWorkContinuityBinding["coverage"],
+      purposeSources: (binding[1] as JsonValue[]).map(pointer),
+      effectInventorySources: (binding[2] as JsonValue[]).map(pointer),
+    },
+    historicalEffects: {
+      completedCount: effects[0],
+      uncertainCount: effects[1],
+      relevantCompletedIds: effects[2],
+      relevantUncertainIds: effects[3],
+      projectedFenceRecords: effects[4],
+    } as CompactGitWorkContext["historicalEffects"],
+    holdReasons: value.holdReasons,
+    authority: value.authority,
+    nativePermissionGranted: value.nativePermissionGranted,
+    semanticAcceptanceEstablished: value.semanticAcceptanceEstablished,
+    ...(task && spec && plan
+      ? {
+          task: {
+            id: task[0],
+            source: pointer(task[1]!),
+            logical: [
+              work[7].domainId,
+              projectId,
+              workId,
+              work[7].issueId,
+              ...spec,
+              ...plan,
+              task[0],
+            ],
+            state: (task[3] as JsonValue[]).map((v) => enumeration(v, packedStates)),
+            executionClass: enumeration(task[4], ["source-only", "native-effect"]),
+            effectIds: task[5],
+            pendingEffectIds: task[6],
+            nextActionCoverage: enumeration(task[7], ["authored", "unspecified"]),
+            ...(next ? { nextAction: { value: next[0], source: pointer(next[1]!) } } : {}),
+          } as CompactGitWorkContext["task"],
+        }
+      : {}),
+  };
+}
+
 /** Decode only a structurally complete, non-authorizing qualified compact view. */
 export function decodeCompactGitWorkContext(
-  context: CompactGitWorkContext,
+  context: GitWorkCompactOutput,
 ): DecodedCompactGitWorkContext {
   try {
-    return validateAndDecodeCompactContext(context);
+    return validateAndDecodeCompactContext(
+      "encoding" in context ? unpackCompactMetadata(context) : context,
+    );
   } catch (error) {
     throw error instanceof CompactContextError
       ? error

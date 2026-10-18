@@ -1,8 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import * as gitWork from "@palantirkc/work-continuity/git-work";
+import * as contextApi from "@palantirkc/work-continuity/context";
 import type { GitWorkRecord, JsonValue } from "@palantirkc/work-continuity/git-work";
 import {
   handleHook,
@@ -918,6 +919,25 @@ test("Git parent and child agent types match exactly and never borrow another tu
   expect(context(result.stdout).value.selectedWork.task.id).toBe("current-task");
 });
 
+test("metadata binding explicitly adopts the composed codec without changing decoded native semantics", async () => {
+  const f = await fixture();
+  const old = context((await handleHook(f.input, { bindings: f.registry }, f.load)).stdout);
+  f.registry.bindings[0]!.gitWorkMetadataEncoding = "metadata.v1";
+  await persistBindings(f);
+  const result = await handleHook(f.input, { bindings: f.registry }, f.load);
+  const packed = context(result.stdout);
+  expect(result.status).toBe("context-injected");
+  expect(packed.text.length).toBeLessThanOrEqual(12000);
+  expect(packed.value.selectedWork.encoding.version).toBe("metadata.v1");
+  expect(gitWork.decodeCompactGitWorkContext(packed.value.selectedWork)).toEqual(
+    gitWork.decodeCompactGitWorkContext(old.value.selectedWork),
+  );
+  expect(packed.value.selectedWork.nativePermissionGranted).toBe(false);
+  delete f.provider.gitWork!.readCompactGitWorkContext;
+  const missing = await handleHook(f.input, { bindings: f.registry }, f.load);
+  expect(missing.status).not.toBe("context-injected");
+});
+
 test("default v1 stays at6000 and carries full shared semantics or holds; explicit v2 never exceeds12000", async () => {
   const f = await fixture();
   const raw = await gitWork.readGitWorkContext(
@@ -1049,4 +1069,190 @@ test("effectful owner cwd uses the same explicit complete v2 policy and holds re
   expect(overflow.requiredContextChars).toBeGreaterThan(12000);
   expect(text.length).toBeLessThanOrEqual(12000);
   expect(overflow.selectedWork.normative).toBeUndefined();
+});
+
+async function normalSessionFixture() {
+  const f = await fixture();
+  delete f.binding.entrypointCwds;
+  delete f.binding.entrypointContextPath;
+  f.binding.workId = "current-work";
+  f.selection.cwd = f.owner;
+  f.input.cwd = f.owner;
+  await mkdir(dirname(f.binding.checkpointPath), { recursive: true });
+  await writeFile(
+    f.binding.checkpointPath,
+    JSON.stringify({
+      schema: "codex.continuity.checkpoint.v1",
+      projectId: "fixture",
+      workId: "current-work",
+      root: f.owner,
+      owner: { agentId: "synthetic", threadId: "parent" },
+      version: 1,
+      updatedAt: "2026-10-17T00:00:00Z",
+      purpose: {
+        objective: "Selected normal capture only",
+        successCriteria: ["Foreign sessions write nothing"],
+        inScope: ["Synthetic source tests"],
+        outOfScope: ["Native dispatch"],
+      },
+      userDecisions: [],
+      completed: [],
+      pending: [],
+      nextAction: null,
+      nativeThreads: [],
+      evidenceRefs: [],
+      sourcePins: [],
+      uncertainEffects: [],
+      uninterpretedInputs: [],
+      authority: "none",
+      nativePermissionGranted: false,
+    }),
+  );
+  f.registry.bindings[0] = f.binding;
+  Object.assign(f.provider.index, {
+    recordBoundary: contextApi.recordBoundary,
+    readCheckpoint: contextApi.readCheckpoint,
+    boundedProjection: contextApi.boundedProjection,
+  });
+  await persistBindings(f);
+  return f;
+}
+
+test("explicit selected-session normal mode declines foreign tuples before provider load or capture", async () => {
+  const f = await normalSessionFixture();
+  const baseline = (await readdir(f.owner, { recursive: true })).sort();
+  const unselected = [
+    { session_id: "different-session" },
+    { agent_id: "unselected-child" },
+    { agent_id: "unselected-child", agent_type: "worker" },
+    { cwd: f.home },
+  ];
+  const neverLoad: NativeContextLoader = async () => {
+    throw Error("FOREIGN_PROVIDER_LOADED");
+  };
+  for (const extra of unselected) {
+    const result = await handleHook(
+      { ...f.input, ...extra },
+      { bindings: f.registry, selectedSessionOnly: true },
+      neverLoad,
+    );
+    expect(result).toEqual({ status: "no-op", stdout: "", exitCode: 0 });
+    expect((await readdir(f.owner, { recursive: true })).sort()).toEqual(baseline);
+  }
+  f.registry.contextSelections = [];
+  await persistBindings(f);
+  expect(
+    await handleHook(f.input, { bindings: f.registry, selectedSessionOnly: true }, neverLoad),
+  ).toEqual({ status: "no-op", stdout: "", exitCode: 0 });
+  expect((await readdir(f.owner, { recursive: true })).sort()).toEqual(baseline);
+});
+
+test("selected normal session keeps actual original prompt, boundary, current Work and Stop behavior", async () => {
+  const f = await normalSessionFixture();
+  const { prompt: _prompt, ...startInput } = f.input;
+  const start = await handleHook(
+    { ...startInput, hook_event_name: "SessionStart", source: "resume" },
+    { bindings: f.registry, selectedSessionOnly: true },
+    f.load,
+  );
+  expect(start.status).toBe("context-injected");
+  expect(JSON.parse(await readFile(start.boundary!.path, "utf8")).nativeSource).toBe("resume");
+  const result = await handleHook(
+    f.input,
+    { bindings: f.registry, selectedSessionOnly: true },
+    f.load,
+  );
+  expect(result.status).toBe("context-injected");
+  const payload = JSON.parse(JSON.parse(result.stdout).hookSpecificOutput.additionalContext);
+  expect(payload.selectedWork.task.id).toBe("current-task");
+  expect(payload.nativePermissionGranted).toBe(false);
+  const events = await readdir(join(f.owner, ".private/native-hook-events"));
+  const raw = events.filter((name) => name.endsWith(".prompt.txt"));
+  expect(raw).toHaveLength(1);
+  expect(await readFile(join(f.owner, ".private/native-hook-events", raw[0]!), "utf8")).toBe(
+    f.input.prompt!,
+  );
+  const boundary = JSON.parse(await readFile(result.boundary!.path, "utf8"));
+  expect(boundary.threadId).toBe("parent");
+  expect(boundary.pendingPrompt.bytes).toBe(Buffer.byteLength(f.input.prompt!));
+  const stop = await handleHook(
+    { ...f.input, hook_event_name: "Stop" },
+    { bindings: f.registry, selectedSessionOnly: true },
+    f.load,
+  );
+  expect(stop.status).toBe("recorded");
+  expect(stop.stdout).toBe("{}");
+  expect(JSON.parse(stop.stdout).decision).toBeUndefined();
+});
+
+test("explicit selected child is exact in both agent ID and type; parent absence is not wildcard", async () => {
+  const f = await normalSessionFixture();
+  f.selection.nativeAgentId = "selected-child";
+  f.selection.nativeAgentType = "worker";
+  await persistBindings(f);
+  const baseline = (await readdir(f.owner, { recursive: true })).sort();
+  for (const extra of [
+    {},
+    { agent_id: "selected-child" },
+    { agent_id: "selected-child", agent_type: "different" },
+  ]) {
+    const result = await handleHook(
+      { ...f.input, ...extra },
+      { bindings: f.registry, selectedSessionOnly: true },
+      f.load,
+    );
+    expect(result.status).toBe("no-op");
+    expect(result.stdout).toBe("");
+    expect((await readdir(f.owner, { recursive: true })).sort()).toEqual(baseline);
+  }
+  const result = await handleHook(
+    { ...f.input, agent_id: "selected-child", agent_type: "worker" },
+    { bindings: f.registry, selectedSessionOnly: true },
+    f.load,
+  );
+  expect(result.status).toBe("context-injected");
+  expect(JSON.parse(await readFile(result.boundary!.path, "utf8")).nativeAgentId).toBe(
+    "selected-child",
+  );
+});
+
+test("normal legacy defaults still capture a same-cwd session without an explicit selection", async () => {
+  const f = await normalSessionFixture();
+  const result = await handleHook(
+    { ...f.input, session_id: "legacy-other" },
+    { bindings: f.registry },
+    f.load,
+  );
+  expect(result.status).toBe("context-injected");
+  expect(
+    (await readdir(join(f.owner, ".private/native-hook-events"))).some((name) =>
+      name.endsWith(".prompt.txt"),
+    ),
+  ).toBe(true);
+  const stop = await handleHook(
+    { ...f.input, session_id: "legacy-other", hook_event_name: "Stop" },
+    { bindings: f.registry },
+    f.load,
+  );
+  expect(stop.status).toBe("recorded");
+  expect(stop.stdout).toBe("{}");
+});
+
+test("selected-session admission retains static selected-context HOLD before invalid-scope capture", async () => {
+  const f = await normalSessionFixture();
+  f.selection.ownerRoot = f.parent;
+  await persistBindings(f);
+  const before = (await readdir(f.owner, { recursive: true })).sort();
+  const result = await handleHook(
+    f.input,
+    { bindings: f.registry, selectedSessionOnly: true },
+    f.load,
+  );
+  expect(result.status).toBe("context-held");
+  expect(JSON.parse(result.stdout).systemMessage).toBe(
+    "CURRENT_SESSION_CONTEXT_HELD: selected Work context could not be verified; inspect source evidence before dependent work.",
+  );
+  expect(result.stdout).not.toContain(f.parent);
+  expect(result.stdout).not.toContain(f.input.prompt!);
+  expect((await readdir(f.owner, { recursive: true })).sort()).toEqual(before);
 });

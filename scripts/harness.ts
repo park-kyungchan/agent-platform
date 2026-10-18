@@ -1,4 +1,12 @@
+import {
+  preflightQualityImprovement,
+  compareQualityImprovement,
+} from "../packages/evidence-foundry/src/modules/evals/quality-improvement.ts";
 import { readFile } from "node:fs/promises";
+import {
+  preflightImprovement,
+  compareImprovement,
+} from "../packages/evidence-foundry/src/modules/evals/improvement.ts";
 import {
   openGitWork,
   resolveGitWorkSelection,
@@ -9,10 +17,13 @@ import {
   type ContextRequest,
   type StartRequest,
 } from "../packages/work-continuity/src/git-work/index.ts";
-import { readDocumentationRegistry } from "../packages/work-continuity/src/runtime-docs/index.ts";
+import {
+  readDocumentationRegistry,
+  type DocumentationObservations,
+} from "../packages/work-continuity/src/runtime-docs/index.ts";
 
 const usage =
-  "bun run harness context|validate|start|docs <request.json>; transition <before.json> <after.json>; source <snapshot.json> <relative-path>";
+  "bun run harness context|validate|start|docs|improvement-preflight|improvement-compare|quality-preflight|quality-compare <request.json>; transition <before.json> <after.json>; source <snapshot.json> <relative-path>";
 async function readRequest(path: string | undefined): Promise<unknown> {
   if (!path) throw Error(usage);
   const bytes = await readFile(path);
@@ -24,6 +35,43 @@ function object(value: unknown): Record<string, unknown> {
     throw Error("Request must be a JSON object");
   return value as Record<string, unknown>;
 }
+function documentationFields(value: Record<string, unknown>, allowed: string[]): void {
+  if (Object.keys(value).some((key) => !allowed.includes(key)))
+    throw Error("UNTRUSTED_OR_UNKNOWN_FIELD");
+}
+function documentationText(value: unknown, max: number): void {
+  if (
+    typeof value !== "string" ||
+    !value.trim() ||
+    value.length > max ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  )
+    throw Error("INVALID_DOCUMENTATION_OBSERVATION");
+}
+/** Validate transport shape only; observations remain unchanged caller claims. */
+function documentationObservations(value: unknown): DocumentationObservations {
+  const observations = object(value);
+  documentationFields(observations, ["installedVersion", "cache"]);
+  if (Object.hasOwn(observations, "installedVersion"))
+    documentationText(observations.installedVersion, 120);
+  if (Object.hasOwn(observations, "cache")) {
+    const cache = object(observations.cache);
+    documentationFields(cache, [
+      "canonicalUrl",
+      "bodySha256",
+      "independentlyConfirmedBodySha256",
+      "revalidatedInCurrentTask",
+      "targetVersion",
+    ]);
+    documentationText(cache.canonicalUrl, 2000);
+    documentationText(cache.bodySha256, 64);
+    documentationText(cache.independentlyConfirmedBodySha256, 64);
+    if (typeof cache.revalidatedInCurrentTask !== "boolean")
+      throw Error("INVALID_DOCUMENTATION_OBSERVATION");
+    if (Object.hasOwn(cache, "targetVersion")) documentationText(cache.targetVersion, 120);
+  }
+  return observations as unknown as DocumentationObservations;
+}
 export {
   gitReadEnvironment,
   resolveGitWorkSelection,
@@ -34,6 +82,14 @@ export async function runHarness(argv: string[]): Promise<unknown> {
     throw Error(usage);
   const request = object(await readRequest(path));
   switch (command) {
+    case "quality-preflight":
+      return preflightQualityImprovement(request);
+    case "quality-compare":
+      return compareQualityImprovement(request);
+    case "improvement-preflight":
+      return preflightImprovement(request);
+    case "improvement-compare":
+      return compareImprovement(request);
     case "context": {
       const reader = await openGitWork(await resolveGitWorkSelection(request.snapshot));
       return readGitWorkContext(reader, object(request.context) as unknown as ContextRequest);
@@ -54,8 +110,17 @@ export async function runHarness(argv: string[]): Promise<unknown> {
     }
     case "start":
       return qualifyGitWorkStart(request as unknown as StartRequest);
-    case "docs":
-      return (await readDocumentationRegistry()).select(request);
+    case "docs": {
+      const reader = await readDocumentationRegistry();
+      if (!Object.hasOwn(request, "request") && !Object.hasOwn(request, "observations"))
+        return reader.select(request);
+      documentationFields(request, ["request", "observations"]);
+      const docsRequest = object(request.request);
+      const observations = Object.hasOwn(request, "observations")
+        ? documentationObservations(request.observations)
+        : undefined;
+      return reader.select(docsRequest, observations);
+    }
     default:
       throw Error(usage);
   }
@@ -66,7 +131,11 @@ if (import.meta.main) {
     console.log(JSON.stringify(result, null, 2));
     if (result && typeof result === "object") {
       const value = result as Record<string, unknown>;
-      if (value.valid === false || value.status === "held") process.exitCode = 1;
+      if (
+        value.valid === false ||
+        ["held", "defer", "repair", "stop"].includes(String(value.status))
+      )
+        process.exitCode = 1;
     }
   } catch (error) {
     console.error(error instanceof Error ? error.message : "Common Harness request failed");

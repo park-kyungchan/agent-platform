@@ -32,6 +32,8 @@ import type {
 } from "./types";
 
 export * from "./types";
+export * from "./improvement";
+export * from "./quality-improvement";
 
 export interface EvalDatasetProperties extends PersistedDatasetProperties {
   revision?: string;
@@ -664,6 +666,8 @@ export async function runSuite(
               inputSnapshot: jsonSnapshot(input),
               unitVersion: unitObject.version,
               evaluatorVersion: String(evaluatorObject.version),
+              objectiveVersion: unit.objectiveVersion ?? evaluator.objectiveVersion ?? "1.0.0",
+              thresholdVersion: unit.thresholdVersion ?? evaluator.thresholdVersion ?? "1.0.0",
               evidenceRefs: unit.sourceRefs ?? [],
               unitSnapshot: jsonSnapshot(unitObject),
               evaluatorSnapshot: jsonSnapshot(evaluatorObject),

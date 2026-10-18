@@ -8,6 +8,7 @@ import {
   openGitWork,
   qualifyGitWorkStart,
   readGitWorkContext,
+  readCompactGitWorkContext,
   validateGitWorkRecords,
   validateGitWorkTransition,
   taskVerificationTarget,
@@ -2018,6 +2019,230 @@ describe("lossless shared native compact context", () => {
       expect(JSON.stringify(result)).not.toContain(sentinel);
       expect(JSON.stringify(result)).not.toContain("privateRaw");
     }
+  });
+});
+
+describe("composed canonical compact context", () => {
+  function repeatedContracts() {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    const spec = rows.find((row) => row.kind === "spec");
+    const plan = rows.find((row) => row.kind === "plan");
+    if (spec?.kind !== "spec" || plan?.kind !== "plan") throw Error("fixture");
+    const criteria = Array.from(
+      { length: 4 },
+      (_, index) => `Faithful criterion ${index}: ` + "preserved meaning ".repeat(80),
+    );
+    work.purpose.successCriteria = [...criteria];
+    const purpose = rows.find((row) => row.kind === "input" && row.id === "purpose") as InputRecord;
+    purpose.content = JSON.parse(JSON.stringify(work.purpose));
+    spec.criteria = [...criteria];
+    const direction = rows.find((row) => row.kind === "decision" && row.id === "direction");
+    if (direction?.kind !== "decision") throw Error("fixture");
+    // Rationale is validated source material; the existing wire codec retains
+    // its decision identity/original pointers rather than copying diagnostic prose.
+    direction.meaning = "Source rationale: " + "structural explanation ".repeat(450);
+    work.plan.revision = 2;
+    rows.push({ ...plan, revision: 2, clauses: ["Current Plan2; historical Task stays Plan1"] });
+    return { rows, criteria };
+  }
+
+  test("raw overflow does not block an exactly decoded compact representation", async () => {
+    const { rows, criteria } = repeatedContracts();
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const raw = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+    expect(raw.holdReasons).toContain("REQUIRED_CONTEXT_OUTPUT_LIMIT");
+    expect(raw.records).toEqual([]);
+    const compact = await readCompactGitWorkContext(
+      reader,
+      { taskId: "a", latestRelevant: "current", maxChars: 12000 },
+      { taskId: "a" },
+    );
+    expect(compact.status).toBe("source-qualified");
+    expect(JSON.stringify(compact).length).toBeLessThanOrEqual(12000);
+    const decoded = decodeCompactGitWorkContext(compact);
+    expect(decoded.normative.find((record) => record.kind === "work")?.purpose).toEqual(
+      (rows.find((record) => record.kind === "work") as WorkRecord).purpose,
+    );
+    expect(decoded.normative.find((record) => record.kind === "spec")?.criteria).toEqual(criteria);
+    expect(
+      decoded.normative.filter((record) => record.kind === "plan").map((r) => r.revision),
+    ).toEqual([2, 1]);
+    expect(decoded.task?.logical.planRevision).toBe(1);
+    expect(decoded.decisions.map((r) => r.id)).toContain("direction");
+    expect(compact.historicalEffects?.uncertainCount).toBe(1);
+    expect(compact.nativePermissionGranted).toBe(false);
+  });
+
+  test("standalone codec keeps its input limit and exposes no unchecked argument", async () => {
+    const { root, oid } = await fixture(boundRecords());
+    const raw = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    raw.records[0]!.unusedDiagnostic = "x".repeat(24000);
+    const result = (compactGitWorkContext as Function)(raw, { taskId: "a" }, false);
+    expect(result.status).toBe("held");
+    expect(result.holdReasons).toContain("REQUIRED_COMPACT_INPUT_LIMIT");
+    expect(result.normative).toEqual([]);
+  });
+
+  test("all composed serialized statuses fit the requested budget or explicitly reject it", async () => {
+    const { rows } = repeatedContracts();
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const statuses = new Set<string>();
+    for (const encoding of [undefined, "metadata.v1"] as const) {
+      for (const maxChars of [1024, 1600, 2048, 12000, 24000]) {
+        for (const latestRelevant of ["current", "advanced", "unavailable"] as const) {
+          const request = { taskId: "a", latestRelevant, maxChars };
+          let result: Awaited<ReturnType<typeof readCompactGitWorkContext>>;
+          try {
+            result = encoding
+              ? await readCompactGitWorkContext(reader, request, { taskId: "a" }, encoding)
+              : await readCompactGitWorkContext(reader, request, { taskId: "a" });
+          } catch (error) {
+            expect(error instanceof Error).toBe(true);
+            const message = (error as Error).message;
+            expect(message).toBe("COMPACT_CONTEXT_OUTPUT_BUDGET_TOO_SMALL");
+            expect(message.length).toBeLessThanOrEqual(maxChars);
+            continue;
+          }
+          statuses.add(result.status);
+          expect(JSON.stringify(result).length).toBeLessThanOrEqual(maxChars);
+          expect(result.nativePermissionGranted).toBe(false);
+          if (result.status === "held") {
+            expect(result.normative).toEqual([]);
+            expect(() => decodeCompactGitWorkContext(result)).toThrow();
+          } else {
+            expect(decodeCompactGitWorkContext(result).task?.id).toBe("a");
+          }
+        }
+      }
+    }
+    expect([...statuses].sort()).toEqual(["held", "source-qualified"]);
+  });
+
+  test("composed output and request budgets still refuse rather than truncate", async () => {
+    const { rows } = repeatedContracts();
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    await expect(
+      readCompactGitWorkContext(
+        reader,
+        { taskId: "a", latestRelevant: "current", maxChars: 1024 },
+        { taskId: "a" },
+      ),
+    ).rejects.toThrow("COMPACT_CONTEXT_OUTPUT_BUDGET_TOO_SMALL");
+    const compact = await readCompactGitWorkContext(
+      reader,
+      { taskId: "a", latestRelevant: "current", maxChars: 2048 },
+      { taskId: "a" },
+    );
+    expect(JSON.stringify(compact).length).toBeLessThanOrEqual(2048);
+    expect(compact.status).toBe("held");
+    expect(compact.holdReasons).toContain("REQUIRED_CONTEXT_OUTPUT_LIMIT");
+    expect(compact.normative).toEqual([]);
+    await expect(
+      readCompactGitWorkContext(
+        reader,
+        { taskId: "a", latestRelevant: "current", maxChars: 24001 },
+        { taskId: "a" },
+      ),
+    ).rejects.toThrow("INVALID_CONTEXT_BUDGET_OR_CURRENTNESS");
+  });
+
+  test.each(["advanced", "original", "dependency"] as const)(
+    "composition retains the %s refusal independently of raw representation size",
+    async (variant) => {
+      const { rows } = repeatedContracts();
+      if (variant === "original") {
+        const answer = rows.find(
+          (row) => row.kind === "input" && row.id === "answer",
+        ) as InputRecord;
+        answer.content = { text: "A changed source answer", question: "Which canonical source?" };
+      }
+      if (variant === "dependency") {
+        const selected = rows.find((row) => row.kind === "task" && row.id === "a") as TaskRecord;
+        selected.dependsOn = [{ taskId: "b", milestone: "execution-and-verification" }];
+      }
+      const { root, oid } = await fixture(rows);
+      const compact = await readCompactGitWorkContext(
+        await open(root, oid),
+        {
+          taskId: "a",
+          latestRelevant: variant === "advanced" ? "advanced" : "current",
+          maxChars: 12000,
+        },
+        { taskId: "a" },
+      );
+      expect(compact.status).toBe("held");
+      expect(compact.normative).toEqual([]);
+      expect(compact.task).toBeUndefined();
+      expect(compact.nativePermissionGranted).toBe(false);
+    },
+  );
+
+  test("opt-in metadata packing decodes identically without changing normative text", async () => {
+    const { rows } = repeatedContracts();
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const request = { taskId: "a", latestRelevant: "current" as const, maxChars: 12000 };
+    const ordinary = await readCompactGitWorkContext(reader, request, { taskId: "a" });
+    const packed = await readCompactGitWorkContext(reader, request, { taskId: "a" }, "metadata.v1");
+    expect(packed.status).toBe("source-qualified");
+    expect("encoding" in packed).toBe(true);
+    expect(packed.strings).toEqual(ordinary.strings);
+    expect(decodeCompactGitWorkContext(packed)).toEqual(decodeCompactGitWorkContext(ordinary));
+    expect(JSON.stringify(packed).length).toBeLessThan(JSON.stringify(ordinary).length);
+  });
+
+  test.each(["version", "prefix", "blob", "contract", "fields", "authority", "extra"] as const)(
+    "packed metadata rejects corrupted %s before exposing a decoded context",
+    async (variant) => {
+      const { root, oid } = await fixture(boundRecords());
+      const packed = await readCompactGitWorkContext(
+        await open(root, oid),
+        { taskId: "a", latestRelevant: "current" },
+        { taskId: "a" },
+        "metadata.v1",
+      );
+      if (!("encoding" in packed)) throw Error("fixture");
+      if (variant === "version") packed.encoding.version = "unknown" as "metadata.v1";
+      if (variant === "prefix") packed.sources[0]![1] = "~9:unavailable";
+      if (variant === "blob") packed.sources[0]![2] = "not+a+full+blob";
+      if (variant === "contract") packed.task![2] = [9999, 9999];
+      if (variant === "fields") packed.normative[0]![3] = 9999;
+      if (variant === "authority") Object.assign(packed, { nativePermissionGranted: true });
+      if (variant === "extra") Object.assign(packed, { unexpected: "must not be discarded" });
+      expect(() => decodeCompactGitWorkContext(packed)).toThrow();
+    },
+  );
+
+  test("packing holds irreducible oversized text and snapshots mutable request options", async () => {
+    const rows = boundRecords();
+    const work = rows.find((row) => row.kind === "work") as WorkRecord;
+    work.purpose.successCriteria = Array.from({ length: 4 }, (_, i) => `${i}:` + "x".repeat(8000));
+    const purpose = rows.find((row) => row.kind === "input" && row.id === "purpose") as InputRecord;
+    purpose.content = JSON.parse(JSON.stringify(work.purpose));
+    const { root, oid } = await fixture(rows);
+    const reader = await open(root, oid);
+    const large = await readCompactGitWorkContext(
+      reader,
+      { taskId: "a", latestRelevant: "current" },
+      { taskId: "a" },
+      "metadata.v1",
+    );
+    expect(large.status).toBe("held");
+    expect(large.holdReasons).toContain("REQUIRED_CONTEXT_OUTPUT_LIMIT");
+    expect(large.normative).toEqual([]);
+    const request = { taskId: "a", latestRelevant: "current" as const, maxChars: 1024 };
+    const selection = { taskId: "a" };
+    const reading = readCompactGitWorkContext(reader, request, selection, "metadata.v1");
+    request.maxChars = 24000;
+    selection.taskId = "b";
+    await expect(reading).rejects.toThrow("COMPACT_CONTEXT_OUTPUT_BUDGET_TOO_SMALL");
   });
 });
 

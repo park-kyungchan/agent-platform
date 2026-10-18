@@ -1,0 +1,208 @@
+{
+  "schema": "agent-platform.contract-maintenance-successor.v1",
+  "id": "agent-platform:maintenance:integrated-contracts:20261017",
+  "recordClass": "current-scoped-maintenance-targets-not-execution-receipt",
+  "preparedAtUtc": "2026-10-17T21:41:07.332208+00:00",
+  "authority": {
+    "currentWorkId": "ontology-driven-platform-integration-20261017",
+    "currentWorkPlan": "ODI-PLAN@2",
+    "decisionId": "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY",
+    "meaning": "User directs common harness alignment and removal of Hermes/profile-specific maintained repositories. Reversible archival of the four integrated contract/example repositories is the accountable Lead choice; this record is not a newly fabricated user answer.",
+    "nativeProfileOrServiceEffectsGranted": false,
+    "owningRepository": "park-kyungchan/agent-platform",
+    "owningBranch": "refs/heads/work/ontology-driven-platform-integration-20261017",
+    "immutableWorkCommit": "9d6291e8d7b6049a1bc91ee89fd3e26da4890683",
+    "records": {
+      "work": {
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/work.json",
+        "sha256": "a3c965af202136a820de7d1c84b01ca70b62cee8b7c1fc18f12e8995a6c90c81",
+        "url": "https://github.com/park-kyungchan/agent-platform/blob/9d6291e8d7b6049a1bc91ee89fd3e26da4890683/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/work.json"
+      },
+      "plan": {
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/plans/ODI-PLAN@2.json",
+        "sha256": "02c8af21d205db84ac2e2bcf61bda39939c0e2bf61a0406ed682b9f345880b30",
+        "url": "https://github.com/park-kyungchan/agent-platform/blob/9d6291e8d7b6049a1bc91ee89fd3e26da4890683/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/plans/ODI-PLAN@2.json"
+      },
+      "topologyDecision": {
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY.json",
+        "sha256": "44d5e40ed4c00d27ab74183deebcca79d9fc9edf3d90de4c1c12285bb4e16d9f",
+        "url": "https://github.com/park-kyungchan/agent-platform/blob/9d6291e8d7b6049a1bc91ee89fd3e26da4890683/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY.json"
+      },
+      "originalAnswer": {
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COMMON-HARNESS-REPOSITORY-DIRECTION.json",
+        "sha256": "2fac81a66b7ed2d342b8aa8a644210350385be05b55421f344cd33a70a650047",
+        "url": "https://github.com/park-kyungchan/agent-platform/blob/9d6291e8d7b6049a1bc91ee89fd3e26da4890683/work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COMMON-HARNESS-REPOSITORY-DIRECTION.json"
+      }
+    },
+    "originalAnswerBinding": {
+      "decisionAnswer": "#/answer",
+      "decisionAnswerSource": "#/answerSource",
+      "originalText": "#/content/text",
+      "originalSha256": "2fac81a66b7ed2d342b8aa8a644210350385be05b55421f344cd33a70a650047",
+      "originalNativeRowSha256": "d25b1f62e7e28051258ba392b84ffd743a8b644f661131c3a6928363a36320cd",
+      "check": "Read these immutable owning-Work records through the canonical reader; Work must select accepted topologyDecision and Plan2, and Decision.answer must equal original Input.content.text at its exact snapshot/fragment. Lead archival choice is disclosed interpretation, not extra user text.",
+      "gitAuthenticatesNativeAuthorship": false
+    },
+    "currentnessBoundary": "This immutable H3 source explains authority and original-answer lineage. Before any effect Root must separately resolve current owning Work/accepted Decisions/fences and verify continued applicability; these Git records neither grant native permission nor make this policy actionable."
+  },
+  "maintainedProducer": {
+    "repository": "park-kyungchan/agent-platform",
+    "sourcePaths": [
+      "packages/operational-context/src/backend/intent-context",
+      "packages/operational-context/src/backend/review"
+    ],
+    "integrationRef": "history/public-contracts/integration.json",
+    "historyCustodyRef": "history/public-contracts/custody.json",
+    "alreadyIntegrated": true,
+    "newPortRequired": false,
+    "reviewedCodeBaseline": {
+      "head": "3b242ac37046ada7d6351f27934ed08bb617c391",
+      "tree": "d0e9de3bfd8d5ba14075d4e2e9a26142666269d8",
+      "sourceManifestSha256": "b30cd9c14bf0bb1c7ebfc98b095aed728c9deab27ed3a0f6b0f9da0d008d8b32",
+      "independentReviewReceipt": {
+        "url": "https://github.com/park-kyungchan/agent-platform/blob/b98e2db5cbc87dfa2a4cfa4dba4f2b57e4876be0/native-reviews/3b242ac37046ada7d6351f27934ed08bb617c391.json",
+        "sha256": "29f0b513bdcfecfa145166df8959338aef575630a0abf26f744977b43aa5162d"
+      },
+      "independentResult": {
+        "url": "https://github.com/park-kyungchan/agent-platform/blob/8bd28cb6e761214fee9b0b1a8febf6176f03dcc5/native-review-results/3b242ac37046ada7d6351f27934ed08bb617c391.json",
+        "sha256": "f3ed30c01f7d96c89382f97a745d277ca27eec69d5b320cc0997a86eecb3ea8e"
+      },
+      "authenticatedReviewStatus": {
+        "id": 56610190116,
+        "context": "native-independent-review",
+        "state": "success",
+        "creatorId": 241037670,
+        "creatorLogin": "park-kyungchan",
+        "targetUrl": "https://github.com/park-kyungchan/agent-platform/blob/b98e2db5cbc87dfa2a4cfa4dba4f2b57e4876be0/native-reviews/3b242ac37046ada7d6351f27934ed08bb617c391.json",
+        "url": "https://api.github.com/repos/park-kyungchan/agent-platform/statuses/3b242ac37046ada7d6351f27934ed08bb617c391",
+        "observedAtUtc": "2026-10-18T01:27:54.638945+00:00"
+      },
+      "scope": "Actual already-reviewed and adopted canonical implementation baseline, not a claim this policy successor has its own review or approval."
+    },
+    "futureAdoptedProducerBinding": {
+      "requiredAtEffectTime": true,
+      "readyForEffects": false,
+      "requiredFields": [
+        "repositoryId",
+        "actualMergedHead",
+        "actualMergedTree",
+        "actualSourceManifestSha256",
+        "exactSuccessorIndependentReview",
+        "authenticatedExactHeadReviewStatus",
+        "actualRootSourceAdoptionReceipt",
+        "freshRootCurrentCodeCAS",
+        "currentUnresolvedRequiredFindings"
+      ],
+      "rule": "Final effect input must pin actual independently reviewed/published/explicitly merged/adopted successor M/T/F and actual current0/status/adoption/CAS. Never substitute this historical baseline review, source-policy text or an unbound future field for that evidence.",
+      "baselineToSuccessorAllowedChangedPaths": [
+        "architecture/contract-maintenance-successor.json",
+        "history/public-contracts/README.md"
+      ],
+      "unchangedCodeRequired": "Compare exact Git blob/mode paths from reviewedCodeBaseline to the final reviewed/adopted successor. Only these two policy/docs blobs may differ; all implementation/generator/adapter/package/lock/project/registration/marker/release/history-custody/bundle/archive bytes must remain identical. Any additional change requires a new exact source review/binding, not reuse by inference.",
+      "selfReferentialFuturePolicyCommitPin": false
+    }
+  },
+  "targets": [
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-context",
+      "repositoryId": 1411493725,
+      "expectedPrivate": true,
+      "defaultBranch": "main",
+      "expectedHead": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+          "type": "commit"
+        }
+      ],
+      "fullHistoryBundle": {
+        "path": "history/public-contracts/bundles/hermes-profile-dc-context.bundle",
+        "sha256": "9b9869ebc61fc39c2e2140714f6c003bb67c4271027e2beae782dfe8180c55da"
+      },
+      "expectedArchived": false
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-contract-audit",
+      "repositoryId": 1411506018,
+      "expectedPrivate": true,
+      "defaultBranch": "main",
+      "expectedHead": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+          "type": "commit"
+        }
+      ],
+      "fullHistoryBundle": {
+        "path": "history/public-contracts/bundles/hermes-profile-dc-contract-audit.bundle",
+        "sha256": "88a79611a678a7dd4abfc19506a6202dc827cf85e0a50a9c5c3177d3b7a86bc4"
+      },
+      "expectedArchived": false
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-dc-review",
+      "repositoryId": 1411547504,
+      "expectedPrivate": true,
+      "defaultBranch": "main",
+      "expectedHead": "69ed6d9a0266066c83789c322c4b4521810333ec",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "69ed6d9a0266066c83789c322c4b4521810333ec",
+          "type": "commit"
+        }
+      ],
+      "fullHistoryBundle": {
+        "path": "history/public-contracts/bundles/hermes-profile-dc-review.bundle",
+        "sha256": "50388b1815bdbea8df8b4f6807353a29d70f19ba17e1dea2172df45046b127cd"
+      },
+      "expectedArchived": false
+    },
+    {
+      "repository": "park-kyungchan/hermes-profile-ontology-platform",
+      "repositoryId": 1411598033,
+      "expectedPrivate": true,
+      "defaultBranch": "main",
+      "expectedHead": "796cd709f356344210aa73f02ca2c8407103cc28",
+      "expectedAdvertisedRefs": [
+        {
+          "ref": "refs/heads/main",
+          "sha": "796cd709f356344210aa73f02ca2c8407103cc28",
+          "type": "commit"
+        }
+      ],
+      "fullHistoryBundle": {
+        "path": "history/public-contracts/bundles/hermes-profile-ontology-platform.bundle",
+        "sha256": "e35c463de8c778f8aa0d9f3732a14650533a4c85726f74071cfaf95186361416"
+      },
+      "expectedArchived": false
+    }
+  ],
+  "effect": {
+    "kind": "archive",
+    "deleteRepository": false,
+    "changeVisibility": false,
+    "removeRefsOrHistoricalSource": false,
+    "relocateNativeProfileDataOrCredentials": false,
+    "changeServiceRoute": false,
+    "reason": "End duplicate maintained writers while retaining current authorized repository/blob/history read paths.",
+    "preExistingArchivedDisposition": "Immediately before each mutation require observed archived=false. If already true, refuse PATCH; durably record the externally observed already-archived state and existing per-target fence with attribution unresolved/external, never label it an effect completed by this run or automatically retry/claim/reset a consumed intent.",
+    "attributionBoundary": "Fresh precondition/readback is a client observation, not an atomic server archive CAS. Concurrent/external archive or uncertain transport leaves effect attribution unknown and consumes the owned intent; state archived=true alone is not a new-effect receipt."
+  },
+  "currentSourceConsumer": "Admitted code uses canonical operational-context. Existing source-navigation URLs are read references; archival preserves their current access rather than requiring another deployment. This is not universal absence of consumers or proof of live deployment parity.",
+  "educationBoundary": "hermes-profile-default/mathCrew and hermes-profile-dc-gang-a-dev/clinic-workbench are Education-owned applications, already integrated under education-platform. They are not these four archive targets, not native profile exports and not another common harness role layer. Their remaining delivery/retirement is consumer-specific.",
+  "historicalPacketRef": "architecture/public-contract-retirement.json",
+  "historicalPacketMeaning": "The October11 deletion candidate, old public labels and old pending gates remain original historical observations. They do not establish current visibility, current archive authority or an archive effect.",
+  "effectOrder": [
+    "Resolve immutable owning-Work authority/original-answer references and current applicable Decision/Plan/effect fences. Independently review this exact source/tree/current zero findings, publish authenticated status before PR, pass required checks, Lead explicitly merges expected head and adopts source. This policy is source only; the effect packet must separately bind actual final M/T/F/review/status/adoption/current-code CAS and unchanged-code proof from the pinned baseline.",
+    "Immediately before each archive require target archived=false plus exact numeric identity/private/default/all advertised refs and canonical producer/custody/authorized source read. Refuse any third state. Already archived must be durably recorded/fenced as externally observed completion with no attribution to this run and no PATCH/replay.",
+    "Record separate non-replayable archive intent/result for each exact target using the authenticated owner. Do not delete, rename, change visibility or touch native profiles/services.",
+    "Read back archived state, unchanged refs and authorized source/blob access. Keep actual effect receipts with the Work evidence owner; this source record never substitutes for them."
+  ],
+  "effectsPerformedByThisRecord": false,
+  "wholeGoalOrSemanticAcceptanceEstablished": false,
+  "updatedAtUtc": "2026-10-18T01:29:56.294994+00:00",
+  "sourceOnlyNotExecutionAuthority": true
+}

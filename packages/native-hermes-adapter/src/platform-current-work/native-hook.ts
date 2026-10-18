@@ -8,6 +8,7 @@ declare const HERMES_CURRENT_WORK_BINDINGS_PATH: string | undefined;
 declare const HERMES_CURRENT_WORK_BINDINGS_SHA256: string | undefined;
 declare const HERMES_CURRENT_WORK_OUTPUT_VERSION: "v1" | "v2" | undefined;
 declare const HERMES_CURRENT_WORK_MAX_CHARS: number | undefined;
+declare const HERMES_CURRENT_WORK_METADATA_ENCODING: "metadata.v1" | undefined;
 
 // Builtin-only bootstrap modules precede the implementation import. Data never chooses executable code.
 let stage: CurrentWorkDiagnosticStage = "input";
@@ -67,6 +68,10 @@ try {
         typeof HERMES_CURRENT_WORK_MAX_CHARS === "undefined"
           ? undefined
           : HERMES_CURRENT_WORK_MAX_CHARS,
+      metadataEncoding:
+        typeof HERMES_CURRENT_WORK_METADATA_ENCODING === "undefined"
+          ? undefined
+          : HERMES_CURRENT_WORK_METADATA_ENCODING,
     });
     await verify();
     console.log(JSON.stringify(response));

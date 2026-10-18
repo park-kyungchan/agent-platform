@@ -11,6 +11,7 @@ import type {
   VerificationUnitProperties,
 } from "../src/modules/evals";
 import { assessFreshness, recordAcceptance, verifyClaim } from "../src/modules/claims";
+import { compareImprovement } from "../src/modules/evals/improvement";
 import {
   importNativeCodexResult,
   parseNativeCodexResult,
@@ -166,6 +167,157 @@ describe("Atomic evaluation and applicability", () => {
     expect((await foundry.store.history(result.run.id)).map((version) => version.version)).toEqual([
       1, 2,
     ]);
+  });
+
+  test.each([
+    {
+      label: "unit overrides the effective suite evaluator",
+      unit: { objectiveVersion: "unit-objective", thresholdVersion: "unit-threshold" },
+      evaluator: {
+        method: "deterministic",
+        objectiveVersion: "evaluator-objective",
+        thresholdVersion: "evaluator-threshold",
+      },
+      suite: { objectiveVersion: "suite-objective", thresholdVersion: "suite-threshold" },
+      expected: ["unit-objective", "unit-threshold"],
+    },
+    {
+      label: "suite overrides evaluator",
+      unit: {},
+      evaluator: {
+        method: "deterministic",
+        objectiveVersion: "evaluator-objective",
+        thresholdVersion: "evaluator-threshold",
+      },
+      suite: { objectiveVersion: "suite-objective", thresholdVersion: "suite-threshold" },
+      expected: ["suite-objective", "suite-threshold"],
+    },
+    {
+      label: "evaluator supplies versions",
+      unit: {},
+      evaluator: {
+        method: "deterministic",
+        objectiveVersion: "evaluator-objective",
+        thresholdVersion: "evaluator-threshold",
+      },
+      suite: {},
+      expected: ["evaluator-objective", "evaluator-threshold"],
+    },
+    {
+      label: "default versions apply",
+      unit: {},
+      evaluator: { method: "deterministic" },
+      suite: {},
+      expected: ["1.0.0", "1.0.0"],
+    },
+  ] satisfies {
+    label: string;
+    unit: Partial<VerificationUnitProperties>;
+    evaluator: EvaluatorProperties;
+    suite: JsonObject;
+    expected: [string, string];
+  }[])("runSuite results retain comparison-compatible versions: $label", async (options) => {
+    const stored = await foundry.store.putBlob("independently fixed expected marker");
+    const source = createObject("SourceCapture", "pilot", {
+      url: "https://example.test/independent-expectation",
+      retrievedAt: NOW,
+      outcome: "success",
+      artifacts: [{ kind: "extracted-text", ...stored }],
+      metadata: {},
+    });
+    const { suite, unit, evaluator, dataset } = await fixture({
+      unit: { ...options.unit, sourceRefs: [source.id] },
+      evaluator: options.evaluator,
+      suite: options.suite as JsonObject,
+      source,
+    });
+    const baseline = await runSuite(foundry, suite.id, { now: NOW });
+    const candidate = await runSuite(foundry, suite.id, { now: NOW });
+    for (const output of [baseline, candidate]) {
+      expect(output.run.properties.status).toBe("completed");
+      const result = output.caseResults[0]!;
+      expect(result.properties.objectiveVersion).toBe(options.expected[0]);
+      expect(result.properties.thresholdVersion).toBe(options.expected[1]);
+      expect(result.properties.evidenceRefs).toEqual([source.id]);
+      const persisted = await foundry.getObject(result.id);
+      expect(persisted?.properties.objectiveVersion).toBe(options.expected[0]);
+      expect(persisted?.properties.thresholdVersion).toBe(options.expected[1]);
+      const metrics = result.properties.metrics as JsonObject[];
+      expect(
+        metrics.every(
+          (metric) =>
+            metric.objectiveVersion === result.properties.objectiveVersion &&
+            metric.thresholdVersion === result.properties.thresholdVersion,
+        ),
+      ).toBe(true);
+    }
+    const bound = (ref: string, value: unknown, version = "1") => ({
+      ref,
+      version,
+      sha256: fingerprint(value),
+    });
+    const target = bound(suite.id, suite.properties.target);
+    const datasetPin = bound(dataset.id, dataset, String(dataset.version));
+    const evaluatorPin = bound(evaluator.id, evaluator, String(evaluator.version));
+    const expectation = bound(unit.id, unit.properties.expectedPredicate);
+    const observation = (output: typeof baseline) => ({
+      target,
+      dataset: datasetPin,
+      evaluator: evaluatorPin,
+      expectedBehavior: expectation,
+      contextSha256: fingerprint(unit.properties.inputSnapshot),
+      environmentSha256: fingerprint("deterministic fixture environment"),
+      results: output.caseResults.map((result) => ({
+        id: result.id,
+        properties: result.properties,
+        measurements: {
+          expectedPredicate: (result.properties.metrics as JsonObject[]).find(
+            (metric) => metric.name === "expectedPredicate",
+          )!.value,
+        },
+      })),
+    });
+    const comparison = compareImprovement({
+      protocol: {
+        schema: "common.constrained-improvement.v1",
+        work: {
+          projectId: "pilot",
+          workId: "producer-compatibility",
+          workRef: bound("work.json", "fixture-work"),
+          specRef: bound("spec@1.json", "fixture-spec"),
+          planRef: bound("plan@1.json", "fixture-plan"),
+        },
+        target: { baseline: target, candidate: target },
+        goal: {
+          metric: "expectedPredicate",
+          unit: "predicate score",
+          direction: "increase",
+          minimumDelta: 1,
+        },
+        validation: {
+          dataset: datasetPin,
+          evaluator: evaluatorPin,
+          expectedBehavior: expectation,
+          independenceEvidence: bound(source.id, source),
+          objectiveVersion: options.expected[0],
+          thresholdVersion: options.expected[1],
+          caseIds: [unit.id],
+          iterations: 1,
+        },
+        allowedChanges: ["fixture.ts"],
+        limits: { maxCaseResults: 2, maxDurationMs: 10000, maxTotalTokens: 1 },
+        decision: { ownerId: "fixture-reviewer", reviewRequired: true },
+      },
+      baseline: observation(baseline),
+      candidate: observation(candidate),
+      changedPaths: [],
+      usage: { durationMs: 0, totalTokens: 0 },
+    });
+    // Identical real runs demonstrate producer/consumer compatibility, not a measured optimization.
+    expect(comparison.status).toBe("defer");
+    expect(comparison.findings).toEqual(["PRACTICAL_GOAL_NOT_ESTABLISHED"]);
+    expect(comparison.comparison).toMatchObject({ baseline: 1, candidate: 1, improvement: 0 });
+    expect(comparison.evidenceRefs).toEqual([source.id]);
   });
 
   test("current-state expiration and fingerprint change preserve prior verdict history", async () => {

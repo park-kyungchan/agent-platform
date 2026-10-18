@@ -4,6 +4,7 @@ import { isAbsolute, relative, resolve } from "node:path";
 import type { HookBinding, NativeContextLoader } from "./hooks.ts";
 import type {
   CompactGitWorkContext,
+  GitWorkCompactOutput,
   CompactSourcePointer,
   GitWorkContext,
 } from "@palantirkc/work-continuity/git-work";
@@ -297,6 +298,11 @@ export function gitWorkDeliveryPolicy(
   )
     throw Error("INVALID_GIT_WORK_CONTEXT_VERSION");
   const policyVersion = binding.gitWorkContextVersion ?? "v1";
+  if (
+    binding.gitWorkMetadataEncoding !== undefined &&
+    (binding.gitWorkMetadataEncoding !== "metadata.v1" || policyVersion !== "v2")
+  )
+    throw Error("INVALID_GIT_WORK_METADATA_ENCODING");
   const versionCapChars = policyVersion === "v2" ? 12000 : 6000;
   return {
     policyVersion,
@@ -333,8 +339,20 @@ export interface SelectedGitWorkView {
   nativePermissionGranted: false;
   semanticAcceptanceEstablished: false;
 }
-export type SelectedGitWorkContext = SelectedGitWorkView | CompactGitWorkContext;
+export type SelectedGitWorkContext = SelectedGitWorkView | GitWorkCompactOutput;
 export function selectedGitWorkPointer(selected: SelectedGitWorkContext) {
+  if ("encoding" in selected) {
+    const [repositoryId, commit, projectId, workId] = selected.metadata;
+    if (![repositoryId, commit, projectId, workId].every((value) => typeof value === "string"))
+      throw Error("INVALID_COMPACT_SOURCE_POINTER");
+    return {
+      repositoryId: repositoryId as string,
+      commit: commit as string,
+      projectId: projectId as string,
+      workId: workId as string,
+      sourcePathBase: `work/${encodeURIComponent(projectId as string)}/${encodeURIComponent(workId as string)}`,
+    };
+  }
   return "pointer" in selected
     ? selected.pointer
     : {

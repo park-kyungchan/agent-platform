@@ -30,7 +30,10 @@ export type NativeContextLoader = () => Promise<{
     | "readGitWorkContext"
     | "compactGitWorkContext"
     | "decodeCompactGitWorkContext"
-  >;
+  > &
+    Partial<
+      Pick<typeof import("@palantirkc/work-continuity/git-work"), "readCompactGitWorkContext">
+    >;
   verifyCurrentSourceClosure(): Promise<void>;
 }>;
 import {
@@ -85,6 +88,8 @@ export interface HookBinding {
   workId?: string;
   /** Explicit source-owned delivery opt-in; native activation is a separate owner gate. */
   gitWorkContextVersion?: "v1" | "v2";
+  /** Explicit owner adoption; old v1/v2 bindings retain their original representation. */
+  gitWorkMetadataEncoding?: "metadata.v1";
   /** Extra isolated worktree roots must be explicitly admitted; they retain the source owner's checkpoint. */
   allowedCwds?: string[];
   /** Bootstrap entrypoints admit only this canonical cwd, never its descendants. */
@@ -499,11 +504,10 @@ function contextSelections(
   return value as (SessionGitWorkSelection | LegacySessionContextSelection)[];
 }
 
-/** Absence of agent identity is an exact parent tuple, never a child wildcard. */
-export function resolveSessionGitWorkSelection(
+/** One tuple predicate serves both pre-capture opt-in admission and context selection. */
+function exactSessionGitWorkSelection(
   input: HookInput,
   registry: HookBindings,
-  binding: HookBinding,
 ): SessionGitWorkSelection | undefined {
   const selected = contextSelections(contextSelectionSnapshot(registry).contextSelections).find(
     (entry) =>
@@ -514,7 +518,17 @@ export function resolveSessionGitWorkSelection(
       entry.cwd === input.cwd,
   );
   if (!selected || selected.schema !== "codex.session-git-work-selection.v1") return undefined;
-  const selection = selected as SessionGitWorkSelection;
+  return selected as SessionGitWorkSelection;
+}
+
+/** Absence of agent identity is an exact parent tuple, never a child wildcard. */
+export function resolveSessionGitWorkSelection(
+  input: HookInput,
+  registry: HookBindings,
+  binding: HookBinding,
+): SessionGitWorkSelection | undefined {
+  const selection = exactSessionGitWorkSelection(input, registry);
+  if (!selection) return undefined;
   if (
     selection.ownerRoot !== binding.root ||
     selection.projectId !== binding.projectId ||
@@ -559,35 +573,48 @@ async function selectedGitWork(
   try {
     const snapshot = await provider.gitWork.resolveGitWorkSelection(selection.snapshot);
     const reader = await provider.gitWork.openGitWork(snapshot);
-    const context = await provider.gitWork.readGitWorkContext(reader, {
+    const request: ContextRequest = {
       ...(selection.taskId ? { taskId: selection.taskId } : {}),
       ...(selection.decisionId ? { decisionId: selection.decisionId } : {}),
       latestRelevant: selection.latestRelevant ?? "unknown",
       maxChars: 24000,
       maxRecords: 256,
-    });
+    };
     const task = selection.taskId
       ? await reader.readRecord({ kind: "task", id: selection.taskId }).catch(() => undefined)
       : undefined;
-    const view = projectSelectedGitWork(
-      context,
-      {
-        taskId: selection.taskId,
-        decisionIds:
-          task?.kind === "task"
-            ? [
-                ...new Set([
-                  ...task.decisionIds,
-                  ...(selection.decisionId ? [selection.decisionId] : []),
-                ]),
-              ]
-            : selection.decisionId
-              ? [selection.decisionId]
-              : undefined,
-      },
-      provider.gitWork,
-      binding.gitWorkContextVersion ?? "v1",
-    );
+    const compactSelection = {
+      taskId: selection.taskId,
+      decisionIds:
+        task?.kind === "task"
+          ? [
+              ...new Set([
+                ...task.decisionIds,
+                ...(selection.decisionId ? [selection.decisionId] : []),
+              ]),
+            ]
+          : selection.decisionId
+            ? [selection.decisionId]
+            : undefined,
+    };
+    if (
+      binding.gitWorkMetadataEncoding &&
+      typeof provider.gitWork.readCompactGitWorkContext !== "function"
+    )
+      throw Error("Selected Git Work metadata requires the proven composed context provider");
+    const view = binding.gitWorkMetadataEncoding
+      ? await provider.gitWork.readCompactGitWorkContext!(
+          reader,
+          request,
+          compactSelection,
+          "metadata.v1",
+        )
+      : projectSelectedGitWork(
+          await provider.gitWork.readGitWorkContext(reader, request),
+          compactSelection,
+          provider.gitWork,
+          binding.gitWorkContextVersion ?? "v1",
+        );
     // A moving local branch is observed twice; neither observation proves remote currentness.
     const after = await provider.gitWork.resolveGitWorkSelection(selection.snapshot);
     if (after.commit !== snapshot.commit) {
@@ -666,6 +693,9 @@ export function readHookBindings(path: string): HookBindings {
       (binding.gitWorkContextVersion !== undefined &&
         binding.gitWorkContextVersion !== "v1" &&
         binding.gitWorkContextVersion !== "v2") ||
+      (binding.gitWorkMetadataEncoding !== undefined &&
+        (binding.gitWorkMetadataEncoding !== "metadata.v1" ||
+          binding.gitWorkContextVersion !== "v2")) ||
       (binding.allowedCwds !== undefined &&
         (!Array.isArray(binding.allowedCwds) ||
           !binding.allowedCwds.every((p) => typeof p === "string" && isAbsolute(p)))) ||
@@ -774,6 +804,7 @@ export function resolveHookBinding(cwd: string, registry: HookBindings): HookBin
           binding.childReservationTokens ?? null,
           binding.entrypointContextPath ?? null,
           binding.gitWorkContextVersion ?? "v1",
+          binding.gitWorkMetadataEncoding ?? null,
         ]),
       ),
   );
@@ -1005,7 +1036,13 @@ async function gateQualificationChild(
 
 export async function handleHook(
   value: unknown,
-  options: { bindings: HookBindings; now?: () => Date; maxChars?: number },
+  options: {
+    bindings: HookBindings;
+    now?: () => Date;
+    maxChars?: number;
+    /** Explicit normal-mode admission before any prompt or boundary capture. */
+    selectedSessionOnly?: boolean;
+  },
   loadCodexOwnerContext: NativeContextLoader,
 ): Promise<HookResult> {
   let gateActive = false;
@@ -1014,6 +1051,14 @@ export async function handleHook(
     const input = parseHookInput(value);
     contextSelectionExpected =
       input.hook_event_name !== "PreToolUse" && selectedContextExpected(input, options.bindings);
+    if (options.selectedSessionOnly) {
+      // Foreign tuples decline before even resolving a checkpoint or loading the provider.
+      if (!exactSessionGitWorkSelection(input, options.bindings))
+        return { status: "no-op", stdout: "", exitCode: 0 };
+      const binding = resolveHookBinding(input.cwd, options.bindings);
+      if (!binding || !resolveSessionGitWorkSelection(input, options.bindings, binding))
+        return { status: "no-op", stdout: "", exitCode: 0 };
+    }
     const chosen =
       input.hook_event_name === "PreToolUse"
         ? { binding: resolveHookBinding(input.cwd, options.bindings), selection: undefined }

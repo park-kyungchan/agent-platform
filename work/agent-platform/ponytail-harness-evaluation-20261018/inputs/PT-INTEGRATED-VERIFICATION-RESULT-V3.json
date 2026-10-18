@@ -1,0 +1,142 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-INTEGRATED-VERIFICATION-RESULT-V3",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-INTEGRATED-VERIFICATION-RESULT-V3.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "codeCommit": "0bcfc3877670a8d6003cd0f57757a8e56de6c9fd",
+    "quality": {
+      "status": "pass",
+      "checks": [
+        {
+          "id": "mutation-policy",
+          "status": "pass"
+        },
+        {
+          "id": "scope",
+          "status": "pass"
+        },
+        {
+          "id": "source-snapshot",
+          "status": "pass"
+        },
+        {
+          "id": "source-identity",
+          "status": "pass"
+        },
+        {
+          "id": "build-public-ontology-package",
+          "status": "pass"
+        },
+        {
+          "id": "architecture",
+          "status": "pass"
+        },
+        {
+          "id": "format",
+          "status": "pass"
+        },
+        {
+          "id": "typed-lint-and-explicit-any-audit",
+          "status": "pass"
+        },
+        {
+          "id": "workflow-correctness-and-security",
+          "status": "pass"
+        },
+        {
+          "id": "dependency-vulnerabilities",
+          "status": "pass"
+        },
+        {
+          "id": "maintained-source-secrets",
+          "status": "pass"
+        },
+        {
+          "id": "quality-negative-fixtures",
+          "status": "pass"
+        },
+        {
+          "id": "source-currentness",
+          "status": "pass"
+        },
+        {
+          "id": "architecture-currentness",
+          "status": "pass"
+        }
+      ]
+    },
+    "source": {
+      "schema": "agent-platform.source-ci.v1",
+      "status": "pass",
+      "sourceOnly": true,
+      "nativeModelCalls": 0,
+      "nativePermissionGranted": false,
+      "sourceRegistrySha256": "2fed53322ef40464d21084418a58f8cc2c9e7f5caad704d41ae6b53057417e0f",
+      "canonicalTestFiles": 34,
+      "qualityTestFiles": 15,
+      "stagedSourceFilesExcluded": 27,
+      "stagedTestsExcluded": [],
+      "packageTestExecution": {
+        "concurrency": 2,
+        "packages": 6,
+        "startedAt": "2026-10-18T11:42:21.667Z",
+        "finishedAt": "2026-10-18T11:46:32.869Z",
+        "durationMs": 251202,
+        "durationMeaning": "Elapsed package phase wall time; overlapping command durations are not summed."
+      },
+      "hermesQaLineage": {
+        "fixtureRoot": "/tmp/hermes-new-source-fictional-ZJvXg6",
+        "manifestSha256": "bb766ad5e36a71d0db94ff766d7cd4b180d12d65d0fab3b42e350bfe73cc1ba8",
+        "verificationClass": "canonical-generated-source-qa-only",
+        "admittedGuardBodyPreserved": true,
+        "nativePermissionGranted": false
+      },
+      "commandCount": 25,
+      "allCommandsExitZero": true
+    },
+    "newComplexScenarios": {
+      "pass": 13,
+      "fail": 0,
+      "skip": 0,
+      "evidenceClass": "source-adapter-offline-calibration"
+    },
+    "joinedQualityAndComplex": {
+      "pass": 68,
+      "fail": 0,
+      "skip": 0
+    },
+    "logReceipts": [
+      {
+        "path": ".private/quality-first-interview-20261018/root-quality-final.log",
+        "sha256": "3f966415edd086732c221331384093976702a46b2c412a2bfbf357ef53e95da8"
+      },
+      {
+        "path": ".private/quality-first-interview-20261018/root-source-final.log",
+        "sha256": "df68e61c5ffde666b860b4b1fdac0ca7daa82b0f1a4acea55f21284a8100983e"
+      },
+      {
+        "path": ".private/quality-first-interview-20261018/root-relocated-scenarios.log",
+        "sha256": "a4db7adf8673bce442c7def05e2ff6a42a3fb157c567b750cacb7fe43ddfc3af"
+      },
+      {
+        "path": ".private/quality-first-interview-20261018/root-joined-quality.log",
+        "sha256": "ff07c8f9c75410451c2355b65cd53f2648999c17b639f31cc3c035e8259c91af"
+      }
+    ],
+    "qualification": "Canonical source/adapter and producer/CLI compatibility only; no native activation or causal Ponytail efficacy. Production native hook/config unchanged. All actually affected paths exercised; no bypass of missing agreed native criterion.",
+    "failuresPreserved": [
+      "Zero-token false refusal repaired",
+      "High-hardlink own dependencies held; own installation files separated without guard change",
+      "Cross-package fixtures relocated to CI owner after architecture rejection"
+    ]
+  }
+}

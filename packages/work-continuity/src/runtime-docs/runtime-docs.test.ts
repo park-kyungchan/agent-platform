@@ -2,12 +2,17 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   createDocumentationReader,
   readDocumentationRegistry,
   safeDocumentationUrl,
 } from "./index.ts";
-import type { DocumentationRegistry } from "./types.ts";
+import type {
+  DocumentationObservations,
+  DocumentationPlan,
+  DocumentationRegistry,
+} from "./types.ts";
 
 const path = new URL(
   "../../../../architecture/runtime-documentation-routing/registry.json",
@@ -16,10 +21,307 @@ const path = new URL(
 const registry = (await Bun.file(path).json()) as DocumentationRegistry;
 const digest = "a".repeat(64);
 
+async function runDocsCli(body: string) {
+  const dir = await mkdtemp(join(tmpdir(), "runtime-docs-cli-"));
+  try {
+    const file = join(dir, "request.json");
+    await writeFile(file, body);
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        "--no-env-file",
+        "--no-install",
+        fileURLToPath(new URL("../../../../scripts/harness.ts", import.meta.url)),
+        "docs",
+        file,
+      ],
+      {
+        cwd: fileURLToPath(new URL("../../../../", import.meta.url)),
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    return { stdout, stderr, exitCode };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+async function expectDocsCli(
+  input: unknown,
+  request: unknown,
+  observations?: DocumentationObservations,
+): Promise<DocumentationPlan> {
+  const expected = createDocumentationReader(registry).select(request, observations);
+  const result = await runDocsCli(JSON.stringify(input));
+  expect(result.exitCode).toBe(0);
+  expect(result.stderr).toBe("");
+  expect(result.stdout).toBe(JSON.stringify(expected, null, 2) + "\n");
+  const plan = JSON.parse(result.stdout) as DocumentationPlan;
+  expect(plan.limits).toEqual({ maxPages: 3, maxExcerptChars: 6000, maxDiscoveryRequests: 2 });
+  expect(plan.executionAuthority).toBe("none");
+  expect(plan.nativePermissionGranted).toBe(false);
+  expect(Object.hasOwn(plan, "execution")).toBe(false);
+  return plan;
+}
+
+describe("real docs CLI transport", () => {
+  test("preserves flat output bytes, aliases, discovery and optional observations", async () => {
+    for (const request of [
+      { surface: "codex.cli", topic: "hooks" },
+      {
+        surface: " CODEX.CLI ",
+        topic: "훅".normalize("NFD"),
+        freshness: "installed",
+        executionHost: "github.actions.hosted",
+        targetVersion: "0.162.1",
+      },
+      { surface: "hermes.agent", topic: "슬래시명령".normalize("NFD"), freshness: "general" },
+      { surface: "github", topic: "permissions" },
+      { surface: "codex.cli", topic: "unknown topic" },
+      { surface: "codex.cli", topic: "😀".repeat(250), targetVersion: "😀".repeat(120) },
+    ]) {
+      await expectDocsCli(request, request);
+      await expectDocsCli({ request }, request);
+      await expectDocsCli({ request, observations: {} }, request, {});
+    }
+  }, 20_000);
+  test("passes installedVersion without certifying installation or compatibility", async () => {
+    const request = { surface: "hermes.agent", topic: "tui", freshness: "installed" };
+    const missing = await expectDocsCli({ request }, request);
+    expect(missing.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+    const observations = { installedVersion: "0.22.0" };
+    const installed = await expectDocsCli({ request, observations }, request, observations);
+    expect(installed.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+    expect(installed.evidenceGaps).not.toContain(
+      "installed-version-unverified-or-conflicting; documentation-is-not-deployed-availability-proof",
+    );
+    expect(installed.evidenceGaps).toContain("route-body-not-fully-reviewed");
+    expect(installed.evidenceGaps).toContain(
+      "confirm-version-matched-release-or-source-if-current-page-cannot-substantiate-this-version",
+    );
+    expect(installed.primary?.evidenceStatus).toBe("page-opened-limited-content");
+    expect(installed.primary?.documentationVersion).toBeUndefined();
+    const conflictRequest = { ...request, targetVersion: "0.21.0" };
+    const conflict = await expectDocsCli(
+      { request: conflictRequest, observations },
+      conflictRequest,
+      observations,
+    );
+    expect(conflict.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+    expect(conflict.evidenceGaps).toContain("requested-version-differs-from-installed-version");
+    const versionRequest = { surface: "muse.code", topic: "protocol", freshness: "installed" };
+    const versionObservations = { installedVersion: "1.4.7" };
+    const version = await expectDocsCli(
+      { request: versionRequest, observations: versionObservations },
+      versionRequest,
+      versionObservations,
+    );
+    expect(version.retrieval).toBe("READ_VERSION_MATCHED_SOURCE");
+    expect(version.evidenceGaps).toContain("documentation-version-differs-from-applicable-version");
+  });
+  test("delegates exact page/version/hash cache matching to the canonical reader", async () => {
+    const request = { surface: "codex.cli", topic: "hooks", freshness: "installed" };
+    const cache = {
+      canonicalUrl: createDocumentationReader(registry).select(request).primary!.canonicalUrl,
+      bodySha256: digest,
+      independentlyConfirmedBodySha256: digest,
+      revalidatedInCurrentTask: false,
+      targetVersion: "0.162.1",
+    };
+    for (const [observations, retrieval] of [
+      [{ installedVersion: "0.162.1", cache }, "REUSE_MATCHING_PAGE"],
+      [{ installedVersion: "0.161.0", cache }, "READ_SELECTED_PAGE"],
+      [
+        { installedVersion: "0.162.1", cache: { ...cache, targetVersion: "0.161.0" } },
+        "READ_SELECTED_PAGE",
+      ],
+      [
+        {
+          installedVersion: "0.162.1",
+          cache: { ...cache, canonicalUrl: "https://example.invalid/" },
+        },
+        "READ_SELECTED_PAGE",
+      ],
+      [
+        {
+          installedVersion: "0.162.1",
+          cache: { ...cache, independentlyConfirmedBodySha256: "b".repeat(64) },
+        },
+        "READ_SELECTED_PAGE",
+      ],
+      [
+        {
+          installedVersion: "0.162.1",
+          cache: {
+            ...cache,
+            bodySha256: "not-a-digest",
+            independentlyConfirmedBodySha256: "not-a-digest",
+          },
+        },
+        "READ_SELECTED_PAGE",
+      ],
+    ] as const) {
+      const plan = await expectDocsCli({ request, observations }, request, observations);
+      expect(plan.retrieval).toBe(retrieval);
+    }
+  }, 20_000);
+  test("requires canonical current-task revalidation and retains partial evidence", async () => {
+    for (const request of [
+      { surface: "hermes.agent", topic: "tui", freshness: "latest" },
+      { surface: "codex.cli", topic: "permissions", freshness: "general" },
+    ]) {
+      const cache = {
+        canonicalUrl: createDocumentationReader(registry).select(request).primary!.canonicalUrl,
+        bodySha256: digest,
+        independentlyConfirmedBodySha256: digest,
+        revalidatedInCurrentTask: false,
+      };
+      for (const [current, confirmed, retrieval] of [
+        [false, digest, "REVALIDATE_SELECTED_PAGE"],
+        [true, "b".repeat(64), "REVALIDATE_SELECTED_PAGE"],
+        [true, digest, "REUSE_MATCHING_PAGE"],
+      ] as const) {
+        const observations = {
+          cache: {
+            ...cache,
+            revalidatedInCurrentTask: current,
+            independentlyConfirmedBodySha256: confirmed,
+          },
+        };
+        const plan = await expectDocsCli({ request, observations }, request, observations);
+        expect(plan.retrieval).toBe(retrieval);
+        expect(plan.evidenceGaps).toContain("route-body-not-fully-reviewed");
+        if (request.surface === "hermes.agent")
+          expect(plan.primary?.evidenceStatus).toBe("page-opened-limited-content");
+      }
+    }
+  }, 20_000);
+  const request = { surface: "codex.cli", topic: "hooks" };
+  const cache = {
+    canonicalUrl: "https://developers.openai.com/codex/hooks",
+    bodySha256: digest,
+    independentlyConfirmedBodySha256: digest,
+    revalidatedInCurrentTask: true,
+  };
+  const malformed: [string, unknown, string][] = [
+    ["null input", null, "Request must be a JSON object"],
+    ["array input", [], "Request must be a JSON object"],
+    ["scalar input", true, "Request must be a JSON object"],
+    ["missing request", { observations: {} }, "Request must be a JSON object"],
+    ...[null, [], true, "request"].map((value): [string, unknown, string] => [
+      `non-object request ${JSON.stringify(value)}`,
+      { request: value },
+      "Request must be a JSON object",
+    ]),
+    ["unknown envelope field", { request, trusted: true }, "UNTRUSTED_OR_UNKNOWN_FIELD"],
+    ["mixed flat/envelope", { ...request, observations: {} }, "UNTRUSTED_OR_UNKNOWN_FIELD"],
+    [
+      "unknown request field",
+      { request: { ...request, nativePermissionGranted: true } },
+      "UNTRUSTED_OR_UNKNOWN_FIELD",
+    ],
+    [
+      "unknown flat field",
+      { ...request, authenticationVerified: true },
+      "UNTRUSTED_OR_UNKNOWN_FIELD",
+    ],
+    ["invalid request scalar", { request: { ...request, topic: 1 } }, "INVALID_TOPIC"],
+    [
+      "oversized request topic",
+      { request: { ...request, topic: "x".repeat(251) } },
+      "INVALID_TOPIC",
+    ],
+    ["invalid freshness", { request: { ...request, freshness: [] } }, "INVALID_FRESHNESS"],
+    [
+      "unknown observations field",
+      { request, observations: { trusted: true } },
+      "UNTRUSTED_OR_UNKNOWN_FIELD",
+    ],
+    ...[null, [], true, "observations"].map((value): [string, unknown, string] => [
+      `non-object observations ${JSON.stringify(value)}`,
+      { request, observations: value },
+      "Request must be a JSON object",
+    ]),
+    ...[null, 22, true, "", "0.22\n", "x".repeat(121)].map((value): [string, unknown, string] => [
+      `invalid installedVersion ${JSON.stringify(value).slice(0, 80)}`,
+      { request, observations: { installedVersion: value } },
+      "INVALID_DOCUMENTATION_OBSERVATION",
+    ]),
+    ...[null, [], true, "cache"].map((value): [string, unknown, string] => [
+      `non-object cache ${JSON.stringify(value)}`,
+      { request, observations: { cache: value } },
+      "Request must be a JSON object",
+    ]),
+    [
+      "missing cache fields",
+      { request, observations: { cache: {} } },
+      "INVALID_DOCUMENTATION_OBSERVATION",
+    ],
+    [
+      "unknown cache field",
+      { request, observations: { cache: { ...cache, trusted: true } } },
+      "UNTRUSTED_OR_UNKNOWN_FIELD",
+    ],
+    ...[
+      ["canonicalUrl", 1],
+      ["canonicalUrl", "x".repeat(2001)],
+      ["bodySha256", true],
+      ["bodySha256", "a".repeat(65)],
+      ["independentlyConfirmedBodySha256", []],
+      ["revalidatedInCurrentTask", "true"],
+      ["revalidatedInCurrentTask", 1],
+      ["revalidatedInCurrentTask", null],
+      ["targetVersion", null],
+      ["targetVersion", "x".repeat(121)],
+    ].map(([key, value]): [string, unknown, string] => [
+      `invalid cache ${key} ${JSON.stringify(value).slice(0, 80)}`,
+      { request, observations: { cache: { ...cache, [key as string]: value } } },
+      "INVALID_DOCUMENTATION_OBSERVATION",
+    ]),
+    [
+      "invalid observation before discovery",
+      {
+        request: { surface: "unknown", topic: "unknown" },
+        observations: { installedVersion: 22 },
+      },
+      "INVALID_DOCUMENTATION_OBSERVATION",
+    ],
+  ];
+  test.each(malformed)(
+    "rejects %s at the process boundary",
+    async (_name: string, input: unknown, error: string) => {
+      const result = await runDocsCli(JSON.stringify(input));
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain(error);
+    },
+  );
+  test("rejects malformed JSON and enforces the existing whole-file byte budget", async () => {
+    const invalid = await runDocsCli("{");
+    expect(invalid.exitCode).toBe(1);
+    expect(invalid.stdout).toBe("");
+    expect(invalid.stderr.length).toBeGreaterThan(0);
+    const body = JSON.stringify({ request, observations: {} });
+    const bounded = body.padEnd(1_048_576, " ");
+    const accepted = await runDocsCli(bounded);
+    expect(accepted.exitCode).toBe(0);
+    expect(accepted.stderr).toBe("");
+    const oversized = await runDocsCli(bounded + " ");
+    expect(oversized.exitCode).toBe(1);
+    expect(oversized.stdout).toBe("");
+    expect(oversized.stderr).toBe("Request exceeds the bounded input size\n");
+  });
+});
+
 describe("portable docs-only Runtime Index", () => {
-  test("selects all84 reviewed routes and their aliases without execution admission", () => {
+  test("selects all98 registered routes and their aliases without execution admission", () => {
     const reader = createDocumentationReader(registry);
-    expect(reader.registry.routes).toHaveLength(84);
+    expect(reader.registry.routes).toHaveLength(98);
     for (const route of registry.routes) {
       for (const topic of [route.topic, ...route.aliases]) {
         const plan = reader.select({ surface: route.surface, topic });
@@ -30,6 +332,214 @@ describe("portable docs-only Runtime Index", () => {
         expect(Object.hasOwn(plan, "execution")).toBe(false);
       }
     }
+  });
+  test("Hermes Client/Backend topics preserve distinct official pages and limited evidence", () => {
+    const reader = createDocumentationReader(registry);
+    for (const [topic, id, pageId] of [
+      ["windows-client", "desktop-client", "user-guide/desktop"],
+      ["원격연결".normalize("NFD"), "remote-gateway", "user-guide/multi-connection-desktop"],
+      ["bots", "bot-mode", "user-guide/bot-mode"],
+      ["봇화면".normalize("NFD"), "bot-screen", "user-guide/features/bot-screen"],
+      ["computer_use", "computer-use", "user-guide/features/computer-use"],
+      ["version", "updating", "getting-started/updating"],
+      ["installer", "installation", "getting-started/installation"],
+      ["support-matrix", "platform-support", "getting-started/platform-support"],
+      ["windows", "windows-native", "user-guide/windows-native"],
+      ["wsl2", "windows-wsl", "user-guide/windows-wsl-quickstart"],
+      ["dashboard", "web-dashboard", "user-guide/features/web-dashboard"],
+      ["multi-gateway", "multi-profile-gateways", "user-guide/multi-profile-gateways"],
+    ]) {
+      const plan = reader.select({ surface: "hermes.agent", topic });
+      expect(plan.status).toBe("SELECTED");
+      expect(plan.primary?.id).toBe(`hermes.agent.${id}`);
+      expect(plan.primary?.pageId).toBe(pageId);
+      expect(plan.primary?.evidenceStatus).toBe(
+        ["desktop-client", "bot-mode", "bot-screen"].includes(id!)
+          ? "page-opened-limited-content"
+          : "index-listed",
+      );
+      expect(plan.primary?.documentationVersion).toBeUndefined();
+      expect(plan.primary?.checkedOn).toBe("2026-10-18");
+      expect(plan.evidenceGaps).toContain("route-body-not-fully-reviewed");
+      expect(plan.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+      const source = reader.registry.sources[plan.primary!.sourceId!];
+      expect(source?.rawBytesVerified).toBe(false);
+      expect(source?.bodySha256).toBeNull();
+      expect(plan.executionAuthority).toBe("none");
+      expect(plan.nativePermissionGranted).toBe(false);
+    }
+    expect(reader.select({ surface: "hermes.agent", topic: "gateway" }).primary?.pageId).toBe(
+      "developer-guide/gateway-internals",
+    );
+  });
+  test("Client version evidence does not supply the Backend's missing installed version", () => {
+    const reader = createDocumentationReader(registry);
+    const client = reader.select(
+      {
+        surface: "hermes.agent",
+        topic: "desktop",
+        freshness: "installed",
+        executionHost: "local.windows",
+      },
+      { installedVersion: "0.22.2" },
+    );
+    const backend = reader.select({
+      surface: "hermes.agent",
+      topic: "bot-screen",
+      freshness: "installed",
+      executionHost: "hostinger.container",
+    });
+    expect(client.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+    expect(client.primary?.documentationVersion).toBeUndefined();
+    expect(backend.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+    expect(backend.evidenceGaps).toContain(
+      "installed-version-unverified-or-conflicting; documentation-is-not-deployed-availability-proof",
+    );
+    expect(backend.nativePermissionGranted).toBe(false);
+  });
+  test("TUI and slash aliases select partial frontend evidence without native admission", () => {
+    const reader = createDocumentationReader(registry);
+    for (const [topic, id, url] of [
+      ["terminal-ui", "hermes.agent.tui", "user-guide/tui"],
+      ["터미널UI".normalize("NFD"), "hermes.agent.tui", "user-guide/tui"],
+      ["slash", "hermes.agent.slash-commands", "reference/slash-commands"],
+      ["슬래시명령".normalize("NFD"), "hermes.agent.slash-commands", "reference/slash-commands"],
+    ]) {
+      const plan = reader.select({ surface: "hermes.agent", topic });
+      expect(plan.status).toBe("SELECTED");
+      expect(plan.primary?.id).toBe(id);
+      expect(plan.primary?.canonicalUrl).toBe(`https://hermes-agent.nousresearch.com/docs/${url}`);
+      expect(plan.primary?.evidenceStatus).toBe("page-opened-limited-content");
+      expect(plan.primary?.documentationVersion).toBeUndefined();
+      expect(plan.primary?.notes).toContain("TUI /sessions lists live sessions");
+      expect(plan.evidenceGaps).toContain("route-body-not-fully-reviewed");
+      expect(plan.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+      expect(plan.executionAuthority).toBe("none");
+      expect(plan.nativePermissionGranted).toBe(false);
+      expect(Object.hasOwn(plan, "execution")).toBe(false);
+      const source = reader.registry.sources[plan.primary!.sourceId!];
+      expect(source?.checkedOn).toBe("2026-10-17");
+      expect(source?.rawBytesVerified).toBe(false);
+      expect(source?.bodySha256).toBeNull();
+    }
+  });
+  test("Bot routes and aliases keep partial evidence and installed/client gaps", () => {
+    const reader = createDocumentationReader(registry);
+    for (const [topic, id, url] of [
+      ["bot-mode", "hermes.agent.bot-mode", "user-guide/bot-mode"],
+      ["bots", "hermes.agent.bot-mode", "user-guide/bot-mode"],
+      ["봇모드".normalize("NFD"), "hermes.agent.bot-mode", "user-guide/bot-mode"],
+      ["bot-screen", "hermes.agent.bot-screen", "user-guide/features/bot-screen"],
+      ["screen", "hermes.agent.bot-screen", "user-guide/features/bot-screen"],
+      ["봇화면".normalize("NFD"), "hermes.agent.bot-screen", "user-guide/features/bot-screen"],
+    ]) {
+      const request = { surface: "hermes.agent", topic, freshness: "installed" };
+      const missing = reader.select(request);
+      expect(missing.status).toBe("SELECTED");
+      expect(missing.primary?.id).toBe(id);
+      expect(missing.primary?.canonicalUrl).toBe(
+        `https://hermes-agent.nousresearch.com/docs/${url}`,
+      );
+      expect(missing.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+      const observed = reader.select(request, { installedVersion: "0.22.0" });
+      expect(observed.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+      expect(observed.primary?.evidenceStatus).toBe("page-opened-limited-content");
+      expect(observed.primary?.documentationVersion).toBeUndefined();
+      expect(observed.evidenceGaps).toContain("route-body-not-fully-reviewed");
+      expect(observed.evidenceGaps).toContain(
+        "confirm-version-matched-release-or-source-if-current-page-cannot-substantiate-this-version",
+      );
+      expect(observed.executionAuthority).toBe("none");
+      expect(observed.nativePermissionGranted).toBe(false);
+      expect(Object.hasOwn(observed, "execution")).toBe(false);
+      const source = reader.registry.sources[observed.primary!.sourceId!];
+      expect(source?.rawBytesVerified).toBe(false);
+      expect(source?.bodySha256).toBeNull();
+    }
+  });
+  test("new route evidence leaves Oct14 capture and family provenance historical", () => {
+    const reader = createDocumentationReader(registry);
+    expect(reader.registry.provenance.sourceDirectory).toBe(
+      "discovery/runtime-documentation-routing/20261014/reviewed",
+    );
+    expect(reader.registry.provenance.sourceArtifacts).toHaveLength(6);
+    expect(reader.registry.provenance.sourceArtifacts[0]).toEqual({
+      path: "routing.json",
+      sha256: "968068af391a6d6948ba047933172fb5030c3fcc430a3a66199a3e4e567ba48a",
+    });
+    expect(reader.registry.captures).toHaveLength(28);
+    expect(
+      reader.registry.captures.some((capture) => capture.retrievedAt.startsWith("2026-10-17")),
+    ).toBe(false);
+    const historical = reader.select({ surface: "hermes.agent", topic: "sessions" }).primary!;
+    expect(historical.checkedOn).toBe("2026-10-14");
+    expect(historical.evidenceStatus).toBe("user-supplied-index-family");
+    expect(historical.sourceId).toBe("hermes-index");
+    expect(reader.registry.sources[historical.sourceId!]!.checkedOn).toBe("2026-10-14");
+    expect(reader.registry.limitations.join(" ")).toContain(
+      "No native Scrapling capture or Evidence Foundry blob admission is claimed",
+    );
+  });
+  test("TUI version observations direct retrieval without certifying documentation compatibility", () => {
+    const reader = createDocumentationReader(registry);
+    expect(
+      reader.select({ surface: "hermes.agent", topic: "tui", freshness: "installed" }).retrieval,
+    ).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+    const installed = reader.select(
+      { surface: "hermes.agent", topic: "slash", freshness: "installed" },
+      { installedVersion: "0.22.0" },
+    );
+    expect(installed.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+    expect(installed.primary?.documentationVersion).toBeUndefined();
+    expect(installed.evidenceGaps).toContain(
+      "confirm-version-matched-release-or-source-if-current-page-cannot-substantiate-this-version",
+    );
+    const conflict = reader.select(
+      { surface: "hermes.agent", topic: "tui", freshness: "installed", targetVersion: "0.22.0" },
+      { installedVersion: "0.21.0" },
+    );
+    expect(conflict.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+    expect(conflict.evidenceGaps).toContain("requested-version-differs-from-installed-version");
+    expect(conflict.nativePermissionGranted).toBe(false);
+  });
+  test("TUI routes do not infer a subject from its host or steal historical aliases", () => {
+    const plan = createDocumentationReader(registry).select({
+      surface: "hermes",
+      topic: "tui",
+      executionHost: "hostinger.container",
+    });
+    expect(plan.status).toBe("NEEDS_DISAMBIGUATION");
+    expect(plan.primary).toBeNull();
+    expect(plan.discovery).toContain("hermes.agent");
+    const collision = structuredClone(registry);
+    collision.routes.find((route) => route.id === "hermes.agent.tui")!.aliases.push("sessions");
+    expect(() => createDocumentationReader(collision)).toThrow("AMBIGUOUS_TOPIC_ALIAS");
+  });
+  test("TUI cache reuse needs this page and current-task revalidation without promoting evidence", () => {
+    const reader = createDocumentationReader(registry);
+    const request = { surface: "hermes.agent", topic: "tui", freshness: "latest" };
+    const cache = {
+      canonicalUrl: reader.select(request).primary!.canonicalUrl,
+      bodySha256: digest,
+      independentlyConfirmedBodySha256: digest,
+      revalidatedInCurrentTask: false,
+    };
+    expect(reader.select(request, { cache }).retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+    expect(
+      reader.select(request, {
+        cache: {
+          ...cache,
+          canonicalUrl: registry.sources["hermes-index"]!.url,
+          revalidatedInCurrentTask: true,
+        },
+      }).retrieval,
+    ).toBe("REVALIDATE_SELECTED_PAGE");
+    const revalidated = reader.select(request, {
+      cache: { ...cache, revalidatedInCurrentTask: true },
+    });
+    expect(revalidated.retrieval).toBe("REUSE_MATCHING_PAGE");
+    expect(revalidated.evidenceGaps).toContain("route-body-not-fully-reviewed");
+    expect(revalidated.primary?.evidenceStatus).toBe("page-opened-limited-content");
   });
   test("normalizes Unicode topic aliases and explicit surface names", () => {
     const reader = createDocumentationReader(registry);
@@ -99,7 +609,7 @@ describe("portable docs-only Runtime Index", () => {
     expect(reader.select({ surface: "codex.cli", topic: "hooks" }).primary?.canonicalUrl).toBe(
       original,
     );
-    expect(reader.registry.routes).toHaveLength(84);
+    expect(reader.registry.routes).toHaveLength(98);
     expect(Object.isFrozen(reader.registry.routes)).toBe(true);
     expect(Object.isFrozen(selected.primary)).toBe(true);
     expect(() =>

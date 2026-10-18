@@ -9,9 +9,10 @@ import {
   sourceDigest,
 } from "./provider.ts";
 import { buildHermesPlatformSource } from "./build.ts";
+import { syntheticMemoryOwner } from "./tests/memory-caller.fixture.ts";
 
 const source = resolve(import.meta.dir, "../../../..");
-async function fixture(importMarker = false) {
+async function fixture(importMarker = false, memoryImportDrift = false) {
   const root = await mkdtemp(join(tmpdir(), "hermes-platform-source-"));
   for (const path of platformSourcePaths) {
     await mkdir(dirname(join(root, path)), { recursive: true });
@@ -29,6 +30,16 @@ async function fixture(importMarker = false) {
         `\nawait Bun.write(${JSON.stringify(markerPath)}, 'implementation imported');\n`,
     );
   }
+  if (memoryImportDrift) {
+    const implementation = join(root, "packages/work-continuity/src/workspace/recall-request.ts");
+    const changed = join(root, "packages/work-continuity/src/workspace/qualification.ts");
+    await writeFile(
+      implementation,
+      (await readFile(implementation, "utf8")) +
+        `\nawait Bun.write(${JSON.stringify(markerPath)}, 'synthetic Memory imported');` +
+        `\nawait Bun.write(${JSON.stringify(changed)}, ${JSON.stringify((await readFile(changed, "utf8")) + "\n// Synthetic import-time source drift.\n")});\n`,
+    );
+  }
   await cp(join(source, "node_modules"), join(root, "node_modules"), {
     recursive: true,
     dereference: false,
@@ -39,6 +50,16 @@ async function fixture(importMarker = false) {
     join(root, "packages/native-hermes-adapter/node_modules"),
     { recursive: true, dereference: false, verbatimSymlinks: true },
   );
+  if (memoryImportDrift) {
+    const canonical = join(root, "packages/work-continuity/src/workspace/recall-request.ts");
+    const installed = await realpath(
+      Bun.resolveSync(
+        "@palantirkc/work-continuity/memory/recall-request",
+        join(root, "packages/native-hermes-adapter/src/platform-current-work"),
+      ),
+    );
+    if (installed !== canonical) await cp(canonical, installed);
+  }
   const registration = await captureHermesPlatformSource(root),
     path = join(root, "source-registration.json"),
     raw = JSON.stringify(registration, null, 2) + "\n";
@@ -57,6 +78,12 @@ test("v2 platform denominator includes transitive contracts, generator, dependen
   try {
     for (const path of [
       "packages/work-continuity/src/runtime-index.ts",
+      "packages/work-continuity/src/workspace/recall-request.ts",
+      "packages/work-continuity/src/workspace/lexical-recall.ts",
+      "packages/work-continuity/src/workspace/qualification.ts",
+      "packages/work-continuity/src/context/source.ts",
+      "packages/work-continuity/src/context/types.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/read-memory.ts",
       "packages/work-continuity/src/git-work/source.ts",
       "packages/work-continuity/src/handoff.ts",
       "packages/native-hermes-adapter/src/platform-rearchitecture/work-identity-contracts.ts",
@@ -208,6 +235,13 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       buildHermesPlatformSource({
         ...request,
         currentWorkOutputVersion: "v1",
+        currentWorkMetadataEncoding: "metadata.v1",
+      }),
+    ).rejects.toThrow("EXPLICIT_CURRENT_WORK_METADATA_ENCODING_REQUIRED");
+    await expect(
+      buildHermesPlatformSource({
+        ...request,
+        currentWorkOutputVersion: "v1",
         currentWorkMaxChars: 6001,
       }),
     ).rejects.toThrow("INVALID_CURRENT_WORK_OUTPUT_BUDGET");
@@ -221,7 +255,7 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       buildHermesPlatformSource({ ...request, runtimeProviderRoot: "/home/synthetic-owner" }),
     ).rejects.toThrow("PC_INDEPENDENT");
     const built = await buildHermesPlatformSource(request);
-    expect(built.bundles).toHaveLength(4);
+    expect(built.bundles).toHaveLength(5);
     expect(built.transitiveCompilerInputsVerified).toBe(true);
     expect(built.sourceClosureVerifiedBeforeAndAfter).toBe(true);
     expect(built.nativeActivation).toBe(false);
@@ -232,6 +266,14 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       capChars: 12000,
     });
     expect(built.compilerExecution).toBe("held-parent-file-descriptor");
+    const metadataBuilt = await buildHermesPlatformSource({
+      ...request,
+      currentWorkMetadataEncoding: "metadata.v1",
+    });
+    expect(metadataBuilt.currentWorkMetadataEncoding).toBe("metadata.v1");
+    expect(metadataBuilt.currentWorkOutputPolicy.capChars).toBe(12000);
+    expect(metadataBuilt.sourceClosureVerifiedBeforeAndAfter).toBe(true);
+    expect(metadataBuilt.nativeActivation).toBe(false);
     const admitted = new Set(
       [...f.registration.sourcePins, ...f.registration.dependencyPins].map((p) => p.path),
     );
@@ -242,8 +284,90 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       await writeFile(join(f.root, bundle.name), bundle.bytes);
     }
     await writeFile(request.runtimeRegistrationPath, built.nativeRegistration.bytes);
+    const memory = await syntheticMemoryOwner();
+    const invokeMemory = async (payload: unknown) => {
+      const child = Bun.spawn([compiler, "--no-env-file", join(f.root, "read-memory.js")], {
+        stdin: new Blob([JSON.stringify(payload)]),
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [code, out, error] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      return { code, out, error };
+    };
+    try {
+      const actual = await invokeMemory(memory.payload);
+      expect(actual.code).toBe(0);
+      expect(actual.error).toBe("");
+      const recalled = JSON.parse(actual.out);
+      expect(recalled.schema).toBe(
+        "workspace-architecture.lexical-recall-git-dataset-reference-result.v1",
+      );
+      expect(recalled.hits).toHaveLength(1);
+      expect(recalled.hits[0].text).toBe("Use Git");
+      expect(recalled.hits[0].status).toBe("unconfirmed-source-attributed-inference");
+      expect(recalled.selectedValue).toBe("Use Git");
+      expect(recalled.selectionClass).toBe("current-authoritative-record");
+      expect(recalled.gitWork.admittedCommit).toBe(memory.payload.snapshot.commit);
+      expect(recalled.gitWork.observedHeadAfter).toBe(memory.payload.snapshot.commit);
+      expect(recalled.gitWork.policyRevision).toBe("synthetic-policy");
+      expect(recalled.gitWork.activeGenerationId).toBe("synthetic-generation");
+      expect(recalled.nativePermissionGranted).toBe(false);
+      expect(recalled.index).toEqual({
+        kind: "sqlite-fts5",
+        lifetime: "one-in-memory-query",
+        disposed: true,
+      });
+      for (const override of [
+        { state: "unknown" },
+        { policyRevision: "stale-policy" },
+        { activeGenerationId: "stale-generation" },
+      ]) {
+        const rejected = await invokeMemory({
+          ...memory.payload,
+          ownerSelection: { ...memory.payload.ownerSelection, ...override },
+        });
+        expect(rejected.code).toBe(1);
+        expect(rejected.out).toBe("");
+        expect(JSON.parse(rejected.error)).toEqual({
+          error: "MEMORY_INPUT_OR_SOURCE_FAILED",
+          stage: "memory",
+          reason: "MEMORY_QUERY_FAILED",
+        });
+      }
+      const badPin = await invokeMemory({
+        ...memory.payload,
+        requestRef: { ...memory.payload.requestRef, sha256: "0".repeat(64) },
+      });
+      expect(badPin.code).toBe(1);
+      expect(badPin.out).toBe("");
+      expect(JSON.parse(badPin.error).stage).toBe("memory");
+      const unknownField = await invokeMemory({
+        ...memory.payload,
+        token: "SYNTHETIC_PRIVATE_MEMORY_VALUE",
+      });
+      expect(unknownField.code).toBe(1);
+      expect(unknownField.out).toBe("");
+      expect(JSON.parse(unknownField.error).stage).toBe("input");
+      expect(unknownField.error).not.toContain("SYNTHETIC_PRIVATE_MEMORY_VALUE");
+      await memory.advance();
+      const advanced = await invokeMemory(memory.payload);
+      expect(advanced.code).toBe(1);
+      expect(advanced.out).toBe("");
+      expect(JSON.parse(advanced.error).stage).toBe("memory");
+    } finally {
+      await memory.cleanup();
+    }
     const marker = "SYNTHETIC_PRIVATE_NATIVE_HOOK_79213";
-    for (const name of ["native-hook.js", "read-current-work.js", "current-work-native-hook.js"]) {
+    for (const name of [
+      "native-hook.js",
+      "read-current-work.js",
+      "current-work-native-hook.js",
+      "read-memory.js",
+    ]) {
       const p = Bun.spawn([compiler, "--no-env-file", join(f.root, name)], {
         stdin: new Blob([marker]),
         stdout: "pipe",
@@ -259,10 +383,13 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
         expect(code).toBe(0);
         expect(JSON.parse(out)).toEqual({});
         expect(JSON.parse(error).error).toBe("NATIVE_BOUNDARY_INPUT_OR_SOURCE_FAILED");
-      } else if (name === "read-current-work.js") {
+      } else if (name === "read-current-work.js" || name === "read-memory.js") {
         expect(code).toBe(1);
         expect(JSON.parse(error)).toEqual({
-          error: "CURRENT_WORK_INPUT_OR_SOURCE_FAILED",
+          error:
+            name === "read-memory.js"
+              ? "MEMORY_INPUT_OR_SOURCE_FAILED"
+              : "CURRENT_WORK_INPUT_OR_SOURCE_FAILED",
           stage: "input",
           reason: "REQUEST_UNAVAILABLE_OR_INVALID",
         });
@@ -379,6 +506,18 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       stage: "source",
       reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
     });
+    const staleMemory = await invokeMemory({
+      snapshot: null,
+      requestRef: null,
+      ownerSelection: null,
+    });
+    expect(staleMemory.code).toBe(1);
+    expect(staleMemory.out).toBe("");
+    expect(JSON.parse(staleMemory.error)).toEqual({
+      error: "MEMORY_INPUT_OR_SOURCE_FAILED",
+      stage: "source",
+      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
+    });
     const staleNative = await invokeNative();
     expect(staleNative.code).toBe(0);
     expect(JSON.parse(staleNative.stdout)).toEqual({});
@@ -388,6 +527,60 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
     });
   } finally {
+    await f.cleanup();
+  }
+}, 60000);
+
+test("compiled Memory caller brackets implementation import and query with exact closure proof", async () => {
+  const f = await fixture(false, true);
+  const memory = await syntheticMemoryOwner();
+  try {
+    const compiler = await realpath(process.execPath);
+    const built = await buildHermesPlatformSource({
+      registrationPath: f.path,
+      registrationSha256: f.sha256,
+      providerRoot: f.root,
+      compiler: { path: compiler, sha256: sourceDigest(await readFile(compiler)) },
+      legacyManifestSha256: "1".repeat(64),
+      runtimeProviderRoot: f.root,
+      runtimeRegistrationPath: join(f.root, "runtime-registration.json"),
+    });
+    const bundle = built.bundles.find((item) => item.name === "read-memory.js")!;
+    await writeFile(join(f.root, bundle.name), bundle.bytes);
+    await writeFile(join(f.root, "runtime-registration.json"), built.nativeRegistration.bytes);
+    const invoke = async () => {
+      const child = Bun.spawn([compiler, "--no-env-file", join(f.root, bundle.name)], {
+        stdin: new Blob([JSON.stringify(memory.payload)]),
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [code, out, error] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      return { code, out, error };
+    };
+    // First guard passes. The admitted synthetic implementation mutates a pinned
+    // source at import; a valid query still cannot publish its result afterward.
+    const after = await invoke();
+    expect(after.code).toBe(1);
+    expect(after.out).toBe("");
+    expect(JSON.parse(after.error)).toEqual({
+      error: "MEMORY_INPUT_OR_SOURCE_FAILED",
+      stage: "source-readback",
+      reason: "SOURCE_CLOSURE_READBACK_FAILED",
+    });
+    expect(await readFile(f.markerPath, "utf8")).toBe("synthetic Memory imported");
+    await rm(f.markerPath);
+    // The same changed closure is now refused before implementation import.
+    const before = await invoke();
+    expect(before.code).toBe(1);
+    expect(before.out).toBe("");
+    expect(JSON.parse(before.error).stage).toBe("source");
+    expect(await Bun.file(f.markerPath).exists()).toBe(false);
+  } finally {
+    await memory.cleanup();
     await f.cleanup();
   }
 }, 60000);

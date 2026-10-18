@@ -57,7 +57,7 @@
   "sharedDefinitionInputs": [
     {
       "path": "architecture/runtime-documentation-routing/registry.json",
-      "sha256": "ebf788ed54cc1102747ef7faae9d49911c6a53b9450690f58fb6ec5ee375c3cf",
+      "sha256": "b7f5646bd3bb00232bd6997dd00803ad38035922d0885476999bf6cf9fad8d3b",
       "ownerId": "agent-platform",
       "purpose": "Shared docs-only source definition; no native execution or active pointer"
     },

@@ -6,6 +6,8 @@ import { validateCompatibilityForwarder } from "./compatibility";
 import { compareGeneratedTrees, verifyOntologyBuild } from "./ontology-build";
 import { readQualityScope, readTrackedMarkdown } from "./scope";
 import { captureQualitySources, compareQualitySources } from "./source-snapshot";
+import { checkFormatting, runQuality } from "./run";
+import { writeQualityProgress, type QualityProgress } from "./progress";
 
 const temporary: string[] = [];
 async function scratch(): Promise<string> {
@@ -105,6 +107,17 @@ test("compatibility and tracked Markdown participate in byte snapshots with prot
     "history/README.md",
     "evidence/README.md",
   ]);
+  await git(root, [
+    "-c",
+    "user.name=Source quality fixture",
+    "-c",
+    "user.email=source-quality-fixture@example.invalid",
+    "commit",
+    "--no-gpg-sign",
+    "--quiet",
+    "-m",
+    "Record tracked Markdown fixture",
+  ]);
   expect(await readTrackedMarkdown(root)).toEqual([
     "AGENTS.md",
     "README.md",
@@ -114,6 +127,29 @@ test("compatibility and tracked Markdown participate in byte snapshots with prot
   for (const files of [scope.lintFiles, scope.formatFiles, scope.secretFiles])
     expect(files).toContain(forwarder);
   expect(scope.secretFiles).toContain("README.md");
+  const progress: QualityProgress[] = [];
+  const observe = async (value: QualityProgress): Promise<void> => {
+    progress.push(value);
+    await writeQualityProgress(join(root, "quality-progress.json"), value);
+  };
+  const unformatted = await runQuality(root, "format", observe);
+  expect(unformatted.status).toBe("fail");
+  expect(progress.find((value) => value.currentCheck === "format")?.checks).not.toContainEqual(
+    expect.objectContaining({ id: "format" }),
+  );
+  expect(progress.at(-1)).toMatchObject({
+    status: "complete",
+    currentCheck: null,
+    checks: expect.arrayContaining([expect.objectContaining({ id: "format", status: "fail" })]),
+  });
+  expect(JSON.stringify(progress)).not.toContain("details");
+  expect(JSON.parse(await readFile(join(root, "quality-progress.json"), "utf8"))).toEqual(
+    progress.at(-1),
+  );
+  await checkFormatting(scope, true);
+  const formatted = await runQuality(root, "format", observe);
+  expect(formatted.status).toBe("pass");
+  expect(progress.at(-1)?.checks.every((check) => check.status === "pass")).toBe(true);
   const before = await captureQualitySources(scope);
   await put(root, forwarder, "export { value } from '@fixture/common';\n");
   await put(root, "README.md", "Changed maintained document.\n");
@@ -121,6 +157,12 @@ test("compatibility and tracked Markdown participate in byte snapshots with prot
   expect(compareQualitySources(before, after).changedPaths).toEqual(["README.md", forwarder]);
   await put(root, forwarder, "export const duplicate = 1;\n");
   await expect(readQualityScope(root)).rejects.toThrow("only forward");
+});
+
+test("a progress sink failure refuses verification before work can be reported as passed", async () => {
+  await expect(
+    runQuality(await scratch(), "format", () => Promise.reject(Error("Progress sink failed"))),
+  ).rejects.toThrow("Progress sink failed");
 });
 
 test("isolated build fails stale, missing and extra reviewed generated files without repairing bytes", async () => {
@@ -186,6 +228,9 @@ test("authored head and prospective merge both run full quality while native rev
     expect(nativeCheckout?.with?.["fetch-depth"]).toBe(0);
     const sourceCheck = job.steps.find((step) => step.run === "bun ci/source-check.ts");
     expect(sourceCheck?.env?.COMMON_BASE_SHA).toBe("${{ github.event.pull_request.base.sha }}");
+    expect(
+      job.steps.some((step) => step.run?.split("\n").includes("bun ci/verify-runtime-layout.ts")),
+    ).toBe(true);
   }
   expect(
     workflow.jobs["quality"]!.steps.find((step) => step.uses?.startsWith("actions/checkout@"))

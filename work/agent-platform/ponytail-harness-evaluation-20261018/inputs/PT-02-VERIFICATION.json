@@ -1,0 +1,96 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-02-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-02-VERIFICATION.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-02",
+    "projectId": "agent-platform",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T09:59:31.412Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:307e6f86db4ce4748f2b642f45cec544db664f99300c40e9230c7551329c2d8d"
+      ],
+      "criteria": [
+        {
+          "id": "PT-02-source-preparation",
+          "status": "pass",
+          "message": "Canonical comparison, CLI, real runSuite version compatibility, required source/package/quality checks and finite source-provider closure pass.",
+          "evidenceRefs": [
+            "agent-platform:evidence:ponytail-harness-evaluation-20261018:checks"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "AGENTS.md",
+          "sha256": "f49f34080cf79fdc6a9e838b132c56e48ff9636df27bbf6c69e3576c1755ca5e"
+        },
+        {
+          "path": "docs/constrained-improvement.md",
+          "sha256": "7023cf08619266400f30e9068cec0543315f8caee071a3503ab41e1376fa9b8f"
+        },
+        {
+          "path": "architecture/capability-source-owners.json",
+          "sha256": "c092d8f4944ca7d56a44a60d6ccc4319d5c26521a44f3d7251ea1abce198ed6f"
+        },
+        {
+          "path": "packages/evidence-foundry/src/modules/evals/improvement.ts",
+          "sha256": "7cb5419760446ea1000db5e9d04d029dc0331ff45fc1d4a27f9580a9981bc583"
+        },
+        {
+          "path": "packages/evidence-foundry/src/modules/evals/index.ts",
+          "sha256": "090ca7a9abb6e845c3aeaec706db75ea3ba9f507b44c4c0ac9a1b60d88e0c517"
+        },
+        {
+          "path": "packages/evidence-foundry/tests/evals.test.ts",
+          "sha256": "5ff6eca2a11e517caf8e2bf958c09876a8fc1c6cc31105c785ce9c4317f4b8a1"
+        },
+        {
+          "path": "packages/evidence-foundry/tests/improvement.test.ts",
+          "sha256": "713b056c4485946fd6097b1332433810500508f1ac495fe4cececa0c2b23ff72"
+        },
+        {
+          "path": "scripts/harness.ts",
+          "sha256": "55f131ac57b7eb1d386614212d4d8828aaf6e2e338e41bcf1d88b5d211f20b3d"
+        },
+        {
+          "path": "scripts/harness-improvement.test.ts",
+          "sha256": "1ebf74303696c0c48b9e0575b3fb91023ca432ed6100dee9493f30329b55e850"
+        },
+        {
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-EVAL-RUBRIC.json",
+          "sha256": "15c6ab0263158e5ffca5fdfd57629ba506f48316e50bd461691c827446e626d2"
+        },
+        {
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-EVALUATION-CASES.json",
+          "sha256": "156ba88d05b42a30f5ddd67fcdabf9f38e8d247cd677ef740a32b43ccadf22a1"
+        },
+        {
+          "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-CANDIDATE-INSTRUCTIONS.json",
+          "sha256": "5cd7aa651c51e2c246d7713eae50c6ca146e5e108d88f07acb4d7e3878256b27"
+        }
+      ],
+      "runtime": {
+        "name": "Bun",
+        "version": "1.4.3"
+      },
+      "details": {
+        "verificationClass": "source-and-fixture-only",
+        "nativePilotExecuted": false,
+        "semanticAcceptanceEstablished": false
+      }
+    }
+  }
+}

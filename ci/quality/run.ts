@@ -19,12 +19,13 @@ import {
   runWorkflowTools,
 } from "./native-tools";
 import { runSecretCheck, verifySecretCanary, type VerifiedSecretTool } from "./secret-check";
-import { exactSourceFile, readQualityScope, type QualityScope } from "./scope";
+import { exactSourceFile, readQualityScope, safeSourcePath, type QualityScope } from "./scope";
 import {
   captureQualitySources,
   compareQualitySources,
   type QualitySourceSnapshot,
 } from "./source-snapshot";
+import { writeQualityProgress, type QualityProgressObserver } from "./progress";
 
 export interface AnyDebt {
   path: string;
@@ -80,6 +81,42 @@ export function metadataOnlyCommandOutput(value: unknown): unknown {
       result[key + "Sha256"] = hash(item);
       result[key + "Bytes"] = Buffer.byteLength(item);
     } else result[key] = metadataOnlyCommandOutput(item);
+  }
+  return result;
+}
+
+/** Bounded stack locations in known source tests only; never retain messages or snippets. */
+export function sourceTestFailureLocations(
+  stderr: string,
+  root: string,
+  testFiles: readonly string[],
+): { path: string; line: number; column: number }[] {
+  const result: { path: string; line: number; column: number }[] = [];
+  if (stderr.length > 1_048_576) return result;
+  const seen = new Set<string>(),
+    known = new Map<string, string>();
+  for (const path of testFiles.slice(0, 1024)) {
+    if (!safeSourcePath(path) || path.length > 512 || !/\.(?:test|spec)\.[cm]?tsx?$/.test(path))
+      continue;
+    known.set(resolve(root, path), path);
+  }
+  for (const rawFrame of stderr.split("\n")) {
+    const frame = rawFrame.replace(/\u001b\[[0-9;]*m/g, "");
+    const match =
+      /^\s*at (?:[^()\r\n]+ )?\((\/[^\r\n]+):([1-9][0-9]{0,6}):([1-9][0-9]{0,6})\)\s*$/.exec(
+        frame,
+      ) ?? /^\s*at (\/[^\r\n]+):([1-9][0-9]{0,6}):([1-9][0-9]{0,6})\s*$/.exec(frame);
+    if (!match) continue;
+    const path = known.get(match[1]!);
+    if (!path) continue;
+    const line = Number(match[2]),
+      column = Number(match[3]);
+    const key = JSON.stringify([path, line, column]);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push({ path, line, column });
+      if (result.length === 16) return result;
+    }
   }
   return result;
 }
@@ -240,7 +277,11 @@ export async function checkTypedLint(scope: QualityScope): Promise<{
 export type QualityMode =
   "all" | "format" | "format:write" | "lint" | "workflows" | "architecture" | "baseline:any";
 
-export async function runQuality(rootPath: string, mode: QualityMode): Promise<QualityReport> {
+export async function runQuality(
+  rootPath: string,
+  mode: QualityMode,
+  observe?: QualityProgressObserver,
+): Promise<QualityReport> {
   const started = performance.now(),
     startedAt = new Date().toISOString(),
     root = resolve(rootPath);
@@ -248,31 +289,45 @@ export async function runQuality(rootPath: string, mode: QualityMode): Promise<Q
   let scope: QualityScope | undefined;
   let sourceIdentity: QualityReport["sourceIdentity"];
   let sourceSnapshot: QualitySourceSnapshot | undefined;
+  const progress = async (currentCheck: string | null, complete = false): Promise<void> => {
+    await observe?.({
+      schema: "agent-platform.quality-progress.v1",
+      status: complete ? "complete" : "running",
+      mode,
+      startedAt,
+      updatedAt: new Date().toISOString(),
+      currentCheck,
+      checks: checks.map(({ id, status, durationMs }) => ({ id, status, durationMs })),
+    });
+  };
   const perform = async (
     id: string,
     callback: () => Promise<unknown>,
     successful: (result: unknown) => boolean = () => true,
   ): Promise<boolean> => {
+    await progress(id);
     const phase = performance.now();
+    let pass = false;
     try {
-      const details = await callback(),
-        pass = successful(details);
+      const details = await callback();
+      pass = successful(details);
       checks.push({
         id,
         status: pass ? "pass" : "fail",
         durationMs: Math.round(performance.now() - phase),
         details: metadataOnlyCommandOutput(details),
       });
-      return pass;
     } catch (error) {
+      pass = false;
       checks.push({
         id,
         status: "fail",
         durationMs: Math.round(performance.now() - phase),
         details: { error: error instanceof Error ? error.message : String(error) },
       });
-      return false;
     }
+    await progress(null);
+    return pass;
   };
   const allowed = await perform("mutation-policy", async () => {
     if (process.env.GITHUB_ACTIONS === "true" && ["format:write", "baseline:any"].includes(mode))
@@ -429,8 +484,8 @@ export async function runQuality(rootPath: string, mode: QualityMode): Promise<Q
       if (installedSecretTool)
         await perform(
           "quality-negative-fixtures",
-          () =>
-            runNativeCommand(
+          async () => {
+            const result = await runNativeCommand(
               "quality-negative-fixtures",
               [process.execPath, "test", "ci/"],
               root,
@@ -440,7 +495,19 @@ export async function runQuality(rootPath: string, mode: QualityMode): Promise<Q
                 GITLEAKS_VERIFY_BINARY: installedSecretTool!.path,
                 GITLEAKS_VERIFY_BINARY_SHA256: installedSecretTool!.binarySha256,
               },
-            ),
+            );
+            return {
+              ...result,
+              failureLocations:
+                result.exitCode === 0
+                  ? []
+                  : sourceTestFailureLocations(
+                      result.stderr,
+                      root,
+                      selected.auxiliaryTypescript.filter((path) => path.startsWith("ci/")),
+                    ),
+            };
+          },
           (result) =>
             (result as { exitCode: number; timedOut: boolean }).exitCode === 0 &&
             !(result as { timedOut: boolean }).timedOut,
@@ -471,6 +538,7 @@ export async function runQuality(rootPath: string, mode: QualityMode): Promise<Q
       (result) => (result as { status: string }).status === "pass",
     );
   }
+  await progress(null, true);
   return {
     schema: "agent-platform.quality-report.v1",
     status: checks.some((check) => check.status !== "pass") ? "fail" : "pass",
@@ -549,7 +617,12 @@ if (import.meta.main) {
         "Custom-root or mutating source quality requires Bun 1.4.3; automatic preparation is unavailable",
       );
     }
-    report = await runQuality(root, mode);
+    report = await runQuality(root, mode, async (progress) => {
+      // Emit bounded metadata before expensive work so a stalled phase is observable.
+      console.error(JSON.stringify(progress));
+      if (process.env.QUALITY_REPORT_PATH)
+        await writeQualityProgress(process.env.QUALITY_REPORT_PATH + ".progress.json", progress);
+    });
   }
   const reportPath = process.env.QUALITY_REPORT_PATH;
   if (reportPath) {

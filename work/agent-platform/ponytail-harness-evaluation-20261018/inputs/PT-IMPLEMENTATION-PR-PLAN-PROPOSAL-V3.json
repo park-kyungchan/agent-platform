@@ -1,0 +1,202 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-IMPLEMENTATION-PR-PLAN-PROPOSAL-V3",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-IMPLEMENTATION-PR-PLAN-PROPOSAL-V3.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common-harness.quality-implementation-pr-plan-proposal.v3",
+    "status": "awaiting-explanation-and-explicit-final-user-approval",
+    "currentLeadAndOrchestrator": "This current user-facing session, for this Work only; not a handoff back to lens-interview.",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "agent-platform",
+      "workId": "ponytail-harness-evaluation-20261018",
+      "issueId": "PT-ISSUE-20261018",
+      "currentPreparationSpec": "PT-SPEC@2",
+      "currentPreparationPlan": "PT-PLAN@2",
+      "proposedImplementationSpec": "PT-SPEC@3",
+      "proposedImplementationPlan": "PT-PLAN@3"
+    },
+    "historicalBase": "7b0c3519638807788e2001d17a4c91ba1ea703fc",
+    "primaryPurpose": "Improve complete common-harness behavior and verification quality with AIP Evolve methodology; Ponytail is a candidate treatment, CI Workflow Agent one added sub-scope.",
+    "acceptedCriteria": [
+      "Behavior quality gains and verification-detection gains are distinct eligible outcomes; prove each.",
+      "Existing passing results and more tests/records alone are not quality improvement.",
+      "All actually affected consumers are E2E scope; common code affects Codex/Hermes, runtime-only changes the relevant consumer.",
+      "Git-first complete publication/concurrency/history with existing owner boundaries; no universal filesystemCAS/permanentimmutability mechanism."
+    ],
+    "plannedChanges": [
+      {
+        "id": "PT-IMPL-QUALITY",
+        "owner": "packages/evidence-foundry/src/modules/evals/",
+        "work": "Add a quality-first comparison/preflight path using current Evidence evaluation contracts; preserve v1 efficiency behavior/API.",
+        "candidateFiles": [
+          "improvement.ts",
+          "types.ts",
+          "index.ts",
+          "one small quality-specific module if it clarifies ownership without duplicate validation"
+        ],
+        "behavior": [
+          "Retain per-criterion baseline/candidate transitions and evidence class.",
+          "Separate experiment evidence/authorization eligibility from target behavior failures.",
+          "Recognize baseline-fail to candidate-pass; distinguish pass-preserved, regression, insufficient evidence.",
+          "Recognize verification-detection gain only with independently fixed defect and valid controls.",
+          "No mandatory speed delta or weighted total; no native runner/store/Acceptance side effect."
+        ]
+      },
+      {
+        "id": "PT-IMPL-CLI",
+        "owner": "scripts/harness.ts and canonical Evidence API",
+        "work": "Expose bounded quality preflight/comparison through existing harness; preserve current command contracts and non-authorizing output.",
+        "behavior": [
+          "Prepared JSON -> input validation -> existing canonical comparison -> explicit JSON result.",
+          "No command executes a model, changes native trust/configuration or automatically accepts a candidate."
+        ]
+      },
+      {
+        "id": "PT-IMPL-SCENARIOS",
+        "owner": "Existing package/CI tests and Work evidence",
+        "work": "Turn selected7complex scenario definitions into independent executable fixtures/probes where possible, preserving historical evidence classes.",
+        "behavior": [
+          "Normal and invalid controls; wrong-allow and wrong-HOLD errors both count.",
+          "Demonstrate verification detection gains with same seeded fault and passing valid controls.",
+          "Current source defects count as behavior gains only if observed on the same frozen independent input and corrected by candidate; otherwise report equivalence.",
+          "Replay historical incident meaning offline; no old native effect or current CI run is replayed."
+        ]
+      },
+      {
+        "id": "PT-IMPL-GIT",
+        "owner": "Existing Git Work/transition/CI owners",
+        "work": "Apply the three Git-first protections at actual source/evidence/integration boundaries; implement only an evidenced gap.",
+        "behavior": [
+          "Use separate branch/worktree ownership, immutable commit/tree/source references, semantic transitions and expected-head/ref integration.",
+          "Carry original/history/effect fences and current finding evidence.",
+          "Keep untracked live native private state with a bounded existing owner apply/observation boundary.",
+          "Do not add a new scheduler, review-arrival observer, generic lock/lease service, credential bridge or global context service."
+        ]
+      },
+      {
+        "id": "PT-IMPL-ROUTING",
+        "owner": "AGENTS.md/docs/common existing route",
+        "work": "Document when to use the quality method, exact scope/limits and actual consumer qualification; keep routine tasks proportional."
+      }
+    ],
+    "dependencyOrder": [
+      {
+        "phase": 0,
+        "mode": "sequential-Root",
+        "work": "After approval only: record exact accepted Spec/Plan3, source baseline, Task ownership, immutable case/oracle versions and bounded outputs; reobserve current target/base without altering other sessions."
+      },
+      {
+        "phase": 1,
+        "mode": "parallel-two-worker-panes",
+        "work": "Implementation worker builds canonical quality API/CLI and direct tests; scenario worker prepares independent complex fixtures/oracles/diagnosis controls under separate Task worktree/branch."
+      },
+      {
+        "phase": 2,
+        "mode": "sequential-contract-join-then-parallel-checks",
+        "work": "Join the agreed API with scenario outputs; Root integrates exact reviewed deltas and pins. Run appropriate package/scenario checks in parallel only where independent; source/provider/owner-generation ordering stays serial."
+      },
+      {
+        "phase": 3,
+        "mode": "independent-review-pane-after-freeze",
+        "work": "Freeze candidate commit/tree, independently review source and evidence, resolve findings and rerun affected checks. Do not review a moving target or reuse a different tree's approval."
+      },
+      {
+        "phase": 4,
+        "mode": "sequential-Root-publication",
+        "work": "Verify frozen exact head/base; push only the owned reviewed source branch with no PR yet; publish independent immutable review evidence and authenticated status for that remotely present SHA; recheck current head/base/findings/required checks; then open the scoped PR."
+      }
+    ],
+    "panes": {
+      "root": "Current user-facing pane retains Lead/Orchestrator purpose, decisions, IDs, dependency graph, integration, approval boundaries and PR.",
+      "implementation": "One native worker pane in its isolated Task worktree/branch; tightly coupled code+direct tests grouped.",
+      "scenario": "One native worker pane in its isolated Task worktree/branch; independent source-grounded scenarios and verification controls.",
+      "review": "One separate reviewer pane after immutable candidate freeze; no author self-review.",
+      "efficiency": "Start only useful panes; no status-only workers, unrelated focus/closure or extra pane count. Read back current live IDs before control; native loops/tools/profiles/credentials stay native."
+    },
+    "proposedTaskGraph": [
+      {
+        "id": "PT-08-QUALITY-CONTRACT",
+        "after": [],
+        "owner": "Root"
+      },
+      {
+        "id": "PT-09-QUALITY-IMPLEMENTATION",
+        "after": [
+          "PT-08-QUALITY-CONTRACT"
+        ],
+        "owner": "implementation-worker"
+      },
+      {
+        "id": "PT-10-COMPLEX-ORACLES",
+        "after": [
+          "PT-08-QUALITY-CONTRACT"
+        ],
+        "owner": "scenario-worker"
+      },
+      {
+        "id": "PT-11-INTEGRATED-VERIFICATION",
+        "after": [
+          "PT-09-QUALITY-IMPLEMENTATION",
+          "PT-10-COMPLEX-ORACLES"
+        ],
+        "owner": "Root"
+      },
+      {
+        "id": "PT-12-INDEPENDENT-REVIEW",
+        "after": [
+          "PT-11-INTEGRATED-VERIFICATION"
+        ],
+        "owner": "independent-reviewer"
+      },
+      {
+        "id": "PT-13-REVIEW-PUBLICATION-PR",
+        "after": [
+          "PT-12-INDEPENDENT-REVIEW"
+        ],
+        "owner": "Root"
+      }
+    ],
+    "verification": [
+      "Quality transition/control tests including both-arm failures, missing evidence, duplicate/version/consumer mismatch and non-authorizing results.",
+      "Actual runSuite/evaluateUnit-produced result compatibility, not only handwritten result fixtures.",
+      "Selected complex context/history/recovery/source-closure/Git semantic integration/CI incident offline oracles.",
+      "bun run check:handoff, check:imports, affected package checks, check:quality and exact check:source/provider closure.",
+      "All affected consumer integration paths; distinguish source/adapter fixtures, actual native consumption and owner activation.",
+      "Final head/tree/exact findings and current required checks before PR."
+    ],
+    "nativeQualificationBoundary": "No inherited or new model-evaluation budget is implied. Existing source and adapter integration can be tested locally. Any actual native evaluation/activation needed for an E2E claim requires its own current owner admission; keep it explicitly incomplete and never relabel a fixture as native behavior. PR scope/claims must match the evidence. If an affected native consumer cannot be qualified without separately unapproved effects/admission, keep that criterion explicitly pending; the PR remains draft for that missing qualification and never claims actual native E2E completion.",
+    "approvalRequestedScope": {
+      "afterApproval": "Implementation, scoped verification, separate native worker/reviewer panes, Task commits and exact integration, owned branch push, independent review evidence/authenticated status publication and PR creation.",
+      "notIncluded": [
+        "Automatic merge",
+        "Native production activation or global trust/profile/credential/cache change",
+        "New model evaluation suite or historical budget revival",
+        "Modifying other active Work files",
+        "Replaying completed/uncertain native effects"
+      ]
+    },
+    "currentExecutionState": {
+      "implementationStarted": false,
+      "newCommits": 0,
+      "newPushes": 0,
+      "newPRs": 0,
+      "newNativePanes": 0,
+      "finalApprovalReceived": false
+    },
+    "reviewedProposal": {
+      "class": "internal-read-only-plan-review",
+      "actionableCorrection": "Remote source SHA must exist before authenticated status publication; order corrected.",
+      "implementationApproval": false
+    }
+  }
+}
