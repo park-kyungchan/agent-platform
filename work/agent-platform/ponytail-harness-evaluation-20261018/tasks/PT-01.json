@@ -30,6 +30,6 @@
   "decisionIds": [],
   "effectIds": [],
   "verificationEvidenceIds": [
-    "PT-01-VERIFICATION"
+    "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-01"
   ]
 }

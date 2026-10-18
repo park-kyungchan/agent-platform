@@ -4,7 +4,7 @@
   "projectId": "agent-platform",
   "workId": "ponytail-harness-evaluation-20261018",
   "kind": "evidence",
-  "id": "PT-CHECKS",
+  "id": "agent-platform:evidence:ponytail-harness-evaluation-20261018:checks",
   "evidenceKind": "observation",
   "source": {
     "kind": "snapshot",

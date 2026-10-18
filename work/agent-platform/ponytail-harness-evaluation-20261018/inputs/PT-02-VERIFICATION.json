@@ -14,7 +14,7 @@
   "content": {
     "schemaVersion": "1.0.0",
     "kind": "verification",
-    "id": "PT-02-VERIFICATION",
+    "id": "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-02",
     "projectId": "agent-platform",
     "domainId": "native-harness",
     "createdAt": "2026-10-18T09:59:31.412Z",
@@ -28,7 +28,7 @@
           "status": "pass",
           "message": "Canonical comparison, CLI, real runSuite version compatibility, required source/package/quality checks and finite source-provider closure pass.",
           "evidenceRefs": [
-            "PT-CHECKS"
+            "agent-platform:evidence:ponytail-harness-evaluation-20261018:checks"
           ]
         }
       ],
