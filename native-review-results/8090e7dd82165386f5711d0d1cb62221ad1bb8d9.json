@@ -1,0 +1,32 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "8090e7dd82165386f5711d0d1cb62221ad1bb8d9",
+  "reviewedTreeSha": "3558b5e68ea51d3819c586bd48a643673bf813f7",
+  "reviewedSourceManifestSha256": "7856266fc4f51b6facf27e974dab7b8b90e14bc7e59040b2b415a8d8a2fa910d",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_native_harness_pair_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "custody": {
+    "nativeThreadId": null,
+    "nativeTaskResourceId": null,
+    "nativeRunResourceId": null,
+    "nativeAuthorshipAuthenticated": false,
+    "publisherAuthenticationPending": true
+  },
+  "nativePermissionGranted": false,
+  "acceptanceEstablished": false
+}
