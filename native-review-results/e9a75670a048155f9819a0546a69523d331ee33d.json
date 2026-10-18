@@ -1,0 +1,212 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "e9a75670a048155f9819a0546a69523d331ee33d",
+  "reviewedTreeSha": "ffc3cfb8d9805a20f91a8b7b2ed7c73f4c679a4d",
+  "reviewedSourceManifestSha256": "6eb7f0b460a3063b3c2de41a9b3a49db3b0da468820f3eccfb196618278894ab",
+  "manifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "ffc3cfb8d9805a20f91a8b7b2ed7c73f4c679a4d",
+    "entryCount": 949,
+    "blobCount": 794,
+    "sha256": "6eb7f0b460a3063b3c2de41a9b3a49db3b0da468820f3eccfb196618278894ab"
+  },
+  "baseSha": "fe591ffe113aef092f3f526cadcd7c575c579881",
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a14e5a-6ee3-7f53-92de-20c1ca955dae"
+  },
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a14eda-03f5-7661-94c8-de94cb1384a7"
+  },
+  "reviewerTaskIdMeaning": "Legacy proof identity field populated with observed CODEX_THREAD_ID; native task/run IDs remain separately null.",
+  "nativeIdentity": {
+    "runtime": "native-codex",
+    "threadId": "01a14eda-03f5-7661-94c8-de94cb1384a7",
+    "sessionId": "01a14eda-03f5-7661-94c8-de94cb1384a7",
+    "taskId": null,
+    "runId": null,
+    "occurrenceId": null,
+    "observationSource": "Current process environment CODEX_THREAD_ID/CODEX_SESSION_ID; task/run/occurrence identifiers unexposed. Identity observations do not independently authenticate native authorship.",
+    "nativeAuthorshipAuthenticated": false
+  },
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "agent-platform",
+    "workId": "ponytail-harness-evaluation-20261018",
+    "taskId": "PT-12-INDEPENDENT-REVIEW"
+  },
+  "recordedAtUtc": "2026-10-18T12:07:22.790Z",
+  "attempt": 2,
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "priorFindingDispositions": [
+    {
+      "id": "PT12-F1",
+      "status": "resolved",
+      "severity": "P2",
+      "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-INTERVIEW-STATE-V2.json",
+      "resolution": "V2 is restored byte-exact to tested0bcfc38. New PT-INTERVIEW-STATE-V3 and typed contains/supersedes relations preserve the current checkpoint separately. Work selects a new governing Decision whose answer and selectionContext bind exact source primitives. No validator weakening or earlier comparison baseline.",
+      "evidence": {
+        "beforeCommit": "0bcfc3877670a8d6003cd0f57757a8e56de6c9fd",
+        "afterCommit": "e9a75670a048155f9819a0546a69523d331ee33d",
+        "restoredV2Sha256": "815040b31c6030153510241f7383d7af3e8a66c9614ff21fadbe3405bb455b37",
+        "v2ByteForByteEquality": true,
+        "independentPublicTransition": {
+          "valid": true,
+          "findings": []
+        },
+        "independentPublicRecordValidation": {
+          "valid": true,
+          "findings": []
+        },
+        "independentPublicContext": {
+          "status": "source-qualified",
+          "holdReasons": [],
+          "maxChars": 24000,
+          "serializedChars": 20562
+        },
+        "governingDecision": "PT-DECISION-CHECKPOINT-SUCCESSOR-20261018",
+        "governingDecisionLinked": true,
+        "answerSourcePrimitiveExact": true,
+        "selectionContextSourcePrimitiveExact": true,
+        "selectionContextSource": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-INTERVIEW-STATE-V3.json#/content/continuity/canonicalCheckpointRule",
+        "publicContextReachesV3SourceFragment": true,
+        "relations": [
+          "PT-CONTAINS-CHECKPOINT-V3",
+          "PT-CHECKPOINT-V3-SUPERSEDES-V2"
+        ]
+      }
+    }
+  ],
+  "priorReview": {
+    "headSha": "5175a88069f10c0cafa406b5ef75263dfb34be06",
+    "reviewedTreeSha": "996253c4eef5c775b057fce36e3dbef84399eaf3",
+    "conclusion": "fail",
+    "unresolvedFindings": 1,
+    "recordedAtUtc": "2026-10-18T11:57:27.998Z",
+    "rawResultSha256": "32125f8647fed325099639cfeea894cb0d50d2e0a1aa119b7f05678dba8ace4e",
+    "sessionSha256": "59f7146608db348980b161d76d7158b33c60f8401636275537d79ed699a49d67",
+    "originalFilesUnchanged": true,
+    "canonicalCapture": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-INDEPENDENT-REVIEW-ATTEMPT-1.json",
+    "canonicalCapturedRawUtf8ExactlyEqualsOriginal": true,
+    "meaning": "Historical failed evidence retained. This is a fresh review of the repaired head/tree and delta, not approval reuse from the different failed tree."
+  },
+  "inspectedScope": [
+    "Full admitted production source diff: new v1 efficiency helper, new quality helper, eval exports, runSuite effective result fields and existing harness CLI extensions.",
+    "All added package/CLI tests and cross-package CI harness-scenarios, fixtures and frozen expectations; no native core dependency was added to Evidence.",
+    "AGENTS.md, project.json, capability owner registry, constrained improvement documentation, accepted Work Decisions, SpecPlan4 and historical Task9/10/12 SpecPlan3 bindings.",
+    "Frozen quality rubric/interface/oracles, worker reports, gain observations, integrated verification records and material Root quality/source/failure/success logs.",
+    "Exact reviewed Git manifest, all registry source pins, tested-source equality, private report snapshot equality and Work public reader/semantic transitions.",
+    "Fresh attempt2: all seven Work repair files compared against failed5175a88; restored V2, new V3, exact failed-review capture, both typed relations, new governing Decision and current Work pointer reviewed. All post-test files and immutable source/evidence equality independently rechecked."
+  ],
+  "checks": [
+    {
+      "name": "New frozen binding and manifest",
+      "status": "pass",
+      "detail": "HEAD/tree match new context; independent recursive Git manifest derives949entries/794blobs and supplied6eb7f0b digest. Tracked review checkout clean."
+    },
+    {
+      "name": "Renewed tested-source and sourceRoot equality",
+      "status": "pass",
+      "detail": "All14 paths changed after actual tested0bcfc38 are Work paths. No non-Work change from either tested0bcfc38 or failed5175a88. All276 recorded quality source snapshot hashes match review checkout; all361 tracked non-Work files match supplied sourceRoot. Earlier source verification applies through independently verified byte equality."
+    },
+    {
+      "name": "Owner/dependency pins",
+      "status": "pass",
+      "detail": "All140 canonical registry source pins freshly hashed and match. Repair changes no package manifest/lock, metadata, source guards, native adapters, immutable releases or dependencies. Cross-package oracles remain CI-owned; Evidence adds no native core dependency."
+    },
+    {
+      "name": "Actual tested-to-reviewed semantic transition",
+      "status": "pass",
+      "detail": "Independently executed validateGitWorkTransition from exact0bcfc3877670a8d6003cd0f57757a8e56de6c9fd to exacte9a75670a048155f9819a0546a69523d331ee33d: valid:true, findings:[]. No older baseline substituted."
+    },
+    {
+      "name": "Typed records and bounded public PT12 context",
+      "status": "pass",
+      "detail": "Fresh validateGitWorkRecords valid with zero findings. Public readGitWorkContext latestRelevant:current,maxChars:24000 source-qualified with no holds, serialized20562chars. Current Work SpecPlan4 and historical Task9/10/12 SpecPlan3 retained; completion and Acceptance remain separate."
+    },
+    {
+      "name": "Checkpoint lineage and source selection",
+      "status": "pass",
+      "detail": "Independently read both typed relation endpoints through public reader. New Decision is in governingDecisionIds; original answer and authored selectionContext exactly equal addressed source primitives. Bounded context reaches V3 canonicalCheckpointRule. V2 bytes exactly match actual tested predecessor at SHA815040b31c6030153510241f7383d7af3e8a66c9614ff21fadbe3405bb455b37."
+    },
+    {
+      "name": "Historical failed review custody",
+      "status": "pass",
+      "detail": "Attempt1 raw/session digests unchanged. New canonical captured rawResultUtf8 equals original byte-for-byte and declared digest matches. Failed conclusion/finding retained as historical evidence."
+    },
+    {
+      "name": "Full required-check evidence recheck",
+      "status": "pass-with-scope-limit",
+      "detail": "Root quality report still passes all14checks; finite source report all25commands exit0, including handoff/imports, package/owner/source closure and both adapter paths. Independently rehashed all four integrated final-log receipts: all match. Heavy suites not rerun for Work-only repair."
+    },
+    {
+      "name": "Focused producer and CLI verification",
+      "status": "pass",
+      "detail": "86 tests passed, 0 failed, 286 assertions across actual evals, quality helper and both CLI suites using the sourceRoot existing dependencies; canonical bytes were independently verified equal. Log: .private/focused-tests-source-root.log. The isolated review checkout has no installed dependencies: initial attempts failed on missing ontology/ajv, not a source defect; NODE_PATH did not resolve them. No dependency installation or cache mutation was performed.",
+      "evidenceOccurrence": "Attempt1 actual execution/read; applicability freshly verified by exact source/evidence equality in attempt2. No new test occurrence asserted."
+    },
+    {
+      "name": "V1 preservation",
+      "status": "pass",
+      "detail": "Read full v1 helper and tests; independently ran v1 improvement tests in the review checkout: 51 pass. Quality changes preserve the scalar paired mean/quality-gate efficiency contract rather than silently replacing it.",
+      "evidenceOccurrence": "Attempt1 actual execution/read; applicability freshly verified by exact source/evidence equality in attempt2. No new test occurrence asserted."
+    },
+    {
+      "name": "Independent adapter/API join",
+      "status": "pass",
+      "detail": "Required CI-owned join rerun: 1 pass, 0 fail. Real offline Codex/Hermes adapter outputs feed evaluateUnit and the quality API; missing module cannot skip. Log: .private/independent-join.log. Synthetic weak-oracle calibration remains explicitly synthetic.",
+      "evidenceOccurrence": "Attempt1 actual execution/read; applicability freshly verified by exact source/evidence equality in attempt2. No new test occurrence asserted."
+    },
+    {
+      "name": "Zero-token source repair and STOP controls",
+      "status": "pass",
+      "detail": "Independently extracted bdcb409 quality implementation; SHA-256 matches recorded 0e12969b1c96758c8faf4772f6cca3610772d79ce0df3da607dce6ee9fdd6f1f. Identical zero-cap protocol defers historically and preflights now; candidate observed 0 reaches review, observed 1 stops, and observed 1 plus malformed candidate remains STOP. Root retained historical failure log shows actual independent join refusal before repair. This is a pre-merge component behavior/detection gain, not native adoption or Ponytail efficacy.",
+      "evidenceOccurrence": "Attempt1 actual execution/read; applicability freshly verified by exact source/evidence equality in attempt2. No new test occurrence asserted."
+    },
+    {
+      "name": "Standing typed engineering preference",
+      "status": "pass",
+      "detail": "Read supplied standing decision after SHA-256 verified bc46b6a65f90716d5d4a729b374951e228adb66aaf003e977e052c0ceed77038; review artifacts are typed JSON/TypeScript and actual/inferred/authentication distinctions preserved.",
+      "evidenceOccurrence": "Attempt1 actual execution/read; applicability freshly verified by exact source/evidence equality in attempt2. No new test occurrence asserted."
+    },
+    {
+      "name": "Root repair report corroboration",
+      "status": "pass",
+      "detail": "Read repaired-tested-transition.json and repaired-work-validation.json: valid/no findings; repaired-public-context.json source-qualified/no holds. Independent exact-head executions above corroborate these results."
+    },
+    {
+      "name": "Patch whitespace/final source state",
+      "status": "pass",
+      "detail": "git diff --check base..HEAD passes. Frozen head/tree and clean tracked state rechecked before new private artifact writes."
+    }
+  ],
+  "scopeAssessment": {
+    "sourceBehavior": "Canonical source-ready quality implementation, actual producer/CLI integration and pre-merge zero-token component repair are supported at this exact head. PT12-F1 is fully resolved.",
+    "verificationDetection": "One independently detected real pre-merge component defect is supported; deliberately weak synthetic comparator controls and historical repaired cases are separately labelled calibration/preserved behavior.",
+    "affectedConsumers": "Both offline adapter paths and actual runSuite/CLI consumer integration are covered. Active native hook/config routes are unchanged; source-only qualification is justified for this patch and does not waive a changed native runtime criterion.",
+    "primaryWork": "Quality-first common harness remains primary; CI Workflow Agent remains design/calibration sub-scope with no new runtime/scheduler or live CI effects.",
+    "causalPonytailEfficacyEstablished": false,
+    "nativeAdoptionEstablished": false,
+    "sourceAuthenticityVerifiedByEnvelope": false,
+    "acceptanceEstablished": false,
+    "historyAndAuthority": "Existing canonical Input preserved; checkpoint successor linked through existing typed owners. Private in-flight projection is not canonical Input or native authority. Failed review, original decisions, historical IDs/contracts and effect fences retained."
+  },
+  "limitations": [
+    "This pass binds only the new exact head/tree and actual tested-to-reviewed transition. Invalid earlier draft commits remain historical with failed review retained; this does not assert every abandoned intermediate draft was valid.",
+    "Full original source review and focused86 producer/quality/CLI tests,51v1 tests and1independent actual-adapter/evaluateUnit join were executed in attempt1. Attempt2 independently reviewed the repair delta and verified source/evidence equality; unchanged tests/full heavy suites were not redundantly rerun or represented as new occurrences.",
+    "Full quality/finite source closure conclusions rely on inspected matching reports/log hashes. Source/adapter evidence, synthetic calibration, historical correction, actual native operation and causal Ponytail efficacy remain distinct; native adoption and Ponytail efficacy remain unproved.",
+    "Review checkout has no installed dependencies. Public reader probes used independently matching sourceRoot implementation and existing dependencies against immutable review-worktree Git commits. No dependency installation, cache mutation or source edit occurred.",
+    "Native thread/session identifiers are process observations, not independently authenticated authorship or permission. Native task/run/occurrence IDs remain null when unexposed.",
+    "Only new attempt2 private output files were written. No production/Work edits, staging/commits, push/publication/PR/merge, model evaluation, Goal creation, parent/session message, native config/trust/credential/cache mutation or activation occurred. Attempt1 files remain unchanged.",
+    "This verification is not AcceptanceDecision or merge/native activation authority. Lead must separately enforce immutable publication/authenticated status, current zero findings, hosted/protected checks and explicit expected-head merge; native owners retain runtime activation."
+  ]
+}
