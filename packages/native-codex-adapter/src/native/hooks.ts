@@ -504,11 +504,10 @@ function contextSelections(
   return value as (SessionGitWorkSelection | LegacySessionContextSelection)[];
 }
 
-/** Absence of agent identity is an exact parent tuple, never a child wildcard. */
-export function resolveSessionGitWorkSelection(
+/** One tuple predicate serves both pre-capture opt-in admission and context selection. */
+function exactSessionGitWorkSelection(
   input: HookInput,
   registry: HookBindings,
-  binding: HookBinding,
 ): SessionGitWorkSelection | undefined {
   const selected = contextSelections(contextSelectionSnapshot(registry).contextSelections).find(
     (entry) =>
@@ -519,7 +518,17 @@ export function resolveSessionGitWorkSelection(
       entry.cwd === input.cwd,
   );
   if (!selected || selected.schema !== "codex.session-git-work-selection.v1") return undefined;
-  const selection = selected as SessionGitWorkSelection;
+  return selected as SessionGitWorkSelection;
+}
+
+/** Absence of agent identity is an exact parent tuple, never a child wildcard. */
+export function resolveSessionGitWorkSelection(
+  input: HookInput,
+  registry: HookBindings,
+  binding: HookBinding,
+): SessionGitWorkSelection | undefined {
+  const selection = exactSessionGitWorkSelection(input, registry);
+  if (!selection) return undefined;
   if (
     selection.ownerRoot !== binding.root ||
     selection.projectId !== binding.projectId ||
@@ -1027,7 +1036,13 @@ async function gateQualificationChild(
 
 export async function handleHook(
   value: unknown,
-  options: { bindings: HookBindings; now?: () => Date; maxChars?: number },
+  options: {
+    bindings: HookBindings;
+    now?: () => Date;
+    maxChars?: number;
+    /** Explicit normal-mode admission before any prompt or boundary capture. */
+    selectedSessionOnly?: boolean;
+  },
   loadCodexOwnerContext: NativeContextLoader,
 ): Promise<HookResult> {
   let gateActive = false;
@@ -1036,6 +1051,14 @@ export async function handleHook(
     const input = parseHookInput(value);
     contextSelectionExpected =
       input.hook_event_name !== "PreToolUse" && selectedContextExpected(input, options.bindings);
+    if (options.selectedSessionOnly) {
+      // Foreign tuples decline before even resolving a checkpoint or loading the provider.
+      if (!exactSessionGitWorkSelection(input, options.bindings))
+        return { status: "no-op", stdout: "", exitCode: 0 };
+      const binding = resolveHookBinding(input.cwd, options.bindings);
+      if (!binding || !resolveSessionGitWorkSelection(input, options.bindings, binding))
+        return { status: "no-op", stdout: "", exitCode: 0 };
+    }
     const chosen =
       input.hook_event_name === "PreToolUse"
         ? { binding: resolveHookBinding(input.cwd, options.bindings), selection: undefined }

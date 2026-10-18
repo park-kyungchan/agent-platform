@@ -319,9 +319,9 @@ describe("real docs CLI transport", () => {
 });
 
 describe("portable docs-only Runtime Index", () => {
-  test("selects all86 registered routes and their aliases without execution admission", () => {
+  test("selects all98 registered routes and their aliases without execution admission", () => {
     const reader = createDocumentationReader(registry);
-    expect(reader.registry.routes).toHaveLength(86);
+    expect(reader.registry.routes).toHaveLength(98);
     for (const route of registry.routes) {
       for (const topic of [route.topic, ...route.aliases]) {
         const plan = reader.select({ surface: route.surface, topic });
@@ -332,6 +332,70 @@ describe("portable docs-only Runtime Index", () => {
         expect(Object.hasOwn(plan, "execution")).toBe(false);
       }
     }
+  });
+  test("Hermes Client/Backend topics preserve distinct official pages and limited evidence", () => {
+    const reader = createDocumentationReader(registry);
+    for (const [topic, id, pageId] of [
+      ["windows-client", "desktop-client", "user-guide/desktop"],
+      ["원격연결".normalize("NFD"), "remote-gateway", "user-guide/multi-connection-desktop"],
+      ["bots", "bot-mode", "user-guide/bot-mode"],
+      ["봇화면".normalize("NFD"), "bot-screen", "user-guide/features/bot-screen"],
+      ["computer_use", "computer-use", "user-guide/features/computer-use"],
+      ["version", "updating", "getting-started/updating"],
+      ["installer", "installation", "getting-started/installation"],
+      ["support-matrix", "platform-support", "getting-started/platform-support"],
+      ["windows", "windows-native", "user-guide/windows-native"],
+      ["wsl2", "windows-wsl", "user-guide/windows-wsl-quickstart"],
+      ["dashboard", "web-dashboard", "user-guide/features/web-dashboard"],
+      ["multi-gateway", "multi-profile-gateways", "user-guide/multi-profile-gateways"],
+    ]) {
+      const plan = reader.select({ surface: "hermes.agent", topic });
+      expect(plan.status).toBe("SELECTED");
+      expect(plan.primary?.id).toBe(`hermes.agent.${id}`);
+      expect(plan.primary?.pageId).toBe(pageId);
+      expect(plan.primary?.evidenceStatus).toBe(
+        ["desktop-client", "bot-mode", "bot-screen"].includes(id!)
+          ? "page-opened-limited-content"
+          : "index-listed",
+      );
+      expect(plan.primary?.documentationVersion).toBeUndefined();
+      expect(plan.primary?.checkedOn).toBe("2026-10-18");
+      expect(plan.evidenceGaps).toContain("route-body-not-fully-reviewed");
+      expect(plan.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+      const source = reader.registry.sources[plan.primary!.sourceId!];
+      expect(source?.rawBytesVerified).toBe(false);
+      expect(source?.bodySha256).toBeNull();
+      expect(plan.executionAuthority).toBe("none");
+      expect(plan.nativePermissionGranted).toBe(false);
+    }
+    expect(reader.select({ surface: "hermes.agent", topic: "gateway" }).primary?.pageId).toBe(
+      "developer-guide/gateway-internals",
+    );
+  });
+  test("Client version evidence does not supply the Backend's missing installed version", () => {
+    const reader = createDocumentationReader(registry);
+    const client = reader.select(
+      {
+        surface: "hermes.agent",
+        topic: "desktop",
+        freshness: "installed",
+        executionHost: "local.windows",
+      },
+      { installedVersion: "0.22.2" },
+    );
+    const backend = reader.select({
+      surface: "hermes.agent",
+      topic: "bot-screen",
+      freshness: "installed",
+      executionHost: "hostinger.container",
+    });
+    expect(client.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+    expect(client.primary?.documentationVersion).toBeUndefined();
+    expect(backend.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+    expect(backend.evidenceGaps).toContain(
+      "installed-version-unverified-or-conflicting; documentation-is-not-deployed-availability-proof",
+    );
+    expect(backend.nativePermissionGranted).toBe(false);
   });
   test("TUI and slash aliases select partial frontend evidence without native admission", () => {
     const reader = createDocumentationReader(registry);
@@ -355,6 +419,38 @@ describe("portable docs-only Runtime Index", () => {
       expect(Object.hasOwn(plan, "execution")).toBe(false);
       const source = reader.registry.sources[plan.primary!.sourceId!];
       expect(source?.checkedOn).toBe("2026-10-17");
+      expect(source?.rawBytesVerified).toBe(false);
+      expect(source?.bodySha256).toBeNull();
+    }
+  });
+  test("Bot routes and aliases keep partial evidence and installed/client gaps", () => {
+    const reader = createDocumentationReader(registry);
+    for (const [topic, id, url] of [
+      ["bot-mode", "hermes.agent.bot-mode", "user-guide/bot-mode"],
+      ["bots", "hermes.agent.bot-mode", "user-guide/bot-mode"],
+      ["봇모드".normalize("NFD"), "hermes.agent.bot-mode", "user-guide/bot-mode"],
+      ["bot-screen", "hermes.agent.bot-screen", "user-guide/features/bot-screen"],
+      ["screen", "hermes.agent.bot-screen", "user-guide/features/bot-screen"],
+      ["봇화면".normalize("NFD"), "hermes.agent.bot-screen", "user-guide/features/bot-screen"],
+    ]) {
+      const request = { surface: "hermes.agent", topic, freshness: "installed" };
+      const missing = reader.select(request);
+      expect(missing.status).toBe("SELECTED");
+      expect(missing.primary?.id).toBe(id);
+      expect(missing.primary?.canonicalUrl).toBe(`https://hermes-agent.nousresearch.com/docs/${url}`);
+      expect(missing.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
+      const observed = reader.select(request, { installedVersion: "0.22.0" });
+      expect(observed.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
+      expect(observed.primary?.evidenceStatus).toBe("page-opened-limited-content");
+      expect(observed.primary?.documentationVersion).toBeUndefined();
+      expect(observed.evidenceGaps).toContain("route-body-not-fully-reviewed");
+      expect(observed.evidenceGaps).toContain(
+        "confirm-version-matched-release-or-source-if-current-page-cannot-substantiate-this-version",
+      );
+      expect(observed.executionAuthority).toBe("none");
+      expect(observed.nativePermissionGranted).toBe(false);
+      expect(Object.hasOwn(observed, "execution")).toBe(false);
+      const source = reader.registry.sources[observed.primary!.sourceId!];
       expect(source?.rawBytesVerified).toBe(false);
       expect(source?.bodySha256).toBeNull();
     }
@@ -511,7 +607,7 @@ describe("portable docs-only Runtime Index", () => {
     expect(reader.select({ surface: "codex.cli", topic: "hooks" }).primary?.canonicalUrl).toBe(
       original,
     );
-    expect(reader.registry.routes).toHaveLength(86);
+    expect(reader.registry.routes).toHaveLength(98);
     expect(Object.isFrozen(reader.registry.routes)).toBe(true);
     expect(Object.isFrozen(selected.primary)).toBe(true);
     expect(() =>

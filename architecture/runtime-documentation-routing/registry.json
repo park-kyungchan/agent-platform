@@ -1,6 +1,6 @@
 {
   "schema": "work-continuity.documentation-registry.v1",
-  "generatedOn": "2026-10-17",
+  "generatedOn": "2026-10-18",
   "provenance": {
     "sourceOwner": "codex-harness-engineering",
     "sourceDirectory": "discovery/runtime-documentation-routing/20261014/reviewed",
@@ -231,6 +231,34 @@
       "rawBytesVerified": false,
       "bodySha256": null,
       "finalReviewCanonicalUrl": "https://meta-models.github.io/muse-code-sdk/1.4/"
+    },
+    "hermes-client-backend-index-review-20261018": {
+      "url": "https://hermes-agent.nousresearch.com/docs/llms.txt",
+      "status": "index-listed",
+      "checkedOn": "2026-10-18",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "hermes-desktop-side-review-20261018": {
+      "url": "https://hermes-agent.nousresearch.com/docs/user-guide/desktop",
+      "status": "page-opened-limited-content",
+      "checkedOn": "2026-10-18",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "hermes-bot-mode-side-review-20261018": {
+      "url": "https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode",
+      "status": "page-opened-limited-content",
+      "checkedOn": "2026-10-18",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "hermes-bot-screen-side-review-20261018": {
+      "url": "https://hermes-agent.nousresearch.com/docs/user-guide/features/bot-screen",
+      "status": "page-opened-limited-content",
+      "checkedOn": "2026-10-18",
+      "rawBytesVerified": false,
+      "bodySha256": null
     }
   },
   "captures": [
@@ -2000,6 +2028,258 @@
       "notes": "For reads with gh api parameters, explicitly specify --method GET; parameter flags may otherwise change the method.",
       "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
       "freshnessPolicy": "general"
+    },
+    {
+      "id": "hermes.agent.desktop-client",
+      "surface": "hermes.agent",
+      "topic": "desktop-client",
+      "aliases": [
+        "desktop",
+        "client",
+        "windows-client",
+        "hermes-desktop",
+        "데스크톱",
+        "클라이언트"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/desktop",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/desktop",
+      "fallbackUrl": null,
+      "evidenceStatus": "page-opened-limited-content",
+      "sourceId": "hermes-desktop-side-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Route for the Desktop application and frontend. Record its version separately from the selected remote backend; local.windows describes the client execution host, not the backend or Bot Screen placement.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "user-guide/desktop",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.remote-gateway",
+      "surface": "hermes.agent",
+      "topic": "remote-gateway",
+      "aliases": [
+        "remote",
+        "remote-backend",
+        "multi-connection-desktop",
+        "원격게이트웨이",
+        "원격연결"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/multi-connection-desktop",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/multi-connection-desktop",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Route for Desktop connections to Hermes instances. Keep the existing gateway topic for developer gateway internals; connection selection, authentication and rendered frames need their own observations.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "user-guide/multi-connection-desktop",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.bot-mode",
+      "surface": "hermes.agent",
+      "topic": "bot-mode",
+      "aliases": [
+        "bot",
+        "bots",
+        "봇",
+        "봇모드"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode",
+      "fallbackUrl": null,
+      "evidenceStatus": "page-opened-limited-content",
+      "sourceId": "hermes-bot-mode-side-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Bounded October18 source discovery: approved-execution/odi03-hermes-bot-screen-e2e-v1/source-discovery/handoff.FINAL.json sha256 8306a8a8b0921bcefca2028554db1ef73387853c03db059608742f23b0cff0ce. Four URL opens across two unique pages (two initial and two follow-up opens), no discovery searches; not a single max3-fetch operation. Current public content is not a version-pinned installed manual, full-body review or native permission. Select the official Bot Mode page for Desktop/Bots context. Profile connection, installed client behavior and actual visible client results require their own observations.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/bot-mode",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.bot-screen",
+      "surface": "hermes.agent",
+      "topic": "bot-screen",
+      "aliases": [
+        "screen",
+        "bot-desktop",
+        "봇화면",
+        "봇스크린",
+        "open-screen"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/bot-screen",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/bot-screen",
+      "fallbackUrl": null,
+      "evidenceStatus": "page-opened-limited-content",
+      "sourceId": "hermes-bot-screen-side-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Bounded October18 source discovery: approved-execution/odi03-hermes-bot-screen-e2e-v1/source-discovery/handoff.FINAL.json sha256 8306a8a8b0921bcefca2028554db1ef73387853c03db059608742f23b0cff0ce. Four URL opens across two unique pages (two initial and two follow-up opens), no discovery searches; not a single max3-fetch operation. Current public content is not a version-pinned installed manual, full-body review or native permission. Opening the Desktop Screen viewer and starting its per-profile backend are separate. Installed CLI/runtime/lease source capture409593 distinguishes status --json from start without --json, Xfce/Xvnc placement and human/agent lease. Backend readiness or screenshots do not prove Windows client rendering.",
+      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
+      "pageId": "user-guide/features/bot-screen",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.computer-use",
+      "surface": "hermes.agent",
+      "topic": "computer-use",
+      "aliases": [
+        "computer_use",
+        "computer-control",
+        "컴퓨터사용"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/computer-use",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/computer-use",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Route for native computer-use tools. Verify installed callable actions, target placement and lease before execution; documentation selection grants no input permission.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "user-guide/features/computer-use",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.updating",
+      "surface": "hermes.agent",
+      "topic": "updating",
+      "aliases": [
+        "update",
+        "upgrade",
+        "version",
+        "업데이트",
+        "버전"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/updating",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/updating",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Choose the actual Desktop or backend distribution before reading update instructions. Planned version, installed Client version and installed Backend version are separate facts.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "getting-started/updating",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.installation",
+      "surface": "hermes.agent",
+      "topic": "installation",
+      "aliases": [
+        "install",
+        "installer",
+        "설치"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/installation",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/installation",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Select the distribution and operating system actually in use. A packaged Desktop installation and a separately managed Docker backend have separate installation owners.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "getting-started/installation",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.platform-support",
+      "surface": "hermes.agent",
+      "topic": "platform-support",
+      "aliases": [
+        "platform",
+        "support-matrix",
+        "지원플랫폼"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/platform-support",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/platform-support",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Platform and distribution support matrix; documented support does not verify the actual Windows Client or remote runtime.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "getting-started/platform-support",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.windows-native",
+      "surface": "hermes.agent",
+      "topic": "windows-native",
+      "aliases": [
+        "windows",
+        "native-windows",
+        "윈도우",
+        "윈도우네이티브"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-native",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-native",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Windows native runtime guidance. Do not infer a local native backend, Git Bash or WSL installation solely from a Windows Desktop connection to a remote backend.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "user-guide/windows-native",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.windows-wsl",
+      "surface": "hermes.agent",
+      "topic": "windows-wsl",
+      "aliases": [
+        "wsl",
+        "wsl2",
+        "windows-wsl2",
+        "윈도우WSL"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-wsl-quickstart",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-wsl-quickstart",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Windows WSL2 runtime guidance, distinct from a native Windows Desktop app and a Linux VPS backend.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "user-guide/windows-wsl-quickstart",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.web-dashboard",
+      "surface": "hermes.agent",
+      "topic": "web-dashboard",
+      "aliases": [
+        "dashboard",
+        "web-ui",
+        "웹대시보드"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/web-dashboard",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/web-dashboard",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Web dashboard and remote-backend connection troubleshooting. Keep browser dashboard behavior separate from Desktop, TUI and Bot Screen rendering.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "user-guide/features/web-dashboard",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "hermes.agent.multi-profile-gateways",
+      "surface": "hermes.agent",
+      "topic": "multi-profile-gateways",
+      "aliases": [
+        "multi-gateway",
+        "profile-gateway",
+        "다중게이트웨이"
+      ],
+      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/multi-profile-gateways",
+      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/multi-profile-gateways",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": "hermes-client-backend-index-review-20261018",
+      "checkedOn": "2026-10-18",
+      "notes": "Route for multiple profile gateways. Verify selected connection, profile and home without assuming every frontend attaches to one gateway process.",
+      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
+      "pageId": "user-guide/multi-profile-gateways",
+      "freshnessPolicy": "revalidate"
     }
   ],
   "policy": {
@@ -2011,6 +2291,8 @@
     "The unchanged Oct14 sourceDirectory/sourceArtifacts, sources and captures retain historical provenance; Oct17 route additions do not promote their evidence or dates.",
     "Oct17 route-only side evidence remains at operations/herdr-hermes-independent-20261017T0433Z: docs-content/capture-manifest.json sha256 5dfc1f6d6c1867589db911a783d62f3dd1fe11956edfa8f64a43b587dc885c6f; docs-content/read-manifest.json sha256 63d22d86ea058dca294475a19051125facbcaa861449fb5ea0d85103258d7e0f; runtime-eval/summary.json sha256 aa153ec3454319993ccf3a2ef212dc8ce47a49d6169522eb9e6fd6427ce7b9c1. No native Scrapling capture or Evidence Foundry blob admission is claimed; their ownership remains unchanged. New sources leave rawBytesVerified false and bodySha256 null; existing side captures are not copied into another maintained body store.",
     "Source documentation is not installed runtime, authenticated capability or behavior verification.",
-    "Two expected-predicate misses retain complete original bodies and separate readback results in the source-owned review."
+    "Two expected-predicate misses retain complete original bodies and separate readback results in the source-owned review.",
+    "Oct18 Client/Backend routes add official-index membership and a limited Desktop page read only. The three web opens (index, Desktop, multi-connection page) do not establish full body review or raw response-byte verification. No new native Scrapling capture, Evidence Foundry blob, installed v0.22.2 compatibility or live host pointer is admitted; historical sources/captures retain their bytes and dates.",
+    "Separate Oct18 Bot Mode/Screen side review recorded four opens over two unique pages (two initial plus two follow-ups), no discovery search. That is not a single max3-fetch operation. Two Bot routes carry partial-page evidence from that review; backend source and client visual/lease/action observations remain separate. No body digest, documentationVersion or native permission is certified."
   ]
 }
