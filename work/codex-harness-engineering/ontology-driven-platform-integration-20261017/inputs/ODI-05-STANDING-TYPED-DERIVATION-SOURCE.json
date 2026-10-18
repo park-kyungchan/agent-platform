@@ -1,0 +1,337 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-STANDING-TYPED-DERIVATION-SOURCE",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/standing-typed-memory-preparation/prepare-source.ts"
+  },
+  "content": {
+    "schema": "host-orchestrator.standing-memory-derivation-source.v1",
+    "classification": "Deterministic compiler output and exact originals for independent inspection; not owner-verified receipts or admission.",
+    "originalsCommit": "5def46fc30949b33a4413848023409107ed46368",
+    "descriptorSha256": "6f7f67e74b8fbefa038a0fbecfbb28eb644ae1617dd356df1d3a149d05f49073",
+    "reviewBindingSha256": "67b0cbd34b00009f11eecdec45578b3f61a1bf00aa8146e8400e649828761017",
+    "memory": {
+      "id": "git-memory:97fd8785f288ac5199c1d5a0396fcdeadf73b63e39c75799722258d7bbf793f8",
+      "episodeId": "git-episode:dad3e5ec9d8e0c6198e29656fcce551575f2c8b031982d85392d8b3218304d7e",
+      "generationId": "odi05.typed-standing.5def46fc.r1",
+      "policyRevision": "odi05.typed-standing.5def46fc.policy.r1",
+      "text": "{\"schema\":\"common.standing-preference-projection.v1\",\"topicId\":\"native-harness:topic:standing-typed-engineering\",\"revision\":\"standing-typed-engineering-20261018\",\"applicability\":\"all-future-herdr-leads-agents-threads-and-hermes\",\"decision\":{\"id\":\"ODI-DECISION-GLOBAL-TYPED-ENGINEERING\",\"answer\":\"추가적으로, 나는 Herdr 전체의 향후 Lead와 에이전트 및 threads 그리고 hermes가, 지금의 자기 개선 리뷰 tools처럼 .md를 수정하고 생성하는 것들을 제외하고는, **\\\"항상 topology hierachy structure typed화된 .json/.ts 포맷으로 모든 작업을 진행하는 것을 강조한다(이것이 왜 중요한지에 대해서 그동안의 user memory history and interview history 등을 흩어져있느 것들을 모아서 위계화하고 구조화해서 Memory System에 적용해라(Lead Session에 전달해야할지 너가 해야할지 의사결정하고 진행해. 필요하면 유저인터뷰 진행해)\\\"**\",\"meaning\":\"Root adopts the preserved source-attributed instruction: all future Herdr Leads, agents, threads and Hermes conduct authored engineering work in meaningful topological, hierarchical, structured, typed .json/.ts artifacts using existing semantic/data owners, independently of this continuing Work. Native Markdown learning and required native interface formats retain their owners; ordinary conversation remains prose. Historical U10 directly states that Memory context/hierarchy/structure/typing minimize drift risk; U8/U9/U10 share one original. Other rationale remains attributed inference. Hermes technical artifacts use English; Korean user conversation is allowed, with no global language extension. Stable topic IDs link current decisions, original Q&A, rationale/revisions, upper purpose and direct dependencies; unknown currentness holds dependent effects. No new Goal, Plan, native permission, source activation or global Recall admission follows.\",\"selectionContext\":{\"text\":\"추가적으로, 나는 Herdr 전체의 향후 Lead와 에이전트 및 threads 그리고 hermes가, 지금의 자기 개선 리뷰 tools처럼 .md를 수정하고 생성하는 것들을 제외하고는, **\\\"항상 topology hierachy structure typed화된 .json/.ts 포맷으로 모든 작업을 진행하는 것을 강조한다(이것이 왜 중요한지에 대해서 그동안의 user memory history and interview history 등을 흩어져있느 것들을 모아서 위계화하고 구조화해서 Memory System에 적용해라(Lead Session에 전달해야할지 너가 해야할지 의사결정하고 진행해. 필요하면 유저인터뷰 진행해)\\\"**\",\"source\":{\"kind\":\"snapshot\",\"path\":\"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json\",\"fragment\":\"#/content/text\"}}},\"nodes\":[{\"id\":\"typed\",\"kind\":\"preference\",\"meaning\":\"All future Herdr Leads, agents, threads and Hermes: author meaningful topological, hierarchical, structured, typed .json/.ts technical work. Native-runtime Markdown creation/modification, including self-improvement learning, retains its native format/owner.\",\"sources\":[\"current\"],\"appliesTo\":\"all-future-herdr-leads-agents-threads-and-hermes\"},{\"id\":\"drift\",\"kind\":\"direct-why\",\"meaning\":\"The user explicitly says Memory context, hierarchy, structure and typing minimize drift risk.\",\"sources\":[\"U10\"]},{\"id\":\"ontology\",\"kind\":\"direct-why\",\"meaning\":\"The user wants operational Ontology-based work by all Leads/agents with Domain-through-Task IDs, audit and traceability.\",\"sources\":[\"U1\"]}],\"relations\":[{\"from\":\"typed\",\"type\":\"motivatedBy\",\"to\":\"drift\"},{\"from\":\"typed\",\"type\":\"motivatedBy\",\"to\":\"ontology\"}],\"originals\":[{\"id\":\"current\",\"source\":{\"kind\":\"git\",\"repositoryId\":\"park-kyungchan/agent-platform\",\"commit\":\"5def46fc30949b33a4413848023409107ed46368\",\"path\":\"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json\",\"sha256\":\"8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058\",\"fragment\":\"#/content/text\"},\"originKind\":\"source-owner-capture\",\"nativeAuthorshipVerified\":false},{\"id\":\"U10\",\"source\":{\"kind\":\"git\",\"repositoryId\":\"park-kyungchan/agent-platform\",\"commit\":\"6933ca88c815f5e6e5490f9232c81e0dc5663af5\",\"path\":\"work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json\",\"sha256\":\"f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a\",\"fragment\":\"#/content/text\"},\"text\":\"권장대로 진행하는데, 유저와 인터뷰 했던 내용들을 WSL2와 VPS 어디에서든지 히스토리까지 원할 때 context window에 load할 수 있도록 설계할 수 있나? 이와 관련해서 인터뷰 진행하자. 공통 Memory/Recall 기능을 최대한 활용해서 만들어놓으면 될 것 같은데? **\\\"메모리는 특히 맥락이 중요하고, 다른 것들과 마찬가지로 위계와 구조도 중요하며, typed화 해놓아야만 drift risk가 최소화되는 것 알고있지?\\\"**\",\"originKind\":\"source-owner-capture\",\"nativeAuthorshipVerified\":false},{\"id\":\"U1\",\"source\":{\"kind\":\"git\",\"repositoryId\":\"park-kyungchan/agent-platform\",\"commit\":\"6933ca88c815f5e6e5490f9232c81e0dc5663af5\",\"path\":\"work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json\",\"sha256\":\"463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7\",\"fragment\":\"#/content/text\"},\"text\":\"WSL2와 VPS의 공통 하네스를 기반으로 해서, 각각에서의 Runtime에서의 고유한 하네스를 가지고, Domain ID부터 Task ID까지 End to End로 빠짐없이 ID를 할당해서, 작업에 대한 감사/추적을 놓치지 않고, **\\\"항상 WSL2와 VPS의 모든 Lead 및 모든 에이전트들이 Palantir's AIP/Foundry급의 Ontology를 기반으로만 작업을 진행할 수 있는 환경을 만드는 것\\\"**. 유저의 요청은 불완전하고 narrow하므로, 이번 인터뷰 세션을 통해서 작업방향에 대한 위계와 구조를 정하고, 실제 이번에 개선된 것을 가지고 Domain ID부터 Task ID까지 할당하려고한다.\",\"originKind\":\"source-owner-capture\",\"nativeAuthorshipVerified\":false}]}",
+      "contentHash": "04564ca886937e5eee143908fceb44e09540817711b35c18e1ffbab3716ebc22",
+      "sourceKeys": [
+        "[\"park-kyungchan/agent-platform\",\"git:5def46fc30949b33a4413848023409107ed46368\",\"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-GLOBAL-TYPED-ENGINEERING.json\",\"853f1325d85c9c24da49929472ddcddaf62e656429a03d09e3de3a9dadaab7ea\"]",
+        "[\"park-kyungchan/agent-platform\",\"git:5def46fc30949b33a4413848023409107ed46368\",\"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json\",\"8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058\"]",
+        "[\"park-kyungchan/agent-platform\",\"git:6933ca88c815f5e6e5490f9232c81e0dc5663af5\",\"work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json\",\"463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7\"]",
+        "[\"park-kyungchan/agent-platform\",\"git:6933ca88c815f5e6e5490f9232c81e0dc5663af5\",\"work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json\",\"f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a\"]"
+      ],
+      "scope": {
+        "kind": "common"
+      },
+      "claim": {
+        "key": "governing.standing.typed.engineering",
+        "value": "추가적으로, 나는 Herdr 전체의 향후 Lead와 에이전트 및 threads 그리고 hermes가, 지금의 자기 개선 리뷰 tools처럼 .md를 수정하고 생성하는 것들을 제외하고는, **\"항상 topology hierachy structure typed화된 .json/.ts 포맷으로 모든 작업을 진행하는 것을 강조한다(이것이 왜 중요한지에 대해서 그동안의 user memory history and interview history 등을 흩어져있느 것들을 모아서 위계화하고 구조화해서 Memory System에 적용해라(Lead Session에 전달해야할지 너가 해야할지 의사결정하고 진행해. 필요하면 유저인터뷰 진행해)\"**"
+      }
+    },
+    "episode": {
+      "id": "git-episode:dad3e5ec9d8e0c6198e29656fcce551575f2c8b031982d85392d8b3218304d7e",
+      "provenance": "source-linked",
+      "sources": [
+        {
+          "source": {
+            "repositoryId": "park-kyungchan/agent-platform",
+            "revision": "git:5def46fc30949b33a4413848023409107ed46368",
+            "relativePath": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-GLOBAL-TYPED-ENGINEERING.json",
+            "sha256": "853f1325d85c9c24da49929472ddcddaf62e656429a03d09e3de3a9dadaab7ea",
+            "byteLength": 3080
+          },
+          "fragmentIds": [
+            "[\"[\\\"park-kyungchan/agent-platform\\\",\\\"git:5def46fc30949b33a4413848023409107ed46368\\\",\\\"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-GLOBAL-TYPED-ENGINEERING.json\\\",\\\"853f1325d85c9c24da49929472ddcddaf62e656429a03d09e3de3a9dadaab7ea\\\"]\",\"#\"]"
+          ]
+        },
+        {
+          "source": {
+            "repositoryId": "park-kyungchan/agent-platform",
+            "revision": "git:5def46fc30949b33a4413848023409107ed46368",
+            "relativePath": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json",
+            "sha256": "8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058",
+            "byteLength": 20244
+          },
+          "fragmentIds": [
+            "[\"[\\\"park-kyungchan/agent-platform\\\",\\\"git:5def46fc30949b33a4413848023409107ed46368\\\",\\\"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json\\\",\\\"8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058\\\"]\",\"#/content/historicalPreferenceTopology/nodes\"]",
+            "[\"[\\\"park-kyungchan/agent-platform\\\",\\\"git:5def46fc30949b33a4413848023409107ed46368\\\",\\\"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json\\\",\\\"8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058\\\"]\",\"#/content/historicalPreferenceTopology/relations\"]",
+            "[\"[\\\"park-kyungchan/agent-platform\\\",\\\"git:5def46fc30949b33a4413848023409107ed46368\\\",\\\"work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json\\\",\\\"8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058\\\"]\",\"#/content/text\"]"
+          ]
+        },
+        {
+          "source": {
+            "repositoryId": "park-kyungchan/agent-platform",
+            "revision": "git:6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+            "relativePath": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json",
+            "sha256": "463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7",
+            "byteLength": 1592
+          },
+          "fragmentIds": [
+            "[\"[\\\"park-kyungchan/agent-platform\\\",\\\"git:6933ca88c815f5e6e5490f9232c81e0dc5663af5\\\",\\\"work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json\\\",\\\"463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7\\\"]\",\"#/content/text\"]"
+          ]
+        },
+        {
+          "source": {
+            "repositoryId": "park-kyungchan/agent-platform",
+            "revision": "git:6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+            "relativePath": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json",
+            "sha256": "f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a",
+            "byteLength": 1437
+          },
+          "fragmentIds": [
+            "[\"[\\\"park-kyungchan/agent-platform\\\",\\\"git:6933ca88c815f5e6e5490f9232c81e0dc5663af5\\\",\\\"work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json\\\",\\\"f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a\\\"]\",\"#/content/text\"]"
+          ]
+        }
+      ]
+    },
+    "authoritativeClaims": [
+      {
+        "key": "governing.standing.typed.engineering",
+        "value": "추가적으로, 나는 Herdr 전체의 향후 Lead와 에이전트 및 threads 그리고 hermes가, 지금의 자기 개선 리뷰 tools처럼 .md를 수정하고 생성하는 것들을 제외하고는, **\"항상 topology hierachy structure typed화된 .json/.ts 포맷으로 모든 작업을 진행하는 것을 강조한다(이것이 왜 중요한지에 대해서 그동안의 user memory history and interview history 등을 흩어져있느 것들을 모아서 위계화하고 구조화해서 Memory System에 적용해라(Lead Session에 전달해야할지 너가 해야할지 의사결정하고 진행해. 필요하면 유저인터뷰 진행해)\"**",
+        "recordClass": "decision",
+        "status": "adopted-current",
+        "source": {
+          "repositoryId": "park-kyungchan/agent-platform",
+          "revision": "git:5def46fc30949b33a4413848023409107ed46368",
+          "relativePath": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-GLOBAL-TYPED-ENGINEERING.json",
+          "sha256": "853f1325d85c9c24da49929472ddcddaf62e656429a03d09e3de3a9dadaab7ea",
+          "byteLength": 3080
+        }
+      }
+    ],
+    "sourceBindings": [
+      {
+        "source": {
+          "repositoryId": "park-kyungchan/agent-platform",
+          "revision": "git:5def46fc30949b33a4413848023409107ed46368",
+          "relativePath": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-GLOBAL-TYPED-ENGINEERING.json",
+          "sha256": "853f1325d85c9c24da49929472ddcddaf62e656429a03d09e3de3a9dadaab7ea",
+          "byteLength": 3080
+        },
+        "origin": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "5def46fc30949b33a4413848023409107ed46368",
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-GLOBAL-TYPED-ENGINEERING.json",
+          "sha256": "853f1325d85c9c24da49929472ddcddaf62e656429a03d09e3de3a9dadaab7ea",
+          "fragment": "#"
+        },
+        "blobOid": "524b187279844b58c418b227d6e286b17a240593",
+        "declarations": [
+          {
+            "kind": "snapshot",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-GLOBAL-TYPED-ENGINEERING.json"
+          }
+        ]
+      },
+      {
+        "source": {
+          "repositoryId": "park-kyungchan/agent-platform",
+          "revision": "git:5def46fc30949b33a4413848023409107ed46368",
+          "relativePath": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json",
+          "sha256": "8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058",
+          "byteLength": 20244
+        },
+        "origin": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "5def46fc30949b33a4413848023409107ed46368",
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json",
+          "sha256": "8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058",
+          "fragment": "#/content/text"
+        },
+        "blobOid": "9ccbeaa71f35a3e58ef2f79ef8fa91943057b4d1",
+        "declarations": [
+          {
+            "kind": "snapshot",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json",
+            "fragment": "#/content/text"
+          },
+          {
+            "kind": "snapshot",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json",
+            "fragment": "#/content/historicalPreferenceTopology/nodes",
+            "sha256": "8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058"
+          },
+          {
+            "kind": "snapshot",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json",
+            "fragment": "#/content/historicalPreferenceTopology/relations",
+            "sha256": "8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058"
+          },
+          {
+            "kind": "snapshot",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json",
+            "fragment": "#/content/text",
+            "sha256": "8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058"
+          }
+        ]
+      },
+      {
+        "source": {
+          "repositoryId": "park-kyungchan/agent-platform",
+          "revision": "git:6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+          "relativePath": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json",
+          "sha256": "463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7",
+          "byteLength": 1592
+        },
+        "origin": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+          "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json",
+          "sha256": "463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7",
+          "fragment": "#/content/text"
+        },
+        "blobOid": "a1890a1f47210d1c54e53dc2c7f2ae31d6b500a6",
+        "declarations": [
+          {
+            "kind": "git",
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json",
+            "fragment": "#/content/text",
+            "sha256": "463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7",
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "6933ca88c815f5e6e5490f9232c81e0dc5663af5"
+          }
+        ]
+      },
+      {
+        "source": {
+          "repositoryId": "park-kyungchan/agent-platform",
+          "revision": "git:6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+          "relativePath": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json",
+          "sha256": "f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a",
+          "byteLength": 1437
+        },
+        "origin": {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+          "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json",
+          "sha256": "f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a",
+          "fragment": "#/content/text"
+        },
+        "blobOid": "7bcbd4f5e5b898b1cb421e01a94eb2c6c320868c",
+        "declarations": [
+          {
+            "kind": "git",
+            "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json",
+            "fragment": "#/content/text",
+            "sha256": "f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a",
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "6933ca88c815f5e6e5490f9232c81e0dc5663af5"
+          }
+        ]
+      }
+    ],
+    "currentOriginalObservations": [
+      {
+        "id": "current",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-GLOBAL-TYPED-ENGINEERING.json",
+        "sha256": "8c2bda3b8e7d590eb22014484e4251509c2636aa5fad48e41be43aa20e0cf058",
+        "blobOid": "9ccbeaa71f35a3e58ef2f79ef8fa91943057b4d1",
+        "sourceCommit": "5def46fc30949b33a4413848023409107ed46368",
+        "presentAt": "5def46fc30949b33a4413848023409107ed46368",
+        "nativeAuthorshipVerified": false
+      },
+      {
+        "id": "U10",
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-005.json",
+        "sha256": "f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a",
+        "blobOid": "7bcbd4f5e5b898b1cb421e01a94eb2c6c320868c",
+        "sourceCommit": "6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+        "presentAt": "5def46fc30949b33a4413848023409107ed46368",
+        "nativeAuthorshipVerified": false
+      },
+      {
+        "id": "U1",
+        "path": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/legacy-answer-001.json",
+        "sha256": "463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7",
+        "blobOid": "a1890a1f47210d1c54e53dc2c7f2ae31d6b500a6",
+        "sourceCommit": "6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+        "presentAt": "5def46fc30949b33a4413848023409107ed46368",
+        "nativeAuthorshipVerified": false
+      }
+    ],
+    "sourceModulePins": [
+      {
+        "path": "packages/work-continuity/src/workspace/recall-request.ts",
+        "sha256": "13e13da36c6f07e044df0b23349ec54949eacebca32cb5a3d0da4bac04bcadb7",
+        "bytes": 62155
+      },
+      {
+        "path": "packages/work-continuity/src/workspace/qualification.ts",
+        "sha256": "c7ef10b6633657368b1a390dc44d93a557a647c61f7077e94ca619b82a847e6d",
+        "bytes": 21603
+      },
+      {
+        "path": "packages/work-continuity/src/workspace/lexical-recall.ts",
+        "sha256": "caa9c227d288a7baabab9768bf65438a35172075067783002930343db3679175",
+        "bytes": 12995
+      }
+    ],
+    "priorTask": {
+      "schema": "common.git-work.v1",
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "kind": "task",
+      "id": "ODI-05-CONTEXT-CONTINUITY",
+      "logical": {
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-platform-integration-20261017",
+        "issueId": "ODI-ISSUE-20261017",
+        "specId": "ODI-SPEC",
+        "specRevision": 1,
+        "planId": "ODI-PLAN",
+        "planRevision": 2,
+        "taskId": "ODI-05-CONTEXT-CONTINUITY"
+      },
+      "title": "Complete the first missing normal native context/currentness boundary with economical steering",
+      "nextAction": "Use compact Whole-Lens/current interview context and existing reader. First reconcile canonical common6933 versus consumed remote8090/fe591 and current Codex owner before edits; do not edit shared main. Identify first missing normal native Root context/Memory/currentness/recovery boundary under existing ODI-02-NATIVE-GLOBAL-USE, reuse completed H3/A/B proofs, and implement only a demonstrated needed source fix in a qualified source-owner Task worktree. Preserve exact guards/owners; no installs/merges/push/PR, native config/cache changes or model evaluation. Return exact source tree/commit, bounded checks/findings, current consumer oracle and next useful action. Root owns paired adoption and native effects.",
+      "state": {
+        "execution": "planned",
+        "verification": "pending",
+        "localAudit": "intent-durable",
+        "sharedAudit": "pending",
+        "formalCompletion": "pending"
+      },
+      "executionClass": "source-only",
+      "dependsOn": [],
+      "decisionIds": [
+        "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+        "ODI-DECISION-FINAL-APPROVAL",
+        "ODI-DECISION-COST",
+        "ODI-DECISION-GLOBAL-TYPED-ENGINEERING",
+        "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION"
+      ],
+      "effectIds": [],
+      "pendingEffectIds": [],
+      "verificationEvidenceIds": []
+    },
+    "rationaleClasses": {
+      "typed": "Accepted actual current directive, not inferred preference.",
+      "drift": "Direct historical U10WHY; U8/U9/U10 share one source.",
+      "ontology": "Direct historical U1purpose/WHY.",
+      "inferred": "Other graph derived-why nodes remain preserved original evidence but are not selected or asserted as direct user statements."
+    },
+    "consumer": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "workId": "ontology-driven-platform-integration-20261017"
+    },
+    "semanticApplicability": "all-future-herdr-leads-agents-threads-and-hermes",
+    "nativeAuthorshipAuthenticated": false,
+    "nativePermissionGranted": false
+  }
+}

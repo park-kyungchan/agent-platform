@@ -1,0 +1,106 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-STANDING-TYPED-PREPARATION-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/standing-typed-memory-preparation/prepare-source.ts"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:standing-typed-memory-source-preparation:5def46fc",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T22:53:06.125Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:f662178a808a2d618062960f1bc24c4942f07e6f6f97cde3225546b66f82b091"
+      ],
+      "criteria": [
+        {
+          "id": "canonical-projection-and-exact-lineage",
+          "status": "pass",
+          "message": "Actual existing compiler derives3meaningful nodes,2relations,4965chars and4exact originals from accepted Decision/current Input/U1/U10.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-memory-source-preparation:5def46fc"
+          ]
+        },
+        {
+          "id": "conditional-source-and-history-boundaries",
+          "status": "pass",
+          "message": "No owner review, derivation/auth receipts or accepted commonAdmission fabricated; oldG2/Run12/native/history and scope owners retained.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-memory-source-preparation:5def46fc"
+          ]
+        },
+        {
+          "id": "independent-owner-data-review",
+          "status": "unverified",
+          "message": "Actual independent derivation/authority source-owner receipts and reviewed binding pending.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-memory-source-preparation:5def46fc"
+          ]
+        },
+        {
+          "id": "accountable-admission-and-actual-caller",
+          "status": "unverified",
+          "message": "Root commonAdmission/current consumer witness and one maintained guarded readonly Recall pending; source/guidance presence is not admission.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:standing-typed-memory-source-preparation:5def46fc"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-STANDING-TYPED-POLICY.json",
+          "sha256": "ee30ef885e26bca2acfd9e1e2b22a57129c65e0ee637d060ef502fc694696b78"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-STANDING-TYPED-DATASET.json",
+          "sha256": "5355be038f2988789a9a373af485137455d0dd0c5b1aa49ba1b63c0204d4da84"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-STANDING-TYPED-REQUEST.json",
+          "sha256": "530f24616dd07b467d721fee7503f58568a5b7aa09df89ab54a976a2a0204a0e"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-STANDING-TYPED-DERIVATION-SOURCE.json",
+          "sha256": "fd3600bb1a2af9c9ff59a0e8ced863673ef71ca6d12c63a2f5b5abc7b46423ba"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-STANDING-TYPED-OWNER-REVIEW-REQUEST.json",
+          "sha256": "a204c9beb70cac936086a8f43568a6430181c8f62a323af39b4bf736d452f9ab"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-STANDING-TYPED-PREPARATION-OBSERVATION.json",
+          "sha256": "d38d2d6c18031264c87ee040b1fa8fcefd76838bcaa42a6151398f778e3179dd"
+        }
+      ],
+      "runtime": {
+        "name": "canonical-source-memory-preparation",
+        "version": "existing-maintained-contracts"
+      },
+      "details": {
+        "logical": {
+          "domainId": "native-harness",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017",
+          "issueId": "ODI-ISSUE-20261017",
+          "specId": "ODI-SPEC",
+          "specRevision": 1,
+          "planId": "ODI-PLAN",
+          "planRevision": 2,
+          "taskId": "ODI-05-CONTEXT-CONTINUITY"
+        },
+        "wholeTaskCompletion": false,
+        "nativePermissionGranted": false
+      }
+    }
+  }
+}

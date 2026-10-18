@@ -1,0 +1,15 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-05-STANDING-TYPED-PREPARATION-OBSERVATION",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-STANDING-TYPED-PREPARATION-OBSERVATION.json",
+    "fragment": "#/content",
+    "sha256": "d38d2d6c18031264c87ee040b1fa8fcefd76838bcaa42a6151398f778e3179dd"
+  }
+}

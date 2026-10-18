@@ -1,0 +1,15 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-HOST-HERMES-FIRST-USE-PARTIAL-VERIFICATION",
+  "evidenceKind": "verification",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-HERMES-FIRST-USE-PARTIAL-VERIFICATION.json",
+    "fragment": "#/content",
+    "sha256": "5e1fb6482777240663411eb3486d2bba5a70466577dc9157473e6b06e16178cc"
+  }
+}
