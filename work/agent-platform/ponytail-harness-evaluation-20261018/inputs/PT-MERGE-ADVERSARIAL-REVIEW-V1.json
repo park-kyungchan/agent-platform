@@ -1,0 +1,173 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-MERGE-ADVERSARIAL-REVIEW-V1",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": ".private/quality-first-interview-20261018/merge-authority-adversarial.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "sha256": "79dc39cd13af1dd2e9234dd7d22aef9286525f5732563d9b7defe51754315129",
+    "report": {
+      "schema": "ponytail.merge-authority-adversarial.v1",
+      "observedAtUtc": "2026-10-18T11:11:22.590718+00:00",
+      "taskId": "PT-14-MERGE-REVIEW-HANDOFF",
+      "classification": "read-only adversarial analysis; not merge execution or independent candidate code approval",
+      "requestAttribution": "Parent relayed new actual user conditional delegation to this Work Lead for explicit merge if supported; exact user original must be bound by Root, no native message identity invented.",
+      "conclusion": {
+        "supported": "This session may own the accountable explicit expected-head PR merge for its bounded common-harness Work under the latest user delegation, after independent exact-source review, publication and every current repository gate. User allocation and current evidence support this; alleged lens inferiority is not the basis.",
+        "rejected": "An older or divergent lens owning Work branch does not prove deficient authority, stale native source activation, missing capability or inferior review judgment. Work-only history is deliberately independent from source integration.",
+        "notYetReady": "Current candidate implementation, final independent review and PR checks are not complete. Merge authority is conditional, not an instruction to merge now.",
+        "nativeActivation": "Explicit source merge does not activate Codex/Hermes source providers or native configuration, authorize new eval budget, or establish whole upstream Work Acceptance."
+      },
+      "actualGit": {
+        "repository": "park-kyungchan/agent-platform",
+        "liveMain": "fe591ffe113aef092f3f526cadcd7c575c579881",
+        "ourBranch": "work/ponytail-harness-evaluation-20261018T093330Z",
+        "ourHead": "7103d97ca68cc606582ddcd7c8bee6547ecdf578",
+        "ourMergeBaseMain": "fe591ffe113aef092f3f526cadcd7c575c579881",
+        "ourAheadBehindLiveMain": "4\t0",
+        "lensRoot": "/home/palantirkc/code/worktrees/ontology-driven-platform-integration-20261017",
+        "lensBranch": "work/ontology-driven-platform-integration-20261017",
+        "lensHead": "87074a9f3f140e7c6cac7f0a250cf41c9ef46aaa",
+        "lensMergeBaseMain": "de71a8fc3f88632f4d7fd8a5c62bb1da065f33f0",
+        "lensAheadBehindLiveMain": "46\t28",
+        "lensExclusiveChangedPathCount": 250,
+        "lensExclusiveAllOwnWorkRecords": true,
+        "exactChangedPathOverlap": [],
+        "meaning": "Lens branch diverges for source-owned Work history; it has 46 unique commits versus 28 live-main unique commits. Neither simple behind-count nor timestamp measures authority. Native loaded source status was not inspected or inferred."
+      },
+      "identityAndScope": {
+        "ours": {
+          "domainId": "native-harness",
+          "projectId": "agent-platform",
+          "workId": "ponytail-harness-evaluation-20261018",
+          "issueId": "PT-ISSUE-20261018",
+          "spec": "PT-SPEC@3",
+          "plan": "PT-PLAN@3"
+        },
+        "lens": {
+          "domainId": "native-harness",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017",
+          "issueId": "ODI-ISSUE-20261017",
+          "spec": "ODI-SPEC@1",
+          "plan": "ODI-PLAN@2"
+        },
+        "commonRepositoryDifferentLogicalWorks": true,
+        "ciAccidentallyPrimary": false,
+        "evidence": [
+          "Current Work purpose objective says quality-first common harness, CI added scope and Ponytail candidate.",
+          "inScope includes Whole common-harness E2E quality and AIP Evolve application; CI Workflow Agent interview as additional sub-scope.",
+          "outOfScope explicitly says CI Workflow Agent as primary purpose.",
+          "Our current logical Work/Issue/Spec/Plan IDs were not renamed to CI Agent."
+        ],
+        "overlap": "Conceptual overlap with lens governed whole-platform source/Work/native ownership exists, but exact Work files are disjoint in compared branches. This Work must not absorb or merge the entire lens history, native effects, old eval budget or unrelated domain outcomes."
+      },
+      "repositoryRules": {
+        "rulesetId": 24871580,
+        "name": "Protected main with exact native review",
+        "enforcement": "active",
+        "ref": "refs/heads/main",
+        "pullRequestRequired": true,
+        "allowedMergeMethods": [
+          "merge"
+        ],
+        "requiredApprovingReviewCount": 0,
+        "requiredReviewThreadResolution": true,
+        "dismissStaleReviewsOnPush": true,
+        "strictUpToDateChecks": true,
+        "requiredStatusContexts": [
+          "Canonical source checks",
+          "Exact head native independent review",
+          "Source and native review gate",
+          "native-independent-review"
+        ],
+        "bypassActors": [],
+        "currentUserCanBypass": "never",
+        "nonFastForwardProhibited": true,
+        "deletionProhibited": true,
+        "repoAllowAutoMerge": false,
+        "repoAllowSquashMerge": false,
+        "repoAllowRebaseMerge": false,
+        "authenticatedUserPermissions": {
+          "admin": true,
+          "maintain": true,
+          "push": true
+        },
+        "classicProtection404Meaning": "Classic branches/main/protection returned404; active repository ruleset is still enforced. Never misreport main as unprotected."
+      },
+      "counterarguments": [
+        {
+          "claim": "Lens is behind this branch so we can bypass its review.",
+          "result": "Rejected. Lens own Work history differs, not a current runtime/source observation. Independent review still required even when this session is accountable merging Lead."
+        },
+        {
+          "claim": "Our session authored it and is Lead, so own approval is enough.",
+          "result": "Rejected. Native independent reviewer identity must differ from author; current findings/status/checks must pass. Lead merge decision is separate from independent review."
+        },
+        {
+          "claim": "CI agent takeover means whole platform authority was transferred.",
+          "result": "Rejected. Transfer is this Work and its additional CI sub-scope only. Other owner branches/effects/native activation remain separately owned."
+        },
+        {
+          "claim": "Latest user delegation overrides main checks or allows auto-merge.",
+          "result": "Rejected. User authorizes explicit reviewed action; active rules have no bypass. No auto-merge configured, direct-main push, force push, workflow bypass or branch-protection change."
+        },
+        {
+          "claim": "Current clean merge means no semantic integration work.",
+          "result": "Rejected. Reobserve live B and expected H immediately before effect; semantic Work transition, owner pins/closure, and required prospective merge checks still apply."
+        },
+        {
+          "claim": "A PR head review automatically covers actual merged commit M.",
+          "result": "Rejected. New M needs explicit identical-reviewed-tree successor binding and current zero-findings readback, or a fresh independent review if tree changed. Historical H status cannot be called M status."
+        }
+      ],
+      "safeMergeOrdering": [
+        "Record exact latest actual user Input and an applicable accepted Decision under this Work, preserving previous delegated handoff request as history. Update current Spec/Plan or successor only as semantic transition requires; do not retag earlier Tasks. PT-14 nextAction changes from asking lens to merge to own explicit merge plus factual lens notification if user authorizes notification.",
+        "Finish approved implementation and all required source/owner/consumer checks in isolated branch. Freeze exact commit H/tree T; independent native reviewer reviews full admitted change against current base and records zero unresolved findings. Root cannot act as its own independent reviewer.",
+        "Reobserve live main B through provider immediately before publication; ensure B is integrated into H under strict up-to-date policy. New base integration changes H/T and requires appropriate rechecks, semantic transition validation and exact review successor; never silently reuse review across changed tree.",
+        "Push owned frozen source branch; publish exact H/T/manifest independent immutable result R and receipt P and authenticated latest success status for H before opening PR. Keep evidence in unique review branch, not append metadata commits to H after review.",
+        "Open scoped PR. Wait for actual hosted checks, including required prospective merge-integration workflow and all four required contexts. Inspect latest H, latest B, unresolved review threads/findings, required checks and current independent receipt/status. Draft PR with unmet qualification remains unmerged.",
+        "Before explicit merge, prepare bounded identical-tree successor review publication for eventual M without claiming unknown M SHA. Capture H/T/current B/PR/checks/reviewer finding state plus exact parent authority. Have official authenticated status publication ready; no additional code changes or unneeded messages in this critical window.",
+        "Explicit merge using maintained GitHub provider merge capability with merge method merge and expected head SHA H. Do not enable auto-merge or invoke admin bypass. Expected-head mismatch or base/check changes holds the action for fresh observation. Record actual API result M; verify PR merged and remote main M, parents/base/source tree.",
+        "If actual merged M tree equals reviewed T and independent review remains current with zero findings, create explicit immutable successor binding to M from H review, publish M receipt/result and authenticated M success status using existing common v2 gate. If actual tree differs, hold successor reuse and obtain fresh independent review; never publish automatic pass by ancestry alone.",
+        "Observe main hosted CI at M and its attempts/results truthfully. Preserve first failure if it occurred. Keep source merge, successor review publication, hosted verification and native owner activation/Acceptance as separate milestones.",
+        "Only after own merge/readback completion, issue user-authorized factual lens notification with stable Work/PT-14 IDs, actual PR/H/M/T, reviewed evidence/status/checks and remaining native gates. No request to merge again and no claims to own upstream Work/native effects."
+      ],
+      "mainPushRace": {
+        "mechanism": "GitHub merge-only PR operation creates new exact commit SHA M and push-main workflow immediately; H status does not satisfy exact M gate. Existing gate waits at most60s only when status absent on protected main push. New M cannot generally be predicted/reliably prepublished with standard merge API, because GitHub owns actual merge commit metadata.",
+        "bestAvailableWithinCurrentWorkflow": "Prepare exact-tree successor inputs/publisher before explicit merge, verify actual M/tree immediately, then publish successor result/receipt/status without unrelated work. Keep actual independent review and current findings proof. This reduces timing exposure but cannot guarantee publication before main CI executes or before60s expiry.",
+        "notAcceptable": "Do not claim race eliminated, lengthen waits arbitrarily as correctness proof, silently rerun to erase first failure, or infer pass status on M from H. Do not publish on synthetic prospective merge SHA as if it were actual M.",
+        "ifDeterministicPreventionRequired": "Requires separately reviewed workflow contract for exact-tree successor readiness/publication ordering; not established by branch ownership or delegation. Current instructions do not authorize bypassing review or disabling main CI."
+      },
+      "evidenceCommands": [
+        "git ls-remote origin refs/heads/main",
+        "git -C LENS_ROOT rev-parse HEAD",
+        "git -C LENS_ROOT merge-base HEAD LIVE_MAIN",
+        "git -C LENS_ROOT rev-list --left-right --count HEAD...LIVE_MAIN",
+        "git -C LENS_ROOT diff --name-only MERGE_BASE HEAD",
+        "gh api repos/park-kyungchan/agent-platform/rulesets/24871580",
+        "gh api repos/park-kyungchan/agent-platform/rules/branches/main",
+        "gh api repos/park-kyungchan/agent-platform --jq repository merge settings and permissions",
+        "gh api repos/park-kyungchan/agent-platform/pulls?state=open"
+      ],
+      "effects": {
+        "trackedChanges": 0,
+        "push": 0,
+        "publication": 0,
+        "merge": 0,
+        "otherSessionMessages": 0,
+        "nativeConfigEffects": 0,
+        "evaluationCalls": 0,
+        "privateReportOnly": true
+      }
+    },
+    "rootConclusion": "Latest direct delegation supports this Work Lead explicit merge after independent current exact-source review and required checks. Older unrelated lens Work commits do not prove authority deficiency. No overlapping paths observed; recheck at integration. CI is additional scope."
+  }
+}

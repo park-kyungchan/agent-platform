@@ -17,13 +17,13 @@
     "taskId": "PT-03-QUALITY-SCENARIOS"
   },
   "title": "Recover complex common-harness verification scenarios and consumer quality baselines",
-  "nextAction": "Pin several existing scenarios and define independently observable quality differences.",
+  "nextAction": "Preparation completed; proceed under accepted successor contract and implementation Tasks. No native efficacy/activation claim.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -32,5 +32,7 @@
     "PT-DECISION-LEAD-ROLE-20261018"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-preparation"
+  ]
 }

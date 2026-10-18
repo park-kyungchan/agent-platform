@@ -8,7 +8,7 @@
   "repositoryId": "park-kyungchan/agent-platform",
   "issueId": "PT-ISSUE-20261018",
   "purpose": {
-    "objective": "Deliver quality-first constrained improvement in the common harness through canonical implementation, independent complex verification, reviewed PR and accountable merge-review handoff; CI is an added scope and Ponytail a candidate.",
+    "objective": "Deliver quality-first constrained improvement in the common harness through canonical implementation, independent complex verification, reviewed PR and accountable merge-review handoff; CI is an added scope and Ponytail a candidate. This Work Lead explicitly merges qualified PR and verifies the resulting main commit before notifying total Lead.",
     "successCriteria": [
       "Preserve v1 and historical Work contracts, originals and completed/uncertain fences.",
       "Canonical quality comparison distinguishes behavior gain, verification detection gain, equality and insufficient evidence; no speed/count-only gain.",
@@ -16,7 +16,7 @@
       "Use Git branches/worktrees, immutable source and semantic transition for publication/concurrency/history without universal filesystem guarantees.",
       "Run affected package/common/source closures and both affected consumer adapter paths.",
       "Independently review exact final source commit/tree; publish immutable evidence and authenticated status before PR.",
-      "Create scoped PR then send lens-interview expected head, evidence, findings, pending native qualification and explicit merge-review/proceed request under PT-14; no automatic merge or activation."
+      "Adversarial readiness confirms scope/ownership; this Lead explicitly merges exact expected head only after current independent evidence and all protected checks, verifies M/tree and explicit identical-tree successor review/status and main CI, then notifies lens-interview with PT-17. Native activation remains separate."
     ],
     "inScope": [
       "Whole common-harness E2E quality and AIP Evolve application",
@@ -33,18 +33,19 @@
   },
   "spec": {
     "id": "PT-SPEC",
-    "revision": 3
+    "revision": 4
   },
   "plan": {
     "id": "PT-PLAN",
-    "revision": 3
+    "revision": 4
   },
   "governingDecisionIds": [
     "PT-DECISION-QUALITY-SCOPE-20261018",
     "PT-DECISION-LEAD-ROLE-20261018",
     "PT-DECISION-QUALITY-SUCCESS-MODES-20261018",
     "PT-DECISION-E2E-CONSUMER-SCOPE-20261018",
-    "PT-DECISION-EXECUTION-APPROVAL-20261018"
+    "PT-DECISION-EXECUTION-APPROVAL-20261018",
+    "PT-DECISION-EXPLICIT-MERGE-20261018"
   ],
   "historicalFenceIds": []
 }

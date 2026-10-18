@@ -17,13 +17,13 @@
     "taskId": "PT-08-QUALITY-CONTRACT"
   },
   "title": "Quality Contract",
-  "nextAction": "Preserve v1 and historical Work contracts, originals and completed/uncertain fences.",
+  "nextAction": "Preparation completed; proceed under accepted successor contract and implementation Tasks. No native efficacy/activation claim.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "source-only",
   "dependsOn": [],
@@ -31,5 +31,7 @@
     "PT-DECISION-EXECUTION-APPROVAL-20261018"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "agent-platform:verification:ponytail-harness-evaluation-20261018:pt-preparation"
+  ]
 }

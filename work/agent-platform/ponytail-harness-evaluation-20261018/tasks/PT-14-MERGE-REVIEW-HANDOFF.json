@@ -17,7 +17,7 @@
     "taskId": "PT-14-MERGE-REVIEW-HANDOFF"
   },
   "title": "Merge Review Handoff",
-  "nextAction": "Create scoped PR then send lens-interview expected head, evidence, findings, pending native qualification and explicit merge-review/proceed request under PT-14; no automatic merge or activation.",
+  "nextAction": "Historical V3 handoff-only proposal superseded by actual PT-DECISION-EXPLICIT-MERGE-20261018. Do not dispatch. Current delivery uses PT-15/16/17.",
   "state": {
     "execution": "planned",
     "verification": "pending",
