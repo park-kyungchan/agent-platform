@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+  "status": "accepted",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-POST-INTERVIEW-ACTUAL-USER-INPUT.json",
+    "fragment": "#/content/actualUserText"
+  },
+  "answer": "이제 진행해라. 너는 모든 작업들 맡긴 이후에, 작업 우선순위에 따라서 작업을 진행하면 되는데, 만약 작업할 것이 없으면, 유저와 상의해야할 것들이 있으니까 대기하면 돼. 무엇에 관한 것이냐면 \"Git/GitHub 사용하면서, 이렇게 pane 여러개 띄워서 Orchestration 진행하는 경우에, each worktree/branch commit 차이 등등 고려해서 repo에 어떻게 CI 시킬 것인지에 대해서, 전담 Agent 하나를 설계해야하니까, 영향미치는 전반에 대해서 인터뷰해야돼. **\"다른 작업 없으면 진행하자는 것이니까, 다른 작업이 있으면 백로그 남기고 나중에 리마인드해라\"**",
+  "meaning": "Final interview is confirmed and user now directs current Lead execution and native Codex/Hermes delegation. Preserve full Spec1/Plan2 outcome and all domains beyond initial19/20. Worker context: compact whole purpose plus relevant originals/dependencies/currentness. Lead handles semantic feedback deltas at relevant work boundaries, with prompt stop/permission handling; no per-feedback auxiliary analysis/global restart. Continue useful goals with only needed Context Governance, finite observed-blocker fixes and independent parallel work. Lead serializes Work/source/pins/CAS, exact review/publication/expected-head merge and separate activation. Preserve all native/store/credential owners, history/releases and consumed/uncertain fences/paid0. This record is policy provenance, not automatic native Goal activation, old-thread wake, global Memory admission, new evaluation or source permission. CI-orchestration Agent interview is deferred until priority work is exhausted; no new CI-agent implementation/prerequisite now.",
+  "supersedes": []
+}

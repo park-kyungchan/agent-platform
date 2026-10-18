@@ -1,0 +1,38 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-07-MATH-CI-CONSUMER",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-07-MATH-CI-CONSUMER"
+  },
+  "title": "Adopt existing reusable common CI in the actual Math research consumer",
+  "nextAction": "Read selected Math research owner purpose/AGENTS and actual workflow, qualify native-owner-observed synchronized main before any new source branch. Existing prepared root is historical, not currentness. Reuse maintained agent-platform common CI and verify actual required capability/access/check/consumer equivalence. Prepare ONE minimal exact source patch in the canonical math-research repository Task worktree; never modify shared main or create second common CI implementation. Preserve research/curriculum originals and human holds. No unrelated universal Governance/ODI05 gate; no push/PR/merge/activation before Root exact independent review/current-source adjudication. Return exact tree/commit, changed consumer checks and remaining exception evidence. This does not implement the deferred dedicated CI Agent.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-COST"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": []
+}
