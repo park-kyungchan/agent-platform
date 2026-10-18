@@ -5,7 +5,7 @@
   "workId": "ontology-driven-platform-integration-20261017",
   "kind": "input",
   "id": "ODI-INPUT-GLOBAL-TYPED-ENGINEERING",
-  "inputKind": "source-owner-record",
+  "inputKind": "actual-user-answer",
   "origin": {
     "ownerId": "native-codex-hermes-bot-worker",
     "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z/global-typed-memory-user-input.actual.json#/originalText",
