@@ -93,27 +93,29 @@ export function sourceTestFailureLocations(
 ): { path: string; line: number; column: number }[] {
   const result: { path: string; line: number; column: number }[] = [];
   if (stderr.length > 1_048_576) return result;
-  const seen = new Set<string>();
+  const seen = new Set<string>(),
+    known = new Map<string, string>();
   for (const path of testFiles.slice(0, 1024)) {
     if (!safeSourcePath(path) || path.length > 512 || !/\.(?:test|spec)\.[cm]?tsx?$/.test(path))
       continue;
-    const marker = resolve(root, path) + ":";
-    let offset = stderr.indexOf(marker);
-    while (offset !== -1) {
-      const match = /^([0-9]{1,7}):([0-9]{1,7})(?:\D|$)/.exec(
-        stderr.slice(offset + marker.length, offset + marker.length + 25),
-      );
-      if (match) {
-        const line = Number(match[1]),
-          column = Number(match[2]);
-        const key = JSON.stringify([path, line, column]);
-        if (line > 0 && column > 0 && !seen.has(key)) {
-          seen.add(key);
-          result.push({ path, line, column });
-          if (result.length === 16) return result;
-        }
-      }
-      offset = stderr.indexOf(marker, offset + marker.length);
+    known.set(resolve(root, path), path);
+  }
+  for (const rawFrame of stderr.split("\n")) {
+    const frame = rawFrame.replace(/\u001b\[[0-9;]*m/g, "");
+    const match =
+      /^\s*at (?:[^()\r\n]+ )?\((\/[^\r\n]+):([1-9][0-9]{0,6}):([1-9][0-9]{0,6})\)\s*$/.exec(
+        frame,
+      ) ?? /^\s*at (\/[^\r\n]+):([1-9][0-9]{0,6}):([1-9][0-9]{0,6})\s*$/.exec(frame);
+    if (!match) continue;
+    const path = known.get(match[1]!);
+    if (!path) continue;
+    const line = Number(match[2]),
+      column = Number(match[3]);
+    const key = JSON.stringify([path, line, column]);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push({ path, line, column });
+      if (result.length === 16) return result;
     }
   }
   return result;

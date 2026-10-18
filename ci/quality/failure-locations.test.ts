@@ -40,6 +40,18 @@ test("failed fixture diagnostics retain only bounded known source locations", ()
 });
 
 test("unknown, outside, malformed and excessive diagnostic input stays unqualified", () => {
+  for (const input of [
+    "    at <anonymous> (/private/fixture/repo/ci/check.test.ts:42:7)",
+    "Example diagnostic says /fixture/repo/ci/check.test.ts:42:7 is relevant",
+  ])
+    expect(sourceTestFailureLocations(input, "/fixture/repo", ["ci/check.test.ts"])).toEqual([]);
+  expect(
+    sourceTestFailureLocations(
+      "\u001b[2m    at <anonymous> (/fixture/repo/ci/check.test.ts:42:7)\u001b[0m",
+      "/fixture/repo",
+      ["ci/check.test.ts"],
+    ),
+  ).toEqual([{ path: "ci/check.test.ts", line: 42, column: 7 }]);
   expect(
     sourceTestFailureLocations("at /private.test.ts:1:1", "/fixture/repo", [
       "../private.test.ts",
