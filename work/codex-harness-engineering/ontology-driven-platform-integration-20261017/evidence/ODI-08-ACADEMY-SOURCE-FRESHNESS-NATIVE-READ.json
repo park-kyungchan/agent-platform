@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-08-ACADEMY-SOURCE-FRESHNESS-NATIVE-READ",
+  "evidenceKind": "native-execution",
+  "source": {
+    "kind": "native",
+    "ownerId": "native-codex",
+    "locator": "thread:01a14734-9160-70a2-a10d-df6ea9c50b91/turn:01a14b88-378d-7021-89c2-da50e6221fc1/mcp:exec-470aa3d9-e3be-40bc-8ddc-204673950836",
+    "receipt": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-08-ACADEMY-SOURCE-FRESHNESS-ACTUAL-RESULT.json",
+      "fragment": "#/content"
+    }
+  }
+}

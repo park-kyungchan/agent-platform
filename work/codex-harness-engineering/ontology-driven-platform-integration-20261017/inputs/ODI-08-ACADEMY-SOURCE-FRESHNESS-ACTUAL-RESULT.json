@@ -1,0 +1,122 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-08-ACADEMY-SOURCE-FRESHNESS-ACTUAL-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex",
+    "locator": "root-native-read-once/native-trace-recovery-v1/recovery-provenance.actual.json#nativeMcpItemId=exec-470aa3d9-e3be-40bc-8ddc-204673950836",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "logicalTaskId": "ODI-08-ACADEMY-SOURCE-FRESHNESS",
+    "intent": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi08-academy-source-freshness-task-v1/Root-native-read-once/intent.json",
+      "sha256": "7d347545b448d02b9307ec2c8a5277b12e196cedbf72495871d9a509d11f0926",
+      "bytes": 789
+    },
+    "invocation": {
+      "exposedTool": "mcp__codex_apps__app_academy_source_freshness",
+      "nativeTool": "asdk_app_sites_ed38d201933881918ec4f4458d410edd.academy_source_freshness",
+      "args": {},
+      "maxDispatches": 1,
+      "actualDispatches": 1,
+      "nativeMcpStatus": "completed",
+      "isError": false,
+      "completedAtUtc": "2026-10-18T04:18:48.425Z"
+    },
+    "observation": {
+      "schemaVersion": "academy.read/1.0.0",
+      "domain": "academy",
+      "sourceMode": "saved_snapshot",
+      "liveRefreshConnected": false,
+      "externalSourceQueried": false,
+      "sourceAsOf": null,
+      "queriedAt": null,
+      "lastSuccessfulRefreshedAt": null,
+      "kind": "source_freshness",
+      "scope": "site_saved_bundle",
+      "studentId": null,
+      "status": "live_not_connected",
+      "lastBackendAttemptAt": null,
+      "backendAttemptStarted": false,
+      "reason": "LIVE_ADAPTER_NOT_CONNECTED",
+      "buildTimeIsNotSourceTime": true,
+      "latestObservationIsNotFullRefresh": true
+    },
+    "nativeCorrelation": {
+      "rootNativeSessionId": "01a14734-9160-70a2-a10d-df6ea9c50b91",
+      "nativeTurnId": "01a14b88-378d-7021-89c2-da50e6221fc1",
+      "nativeMcpItemId": "exec-470aa3d9-e3be-40bc-8ddc-204673950836",
+      "outerCallId": "call_8907d8c426444b3282617f92e0ec7d37",
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "nativeAttemptResourceId": null,
+      "occurrenceBinding": {
+        "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+        "attemptId": "native-turn:01a14b88-378d-7021-89c2-da50e6221fc1",
+        "occurrenceId": "native-mcp-tool-call:exec-470aa3d9-e3be-40bc-8ddc-204673950836"
+      },
+      "bindingMeaning": "Source-normalized correlation tuple using actual observed thread/turn/MCP item locators under the existing string-valued NativeOccurrence contract. attemptId is a source-owned join label for the observed native turn, NOT a backend Attempt resource or claim that a backend read attempt started. Native backend Task/Run/Attempt resource IDs remain unexposed/null; the Root session, native turn and MCP item are not logical Task IDs."
+    },
+    "custody": {
+      "rawPrivateResult": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi08-academy-source-freshness-task-v1/Root-native-read-once/native-trace-recovery-v1/result.recovered-from-native-command.json",
+        "sha256": "2a660c2c94c734cb572f77fbf482625700a188360d7922edbfe0d26de61395fc",
+        "bytes": 1174715
+      },
+      "recoveryProvenance": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi08-academy-source-freshness-task-v1/Root-native-read-once/native-trace-recovery-v1/recovery-provenance.actual.json",
+        "sha256": "705f00e607dc9fe06fadf5613bb67e68d4c149ebfa0ba4a3f60fa0124ca4d1e9",
+        "bytes": 4559
+      },
+      "recoverySeal": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi08-academy-source-freshness-task-v1/Root-native-read-once/native-trace-recovery-v1/manifest.SEALED.json",
+        "sha256": "c87c35709d4a67abd656a433ae6bfa4e9f9280d61e79cab1a4e36f0953774e98",
+        "bytes": 1691
+      },
+      "minimizedClassification": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi08-academy-source-freshness-task-v1/Root-native-read-once/native-trace-recovery-v1/minimized-source-classification.actual.json",
+        "sha256": "bd755a1a47ff006f25d2a9e8747f96cea42486ea95540d0425285136da3aa07e",
+        "bytes": 1265
+      },
+      "initialRecordingFailure": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi08-academy-source-freshness-task-v1/Root-native-read-once/recording-failure.actual.json",
+        "sha256": "500a8bb1775d5b5f75f5c7beaf42493a889ae310470c85423e0d748fa7a7fbff",
+        "bytes": 584
+      },
+      "initialFilesystemWriteSucceeded": false,
+      "initialFailureMeaning": "OS argument length rejected the attempted recording process before file creation; native call had completed. Initial failure is preserved, not erased or reclassified as a successful save.",
+      "recoveryMeaning": "Root recovered the original raw JSON string literal by AST/JSON decoding without executing recovered text or rerunning the tool. Candidate hashes the preserved file only; no private overlay or student payload enters Git.",
+      "replayed": false
+    },
+    "effectCustody": {
+      "completedEffectIds": [
+        "ODI-08-ACADEMY-SOURCE-FRESHNESS-READ-ONCE1"
+      ],
+      "uncertainEffectIds": [],
+      "noReplay": true,
+      "scope": "Only this completed saved-source read; prior teacher PG once1 UNKNOWN and all historical fences remain unchanged.",
+      "fenceRepresentation": "Canonical immutable completed Effect plus this source-owned noReplay inventory. No new historical-fence record or Work change is needed; existing historical fences remain unchanged."
+    },
+    "disposition": {
+      "execution": "complete",
+      "localResult": "durable",
+      "independentVerification": "pending",
+      "sharedReceiverRead": "pending",
+      "formalCompletion": "pending",
+      "humanAcceptance": "not_claimed",
+      "engineeringWholeWorkAcceptance": "not_claimed",
+      "notProven": [
+        "current deployed source equality",
+        "live Academy freshness",
+        "teacher PG/schema/UI/WebMCP parity",
+        "student mastery or teacher completion",
+        "independent recovery or production acceptance"
+      ]
+    }
+  }
+}

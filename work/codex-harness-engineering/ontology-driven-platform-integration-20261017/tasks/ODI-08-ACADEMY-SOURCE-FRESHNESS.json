@@ -17,11 +17,11 @@
     "taskId": "ODI-08-ACADEMY-SOURCE-FRESHNESS"
   },
   "title": "Read protected Academy saved-source freshness through the existing native connector",
-  "nextAction": "After Root independently reviews, serially adopts and shares this planned Task against current Work/authority/fences, invoke exactly tools.mcp__codex_apps__app_academy_source_freshness({}) through the existing connected native owner. Use the result to distinguish saved-source scope/clocks/coverage and live-connection limits from build time; retain actual authenticated refusal or uncertainty without fallback/retry. Minimize private output. No student/date invention, refresh, domain write, SQL, credential transfer, new client/store, teacher PG once1 replay or month-end reopening. Native tool discovery, actual read result, source currentness, live Academy/PG/Sites parity and human/whole-Work Acceptance are separate claims. Record the actual native occurrence/result with Root before advancing verification or completion; native Task/Run IDs remain unexposed, not inferred from Root session.",
+  "nextAction": "Do not replay the completed native saved-source read. Root independently checks original recovered-result/provenance/failure hashes and minimized source-freshness meaning, then serially integrates, shares and obtains the separate receiver read before advancing verification or formal completion. Source currentness, live Academy/PG/Sites parity and human/whole-Work Acceptance remain unproved; no refresh, domain write or historical teacher UNKNOWN retry follows.",
   "state": {
-    "execution": "planned",
+    "execution": "complete",
     "verification": "pending",
-    "localAudit": "intent-durable",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -32,6 +32,15 @@
     "ODI-DECISION-COST",
     "ODI-DECISION-USEFUL-NATIVE-FLOW"
   ],
-  "effectIds": [],
-  "verificationEvidenceIds": []
+  "effectIds": [
+    "ODI-08-ACADEMY-SOURCE-FRESHNESS-READ-ONCE1"
+  ],
+  "verificationEvidenceIds": [],
+  "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+  "occurrence": {
+    "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+    "attemptId": "native-turn:01a14b88-378d-7021-89c2-da50e6221fc1",
+    "occurrenceId": "native-mcp-tool-call:exec-470aa3d9-e3be-40bc-8ddc-204673950836"
+  },
+  "executionEvidenceId": "ODI-08-ACADEMY-SOURCE-FRESHNESS-NATIVE-READ"
 }
