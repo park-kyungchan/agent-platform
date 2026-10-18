@@ -1,0 +1,121 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "130b9e9aeae66245a4ae6c2f79bc43db98e3024b",
+  "reviewedTreeSha": "135d0e3dac4989cde39d24f0f4df5bca88896b1d",
+  "reviewedSourceManifestSha256": "716d73ca83ca3de3df6c68e30adf9494f26e50f8c9956ad77fe8ebf18e020775",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15007-0a5d-7fc3-af66-cf9c7e5194a8"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-thread:01a15006-eaef-7f23-bcb8-c3440a03b7dc"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "findings": [],
+  "recordedAtUtc": "2026-10-18T23:04:42.885949+00:00",
+  "reviewStatus": "exact21-metadata-publication-delta-source-review-pass",
+  "identitySemantics": {
+    "legacyTaskIdMeaning": "Actual stored native thread actor reference; never a backend native Task or Run ID.",
+    "reviewerAgentPath": "/root/architecture_context",
+    "authorAgentPath": "/root/handoff_recovery",
+    "accountableLead": "native-thread:01a15003-9cee-7662-bbc2-7c1990379b30",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "evidence": {
+      "path": "owned-root-subagents-metadata.actual.json",
+      "sha256": "35adfd475b8d117451997f07f8f86d8abc71b599bcfe135fea0e2189894e046a",
+      "bytes": 2419
+    }
+  },
+  "fullSourceManifest": {
+    "schema": "agent-platform.reviewed-source-manifest.v1",
+    "reviewedTreeSha": "135d0e3dac4989cde39d24f0f4df5bca88896b1d",
+    "entryCount": 1324,
+    "blobCount": 1157,
+    "sha256": "716d73ca83ca3de3df6c68e30adf9494f26e50f8c9956ad77fe8ebf18e020775"
+  },
+  "scope": {
+    "base": "f078165587faff2d179d9e6ae451aea34b72ff74",
+    "preparationBase": "5def46fc30949b33a4413848023409107ed46368",
+    "changedFiles": 21,
+    "newRecords": 19,
+    "existingTasksChanged": 2,
+    "records": [
+      338,
+      348,
+      357
+    ],
+    "entireNonWorkSourceUnchanged": true,
+    "codeReuse": "Accepted Mf078 whole code/registry/providers/pins/fixtures/package/lock reused by exact unchanged Git blob/tree comparison. This is a new metadata composite review; full tree differs from Mf078, with a newly derived full manifest. My own old context35 remains within accepted unchanged code, not newly independently recertified."
+  },
+  "reviewEvidence": [
+    {
+      "path": "publication-remaining-130b9e9/independent-checks.actual.json",
+      "sha256": "628d9f99a78e30cfad46e91b447fdc65d98a5023d8924bece535e913752fb333",
+      "bytes": 9414
+    },
+    {
+      "path": "standing-typed-memory-admission-preparation.actual.json",
+      "sha256": "0a8c5a5037ca17c8a36988fb291d524d63947d8558529b08a0a8276aa213aff6",
+      "bytes": 5558
+    },
+    {
+      "path": "hermes-first-use-source.native-independent-review.actual.json",
+      "sha256": "bd434d1c1bc3e5608754445b5e7ec410b5876fbb34c5c75bb0cf933eb2663522",
+      "bytes": 9827
+    },
+    {
+      "path": "common-merge-f0781655-review-result.canonical.json",
+      "sha256": "8018f901774f3a2ce442fa4c5cd47b463e29d251ed42e691fbe718835613294c",
+      "bytes": 5842
+    },
+    {
+      "path": "standing-typed-memory-preparation/next-review-and-caller.actual.json",
+      "sha256": "e0617c7858a94922f57bedf576780a5b092b3813360eb901ee113a8b75c8f5e7",
+      "bytes": 3742
+    }
+  ],
+  "inspection": [
+    "All11 Hermes first-use postimage hashes match the actual independent nativeC1 review exactly; observed native effect/milestone is preserved, with broad Task running/pending/result-durable/shared-pending/formal-pending, five pass/two unverified. No replay, broad completion or native Task/Run authentication is invented.",
+    "All10 standing-preference preparation files inspected. Existing maintained compiler independently reproduces dataset/policy/request, derivation memory/episode/claims/sourceBindings and exact binding67b0cbd34b00009f11eecdec45578b3f61a1bf00aa8146e8400e649828761017. Four actual source blobs and current availability match; accepted directive/native-format exception, direct U10 drift WHY and U1 Ontology purpose preserve attribution. Inferred rationale remains unselected.",
+    "Current generation odi05.typed-standing.5def46fc.r1 preserves old G2/Run12/history. ownerReview null; zero derivation/authoritative receipts/commonAdmissions; no Recall. Pending review request is rejected as a real owner review by the unchanged maintained guard. ODI-05 retains historical Spec1/Plan2, planned/pending/intent-durable state and empty effects; its verification is two pass/two unverified.",
+    "336 unaffected original records match Mf078 byte-for-byte, including original Inputs/decisions/Specs/Plans/effect fences and all other Tasks. New bounded preparation creates no Decision, actual user answer, global consumer permission, new Memory store or admission."
+  ],
+  "independentChecks": {
+    "receipt": {
+      "path": "publication-remaining-130b9e9/independent-checks.actual.json",
+      "sha256": "628d9f99a78e30cfad46e91b447fdc65d98a5023d8924bece535e913752fb333",
+      "bytes": 9414
+    },
+    "strict": true,
+    "semanticTransitionMf078To130b": true,
+    "semanticTransition5defTo130b": true,
+    "compilerReproduction": true,
+    "upperArtifactsValid": 2,
+    "preparationVerificationInputHashes": 6,
+    "firstUse11HashesReused": true,
+    "sourceModulesBeforeAfterUnchanged": true,
+    "newSuiteOrEvalRuns": 0,
+    "reviewerAttemptHistory": "Reviewer-owned attempt01 had a known gitRecordPath API arity error before receipt write; preserved exact failed script/receipt. Corrected only that caller signature; bounded readonly successor exit0. No canonical source bug or ambiguous effect."
+  },
+  "requiredChecksAndPublication": "This source review passes; fresh head-specific mandatory source/quality/layout/remote CI status is not declared by this record. Root must qualify actual current required checks, publish immutable exact result/receipt and authenticated existing CommonV2 status before PR, then explicitly merge expected head. No GitHub write or guessed immutable commit by reviewer.",
+  "authorizationAndAcceptanceBoundary": "Actual current user separately authorized publishing completed work only; main Goal remains paused. This reviews preparation for publication, not real owner derivation/authority receipts, commonAdmission, native Recall/config/trust, Task/Work Acceptance or Goal resumption. Final admitted tuple needs separately versioned Inputs/generation/recompiled binding and genuine owner review under later applicable authority; no receipt transplant.",
+  "nativePermissionGranted": false,
+  "formalWorkCompletion": false,
+  "acceptanceDecision": null,
+  "effects": {
+    "canonicalSourceGitWrites": 0,
+    "GitHubWrites": 0,
+    "nativeModelConfigGoalCalls": 0,
+    "MemoryAdmissionOrRecall": false,
+    "privateReviewArtifactsOnly": true
+  }
+}
