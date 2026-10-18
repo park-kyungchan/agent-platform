@@ -547,6 +547,19 @@ for (const mutation of [
   });
 }
 
+for (const value of ["undefined", "NaN"] as const) {
+  test(`Home v2 renderer rejects serialized optional ${value} loss`, () => {
+    const view = rootHomeView();
+    view.selectedCapabilities =
+      value === "undefined"
+        ? undefined
+        : { S1: { enabled: false, meaning: "source-safe", observedScore: NaN } };
+    view.omitted = view.omitted.filter((key) => key !== "selectedCapabilities");
+    expect(Object.hasOwn(view, "selectedCapabilities")).toBe(true);
+    expect(() => renderHomeContextProjectionV2(view)).toThrow("HOME_PROJECTION_ROUNDTRIP_MISMATCH");
+  });
+}
+
 test("isolated canonical Home loader delivers exact Root Work and keeps stale/held guards", async () => {
   const f = await hostHomeFixture();
   try {

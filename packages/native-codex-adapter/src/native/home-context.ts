@@ -1027,12 +1027,12 @@ export function decodeHomeContextProjection(value: unknown): HomeContextViewV2 {
 export function renderHomeContextProjectionV2(view: HomeContextViewV2): string {
   const ordinary = homeV2Prefix + JSON.stringify(view);
   if (ordinary.length <= view.deliveryPolicy.maxChars) return ordinary;
-  const encoded = encodeHomeContextProjection(view),
-    result = homeCompactPrefix + JSON.stringify(encoded);
+  const payload = JSON.stringify(encodeHomeContextProjection(view)),
+    result = homeCompactPrefix + payload;
   // Oversized required views are returned only to the caller's existing hold path.
   if (
     result.length <= view.deliveryPolicy.maxChars &&
-    !isDeepStrictEqual(decodeHomeContextProjection(encoded), view)
+    !isDeepStrictEqual(decodeHomeContextProjection(JSON.parse(payload)), view)
   )
     throw Error("HOME_PROJECTION_ROUNDTRIP_MISMATCH");
   return result;
