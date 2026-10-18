@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "spec",
+  "id": "PT-SPEC",
+  "revision": 1,
+  "outcome": "Evaluate where Ponytail can improve common-harness work and apply the useful AIP Evolve constrained-improvement methodology through existing canonical Work and Evidence contracts in an isolated branch.",
+  "criteria": [
+    "Ponytail and common baseline source are pinned and other sessions remain untouched.",
+    "A source-grounded task-specific rubric fixes meaningful quality and efficiency criteria before candidate outcomes.",
+    "The common harness offers a reusable bounded read-only improvement preflight/comparison using existing evaluation semantics.",
+    "Meaningful tests, required common/package/source-provider checks and independent source review support the candidate.",
+    "The user receives a clear Korean explanation of the fixed rubric and actual execution flow."
+  ]
+}

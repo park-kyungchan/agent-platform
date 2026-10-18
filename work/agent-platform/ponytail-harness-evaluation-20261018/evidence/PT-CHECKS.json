@@ -1,0 +1,14 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "evidence",
+  "id": "PT-CHECKS",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-CHECKS.json",
+    "fragment": "#/content"
+  }
+}

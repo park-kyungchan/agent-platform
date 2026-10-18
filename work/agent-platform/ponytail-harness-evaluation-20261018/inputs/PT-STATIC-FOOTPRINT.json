@@ -1,0 +1,57 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-STATIC-FOOTPRINT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-STATIC-FOOTPRINT.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "deterministic-static-footprint-observation",
+    "method": "Static mirror of upstream mode-line filtering; no upstream hooks were executed.",
+    "upstreamCommit": "09c434ab73ca43761c5d8b0c5d341926c2fba710",
+    "rawSkill": {
+      "utf8Bytes": 3496,
+      "characters": 3496,
+      "whitespaceWords": 592,
+      "sha256": "9badd22a32e19cb884e46dfa8d3aae82bb81dfa5484105b8b4f0262df823a509"
+    },
+    "injections": {
+      "lite": {
+        "utf8Bytes": 2916,
+        "characters": 2914,
+        "whitespaceWords": 505,
+        "sha256": "5e3586859c414fd4c6c64007a94015f4ad1c8d9d7ddcb71d89811ae0c1225c76"
+      },
+      "full": {
+        "utf8Bytes": 2861,
+        "characters": 2859,
+        "whitespaceWords": 493,
+        "sha256": "44b9a3a32a2a8c025535cb746552bc6dd82816469af264130937f0ec2b56eb00"
+      },
+      "ultra": {
+        "utf8Bytes": 2930,
+        "characters": 2928,
+        "whitespaceWords": 505,
+        "sha256": "10f18a8aaed8ced5a2b3f0b7db37e16ac5094b574fde9e165b001e3bd7cefb9d"
+      }
+    },
+    "distilledTreatment": {
+      "utf8Bytes": 775,
+      "characters": 775,
+      "whitespaceWords": 115,
+      "sha256": "99116ba7e596d8db17f358f37b26d9b3d892e3ae989c60261977358071aaa149"
+    },
+    "limits": [
+      "Characters and whitespace words are not native model tokens.",
+      "Current common baseline has no added Ponytail body; the candidate adds its own bytes.",
+      "This compares instruction footprint, not task quality, elapsed work or billed cost."
+    ],
+    "nativeModelCalls": 0
+  }
+}

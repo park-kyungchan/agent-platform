@@ -1,5 +1,9 @@
 import { readFile } from "node:fs/promises";
 import {
+  preflightImprovement,
+  compareImprovement,
+} from "../packages/evidence-foundry/src/modules/evals/improvement.ts";
+import {
   openGitWork,
   resolveGitWorkSelection,
   qualifyGitWorkStart,
@@ -15,7 +19,7 @@ import {
 } from "../packages/work-continuity/src/runtime-docs/index.ts";
 
 const usage =
-  "bun run harness context|validate|start|docs <request.json>; transition <before.json> <after.json>; source <snapshot.json> <relative-path>";
+  "bun run harness context|validate|start|docs|improvement-preflight|improvement-compare <request.json>; transition <before.json> <after.json>; source <snapshot.json> <relative-path>";
 async function readRequest(path: string | undefined): Promise<unknown> {
   if (!path) throw Error(usage);
   const bytes = await readFile(path);
@@ -74,6 +78,10 @@ export async function runHarness(argv: string[]): Promise<unknown> {
     throw Error(usage);
   const request = object(await readRequest(path));
   switch (command) {
+    case "improvement-preflight":
+      return preflightImprovement(request);
+    case "improvement-compare":
+      return compareImprovement(request);
     case "context": {
       const reader = await openGitWork(await resolveGitWorkSelection(request.snapshot));
       return readGitWorkContext(reader, object(request.context) as unknown as ContextRequest);
@@ -115,7 +123,11 @@ if (import.meta.main) {
     console.log(JSON.stringify(result, null, 2));
     if (result && typeof result === "object") {
       const value = result as Record<string, unknown>;
-      if (value.valid === false || value.status === "held") process.exitCode = 1;
+      if (
+        value.valid === false ||
+        ["held", "defer", "repair", "stop"].includes(String(value.status))
+      )
+        process.exitCode = 1;
     }
   } catch (error) {
     console.error(error instanceof Error ? error.message : "Common Harness request failed");

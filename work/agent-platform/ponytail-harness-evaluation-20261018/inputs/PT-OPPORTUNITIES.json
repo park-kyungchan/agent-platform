@@ -1,0 +1,70 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "agent-platform",
+  "workId": "ponytail-harness-evaluation-20261018",
+  "kind": "input",
+  "id": "PT-OPPORTUNITIES",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "agent-platform",
+    "locator": "work/agent-platform/ponytail-harness-evaluation-20261018/inputs/PT-OPPORTUNITIES.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "source-supported-optimization-opportunities",
+    "orderedCandidates": [
+      {
+        "priority": 1,
+        "area": "Scope and canonical reuse before editing",
+        "application": "Task-scoped distilled treatment",
+        "reason": "Ponytail's strongest portable behavior; current owner rules already overlap, so incremental benefit must be measured.",
+        "sources": [
+          "Ponytail skills/ponytail/SKILL.md",
+          "AGENTS.md",
+          "packages/native-codex-adapter/skills/herdr-codex-long-work/SKILL.md"
+        ]
+      },
+      {
+        "priority": 2,
+        "area": "Review actual affected callers with concrete-case findings",
+        "application": "Use within existing exact independent review",
+        "reason": "May reduce missed caller regressions and speculative findings; no replacement for authenticated status or Lead merge.",
+        "sources": [
+          "Ponytail skills/ponytail-review/SKILL.md",
+          "ci/quality/receipt-validator.ts"
+        ]
+      },
+      {
+        "priority": 3,
+        "area": "Make existing compact context accessible to CLI consumers",
+        "application": "Potential follow-up opt-in CLI route to existing reader",
+        "reason": "scripts/harness.ts context emits raw representation while canonical readCompactGitWorkContext already exists and both native adapters use it. Frequency and actual bottleneck remain unobserved.",
+        "sources": [
+          "scripts/harness.ts",
+          "packages/work-continuity/src/git-work/context.ts"
+        ]
+      },
+      {
+        "priority": 4,
+        "area": "Reuse routed documentation and valid same-source evidence",
+        "application": "Existing harness docs and canonical registry",
+        "reason": "Avoid another search/index/runtime layer; current version/body-digest constraints remain.",
+        "sources": [
+          "packages/work-continuity/src/runtime-docs/index.ts",
+          "docs/runtime-documentation-routing.md"
+        ]
+      }
+    ],
+    "upstreamLimits": [
+      "Author-reported Claude benchmark, Bash disabled; repository instructions/auto memory disabled.",
+      "18 of 39 tasks have executable hidden checks; remaining completeness includes model judgment.",
+      "Harness-like small reuse tasks can become more costly; no transfer of aggregate savings to Codex/Hermes is established.",
+      "Raw benchmark runs are not tracked in the clone, so aggregate results were not independently recomputed."
+    ],
+    "installation": {
+      "performed": false,
+      "scope": "Source-only task treatment; no global runtime integration or mode state is needed for this experiment."
+    }
+  }
+}

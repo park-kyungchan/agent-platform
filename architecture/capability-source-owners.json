@@ -357,8 +357,13 @@
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/index.ts",
-          "sha256": "26e7f8ab67e24bc191ce1465c9e579d45c760274771500439028c4c50ee4d182",
+          "sha256": "090ca7a9abb6e845c3aeaec706db75ea3ba9f507b44c4c0ac9a1b60d88e0c517",
           "relativePath": "packages/evidence-foundry/src/modules/evals/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/improvement.ts",
+          "sha256": "7cb5419760446ea1000db5e9d04d029dc0331ff45fc1d4a27f9580a9981bc583",
+          "relativePath": "packages/evidence-foundry/src/modules/evals/improvement.ts"
         },
         {
           "path": "/home/palantirkc/code/shared/agent-platform/packages/evidence-foundry/src/modules/evals/types.ts",
