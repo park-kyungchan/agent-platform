@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "relation",
+  "id": "ODI-05-CONTAINS-NATIVE-MEMORY-A",
+  "relation": "contains",
+  "from": {
+    "kind": "task",
+    "id": "ODI-05"
+  },
+  "to": {
+    "kind": "task",
+    "id": "ODI-05-NATIVE-MEMORY-A"
+  }
+}

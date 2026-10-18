@@ -1,0 +1,42 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-07-EDUCATION-CI-CONSUMER",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-07-EDUCATION-CI-CONSUMER"
+  },
+  "title": "Adopt existing common CI in the actual Education consumer",
+  "nextAction": "Sourcefa8/tree139f independently reviewed/published with status56625809743, PR13 source checks39118281417 passed and Root explicitly merged M af61 with identical reviewed tree. Distinct merged-main review proof/status and actual main-push qualification remain Root-owned pending work; no source re-review/replay or native activation inferred. Work shared/formal and human/whole Acceptance pending.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+    "ODI-DECISION-GLOBAL-TYPED-ENGINEERING",
+    "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:odi07-education-ci-source-integration"
+  ]
+}

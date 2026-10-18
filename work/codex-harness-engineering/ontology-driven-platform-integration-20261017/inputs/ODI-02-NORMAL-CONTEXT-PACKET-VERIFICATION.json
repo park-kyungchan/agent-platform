@@ -1,0 +1,70 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-NORMAL-CONTEXT-PACKET-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/packet-preparation-root-component-check.001.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:odi02-normal-packet-preparation",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T08:46:20.955Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:e45e6c52f6deebfdd97e90428cdcc70e530d9b3ecf2120fb9647ee13d37706d0"
+      ],
+      "criteria": [
+        {
+          "id": "explicit-contract-separation",
+          "status": "pass",
+          "message": "Root explicitly records f954 original full projection requirement unfulfilled and moves mandatory full-fit preflight to existing native leaf; this is not fulfillment of the old contract.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi02-normal-packet-preparation"
+          ]
+        },
+        {
+          "id": "preparation-integrity",
+          "status": "pass",
+          "message": "Root rechecked exact candidate/target/result hashes, original bytes outside contextSelections, canonical parser,8 refusal variants and OPS containment veto with current native16/context34 source closures.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi02-normal-packet-preparation"
+          ]
+        },
+        {
+          "id": "unknowns-and-effects-preserved",
+          "status": "pass",
+          "message": "Full qualified projection/decode/fit, actual native agent fields/trust and native event stay unproved; native leaf remains planned/pending; no native effect claimed; shared/formal/Acceptance remain pending.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi02-normal-packet-preparation"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-NORMAL-CONTEXT-PACKET-RESULT.json",
+          "sha256": "945f2e4d21c22161fef96a07d6bf4caf0405b05bd4fd6f5599a86dcde7461b6d"
+        }
+      ],
+      "runtime": {
+        "name": "native-codex-lead-source-preparation-verification",
+        "version": "source-only"
+      },
+      "details": {
+        "originalContractPassed": false,
+        "fullQualifiedFit": null,
+        "nativePermissionGranted": false,
+        "AcceptanceDecision": null,
+        "sourceContractClarification": "ODI-02-PACKET-CONTRACT-CLARIFICATION"
+      }
+    }
+  }
+}

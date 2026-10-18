@@ -1,4 +1,4 @@
-// codex-native-provider-registration-sha256: 1e36ba51e6f941c5d7b47fd76c3e8c9c831244254adebc438e2307a465b640b3
+// codex-native-provider-registration-sha256: 6ebbecf46036e699619609c14f9cc816ee092d4c9270d3a60c81e8272fc9e503
 import {handleHook as coreHandleHook} from '@palantirkc/native-codex-adapter/hooks';
 import {loadCodexOwnerContext} from '../legacy/harness/owner-context-loader.ts';
 export * from '@palantirkc/native-codex-adapter/hooks';

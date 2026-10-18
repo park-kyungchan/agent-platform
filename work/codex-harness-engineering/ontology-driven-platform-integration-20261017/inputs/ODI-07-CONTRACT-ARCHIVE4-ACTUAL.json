@@ -1,0 +1,280 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-CONTRACT-ARCHIVE4-ACTUAL",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "ops:orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-four-contract-archive-effect-successor-v2/Root-sequential-execution-once/actual.json#sha256=19e776473d011d81c9010fbe1198b7d9e36e1ea41934de8f5453148610eead03",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "recordClass": "PortableActualSourceAdoptionAndFourContractArchiveCapture",
+    "captureAtUtc": "2026-10-18T02:32:15.437118+00:00",
+    "scope": "Actual completed four-contract archival and its common source adoption/CI episode only; not whole ODI07/estate/domain/Bot integration Acceptance.",
+    "originalArtifactOwner": "codex-harness-engineering",
+    "artifactBase": "ops:orchestrator-history-audit-20261017T003728Z/approved-execution/",
+    "anchorsMeaning": "Each archive/source anchor path is relative to its artifactDirectories entry under artifactBase. Original independent owner journals remain unchanged; portable selected facts suffice to consume this Input without local OPS files. No credentials or full metadata bodies copied.",
+    "aggregate": {
+      "path": "Root-sequential-execution-once/actual.json",
+      "sha256": "19e776473d011d81c9010fbe1198b7d9e36e1ea41934de8f5453148610eead03",
+      "bytes": 2364
+    },
+    "archives": [
+      {
+        "repositoryId": 1411493725,
+        "repository": "park-kyungchan/hermes-profile-dc-context",
+        "effectLabel": "ODI-07-CONTRACT-ARCHIVAL:1411493725:20261018",
+        "beforeArchived": false,
+        "afterArchived": true,
+        "privateUnchanged": true,
+        "allRefs": [
+          {
+            "ref": "refs/heads/main",
+            "sha": "3cb238d352b3ace3f94e653e3f4e1590b194a323",
+            "type": "commit"
+          }
+        ],
+        "allRefsUnchanged": true,
+        "readmeAtTargetHead": {
+          "sha256": "e67d7bbce80d972e2e650934e8f7bf75c469f3c69168d7efec4e7e296d04361f",
+          "bytes": 5076,
+          "blobOid": "48e84547854bf4a77cea83848243d746978aee4c"
+        },
+        "readmeUnchanged": true,
+        "publishedHistoryBundle": {
+          "path": "history/public-contracts/bundles/hermes-profile-dc-context.bundle",
+          "sha256": "9b9869ebc61fc39c2e2140714f6c003bb67c4271027e2beae782dfe8180c55da",
+          "bytes": 26097
+        },
+        "publishedHistoryBundleUnchanged": true,
+        "result": {
+          "path": "Root-sequential-execution-once/1411493725.stdout.json",
+          "sha256": "e6e0e602a9c71a58e3f93979888e4fb39e13d2ad7267a1a2d5cb5dcdfe7b3f17",
+          "bytes": 15972
+        },
+        "input": {
+          "path": "input.ROOT-1411493725.actual.json",
+          "sha256": "6bd6c1f1f07544345f609faa3a86de34fb276e0ed2d2d9dcfb23c998036a4e77",
+          "bytes": 5422
+        },
+        "journal": {
+          "path": "archive-1411493725-once.jsonl",
+          "sha256": "8e8cb8261525c5f4d06ff799e90f25ec583b58ab0f131fd5d52581d0ba4e7618",
+          "bytes": 30154
+        },
+        "oneJournalCompletePatchInvocation": true
+      },
+      {
+        "repositoryId": 1411506018,
+        "repository": "park-kyungchan/hermes-profile-dc-contract-audit",
+        "effectLabel": "ODI-07-CONTRACT-ARCHIVAL:1411506018:20261018",
+        "beforeArchived": false,
+        "afterArchived": true,
+        "privateUnchanged": true,
+        "allRefs": [
+          {
+            "ref": "refs/heads/main",
+            "sha": "3ab5d8d8e4876b2d74b60e39879cec98d810f0a4",
+            "type": "commit"
+          }
+        ],
+        "allRefsUnchanged": true,
+        "readmeAtTargetHead": {
+          "sha256": "30282cb8a249facaf991d3021330eaafc55f30937bc5d5777c379197c14d0847",
+          "bytes": 5274,
+          "blobOid": "049039777f911ddf3d9f56e576f2f2996f5257ee"
+        },
+        "readmeUnchanged": true,
+        "publishedHistoryBundle": {
+          "path": "history/public-contracts/bundles/hermes-profile-dc-contract-audit.bundle",
+          "sha256": "88a79611a678a7dd4abfc19506a6202dc827cf85e0a50a9c5c3177d3b7a86bc4",
+          "bytes": 35927
+        },
+        "publishedHistoryBundleUnchanged": true,
+        "result": {
+          "path": "Root-sequential-execution-once/1411506018.stdout.json",
+          "sha256": "d16a6d0568574b0a2740afa25b683389f1db1f526154a0068382554b2a142d86",
+          "bytes": 16623
+        },
+        "input": {
+          "path": "input.ROOT-1411506018.actual.json",
+          "sha256": "aa7b10909c824711b3502eacf676e2b1d43af3daa29d3c7f5d4115b038ad6aab",
+          "bytes": 5422
+        },
+        "journal": {
+          "path": "archive-1411506018-once.jsonl",
+          "sha256": "4406bd9bf8127d1649fa0dc016dee15dfd85a025cc462a5860f561f311e05686",
+          "bytes": 31435
+        },
+        "oneJournalCompletePatchInvocation": true
+      },
+      {
+        "repositoryId": 1411547504,
+        "repository": "park-kyungchan/hermes-profile-dc-review",
+        "effectLabel": "ODI-07-CONTRACT-ARCHIVAL:1411547504:20261018",
+        "beforeArchived": false,
+        "afterArchived": true,
+        "privateUnchanged": true,
+        "allRefs": [
+          {
+            "ref": "refs/heads/main",
+            "sha": "69ed6d9a0266066c83789c322c4b4521810333ec",
+            "type": "commit"
+          }
+        ],
+        "allRefsUnchanged": true,
+        "readmeAtTargetHead": {
+          "sha256": "4bf02330f16a2e977aaf646db8d2638f8d5222749af3eafa4ca9b02c9afb7b70",
+          "bytes": 3701,
+          "blobOid": "aef105617cd952f76931b23b484b794b34fec920"
+        },
+        "readmeUnchanged": true,
+        "publishedHistoryBundle": {
+          "path": "history/public-contracts/bundles/hermes-profile-dc-review.bundle",
+          "sha256": "50388b1815bdbea8df8b4f6807353a29d70f19ba17e1dea2172df45046b127cd",
+          "bytes": 26659
+        },
+        "publishedHistoryBundleUnchanged": true,
+        "result": {
+          "path": "Root-sequential-execution-once/1411547504.stdout.json",
+          "sha256": "0155306c7329eacd69035b13671fec1e8e8a2180f61839bc59bba1e1b78bac3f",
+          "bytes": 15879
+        },
+        "input": {
+          "path": "input.ROOT-1411547504.actual.json",
+          "sha256": "a200a7735960eb5fdb068a818fd3116294c963a285f53b7828a1b95114cfb0c0",
+          "bytes": 5422
+        },
+        "journal": {
+          "path": "archive-1411547504-once.jsonl",
+          "sha256": "1504821d1ad44d1bbbfd7273b2a024b7a1874a7b4d6b839b808599bb6ac85727",
+          "bytes": 29971
+        },
+        "oneJournalCompletePatchInvocation": true
+      },
+      {
+        "repositoryId": 1411598033,
+        "repository": "park-kyungchan/hermes-profile-ontology-platform",
+        "effectLabel": "ODI-07-CONTRACT-ARCHIVAL:1411598033:20261018",
+        "beforeArchived": false,
+        "afterArchived": true,
+        "privateUnchanged": true,
+        "allRefs": [
+          {
+            "ref": "refs/heads/main",
+            "sha": "796cd709f356344210aa73f02ca2c8407103cc28",
+            "type": "commit"
+          }
+        ],
+        "allRefsUnchanged": true,
+        "readmeAtTargetHead": {
+          "sha256": "c31d77b515a787e22a17a804bc671cf04ced76ce19df39ba402bbe995d7adae3",
+          "bytes": 5169,
+          "blobOid": "0bd1c09e032e4e56aea3b0d0110fdceae7126a4f"
+        },
+        "readmeUnchanged": true,
+        "publishedHistoryBundle": {
+          "path": "history/public-contracts/bundles/hermes-profile-ontology-platform.bundle",
+          "sha256": "e35c463de8c778f8aa0d9f3732a14650533a4c85726f74071cfaf95186361416",
+          "bytes": 41800
+        },
+        "publishedHistoryBundleUnchanged": true,
+        "result": {
+          "path": "Root-sequential-execution-once/1411598033.stdout.json",
+          "sha256": "e3d6bc57c7a12293dc47ab9986529f48b9c11b3f9342ffb644a5e2dd0a5cb551",
+          "bytes": 16623
+        },
+        "input": {
+          "path": "input.ROOT-1411598033.actual.json",
+          "sha256": "207a7e3d345d9ab04dc1cca95fe98ed49c5cf2646f0bf64a80bba3630fb67535",
+          "bytes": 5422
+        },
+        "journal": {
+          "path": "archive-1411598033-once.jsonl",
+          "sha256": "aced3c2f021e35cdf7a1a4d94715f343461a4c5f3a5d297e1b57e98dd5908c04",
+          "bytes": 31435
+        },
+        "oneJournalCompletePatchInvocation": true
+      }
+    ],
+    "sourceAdoption": {
+      "atUtc": "2026-10-18T02:11:15.194561+00:00",
+      "before": "3b242ac37046ada7d6351f27934ed08bb617c391",
+      "head": "b3a2a8c2235b994407a903e4c3d3d907fdaa014c",
+      "tree": "a0db3ee240941cf5b2f976b15cca7f77fbc39b04",
+      "sourceManifest": "08c6806971a4b9626825fc0955cc62ca7cee1595c6e8cdae0659cdc44a527ff5",
+      "reviewStatusId": 56614940937,
+      "exactFastForward": true,
+      "sourceGuardPrePost": {
+        "before": {
+          "sourceGuardPassed": true,
+          "pins": 34
+        },
+        "after": {
+          "sourceGuardPassed": true,
+          "pins": 34
+        }
+      },
+      "changedPaths": [
+        "architecture/contract-maintenance-successor.json",
+        "history/public-contracts/README.md"
+      ],
+      "sourceAdoptionOnly": true,
+      "nativeConfigurationActivated": false,
+      "profileOrServiceChangedByThisSourceEpisode": false,
+      "globalSkillChanged": false,
+      "archiveEffectsInThisEarlierAdoptionReceipt": 0,
+      "receipt": {
+        "path": "source-adoption-once/actual.json",
+        "sha256": "36956f3a6e2d0ed75f4019db1512a48dc0b559b4ac234fb4f8df0ac92648b745",
+        "bytes": 910
+      }
+    },
+    "mainCI": {
+      "run": 39088636236,
+      "head": "b3a2a8c2235b994407a903e4c3d3d907fdaa014c",
+      "attempt": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "rerunCommandsIssued": 1,
+      "failedJobsOnlyRequested": true,
+      "initialMissingMReviewStatusFailurePreserved": true,
+      "initialImmediatePostDispatchAssertionFailed": true,
+      "passedInitialCodeChecksPreserved": true,
+      "receipt": {
+        "path": "main-ci-recovery-once/actual-completion.json",
+        "sha256": "f39e6c72113a853eb61717cb5d8781f55f9718967121640903f82c0936d002ea",
+        "bytes": 713
+      }
+    },
+    "effectCustody": {
+      "completedEffectIds": [
+        "ODI-07-CONTRACT-ARCHIVAL:1411493725:20261018",
+        "ODI-07-CONTRACT-ARCHIVAL:1411506018:20261018",
+        "ODI-07-CONTRACT-ARCHIVAL:1411547504:20261018",
+        "ODI-07-CONTRACT-ARCHIVAL:1411598033:20261018"
+      ],
+      "uncertainEffectIds": []
+    },
+    "resourceIdentity": {
+      "nativeBackendTaskId": null,
+      "nativeBackendRunId": null,
+      "nativeOccurrenceInvented": false,
+      "logicalArchiveTaskAsDeclared": "ODI-07-CONTRACT-ARCHIVAL",
+      "parentRepoTaskPlanRevisionPreserved": 1,
+      "currentWorkPlanRevision": 2
+    },
+    "remainingWholeLens": "Continue original fullestate integration/split/naming/common reusableCI rules+implementation/domain checks+exceptions, actual Bot/client integration, native/domain value/recovery/cost/adoption/Acceptance by their own dependencies. Archive4 is done and is not a new prerequisite for unrelated work.",
+    "wholeGoalOrWholeRepoTaskAcceptance": false,
+    "artifactDirectories": {
+      "archive": "odi07-four-contract-archive-effect-successor-v2/",
+      "source": "odi07-contract-maintenance-cloud-findings-successor-v2/"
+    },
+    "effectAttribution": "Root-controlled per-target one-use invocations; beforefalse/aftertrue and unchanged source/history/ref readbacks are client observations. Labels are actual source-owned fences, not native backend Task/Run/Attempt IDs or cryptographic native authorship. All four declare ODI-07-CONTRACT-ARCHIVAL@Plan2; parent ODI-07 stays originalPlan1.",
+    "uncertaintyScope": "Only this archive4 subset has no uncertain labels; every older completed/uncertain fence and unknown usage elsewhere is preserved."
+  }
+}

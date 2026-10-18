@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-03-native-readback",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "native",
+    "ownerId": "native-hermes",
+    "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_130701_1c9d3d/messages/1,45",
+    "receipt": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-NATIVE-RESULT.json",
+      "fragment": "#/content"
+    }
+  }
+}

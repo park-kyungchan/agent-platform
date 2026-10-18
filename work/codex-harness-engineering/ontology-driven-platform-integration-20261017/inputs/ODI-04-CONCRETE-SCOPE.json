@@ -1,0 +1,305 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-04-CONCRETE-SCOPE",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-data-and-producer-recipe/root-receiver-owner-binding.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi04.actual-use.concrete-producer-scope.v1",
+    "recipe": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi04-native-data-and-producer-recipe/task04-contract-and-binding.recipe.v2.json",
+      "sha256": "384aa175833a48af939f3be48752f764409ac8ff53dc79a71761f61a5371a877",
+      "bytes": 13797,
+      "content": {
+        "schema": "odi04.actual-receiver-logical-contract-and-useful-producer.v1",
+        "status": "OPS-proposal-no-effects",
+        "atUtc": "2026-10-17T06:16:41.774460+00:00",
+        "unchangedContract": {
+          "workId": "ontology-driven-platform-integration-20261017",
+          "spec": "ODI-SPEC@1",
+          "plan": "ODI-PLAN@1",
+          "taskId": "ODI-04",
+          "independentReviewTask": "ODI-04-R",
+          "wholeFlowTask": "ODI-05",
+          "noNewGoal": true
+        },
+        "C03": "a497ff163eb5b5a16270de270df6e843b1bc40a9",
+        "codeBaseM": "a91ef0564997a3a3736564f35a2e8354ae47e47b",
+        "skill": {
+          "actualInstalledPath": "/home/palantirkc/.agents/skills/herdr-hermes/SKILL.md",
+          "actualFiveFiles": [
+            {
+              "path": "/home/palantirkc/.agents/skills/herdr-hermes/SKILL.md",
+              "sha256": "c2c014becf8cf76ebeaa9b8135ef56a0d9ca140d66cd3b21bd4051c0132068e4",
+              "bytes": 3858
+            },
+            {
+              "path": "/home/palantirkc/.agents/skills/herdr-hermes/references/control.md",
+              "sha256": "dc36ee1afb6174afa108f071077677aad261e84d2f675d18210528c881d95a77",
+              "bytes": 7553
+            },
+            {
+              "path": "/home/palantirkc/.agents/skills/herdr-hermes/references/deployment.md",
+              "sha256": "0082a0ca7735bc144628b174d0bcebfe3dc4cd23c87f4527bff10461d410448c",
+              "bytes": 5414
+            },
+            {
+              "path": "/home/palantirkc/.agents/skills/herdr-hermes/references/documentation.md",
+              "sha256": "6451aff12919477bd6f972a22fd3a81abf6eade89257da4041cdec2fdd03d6c5",
+              "bytes": 3655
+            },
+            {
+              "path": "/home/palantirkc/.agents/skills/herdr-hermes/references/live-use.md",
+              "sha256": "a9d337eca2e7e3036acebb16f3641bab210525a2a0f94a2788b3f1e9eb4cf719",
+              "bytes": 2376
+            }
+          ],
+          "mode": "Use installedbase herdr + thin herdr-hermes. Reobserve HERDR_ENV/liveIDs/foreground/readycomposer; existingSSHDockerTUI remains rawpane, not recognizedagent. Preserve focus and submit bodyonce/readcomposer/Enteronce; never oneshot/YOLO/retryuncertain."
+        },
+        "producerGap": {
+          "observedSource": [
+            {
+              "path": "/home/palantirkc/code/shared/agent-platform/scripts/harness.ts",
+              "sha256": "5060b6bb347d6f09ce5e6d59918947c196538ebb259a93a6a5f9059829839301"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/runtime-docs/index.ts",
+              "sha256": "72b4a6ef5faa84978d1a041e8d0b7f1191365c041f796b737db4ca549931c536"
+            },
+            {
+              "path": "/home/palantirkc/code/shared/agent-platform/packages/work-continuity/src/runtime-docs/types.ts",
+              "sha256": "dd3a897c221c30ab404323604a7bb56664373ec7d26ccf1682d7bb55c4872846"
+            }
+          ],
+          "problem": "Public scripts/harness.ts docs branch calls reader.select(request) only, while canonical reader.select(request,observations) already supports caller-declared installedVersion/current-cache evidence. CLI cannot deliver those observations.",
+          "usefulDeliverable": "Backward-compatible CLI transport patch exposing explicit {request,observations}, retaining existing flat DocumentationRequest. Include meaningful real CLI-boundary tests and a short executable docs example; deliver exactpatch+tests to Lead, not another readiness report.",
+          "allowedCodePaths": [
+            "scripts/harness.ts",
+            "packages/work-continuity/src/runtime-docs/runtime-docs.test.ts",
+            "docs/runtime-documentation-routing.md"
+          ],
+          "semanticOwner": "Same canonical work-continuity runtime-docs reader/router. CLI owns envelope transport/shape; delegate route/version/cache matching and all authority decisions to existing reader.select.",
+          "requiredBehavior": [
+            "Existing flat validrequest output/error behavior remains unchanged. Explicit envelope accepts only request+optionalobservations; request object and observations object/knownscalar/cachefields bounded; malformed/unknown envelope data rejects predictably.",
+            "Pass observations unchanged to canonical select; no host/version probing, webfetch, credentials, cache store, newrouter/client/loop/registry or nativeauthority claim.",
+            "InstalledVersion removes only appropriate missing-version evidence gap; conflicting version and hash provenance remain meaningful. Matching cache onlyreuses under canonical conditions; bogus current-task/hash values cannot force trust.",
+            "Preserve page/discovery/excerpt limits and executionAuthority none/nativePermissionGranted false."
+          ],
+          "mechanicalTests": [
+            "Real flat CLIrequest still works and stays byte/semanticallycompatible.",
+            "Envelope installedVersion reaches canonicalreader; applicable version gap changes as expected.",
+            "Matching independentlyconfirmed/current-taskcache reaches canonical decision; mismatching confirmation or required revalidation doesnotforce reuse.",
+            "In the existing runtime-docs.test.ts exercise child CLI exit and output for malformed envelope/request/observations/cache scalar types/unknownfields/oversized request; do not create scripts/harness.test.ts or edit README.md.",
+            "No network/nativeapp calls; docs example explicitcaller-declared observations never installation/authentication/permission proof."
+          ],
+          "requiredChecks": [
+            "bun test packages/work-continuity/src/runtime-docs/runtime-docs.test.ts (include meaningful real CLI subprocess boundary cases in this existing test file)",
+            "bun run check:handoff",
+            "bun run check:imports",
+            "affected source/package/owner checks and exact provider closure per AGENTS; Root repeats required canonical checks on receivedexactpatch."
+          ],
+          "forbiddenEdits": [
+            "package.json/bun.lock/provider registrations/markers/nativehooks/profiles/credentials/defaultstores/Loop/SDK client",
+            "Completed Work03 records or frozen data/provider workingtrees",
+            "Independent side-skill test result as04completion; actual04mustproduce this patch under admitted context."
+          ]
+        },
+        "threeSeparateRoots": {
+          "provider": "Existing immutable pinned provider-0d33f6fa and generatedreader/hook; no C03 data movement chooses code.",
+          "data": "Newdata-a497ff16 and later exactC04 data worktree; immutable receipts/purpose/currentdecisions/fences, no source edits there.",
+          "producerCode": "Fresh owned editable source worktree exactM and reviewed dependency closure; context_bundle_review owns its setup proposal. Do not reuse A8/provider code as writableproducer source. Shell tool supports its own cwd/absolute paths; TUIcwd remains /opt/data for hookbinding."
+        },
+        "receiverFirst": {
+          "executeBeforeAny04Model": "Separate frozen c03-data-receiver.recipe.json; Root reviews/executes absent-only dataimport + owner-side canonical source receiver. No binding/config/model change.",
+          "payload": {
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "a497ff163eb5b5a16270de270df6e843b1bc40a9",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-EXECUTION-RECEIPT.json",
+            "fragment": "#/content",
+            "sha256": "c3c0c164a9abc6432a56e1575ef64c57fb0e7df743a17912c4e3edd4b92e8313",
+            "blobOid": "dd2288cd238e6614e6fa581a03bbeab380a17f25"
+          },
+          "expectedProducerOccurrence": {
+            "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+            "attemptId": "01a1476a-2492-7922-94c5-5665dee62602",
+            "occurrenceId": "call_3fd95b21a92a4155b427824de0fb5b10"
+          },
+          "receiverRuntimeAddressCandidate": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+          "addressMeaning": "Common receipt address composed from actually observed nativeowner/profile/storedsession. Not nativeTask/Run ID and not authenticated by strings. Root actual owner/profile/process/currentness observation must bind returned read before receipt creation.",
+          "readObservationNotYetClaimed": true
+        },
+        "postActualReceiverSourceRecords": {
+          "newNativeExecutionEvidenceId": "ODI-03-PREREQUISITE-C03",
+          "newNativeExecutionEvidenceSource": {
+            "kind": "native",
+            "ownerId": "native-codex",
+            "locator": "Original actually observed03 Root occurrence, unchanged",
+            "receipt": {
+              "kind": "git",
+              "repositoryId": "park-kyungchan/agent-platform",
+              "commit": "a497ff163eb5b5a16270de270df6e843b1bc40a9",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-EXECUTION-RECEIPT.json",
+              "fragment": "#/content",
+              "sha256": "c3c0c164a9abc6432a56e1575ef64c57fb0e7df743a17912c4e3edd4b92e8313"
+            }
+          },
+          "receiverInputId": "ODI-04-RECEIVER-C03",
+          "receiverInputContent": {
+            "schema": "common.git-receiver-receipt.v1",
+            "receiverRuntimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+            "producer": {
+              "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+              "attemptId": "01a1476a-2492-7922-94c5-5665dee62602",
+              "occurrenceId": "call_3fd95b21a92a4155b427824de0fb5b10"
+            },
+            "prerequisiteTaskId": "ODI-03",
+            "payload": {
+              "kind": "git",
+              "repositoryId": "park-kyungchan/agent-platform",
+              "commit": "a497ff163eb5b5a16270de270df6e843b1bc40a9",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-EXECUTION-RECEIPT.json",
+              "fragment": "#/content",
+              "sha256": "c3c0c164a9abc6432a56e1575ef64c57fb0e7df743a17912c4e3edd4b92e8313"
+            }
+          },
+          "receiverEvidenceId": "ODI-04-RECEIVER-C03",
+          "receiverEvidenceSource": "Native owner/actual returned read locator + snapshot receipt of receiverInput#/content, authored only after actual observation.",
+          "onlyUnstartedTask04Changes": {
+            "runtimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+            "dependsOn03": {
+              "milestone": "execution-and-verification",
+              "receiptEvidenceId": "ODI-03-PREREQUISITE-C03",
+              "receiverEvidenceId": "ODI-04-RECEIVER-C03"
+            },
+            "nextAction": "Implement the bounded docs CLI observations envelope patch at exactM; usefulpatch+mechanicalchecks→Lead;04-Rindependent semanticreview stillrequired."
+          },
+          "preserve": "Original completed03 Task/executionEvidenceId/input bytes/state/occurrence unchanged. New externalGit proof and Receiver.payload must resolve identical C03address/value/SHA; no future selfcommit.",
+          "futureCommitC04": "PENDING Root exactdatareview/apply/commit after actualreceiver. No fabricated SHA."
+        },
+        "bindingAfterC04": {
+          "mechanism": "Canonical buildHermesPlatformSource generator only; exactexpected-current binding/program CAS retains displaced bytes between admittedturns. No replay of earlier installers/worktree/CAS scripts.",
+          "nativeTuple": {
+            "runtime": "native-hermes",
+            "profileId": "odi-platform",
+            "sessionId": "20261017_130701_1c9d3d",
+            "agentId": null,
+            "nativeProjectId": null,
+            "nativeTaskId": "20261017_130701_1c9d3d",
+            "nativeRunId": null
+          },
+          "nativeTaskMeaning": "Ordinary uncompressed TUI source mapping plus prior actual matched APIcontext; fresh wire/component IDs nullable and no logicalTask substitution.",
+          "logical": "SameWork/Issue/Spec1/Plan1, taskIdODI04",
+          "dataSelection": "Actual Root-reviewed C04snapshot + exactdetached dataworktree/currentness; C03 only is insufficient because C03Task04 has no receipt/runtime binding.",
+          "readOnlyGate": "Pure canonical sourceoracle qualified/current/noholds/completev2<=12000 and actualnative10sec; actualnextpreLLM/APIsidecar separate. Preserve profile/model/xhigh/trust/timeout10/spill12000.",
+          "sourceCodeGate": "If any admittedsource/dependency/provider pins change, Root separately reviews native source successor; M source tree vs fixed context provider code are separate observed revisions, no silent code retag.",
+          "admission": "Root fresh positive existing-suite reservation immediatelybefore prompt; retained ledger1completed374617,15runs/4625383tokens remaining, original12:55:31.863Zdeadline/paid0, no renewal. Include nativeaux/retries/children if any; no extra modeldelegation for boundedproducer."
+        },
+        "actualProducerResultEvidence": [
+          "One exact correlatedprompt/newnativeuserrow and complete04APIcontext at actualC04 tuple; rawpayload not invented.",
+          "Patch/diffhash + exactMbase + editedpaths + actualtestcommand/exit/stdout hashes; independent04-R gets exactartifact and actualreceiver proof.",
+          "Actual native result/usage main+aux+ownerstatus and actual available owner turn/request/response/message UID occurrences; nativeTask/Run remainnull when absent. No completed Task04 occurrence allocated before actualdispatch/result.",
+          "Bounded mechanical verification != independentsemanticreview.04-R/05/fullOntology/privateGitHub/domain/sourceactivation/shared/formal/Acceptance all separate."
+        ],
+        "pendingConcreteHoles": [
+          "Actual C03nativeimport/receiver execution and owner-boundread observation",
+          "Root C04data records/commit and native data delivery/binding/oracle",
+          "Fresh editable nativeMworktree/dependencysetup (otheragent scope)",
+          "Actual04runtime/admission/turn/patch/result/usage and04-Rreview"
+        ],
+        "effectsByPreparation": {
+          "opsFilesOnly": true,
+          "canonicalEdits": 0,
+          "nativeWrites": 0,
+          "gitMutations": 0,
+          "newModels": 0,
+          "evalLedgerWrites": 0,
+          "globalWrites": 0
+        },
+        "scopeSuccessor": {
+          "priorRecipe": "task04-contract-and-binding.recipe.json",
+          "priorSha256": "b256bb34093ae7eff38a54ff15301d5ac0960dccf150cb7f4ba0eb3bb26f81e5",
+          "reason": "Root specified exact three canonical paths in producer setup and builder instructions; remove earlier optional test/README alternatives before dispatch. Existing Plan1 Task choice unchanged.",
+          "author": "accountable Root",
+          "nativeEffects": false
+        }
+      }
+    },
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-04"
+    },
+    "prerequisite": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "a497ff163eb5b5a16270de270df6e843b1bc40a9",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-EXECUTION-RECEIPT.json",
+      "fragment": "#/content",
+      "sha256": "c3c0c164a9abc6432a56e1575ef64c57fb0e7df743a17912c4e3edd4b92e8313"
+    },
+    "actualReceiver": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-04-RECEIVER-C03-OBSERVATION.json",
+      "fragment": "#/content"
+    },
+    "producerSource": {
+      "commit": "a91ef0564997a3a3736564f35a2e8354ae47e47b",
+      "repositoryRoot": "/opt/data/runtime/harness/current-git-work/odi-20261017/git/producer-odi04-a91ef056",
+      "setup": "separate reviewed proposal; native applied status not inferred here"
+    },
+    "allowedCodePaths": [
+      "scripts/harness.ts",
+      "packages/work-continuity/src/runtime-docs/runtime-docs.test.ts",
+      "docs/runtime-documentation-routing.md"
+    ],
+    "predecessorCheckpoint": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "a497ff163eb5b5a16270de270df6e843b1bc40a9",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-LEAD-CHECKPOINT%404.json",
+      "sha256": "f243ca3ba5fb0bd1764bf36a5d290516d787f6e7a6f88dd9b5733d88c79426ef"
+    },
+    "adoption": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/herdr-hermes-adoption/global-adoption-status.json",
+      "sha256": "8bc855fbc55d0b1b628a2e4936c8539eea52e1522865f969f37f2c99cded87f0",
+      "bytes": 1015,
+      "content": {
+        "schema": "orchestrator.herdr-hermes-main-goal-adoption.v1",
+        "atUtc": "2026-10-17T06:12:52.674962+00:00",
+        "handoffMarker": "HERDR-HERMES-LEAD-ADOPT-20261017-01",
+        "sameGoalThreadId": "01a14734-9160-70a2-a10d-df6ea9c50b91",
+        "sameWorkId": "ontology-driven-platform-integration-20261017",
+        "canonicalMergedCommit": "a91ef0564997a3a3736564f35a2e8354ae47e47b",
+        "globalInstall": "exact5 pass",
+        "validator": "pass",
+        "nativeCatalogDiscovery": "pass",
+        "sessionReloadRequired": false,
+        "leadAppliedInstalledSkill": {
+          "reference": "/home/palantirkc/.agents/skills/herdr-hermes/references/control.md",
+          "actualOwnedTarget": "w7:p2/odi-platform/20261017_130701_1c9d3d",
+          "observation": "ready; raw SSH/Docker Hermes unrecognized by herdr agent list; no input resent"
+        },
+        "actualUseful04Development": "pending prerequisite receiver/new binding then actual model; do not count installed/readiness as done",
+        "sideOriginal4VersusSuccessor5BoundaryPreserved": true,
+        "fullGoalCompleted": false
+      }
+    },
+    "plan": "ODI-PLAN@1 unchanged; no Plan2",
+    "state": "04 unstarted; source delivery/binding/oracle/owner activation/fresh evaluation reservation before prompt;04-R independent review/05/full Goal remain",
+    "authority": "none",
+    "nativePermissionGranted": false
+  }
+}

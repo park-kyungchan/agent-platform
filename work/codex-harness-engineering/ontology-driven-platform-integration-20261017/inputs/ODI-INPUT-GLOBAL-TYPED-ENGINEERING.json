@@ -1,0 +1,398 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-INPUT-GLOBAL-TYPED-ENGINEERING",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-hermes-bot-worker",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z/global-typed-memory-user-input.actual.json#/originalText",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "추가적으로, 나는 Herdr 전체의 향후 Lead와 에이전트 및 threads 그리고 hermes가, 지금의 자기 개선 리뷰 tools처럼 .md를 수정하고 생성하는 것들을 제외하고는, **\"항상 topology hierachy structure typed화된 .json/.ts 포맷으로 모든 작업을 진행하는 것을 강조한다(이것이 왜 중요한지에 대해서 그동안의 user memory history and interview history 등을 흩어져있느 것들을 모아서 위계화하고 구조화해서 Memory System에 적용해라(Lead Session에 전달해야할지 너가 해야할지 의사결정하고 진행해. 필요하면 유저인터뷰 진행해)\"**",
+    "verbatim": true,
+    "sourceCapture": {
+      "id": "current-user",
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z/global-typed-memory-user-input.actual.json",
+      "sha256": "5795f4fa26df90da95b5784285fccc8c49fdb31df424b4aa4a7a6b67d7d1e8a3",
+      "byteLength": 2560,
+      "fragment": "#/originalText",
+      "classification": "actual-current-user-message-capture; native authentication not independently recreated",
+      "nativeThreadId": "01a14cae-4ac1-7cb1-ac35-27060c49037b",
+      "nativeMessageId": null,
+      "nativeAuthorshipIndependentlyAuthenticated": false
+    },
+    "selectionContextMeaning": "The actual utterance supplies its own directive. No separate interview question is invented.",
+    "derivedStandingDecision": {
+      "path": "/home/palantirkc/code/worktrees/global-typed-memory-pair-20261018/agent-platform/packages/native-codex-adapter/skills/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
+      "sha256": "bc46b6a65f90716d5d4a729b374951e228adb66aaf003e977e052c0ceed77038",
+      "recordClass": "source-owned-normalization-not-native-permission"
+    },
+    "rationaleClassification": "Actual current directive, direct historical user WHY, normalized/source-attributed historical records, and derived engineering inference remain distinct.",
+    "historyEvidence": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z/preference-history-consolidation/memory-admission.compact-candidate.v2.actual.json",
+        "sha256": "093a191ac2c2aac59894d819a913a74442ce153d6c84607bef7b4c1b80402ecf",
+        "role": "compact9nodes8relations; not an admitted Memory request"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z/preference-history-consolidation/root.exact-candidate-review.actual.json",
+        "sha256": "74ccfddd18874fb49d220f6c53466bf156b21f72b0e52d8a7244cc701d5dfe47",
+        "role": "independent exact source review"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z/preference-history-consolidation/compact-source-anchors.validation.actual.json",
+        "sha256": "36f17450eb0501745e623f88e2b56be5c4cba6fefe8503534dbd82d23c80a739",
+        "role": "13 bounded original anchors; not native user authentication"
+      }
+    ],
+    "captureProvenance": "Source-owner record preserving the attributed actual user utterance captured in native thread 01a14cae-4ac1-7cb1-ac35-27060c49037b. This is not a direct new Root user message; nativeMessageId remains null. Parent Root declares it read the originals and adopts the exact meaning. Candidate publication and native activation remain separate.",
+    "RootAdoption": {
+      "status": "meaning-accepted-by-accountable-Root",
+      "nativeMessageId": null,
+      "canonicalIntegration": "pending separate native Git effect and receipt",
+      "meaning": "Root accepts this exact preserved user instruction and its explicit all-future engineering scope; direct historical reasons retain their source class."
+    },
+    "directHistoricalWhy": {
+      "originalSha256": "f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a",
+      "meaning": "The user explicitly states Memory context/hierarchy/structure/typing minimize drift risk. U8/U9/U10 share one original, not three confirmations.",
+      "englishScope": "Hermes technical work/artifacts only; Korean conversation allowed."
+    },
+    "typedPreference": {
+      "application": {
+        "actors": [
+          "future Herdr Leads",
+          "future agents",
+          "future threads",
+          "Hermes"
+        ],
+        "artifacts": "Authored engineering contracts, source, decisions, continuity and evidence; use existing owner schemas and generators.",
+        "meaning": "Represent purpose, owners, dependencies, hierarchy, identities, rationale, source lineage, revision and relevant state transitions as meaningful typed relationships. Merely wrapping prose in JSON is insufficient. Scale detail to the task; small reversible work does not require a new Work, Task or Goal.",
+        "nativeExceptions": [
+          "Native runtime self-learning and review tools that create or edit Markdown retain native ownership.",
+          "Required native interface formats, including Python, YAML and SKILL.md, retain their established native/source owners."
+        ],
+        "ordinaryConversation": "Ordinary user-facing prose and conversation retain their appropriate format.",
+        "precedence": "A later applicable actual user correction takes precedence; historical Memory and inferred rationale do not override actual current decisions.",
+        "longWork": "The separate standing long-work decision retains its qualifying entrusted-work conditions. This preference creates no native Goal or plan.",
+        "historicalTopicRelations": {
+          "sourceEvidenceId": "compact-history",
+          "scope": "Historical applicable interview requirements; preserve actual current source/access scope.",
+          "topic": "U11/U12/U17: stable topic Memory IDs link current decisions, original question/answer, rationale and revisions; load required upper purpose/direct dependencies and log ID/revision/reason.",
+          "currentness": "U22/U25: unknown authoritative currentness holds dependent effects only; preserve concurrent originals and reconcile compatible meaning, asking about genuine semantic conflict.",
+          "consumption": "Typed relationships must be validated and consumed through the existing Memory/Recall owners; file suffixes alone do not establish operation."
+        },
+        "language": {
+          "verbatimHistoricalAnswer": "Hermes의 기술 작업·산출물은 영어, 사용자 대화는 한국어 허용",
+          "scope": "Hermes technical work and artifacts only; Korean user conversation allowed. This answer does not establish a new global language rule for every runtime.",
+          "sourceEvidenceId": "hermes-language"
+        }
+      },
+      "rationaleHierarchy": {
+        "root": {
+          "id": "recoverable-governed-engineering",
+          "claimClass": "source-attributed-inference-not-new-user-answer",
+          "text": "Meaningful typed engineering links help native runtimes recover the same purpose and apply governed actions across lifecycle boundaries.",
+          "sourceEvidenceIds": [
+            "current-user",
+            "historical-integrated-purpose",
+            "historical-north-star"
+          ],
+          "children": [
+            "memory-drift",
+            "ontology-purpose",
+            "continuity",
+            "mechanical-enforcement",
+            "efficient-context",
+            "single-owner"
+          ]
+        },
+        "reasons": [
+          {
+            "id": "memory-drift",
+            "claimClass": "historical-direct-user-why-not-current-native-authentication",
+            "text": "The user explicitly says Memory context, hierarchy, structure and typing minimize drift risk. This is the user's stated reason, not an empirical guarantee from this change.",
+            "verbatimHistoricalAnswer": "권장대로 진행하는데, 유저와 인터뷰 했던 내용들을 WSL2와 VPS 어디에서든지 히스토리까지 원할 때 context window에 load할 수 있도록 설계할 수 있나? 이와 관련해서 인터뷰 진행하자. 공통 Memory/Recall 기능을 최대한 활용해서 만들어놓으면 될 것 같은데? **\"메모리는 특히 맥락이 중요하고, 다른 것들과 마찬가지로 위계와 구조도 중요하며, typed화 해놓아야만 drift risk가 최소화되는 것 알고있지?\"**",
+            "sourceEvidenceIds": [
+              "history-U10"
+            ],
+            "dedup": "U8/U9/U10 share legacy-answer-005.json: one original answer, not three confirmations."
+          },
+          {
+            "id": "ontology-purpose",
+            "claimClass": "historical-direct-user-purpose-not-new-user-answer",
+            "text": "All Leads and agents should operate through an Ontology with Domain-through-Task IDs for end-to-end audit and traceability.",
+            "sourceEvidenceIds": [
+              "history-U1"
+            ]
+          },
+          {
+            "id": "continuity",
+            "claimClass": "source-attributed-inference-not-new-user-answer",
+            "text": "Keep accepted intent, original questions/answers, hierarchy and pending work recoverable so interruption does not force repeated interviews.",
+            "sourceEvidenceIds": [
+              "historical-interview",
+              "historical-integrated-purpose",
+              "history-U10",
+              "compact-history"
+            ]
+          },
+          {
+            "id": "mechanical-enforcement",
+            "claimClass": "source-attributed-inference-not-new-user-answer",
+            "text": "Typed problem definitions and executable mechanisms make failure classes checkable; prose observations alone do not enforce behavior.",
+            "sourceEvidenceIds": [
+              "historical-typed-problem"
+            ]
+          },
+          {
+            "id": "efficient-context",
+            "claimClass": "source-attributed-inference-not-new-user-answer",
+            "text": "Select relevant purpose and dependency context rather than repeatedly reading flat history; measured spend per useful decision matters more than registration counts. No cost reduction is established by this source change.",
+            "sourceEvidenceIds": [
+              "historical-north-star"
+            ]
+          },
+          {
+            "id": "single-owner",
+            "claimClass": "source-attributed-inference-not-new-user-answer",
+            "text": "One common implementation and thin native adapters reduce redundant maintenance while preserving real native runtime and domain data owners. Repository names do not define native profile identities.",
+            "sourceEvidenceIds": [
+              "current-owner-topology",
+              "historical-integrated-purpose"
+            ]
+          }
+        ]
+      }
+    },
+    "historicalPreferenceTopology": {
+      "schema": "odi.existing-memory-admission.preference-candidate.v1",
+      "status": "source-attributed-Root-meaning-adoption; not-separate-Memory-admission",
+      "bases": {
+        "worker": {
+          "filesystemRoot": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-bot-screen-e2e-20261018-v1/worker/runtime-prose-topology-audit-20261018T024942258Z"
+        },
+        "historical": {
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "6933ca88c815f5e6e5490f9232c81e0dc5663af5",
+          "pathPrefix": "work/codex-harness-engineering/ontology-driven-harness-operation/inputs/"
+        },
+        "odi": {
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "15a02852949032150e7be9c88e3f83616518b29e",
+          "pathPrefix": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/"
+        }
+      },
+      "nodes": [
+        {
+          "id": "typed",
+          "kind": "preference",
+          "meaning": "All future Herdr Leads, agents, threads and Hermes: author meaningful topological, hierarchical, structured, typed .json/.ts technical work. Native-runtime Markdown creation/modification, including self-improvement learning, retains its native format/owner.",
+          "sources": [
+            "current"
+          ],
+          "appliesTo": "all-future-herdr-leads-agents-threads-and-hermes"
+        },
+        {
+          "id": "drift",
+          "kind": "direct-why",
+          "meaning": "The user explicitly says Memory context, hierarchy, structure and typing minimize drift risk.",
+          "sources": [
+            "U10"
+          ]
+        },
+        {
+          "id": "ontology",
+          "kind": "direct-why",
+          "meaning": "The user wants operational Ontology-based work by all Leads/agents with Domain-through-Task IDs, audit and traceability.",
+          "sources": [
+            "U1"
+          ]
+        },
+        {
+          "id": "topic",
+          "kind": "preference",
+          "meaning": "Stable topic Memory IDs connect current decisions, original questions/answers, rationale and revisions; retrieve required upper purpose/direct dependencies within admitted access and log loaded ID/revision/reason.",
+          "sources": [
+            "U11",
+            "U12",
+            "U17"
+          ]
+        },
+        {
+          "id": "reuse",
+          "kind": "preference",
+          "meaning": "Runtime-specific harnesses optimize the common Harness rather than add complexity; reuse common Memory/Recall and existing original/data owners.",
+          "sources": [
+            "U5",
+            "U10"
+          ]
+        },
+        {
+          "id": "english",
+          "kind": "preference",
+          "meaning": "Hermes technical work/artifacts use English; Korean user conversation is allowed. This quoted interview answer does not newly prescribe a global language for every runtime.",
+          "sources": [
+            "english"
+          ],
+          "appliesTo": "hermes-technical-work-and-artifacts"
+        },
+        {
+          "id": "currentness",
+          "kind": "preference",
+          "meaning": "Unknown authoritative currentness holds only dependent effects. Preserve both original histories during concurrent updates; reconcile compatible meaning and ask about genuine semantic conflicts.",
+          "sources": [
+            "U22",
+            "U25"
+          ]
+        },
+        {
+          "id": "owners",
+          "kind": "derived-why",
+          "meaning": "Explicit owner/identity relations prevent Native Profile, Native Project, Git repository, session cwd and logical Work being conflated; per-profile repository coupling was called a bottleneck.",
+          "sources": [
+            "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
+          ]
+        },
+        {
+          "id": "consumption",
+          "kind": "derived-why",
+          "meaning": "Typing must express validated consumable contracts, not just file suffixes. Keep stable preferences and source pointers small, preserve original evidence, and create no parallel unconsumed Memory engine.",
+          "sources": [
+            "U1",
+            "U5",
+            "U10",
+            "U12",
+            "U17"
+          ]
+        }
+      ],
+      "relations": [
+        {
+          "from": "typed",
+          "type": "motivatedBy",
+          "to": "drift"
+        },
+        {
+          "from": "typed",
+          "type": "motivatedBy",
+          "to": "ontology"
+        },
+        {
+          "from": "topic",
+          "type": "refines",
+          "to": "typed"
+        },
+        {
+          "from": "reuse",
+          "type": "constrains",
+          "to": "consumption"
+        },
+        {
+          "from": "currentness",
+          "type": "constrains",
+          "to": "topic"
+        },
+        {
+          "from": "owners",
+          "type": "refines",
+          "to": "typed"
+        },
+        {
+          "from": "consumption",
+          "type": "refines",
+          "to": "typed"
+        },
+        {
+          "from": "english",
+          "type": "constrains",
+          "to": "typed",
+          "appliesTo": "hermes-technical-work-and-artifacts"
+        }
+      ],
+      "sources": [
+        {
+          "id": "current",
+          "base": "worker",
+          "path": "global-typed-memory-user-input.actual.json",
+          "sha256": "5795f4fa26df90da95b5784285fccc8c49fdb31df424b4aa4a7a6b67d7d1e8a3",
+          "fragment": "#/originalText"
+        },
+        {
+          "id": "english",
+          "base": "worker",
+          "path": "profile-reorganization.actual-user-authority.v4.json",
+          "sha256": "d74d983fecb38c410c83993c1ee215fe31e529a826232dc7ba243ecca9848109",
+          "fragment": "#/instructions/3/originalAnswer"
+        },
+        {
+          "id": "U1",
+          "base": "historical",
+          "path": "legacy-answer-001.json",
+          "sha256": "463f7e3160cc663cc334f0299435a1f3a371480c1d5c336748beb166a8cda6e7",
+          "fragment": "#/content/text"
+        },
+        {
+          "id": "U5",
+          "base": "historical",
+          "path": "legacy-answer-004.json",
+          "sha256": "931963e9d25bc4027aadc2cf823042e28288c4c947f8d68993fee90f0cb2b7f1",
+          "fragment": "#/content/text"
+        },
+        {
+          "id": "U10",
+          "base": "historical",
+          "path": "legacy-answer-005.json",
+          "sha256": "f746010738d5542d532fc762330d8361d53bc51f820f497e4204eee5fbf6b22a",
+          "fragment": "#/content/text"
+        },
+        {
+          "id": "U11",
+          "base": "historical",
+          "path": "legacy-answer-006.json",
+          "sha256": "43869cf7624c6488d758c32ee53e5245679c78a0155c98b83362b49fa1e8c919",
+          "fragment": "#/content/text"
+        },
+        {
+          "id": "U12",
+          "base": "historical",
+          "path": "legacy-answer-007.json",
+          "sha256": "9693ee1bd7a79b943d83d8553140d547600d6b1008e0a3886246ef2d3914a9bf",
+          "fragment": "#/content/text"
+        },
+        {
+          "id": "U17",
+          "base": "historical",
+          "path": "legacy-answer-012.json",
+          "sha256": "95d4a787b18cd445f1b0fdb6b2c09c0d1c3cd739cea864ad1502eea4cac41eb3",
+          "fragment": "#/content/text"
+        },
+        {
+          "id": "U22",
+          "base": "historical",
+          "path": "legacy-answer-017.json",
+          "sha256": "f88be61d91655d4f1a5c0fa8b2ddc6db8472994141c38fac760067847a7aef53",
+          "fragment": "#/content/text"
+        },
+        {
+          "id": "U25",
+          "base": "historical",
+          "path": "legacy-answer-020.json",
+          "sha256": "b66ac1a6f90cd0a8c23a1186b2559194db90d2bb8009f0e9342e1d209b5b0604",
+          "fragment": "#/content/text"
+        },
+        {
+          "id": "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY",
+          "base": "odi",
+          "path": "ODI-INPUT-COMMON-HARNESS-REPOSITORY-DIRECTION.json",
+          "sha256": "2fac81a66b7ed2d342b8aa8a644210350385be05b55421f344cd33a70a650047",
+          "fragment": "#/content/text"
+        }
+      ],
+      "dedup": "U8/U9/U10 share legacy-answer005; one original statement, not three confirmations. U1/U2 and U5/U6/U7 likewise share originals."
+    }
+  }
+}

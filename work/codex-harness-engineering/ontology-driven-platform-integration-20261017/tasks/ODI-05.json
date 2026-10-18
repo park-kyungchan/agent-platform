@@ -1,0 +1,53 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-05"
+  },
+  "title": "Prove full common Memory, identity, handoff and recovery flow",
+  "nextAction": "Hold dispatch until this Task's exact declared dependencies and native/source owner qualifications pass; then Same logical Task/purpose/topic current decisions/original lineage through worker handoff, interruption/resume, nativeRun references, concurrent updates, durable local/shared/receiver receipts Verify: Use owned new occurrences; preserve consumed/uncertain effects and native ownership; required missing context holds only dependent effects.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-04",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-PREREQUISITE-C05",
+      "receiverEvidenceId": "ODI-05-ROOT-RECEIVER-C05"
+    },
+    {
+      "taskId": "ODI-04-R",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-R-PREREQUISITE-C07",
+      "receiverEvidenceId": "ODI-05-MEMORY-ROOT-RECEIVER-C07"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [],
+  "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91"
+}

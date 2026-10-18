@@ -115,6 +115,27 @@ async function buildGitWorkContext(
     }
   }
   holdReasons.push(...(await validateRecordSet(records, reader)).findings);
+  // Effect inventories require the producer's complete proof graph for validation.
+  // That reverse provenance edge does not make an unrelated producer's historical
+  // action contract normative for the selected Work/Task. Explicit Task dependency
+  // edges still carry their own complete, possibly historical, Spec/Plan bindings.
+  const normativeRecords = new Set<string>();
+  const normativeQueue: RecordReference[] = [{ kind: "work", id: reader.selection.workId }];
+  if (request.taskId) normativeQueue.push({ kind: "task", id: request.taskId });
+  if (request.decisionId) normativeQueue.push({ kind: "decision", id: request.decisionId });
+  while (normativeQueue.length) {
+    const reference = normativeQueue.shift()!,
+      key = recordKey(reference);
+    if (normativeRecords.has(key)) continue;
+    normativeRecords.add(key);
+    const record = records.get(key);
+    if (record)
+      normativeQueue.push(
+        ...recordDependencies(record).filter(
+          (dependency) => record.kind !== "effect" || dependency.kind !== "task",
+        ),
+      );
+  }
   if (request.taskId) {
     const selected = records.get(recordKey({ kind: "task", id: request.taskId }));
     if (selected?.kind === "task") {
@@ -172,9 +193,20 @@ async function buildGitWorkContext(
   const sourceId = (reference: SourceReference) => sourceIds.get(sourceKey(reference)) ?? null;
   const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as JsonValue;
   const projected: ContextRecordProjection[] = [];
-  for (const record of records.values()) {
+  for (const [key, record] of records) {
     if (record.kind === "effect-fence") continue;
     const base = { kind: record.kind, id: record.id };
+    if (["work", "spec", "plan", "task"].includes(record.kind) && !normativeRecords.has(key)) {
+      const source = normativeSources.get(key);
+      projected.push({
+        ...base,
+        contextRole: "provenance",
+        source: source ? sourceId(source.reference) : null,
+        ...(record.kind === "spec" || record.kind === "plan" ? { revision: record.revision } : {}),
+        ...(record.kind === "task" ? { logical: json(record.logical) } : {}),
+      });
+      continue;
+    }
     switch (record.kind) {
       case "work":
         projected.push({
@@ -249,6 +281,7 @@ async function buildGitWorkContext(
   }
   const contracts: NormativeContextSource[] = [];
   for (const [key, source] of normativeSources) {
+    if (!normativeRecords.has(key)) continue;
     const record = records.get(key)!;
     const base = { id: record.id, source: sourceId(source.reference)! };
     if (record.kind === "work")
@@ -717,8 +750,9 @@ function encodeCompactGitWorkContext(
         "INVALID_COMPACT_CONTRACT_BINDING",
       );
       const revision = Number(value.revision);
+      const key = recordKey({ kind, id: value.id, revision });
       compactAssert(
-        records.has(recordKey({ kind, id: value.id, revision })),
+        records.has(key) && contractSources.has(key),
         "COMPACT_BOUND_CONTRACT_UNAVAILABLE",
       );
       return [value.id, revision];
@@ -726,6 +760,15 @@ function encodeCompactGitWorkContext(
     let works = 0;
     for (const record of context.records) {
       if (!["work", "spec", "plan"].includes(record.kind)) continue;
+      if (record.contextRole === "provenance") {
+        compactAssert(
+          !contractSources.has(
+            recordKey({ kind: record.kind, id: record.id, revision: Number(record.revision) }),
+          ),
+          "COMPACT_PROVENANCE_CONTRACT_CONFLICT",
+        );
+        continue;
+      }
       const { contract, source } = contractSource(record);
       const sourceIndex = source[0];
       if (record.kind === "work") {

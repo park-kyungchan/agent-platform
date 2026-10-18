@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-USER-PANES",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "native-user-message",
+    "locator": "/root/.codex/sessions/2026/10/18/rollout-2026-10-18T17-16-16-01a15003-9cee-7662-bbc2-7c1990379b30.jsonl:408"
+  },
+  "content": {
+    "answer": "어차피 Git/GitHub 이용해서 main 최신으로 적용하려면 pane 열면 되잖아? 너는 Orchestrator로서 pane과 tab을 최대한 활용하면 돼. 각 pane을 subLead로서 활용해도 되잖아. ID 부여는 다 했어? 그리고 공통하네스 적용했어? 인터뷰 계속 진행해. 그리고 auto-compact risk 있으니까 지금 인터뷰들 전부 위계화하고 구조화해놓으면서 진행해.",
+    "question": "공통 하네스를 실제 적용할 때 필요한 운영 변경 범위를 정해주세요. 기존 소유권·데이터·인증을 보존하고, 코드와 정책은 독립 검토 후 적용하는 것을 전제로 합니다.",
+    "nativeSourceRecordSha256": "94ab630ff1f169ae42aadbb7475d8a87848eac87dd1b3929792a157780f95ef2",
+    "sourceTimestamp": "2026-10-18T17:33:20.959Z",
+    "captureLimitation": "Engineering user-message content capture with original locator/hash; Git does not authenticate native authorship."
+  }
+}

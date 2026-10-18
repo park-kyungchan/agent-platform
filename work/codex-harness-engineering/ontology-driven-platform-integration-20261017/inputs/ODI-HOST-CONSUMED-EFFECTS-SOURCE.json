@@ -1,0 +1,79 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-CONSUMED-EFFECTS-SOURCE",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "source-owner-capture",
+    "locator": "Current host recovery: exact received native metadata and same-task Jev receipts, not native occurrence/authentication reconstruction"
+  },
+  "content": {
+    "effectInventory": {
+      "completedEffectIds": [
+        "2d59b746-1ab0-42fd-a506-d6411ddd6bea",
+        "jev-native-smoke-001",
+        "jev-native-rank-002"
+      ],
+      "uncertainEffectIds": []
+    },
+    "hermesReceive": {
+      "sourceSha256": "8a782992440bf43a228a727b28fa7dce479e8839a367ddc517b5df3d94e50102",
+      "originalReceipt": {
+        "atUtc": "2026-10-18T14:21:21.681Z",
+        "operationId": "2d59b746-1ab0-42fd-a506-d6411ddd6bea",
+        "manifestSha256": "d33b355465c4400ccce4ed80032d6eeee047bb4c35bc9edae4784dd994756db7",
+        "result": {
+          "schema": "whole-lens.hermes-current-immutable-receiver-result.v1",
+          "atNs": 1792333281647067600,
+          "operationId": "2d59b746-1ab0-42fd-a506-d6411ddd6bea",
+          "manifestSha256": "d33b355465c4400ccce4ed80032d6eeee047bb4c35bc9edae4784dd994756db7",
+          "namespace": "/opt/data/runtime/harness/current-git-work/odi-20261017/successor-fe591ffe113a-eeff0040f789-01",
+          "sourceEpoch": "fe591-eeff-fixed-address-not-Work-latestness",
+          "sourceFiles": 669,
+          "sourceLinks": 22,
+          "closedFiles": 6,
+          "workCommit": "a6fdad95559079b4752838c6084934eb47e2d306",
+          "workTree": "aef7b34000df6443d9a475e7e6601e4e0cfb3b6b",
+          "noCheckoutOwnObjects": true,
+          "publicReaderInvoked": false,
+          "nativeCallerAdmitted": false,
+          "nativeActivation": false,
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "sourcePermissionGranted": false
+        },
+        "meaning": "Immutable receiver only. Native public reader/caller tuple/scope/admission/activation still separate; Git does not authenticate native authors."
+      },
+      "nativeCallsAlreadyCompleted": 159,
+      "qualification": "Exact immutable source/data receive only. Operation ID is not a native Task/Run. Native source admission/activation remains separate."
+    },
+    "jevPrecursor": {
+      "reportSha256": "05f6aa9b2f7ac0fa5eb80a2379027e7814eab6f9666bc407bd051d471c6167fb",
+      "sourceDeliveryAndTwoCallsCompleted": true,
+      "calls": [
+        {
+          "localCorrelationId": "jev-native-smoke-001",
+          "requestSha256": "fe6fd2a79d0a2bd0a21df9c63516c918de8f272a4817cb823212f9d243234de0",
+          "returnedModel": "typesafe-ai/jev-1.14.0",
+          "receipt": "jev-application/jev-native-smoke-001.receipt.json"
+        },
+        {
+          "localCorrelationId": "jev-native-rank-002",
+          "requestSha256": "2fe3eebe9afae857ae6f93756da42be828bcc2215af0ab138ddfb204bc63d6be",
+          "returnedModel": "typesafe-ai/jev-1.14.0",
+          "receipt": "jev-application/jev-native-rank-002.receipt.json"
+        }
+      ],
+      "capUsd": 14,
+      "unreconciledReserveUsd": 0.2,
+      "estimatedSpendUsd": 6.5688e-05,
+      "providerReportedCostUsd": null,
+      "qualification": "Local correlations and usage are not native Task/Run IDs or invoices; all existing reservations remain counted. No efficacy evaluation claimed."
+    },
+    "rule": "Preserve these already completed effects even when an older canonical Task is still planned. Reconcile original occurrence before any genuinely new attempt; no resend/retry by metadata lag."
+  }
+}

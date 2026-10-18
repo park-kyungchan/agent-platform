@@ -1,7 +1,15 @@
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readSync,
+  realpathSync,
+} from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import type { HookBinding, NativeContextLoader } from "./hooks.ts";
+import type { HookBinding, NativeContextLoader, NativeWorkCheckoutObservation } from "./hooks.ts";
 import type {
   CompactGitWorkContext,
   GitWorkCompactOutput,
@@ -46,6 +54,28 @@ export interface HomeContextContract {
   };
   boundaries: ObjectValue;
 }
+/**
+ * Explicit HOST successor. The code owner is fixed by the native wrapper, while
+ * projectId/workId identify the independently selected immutable Git Work.
+ * A checkout receipt is owner-local source evidence, never native permission.
+ */
+export interface HomeContextContractV2 extends Omit<
+  HomeContextContract,
+  "schema" | "sourceProjectRoot" | "projectRoute"
+> {
+  schema: "codex.home-context.v2";
+  nativeCodexHome: string;
+  codeOwner: { projectId: "codex-harness-engineering"; root: string };
+  selectedWork: {
+    repositoryRoot: string;
+    repositoryId: string;
+    commit: string;
+    projectId: string;
+    workId: string;
+    checkoutObservation?: { path: string; sha256: string };
+  };
+}
+export type NativeHomeContextContract = HomeContextContract | HomeContextContractV2;
 export interface HomeContextProjection {
   status: "current" | "held" | "repair-required";
   text: string;
@@ -84,17 +114,63 @@ function row(value: unknown): ObjectValue {
   if (!object(value)) throw new Error("Invalid context record");
   return value;
 }
+function exactKeys(value: ObjectValue, required: string[], optional: string[] = []): void {
+  if (
+    required.some((key) => !Object.hasOwn(value, key)) ||
+    Object.keys(value).some((key) => !required.includes(key) && !optional.includes(key))
+  )
+    throw new Error("Invalid exact Home v2 record");
+}
+function canonicalDirectory(value: unknown): string {
+  const path = pointer(value);
+  if (realpathSync(path) !== path || !lstatSync(path).isDirectory())
+    throw new Error("Unsafe Home directory");
+  return path;
+}
 function sourceFile(path: string, maxBytes: number): { value: unknown; sha256: string } {
+  const before = lstatSync(path);
   if (
     resolve(path) !== path ||
     realpathSync(path) !== path ||
-    !lstatSync(path).isFile() ||
-    lstatSync(path).size > maxBytes
+    !before.isFile() ||
+    before.isSymbolicLink() ||
+    before.size > maxBytes
   )
     throw new Error("Unsafe or oversized context source");
-  const bytes = readFileSync(path);
-  if (bytes.length > maxBytes) throw new Error("Context source changed size");
-  return { value: JSON.parse(bytes.toString("utf8")), sha256: hash(bytes) };
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const opened = fstatSync(fd);
+    if (
+      !opened.isFile() ||
+      opened.dev !== before.dev ||
+      opened.ino !== before.ino ||
+      opened.size > maxBytes
+    )
+      throw new Error("Context source changed before open");
+    const buffer = Buffer.alloc(opened.size + 1);
+    let count = 0;
+    while (count < buffer.length) {
+      const next = readSync(fd, buffer, count, buffer.length - count, null);
+      if (!next) break;
+      count += next;
+    }
+    const after = fstatSync(fd),
+      named = lstatSync(path);
+    if (
+      count !== opened.size ||
+      after.size !== opened.size ||
+      after.mtimeMs !== opened.mtimeMs ||
+      named.dev !== opened.dev ||
+      named.ino !== opened.ino ||
+      named.isSymbolicLink() ||
+      realpathSync(path) !== path
+    )
+      throw new Error("Context source changed during read");
+    const bytes = buffer.subarray(0, count);
+    return { value: JSON.parse(bytes.toString("utf8")), sha256: hash(bytes) };
+  } finally {
+    closeSync(fd);
+  }
 }
 function ownerPointers(value: unknown): Pointer[] {
   if (!Array.isArray(value) || value.length > 20)
@@ -154,12 +230,27 @@ function safeProfile(value: unknown): ObjectValue {
   });
   return safe;
 }
-/** Validate a prospective Home value without reading or publishing global/native files. */
+/** Validate a prospective Home value without reading profile bytes or publishing native files. */
+export function readHomeContextContractValue(
+  value: HomeContextContract,
+  binding: HookBinding,
+  cwd: string,
+): HomeContextContract;
+export function readHomeContextContractValue(
+  value: HomeContextContractV2,
+  binding: HookBinding,
+  cwd: string,
+): HomeContextContractV2;
 export function readHomeContextContractValue(
   value: unknown,
   binding: HookBinding,
   cwd: string,
-): HomeContextContract {
+): NativeHomeContextContract;
+export function readHomeContextContractValue(
+  value: unknown,
+  binding: HookBinding,
+  cwd: string,
+): NativeHomeContextContract {
   if (
     !binding.entrypointContextPath ||
     binding.qualificationLedgerPath ||
@@ -173,9 +264,10 @@ export function readHomeContextContractValue(
   if (pointer(path) !== path || !within(binding.root, path))
     throw new Error("Home contract escapes its project owner");
   const data = row(structuredClone(value)),
-    route = row(data.projectRoute),
     boundaries = row(data.boundaries),
     policy = row(data.recordPolicy);
+  if (data.schema === "codex.home-context.v2") return readHomeContextV2Value(data, binding, cwd);
+  const route = row(data.projectRoute);
   if (
     data.schema !== "codex.home-context.v1" ||
     data.projectId !== binding.projectId ||
@@ -258,10 +350,132 @@ export function readHomeContextContractValue(
   return contract;
 }
 
+function readHomeContextV2Value(
+  data: ObjectValue,
+  binding: HookBinding,
+  cwd: string,
+): HomeContextContractV2 {
+  exactKeys(data, [
+    "schema",
+    "projectId",
+    "entrypointCwd",
+    "nativeCodexHome",
+    "globalProfilePath",
+    "codeOwner",
+    "selectedWork",
+    "northStar",
+    "priorities",
+    "ownership",
+    "canonicalSources",
+    "recordPolicy",
+    "boundaries",
+  ]);
+  const codeOwner = row(data.codeOwner),
+    selected = row(data.selectedWork),
+    boundaries = row(data.boundaries),
+    policy = row(data.recordPolicy);
+  exactKeys(codeOwner, ["projectId", "root"]);
+  exactKeys(
+    selected,
+    ["repositoryRoot", "repositoryId", "commit", "projectId", "workId"],
+    ["checkoutObservation"],
+  );
+  if (
+    binding.gitWorkContextVersion !== "v2" ||
+    binding.gitWorkMetadataEncoding !== "metadata.v1" ||
+    !binding.nativeCodexHome ||
+    canonicalDirectory(binding.nativeCodexHome) !== data.nativeCodexHome ||
+    canonicalDirectory(binding.root) !== codeOwner.root ||
+    canonicalDirectory(cwd) !== data.entrypointCwd ||
+    !within(binding.root, pointer(binding.checkpointPath)) ||
+    codeOwner.projectId !== "codex-harness-engineering" ||
+    data.projectId !== binding.projectId ||
+    selected.projectId !== binding.projectId ||
+    !binding.workId ||
+    selected.workId !== binding.workId ||
+    data.globalProfilePath !== resolve(binding.nativeCodexHome, "harness/profile.json") ||
+    typeof selected.commit !== "string" ||
+    !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(selected.commit)
+  )
+    throw new Error("Home v2 differs from the fixed owner, native Home or selected Work");
+  const falseBoundaries = [
+    "nativePermissionGranted",
+    "captureHomeRawPrompts",
+    "qualificationLedgerBoundToHome",
+    "newModelBudgetGranted",
+    "directoryMoveAuthorized",
+    "hermesRuntimeEffectsAuthorized",
+    "configuredInjectionIsFreshSessionProof",
+  ];
+  exactKeys(boundaries, [
+    "authority",
+    ...falseBoundaries,
+    "maxContextChars",
+    "nativeContextTokenLimit",
+  ]);
+  if (
+    falseBoundaries.some((key) => boundaries[key] !== false) ||
+    boundaries.authority !== "none" ||
+    boundaries.maxContextChars !== 6000 ||
+    boundaries.nativeContextTokenLimit !== 1500
+  )
+    throw new Error("Home context boundary or budget differs");
+  let checkoutObservation: { path: string; sha256: string } | undefined;
+  if (selected.checkoutObservation !== undefined) {
+    const pin = row(selected.checkoutObservation);
+    exactKeys(pin, ["path", "sha256"]);
+    const path = pointer(pin.path);
+    if (
+      !within(binding.root, path) ||
+      typeof pin.sha256 !== "string" ||
+      !/^[a-f0-9]{64}$/.test(pin.sha256)
+    )
+      throw new Error("Home checkout observation escapes its fixed owner");
+    checkoutObservation = { path, sha256: pin.sha256 };
+  }
+  if (!Array.isArray(data.canonicalSources) || data.canonicalSources.length > 20)
+    throw new Error("Invalid canonical context pointers");
+  return {
+    schema: "codex.home-context.v2",
+    projectId: binding.projectId,
+    entrypointCwd: cwd,
+    nativeCodexHome: binding.nativeCodexHome,
+    globalProfilePath: pointer(data.globalProfilePath),
+    codeOwner: { projectId: "codex-harness-engineering", root: binding.root },
+    selectedWork: {
+      repositoryRoot: canonicalDirectory(selected.repositoryRoot),
+      repositoryId: text(selected.repositoryId, 120),
+      commit: selected.commit,
+      projectId: text(selected.projectId, 120),
+      workId: text(selected.workId, 120),
+      ...(checkoutObservation ? { checkoutObservation } : {}),
+    },
+    northStar: text(data.northStar, 1600),
+    priorities: list(data.priorities, 10, 300),
+    ownership: ownerPointers(data.ownership),
+    canonicalSources: data.canonicalSources.map((value) => {
+      const entry = row(value);
+      return {
+        role: text(entry.role),
+        path: pointer(entry.path),
+        readPolicy: text(entry.readPolicy),
+      };
+    }),
+    recordPolicy: {
+      distinctions: list(policy.distinctions, 15, 100),
+      materialBoundary: text(policy.materialBoundary),
+      tinyWork: text(policy.tinyWork),
+      sources: text(policy.sources),
+      ontologyPromotion: text(policy.ontologyPromotion),
+    },
+    boundaries,
+  };
+}
+
 function readContract(
   binding: HookBinding,
   cwd: string,
-): { contract: HomeContextContract; sha256: string } {
+): { contract: NativeHomeContextContract; sha256: string } {
   if (
     !binding.entrypointContextPath ||
     binding.qualificationLedgerPath ||
@@ -445,12 +659,88 @@ export function projectSelectedGitWork(
   };
 }
 
+function selectedHomeRoute(
+  contract: HomeContextContractV2,
+  options: {
+    selectedWork?: SelectedGitWorkContext;
+    selectedRepositoryRoot?: string;
+    observeCheckout?: (observation: NativeWorkCheckoutObservation) => void;
+  },
+): {
+  executionReady: boolean;
+  effectfulWorkCwd?: string;
+  observation?: { path: string; sha256: string };
+} {
+  const expected = contract.selectedWork;
+  if (options.selectedWork) {
+    const actual = selectedGitWorkPointer(options.selectedWork);
+    if (
+      ["repositoryId", "commit", "projectId", "workId"].some(
+        (key) => actual[key as keyof typeof actual] !== expected[key as keyof typeof expected],
+      ) ||
+      options.selectedRepositoryRoot !== expected.repositoryRoot
+    )
+      throw new Error("Home v2 selected route differs from the exact session Work");
+  }
+  if (
+    !options.selectedWork ||
+    options.selectedWork.status === "held" ||
+    !expected.checkoutObservation
+  )
+    return { executionReady: false };
+  const pin = expected.checkoutObservation,
+    source = sourceFile(pin.path, 16 * 1024);
+  if (source.sha256 !== pin.sha256) throw new Error("Home checkout observation drift");
+  const data = row(source.value);
+  exactKeys(data, [
+    "schema",
+    "repositoryRoot",
+    "repositoryId",
+    "commit",
+    "projectId",
+    "workId",
+    "cwd",
+    "branch",
+  ]);
+  if (
+    data.schema !== "codex.home-work-checkout-observation.v1" ||
+    ["repositoryRoot", "repositoryId", "commit", "projectId", "workId"].some(
+      (key) => data[key] !== expected[key as keyof typeof expected],
+    ) ||
+    typeof data.branch !== "string" ||
+    !/^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]{0,240}$/.test(data.branch) ||
+    data.branch.includes("..") ||
+    data.branch.includes("//") ||
+    /[/.]$/.test(data.branch)
+  )
+    throw new Error("Home checkout observation differs from selected Work");
+  const observation: NativeWorkCheckoutObservation = {
+    schema: "codex.home-work-checkout-observation.v1",
+    repositoryRoot: expected.repositoryRoot,
+    repositoryId: expected.repositoryId,
+    commit: expected.commit,
+    projectId: expected.projectId,
+    workId: expected.workId,
+    cwd: canonicalDirectory(data.cwd),
+    branch: data.branch,
+  };
+  if (!options.observeCheckout) throw new Error("Native checkout observation is required");
+  options.observeCheckout(observation);
+  if (sourceFile(pin.path, 16 * 1024).sha256 !== pin.sha256)
+    throw new Error("Home checkout observation changed during read");
+  return { executionReady: true, effectfulWorkCwd: observation.cwd, observation: pin };
+}
+
 /** Read-only bootstrap: never reads the Home prompt or updates a semantic Work. */
 export function projectHomeContext(options: {
   binding: HookBinding;
   cwd: string;
   maxChars?: number;
   selectedWork?: SelectedGitWorkContext;
+  /** Exact source root from the source-verified registry tuple, not from Work text. */
+  selectedRepositoryRoot?: string;
+  /** Native adapter reobserves the admitted checkout; this callback grants no permission. */
+  observeCheckout?: (observation: NativeWorkCheckoutObservation) => void;
 }): HomeContextProjection {
   try {
     const deliveryPolicy = gitWorkDeliveryPolicy(options.binding, options.maxChars);
@@ -459,22 +749,48 @@ export function projectHomeContext(options: {
       profileSource = sourceFile(contract.globalProfilePath, 128 * 1024),
       profile = safeProfile(profileSource.value);
     const { selectedCapabilities, semanticOwners, projectEntrypoints, ...preferences } = profile;
-    const { root: _root, effectfulWorkCwd: _effectfulCwd, ...projectRoute } = contract.projectRoute;
+    const v2 = contract.schema === "codex.home-context.v2";
+    const projectRoute =
+      contract.schema === "codex.home-context.v1"
+        ? (({ root: _root, effectfulWorkCwd: _effectfulCwd, ...route }) => route)(
+            contract.projectRoute,
+          )
+        : undefined;
+    const selectedWorkRoute = v2 ? selectedHomeRoute(contract, options) : undefined;
     const context: ObjectValue = {
-      schema: "codex.home-context.projection.v1",
+      schema: v2 ? "codex.home-context.projection.v2" : "codex.home-context.projection.v1",
       deliveryPolicy,
-      sourceOwnerProjectRoot: contract.sourceProjectRoot,
+      sourceOwnerProjectRoot: v2 ? contract.codeOwner.root : contract.sourceProjectRoot,
+      ...(v2
+        ? {
+            nativeCodexHome: contract.nativeCodexHome,
+            codeOwner: contract.codeOwner,
+            selectedWorkRoute,
+          }
+        : {}),
       actualNativeCwd: options.cwd,
       northStar: contract.northStar,
       priorities: contract.priorities,
       ownership: contract.ownership,
       preferences,
-      ...(options.selectedWork ? { selectedWork: options.selectedWork } : { projectRoute }),
+      ...(options.selectedWork
+        ? { selectedWork: options.selectedWork }
+        : v2
+          ? {
+              selectedWork: {
+                ...contract.selectedWork,
+                status: "held",
+                holdReasons: ["EXACT_SELECTED_WORK_REQUIRED"],
+                authority: "none",
+                nativePermissionGranted: false,
+              },
+            }
+          : { projectRoute }),
       recordPolicy: contract.recordPolicy,
       boundaries: {
         authority: "none",
         nativePermissionGranted: false,
-        executionReady: false,
+        executionReady: selectedWorkRoute?.executionReady ?? false,
         captureHomeRawPrompts: false,
         exactCwdOnly: true,
         excludedDomainsRemainExcluded: true,
@@ -486,14 +802,15 @@ export function projectHomeContext(options: {
         { path: contract.globalProfilePath, sha256: profileSource.sha256 },
       ],
     };
-    const prefix =
-      "Source-owned Home bootstrap. Preserve actualNativeCwd; enter sourceOwnerProjectRoot for effectful Work. Configured capabilities do not prove callable/authenticated tools. This hook does not capture or accept the prompt.\n";
+    const prefix = v2
+      ? "Source-owned Home bootstrap. Preserve actualNativeCwd. Only selectedWorkRoute can identify an observed Work checkout; executionReady is source qualification and grants no native permission. Configured capabilities do not prove callable/authenticated tools. This hook does not capture or accept the prompt.\n"
+      : "Source-owned Home bootstrap. Preserve actualNativeCwd; enter sourceOwnerProjectRoot for effectful Work. Configured capabilities do not prove callable/authenticated tools. This hook does not capture or accept the prompt.\n";
     const optionalContext = Object.entries({
       selectedCapabilities,
       semanticOwners,
       projectEntrypoints,
       canonicalSourcePaths: contract.canonicalSources.map(({ path }) => path),
-      ...(options.selectedWork
+      ...(options.selectedWork && !v2
         ? {
             defaultProjectRoute: {
               ...projectRoute,
@@ -506,11 +823,15 @@ export function projectHomeContext(options: {
     // omission cannot push otherwise valid essential context over the cap.
     const omitted = optionalContext.map(([key]) => key),
       render = () => `${prefix}${JSON.stringify({ ...context, omitted })}`;
-    let held = options.selectedWork?.status === "held";
+    let held = options.selectedWork?.status === "held" || (v2 && !options.selectedWork);
     if (render().length > maxChars && options.selectedWork) {
       // Hold the complete required payload. Never drop clauses, decisions, or
       // original pointers until a weakened projection happens to fit.
       held = true;
+      if (v2) {
+        context.selectedWorkRoute = { executionReady: false };
+        (context.boundaries as ObjectValue).executionReady = false;
+      }
       context.selectedWork = {
         ...selectedGitWorkPointer(options.selectedWork),
         status: "held",
@@ -534,6 +855,12 @@ export function projectHomeContext(options: {
     }
     const result = render();
     if (result.length > maxChars) throw new Error("Home context exceeds the bounded budget");
+    if (
+      v2 &&
+      (sourceFile(options.binding.entrypointContextPath!, 64 * 1024).sha256 !== sha256 ||
+        sourceFile(contract.globalProfilePath, 128 * 1024).sha256 !== profileSource.sha256)
+    )
+      throw new Error("Home v2 sources changed during projection");
     return {
       status: held ? "held" : "current",
       text: result,

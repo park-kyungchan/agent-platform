@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-FRESH-EVALUATION",
+  "status": "superseded",
+  "answer": "토큰 10배 늘리고 시간도 4배 늘려라",
+  "meaning": "Increase only the freshly admitted evaluation envelope from16requests/500000tokens/2hours to16requests/5000000native-reported-total-tokens/8hours. Additional paid cost0; no Goal token_budget or ordinary engineering cap inferred; closed old suites stay closed.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-FRESH-EVALUATION.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "추가 비용 0을 유지하면서, 별도 native 모델 평가 suite의 한도를 어떻게 정할까요? 실제 업무 수행과 동작·비용 측정은 어느 선택에서도 포함됩니다. 이 한도는 별도 평가에만 적용됩니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-FRESH-EVALUATION.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": []
+}

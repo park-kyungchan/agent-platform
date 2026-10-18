@@ -1,0 +1,80 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-NATIVE-MEMORY-A-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-hermes",
+    "kind": "source-owner-capture",
+    "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_200344_b1c008/messages/184,185"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:05-native-a",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-17T11:41:36.049296+00:00",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:98b592504523f49394eb96bd4a143ef48660159b11aed38ed122aeefc6b14d3f"
+      ],
+      "criteria": [
+        {
+          "id": "actual-exact-native-intent-and-terminal-result",
+          "status": "pass",
+          "message": "Actual user/final native rows/UIDs and full literal bytes match frozen one-shot readonly snapshots; final stop. No native Task/Run or raw API/autohook claim.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:05-native-a"
+          ]
+        },
+        {
+          "id": "useful-genuine-memory-consumption",
+          "status": "pass",
+          "message": "Actual final cites genuine cost Memory fullblob/pointer/85digest and distinct current authority with concrete reuse/consumer evidence decision impact; not fresh worker query or whole Acceptance.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:05-native-a"
+          ]
+        },
+        {
+          "id": "bounded-useful-outcome-and-limits",
+          "status": "pass",
+          "message": "Useful source07 static review restored exact source details across owned cold resume, distinguishes ownership/freeze/consumer limits and identifies real delivered QA projection missing pins. It is supplemental internal source analysis, NOT independent Codex07 review. Local verification concerns this observed outcome, not code correctness/native independent review.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:05-native-a"
+          ]
+        },
+        {
+          "id": "recovery-and-usage-truthfulness",
+          "status": "pass",
+          "message": "A10newexactprompt/no-tools/history-specific details and held checks preserved;113924delta/old08uncertainty retained.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:05-native-a"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-NATIVE-MEMORY-A-RESULT.json",
+          "sha256": "7ab9b732aab709c235d927c04ac985585a524bdbd3902be6c66cabcd044ed839"
+        }
+      ],
+      "runtime": {
+        "name": "native-hermes/independent-readonly-observation",
+        "version": "ODI05-AB10-20261017"
+      },
+      "details": {
+        "verificationClass": "bounded-native-useful-local-result",
+        "actualNativeUse": true,
+        "sourceIndependentReview": false,
+        "nativeAuthorshipAuthenticatedByGit": false,
+        "sharedDeliveryConfirmed": false,
+        "fullMemoryFlowComplete": false,
+        "wholeWorkAccepted": false
+      }
+    }
+  }
+}

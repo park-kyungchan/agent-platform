@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-TYPED-FORMAT-CURRENT-CLARIFICATION",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "Latest actual typed-format answer previously read at governed intake; exact original retained in latest-user-inputs.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "text": "내가 아마도 반복적으로 feedback했던 history가 있을 것인데, Codex CLI 그리고 Hermes Backend의 Native Runtime에 의해서 어쩔 수 없이 생성되거나 수정되는 .md 파일들을 제외하고는, 항상 topology hierachy structure typed화 고려해서 .ts/.json 포맷으로 작성하기를 원한다(이것이 왜 중요한가? 그리고 공통 하네스의 메모리 시스템을 비롯한 전반에 중요한데)",
+    "questionItemId": "[\"request_user_input_async\",\"call_01453958b2634e2c89bae902ffa56e76\",0]",
+    "nativeMessageId": null,
+    "sourcePath": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/latest-user-inputs.actual.json",
+    "meaning": "Current original clarification, not a new user answer or language decision. Relevant to all three current Tasks; preserve earlier global source and historical artifacts."
+  }
+}

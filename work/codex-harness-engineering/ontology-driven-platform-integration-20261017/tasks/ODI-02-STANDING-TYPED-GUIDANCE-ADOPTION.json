@@ -1,0 +1,51 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION"
+  },
+  "title": "Adopt approved standing typed engineering meaning through native-owned global skills and guidance",
+  "nextAction": "OWN finite five-file typed guidance installation/readback/preservation/source and bounded Root consumption are complete, shared-delivered and formally audited. Never replay installation. Global Memory/all-runtime/Hermes adoption, native trust/agent attributes and whole/human Acceptance remain separate; actual first prompt delivery belongs to ODI-02-CURRENT-ROOT-EVENT.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+    "ODI-DECISION-GLOBAL-TYPED-ENGINEERING",
+    "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION"
+  ],
+  "effectIds": [
+    "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-FIVE-FILE-INSTALL-ONCE"
+  ],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:standing-typed-guidance-installed"
+  ],
+  "runtimeId": "native-codex:01a14dce-388e-7162-ae22-757566401de7",
+  "occurrence": {
+    "runtimeId": "native-codex:01a14dce-388e-7162-ae22-757566401de7",
+    "attemptId": "native-turn:01a14eca-7cdb-7d10-a08d-9cd6e80d7863",
+    "occurrenceId": "native-tool-call:call_aa5e22620fc04f858da4e3f4d2485d55"
+  },
+  "executionEvidenceId": "ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION"
+}

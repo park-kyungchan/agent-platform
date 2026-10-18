@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-02-LONG-WORK-SKILL",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-02-LONG-WORK-SKILL"
+  },
+  "title": "Improve and adopt Herdr Codex long-work skill from actual user feedback, interview history and session evidence",
+  "nextAction": "Skill source PR28 explicitly merged, current merged-tree review/status and terminal mainCI attempt2 passed; common source and global4file equality observed separately. Preserve original assigned Plan1 while Work is Plan2. Root must adopt this exact actual-result record proposal, deliver shared Work audit and retain formal completion/whole-Goal Acceptance pending. No native runtime behavior or Goal transition follows; do not replay source/global effects.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "source-only",
+  "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:odi02-long-work-skill-actual"
+  ]
+}

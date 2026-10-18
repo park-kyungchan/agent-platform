@@ -237,6 +237,9 @@ export interface ContextRequest {
 export interface ContextRecordProjection {
   kind: RecordKind;
   id: string;
+  /** Reverse effect-producer proof only: exact source/identity, not action instructions.
+   * The complete record and its dependency graph remain privately validated. */
+  contextRole?: "provenance";
   [key: string]: JsonValue | undefined;
 }
 export interface ContextSourceProjection {

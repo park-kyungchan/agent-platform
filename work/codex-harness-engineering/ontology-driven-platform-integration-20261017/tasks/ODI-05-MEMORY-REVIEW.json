@@ -1,0 +1,57 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05-MEMORY-REVIEW",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-05-MEMORY-REVIEW"
+  },
+  "title": "Independently review the final common and CodexOwner Memory source successors",
+  "nextAction": "Actual native07 paired exact-source review PASS0 recorded locally, historical04HOLD/05/USER06aborts and unknowns preserved; NEVER replay completed/uncertain native turns. Shared/formal audit pending. Root separately publishes exact paired source review, explicitly merges/activates owners, then genuine Memory adoption under fresh H0. Parent05/source implementation Task and whole Goal remain open.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "native-effect",
+  "runtimeId": "native-codex:01a14903-d56d-7d83-ab48-86549b09beb1",
+  "dependsOn": [
+    {
+      "taskId": "ODI-04-R",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-R-PREREQUISITE-MEMORY-REVIEW",
+      "receiverEvidenceId": "codex-harness-engineering:evidence:odi05-memory-review-receiver"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [
+    "ODI-05-MEMORY-REVIEW-DISPATCH-07"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:odi05-memory-review"
+  ],
+  "occurrence": {
+    "runtimeId": "native-codex:01a14903-d56d-7d83-ab48-86549b09beb1",
+    "attemptId": "native-turn:01a14952-f5d1-7fa1-9409-55b5fd3e890e",
+    "occurrenceId": "native-message:msg_06199e314161c8b4016ad349300d308191a704808938fd5d0c"
+  },
+  "executionEvidenceId": "codex-harness-engineering:evidence:odi05-memory-review-execution"
+}

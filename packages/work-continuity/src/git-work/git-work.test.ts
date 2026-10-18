@@ -1361,6 +1361,142 @@ function addStandaloneEffect(rows: GitWorkRecord[], id: string, status: "complet
   return producer;
 }
 
+function historicalEffectContracts(status: "completed" | "uncertain" = "completed") {
+  const rows = boundRecords();
+  const work = rows.find((row) => row.kind === "work") as WorkRecord;
+  const plan = rows.find((row) => row.kind === "plan");
+  if (plan?.kind !== "plan") throw Error("fixture");
+  plan.clauses = ["Historical producer contract remains recoverable in full"];
+  rows.push({ ...plan, revision: 2, clauses: ["Current complete action contract"] });
+  work.plan.revision = 2;
+  byTask(rows, "a").logical.planRevision = 2;
+  const producer = addStandaloneEffect(rows, "historical-once", status);
+  producer.nextAction = "Historical producer instruction";
+  rows.push(
+    input("consumed", {
+      completedEffectIds: status === "completed" ? ["historical-once"] : [],
+      uncertainEffectIds: status === "uncertain" ? ["historical-once"] : [],
+    }),
+  );
+  work.continuity!.effectInventorySources.push(ref("consumed"));
+  return { rows, producer };
+}
+
+describe("effect producer provenance versus normative Task dependencies", () => {
+  test.each(["completed", "uncertain"] as const)(
+    "%s inventory privately validates old contracts without making them current instructions",
+    async (status) => {
+      const { rows, producer } = historicalEffectContracts(status);
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      const raw = await readGitWorkContext(reader, { taskId: "a", latestRelevant: "current" });
+      expect(raw.status).toBe("source-qualified");
+      const historical = raw.records.find((row) => row.kind === "plan" && row.revision === 1)!;
+      expect(historical.contextRole).toBe("provenance");
+      expect(historical.clauses).toBeUndefined();
+      const address = raw.sources.find((row) => row.id === historical.source)!;
+      const original = await reader.readSource({
+        kind: "snapshot",
+        path: `${raw.sourcePathBase}/${address.path}`,
+      });
+      expect(original.blobOid).toBe(address.blobOid);
+      expect(original.value).toMatchObject({
+        clauses: ["Historical producer contract remains recoverable in full"],
+      });
+      expect(raw.records.find((row) => row.id === producer.id)).toMatchObject({
+        contextRole: "provenance",
+        logical: producer.logical,
+      });
+      const compact = compactGitWorkContext(raw, { taskId: "a" });
+      expect(compact.status).toBe("source-qualified");
+      expect(
+        decodeCompactGitWorkContext(compact).normative.filter((row) => row.kind === "plan"),
+      ).toMatchObject([{ revision: 2, clauses: ["Current complete action contract"] }]);
+      expect(compact.historicalEffects).toEqual(raw.historicalEffects);
+      expect(compact.continuityBinding.effectInventorySources).toHaveLength(2);
+      expect(
+        compact.historicalEffects?.[
+          status === "completed" ? "relevantCompletedIds" : "relevantUncertainIds"
+        ],
+      ).toContain("historical-once");
+      const selectedOld = await readCompactGitWorkContext(
+        reader,
+        { taskId: producer.id, latestRelevant: "current" },
+        { taskId: producer.id },
+      );
+      expect(selectedOld.status).toBe("source-qualified");
+      expect(
+        decodeCompactGitWorkContext(selectedOld).normative.filter((row) => row.kind === "plan"),
+      ).toMatchObject([
+        { revision: 2 },
+        { revision: 1, clauses: ["Historical producer contract remains recoverable in full"] },
+      ]);
+    },
+  );
+  test.each(["occurrence", "old-plan", "proof-source"] as const)(
+    "historical provenance still fails closed on invalid %s",
+    async (variant) => {
+      const { rows } = historicalEffectContracts();
+      if (variant === "occurrence") {
+        const effect = rows.find((row) => row.kind === "effect");
+        if (effect?.kind !== "effect") throw Error("fixture");
+        effect.occurrence.attemptId = "unrelated";
+      }
+      if (variant === "old-plan") {
+        const i = rows.findIndex((row) => row.kind === "plan" && row.revision === 1);
+        rows.splice(i, 1);
+      }
+      if (variant === "proof-source") {
+        const proof = rows.find(
+          (row) => row.kind === "evidence" && row.id === "proof-historical-once",
+        );
+        if (proof?.kind !== "evidence") throw Error("fixture");
+        proof.source = ref("unavailable");
+      }
+      const { root, oid } = await fixture(rows);
+      const reader = await open(root, oid);
+      expect((await validateGitWorkRecords(reader)).valid).toBe(false);
+      const context = await readCompactGitWorkContext(
+        reader,
+        { taskId: "a", latestRelevant: "current" },
+        { taskId: "a" },
+      );
+      expect(context.status).toBe("held");
+    },
+  );
+  test("transitive explicit dependencies retain their complete historical contracts", async () => {
+    const { rows } = historicalEffectContracts();
+    rows.push(...completed("middle"), ...completed("leaf"));
+    byTask(rows, "a").dependsOn = [{ taskId: "middle", milestone: "execution-and-verification" }];
+    byTask(rows, "middle").dependsOn = [
+      { taskId: "leaf", milestone: "execution-and-verification" },
+    ];
+    const { root, oid } = await fixture(rows);
+    const context = await readGitWorkContext(await open(root, oid), {
+      taskId: "a",
+      latestRelevant: "current",
+    });
+    expect(context.status).toBe("source-qualified");
+    for (const id of ["middle", "leaf"])
+      expect(context.normative.contracts.some((row) => row.kind === "task" && row.id === id)).toBe(
+        true,
+      );
+    expect(
+      decodeCompactGitWorkContext(compactGitWorkContext(context, { taskId: "a" })).normative.filter(
+        (row) => row.kind === "plan",
+      ),
+    ).toMatchObject([
+      { revision: 2 },
+      { revision: 1, clauses: ["Historical producer contract remains recoverable in full"] },
+    ]);
+    const required = context.records.find((row) => row.kind === "plan" && row.revision === 1)!;
+    required.contextRole = "provenance";
+    expect(compactGitWorkContext(context, { taskId: "a" }).holdReasons).toContain(
+      "COMPACT_PROVENANCE_CONTRACT_CONFLICT",
+    );
+  });
+});
+
 describe("source-addressed normative continuity and consumed effect closure", () => {
   test("full purpose, Spec criteria and Plan clauses equal their exact addressed fragments", async () => {
     const { root, oid } = await fixture(boundRecords());

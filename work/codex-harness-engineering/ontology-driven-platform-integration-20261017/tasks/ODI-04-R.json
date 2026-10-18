@@ -1,0 +1,57 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-04-R",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-04-R"
+  },
+  "title": "Independently review the first Hermes producer result in native Codex",
+  "nextAction": "Independent native04-R exact902 review PASS0; actual manual source consumption/result/settled usage and code publication beforePR26 recorded locally. Never replay completed turn. Work shared/formal still pending actual audit delivery; Root source merge/owner activation and05 actual Memory/IDs/recovery/fullGoal remain.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-04",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-PREREQUISITE-C05",
+      "receiverEvidenceId": "ODI-04-R-RECEIVER-C05"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [
+    "codex-harness-engineering:effect:04r-dispatch"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:04r"
+  ],
+  "runtimeId": "native-codex:01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+  "occurrence": {
+    "runtimeId": "native-codex:01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+    "attemptId": "native-turn:01a148c1-b89b-7c02-892f-5faefb291004",
+    "occurrenceId": "native-message:msg_09f24631e4edef82016ad32414ae748191bdaef879cf88b51c"
+  },
+  "executionEvidenceId": "codex-harness-engineering:evidence:04r-execution"
+}

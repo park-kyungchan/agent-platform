@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-HOST-COMMON-ADMISSION",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 3,
+    "taskId": "ODI-HOST-COMMON-ADMISSION"
+  },
+  "title": "Separate host native Home, code owner and selected Work context contracts",
+  "nextAction": "Local common implementation and received source/check evidence are durable in Input ODI-HOST-COMMON-SOURCE-RESULT; do not repeat this source dispatch. Root must integrate exact provider/registry/fixture pins, obtain independent final source review and publication, and separately verify actual native host caller. Verification/shared/formal/Acceptance remain pending.",
+  "state": {
+    "execution": "complete",
+    "verification": "pending",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-HOST-DECISION-BUDGET",
+    "ODI-HOST-DECISION-IDENTITY",
+    "ODI-HOST-DECISION-NO-EVAL",
+    "ODI-HOST-DECISION-PANES",
+    "ODI-HOST-DECISION-APPROVAL",
+    "ODI-HOST-DECISION-RESUME"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

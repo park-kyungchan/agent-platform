@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-HOST-CODEX-ADMISSION",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 3,
+    "taskId": "ODI-HOST-CODEX-ADMISSION"
+  },
+  "title": "Deliver actual host native Codex current Work admission",
+  "nextAction": "Source implementation and four focused repairs received at Input ODI-HOST-CODEX-SOURCE-RESULT; do not repeat completed dispatch. Root must finish coordinated provider/marker/fixture currentness, full checks and independent final review/publication; actual host native application/readback, shared/formal/Acceptance remain pending.",
+  "state": {
+    "execution": "complete",
+    "verification": "pending",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-HOST-DECISION-BUDGET",
+    "ODI-HOST-DECISION-IDENTITY",
+    "ODI-HOST-DECISION-NO-EVAL",
+    "ODI-HOST-DECISION-PANES",
+    "ODI-HOST-DECISION-APPROVAL",
+    "ODI-HOST-DECISION-RESUME"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

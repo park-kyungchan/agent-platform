@@ -1,0 +1,64 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-CODEX-SOURCE-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/orchestrator/.recovery-20261019/continuation/codex-owner-repair-result.actual.json"
+  },
+  "content": {
+    "classification": "Exact author source and Root received bytes; independent review/shared/native application/formal/Acceptance pending",
+    "authorSource": {
+      "head": "15e8f3d39cb76dfbb5b293b3e5c58ce9ed7ca1a0",
+      "tree": "7a078de22cc4c05a58bc5192b65577ac1b31322b",
+      "resultSha256": "94cdd8447729e269411e39b5ecc9d5b2023a3e80818d111178a0cd64846d156b",
+      "preservedParent": "cb13db30fcec717a891281f270c4e6d06ac5e282",
+      "paths": [
+        {
+          "path": "src/native/hook-cli.ts",
+          "sha256": "196fac5cf6675329679a654b7c6130eb8c24065dce5739f59519fc91fc72a500",
+          "bytes": 10545
+        },
+        {
+          "path": "src/native/host-candidate.ts",
+          "sha256": "987cef7b59711e2787c236c4940fdede3ff39a72fafe00606fda511f3c8bcd6e",
+          "bytes": 20870
+        },
+        {
+          "path": "src/promotion.ts",
+          "sha256": "9ee4c1a239843e426b6a7ce79adda9cd111ed4dbf0faf491d8788b9dc5dab911",
+          "bytes": 32621
+        },
+        {
+          "path": "tests/host-candidate.test.ts",
+          "sha256": "a2dcfaf90f78316861d409898f7682999a06f22a647f15747402777b253ffb15",
+          "bytes": 40336
+        }
+      ]
+    },
+    "rootReadback": {
+      "fourSourceAndSixRepairLogsVerified": true,
+      "sourceIntegratedAt": "3f218ea",
+      "rootRequestGuidancePredecessor": "5afcc21"
+    },
+    "verification": {
+      "affectedPassed": 71,
+      "affectedFailed": 0,
+      "fullPassed": 533,
+      "fullFailed": 7,
+      "fullCheckStatus": "held-existing-provider-fixture-roots-and-pins",
+      "independentReReview": "Dispatched native common-admission against15e8f3d; no conclusion yet"
+    },
+    "effects": {
+      "nativeConfigAuthTrustProfileWrites": 0,
+      "pushPrMerge": false,
+      "preserveAllPriorAttempts": true
+    },
+    "nextAction": "Finish coordinated production-root registrations/markers and fixture pins, full checks and independent final integrated review; publish authenticated evidence before PR/explicit expected-head merge; then native owner application/readback. Do not replay source dispatch or prior native effects."
+  }
+}

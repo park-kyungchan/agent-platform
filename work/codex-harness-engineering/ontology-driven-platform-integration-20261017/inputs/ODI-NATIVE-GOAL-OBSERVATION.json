@@ -1,0 +1,41 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-NATIVE-GOAL-OBSERVATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex",
+    "locator": "codex-thread:01a14734-9160-70a2-a10d-df6ea9c50b91/native-goal/create_goal/1792203972",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "logicalWork": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017"
+    },
+    "nativeGoalReceipt": {
+      "goal": {
+        "threadId": "01a14734-9160-70a2-a10d-df6ea9c50b91",
+        "objective": "Lead the new ontology-driven-platform-integration-20261017 successor Work to make the admitted codebase operate integrally on ONE governed semantic+kinetic Ontology: Data, Logic, Action and Security bind original user purpose, decisions, useful actions and truthful evidence. Maintain a Whole-Lens of srv1873899 purposes, code/data/semantic owners, topology/hierarchy, dependencies and cross-runtime impact. Scope runtime changes to /docker/hermes-agent-2q3y/ and /docker/herdr-runtime/; retain the full large private GitHub repository rearchitecture, not merely the19prepared checkouts.\n\nFirst deliver actual usable operation: one user-facing native Codex CLI Orchestrator in srv1873899-herdr controls on-demand native Hermes0.22 and Codex worker panes/tabs. Qualify current executable/profile/source/admission, perform a useful common-Work-bound task, recover its result and independent review, then demonstrate stable topic Memory/current decisions/original Q&A/parent dependencies, logical/native identities, handoff/interruption/resume, concurrent reconciliation, PC-off currentness and durable local/shared/receiver receipts. Do not substitute installation/readiness screens, source tests or optimization for useful native behavior. Before usability, optimize only observed blockers with bounded oracles/exit conditions and return to actual use.\n\nUse THAT working system to complete evidence-backed repository/module integration, split, naming, retirement and policy changes; one canonical implementation/generator per capability, updated consumers/imports/build/docs/projections/provider pins/CI and verified recovery. Bind governed construction and actual domain decision/action callers, carry existing accepted product/operational outcomes, and measure correctness/invariant coverage and marginal tokens per comparable decision. Month-end preparation is complete, not a new workstream or deadline.\n\nLead binds Domain/Project/Work/Issue/Spec+Plan revisions and each Task contract before dispatch; workers decompose within scope; native runtimes generate sessions/agents/Task/Run occurrences, Herdr owns locations. Native Codex/Hermes retain loops/tools/retries/credentials/stores. Use canonical TypeScript/Bun/source owners and native common GitWork reader. Preserve domain meaning/data ownership, immutable0.1/0.2releases/pins, first-import guards, historical IDs/tuples and completed/consumed/uncertain effects. Link predecessors without resuming/copying old native Goals or replaying effects. No second loop/scheduler/client/registry/credential bridge; no source proof as native permission.\n\nFor each change publish independent exact-commit/tree review evidence and authenticated status BEFORE PR; require current zero unresolved findings, required checks and explicit expected-head Lead merge, followed by separate owner verification/activation. Serialize shared pins/current-code CAS; parallelize bounded independent Tasks. Keep bounded source-owned checkpoints/references and reconcile live/native/source state after compaction/handoff. Preserve selected model and ultra effort. Additional paid cost0; fresh separate native evaluation cap16requests/5000000native-reportedtotal tokens/8hours, not a Goal or ordinaryengineering budget; do not renew old suites.\n\nContinue autonomously within final-approved scope until all required integrated outcomes, verification, actual adoption and useful delivery are fulfilled or a real native/authority/budget/user stop condition prevents progress. Keep execution,Verification,evaluation,shared delivery,formal completion,Lead engineering Acceptance and actual human/domain judgment distinct; never fabricate success or complete merely because a milestone/budget ended.",
+        "status": "active",
+        "tokensUsed": 0,
+        "timeUsedSeconds": 0,
+        "createdAt": 1792203972,
+        "updatedAt": 1792203972
+      },
+      "remainingTokens": null,
+      "completionBudgetReport": null
+    },
+    "sourceReceipt": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/native-goal-creation-receipt.json",
+      "sha256": "bef8f78e7656eae94d2be11f7069354fc047243ca959ea53c60ac9b309bdd5e3",
+      "bytes": 4542
+    },
+    "observationLimit": "Observed create_goal result, not a later current status. threadId and createdAt come from actual native receipt; no extra native Goal/Run identity allocated. Git source capture grants no native authority/permission and no Acceptance.",
+    "tokenBudgetMeaning": "No token_budget passed to create_goal; the separate evaluation allowance is not a Goal budget."
+  }
+}

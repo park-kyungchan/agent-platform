@@ -1,0 +1,80 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-NATIVE-MEMORY-B-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-hermes",
+    "kind": "source-owner-capture",
+    "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_200502_0132f4/messages/135,180"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:05-native-b",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-17T11:28:43.059042+00:00",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:152a614ab162660eb927056c9b94aabb5f56f2e3d0bfab64e18a1f2e9f12beed"
+      ],
+      "criteria": [
+        {
+          "id": "actual-exact-native-intent-and-terminal-result",
+          "status": "pass",
+          "message": "Actual user/final native rows/UIDs and full literal bytes match frozen one-shot readonly snapshots; final stop. No native Task/Run or raw API/autohook claim.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:05-native-b"
+          ]
+        },
+        {
+          "id": "useful-genuine-memory-consumption",
+          "status": "pass",
+          "message": "Actual final cites genuine cost Memory fullblob/pointer/85digest and distinct current authority with concrete reuse/consumer evidence decision impact; not fresh worker query or whole Acceptance.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:05-native-b"
+          ]
+        },
+        {
+          "id": "bounded-useful-outcome-and-limits",
+          "status": "pass",
+          "message": "Useful four-repository successor/consumer closure analysis distinguishes already-integrated implementation/navigation from missing selected-current publish/restore/deployed consumer proofs; recommends one bounded evidence patch. Local verification concerns this observed outcome, not code correctness/native independent review.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:05-native-b"
+          ]
+        },
+        {
+          "id": "recovery-and-usage-truthfulness",
+          "status": "pass",
+          "message": "Final180 and reported596789 main+aux buckets; no duplicate cache/reasoning, financialfinality or absent-api=no-oldinjection claim.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:05-native-b"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-NATIVE-MEMORY-B-RESULT.json",
+          "sha256": "2efc5aa9c8e8df9c0ff94861d451f8643f71eb555648ca963fa94e0f9af585ff"
+        }
+      ],
+      "runtime": {
+        "name": "native-hermes/independent-readonly-observation",
+        "version": "ODI05-AB10-20261017"
+      },
+      "details": {
+        "verificationClass": "bounded-native-useful-local-result",
+        "actualNativeUse": true,
+        "sourceIndependentReview": false,
+        "nativeAuthorshipAuthenticatedByGit": false,
+        "sharedDeliveryConfirmed": false,
+        "fullMemoryFlowComplete": false,
+        "wholeWorkAccepted": false
+      }
+    }
+  }
+}

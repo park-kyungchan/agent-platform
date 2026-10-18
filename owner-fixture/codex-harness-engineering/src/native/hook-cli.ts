@@ -1,8 +1,61 @@
 import { readNativeAdapterSourceClosure } from "./provider-closure.ts";
 import { constants, openSync, closeSync, fstatSync, readFileSync, realpathSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import type { HookBindings, HookInput } from "./hooks.ts";
+import type { HostAdmissionDescriptor } from "./host-candidate.ts";
+
+function admitsHostDescriptor(registry: HookBindings): boolean {
+  const descriptor = (registry as HookBindings & {hostAdmission?: HostAdmissionDescriptor}).hostAdmission;
+  const binding = registry.bindings[0], selected = registry.contextSelections?.[0];
+  if (!descriptor || !binding || !selected ||
+      Object.keys(descriptor).sort().join('|') !== 'authority|codeOwnerRoot|entrypointCwd|nativeCodexHome|nativePermissionGranted|schema|selection' ||
+      descriptor.schema !== 'codex.host-context-admission.v1' || descriptor.authority !== 'none' ||
+      descriptor.nativePermissionGranted !== false ||
+      descriptor.codeOwnerRoot !== resolve(import.meta.dir, '../..') || binding.root !== descriptor.codeOwnerRoot ||
+      !binding.nativeCodexHome || descriptor.nativeCodexHome !== binding.nativeCodexHome ||
+      realpathSync(binding.nativeCodexHome) !== binding.nativeCodexHome ||
+      descriptor.entrypointCwd !== binding.entrypointCwds?.[0] ||
+      binding.gitWorkContextVersion !== 'v2' || binding.gitWorkMetadataEncoding !== 'metadata.v1' ||
+      selected.schema !== 'codex.session-git-work-selection.v1' || !selected.taskId ||
+      selected.latestRelevant !== 'current' || !isDeepStrictEqual(descriptor.selection, selected)) return false;
+  return true;
+}
+
+function hostRegistryPathMatches(bindingsPath: string, registry: HookBindings): boolean {
+  return /^host-candidate-[a-zA-Z0-9][a-zA-Z0-9-]{0,63}$/.test(dirname(bindingsPath).split('/').at(-1)!) &&
+    dirname(dirname(bindingsPath)) === resolve(import.meta.dir, '../../.private') &&
+    bindingsPath === dirname(bindingsPath)+'/bindings.json' &&
+    registry.bindings[0]?.entrypointContextPath === dirname(bindingsPath)+'/home-context.json' &&
+    registry.bindings[0]?.checkpointPath === dirname(bindingsPath)+'/checkpoint-not-used.json';
+}
+const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
+function hasHostDescriptor(value: unknown): boolean {
+  return record(value) && (Object.hasOwn(value, 'hostAdmission') ||
+    (Array.isArray(value.bindings) && value.bindings.some(binding => record(binding) && Object.hasOwn(binding, 'nativeCodexHome'))));
+}
+/** Builtins only. Canonical parsing still follows, but a foreign first event imports no common code. */
+function admitsPinnedHostInput(value: unknown, retained: unknown, bindingsPath: string): boolean {
+  try {
+    if (!record(value) || !record(retained) || retained.schemaVersion !== '1.0.0' ||
+        !Array.isArray(retained.bindings) || !Array.isArray(retained.contextSelections) ||
+        retained.bindings.length !== 1 || retained.contextSelections.length !== 1 ||
+        !record(retained.bindings[0]) || !record(retained.contextSelections[0]) ||
+        !record(retained.contextSelections[0].snapshot) ||
+        typeof value.cwd !== 'string' || typeof value.session_id !== 'string' || !value.session_id ||
+        value.session_id.length > 1024 || /[\u0000-\u001f]/.test(value.session_id) ||
+        !['SessionStart','UserPromptSubmit'].includes(String(value.hook_event_name)) ||
+        (value.hook_event_name === 'SessionStart' && !['startup','resume','compact','clear'].includes(String(value.source)))) return false;
+    const text = (item: unknown) => typeof item === 'string' && item.length > 0 && item.length <= 1024 && !/[\u0000-\u001f]/.test(item);
+    const selected = retained.contextSelections[0];
+    if (!['projectId','workId','taskId','nativeSessionId'].every(key => text(selected[key])) ||
+        !['agent_id','agent_type'].every(key => value[key] === undefined || text(value[key])) ||
+        !['nativeAgentId','nativeAgentType'].every(key => selected[key] === undefined || text(selected[key]))) return false;
+    const registry = retained as unknown as HookBindings;
+    return hostRegistryPathMatches(bindingsPath, registry) && admitsCurrentHomeContext(value as unknown as HookInput, registry);
+  } catch { return false; }
+}
 
 // Reviewed owner facade: a builtin guard precedes the first common implementation import.
 // Its native command path/arguments stay unchanged; native /hooks owns exact definition trust.
@@ -11,9 +64,10 @@ export function admitsCurrentHomeContext(input: HookInput, registry: HookBinding
   if (!["SessionStart", "UserPromptSubmit"].includes(input.hook_event_name) ||
       registry.bindings.length !== 1 || registry.contextSelections?.length !== 1) return false;
   const binding = registry.bindings[0]!, selected = registry.contextSelections[0]!;
+  const host = binding.nativeCodexHome !== undefined || Object.hasOwn(registry, 'hostAdmission');
   if (selected.schema !== "codex.session-git-work-selection.v1" ||
-      binding.projectId !== "codex-harness-engineering" ||
-      binding.workId !== "ontology-driven-harness-operation" ||
+      (host ? !admitsHostDescriptor(registry) :
+        binding.projectId !== "codex-harness-engineering" || binding.workId !== "ontology-driven-harness-operation") ||
       binding.allowedCwds !== undefined || binding.qualificationLedgerPath !== undefined ||
       binding.childReservationTokens !== undefined || binding.entrypointCwds?.length !== 1 ||
       !binding.entrypointContextPath || input.cwd !== binding.entrypointCwds[0] ||
@@ -21,7 +75,7 @@ export function admitsCurrentHomeContext(input: HookInput, registry: HookBinding
       realpathSync(input.cwd) !== input.cwd || realpathSync(binding.root) !== binding.root ||
       selected.cwd !== input.cwd || selected.ownerRoot !== binding.root ||
       selected.projectId !== binding.projectId || selected.workId !== binding.workId ||
-      selected.taskId !== "CODEX-NATIVE-ADOPTION-RECOVERY" ||
+      (!host && selected.taskId !== "CODEX-NATIVE-ADOPTION-RECOVERY") ||
       !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(selected.snapshot.commit) ||
       selected.snapshot.projectId !== binding.projectId || selected.snapshot.workId !== binding.workId ||
       selected.nativeSessionId !== input.session_id ||
@@ -56,6 +110,7 @@ export async function runNativeHook(inputText: string, bindingsPath: string, opt
         throw Error("CONTEXT_BINDINGS_DRIFT");
       retainedBindings = JSON.parse(bytes.toString());
     } finally { closeSync(fd); }
+    if ((hasHostDescriptor(retainedBindings) || dirname(bindingsPath).split('/').at(-1)!.startsWith('host-candidate-')) && !admitsPinnedHostInput(value, retainedBindings, bindingsPath)) return '';
   }
   const { handleHook, readHookBindings, parseHookInput, resolveHookBinding, resolveSessionGitWorkSelection } = await import("./hooks.ts");
   await source.verify();
@@ -63,6 +118,8 @@ export async function runNativeHook(inputText: string, bindingsPath: string, opt
   if (options.contextOnly) {
     if (JSON.stringify(bindings) !== JSON.stringify(retainedBindings)) throw Error("CONTEXT_BINDINGS_DRIFT");
     const input = parseHookInput(value);
+    if (hasHostDescriptor(bindings) && !hostRegistryPathMatches(bindingsPath, bindings))
+      throw Error('OWNER_LOCAL_HOST_REGISTRY_REQUIRED');
     if (!admitsCurrentHomeContext(input, bindings)) return "";
     const binding = resolveHookBinding(input.cwd, bindings);
     if (!binding || !resolveSessionGitWorkSelection(input, bindings, binding)) return "";

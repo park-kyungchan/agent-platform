@@ -1,0 +1,101 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-03-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "native-codex-thread:01a14734-9160-70a2-a10d-df6ea9c50b91/turn:01a1476a-2492-7922-94c5-5665dee62602/call:call_3fd95b21a92a4155b427824de0fb5b10",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:ontology-driven-platform-integration-20261017:odi-03-native-qualification",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-17T05:46:27.322Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:0bd963d9a244c86aeec7ccb8d96d2128f9465347c375b83ad52fb95803bf044a"
+      ],
+      "criteria": [
+        {
+          "id": "owned-native-first-use",
+          "status": "pass",
+          "message": "Actual Root occurrence/owned Herdr pane, explicit fresh native profile/session, source oracle and owner activation/reservation precede exactly one useful qualification prompt; Root native turn retains ultra and Hermes selected900k/xhigh.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-03-native-readback"
+          ]
+        },
+        {
+          "id": "actual-api-context",
+          "status": "pass",
+          "message": "Native stored user api_content exactly matches original prompt833a4b… and complete10951char qualifiedv2 context5df80…/currenta8/ODI03/exact native tuple. Raw event logging is not required or claimed.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-03-native-readback"
+          ]
+        },
+        {
+          "id": "actual-authenticated-useful-result",
+          "status": "pass",
+          "message": "Native provider openai-codex/model900k returned durable useful audit row45 stop with contentSHAca729a…; actual model/auth is established by native request/result/usage, not config or credential presence.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-03-native-readback"
+          ]
+        },
+        {
+          "id": "usage-and-paid0",
+          "status": "pass",
+          "message": "Live owner status372886NoAgent matches DB main; synchronous auxiliary1731 yields374617 exactly once,9main+2auxAPI calls. Canonical ledger completed/reported with zero unknownUsageRuns,15runs/4625383tokens remaining and unchanged8h deadline; native subscription route evidence paid0.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-03-native-readback"
+          ]
+        },
+        {
+          "id": "source-and-owner-boundaries",
+          "status": "pass",
+          "message": "Selected source/runtime compiler/bindings/currentness/native result joins verified; common/native loops/stores/credentials preserved, nativeTask/Run nullable, source evidence grants no authority.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-03-native-readback"
+          ]
+        },
+        {
+          "id": "effect-and-completion-separation",
+          "status": "pass",
+          "message": "Completed setup/model effects fenced and prior93completed/3uncertain preserved.03 execution+verification+local durability alone; shared/formal/04producer/04-R/05/fullGoal/Acceptance remain pending.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:ontology-driven-platform-integration-20261017:odi-03-native-readback"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-NATIVE-INTENT.json",
+          "sha256": "006fd20ca03782d82200827b2b1d44a71bf2d3900d63a4bc321d442ef0df02c6"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-NATIVE-RESULT.json",
+          "sha256": "66f8b9a36bdcd4c8f7a77d8364b442d73bf1a8a20f284a4a34604a887e310156"
+        }
+      ],
+      "runtime": {
+        "name": "native-codex-root/native-hermes-observed-first-use",
+        "version": "first-use-20261017"
+      },
+      "details": {
+        "verificationClass": "bounded-actual-native-qualification",
+        "nativeContextAutoInjectionVerified": true,
+        "actualNativeModelUse": true,
+        "actualNativePermissionOwnerEvidence": true,
+        "rawPreLlmPayloadCaptured": false,
+        "nativeAuthorshipAuthenticatedByGit": false,
+        "sharedDeliveryConfirmed": false,
+        "wholeWorkAccepted": false
+      }
+    }
+  }
+}

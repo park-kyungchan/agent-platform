@@ -1,0 +1,56 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-03",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-03"
+  },
+  "title": "Qualify explicit native adoption and current execution routes",
+  "nextAction": "Bounded native qualification passed and local result durable. Preserve consumed effects/no replay. Root reviews/commits this03receipt, obtains actual committed-payload receiver proof and current consumer/runtime binding before04full producer;04-R/05/fullGoal remain.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-02",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [
+    "ODI-03-FIRST-USE-DISPATCH:call_3fd95b21a92a4155b427824de0fb5b10"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:ontology-driven-platform-integration-20261017:odi-03-native-qualification"
+  ],
+  "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+  "occurrence": {
+    "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+    "attemptId": "01a1476a-2492-7922-94c5-5665dee62602",
+    "occurrenceId": "call_3fd95b21a92a4155b427824de0fb5b10"
+  },
+  "executionEvidenceId": "ODI-03-NATIVE-EXECUTION",
+  "pendingEffectIds": []
+}

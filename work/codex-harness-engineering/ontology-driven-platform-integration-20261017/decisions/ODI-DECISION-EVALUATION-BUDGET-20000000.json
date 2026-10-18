@@ -1,0 +1,27 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-EVALUATION-BUDGET-20000000",
+  "status": "superseded",
+  "answer": "누적 2,000만 토큰으로 상향",
+  "meaning": "Current explicit user token-cap successor for SAME ODI-EVAL-20261017-FIRSTUSE only: aggregate native-reported tokens20,000,000, maxRuns16, includes children/retries/resume/aux; original startedAt2026-10-17T04:55:31.863Z and deadline12:55:31.863Z/maxDuration28800s unchanged; additional paid cost0. Narrow current override of only the5M token field in immutable Plan1 fresh-evaluation clause. Preserve all prior5M policy/admissions/actual overrun/interrupted usage and unreserved user resume; no retroactive preauthorization, new clock/suite, Goal budget/replacement or new model admission. Active policy was separately Root-CASed; this Git record does not reactivate it.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-EVALUATION-BUDGET-20000000.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "[최종 실행계약]의 별도 native 평가 한도는 500만 토큰입니다. 현재 확인된 누계는 최소 659만이며, 방금 사용자 재개분은 별도 정산 중입니다. 추가 결제 0·최대 16회·원래 12:55:31 UTC 마감을 유지하면서 토큰 한도를 어떻게 조정할까요? 전체 개발 Goal은 계속 유지합니다.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-EVALUATION-BUDGET-20000000.json",
+      "fragment": "#/content/question"
+    }
+  },
+  "supersedes": [
+    "ODI-DECISION-FRESH-EVALUATION"
+  ]
+}

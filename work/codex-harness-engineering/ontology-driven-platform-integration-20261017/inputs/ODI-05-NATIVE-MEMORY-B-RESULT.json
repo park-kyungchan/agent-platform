@@ -1,0 +1,95 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-NATIVE-MEMORY-B-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-hermes",
+    "kind": "source-owner-capture",
+    "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_200502_0132f4/messages/135,180"
+  },
+  "content": {
+    "schema": "odi05.native-memory.actual-useful-local-result.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-05-NATIVE-MEMORY-B"
+    },
+    "occurrence": {
+      "runtimeId": "native-hermes:odi-platform:20261017_200502_0132f4",
+      "attemptId": "native-message:135",
+      "occurrenceId": "native-message:180"
+    },
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "actualFinal": {
+      "id": 180,
+      "message_uid": "f219c165bb7f4d7ca333aa26ee437061",
+      "finish_reason": "stop",
+      "contentSha256": "dd4bc886740cfda105973ec8b9492faa1f85b9ad0371bef315503eed80b6a8ec",
+      "contentBytes": 7523,
+      "contentChars": 5301,
+      "literalContent": "## ODI05-MEMORY-B-20261017-0c36\n- **Task:** `ODI-05-NATIVE-MEMORY-B`\n- **stored key:** `20261017_200502_0132f4`\n- frontend `904592c3` / ledger run `ODI-EVAL-20261017-NATIVE-MEMORY-B-09`는 별개이며, native Task/Run ID는 `null`입니다.\n- 읽기 전용 분석 완료. 쓰기·네트워크·모델 위임·effect 재실행은 하지 않았습니다.\n\n### Memory 근거와 제안에 미친 영향\n제공된 `current-memory.json`을 완독했습니다. 이는 **Root가 head `0c36a1cfa5b87b4a24cd1a205af32cea5c36ac8c`에서 수행한 조회의 literal 결과**이며, 이 B 세션이 common CLI를 재실행했다는 뜻은 아닙니다.\n\n- memoryId: `git-memory:7b831c20f025538cebcdfa27b8aa31fa79d22d6409c86c0ec81d233f57ff4e8f`\n- dataset: `park-kyungchan/agent-platform`의 위 commit,  \n  `work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-COST-DATASET-G1.json#/content/memories/2`\n- **full-blob SHA256:** `4da24d8427065fcab28d31234ae0b1d9d421dd73b34dec02ffae988b1b6b544f`  \n  blobOid `d0a053b7b5c5cf2e9da6dc70c32aee3f12e4f58b`, 621498 bytes.\n- **85-key lineage:** `#/content/memories/2/sourceKeys`, count `85`, ordered digest `c4ad1e57aa82950d3d5a1c7b8ef648800be6cc8270726f200dba43ba8cd0d251`.\n- derived hit는 여전히 **미확인 추론**입니다. 선택 권위는 별도의 adopted-current `ODI-DECISION-COST.json`—revision `git:92aadd365f49dbf4648e42e58ac004a1fa715a85`, SHA256 `65d747042dbac56285b7d83115b261e31388be39c8178378d2598a0252afa734`—의 **“기존 구독·자원 사용, 추가 결제 0”**입니다.\n\n따라서 새 서비스·평가·writer를 만들기보다 **기존 통합과 도구를 재사용하여 실제 소비자 증거를 닫는 작업**을 우선합니다. 전체 Ontology 목적도 저장소 수 감소가 아니라 **Data/Logic/Action/Security 의미를 실제 소비·권한·증거에 연결하는 것**이므로, R6 재포팅이나 이름 변경보다 아래 closure가 먼저입니다. 비용·의사결정 효율 개선은 아직 측정했다고 주장하지 않습니다.\n\n### 확인된 통합과 남은 증거\n`B-primary.txt`의 원문 및 선택 필드를 교차검사한 결과:\n\n- canonical `9b68b166…`의 `history/public-contracts/integration.json`에는 **14개 HEAD source variant**가 모두 분류되어 있습니다: corrective 채택 8, 기존 byte-identical 1, historical export map 4, 별도 historical variant 1.\n- 특히 dc-review의 `source-coverage.ts` 해시 `9e65ba81…`는 historical variant로 보존됩니다. 다른 coverage variant와 동일시하거나 별도 maintained writer로 되살리면 안 됩니다.\n- 네 저장소의 bundle·HEAD archive 핀이 retirement/custody 사이에서 일치합니다. **과거 independent restore 네 건의 refs/objects 일치·fsck exit 0 기록은 이미 존재**합니다. 부족한 것은 “복구 증거가 전혀 없음”이 아니라 **선택한 현재 published successor에 대한 독립 restore/readback**입니다.\n- mathCrew `dcf31408…`에서 기존 여섯 snapshot identity는 보존되고, `maintainedSourceURL()`이 education 모듈 또는 common history로 연결됩니다. `render.ts`도 그 함수를 사용하며 EN/KO 모두 private 접근 필요 문구가 이미 있습니다. **navigation 구현을 다시 만드는 것은 새 진척이 아닙니다.**\n- 공급된 10월 17일 목록 관측은 **17 private / 2 public**입니다. 과거 `public` 라벨·10월 11일 href·토큰 scope는 현재 visibility·배포·권한 증거가 아닙니다.\n\n이번 실제 검사는 전달 파일 13개의 byte/hash 일치, full literal section 11개의 원본 핀 일치 및 위 정적 교차검사입니다. 빌드·live readback·restore를 새로 실행한 결과는 아닙니다.\n\n### 1순위 다음 closure — 현재 successor와 mathCrew 소비자 영수증 연결\n**하나의 bounded evidence patch**를 권고합니다. R6 코드·navigation 코드는 그대로 두고, 오래된 pending 표시와 실제 현재 증거를 분리합니다.\n\n| 항목 | 정확한 범위 |\n|---|---|\n| 소유자 | `agent-platform` canonical/custody owner + `education-platform` mathCrew consumer owner. Backend/SharedWiki 의미·native reader 소유권은 유지. Lead가 공유 변경을 직렬화 |\n| 예정 변경 경로 | common `architecture/public-contract-retirement.json`, education `architecture/public-successors.json`에 **날짜·선택 commit에 묶인 관측/receipt 참조** 추가. 기존 역사 필드와 `history/public-contracts/{integration.json,custody.json}`, bundles/snapshots는 덮어쓰지 않음 |\n| 실제 소비자 | canonical operational-context exports/native source projections, mathCrew EN/KO development navigation |\n| 현재성 선택 | 네 대상 ID `1411493725`, `1411506018`, `1411547504`, `1411598033`; successor `1413326539`, education `1414002561`의 선택 HEAD/tree/refs를 owner가 별도 readback하여 바인딩 |\n| 검사 | 기존 `bun history/public-contracts/verify-custody.ts`; published successor 독립 empty-target restore와 refs/reachable objects/strict fsck; mathCrew 기존 build/test/check/verify 및 두-build byte manifest, EN/KO 여섯 source href·접근 제한 문구·거부 경로 확인 |\n| 완료 조건 | source-level navigation 결과와 실제 배포 caller readback을 구분해 기록. 정확한 독립 review·필수 checks·expected-head Lead merge 후에만 해당 증거 gate 갱신; native 활성화는 별도 owner 검증 |\n\n**먼저 닫을 이유:** 유지보수 writer와 navigation은 이미 있으므로, 가장 작은 추가 작업으로 **통합된 코드 → 현재 배포/소비자 → 복구 가능한 successor** 사이의 누락을 줄일 수 있습니다. 오래된 `pending-parent-serialization`을 현재 코드 결함으로 재해석하지 말고, Root의 완료된 source/provider 검증과 대조해야 합니다. README/CI 수정은 이후 exact HEAD 비교에서 실제 drift가 발견될 때만 별도 검토합니다.\n\n### 소비 범위와 HOLD\n- **완독:** `README.txt`, `native-contract.json`, `shared-core.txt`, `shared-effects.txt`, `current-memory.json`, `task-B.json`, `receiver-B.json`, `B-primary.txt`, `B-secondary.txt`. 후자는 **secondary investigation으로만** 사용했습니다. 추가로 `admission.json`, `declared-source-validation.json`, `manifest.json`, `source-index.json`, `code-source-provenance.json`을 읽었습니다. 도구의 긴 행 잘림은 읽기 전용 출력으로 보완했습니다.\n- **미소비/미제공:** A 전용 파일·transport 원문, dataset 전체와 85개 key 개별 값, canonical `packages/operational-context/src/backend/{intent-context,review}` 구현·tests·검사 스크립트 본문. retirement **10857 bytes**와 custody **30334 bytes** 원본은 선택 필드만 제공되었고, custody per-file manifest도 생략되었습니다. 따라서 코드 재검토·전체 archive 검증·구체 JSON 수정 호환성 판정은 보류합니다.\n- **실제 미확정:** 현재 선택 remote refs, published successor 독립 restore, 실제 deployed mathCrew owner/HEAD와 caller readback, native consumer 동등성. D26 raw original은 미복구이므로 의미나 권한을 만들지 않습니다.\n- canonical unknown-usage guard는 **HELD 그대로**이며, 읽은 admission의 B09 owner exception과 구분합니다. 전체 Goal Acceptance·native 권한·교사 승인·retirement 적격성을 선언하지 않습니다. B 결과는 독립적으로 반환하며 A 제어는 Root에 남깁니다."
+    },
+    "occurrenceMeaning": "Observed native SQLite user/final message addresses within exact storedSID; UIDs retained, not native Task/Run allocation/authentication.",
+    "summary": "Useful four-repository successor/consumer closure analysis distinguishes already-integrated implementation/navigation from missing selected-current publish/restore/deployed consumer proofs; recommends one bounded evidence patch.",
+    "actualMemoryUse": {
+      "memoryId": "git-memory:7b831c20f025538cebcdfa27b8aa31fa79d22d6409c86c0ec81d233f57ff4e8f",
+      "datasetFullSha256": "4da24d8427065fcab28d31234ae0b1d9d421dd73b34dec02ffae988b1b6b544f",
+      "pointer": "#/content/memories/2",
+      "sourceKeyCount": 85,
+      "orderedSourceKeysDigest": "c4ad1e57aa82950d3d5a1c7b8ef648800be6cc8270726f200dba43ba8cd0d251",
+      "authority": "Independent current cost Decision has precedence; derived inference remains unconfirmed. Native consumed Root actual genuine query literal, not own CLI query.",
+      "decisionImpact": "Reuse existing code/delivery/consumer evidence and paid0 resources; avoid new frameworks/services/re-porting and preserve owner/native/domain boundaries.",
+      "apiPayloadOrAutohookProof": false
+    },
+    "usage": {
+      "reportedTokens": 596789,
+      "meaning": "09main591784+approval4429+title576 once including cache; auxiliary billingmetadata unknown is not token-usage unknown.",
+      "reasoningSubsetNotAdded": true,
+      "financialFinality": false,
+      "actualReaderEvidence": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/independent-observation-v2/usage-counted-once.json",
+        "sha256": "dd7be74eac4b5dea22754d8bbc4c042c6678c59e38f53b2d2baae071dcc962a4",
+        "bytes": 6078
+      }
+    },
+    "custody": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-NATIVE-AB-RECOVERY-CUSTODY.json",
+      "fragment": "#/content"
+    },
+    "actualObservationEvidence": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/independent-observation-v2/selected-snapshot-01.exact.json",
+        "sha256": "1d4f96a5cb2ef013731201d64b169d81924c537283793aecb4f7cb9c4060da02",
+        "bytes": 830871
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/independent-observation-v2/independent-observation-report.json",
+        "sha256": "443257041fa5ef207dc2dccbbc34b4150f7a63debe362339fb51f000466998b5",
+        "bytes": 17528
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/independent-observation-v2/usage-counted-once.json",
+        "sha256": "dd7be74eac4b5dea22754d8bbc4c042c6678c59e38f53b2d2baae071dcc962a4",
+        "bytes": 6078
+      }
+    ],
+    "QAProjection": null,
+    "limits": [
+      "Local useful result/verification only; shared/formal pending. Parent05/Source07/wholeGoal remain open.",
+      "No native authorship/permission, deployment, independent source review PASS, native parity/retirement or measured cost improvement inferred.",
+      "A08/previous unknown usage retained; blocked tools181/182 unexecuted and never retried by10; full dataset85original bodies not newly fetched."
+    ]
+  }
+}

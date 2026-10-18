@@ -1,0 +1,58 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-04",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 1,
+    "taskId": "ODI-04"
+  },
+  "title": "Execute and deliver the first useful native Hermes result",
+  "nextAction": "04 local passed; see inputs/ODI-04-NATIVE-RESULT.json. Next04-R; no replay.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-03",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-03-PREREQUISITE-C03",
+      "receiverEvidenceId": "ODI-04-RECEIVER-C03"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-FRESH-EVALUATION"
+  ],
+  "effectIds": [
+    "ODI-04-PRODUCER-DISPATCH:native-message:46"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:04"
+  ],
+  "runtimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+  "occurrence": {
+    "runtimeId": "native-hermes:odi-platform:20261017_130701_1c9d3d",
+    "attemptId": "native-message:46",
+    "occurrenceId": "native-message:106"
+  },
+  "executionEvidenceId": "ODI-04-NATIVE-EXECUTION",
+  "pendingEffectIds": []
+}

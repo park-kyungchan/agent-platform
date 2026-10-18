@@ -1,0 +1,101 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-01-SOURCE-READBACK",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "git://park-kyungchan/agent-platform@063c87cf53e931adb5b6ec9a8388a9d06f032481/work/codex-harness-engineering/ontology-driven-platform-integration-20261017",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi.source-binding-readback.v1",
+    "observedAtUtc": "2026-10-17T02:43:15.600Z",
+    "source": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "063c87cf53e931adb5b6ec9a8388a9d06f032481",
+      "tree": "292c1f4acc831eeefe2f52a5fbca89f0445c707c",
+      "scope": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/"
+    },
+    "facts": {
+      "canonicalValidation": "PASS/no findings",
+      "selectedContext": "source-qualified/bound continuity/no holds/4normative contracts",
+      "independentSourceReview": "PASS/zero unresolved findings for exact063c87 candidate only",
+      "handoffCheck": "PASS",
+      "importsCheck": "PASS",
+      "nativeExecution": "UNVERIFIED",
+      "nativeInstallation": "UNVERIFIED",
+      "nativeAdoption": "UNVERIFIED",
+      "sharedDelivery": "PENDING",
+      "formalCompletion": "PENDING",
+      "Acceptance": "NOT_ESTABLISHED"
+    },
+    "receipts": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/successor-work-binding/committed-validation.json",
+        "sha256": "10e556a039be47aec25f2986272ba577482903f204e652ec58cc8a22c600c0eb",
+        "bytes": 139
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/successor-work-binding/committed-ODI-01-context.json",
+        "sha256": "c6da5d10a09d7926e63cedf45a1e1e79f4873291feef56f75c7ab815aabf737e",
+        "bytes": 16395
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/successor-work-binding/check-handoff.json",
+        "sha256": "5b725956d55bf66ed67292b4aa2d2c39a6d7e30f34ebea4a6506d68080ae1295",
+        "bytes": 406
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/successor-work-binding/check-imports.json",
+        "sha256": "04c5ba36e695d0a5b40a9f1e587b2b1685a5e8263ce5cbdb71b67c78ee12a633",
+        "bytes": 405
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/successor-work-binding/independent-review.json",
+        "sha256": "68894ef77d01754fcae3af5441415fcc76988f82cc1dbde64ea62c86ead6f0ac",
+        "bytes": 12366
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/fresh-main-observation.json",
+        "sha256": "d6ded9a2d2065c37606340e83a697215b2f86e5e976b24fa938c2bdbd2f8a471",
+        "bytes": 2494
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/native-goal-creation-receipt.json",
+        "sha256": "bef8f78e7656eae94d2be11f7069354fc047243ca959ea53c60ac9b309bdd5e3",
+        "bytes": 4542
+      }
+    ],
+    "boundedAgentOutputs": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/native-work-admission.json",
+        "sha256": "3736e2d2dfe383aa82e6a6d32f74d1642be467463dc88b3b7fe528a6cd24e7a5",
+        "bytes": 23796
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/hermes-launch-contract.json",
+        "sha256": "22f2dcc4bfed575278481fe3360a77ded2386e21fa96ce2e4913edb1340c8d29",
+        "bytes": 11990
+      }
+    ],
+    "additionalRootObservations": {
+      "source": "Actual Root task message to this bounded agent; not independently reobserved native identities",
+      "leadThread": "01a14734-9160-70a2-a10d-df6ea9c50b91",
+      "leadHerdrPane": "w7:p1",
+      "baselineTestPane": "w7:p2",
+      "baselineGitWorkTests": "167pass/0fail/2102expect/31.66s; terminal-reported Root observation, not a complete captured test receipt",
+      "staleInheritedPane": "w3:p8 must not be controlled from inherited metadata",
+      "goal": "active reported by Root; exact canonical Goal observation remains creation-time receipt"
+    },
+    "limits": [
+      "Source checks/commit/review do not prove native authentication, source-provider adoption, activation, useful Hermes/Codex behavior or Acceptance.",
+      "Check:source was still running in the Root task message and is not claimed passed here.",
+      "Independent review applies exact063c87/tree292c1f4 only; these new followup bytes require their own exact review before publication.",
+      "Actual runtime loops, native state and receipts remain owner-owned. No native occurrence or completed effect is allocated by this record."
+    ]
+  }
+}

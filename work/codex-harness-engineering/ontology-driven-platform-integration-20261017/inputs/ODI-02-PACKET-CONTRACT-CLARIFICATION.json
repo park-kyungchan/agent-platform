@@ -1,0 +1,42 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-PACKET-CONTRACT-CLARIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/packet-result-adjudication.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "atUtc": "2026-10-18T08:46:20.955Z",
+    "decision": "Root separates source preparation integrity from the existing native leaf full-projection/decode/size preflight. The f954 Task full-projection requirement was not fulfilled; its original contract and HOLD remain historical. Preparation can finish under the clarified bounded contract only; native admission cannot proceed before actual full preflight passes.",
+    "authority": "Current user-authorized Lead decomposition and dependency management within existing Work; this is a Lead engineering decision, not a new user answer or broader permission.",
+    "priorContract": {
+      "commit": "f954334b1eeaec46a48eca363711213ee9b4d132",
+      "tasks": [
+        "ODI-02-NORMAL-CONTEXT-PACKET",
+        "ODI-02-CURRENT-ROOT-EVENT"
+      ],
+      "resultPath": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/normal-context-packet-result.actual.json",
+      "resultSha256": "3a1e2b45456571f7ca571229a9ce96af5669408250910746820b630acca2c218",
+      "originalFullProjectionCriteriaPassed": false
+    },
+    "independentAdjudication": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/packet-result-adjudication.actual.json",
+      "sha256": "84cbc4c869d92ed79c89177edd2ebf7631780dffee382888ba7b05f90d49f355",
+      "reviewer": "/root/packet_result_adjudication"
+    },
+    "newPreparationOracle": [
+      "Exact current-source request/selection, original bindings and all owner/guard/fence semantics preserved",
+      "Canonical parser accepts conditional candidate; actual omitted native agent fields remain unknown; present/null/foreign cases refused and OPS containment veto retained",
+      "Recorded source closure/currentness and finite diagnostic are genuine; complete qualified decode/fit remains unknown, explicitly assigned to mandatory leaf preflight",
+      "No native handler/admission/config/trust/cache/install/Goal/evaluation/source-publication effect"
+    ],
+    "leafMandatoryOracle": "At exact successor Work/source closure, complete existing canonical reader qualifies native leaf, decoder succeeds and FULL normal wrapper fits unchanged12000 cap; then and only then Root may separately review one-file CAS and one genuine event under matching/currentness/trust veto.",
+    "AcceptanceDecision": null
+  }
+}

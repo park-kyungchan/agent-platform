@@ -1,0 +1,140 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-MATH-CI-CONSUMER-SOURCE-INTEGRATION-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "Root-owned exact source result/proof/merge and hosted CI captures; Git does not authenticate native authorship"
+  },
+  "content": {
+    "recordedAtUtc": "2026-10-18T10:22:26.326Z",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 2,
+      "taskId": "ODI-07-MATH-CI-CONSUMER"
+    },
+    "outcome": "SOURCE_INTEGRATION_COMPLETE_VERIFIED_LOCALLY",
+    "facts": {
+      "repository": "park-kyungchan/math-research-module",
+      "sourceHead": "9cbef9432e418efde453cfdda1c79b6ea12bd882",
+      "tree": "50db4eafbb6ed36d49907b9338fa5356a5e4a3d9",
+      "mergedHead": "9cbef9432e418efde453cfdda1c79b6ea12bd882",
+      "pullRequest": 4,
+      "automaticMerge": false,
+      "sourceFindingCount": 0,
+      "sourceReviewStatusId": 56624740530,
+      "sourcePinnedGate": "PASS",
+      "publisherAuthenticated": true,
+      "observedRun": {
+        "id": 39116391150,
+        "head": "9cbef9432e418efde453cfdda1c79b6ea12bd882",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success"
+      },
+      "sourceIntegrationComplete": true,
+      "nativeActivation": false,
+      "wholeAcceptance": false,
+      "mergedMainProof": "Existing source head preserved; main push source checks passed"
+    },
+    "captures": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/math-ci-successor-result.actual.json",
+        "sha256": "5ce634e56c9469b2c7d790cb696cac90024e9f83217cecf370a9bc9992b20927"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-math-review-publication-once-001/actual-publication.json",
+        "sha256": "2f31acc03612263f7fc5b08880603feb6b537719130da3659ea2d4f61baccafa"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-math-explicit-fast-forward-once-001/actual-merge.json",
+        "sha256": "5e30adf05ddced4026e62e91382d51bc8a188602d5a549939a5779c358471f9b"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/Root-education-PR13-checks-001/mathMainRuns.json",
+        "sha256": "e1817485bc5057cb0e6a6e8cafc0786d0883cda53da8f6747532d5ff4babd130"
+      }
+    ],
+    "originalResultSummary": {
+      "schema": "odi.math-ci-consumer-successor-result.v1",
+      "status": "minimal-typed-successor-prepared-verified-independently-reviewed",
+      "logicalTaskId": "ODI-07-MATH-CI-CONSUMER"
+    },
+    "evidence": {
+      "schemaVersion": "1.0.0",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-18T10:22:26.326Z",
+      "kind": "evidence",
+      "id": "codex-harness-engineering:evidence:odi07-math-ci-source-integration",
+      "payload": {
+        "claim": "Exact math common-CI source preparation, independent source review, required source checks and explicit Root integration observed",
+        "method": "source-owner-observed-source-integration",
+        "sourceUrl": "https://github.com/park-kyungchan/math-research-module/commit/9cbef9432e418efde453cfdda1c79b6ea12bd882",
+        "fetchedAt": "2026-10-18T10:22:26.326Z",
+        "upstreamRevision": "9cbef9432e418efde453cfdda1c79b6ea12bd882",
+        "result": {
+          "outcome": "success",
+          "processExitCode": null,
+          "contentMatched": true
+        },
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "success"
+          }
+        ],
+        "limitations": [
+          "Source integration and source CI only; no native use, domain/human or whole Work Acceptance.",
+          "Publication is not this Work Task shared/receiver delivery or formal completion."
+        ],
+        "details": {
+          "semanticOwner": "codex-harness-engineering",
+          "taskId": "ODI-07-MATH-CI-CONSUMER",
+          "sourceResultOwner": "park-kyungchan/math-research-module",
+          "nativeAuthenticationEstablished": false,
+          "nativePermissionGranted": false,
+          "facts": {
+            "repository": "park-kyungchan/math-research-module",
+            "sourceHead": "9cbef9432e418efde453cfdda1c79b6ea12bd882",
+            "tree": "50db4eafbb6ed36d49907b9338fa5356a5e4a3d9",
+            "mergedHead": "9cbef9432e418efde453cfdda1c79b6ea12bd882",
+            "pullRequest": 4,
+            "automaticMerge": false,
+            "sourceFindingCount": 0,
+            "sourceReviewStatusId": 56624740530,
+            "sourcePinnedGate": "PASS",
+            "publisherAuthenticated": true,
+            "observedRun": {
+              "id": 39116391150,
+              "head": "9cbef9432e418efde453cfdda1c79b6ea12bd882",
+              "event": "push",
+              "attempt": 1,
+              "status": "completed",
+              "conclusion": "success"
+            },
+            "sourceIntegrationComplete": true,
+            "nativeActivation": false,
+            "wholeAcceptance": false,
+            "mergedMainProof": "Existing source head preserved; main push source checks passed"
+          }
+        }
+      }
+    },
+    "sharedWorkDeliveryConfirmed": false,
+    "formalTaskCompletion": false,
+    "AcceptanceDecision": null
+  }
+}

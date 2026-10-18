@@ -1,5 +1,15 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import * as gitWork from "@palantirkc/work-continuity/git-work";
@@ -7,6 +17,7 @@ import * as contextApi from "@palantirkc/work-continuity/context";
 import type { GitWorkRecord, JsonValue } from "@palantirkc/work-continuity/git-work";
 import {
   handleHook,
+  hashBytes,
   readHookBindings,
   parseHookInput,
   resolveSessionGitWorkSelection,
@@ -14,9 +25,15 @@ import {
   type HookBindings,
   type HookInput,
   type NativeContextLoader,
+  type NativeWorkCheckoutObservation,
   type SessionGitWorkSelection,
 } from "./hooks.ts";
-import { projectSelectedGitWork, type HomeContextContract } from "./home-context.ts";
+import {
+  projectSelectedGitWork,
+  selectedGitWorkPointer,
+  type HomeContextContract,
+  type HomeContextContractV2,
+} from "./home-context.ts";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -355,6 +372,286 @@ function context(stdout: string) {
   const injected = JSON.parse(stdout).hookSpecificOutput.additionalContext as string;
   return { text: injected, value: JSON.parse(injected.slice(injected.indexOf("\n") + 1)) };
 }
+
+async function homeV2Fixture(observedCheckout = true) {
+  const f = await fixture();
+  const previous = JSON.parse(
+    await readFile(f.binding.entrypointContextPath!, "utf8"),
+  ) as HomeContextContract;
+  const nativeCodexHome = join(f.parent, "native/.codex");
+  await mkdir(join(nativeCodexHome, "harness"), { recursive: true });
+  const globalProfilePath = join(nativeCodexHome, "harness/profile.json");
+  await writeFile(globalProfilePath, await readFile(previous.globalProfilePath), { mode: 0o600 });
+  // The former entrypoint-relative profile must never supply Home v2 preferences.
+  await writeFile(previous.globalProfilePath, "{}");
+  f.binding.nativeCodexHome = nativeCodexHome;
+  f.binding.workId = "current-work";
+  f.binding.gitWorkMetadataEncoding = "metadata.v1";
+  f.registry.bindings[0] = f.binding;
+  f.selection.snapshot.commit = f.commit;
+  const observation: NativeWorkCheckoutObservation = {
+    schema: "codex.home-work-checkout-observation.v1",
+    repositoryRoot: f.repositoryRoot,
+    repositoryId: "synthetic/common",
+    commit: f.commit,
+    projectId: "fixture",
+    workId: "current-work",
+    cwd: f.repositoryRoot,
+    branch: "refs/heads/work",
+  };
+  const observationPath = join(f.owner, "architecture/home-work-checkout.json");
+  const observationBytes = JSON.stringify(observation);
+  if (observedCheckout) await writeFile(observationPath, observationBytes);
+  const {
+    schema: _schema,
+    sourceProjectRoot: _sourceProjectRoot,
+    projectRoute: _projectRoute,
+    ...common
+  } = previous;
+  const contract: HomeContextContractV2 = {
+    ...common,
+    schema: "codex.home-context.v2",
+    nativeCodexHome,
+    globalProfilePath,
+    codeOwner: { projectId: "codex-harness-engineering", root: f.owner },
+    selectedWork: {
+      repositoryRoot: f.repositoryRoot,
+      repositoryId: "synthetic/common",
+      commit: f.commit,
+      projectId: "fixture",
+      workId: "current-work",
+      ...(observedCheckout
+        ? { checkoutObservation: { path: observationPath, sha256: hashBytes(observationBytes) } }
+        : {}),
+    },
+  };
+  await writeFile(f.binding.entrypointContextPath!, JSON.stringify(contract));
+  await persistBindings(f);
+  return { ...f, nativeCodexHome, contract, observation, observationPath };
+}
+
+test("Home v2 keeps native Home, entrypoint, fixed code owner and observed selected Work distinct", async () => {
+  const f = await homeV2Fixture();
+  const before = (await readdir(f.parent, { recursive: true })).sort();
+  const pinnedPaths = [
+    f.registryPath,
+    f.binding.entrypointContextPath!,
+    f.contract.globalProfilePath,
+    f.observationPath,
+  ];
+  const pinnedBefore = await Promise.all(pinnedPaths.map((path) => readFile(path)));
+  expect(new Set([f.nativeCodexHome, f.home, f.owner, f.repositoryRoot]).size).toBe(4);
+  for (const input of [
+    f.input,
+    { ...f.input, hook_event_name: "SessionStart" as const, source: "resume" },
+  ]) {
+    const result = await handleHook(
+      input,
+      { bindings: f.registry, selectedSessionOnly: true },
+      f.load,
+    );
+    expect(result.status).toBe("context-injected");
+    expect(result.boundary).toBeUndefined();
+    const c = context(result.stdout);
+    expect(c.value.schema).toBe("codex.home-context.projection.v2");
+    expect(c.value.nativeCodexHome).toBe(f.nativeCodexHome);
+    expect(c.value.actualNativeCwd).toBe(f.home);
+    expect(c.value.sourceOwnerProjectRoot).toBe(f.owner);
+    expect(c.value.codeOwner).toEqual({ projectId: "codex-harness-engineering", root: f.owner });
+    expect(c.value.selectedWorkRoute).toEqual({
+      executionReady: true,
+      effectfulWorkCwd: f.repositoryRoot,
+      observation: f.contract.selectedWork.checkoutObservation,
+    });
+    expect(c.value.projectRoute).toBeUndefined();
+    expect(c.value.defaultProjectRoute).toBeUndefined();
+    expect(c.value.boundaries).toMatchObject({
+      authority: "none",
+      nativePermissionGranted: false,
+      executionReady: true,
+      captureHomeRawPrompts: false,
+      newModelBudgetGranted: false,
+    });
+    expect(selectedGitWorkPointer(c.value.selectedWork)).toMatchObject({
+      repositoryId: "synthetic/common",
+      commit: f.commit,
+      projectId: "fixture",
+      workId: "current-work",
+    });
+    expect(c.value.selectedWork.encoding.version).toBe("metadata.v1");
+    expect(c.value.selectedWork.status).toBe("source-qualified");
+    expect(c.value.preferences.excludedDomains).toEqual(["synthetic-excluded"]);
+    expect(c.text.length).toBeLessThanOrEqual(12000);
+    const decoded = gitWork.decodeCompactGitWorkContext(c.value.selectedWork);
+    expect(decoded.task!.id).toBe("current-task");
+    expect(decoded.normative.find((row) => row.kind === "plan")!.clauses).toEqual([
+      "Preserve every authored Plan clause",
+      "Verify before continuation",
+    ]);
+    for (const sentinel of [
+      "PRIVATE-PROMPT-SENTINEL",
+      "PRIVATE-ORIGINAL-SENTINEL",
+      "PRIVATE-PROFILE-SENTINEL",
+    ])
+      expect(result.stdout).not.toContain(sentinel);
+  }
+  expect((await readdir(f.parent, { recursive: true })).sort()).toEqual(before);
+  expect(
+    before.some((path) => path.split("/").includes(".private") || path.includes("ledger")),
+  ).toBe(false);
+  expect(await Promise.all(pinnedPaths.map((path) => readFile(path)))).toEqual(pinnedBefore);
+  expect(await command(f.repositoryRoot, "status", "--porcelain")).toBe("");
+});
+
+test("Home v2 immutable source without a checkout observation never qualifies an effectful cwd", async () => {
+  const f = await homeV2Fixture(false);
+  const result = await handleHook(
+    f.input,
+    { bindings: f.registry, selectedSessionOnly: true },
+    f.load,
+  );
+  expect(result.status).toBe("context-injected");
+  const c = context(result.stdout);
+  expect(c.value.selectedWork.status).toBe("source-qualified");
+  expect(c.value.selectedWorkRoute).toEqual({ executionReady: false });
+  expect(c.value.boundaries.executionReady).toBe(false);
+  expect(c.value.projectRoute).toBeUndefined();
+  expect(c.value.defaultProjectRoute).toBeUndefined();
+});
+
+test("Home v2 selected-session admission declines foreign session, agent and type before provider load", async () => {
+  const f = await homeV2Fixture();
+  f.selection.nativeAgentId = "selected-child";
+  f.selection.nativeAgentType = "worker";
+  await persistBindings(f);
+  const before = (await readdir(f.parent, { recursive: true })).sort();
+  let loads = 0;
+  const neverLoad: NativeContextLoader = async () => {
+    loads++;
+    throw Error("FOREIGN_PROVIDER_LOADED");
+  };
+  for (const extra of [
+    {},
+    { session_id: "foreign", agent_id: "selected-child", agent_type: "worker" },
+    { agent_id: "selected-child" },
+    { agent_id: "foreign-child", agent_type: "worker" },
+    { agent_id: "selected-child", agent_type: "foreign-type" },
+  ]) {
+    expect(
+      await handleHook(
+        { ...f.input, ...extra },
+        { bindings: f.registry, selectedSessionOnly: true },
+        neverLoad,
+      ),
+    ).toEqual({ status: "no-op", stdout: "", exitCode: 0 });
+  }
+  expect(loads).toBe(0);
+  expect(f.counters().gitReads).toBe(0);
+  expect((await readdir(f.parent, { recursive: true })).sort()).toEqual(before);
+  const selected = await handleHook(
+    { ...f.input, agent_id: "selected-child", agent_type: "worker" },
+    { bindings: f.registry, selectedSessionOnly: true },
+    f.load,
+  );
+  expect(selected.status).toBe("context-injected");
+  expect(context(selected.stdout).value.selectedWorkRoute.executionReady).toBe(true);
+});
+
+test("Home v2 reobserves exact checkout commit, branch and attached HEAD instead of trusting its receipt", async () => {
+  for (const change of ["commit", "branch", "detached"] as const) {
+    const f = await homeV2Fixture();
+    if (change === "commit") {
+      await writeFile(join(f.repositoryRoot, "new.txt"), "Synthetic checkout advancement");
+      await command(f.repositoryRoot, "add", ".");
+      await command(f.repositoryRoot, "commit", "-qm", "Advance selected synthetic checkout");
+    } else if (change === "branch") {
+      await command(f.repositoryRoot, "checkout", "-qb", "different-work");
+    } else {
+      await command(f.repositoryRoot, "checkout", "--detach", f.commit);
+    }
+    const result = await handleHook(
+      f.input,
+      { bindings: f.registry, selectedSessionOnly: true },
+      f.load,
+    );
+    expect(result.status).toBe("failed-open");
+    expect(result.stdout).not.toContain('"executionReady":true');
+    expect(result.stdout).not.toContain("PRIVATE-");
+    expect(result.stdout).not.toContain(f.repositoryRoot);
+    expect(result.boundary).toBeUndefined();
+  }
+});
+
+test("Home v2 refuses a different canonical native Home and post-admission native Home symlink", async () => {
+  for (const change of ["different-home", "symlink"] as const) {
+    const f = await homeV2Fixture();
+    if (change === "different-home") {
+      const wrongHome = join(f.parent, "different-native/.codex");
+      await mkdir(join(wrongHome, "harness"), { recursive: true });
+      await writeFile(
+        join(wrongHome, "harness/profile.json"),
+        await readFile(f.contract.globalProfilePath),
+      );
+      f.contract.nativeCodexHome = wrongHome;
+      f.contract.globalProfilePath = join(wrongHome, "harness/profile.json");
+      await writeFile(f.binding.entrypointContextPath!, JSON.stringify(f.contract));
+    } else {
+      const moved = join(f.parent, "native/original-codex");
+      await rename(f.nativeCodexHome, moved);
+      await symlink(moved, f.nativeCodexHome);
+    }
+    const result = await handleHook(
+      f.input,
+      { bindings: f.registry, selectedSessionOnly: true },
+      f.load,
+    );
+    expect(result.status).not.toBe("context-injected");
+    expect(result.stdout).not.toContain('"executionReady":true');
+    expect(result.stdout).not.toContain("PRIVATE-");
+  }
+});
+
+test("Home v2 refuses symlinked checkout receipts and mismatched owner, Work or checkout route", async () => {
+  for (const change of [
+    "receipt-symlink",
+    "receipt-hash",
+    "owner",
+    "work",
+    "repository",
+    "receipt-cwd",
+  ] as const) {
+    const f = await homeV2Fixture();
+    if (change === "receipt-symlink") {
+      const moved = join(f.owner, "architecture/original-checkout.json");
+      await rename(f.observationPath, moved);
+      await symlink(moved, f.observationPath);
+    } else if (change === "receipt-hash") {
+      await writeFile(
+        f.observationPath,
+        JSON.stringify({ ...f.observation, branch: "refs/heads/other" }),
+      );
+    } else {
+      if (change === "owner") f.contract.codeOwner.root = f.repositoryRoot;
+      if (change === "work") f.contract.selectedWork.workId = "foreign-work";
+      if (change === "repository") f.contract.selectedWork.repositoryId = "synthetic/foreign";
+      if (change === "receipt-cwd") {
+        const bytes = JSON.stringify({ ...f.observation, cwd: f.owner });
+        await writeFile(f.observationPath, bytes);
+        f.contract.selectedWork.checkoutObservation!.sha256 = hashBytes(bytes);
+      }
+      await writeFile(f.binding.entrypointContextPath!, JSON.stringify(f.contract));
+    }
+    const result = await handleHook(
+      f.input,
+      { bindings: f.registry, selectedSessionOnly: true },
+      f.load,
+    );
+    expect(result.status).toBe("failed-open");
+    expect(result.stdout).not.toContain('"executionReady":true');
+    expect(result.stdout).not.toContain("PRIVATE-");
+    expect(result.boundary).toBeUndefined();
+  }
+});
 
 test("selected native tuple injects immutable current Task and decision originals without payloads", async () => {
   const f = await fixture();

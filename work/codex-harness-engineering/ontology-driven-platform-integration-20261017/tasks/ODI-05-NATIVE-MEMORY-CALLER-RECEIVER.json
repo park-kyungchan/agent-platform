@@ -1,0 +1,52 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05-NATIVE-MEMORY-CALLER-RECEIVER",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-05-NATIVE-MEMORY-CALLER-RECEIVER"
+  },
+  "title": "Verify exact shared H3 native caller receipt through the canonical Codex reader",
+  "nextAction": "Receiver Task own H4 shared delivery and actual Root canonical read/audit are confirmed in codex-harness-engineering:evidence:run12-receiver-shared-audit. Preserve native Run12 consumed effect and all original execution/verification evidence; do not replay or create another receipt Task. Continue admitted Plan2 priorities; whole-Goal/domain Acceptance remains separate.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    {
+      "taskId": "ODI-05-NATIVE-MEMORY-CALLER",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-05-CALLER-RUN12-IMMUTABLE-H3",
+      "receiverEvidenceId": "codex-harness-engineering:evidence:run12-current-memory-caller-receiver"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-EVALUATION-BUDGET-DELEGATED-40M32R48H",
+    "ODI-DECISION-CLI-WORKER-DEFAULT",
+    "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION",
+    "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:run12-current-memory-caller-receiver"
+  ],
+  "runtimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91"
+}

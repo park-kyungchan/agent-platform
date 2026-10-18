@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY",
+  "status": "accepted",
+  "answer": "hermes-* repo도 대폭 정리해야되는데? hermes 전용 repo는 전혀 필요없어. profiles별 repo가 있다는 것 자체가 병목인데? 공통하네스에만 맞춰야하는거야. 이와 관련해서 repo관련 통합과 분리와 유지보수 관계 정리를 대폭 최적화할 수 있도록 Lead Session에 메시지 보내라.",
+  "meaning": "Current actual user topology direction: remove separately maintained Hermes-only/profile-per-repository harness source; use one common harness canonical implementation and its native adapters/nonsecret declarations only where real runtime differences require them. Root interpretation, distinct from the verbatim answer: six Hermes-prefix repository names are not six native profiles. Four historical contract/example packages are already canonical in agent-platform/packages/operational-context; default mathCrew frontend and clinic workbench domain code remain education-platform-owned. Eliminate redundant maintenance by actual producer/consumer owner, not by re-porting integrated code, inventing a generic six-profile layer or moving all domain code into agent-platform. Review and reorder priorities first; begin exact source-maintenance consolidation for the already integrated contracts in parallel with real Hermes/Memory caller gaps. Source-only retirement follows its actual consumer/custody oracle, without an unrelated live-runtime gate; live consumer cutover still requires its own equivalence and native owner activation. Preserve full estate scope beyond19, semantic/data/native Home/profile/session/tool/credential owners, immutable history/releases/logical IDs/completed and uncertain effects/paid0. This accepted authority record performs no migration, native activation, operational budget change or Goal lifecycle action.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COMMON-HARNESS-REPOSITORY-DIRECTION.json",
+    "fragment": "#/content/text"
+  },
+  "selectionContext": {
+    "text": "hermes-* repo도 대폭 정리해야되는데? hermes 전용 repo는 전혀 필요없어. profiles별 repo가 있다는 것 자체가 병목인데? 공통하네스에만 맞춰야하는거야. 이와 관련해서 repo관련 통합과 분리와 유지보수 관계 정리를 대폭 최적화할 수 있도록 Lead Session에 메시지 보내라.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COMMON-HARNESS-REPOSITORY-DIRECTION.json",
+      "fragment": "#/content/text"
+    }
+  },
+  "supersedes": []
+}

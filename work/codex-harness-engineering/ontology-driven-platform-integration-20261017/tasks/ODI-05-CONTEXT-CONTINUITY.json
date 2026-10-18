@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05-CONTEXT-CONTINUITY",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-05-CONTEXT-CONTINUITY"
+  },
+  "title": "Complete the first missing normal native context/currentness boundary with economical steering",
+  "nextAction": "Use compact Whole-Lens/current interview context and existing reader. First reconcile canonical common6933 versus consumed remote8090/fe591 and current Codex owner before edits; do not edit shared main. Identify first missing normal native Root context/Memory/currentness/recovery boundary under existing ODI-02-NATIVE-GLOBAL-USE, reuse completed H3/A/B proofs, and implement only a demonstrated needed source fix in a qualified source-owner Task worktree. Preserve exact guards/owners; no installs/merges/push/PR, native config/cache changes or model evaluation. Return exact source tree/commit, bounded checks/findings, current consumer oracle and next useful action. Root owns paired adoption and native effects.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-GLOBAL-TYPED-ENGINEERING",
+    "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": []
+}

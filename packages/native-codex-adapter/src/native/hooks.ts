@@ -32,7 +32,10 @@ export type NativeContextLoader = () => Promise<{
     | "decodeCompactGitWorkContext"
   > &
     Partial<
-      Pick<typeof import("@palantirkc/work-continuity/git-work"), "readCompactGitWorkContext">
+      Pick<
+        typeof import("@palantirkc/work-continuity/git-work"),
+        "readCompactGitWorkContext" | "gitReadEnvironment"
+      >
     >;
   verifyCurrentSourceClosure(): Promise<void>;
 }>;
@@ -95,6 +98,8 @@ export interface HookBinding {
   /** Bootstrap entrypoints admit only this canonical cwd, never its descendants. */
   entrypointCwds?: string[];
   entrypointContextPath?: string;
+  /** Explicit native state directory for an exact bootstrap entrypoint; never selected by Work data. */
+  nativeCodexHome?: string;
   qualificationLedgerPath?: string;
   childReservationTokens?: number;
 }
@@ -112,6 +117,18 @@ export interface SessionGitWorkSelection {
   decisionId?: string;
   /** Caller-declared currentness; never a remote observation or permission grant. */
   latestRelevant?: ContextRequest["latestRelevant"];
+}
+/** Owner-pinned checkout declaration, reobserved locally before a Home v2 route is projected. */
+export interface NativeWorkCheckoutObservation {
+  schema: "codex.home-work-checkout-observation.v1";
+  repositoryRoot: string;
+  repositoryId: string;
+  commit: string;
+  projectId: string;
+  workId: string;
+  cwd: string;
+  /** Exact symbolic ref, including refs/heads/. Detached HEAD never qualifies. */
+  branch: string;
 }
 export interface LegacySessionContextSelection {
   schema: "codex.session-context-selection.v1";
@@ -164,6 +181,102 @@ const within = (root: string, target: string) => {
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`;
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function canonicalDirectory(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= 1024 &&
+    !/[\u0000-\u001f]/.test(value) &&
+    isAbsolute(value) &&
+    resolve(value) === value &&
+    realpathSync(value) === value &&
+    lstatSync(value).isDirectory() &&
+    !lstatSync(value).isSymbolicLink()
+  );
+}
+/** Read-only, bounded local checkout observation; no fetch, checkout, native permission or authorship proof. */
+export function observeNativeWorkCheckout(
+  observation: NativeWorkCheckoutObservation,
+  provider: Awaited<ReturnType<NativeContextLoader>>,
+): void {
+  const deadline = Date.now() + 10_000;
+  const fields = [
+    "schema",
+    "repositoryRoot",
+    "repositoryId",
+    "commit",
+    "projectId",
+    "workId",
+    "cwd",
+    "branch",
+  ];
+  if (
+    !object(observation) ||
+    Object.keys(observation).length !== fields.length ||
+    fields.some((field) => !Object.hasOwn(observation, field)) ||
+    observation.schema !== "codex.home-work-checkout-observation.v1" ||
+    !canonicalDirectory(observation.repositoryRoot) ||
+    !canonicalDirectory(observation.cwd) ||
+    !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(observation.commit) ||
+    ![observation.repositoryId, observation.projectId, observation.workId].every(
+      (value) =>
+        typeof value === "string" &&
+        value.length > 0 &&
+        value.length <= 1024 &&
+        !/[\u0000-\u001f]/.test(value),
+    ) ||
+    !/^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]{0,240}$/.test(observation.branch) ||
+    observation.branch.includes("..") ||
+    observation.branch.includes("//") ||
+    observation.branch.endsWith("/") ||
+    observation.branch.endsWith(".") ||
+    typeof provider.gitWork?.gitReadEnvironment !== "function"
+  )
+    throw Error("HOME_WORK_CHECKOUT_OBSERVATION_INVALID");
+  const read = (cwd: string, args: string[]): string => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw Error("HOME_WORK_CHECKOUT_OBSERVATION_UNAVAILABLE");
+    const result = Bun.spawnSync(
+      ["git", "--no-replace-objects", "--no-pager", "--literal-pathspecs", "-C", cwd, ...args],
+      {
+        env: provider.gitWork!.gitReadEnvironment!(),
+        stdout: "pipe",
+        stderr: "ignore",
+        timeout: remaining,
+        maxBuffer: 8192,
+      },
+    );
+    if (!result.success || result.stdout.byteLength > 8192 || Date.now() > deadline)
+      throw Error("HOME_WORK_CHECKOUT_OBSERVATION_UNAVAILABLE");
+    return new TextDecoder().decode(result.stdout).trimEnd();
+  };
+  // Reobserve the complete tuple after the first reads; no observation establishes remote freshness.
+  for (let pass = 0; pass < 2; pass++) {
+    const repositoryCommonDir = read(observation.repositoryRoot, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ]);
+    const checkoutCommonDir = read(observation.cwd, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ]);
+    if (
+      !canonicalDirectory(observation.repositoryRoot) ||
+      !canonicalDirectory(observation.cwd) ||
+      !canonicalDirectory(repositoryCommonDir) ||
+      !canonicalDirectory(checkoutCommonDir) ||
+      repositoryCommonDir !== checkoutCommonDir ||
+      read(observation.repositoryRoot, ["rev-parse", "--show-toplevel"]) !==
+        observation.repositoryRoot ||
+      read(observation.cwd, ["rev-parse", "--show-toplevel"]) !== observation.cwd ||
+      read(observation.cwd, ["rev-parse", "--verify", "HEAD^{commit}"]) !== observation.commit ||
+      read(observation.cwd, ["symbolic-ref", "--quiet", "HEAD"]) !== observation.branch
+    )
+      throw Error("HOME_WORK_CHECKOUT_OBSERVATION_MISMATCH");
+  }
 }
 const safeId = (value: string) => hashBytes(value).slice(0, 32);
 
@@ -719,7 +832,9 @@ export function readHookBindings(path: string): HookBindings {
         (typeof binding.entrypointContextPath !== "string" ||
           !isAbsolute(binding.entrypointContextPath))) ||
       (binding.entrypointCwds !== undefined) !== (binding.entrypointContextPath !== undefined) ||
-      (binding.entrypointCwds !== undefined && binding.qualificationLedgerPath !== undefined)
+      (binding.entrypointCwds !== undefined && binding.qualificationLedgerPath !== undefined) ||
+      (binding.nativeCodexHome !== undefined &&
+        (binding.entrypointCwds === undefined || !canonicalDirectory(binding.nativeCodexHome)))
     )
       throw new Error("Invalid exact entrypoint binding; qualification aliases are prohibited");
     const entrypoints = binding.entrypointCwds,
@@ -751,6 +866,14 @@ export function resolveHookBinding(cwd: string, registry: HookBindings): HookBin
   const current = realpathSync(cwd);
   const matching = registry.bindings
     .flatMap((binding) => {
+      if (
+        binding.nativeCodexHome !== undefined &&
+        (!binding.entrypointCwds?.length ||
+          !binding.entrypointContextPath ||
+          binding.qualificationLedgerPath ||
+          !canonicalDirectory(binding.nativeCodexHome))
+      )
+        throw new Error("Native Codex Home requires a canonical exact entrypoint binding");
       const exact = (binding.entrypointCwds ?? []).filter(
         (path) =>
           path === cwd && resolve(path) === path && realpathSync(path) === path && current === path,
@@ -803,6 +926,7 @@ export function resolveHookBinding(cwd: string, registry: HookBindings): HookBin
           binding.qualificationLedgerPath ?? null,
           binding.childReservationTokens ?? null,
           binding.entrypointContextPath ?? null,
+          binding.nativeCodexHome ?? null,
           binding.gitWorkContextVersion ?? "v1",
           binding.gitWorkMetadataEncoding ?? null,
         ]),
@@ -1076,6 +1200,9 @@ export async function handleHook(
         cwd: input.cwd,
         maxChars: options.maxChars,
         selectedWork: await selectedGitWork(input, options.bindings, binding, provider),
+        selectedRepositoryRoot: resolveSessionGitWorkSelection(input, options.bindings, binding)
+          ?.snapshot.repositoryRoot,
+        observeCheckout: (observation) => observeNativeWorkCheckout(observation, provider),
       });
       await provider.verifyCurrentSourceClosure();
       verifySelectedGitRegistry(input, options.bindings, binding);

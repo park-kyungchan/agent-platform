@@ -1,0 +1,144 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-NATIVE-MEMORY-A-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-hermes",
+    "kind": "source-owner-capture",
+    "locator": "/opt/data/profiles/odi-platform/state.db#session/20261017_200344_b1c008/messages/184,185"
+  },
+  "content": {
+    "schema": "odi05.native-memory.actual-useful-local-result.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-05-NATIVE-MEMORY-A"
+    },
+    "occurrence": {
+      "runtimeId": "native-hermes:odi-platform:20261017_200344_b1c008",
+      "attemptId": "native-message:184",
+      "occurrenceId": "native-message:185"
+    },
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "actualFinal": {
+      "id": 185,
+      "message_uid": "f6f6d22f8b3842e8ab55b16f11f0d57f",
+      "finish_reason": "stop",
+      "contentSha256": "b41a294a66eb8a3541502da3d60139fe16294e8f800452e41ca4e0eb0ae38d90",
+      "contentBytes": 5801,
+      "contentChars": 3869,
+      "literalContent": "**ODI05-MEMORY-A-RESUME-10-20261017-34446ed1**  \n원래 marker: `ODI05-MEMORY-A-20261017-0c36`  \nTask: `ODI-05-NATIVE-MEMORY-A` · stored key: `20261017_200344_b1c008` · 새 frontend: `34446ed1`  \n논리 Task·저장 세션·frontend·평가 ledger run은 별개이며 native Task/Run ID는 `null`입니다.\n\n### Memory 근거와 제안에 미친 영향\n선택된 비용 원칙은 **“기존 구독·자원 사용, 추가 결제 0”**입니다.\n\n- 파생 hit: `git-memory:7b831c20f025538cebcdfa27b8aa31fa79d22d6409c86c0ec81d233f57ff4e8f` — **미확인 추론** 상태입니다.\n- Dataset: `park-kyungchan/agent-platform@0c36a1cfa5b87b4a24cd1a205af32cea5c36ac8c`의  \n  `work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-COST-DATASET-G1.json#/content/memories/2`\n- 전체 dataset blob SHA-256: `4da24d8427065fcab28d31234ae0b1d9d421dd73b34dec02ffae988b1b6b544f`\n- 85-key 계보: `#/content/memories/2/sourceKeys`, digest `c4ad1e57aa82950d3d5a1c7b8ef648800be6cc8270726f200dba43ba8cd0d251`.\n- 실제 선택 권위는 별도의 current `decisions/ODI-DECISION-COST.json@92aadd365f49dbf4648e42e58ac004a1fa715a85`, SHA-256 `65d747042dbac56285b7d83115b261e31388be39c8178378d2598a0252afa734`입니다.\n\n따라서 새 서비스·실행 프레임워크·광범위 재평가 대신 **기존 전달 증거의 결함을 작게 고치고, 실제 consumer 한 경계의 의미·권한·출력을 확인하는 방향**을 권고합니다. 전체 Ontology 목적은 저장소 정리 자체가 아니라 Data/Logic/Action/Security와 실제 업무의 연결이므로, freeze PASS를 업무 전환 성과로 세지 않습니다.\n\n### 구체적 검토 결과\n아래 행 번호는 보존된 **`A-code.txt` 전달본 기준**입니다.\n\n1. **소유자 선언 ≠ 실제 전환.**  \n   `education-platform/architecture/source-map.json`의 `academyGangSourceMaintenance`는 구현 유지보수 위치를 지정하면서 `runtimeAuthority: \"none\"`, `nativeOrDataCutoverPerformed: false`, `retirementAuthorized: false`를 유지합니다(194–214행). Gang README도 원본·교사·학생 데이터 소유권을 바꾸지 않습니다(400–406행). 이 변경으로 native 소유권 이전이나 standalone 폐기를 승인할 수 없습니다.\n\n2. **freeze는 자기 자신의 변경까지 독립적으로 통제하지 않습니다.**  \n   `.github/workflows/ci.yml`의 literal `metadataPaths = new Set(['README.md', '.github/workflows/ci.yml'])`에서 workflow 자체가 예외입니다(293행). `compare()`는 mode를 확인하지만 예외 경로의 OID 변경은 허용합니다(326–337행). 따라서 guard 제거·약화를 막는 별도 검토/필수-check 경계가 필요합니다. 이는 현재 우회 발생의 증거가 아니라 **보장 범위의 한계**입니다. 또한 `selfTest()`의 `return 14`는 고정값입니다(340–366행). 이를 “독립적으로 계측한 음성 사례 14개”로 확대 해석하면 안 됩니다.\n\n3. **소스 연결·서로 다른 runtime 검사 ≠ consumer 동등성.**  \n   source-map의 `gang-a/packages/application/select-operational-context.ts` entrypoint와 dependency는 검증 순서를 나타낼 뿐 실제 승인된 소비를 증명하지 않습니다(78–82행 및 12행). standalone Bun `1.4.2`와 maintained module Bun `1.4.3` 검사는 별개입니다(210행, README 404행). 실제 호출자 입력·출력·권한 거절의 readback 없이 consumer 전환이나 native parity를 결론낼 수 없습니다.\n\n4. **실행 가능한 전달 증거 결함: QA 원문 메타데이터 불일치.**  \n   `A-code.txt:583–585`의 `binding-result.json` 선언은 **4,777 bytes / `de472cb6…`**인데, 실제 전달 literal은 사전 실행된 해시 검사에서 **2,265 bytes / `f1b2ff69…`**였습니다. 투영인지 미명시되어 원문 전체 소비로 인정할 수 없습니다. 반면 **세 소스 파일과 두 전체 diff의 바이트 수·SHA, 세 파일의 Git blob OID는 선언과 일치**했습니다. 이 결함은 QA 원문 완전성 판단만 보류하며 소스 검토 전체를 무효화하지 않습니다.\n\n### 소비 범위·검증 한계\n- 전체 소비: `README.txt`, `native-contract.json`, `shared-core.txt`, `shared-effects.txt`, `current-memory.json`, `task-A.json`, `receiver-A.json`, `A-code.txt`, `code-source-provenance.json`; 추가로 manifest/index/admission/source-validation. `read_file`의 행내 절단은 중단 전에 무기록 literal 분할 출력으로 보완했습니다.\n- 미소비/누락: dataset 전체 blob과 실제 85-key 배열 원문, 관련 AGENTS/project 원문, `ODI-07-GANG-OWNER-CONTRACT.json` 본문, 위 QA 원본 전체. B 전용 자료는 전체 검토하지 않았습니다.\n- 기존 QA는 literal상 **`independent-internal-source-binding-not-native-review`** 작성자의 관찰입니다. 제가 Bun/education 전체 검사를 실행한 결과가 아닙니다.\n- 승인 철회된 pure-function probe와 명시적으로 건너뛴 reverse-diff/행번호 검사는 **미실행·HELD**입니다. 재시도하지 않았습니다. canonical unknown-usage guard도 계속 **HELD**이며 continuation 예외는 guard PASS가 아닙니다.\n\n### 가장 작은 다음 조치\nRoot가 기존 수동 전달 경로로 **`binding-result.json` 원문을 보완하거나, 전달값을 명시적 projection으로 표시하고 그 자체의 digest를 붙이는 것**이 우선입니다. 필요한 검사는 해당 값의 bytes/SHA와 exact source binding 확인입니다.\n\n그다음 구현을 추가하지 말고 위 selector의 **실제 consumer 한 경계**에 대해 기존 fixture의 입력→출력과 권한 거절을 owner가 확인하도록 권고합니다. 배포·폐기·native parity·전체 Goal Acceptance는 여전히 별도 판단입니다."
+    },
+    "occurrenceMeaning": "Observed native SQLite user/final message addresses within exact storedSID; UIDs retained, not native Task/Run allocation/authentication.",
+    "summary": "Useful source07 static review restored exact source details across owned cold resume, distinguishes ownership/freeze/consumer limits and identifies real delivered QA projection missing pins. It is supplemental internal source analysis, NOT independent Codex07 review.",
+    "actualMemoryUse": {
+      "memoryId": "git-memory:7b831c20f025538cebcdfa27b8aa31fa79d22d6409c86c0ec81d233f57ff4e8f",
+      "datasetFullSha256": "4da24d8427065fcab28d31234ae0b1d9d421dd73b34dec02ffae988b1b6b544f",
+      "pointer": "#/content/memories/2",
+      "sourceKeyCount": 85,
+      "orderedSourceKeysDigest": "c4ad1e57aa82950d3d5a1c7b8ef648800be6cc8270726f200dba43ba8cd0d251",
+      "authority": "Independent current cost Decision has precedence; derived inference remains unconfirmed. Native consumed Root actual genuine query literal, not own CLI query.",
+      "decisionImpact": "Reuse existing code/delivery/consumer evidence and paid0 resources; avoid new frameworks/services/re-porting and preserve owner/native/domain boundaries.",
+      "apiPayloadOrAutohookProof": false
+    },
+    "usage": {
+      "reportedTokens": 113924,
+      "meaning": "A10 composite-bucket delta from pinned pre10 baseline, not cumulative538749; A08reportedfloor424825 remains uncertain",
+      "reasoningSubsetNotAdded": true,
+      "financialFinality": false,
+      "actualReaderEvidence": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/owned-A-coldresume-01/independent-final-observation-v1/usage-delta.json",
+        "sha256": "adad5138d0f75f5f3af195dbd385e6577e6912ff19b2421860ae54071eacbe98",
+        "bytes": 6219
+      }
+    },
+    "custody": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-NATIVE-AB-RECOVERY-CUSTODY.json",
+      "fragment": "#/content"
+    },
+    "actualObservationEvidence": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/independent-observation-v2/selected-snapshot-01.exact.json",
+        "sha256": "1d4f96a5cb2ef013731201d64b169d81924c537283793aecb4f7cb9c4060da02",
+        "bytes": 830871
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/independent-observation-v2/independent-observation-report.json",
+        "sha256": "443257041fa5ef207dc2dccbbc34b4150f7a63debe362339fb51f000466998b5",
+        "bytes": 17528
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/independent-observation-v2/usage-counted-once.json",
+        "sha256": "dd7be74eac4b5dea22754d8bbc4c042c6678c59e38f53b2d2baae071dcc962a4",
+        "bytes": 6078
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/owned-A-coldresume-01/independent-final-observation-v1/snapshot.exact.json",
+        "sha256": "76053621f4d326b438f677691a3b8781064c8a5861129504e107fdd701a42b2c",
+        "bytes": 14175
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/owned-A-coldresume-01/independent-final-observation-v1/independent-final-report.json",
+        "sha256": "0426ea893941f257a7476a2f4aa35a0e3c6cb8bedb6484f4ac75bcfdf20cbc56",
+        "bytes": 7648
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-native-ab-actual/owned-A-coldresume-01/independent-final-observation-v1/usage-delta.json",
+        "sha256": "adad5138d0f75f5f3af195dbd385e6577e6912ff19b2421860ae54071eacbe98",
+        "bytes": 6219
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-independent-code-review/QA-projection-corrective-root-assessment.json",
+        "sha256": "10249f4543be6517e0a7a88c6dfc043a21249b95dd161925ac802834d7fc6f3e",
+        "bytes": 1582
+      }
+    ],
+    "QAProjection": {
+      "actualRootCorrectiveAssessment": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-independent-code-review/QA-projection-corrective-root-assessment.json",
+        "sha256": "10249f4543be6517e0a7a88c6dfc043a21249b95dd161925ac802834d7fc6f3e",
+        "bytes": 1582
+      },
+      "originalAndDeliveredParsedValuesEqual": false,
+      "omittedPath": "/pins",
+      "original": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-gang-owner-contract/runtime-prepared-child/independent-repo07-contract-review/committed-binding/binding-result.json",
+        "sha256": "de472cb67304b315210e0ecac388988986aafd878226dbf7ec778783a9d2bb89",
+        "bytes": 4777
+      },
+      "deliveredProjection": {
+        "sourceFile": "../odi05-native-ab-actual/delivery-package/A-code.txt",
+        "lines": "583metadata/585value",
+        "sha256IncludingLF": "f1b2ff69b06c1ff5c06610d13c6d6800e1efcba71bd904c54a0965f5892bf66f",
+        "bytesIncludingLF": 2265,
+        "sameParsedJSONValue": false,
+        "differenceCount": 1,
+        "differences": [
+          {
+            "path": "/pins",
+            "kind": "omitted",
+            "sourceType": "list"
+          }
+        ]
+      },
+      "meaning": "Finding affects QA-original consumption, not separately exact three source files/diffs; preserve historical delivery and native finding. Independent07 must receive exact originalQA; no new source patch implied."
+    },
+    "limits": [
+      "Local useful result/verification only; shared/formal pending. Parent05/Source07/wholeGoal remain open.",
+      "No native authorship/permission, deployment, independent source review PASS, native parity/retirement or measured cost improvement inferred.",
+      "A08/previous unknown usage retained; blocked tools181/182 unexecuted and never retried by10; full dataset85original bodies not newly fetched."
+    ]
+  }
+}

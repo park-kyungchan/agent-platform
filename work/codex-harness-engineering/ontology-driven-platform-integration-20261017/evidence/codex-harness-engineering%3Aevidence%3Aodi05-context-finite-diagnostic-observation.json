@@ -1,0 +1,14 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "codex-harness-engineering:evidence:odi05-context-finite-diagnostic-observation",
+  "evidenceKind": "observation",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-CONTEXT-CONTINUITY-FINITE-DIAGNOSTIC-OBSERVATION.json",
+    "fragment": "#/content"
+  }
+}

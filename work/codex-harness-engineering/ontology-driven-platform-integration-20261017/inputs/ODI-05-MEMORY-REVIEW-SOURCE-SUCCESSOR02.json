@@ -1,0 +1,156 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-MEMORY-REVIEW-SOURCE-SUCCESSOR02",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-memory-binding-implementation/successor02/root-local-commits.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi05.memory-review.source-successor02.v1",
+    "status": "ROOT_PROPOSED_SOURCE_SUCCESSOR_NATIVE_REVIEW_NOT_DISPATCHED",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-05-MEMORY-REVIEW"
+    },
+    "parentTaskId": "ODI-05",
+    "supersedesCandidateBindingOnly": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "3068434fef8965a5f41eaa073f9a77b22be491ed",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-MEMORY-REVIEW-CONTRACT.json",
+      "sha256": "a68d9dd09367025ab031f9ec055173f4c6f6e5ecc980cf93a6c1401895faf25f",
+      "fragment": "#/content"
+    },
+    "retainedContract": "C09 retained; override candidate pair/sourceQA/measured fix ONLY. Same Task/runtime/Spec1/Plan1/dependencies; no Goal/completion.",
+    "finalSourcePair": [
+      {
+        "owner": "agent-platform",
+        "root": "/home/palantirkc/code/worktrees/odi05-memory-binding-20261017/agent-platform",
+        "parent": "6c457297be6838ed60834409deacdbb1f1e2fa23",
+        "commit": "67c786775011f46732ffebaa78fd2dd3c93eb965",
+        "tree": "fbcfd729a32c18dea124fbc533663cbdebe7050e"
+      },
+      {
+        "owner": "codex-harness-engineering",
+        "root": "/home/palantirkc/code/worktrees/odi05-memory-binding-20261017/codex-harness-engineering",
+        "parent": "151336f71066a4d1761a3930410a7592f9e1b779",
+        "commit": "ee9b9f756fa533226b92426a1e8fefa9c277c205",
+        "tree": "24c6c6774444c71cdc92f31258dfcfb92f53982c"
+      }
+    ],
+    "observedRepair": {
+      "finding": "Root observed full67sourceKeys JSON18899chars exceeds unchanged lexicalRecall16000wholehit maximum; not a hypothetical optimization. Accepted narrow postqualification/FTS typed provenance projection now committed.",
+      "disposition": "Internal helper source review0current material findings; genuine owner data/native review/use and formal acceptance NOT inferred.",
+      "mustPreserve": "Full67keys/Episode/original bindings; qualification/exclusions/alias/policy/generation/currentness; default legacy schema/keyorder/API; first-import guards;16k/24k limits; owner/runtime permissions. No new router/store/client.",
+      "findingId": "F2"
+    },
+    "sourceArtifacts": {
+      "rootMeasuredBlocker": {
+        "path": "approved-execution/odi05-genuine-data-source-qa/root-measured-hit-size-blocker.json",
+        "sha256": "3eb1610de75c94673bff317d4bd5221b6accfb3b3b1a567b1405c504829b093d"
+      },
+      "acceptedSourceDesign": {
+        "path": "approved-execution/odi05-genuine-data-source-qa/context-bundle-review/compact-provenance-design-review.json",
+        "sha256": "44880f70c13e5261c663c21ecd89c2f1b2507277715936c65dcc58ddfd421ea0"
+      },
+      "runtimeDesign": {
+        "path": "approved-execution/odi05-genuine-data-source-qa/output-budget-successor-design/design.md",
+        "sha256": "1bc9b77977f0a99c904e4d6ba75a00cd6196c861fdb453adec2992b7d63d6476"
+      },
+      "frozenSourceManifest": {
+        "path": "approved-execution/odi05-memory-binding-implementation/successor02/candidate-manifest.json",
+        "sha256": "cd3bc2329c4b63af5db792d6088207cc6cfda1018b9c5836a0c1c773be69ef67"
+      },
+      "effectiveUnionManifest": {
+        "path": "approved-execution/odi05-memory-binding-implementation/successor02/effective-union-manifest.json",
+        "sha256": "7a15787ea1cecfd207b352fb5ac67e0cb676afd2fd418a1d430821c3f9d958c8"
+      },
+      "internalSourceReview": {
+        "path": "approved-execution/odi05-memory-binding-implementation/context-bundle-review/successor02-final-review.json",
+        "sha256": "9db133f08af4112d855e634a34232a8da38ab4afc6cce15815e2af214d27184b"
+      },
+      "committedSourceReviewBinding": {
+        "path": "approved-execution/odi05-memory-binding-implementation/context-bundle-review/successor02-committed-source-binding.json",
+        "sha256": "31716488dca0236ac2551274fa802cf0ac399866b124bc6f302834621e2e077a"
+      },
+      "rootLocalCodeCommits": {
+        "path": "approved-execution/odi05-memory-binding-implementation/successor02/root-local-commits.json",
+        "sha256": "8dbdf0802aa8f4947d38082764df2ffeba359f30664a26f61a576679f074bfe1"
+      },
+      "authorSourceQA": {
+        "path": "approved-execution/odi05-memory-binding-implementation/successor02/implementation-status.json",
+        "sha256": "8dc23ba43d81113e027079d6306771e94bd1644f81ed416c8e774b05046c7f11"
+      },
+      "authorFictional67SourceOracle": {
+        "path": "approved-execution/odi05-memory-binding-implementation/successor02/fictional-67-source-oracles.json",
+        "sha256": "d5b32d521cd7fb8fc6066792584cd2420f1248bcca5eebad9328050f87922202"
+      },
+      "authorLegacyByteAudit": {
+        "path": "approved-execution/odi05-memory-binding-implementation/successor02/legacy-byte-audit.json",
+        "sha256": "32471e387985d069be23dd80116c6df9397fb6163a2892a869cc62238a3b645b"
+      }
+    },
+    "reviewSupplement": [
+      "Review full18path union80c/bdd→67c/ee9, not only8delta; retain reflog F1 history/literal-ref fix.",
+      "Check typed projected schema/overload and actual dataset fullblob pin after deepcompile equality; original dataset index, key count/digest; postqualification/FTS only; no callback/fakeemptykeys/native authentication.",
+      "Check whole final Git response cap and67source fixtures including sameclaim cost+구독 hit/currentauthority. Author118/118fictional source QA is not actual native evidence or real owner review."
+    ],
+    "firstActualTopicQuery": {
+      "claimKey": "governing.cost",
+      "query": "구독",
+      "status": "INTENDED_AFTER_SEPARATE_DATA_REVIEW_CURRENTNESS_AND_OWNER_ADMISSION_NOT_EXECUTED",
+      "oracle": "A derived hit and independent current authoritative cost claim for SAMEkey; full67source lineage retained and pointer/digest/count reader-addressable. No crossclaim filter relaxation.",
+      "maxChars": 8000,
+      "permissionGranted": false
+    },
+    "runtime": {
+      "runtimeId": "native-codex:01a14903-d56d-7d83-ab48-86549b09beb1",
+      "sessionId": "01a14903-d56d-7d83-ab48-86549b09beb1",
+      "model": "gpt-6.1-sol",
+      "effort": "ultra",
+      "mode": "noDaemon/readOnly",
+      "actualStartupArtifact": {
+        "path": "approved-execution/odi05-native-code-review/actual-startup-identity.json",
+        "sha256": "5ce987dc7e1d9ebab5c57317a17b4160c3ab53c9f95d2790cd1c955639be27c1"
+      },
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "nativeAuthorshipAuthenticated": false,
+      "modelConsumption": "PENDING; startup zero requests was historical, not current admission"
+    },
+    "prerequisiteAndReceiver": "Original04-R prerequisite/declared Root companion receiver unchanged. Actual C10 capture/guard/dependency checks precede model; capture is not consumption.",
+    "remainingRootOrder": [
+      "Review/CAS adopt this exact Input and nextAction-only Task update at current C09; preserve all historical/effect bytes.",
+      "On actual new commit run canonical validate/transition/selected dependency checks, rebind manual source capture and exact final code manifests. Keep24k monolithic HELD separate.",
+      "Reobserve actual native owner/session/permissions and remaining suite/deadline, then persist positive evaluation admission BEFORE one exact review prompt. No retry of uncertain dispatch.",
+      "Record actual consumption/result/usage/current findings later; review result publication/authstatus precedes PR, explicit expected-head merge then separate owner activation."
+    ],
+    "budgetAdmission": {
+      "status": "NONE_CREATED_BY_THIS_SOURCE_SUCCESSOR",
+      "newReservation": false,
+      "modelDispatched": false
+    },
+    "authority": "none",
+    "nativePermissionGranted": false,
+    "nativeAuthorshipAuthenticated": false,
+    "actualMemoryDataProduced": false,
+    "actualNativeMemoryUse": false,
+    "actualReviewDispatch": false,
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "GoalComplete": false
+  }
+}

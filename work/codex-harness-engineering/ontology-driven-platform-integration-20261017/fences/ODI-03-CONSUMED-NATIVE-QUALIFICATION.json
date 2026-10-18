@@ -1,0 +1,31 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "effect-fence",
+  "id": "ODI-03-CONSUMED-NATIVE-QUALIFICATION",
+  "completedEffectIds": [
+    "native-source-install:78d652ad-b404-4391-a070-cc9d05653db1",
+    "ODI-NATIVE-PROFILE-create",
+    "ODI-NATIVE-PROFILE-set-1",
+    "ODI-NATIVE-PROFILE-set-2",
+    "ODI-NATIVE-PROFILE-set-3",
+    "ODI-NATIVE-PROFILE-set-4",
+    "ODI-NATIVE-PROFILE-set-5",
+    "native-hook-consent:dbd38a573a102444645b427a10fb696a6eae842a1b04c9194fd51ef762835dcf",
+    "native-bound-cas:a53ec0e5-3e04-4aa3-97dc-e82d8523945b:current-work-bindings.json",
+    "native-bound-cas:a53ec0e5-3e04-4aa3-97dc-e82d8523945b:current-work-native-hook.js",
+    "native-worktree-add:420400b8-cc1a-4c3e-8422-8b33e1adc602",
+    "native-bound-cas:420400b8-cc1a-4c3e-8422-8b33e1adc602:current-work-bindings.json",
+    "native-bound-cas:420400b8-cc1a-4c3e-8422-8b33e1adc602:current-work-native-hook.js",
+    "native-profile-spill-max-chars:12000:first-use-03",
+    "ODI-03-FIRST-USE-DISPATCH:call_3fd95b21a92a4155b427824de0fb5b10"
+  ],
+  "uncertainEffectIds": [],
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-03-NATIVE-RESULT.json",
+    "fragment": "#/content/effectCustody"
+  }
+}

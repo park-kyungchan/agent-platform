@@ -5,40 +5,59 @@
   "canonicalRepository": "park-kyungchan/agent-platform",
   "sourceRegistry": "architecture/capability-source-owners.json",
   "commonPackage": "@palantirkc/agent-platform",
+  "commonSourceRoot": "/home/palantirkc/projects/agent-platform",
   "modules": [
     {
       "capabilityId": "native-codex-source",
       "packagePath": "packages/native-codex-adapter",
       "packageName": "@palantirkc/native-codex-adapter",
-      "semanticOwner": "codex-harness-engineering"
+      "semanticOwner": "codex-harness-engineering",
+      "nativeSourceProjectId": "codex-harness-engineering"
     },
     {
       "capabilityId": "native-hermes-context",
       "packagePath": "packages/native-hermes-adapter",
       "packageName": "@palantirkc/native-hermes-adapter",
-      "semanticOwner": "ontology-platform and hermes-harness-engineering"
+      "semanticOwner": "ontology-platform and hermes-harness-engineering",
+      "nativeSourceProjectId": "hermes-harness-engineering"
     },
     {
       "capabilityId": "infrastructure-domain",
       "packagePath": "packages/infrastructure-operations",
       "packageName": "@palantirkc/infrastructure-operations",
-      "semanticOwner": "vps-operations"
+      "semanticOwner": "vps-operations",
+      "nativeSourceProjectId": "vps-operations"
     }
   ],
   "nativeSourceProjects": [
     {
       "id": "codex-harness-engineering",
-      "homeRelativeRoot": "code/shared/codex-harness-engineering",
+      "sourceRoot": "/home/palantirkc/projects/codex-harness-engineering",
+      "historicalSource": {
+        "homeRelativeRoot": "code/shared/codex-harness-engineering",
+        "namespace": "previous-source-owner-home",
+        "classification": "history-only-no-provider-fallback"
+      },
       "boundary": "Native Codex configuration, trust, authentication, sessions and ledgers retain their owner; shared Harness implementation belongs to the canonical common modules."
     },
     {
       "id": "hermes-harness-engineering",
-      "homeRelativeRoot": "code/shared/hermes-harness-engineering",
+      "sourceRoot": "/home/palantirkc/projects/hermes-harness-engineering",
+      "historicalSource": {
+        "homeRelativeRoot": "code/shared/hermes-harness-engineering",
+        "namespace": "previous-source-owner-home",
+        "classification": "history-only-no-provider-fallback"
+      },
       "boundary": "Native Hermes profiles, Task/Run, credentials, stores, activation and lifecycle retain their owner."
     },
     {
       "id": "vps-operations",
-      "homeRelativeRoot": "code/shared/vps-operations",
+      "sourceRoot": "/home/palantirkc/projects/vps-operations",
+      "historicalSource": {
+        "homeRelativeRoot": "code/shared/vps-operations",
+        "namespace": "previous-source-owner-home",
+        "classification": "history-only-no-provider-fallback"
+      },
       "boundary": "Independent native infrastructure CLI, SSH/container adapters and deployment source; pure domain modules are consumed as an immutable exact-common-commit distribution, without a sibling-private credential bridge."
     }
   ],

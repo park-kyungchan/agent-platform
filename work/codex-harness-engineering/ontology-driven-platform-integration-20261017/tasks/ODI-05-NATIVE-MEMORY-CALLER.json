@@ -1,0 +1,58 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05-NATIVE-MEMORY-CALLER",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 2,
+    "taskId": "ODI-05-NATIVE-MEMORY-CALLER"
+  },
+  "title": "Use current canonical Memory in a useful fresh native Hermes task",
+  "nextAction": "Run12 is consumed and its exact H3 payload has actual shared publication/canonical Codex receiver readback. Preserve all original execution/verification/effect evidence. Receiver Task own H4 delivery/audit and whole-Goal/domain Acceptance remain separate; never replay.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-05-MEMORY-BINDING",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-SUCCESSOR",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-USEFUL-NATIVE-FLOW",
+    "ODI-DECISION-EVALUATION-BUDGET-DELEGATED-40M32R48H",
+    "ODI-DECISION-CLI-WORKER-DEFAULT",
+    "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION",
+    "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
+  ],
+  "effectIds": [
+    "ODI-05-CALLER-RUN12-NATIVE-EFFECT"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:run12-current-memory-caller"
+  ],
+  "runtimeId": "native-hermes:20261018_075237_f00a9d",
+  "occurrence": {
+    "runtimeId": "native-hermes:20261018_075237_f00a9d",
+    "attemptId": "afac05587261438cb2bde45a719c52af",
+    "occurrenceId": "call_bcc68df029d8447eb12788ae53fa28c4"
+  },
+  "executionEvidenceId": "ODI-05-CALLER-RUN12-NATIVE-EXECUTION"
+}

@@ -1,0 +1,79 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-02-NORMAL-CONTEXT-PACKET-RESULT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-worker:lens-context",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/normal-context-packet-result.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "atUtc": "2026-10-18T08:46:20.955Z",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 2,
+      "taskId": "ODI-02-NORMAL-CONTEXT-PACKET"
+    },
+    "sourceResult": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/normal-context-packet-result.actual.json",
+      "sha256": "3a1e2b45456571f7ca571229a9ce96af5669408250910746820b630acca2c218",
+      "workCommit": "f954334b1eeaec46a48eca363711213ee9b4d132"
+    },
+    "classification": "Finite source preparation only; old full-projection contract incomplete; preparation verified only after explicit Root contract clarification",
+    "outcome": "BOUNDED_PACKET_AND_CONDITIONAL_SELECTION_PREPARED_CURRENT_LEAF_HELD",
+    "conditionalCandidate": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/normal-context-packet/bindings.exact-undefined-subset.candidate.json",
+      "sha256": "33359aa5548db08374c8e68c6f520b6f741301705918379e1881cd70bd363c6b",
+      "bytes": 1436,
+      "semantics": "Exact undefined optional-agent-fields subset only; actual fields unobserved"
+    },
+    "componentChecks": {
+      "nativePins": 16,
+      "contextPins": 34,
+      "canonicalParser": "pass",
+      "bytesOutsideContextSelections": "preserved exactly",
+      "foreignNullPresentRefusals": [
+        "NO_SELECTION",
+        "NO_SELECTION",
+        "NO_SELECTION",
+        "Invalid agent_id",
+        "Invalid agent_type",
+        "NO_SELECTION",
+        "NO_SELECTION",
+        "NO_SELECTION"
+      ],
+      "OPSContainmentVeto": "CONTEXT_SELECTION_SOURCE_UNSAFE"
+    },
+    "fullQualifiedProjection": {
+      "status": "unknown",
+      "decoded": false,
+      "fit": null,
+      "heldWrapperChars": 2584,
+      "heldWrapperIsSuccess": false,
+      "priorParentWrapperChars": 12031,
+      "cap": 12000
+    },
+    "remainingNativeHolds": [
+      "Complete qualified leaf projection/decode/size preflight",
+      "Actual native agent field presence and trust unobserved",
+      "Root separately reviewed one-file CAS and actual genuine event not performed"
+    ],
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "nativeEffects": 0,
+    "sourceEdits": 0,
+    "sharedDelivery": false,
+    "formalCompletion": false,
+    "AcceptanceDecision": null
+  }
+}

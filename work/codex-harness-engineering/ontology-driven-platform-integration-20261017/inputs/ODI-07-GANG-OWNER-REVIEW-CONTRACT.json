@@ -1,0 +1,243 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-REVIEW-CONTRACT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-review-contract-preparation-v1/successor-r1/root-declared-companion-binding.json"
+  },
+  "content": {
+    "schema": "odi07.gang-owner-independent-review-child-contract.v1",
+    "status": "OPS_PROPOSED_ACTUAL_STARTUP_BOUND_DECLARED_RECEIVER_NATIVE_CONSUMPTION_PENDING",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 1,
+      "taskId": "ODI-07-GANG-OWNER-REVIEW"
+    },
+    "parentTaskId": "ODI-07-GANG-OWNER",
+    "baseline": {
+      "commit": "0c36a1cfa5b87b4a24cd1a205af32cea5c36ac8c",
+      "tree": "7cb8bd12bfba5274ea8008a40a3e07e77683c4e0",
+      "records": 138
+    },
+    "governingDecisionIds": [
+      "ODI-DECISION-FINAL-APPROVAL",
+      "ODI-DECISION-SUCCESSOR",
+      "ODI-DECISION-COST",
+      "ODI-DECISION-USEFUL-NATIVE-FLOW",
+      "ODI-DECISION-EVALUATION-BUDGET-20000000",
+      "ODI-DECISION-CLI-WORKER-DEFAULT",
+      "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION"
+    ],
+    "purpose": {
+      "objective": "Whole admitted codebase governed semantic+kinetic Ontology; Data/Logic/Action/Security, actual useful native/domain operations and lower measured decision cost. Harness,Memory,repos serve this purpose.",
+      "successCriteria": [
+        "One user-facing native Codex Orchestrator controls actual useful native Hermes0.22 and Codex worker sessions/panes/tabs, recovers useful results and distinct independent review.",
+        "The full useful common flow proves stable topic Memory/current decisions/original Q&A/parent dependencies, logical/native identity, interruption/resume, concurrent reconciliation, PC-off currentness and local/shared/receiver receipts.",
+        "The whole admitted codebase binds governed Data/Logic/Action/Security meaning to actual permitted consumers/actions and evidence, retaining native and domain owners.",
+        "Complete evidence-backed large private GitHub/module integration, split, naming, retirement and policy changes with one canonical implementation/generator, exact pins and actual consumer equivalence/recovery.",
+        "Carry existing accepted product/domain/operational outcomes through the working unified system, reserving human/domain judgments and holds to their actual dependent effects.",
+        "Measure comparable decision correctness/invariant coverage and marginal total tokens; demonstrate declared model and harness portability invariants with actual evidence.",
+        "Every delivered change has current independent exact source review, zero unresolved required findings, required checks, explicit expected-head Lead merge and separate native-owner verification/activation.",
+        "Truthful whole-work Engineering Acceptance and useful operator delivery remain distinct from native execution, Verification, evaluation, shared delivery, formal Task completion and human/domain Acceptance."
+      ],
+      "inScope": [
+        "Runtime engineering under /docker/hermes-agent-2q3y/ and /docker/herdr-runtime/; canonical common/native source and large private GitHub rearchitecture beyond fixed19prepared boundaries.",
+        "Actual common/native Work, Memory/IDs/context trigger/action binding and bounded independent source/runtime/delegated tasks under one Codex Orchestrator.",
+        "Owner-aligned source clusters, domain/product modules, generators/adapters/distributions and existing accepted domain outcomes; shared provider pins/CAS serialized by Root."
+      ],
+      "outOfScope": [
+        "Additional paid costs, new paid services or inferred renewal/replay of a historical evaluation suite.",
+        "Automatic predecessor native Goal resume, old Task retagging, completed/consumed effect replay or uncertain effect retry before observation.",
+        "Native-store/credential transplantation, cache clearing, weakened first-import guards, second loops/schedulers/provider clients/tool registries/credential bridges, unrelated runtime service changes.",
+        "Reopening already-completed month-end preparation or inventing new Bible/housing products or human/math/teacher approvals.",
+        "Automatic merge, source-proof-derived native permissions, unreviewed owner activation or historical immutable0.1.0/0.2.0 release/pin replacement."
+      ]
+    },
+    "sourceScope": [
+      {
+        "owner": "education-platform",
+        "root": "/home/palantirkc/code/worktrees/odi07-gang-owner-runtime-20261017T101124954Z/education-platform",
+        "baseCommit": "39b69e5daae7bb5f35ce76378be8e29cf6f06723",
+        "baseTree": "c7ccc58448ad4d3580f7365fe6ef3b70788d9ce3",
+        "head": "dcf31408e60b5cf147ea5f5fa9a30fec42fb5461",
+        "tree": "51acc571fd7c7dfc6416c7137ef2e1ddb1af025d",
+        "branch": "task/odi07-gang-owner-20261017",
+        "paths": [
+          "architecture/source-map.json"
+        ],
+        "manifest": {
+          "schema": "agent-platform.reviewed-source-manifest.v1",
+          "reviewedTreeSha": "51acc571fd7c7dfc6416c7137ef2e1ddb1af025d",
+          "entryCount": 1258,
+          "blobCount": 1088,
+          "sha256": "c4462fe53ffa72662b56fbd85f0a2d4b96ca366a627955c5a2384d09c8df2a7c"
+        },
+        "codeFiles": [
+          {
+            "path": "architecture/source-map.json",
+            "sha256": "216c6449ae2e7ad07a5b851fc583aa3a9fa64808a8084eff39cc80425063ea4c",
+            "bytes": 7309
+          }
+        ]
+      },
+      {
+        "owner": "gang-a",
+        "root": "/home/palantirkc/code/worktrees/odi07-gang-owner-runtime-20261017T101124954Z/gang-a",
+        "baseCommit": "7b5cf56dd6f19ffe56d180b61c03d8366f5f98b1",
+        "baseTree": "72736bdc69f26a233736f19cff7bfe948ba2226b",
+        "head": "3f0af3f0ab03ffc692e1ff927859d7cfbb383ffc",
+        "tree": "d9ed2a709a029dc0c9bf76a5adeddf10318d4344",
+        "branch": "task/odi07-gang-owner-20261017",
+        "paths": [
+          ".github/workflows/ci.yml",
+          "README.md"
+        ],
+        "manifest": {
+          "schema": "agent-platform.reviewed-source-manifest.v1",
+          "reviewedTreeSha": "d9ed2a709a029dc0c9bf76a5adeddf10318d4344",
+          "entryCount": 159,
+          "blobCount": 129,
+          "sha256": "a23331e28fa7425c8c748e189158fc73f40c3d7369d994b6915ffbe8c6b16321"
+        },
+        "codeFiles": [
+          {
+            "path": ".github/workflows/ci.yml",
+            "sha256": "e92729d4b4e365ed69b8998ea1907c5bf0373ffdd9b1bc25f253e013c673e2b6",
+            "bytes": 7836
+          },
+          {
+            "path": "README.md",
+            "sha256": "bfd6085f7b51a64009a1537810847fffce16641c65ee6e5c3b5aea5a5a113075",
+            "bytes": 5689
+          }
+        ]
+      }
+    ],
+    "runtime": {
+      "status": "ROOT_OBSERVED_PREPROMPT_IDENTITY_BOUND",
+      "runtimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9",
+      "sessionId": "01a149a6-5080-76e3-b094-2816479f55a9",
+      "pane": "w7:pB",
+      "model": "gpt-6.1-sol",
+      "effort": "ultra",
+      "cliFlags": [
+        "--dangerously-bypass-approvals-and-sandbox"
+      ],
+      "authorSession": "01a14734-9160-70a2-a10d-df6ea9c50b91",
+      "mustBeIndependent": true,
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "actualTurnId": null,
+      "actualMessageId": null,
+      "nativeAuthorshipAuthenticated": false,
+      "name": "odi07-review",
+      "mode": "noDaemon/fullAccess prompt-scoped read-only",
+      "actualStartupArtifact": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-independent-code-review/actual-startup-identity.json",
+        "sha256": "fe4c7f243ffc2ae084346479a00996051ada490a8b85296e561c1478f791843d",
+        "bytes": 1214
+      },
+      "modelRequestsObserved": 0,
+      "modelRequestsMeaning": "zero at actual startup; not future admission/success"
+    },
+    "prerequisite": {
+      "taskId": "ODI-04-R",
+      "milestone": "execution-and-verification",
+      "receiptEvidenceId": "ODI-04-R-PREREQUISITE-GANG-OWNER",
+      "receiverEvidenceId": "ODI-07-GANG-OWNER-REVIEW-RECEIVER",
+      "payload": {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "8f741b60be459a21e411418e9d3d4c0641492ac3",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-04-R-EXECUTION-RECEIPT.json",
+        "fragment": "#/content",
+        "sha256": "e56bd09a487348a837aaaf9ccd944aa18dc2e04695d6d7cc152c8126e27ee351"
+      },
+      "producer": {
+        "runtimeId": "native-codex:01a148ac-3da8-77b3-97d2-f6e14bbb163f",
+        "attemptId": "native-turn:01a148c1-b89b-7c02-892f-5faefb291004",
+        "occurrenceId": "native-message:msg_09f24631e4edef82016ad32414ae748191bdaef879cf88b51c"
+      },
+      "priorActualRootRead": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-gang-owner-contract/actual-root-prerequisite-read.json",
+        "sha256": "600481b87c56e98c37df13d92c7d64f4bddec16b0b66888f51c1f605d2ed7648",
+        "bytes": 12752
+      },
+      "bindingMeaning": "Prior Root C07 source read is actual. Root instructed declared companion binding to the actual observed native Codex reviewer01a149a6 is now bound and pinned; native model consumption and native-authorship authentication remain pending. Exact immutable C07 address must remain; equal bytes at another commit are not this payload.",
+      "declaredCompanionBinding": {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-review-contract-preparation-v1/successor-r1/root-declared-companion-binding.json",
+        "sha256": "2f61f3976da6bf3c718abc8ea418418ba1401863f94b756fc427be5fd12e5741",
+        "bytes": 2272
+      },
+      "receiverRuntimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9",
+      "nativeReviewerConsumption": false
+    },
+    "review": {
+      "required": "Both complete tree manifests, full base-to-head diffs/three changed files, education AGENTS/project/source-map, Gang baseline/CI, owner boundaries and actual committed QA/limits; current whole Work/Spec1/Plan1/seven Decisions/original Q&A/effect inventories, parent and this child,04-R original receipt intent/result/verification and bound receiver.",
+      "counterexamples": [
+        "Challenge127 non-exempt-path freeze and129 tracked denominator, path/mode/add-delete/metadata-only changes; inspect14 negative cases and exact currentworkflow, not historical50c8.",
+        "Challenge whether education owner relation matches already-owned identical implementation while standalone Gang source/domain/native consumers and d604 parity remain distinct.",
+        "Challenge CI baseline/ref selectors, mutable metadata exemption effects and owner/consumer overclaims; actual defects or justified current zero separately per owner."
+      ],
+      "limits": "Read-only review only; no source/data/Work/Git/native/config/trust/cache/network/model-child mutations. Native installed tool permission is owned by native runtime. No forced PASS; genuine findings/HOLD admissible.",
+      "output": "Actual unchanged owner-scoped-native-review-output.v1 records separately per fixed owner policy only if justified, with final exact trees/full manifests/current findings. Preserve full native final and exact UTF8 spans; no normalization of raw records/no fabricated nativeTask or nativeRun.",
+      "policies": {
+        "education": {
+          "repository": "park-kyungchan/education-platform",
+          "projectId": "education-platform",
+          "domainId": "education",
+          "semanticOwner": "education-platform",
+          "scope": "month-end-source-redesign",
+          "statusContext": "native-independent-review",
+          "publisher": {
+            "id": "241037670",
+            "login": "park-kyungchan",
+            "type": "User"
+          }
+        },
+        "educationScopeMeaning": "Root explicitly adopted the existing fixed month-end-source-redesign gate label as honestly applicable to this narrow source-map relation; no month-end task reopened or generated gate changed.",
+        "gangProposal": {
+          "repository": "park-kyungchan/gang-a",
+          "projectId": "gang-a",
+          "domainId": "education",
+          "semanticOwner": "education-platform",
+          "scope": "retained-gang-source-maintenance",
+          "statusContext": "native-independent-review",
+          "publisher": {
+            "id": "241037670",
+            "login": "park-kyungchan",
+            "type": "User"
+          },
+          "adopted": true
+        },
+        "gangStatus": "Root explicitly adopted exact fixed policy for this narrow review; no existing Gang hosted owner-review CI gate claimed."
+      },
+      "publication": "Independent finite publisher successor needed; actual immutable raw/result/Evidence/Verification/receipt/authenticated status BEFORE either PR. Exact expected-head Lead merge then separate owner adoption. No publisher or publication authorization created here."
+    },
+    "supplementalHermesA": "A08 consumed delivered source values but was interrupted; no final. A10 continuation result, if later actual, is supplementary internal/source analysis, not independent native Codex review. B09 is another task/proposal, not this review.",
+    "preserve": "All138 historical records/all85 genuine Memory originals/parentSource07 state/Spec1Plan1/wholeGoal and completed/uncertain fences unchanged. No dependencies on completing05 or blanket06; no old turn/effect replay.",
+    "authority": "none",
+    "nativePermissionGranted": false,
+    "actualReviewDispatch": false,
+    "nativeAuthorshipAuthenticated": false,
+    "actualNativeReview": false,
+    "GoalComplete": false,
+    "rootPolicyAdoptionSource": {
+      "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi07-native-review-contract-preparation-v1/successor-r1/root-declared-companion-binding.json",
+      "sha256": "2f61f3976da6bf3c718abc8ea418418ba1401863f94b756fc427be5fd12e5741",
+      "bytes": 2272
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-05-HERMES-NATIVE-CURRENTNESS-FINITE-DIAGNOSTIC-OBSERVATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "Transported native diagnostic original hash preserved; finite diagnosis is not caller admission or native receipt qualification"
+  },
+  "content": {
+    "recordedAtUtc": "2026-10-18T10:22:26.326Z",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 2,
+      "taskId": "ODI-05-HERMES-NATIVE-CURRENTNESS",
+      "requestedCommit": "33d2f2c0f8195b1ae8f682387d6aa8821a1f60d6",
+      "authorityClass": "Direct user diagnostic assignment containing an attributed Lead relay; not source admission"
+    },
+    "captures": [
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/hermes-worker-result.transported.actual.json",
+        "sha256": "70ad7758059d4c7f4fe955669ade4e1348ca1e31c23b511eca468ddb75b23373"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/hermes-result-transport.receipt.actual.json",
+        "sha256": "bf572cfe03ea90cd1d7e3b7c27a41d18df2dceeb29b91e5bbaf3b7188c1d769c"
+      },
+      {
+        "path": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/hermes-current-admission.preparation.transported.actual.json",
+        "sha256": "f6c690db7b4933a7968af8c67fdc93eeb36d7aaf5847a1eac2e2705ff0e7b2c1"
+      }
+    ],
+    "qualification": {
+      "status": "HOLD",
+      "finiteQualificationFinished": true,
+      "canonicalTaskCompletionClaimed": false,
+      "firstProvenFailingBoundary": "Fresh native occurrence has no exact installed Work selection; current Task/source was not injected",
+      "priorSourceGuardExecution": "Not independently observed; matching registered bytes do not prove the complete guard ran successfully",
+      "nativePermissionGranted": false,
+      "sourceProofDoesNotGrantPermission": true,
+      "semanticAcceptanceEstablished": false,
+      "wholeWorkAcceptanceClaimed": false
+    },
+    "nativeLocator": {
+      "profile": "odi-platform",
+      "sessionId": "20261018_164056_1024e0",
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    "originalNativeCustody": {
+      "requestedHostResultAddress": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/context-governed-lead-interview-20261018-v1/execution-resume-v1/hermes-worker-result.actual.json",
+      "requestedHostParentAccessible": false,
+      "nativeResultPath": "/opt/data/runtime/harness/current-git-work/odi-20261017/delivery/ODI-05-HERMES-NATIVE-CURRENTNESS/20261018_164056_1024e0/hermes-worker-result.actual.json",
+      "nativeEvidenceOwner": "/opt/data/runtime/harness/current-git-work/odi-20261017/delivery",
+      "delivery": "Local task evidence only. No host upload/publication/shared receiver acknowledgement or Acceptance claimed.",
+      "reportIntegrity": "SHA-256 emitted by capture command; do not infer source admission from this artifact"
+    },
+    "transport": {
+      "remotePath": "/opt/data/runtime/harness/current-git-work/odi-20261017/delivery/ODI-05-HERMES-NATIVE-CURRENTNESS/20261018_164056_1024e0/hermes-worker-result.actual.json",
+      "sha256": "70ad7758059d4c7f4fe955669ade4e1348ca1e31c23b511eca468ddb75b23373",
+      "expectedUiSha256": "70ad7758059d4c7f4fe955669ade4e1348ca1e31c23b511eca468ddb75b23373",
+      "matchesUi": true,
+      "nativeOriginalPreserved": true,
+      "nativeAuthorshipNotInferred": true,
+      "atUtc": "2026-10-18T08:04:21.323Z"
+    },
+    "laterOwnerAdmissionStatus": "HOLD_OWNER_INTERFACE_AND_AUTHORITY",
+    "canonicalTaskStateChanged": false,
+    "verificationPassedHere": false,
+    "nativeAuthorshipAuthenticatedByGit": false,
+    "nativePermissionGranted": false,
+    "AcceptanceDecision": null
+  }
+}

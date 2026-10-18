@@ -1,0 +1,97 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "codex-harness-engineering:input:04r-verification",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/.codex/sessions/2026/10/17/rollout-2026-10-17T16-03-30-01a148ac-3da8-77b3-97d2-f6e14bbb163f.jsonl:126"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:04r",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-17T07:45:20.547Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:449aa1ec62b636eb874f70be5575bcba1e28079d39313f14e29df72b5686fb75"
+      ],
+      "criteria": [
+        {
+          "id": "actual-native-review",
+          "status": "pass",
+          "message": "Actual distinct native session/turn/final message and task_complete125/128; exact902/tree/manifest independent PASS0, raw Hermes versus Root test-only successor lineage retained.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:04r"
+          ]
+        },
+        {
+          "id": "required-context-consumed",
+          "status": "pass",
+          "message": "Independent actual consumption check observed all required source pages1-37 and fullsource21 literal parts/reassembly, originals/purpose/Plan1/effects/dependency joins; monolithic HELD unchanged.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:04r"
+          ]
+        },
+        {
+          "id": "settled-native-accounting",
+          "status": "pass",
+          "message": "15 unique response records total1,489,828 includes-cache input accounting; actual native owner terminal and canonical reconciliation3completed/4,172,027/827,973 remaining, original deadline and no reset.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:04r"
+          ]
+        },
+        {
+          "id": "publication-separate",
+          "status": "pass",
+          "message": "Actual immutable result/receipt and authenticated status56585510500 preceded PR26; source publication is not Work sharedAudit/formal completion, source merge/activation or whole Acceptance.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:04r"
+          ]
+        },
+        {
+          "id": "no-replay-and-full-scope",
+          "status": "pass",
+          "message": "Single actual input and consumed turn/tool/model effects fenced; prior completed/uncertain/history preserved.05 and whole Ontology/privateGitHub/domain outcomes remain.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:04r"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/codex-harness-engineering%3Ainput%3A04r-intent.json",
+          "sha256": "41a3c10fdb0f260891984a22844eb1f4adeb2c1587b18520d45dd3f6fc48b81a"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/codex-harness-engineering%3Ainput%3A04r-result.json",
+          "sha256": "1acf26a6d69385dee6ee8b68140afd0272f7f394ef749dcd0e80def0db280a69"
+        }
+      ],
+      "runtime": {
+        "name": "native-codex-actual-review/root-observed",
+        "version": "0.163.0"
+      },
+      "details": {
+        "actualNativeReview": true,
+        "actualRequiredSourceConsumption": true,
+        "rawPreLlmCaptured": false,
+        "monolithicTypedContextQualified": false,
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeAuthorshipAuthenticatedByGit": false,
+        "codePublicationBeforePRObserved": true,
+        "sourceMerged": false,
+        "nativeActivation": false,
+        "WorkSharedDeliveryConfirmed": false,
+        "wholeWorkAccepted": false
+      }
+    }
+  }
+}
