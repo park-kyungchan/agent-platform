@@ -14,7 +14,7 @@ import {
   type HomeContextViewV2,
 } from "./home-context.ts";
 import type { HookBinding } from "./hooks.ts";
-import rootHomeFixture from "./fixtures/root-home-wrapper.json";
+import rootHomeFixture from "./__tests__/fixtures/root-home-wrapper.json";
 import {
   decodeCompactGitWorkContext,
   type MetadataPackedGitWorkContext,
