@@ -437,7 +437,9 @@ describe("portable docs-only Runtime Index", () => {
       const missing = reader.select(request);
       expect(missing.status).toBe("SELECTED");
       expect(missing.primary?.id).toBe(id);
-      expect(missing.primary?.canonicalUrl).toBe(`https://hermes-agent.nousresearch.com/docs/${url}`);
+      expect(missing.primary?.canonicalUrl).toBe(
+        `https://hermes-agent.nousresearch.com/docs/${url}`,
+      );
       expect(missing.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
       const observed = reader.select(request, { installedVersion: "0.22.0" });
       expect(observed.retrieval).toBe("REVALIDATE_SELECTED_PAGE");

@@ -2078,12 +2078,7 @@
       "id": "hermes.agent.bot-mode",
       "surface": "hermes.agent",
       "topic": "bot-mode",
-      "aliases": [
-        "bot",
-        "bots",
-        "봇",
-        "봇모드"
-      ],
+      "aliases": ["bot", "bots", "봇", "봇모드"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode",
       "fallbackUrl": null,
@@ -2099,13 +2094,7 @@
       "id": "hermes.agent.bot-screen",
       "surface": "hermes.agent",
       "topic": "bot-screen",
-      "aliases": [
-        "screen",
-        "bot-desktop",
-        "봇화면",
-        "봇스크린",
-        "open-screen"
-      ],
+      "aliases": ["screen", "bot-desktop", "봇화면", "봇스크린", "open-screen"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/bot-screen",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/bot-screen",
       "fallbackUrl": null,
@@ -2121,11 +2110,7 @@
       "id": "hermes.agent.computer-use",
       "surface": "hermes.agent",
       "topic": "computer-use",
-      "aliases": [
-        "computer_use",
-        "computer-control",
-        "컴퓨터사용"
-      ],
+      "aliases": ["computer_use", "computer-control", "컴퓨터사용"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/computer-use",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/computer-use",
       "fallbackUrl": null,
@@ -2141,13 +2126,7 @@
       "id": "hermes.agent.updating",
       "surface": "hermes.agent",
       "topic": "updating",
-      "aliases": [
-        "update",
-        "upgrade",
-        "version",
-        "업데이트",
-        "버전"
-      ],
+      "aliases": ["update", "upgrade", "version", "업데이트", "버전"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/updating",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/updating",
       "fallbackUrl": null,
@@ -2163,11 +2142,7 @@
       "id": "hermes.agent.installation",
       "surface": "hermes.agent",
       "topic": "installation",
-      "aliases": [
-        "install",
-        "installer",
-        "설치"
-      ],
+      "aliases": ["install", "installer", "설치"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/installation",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/installation",
       "fallbackUrl": null,
@@ -2183,11 +2158,7 @@
       "id": "hermes.agent.platform-support",
       "surface": "hermes.agent",
       "topic": "platform-support",
-      "aliases": [
-        "platform",
-        "support-matrix",
-        "지원플랫폼"
-      ],
+      "aliases": ["platform", "support-matrix", "지원플랫폼"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/platform-support",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/getting-started/platform-support",
       "fallbackUrl": null,
@@ -2203,12 +2174,7 @@
       "id": "hermes.agent.windows-native",
       "surface": "hermes.agent",
       "topic": "windows-native",
-      "aliases": [
-        "windows",
-        "native-windows",
-        "윈도우",
-        "윈도우네이티브"
-      ],
+      "aliases": ["windows", "native-windows", "윈도우", "윈도우네이티브"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-native",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-native",
       "fallbackUrl": null,
@@ -2224,12 +2190,7 @@
       "id": "hermes.agent.windows-wsl",
       "surface": "hermes.agent",
       "topic": "windows-wsl",
-      "aliases": [
-        "wsl",
-        "wsl2",
-        "windows-wsl2",
-        "윈도우WSL"
-      ],
+      "aliases": ["wsl", "wsl2", "windows-wsl2", "윈도우WSL"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-wsl-quickstart",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-wsl-quickstart",
       "fallbackUrl": null,
@@ -2245,11 +2206,7 @@
       "id": "hermes.agent.web-dashboard",
       "surface": "hermes.agent",
       "topic": "web-dashboard",
-      "aliases": [
-        "dashboard",
-        "web-ui",
-        "웹대시보드"
-      ],
+      "aliases": ["dashboard", "web-ui", "웹대시보드"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/web-dashboard",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/features/web-dashboard",
       "fallbackUrl": null,
@@ -2265,11 +2222,7 @@
       "id": "hermes.agent.multi-profile-gateways",
       "surface": "hermes.agent",
       "topic": "multi-profile-gateways",
-      "aliases": [
-        "multi-gateway",
-        "profile-gateway",
-        "다중게이트웨이"
-      ],
+      "aliases": ["multi-gateway", "profile-gateway", "다중게이트웨이"],
       "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/multi-profile-gateways",
       "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/multi-profile-gateways",
       "fallbackUrl": null,
