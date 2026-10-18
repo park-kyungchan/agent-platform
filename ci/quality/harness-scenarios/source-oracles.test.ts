@@ -3,12 +3,12 @@ import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { generateHermesSourceFixture } from "../../native-hermes-adapter/src/source-provider/generate.ts";
+import { generateHermesSourceFixture } from "../../../packages/native-hermes-adapter/src/source-provider/generate.ts";
 import {
   applyHermesSourceDelivery,
   prepareHermesSourceDelivery,
   deliveryPaths,
-} from "../../native-hermes-adapter/src/source-provider/delivery.ts";
+} from "../../../packages/native-hermes-adapter/src/source-provider/delivery.ts";
 
 import { fixture as workFixture } from "./fixtures/work.ts";
 import { hermes } from "./fixtures/consumers.ts";
