@@ -17,13 +17,13 @@
     "taskId": "ODI-05-NATIVE-MEMORY-CALLER-RECEIVER"
   },
   "title": "Verify exact shared H3 native caller receipt through the canonical Codex reader",
-  "nextAction": "Actual Root read of shared H3 and exact producer/receiver payload joins is locally durable. Deliver this receiver Task evidence in its own H4 shared source and finish its audit separately; never replay Run12 or infer whole Goal Acceptance.",
+  "nextAction": "Receiver Task own H4 shared delivery and actual Root canonical read/audit are confirmed in codex-harness-engineering:evidence:run12-receiver-shared-audit. Preserve native Run12 consumed effect and all original execution/verification evidence; do not replay or create another receipt Task. Continue admitted Plan2 priorities; whole-Goal/domain Acceptance remains separate.",
   "state": {
     "execution": "complete",
     "verification": "passed",
     "localAudit": "result-durable",
-    "sharedAudit": "pending",
-    "formalCompletion": "audit-synchronization-pending"
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
   },
   "executionClass": "source-only",
   "dependsOn": [
