@@ -1,0 +1,1224 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-ACTUAL-SOURCE-OUTCOME",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "odi07-source-outcome/ODI-07-GANG-OWNER-ACTUAL-SOURCE-OUTCOME@eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi07.actual-source-outcome-reconciliation.v1",
+    "atUtc": "2026-10-18T13:47:12.318Z",
+    "observationClass": "Root-produced native source-result artifacts consumed locally; no fresh native execution or remote re-query",
+    "selectedWork": {
+      "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+      "tree": "1b460058d831a4e6145e2ce9d0c7598716c7f72d",
+      "sharedPublicationSha256": "4c926e53283ff6b47ec7fd685d2474e3cb5200e3b155c8a1903326d4b1386e3e",
+      "sharedPublicationIsCandidateDelivery": false
+    },
+    "logicalTasks": [
+      {
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-platform-integration-20261017",
+        "issueId": "ODI-ISSUE-20261017",
+        "specId": "ODI-SPEC",
+        "specRevision": 1,
+        "planId": "ODI-PLAN",
+        "planRevision": 1,
+        "taskId": "ODI-07-GANG-OWNER"
+      },
+      {
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-platform-integration-20261017",
+        "issueId": "ODI-ISSUE-20261017",
+        "specId": "ODI-SPEC",
+        "specRevision": 1,
+        "planId": "ODI-PLAN",
+        "planRevision": 1,
+        "taskId": "ODI-07-GANG-OWNER-REVIEW"
+      }
+    ],
+    "contractBindings": {
+      "owner": {
+        "recordId": "ODI-07-GANG-OWNER-CONTRACT",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-CONTRACT.json",
+        "sha256": "bcf36e99a214cbce3171bdb1bf831216384895aadb421d4adbe2f8127530fcba"
+      },
+      "review": {
+        "recordId": "ODI-07-GANG-OWNER-REVIEW-CONTRACT",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-CONTRACT.json",
+        "sha256": "08557c2b57b7c6d075939f3f73255e351e041e9278aa0f5cda7515daf2710c30"
+      }
+    },
+    "sourceOutcomes": {
+      "education": {
+        "repository": "park-kyungchan/education-platform",
+        "PR": 14,
+        "H": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+        "M": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+        "tree": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+        "parents": [
+          "af61d9707b22b2434fb64db2bc28e25b8985558f",
+          "6bc31886fea36d441f7f88bf880d0e61189b952f"
+        ],
+        "sourcePeerReview": "genuine current exact-H review, required0",
+        "HauthenticatedStatus": 56629241903,
+        "Hreceipt": {
+          "commit": "afe354bae388fc71cf1be362dd252a3373b177b9",
+          "path": "native-reviews/6bc31886fea36d441f7f88bf880d0e61189b952f.json",
+          "sha256": "51c7b3939485e04d32902fe86f66cee9495aefafeea6e5fb0ceab8c124730dba"
+        },
+        "MauthenticatedStatus": 56630715517,
+        "Mreceipt": {
+          "commit": "e2ee694e0b5721f9824224e76c0dbd254ac8108b",
+          "path": "native-reviews/8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e.json",
+          "sha256": "6ce1de877a8ce42873094c4294855817743bdacedfad75319fc7ab99220a2b90"
+        },
+        "McanonicalGate": "PASS with explicit identical-tree reviewReuse, no fresh peer",
+        "mainCI": {
+          "atUtc": "2026-10-18T13:15:58.739306+00:00",
+          "run": {
+            "id": 39127324658,
+            "status": "completed",
+            "conclusion": "success",
+            "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+            "run_attempt": 2
+          },
+          "jobs": [
+            {
+              "id": 117684906044,
+              "name": "Exact head native independent review",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e"
+            },
+            {
+              "id": 117684907507,
+              "name": "Canonical source checks",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e"
+            },
+            {
+              "id": 117684957982,
+              "name": "Source and native review gate",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e"
+            }
+          ]
+        },
+        "originalFailedAttempt": {
+          "head": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+          "runs": [
+            {
+              "id": 39127324658,
+              "name": "Source verification",
+              "event": "push",
+              "status": "completed",
+              "conclusion": "failure",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+              "run_attempt": 1
+            }
+          ]
+        },
+        "consumedOneFailedJobsRetry": {
+          "rootIntentSha256": "dc734c2d65d38343aef09f782ecb7ab56370fd95142c65113f5f7a92da343f4c",
+          "responseSha256": "4e43941434208e37014c3385cdf969bfd4b0880ca8b84b055ba35167dde7f5af",
+          "replayForbidden": true
+        }
+      },
+      "gang": {
+        "repository": "park-kyungchan/gang-a",
+        "PR": 5,
+        "H": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+        "M": "c4475511b347e9fdc83a7ebbc4b5a1779fa1be6e",
+        "tree": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+        "parents": [
+          "7b5cf56dd6f19ffe56d180b61c03d8366f5f98b1",
+          "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207"
+        ],
+        "ownerEducationMergedFirst": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+        "HauthenticatedStatus": 56629280363,
+        "Hreceipt": {
+          "commit": "b80fa2dca11fbc4627f6058d31a1e3da8a4a2f6b",
+          "path": "native-reviews/2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207.json",
+          "sha256": "13dbb878ced26ef17a3de4129fe98636f976d3516944a10a7da401eaa0219597"
+        },
+        "sourceCanonicalProof": "actual common-M owner proof PASS; no hosted Gang owner-review gate",
+        "mainCI": {
+          "id": 39127533223,
+          "name": "Code-only synthetic validation",
+          "event": "push",
+          "status": "completed",
+          "conclusion": "success",
+          "head_sha": "c4475511b347e9fdc83a7ebbc4b5a1779fa1be6e",
+          "run_attempt": 1
+        },
+        "MnativeReviewStatus": "not inferred from H or main validate CI",
+        "freeze": {
+          "trackedPaths": 129,
+          "frozenImplementationBlobs": 127,
+          "nativeYamlAndBunSplitPreserved": true
+        }
+      }
+    },
+    "sourceResult": {
+      "sourceOwnerRelation": "typed and consumed in existing SourceMap/readSourceMap checker",
+      "retainedGangFreeze": "source129/127 preserved; only admitted governance metadata changed",
+      "reviewPublicationIntegrationSourceCI": "actual exactH and explicitM milestones recorded",
+      "sourceChecksOrEffectsReplayed": false,
+      "newPeerReviewClaimed": false,
+      "repoOutcomeIsWorkSharedAuditOrTaskNativeReceipt": false
+    },
+    "originalNativeTaskBoundary": {
+      "ownerInitialRuntimeId": "native-codex:01a14734-9160-70a2-a10d-df6ea9c50b91",
+      "reviewInitialRuntimeId": "native-codex:01a149a6-5080-76e3-b094-2816479f55a9",
+      "originalNativeReviewFinalObservation": {
+        "schema": "odi07.actual-native-review-completion-observation.v1",
+        "nativeSessionId": "01a149a6-5080-76e3-b094-2816479f55a9",
+        "nativeTurnId": "01a149ba-2065-7101-b55c-e131b8d26bea",
+        "nativeFinalMessageId": "msg_025e4cc173b7bdf5016ad3644eb3408191981dfd55b0c23d2b",
+        "completed": true,
+        "nativeFinalSha256": "613e57df57bfc83dc5f4d38bd4d6af2ebab78149aa0bd33b7baf97857f9afe95",
+        "nativeFinalBytes": 5125,
+        "completedAtUtc": "2026-10-17T12:04:50.558Z",
+        "finalPhase": "final_answer",
+        "sourceLine": 291,
+        "terminalSourceLine": 294,
+        "status": "completed",
+        "processExitCode": null,
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "extractionCorrection": "Native CLI phase is final_answer, not final. These additions use the same already-frozen prefix and preserve initial observation bytes."
+      },
+      "originalNativeReviewObservedCompleted": true,
+      "currentWorkOccurrenceAndExecutionEvidenceUnchanged": true,
+      "currentSourcePeerAddressNamespace": "codex-native-collaboration-task-address",
+      "currentSourcePeerReviewer": "/root/gang_successor_review",
+      "currentSourceAuthor": "/root",
+      "freshSourcePeerIsOriginalNativeReviewOccurrence": false,
+      "nativeEntityTaskId": null,
+      "nativeEntityRunId": null
+    },
+    "currentness": {
+      "asOfRootArtifacts": {
+        "educationProof": "2026-10-18T13:11:41.437Z",
+        "educationMainCI": "2026-10-18T13:15:58.739306+00:00",
+        "gangMergeBinding": "2026-10-18T12:31:11.805984+00:00",
+        "gangMainObservation": "2026-10-18T12:33:40.534869+00:00"
+      },
+      "workerNativeRequeryOrRetry": false,
+      "platformRunIdsAreNativeEntityIds": false,
+      "oldFailedAttemptAndOriginalRawProofsPreserved": true,
+      "rootBindingsEarlierPendingClaimsAreHistoricalSupersededOnlyByExactLaterProofCI": true
+    },
+    "remainingGates": {
+      "owner": "Root typed successor/exit adjudication required: immutable original contract fixes historical3file postimages and says child stays planned; source milestones do not silently alter that contract.",
+      "review": "Root qualifies original native01a149a6 occurrence and execution receipt/Verification join from original observed final; new source peer/Git status/merge/CI is not a replacement. Do not redispatch.",
+      "sharedAudit": "Current EEFF pub002 is actual delivery of old selected snapshot; this new candidate/source records have no shared delivery or independent receiver yet.",
+      "nativeActivationHumanRetirementWholeAcceptance": "Separate owners/holds; no inference or global prerequisite."
+    },
+    "capturedRootAndSourceArtifacts": {
+      "educationBinding": {
+        "ownerLocator": "education-owner-pr14-M8611.Root-binding.actual.json",
+        "sha256": "388efb3ef325b953b8dff8325bfbff18387182f6a1158fa9694e374c6489aebd",
+        "bytes": 1163,
+        "value": {
+          "schema": "odi.Root-actual-Education-owner-merge-and-identical-tree-reuse-binding.v1",
+          "atUtc": "2026-10-18T12:27:31.462178+00:00",
+          "repository": "park-kyungchan/education-platform",
+          "PR": 14,
+          "M": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+          "head": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+          "tree": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+          "parents": [
+            "af61d9707b22b2434fb64db2bc28e25b8985558f",
+            "6bc31886fea36d441f7f88bf880d0e61189b952f"
+          ],
+          "actualMain": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+          "RootReviewReuseDecision": "EXACT_IDENTICAL_TREE_AND_CURRENT_ZERO_FINDINGS_QUALIFIED_FOR_EXPLICIT_SUCCESSOR_PROOF",
+          "priorReviewReceipt": "afe354bae388fc71cf1be362dd252a3373b177b9",
+          "priorReviewStatus": 56629241903,
+          "currentFindingsSHA256": "2c77ff1f7d04b8d7a2c4f027cafc56b63ee88c791166ea5e94ae57ab142a59b4",
+          "remaining": "Separate exactM portable successor proof/authenticatedstatus/actual canonicalgate before native owner activation. Main automaticCI outcome not yet claimed; do not reuse sourceHstatus asMstatus. No rerun here.",
+          "nativeActivation": false,
+          "GoalChanged": false,
+          "wholeAcceptance": false
+        }
+      },
+      "gangBinding": {
+        "ownerLocator": "gang-owner-pr5-Mc447.Root-binding.actual.json",
+        "sha256": "ffff110e5fbe606e7708445455eda964a474bf0a317becd854ff2d4aabb2d8b3",
+        "bytes": 1189,
+        "value": {
+          "schema": "odi.Root-actual-Gang-owner-merge-identical-tree-reuse-binding.v1",
+          "atUtc": "2026-10-18T12:31:11.805984+00:00",
+          "repository": "park-kyungchan/gang-a",
+          "PR": 5,
+          "M": "c4475511b347e9fdc83a7ebbc4b5a1779fa1be6e",
+          "head": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+          "tree": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+          "parents": [
+            "7b5cf56dd6f19ffe56d180b61c03d8366f5f98b1",
+            "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207"
+          ],
+          "actualMain": "c4475511b347e9fdc83a7ebbc4b5a1779fa1be6e",
+          "RootReviewReuseDecision": "EXACT_IDENTICAL_TREE_EXPLICIT_SUCCESSOR_BINDING_CURRENT_ZERO_FINDINGS",
+          "priorReviewReceipt": "b80fa2dca11fbc4627f6058d31a1e3da8a4a2f6b",
+          "priorReviewStatus": 56629280363,
+          "currentFindingsSHA256": "2c77ff1f7d04b8d7a2c4f027cafc56b63ee88c791166ea5e94ae57ab142a59b4",
+          "ownerContractMergedFirst": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+          "remaining": "Actual mainfreezeCI not yet claimed; no hostedGangnativeReviewgate installed orMauthenticatedstatus inferred. Native source adoption/deployedparity/retirement/human/whole Acceptance remain separate.",
+          "nativeActivation": false,
+          "GoalChanged": false,
+          "wholeAcceptance": false
+        }
+      },
+      "educationMProof": {
+        "ownerLocator": "Root-education-owner-M8611-manual-publication.once/actual-publication.json",
+        "sha256": "2b7ec3f1026132838fceb0c2b939d7a191da11d6b8645e033a242f801ee6f176",
+        "bytes": 1712,
+        "value": {
+          "atUtc": "2026-10-18T13:11:41.437Z",
+          "M": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+          "T": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+          "R": "e2ee694e0b5721f9824224e76c0dbd254ac8108b",
+          "statusId": 56630715517,
+          "proof": {
+            "schema": "owner-scoped-native-review-ci.v1",
+            "binding": {
+              "repository": "park-kyungchan/education-platform",
+              "projectId": "education-platform",
+              "domainId": "education",
+              "semanticOwner": "education-platform",
+              "scope": "month-end-source-redesign"
+            },
+            "headSha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+            "reviewedTreeSha": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+            "receipt": {
+              "commit": "e2ee694e0b5721f9824224e76c0dbd254ac8108b",
+              "path": "native-reviews/8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e.json",
+              "sha256": "6ce1de877a8ce42873094c4294855817743bdacedfad75319fc7ab99220a2b90"
+            },
+            "manifest": {
+              "schema": "agent-platform.reviewed-source-manifest.v1",
+              "reviewedTreeSha": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+              "entryCount": 1259,
+              "blobCount": 1089,
+              "sha256": "a347f0ea1a7f25c0aeb7ecd21fcabcb2e0099df722b5beb9394c1db11071a63f"
+            },
+            "publisherAuthenticated": true,
+            "nativeAuthenticationEstablished": false,
+            "nativePermissionGranted": false,
+            "acceptanceEstablished": false
+          },
+          "publisherAuthenticated": true,
+          "nativeAuthenticationEstablished": false,
+          "nativePermissionGranted": false,
+          "actualPinnedOwnerGate": "PASS",
+          "sourceReviewReused": true,
+          "newIndependentReviewPerformed": false,
+          "sourceMainIndexOtherRefsChanged": false,
+          "CIAlreadyRetried": false,
+          "PR": false,
+          "merge": false,
+          "activation": false,
+          "calls": 15
+        }
+      },
+      "educationFinalMainCI": {
+        "ownerLocator": "education-owner-M8611-main-run.after-M-proof-and-one-retry.actual.json",
+        "sha256": "53891f270aa7794da4c9cfe58bc2a6d535d769732ba8c7813aeb893bab075778",
+        "bytes": 864,
+        "value": {
+          "atUtc": "2026-10-18T13:15:58.739306+00:00",
+          "run": {
+            "id": 39127324658,
+            "status": "completed",
+            "conclusion": "success",
+            "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+            "run_attempt": 2
+          },
+          "jobs": [
+            {
+              "id": 117684906044,
+              "name": "Exact head native independent review",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e"
+            },
+            {
+              "id": 117684907507,
+              "name": "Canonical source checks",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e"
+            },
+            {
+              "id": 117684957982,
+              "name": "Source and native review gate",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e"
+            }
+          ]
+        }
+      },
+      "initialMainCI": {
+        "ownerLocator": "gang-owner-merged-main-native-runs.001.actual.json",
+        "sha256": "2f5786dc4085e20581236e2c7fdb325d539d5ff3f3dcf47c3e39f6159c2c9283",
+        "bytes": 893,
+        "value": {
+          "atUtc": "2026-10-18T12:33:40.534869+00:00",
+          "repositories": {
+            "park-kyungchan/education-platform": {
+              "head": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+              "runs": [
+                {
+                  "id": 39127324658,
+                  "name": "Source verification",
+                  "event": "push",
+                  "status": "completed",
+                  "conclusion": "failure",
+                  "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+                  "run_attempt": 1
+                }
+              ]
+            },
+            "park-kyungchan/gang-a": {
+              "head": "c4475511b347e9fdc83a7ebbc4b5a1779fa1be6e",
+              "runs": [
+                {
+                  "id": 39127533223,
+                  "name": "Code-only synthetic validation",
+                  "event": "push",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "head_sha": "c4475511b347e9fdc83a7ebbc4b5a1779fa1be6e",
+                  "run_attempt": 1
+                }
+              ]
+            }
+          }
+        }
+      },
+      "educationInitialJobs": {
+        "ownerLocator": "education-owner-M8611-main-run39127324658.jobs.attempt1.actual.json",
+        "sha256": "86d899c68e2930fd347bb5db8015e3b943187703c59d58cd6aa997f38e9d13d4",
+        "bytes": 6344,
+        "value": {
+          "atUtc": "2026-10-18T12:34:05.120526+00:00",
+          "run": 39127324658,
+          "attempt": 1,
+          "jobs": [
+            {
+              "id": 117675085418,
+              "name": "Exact head native independent review",
+              "status": "completed",
+              "conclusion": "failure",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 1,
+                  "started_at": "2026-10-18T12:27:08Z",
+                  "completed_at": "2026-10-18T12:27:09Z"
+                },
+                {
+                  "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 2,
+                  "started_at": "2026-10-18T12:27:09Z",
+                  "completed_at": "2026-10-18T12:27:11Z"
+                },
+                {
+                  "name": "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 3,
+                  "started_at": "2026-10-18T12:27:11Z",
+                  "completed_at": "2026-10-18T12:27:13Z"
+                },
+                {
+                  "name": "Verify generated owner review closure",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 4,
+                  "started_at": "2026-10-18T12:27:13Z",
+                  "completed_at": "2026-10-18T12:27:13Z"
+                },
+                {
+                  "name": "Read immutable native review receipt for this exact head",
+                  "status": "completed",
+                  "conclusion": "failure",
+                  "number": 5,
+                  "started_at": "2026-10-18T12:27:13Z",
+                  "completed_at": "2026-10-18T12:27:14Z"
+                },
+                {
+                  "name": "Post Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+                  "status": "completed",
+                  "conclusion": "skipped",
+                  "number": 9,
+                  "started_at": "2026-10-18T12:27:14Z",
+                  "completed_at": "2026-10-18T12:27:14Z"
+                },
+                {
+                  "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 10,
+                  "started_at": "2026-10-18T12:27:14Z",
+                  "completed_at": "2026-10-18T12:27:14Z"
+                },
+                {
+                  "name": "Complete job",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 11,
+                  "started_at": "2026-10-18T12:27:14Z",
+                  "completed_at": "2026-10-18T12:27:14Z"
+                }
+              ]
+            },
+            {
+              "id": 117675085631,
+              "name": "Canonical source checks",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 1,
+                  "started_at": "2026-10-18T12:27:08Z",
+                  "completed_at": "2026-10-18T12:27:10Z"
+                },
+                {
+                  "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 2,
+                  "started_at": "2026-10-18T12:27:10Z",
+                  "completed_at": "2026-10-18T12:27:11Z"
+                },
+                {
+                  "name": "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 3,
+                  "started_at": "2026-10-18T12:27:11Z",
+                  "completed_at": "2026-10-18T12:27:12Z"
+                },
+                {
+                  "name": "Install checksum-verified private toolchains and frozen dependencies",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 4,
+                  "started_at": "2026-10-18T12:27:12Z",
+                  "completed_at": "2026-10-18T12:27:19Z"
+                },
+                {
+                  "name": "Verify generated CI projection and scoped module integration",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 5,
+                  "started_at": "2026-10-18T12:27:19Z",
+                  "completed_at": "2026-10-18T12:27:50Z"
+                },
+                {
+                  "name": "Post Verify generated CI projection and scoped module integration",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 8,
+                  "started_at": "2026-10-18T12:27:50Z",
+                  "completed_at": "2026-10-18T12:27:50Z"
+                },
+                {
+                  "name": "Post Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 9,
+                  "started_at": "2026-10-18T12:27:50Z",
+                  "completed_at": "2026-10-18T12:27:51Z"
+                },
+                {
+                  "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 10,
+                  "started_at": "2026-10-18T12:27:51Z",
+                  "completed_at": "2026-10-18T12:27:51Z"
+                },
+                {
+                  "name": "Complete job",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 11,
+                  "started_at": "2026-10-18T12:27:51Z",
+                  "completed_at": "2026-10-18T12:27:51Z"
+                }
+              ]
+            },
+            {
+              "id": 117675246290,
+              "name": "Source and native review gate",
+              "status": "completed",
+              "conclusion": "failure",
+              "head_sha": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 1,
+                  "started_at": "2026-10-18T12:27:55Z",
+                  "completed_at": "2026-10-18T12:27:55Z"
+                },
+                {
+                  "name": "Require both source checks and exact head native review",
+                  "status": "completed",
+                  "conclusion": "failure",
+                  "number": 2,
+                  "started_at": "2026-10-18T12:27:55Z",
+                  "completed_at": "2026-10-18T12:27:55Z"
+                },
+                {
+                  "name": "Complete job",
+                  "status": "completed",
+                  "conclusion": "success",
+                  "number": 3,
+                  "started_at": "2026-10-18T12:27:55Z",
+                  "completed_at": "2026-10-18T12:27:55Z"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "educationHProof": {
+        "ownerLocator": "Root-gang-owner-education-source-review-publication-once-001/actual-publication.json",
+        "sha256": "2435ea01227a884738e62606d37570ee7ba38f4a4b2c852fdf30e237a5de5653",
+        "bytes": 1193,
+        "value": {
+          "H": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+          "T": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+          "R": "afe354bae388fc71cf1be362dd252a3373b177b9",
+          "statusId": 56629241903,
+          "proof": {
+            "schema": "owner-scoped-native-review-ci.v1",
+            "binding": {
+              "repository": "park-kyungchan/education-platform",
+              "projectId": "education-platform",
+              "domainId": "education",
+              "semanticOwner": "education-platform",
+              "scope": "month-end-source-redesign"
+            },
+            "headSha": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+            "reviewedTreeSha": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+            "receipt": {
+              "commit": "afe354bae388fc71cf1be362dd252a3373b177b9",
+              "path": "native-reviews/6bc31886fea36d441f7f88bf880d0e61189b952f.json",
+              "sha256": "51c7b3939485e04d32902fe86f66cee9495aefafeea6e5fb0ceab8c124730dba"
+            },
+            "manifest": {
+              "schema": "agent-platform.reviewed-source-manifest.v1",
+              "reviewedTreeSha": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+              "entryCount": 1259,
+              "blobCount": 1089,
+              "sha256": "a347f0ea1a7f25c0aeb7ecd21fcabcb2e0099df722b5beb9394c1db11071a63f"
+            },
+            "publisherAuthenticated": true,
+            "nativeAuthenticationEstablished": false,
+            "nativePermissionGranted": false,
+            "acceptanceEstablished": false
+          },
+          "qualification": "compiled gate",
+          "PR": false,
+          "merge": false,
+          "activation": false,
+          "calls": 118
+        }
+      },
+      "gangHProof": {
+        "ownerLocator": "Root-gang-owner-gang-source-review-publication-once-001/actual-publication.json",
+        "sha256": "36344c84c2cd37ae1475b3d91b3a585a3a703c8eee9b37f36a6373c7c5aa1e13",
+        "bytes": 1196,
+        "value": {
+          "H": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+          "T": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+          "R": "b80fa2dca11fbc4627f6058d31a1e3da8a4a2f6b",
+          "statusId": 56629280363,
+          "proof": {
+            "schema": "owner-scoped-native-review-ci.v1",
+            "binding": {
+              "repository": "park-kyungchan/gang-a",
+              "projectId": "gang-a",
+              "domainId": "education",
+              "semanticOwner": "education-platform",
+              "scope": "retained-gang-source-maintenance"
+            },
+            "headSha": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+            "reviewedTreeSha": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+            "receipt": {
+              "commit": "b80fa2dca11fbc4627f6058d31a1e3da8a4a2f6b",
+              "path": "native-reviews/2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207.json",
+              "sha256": "13dbb878ced26ef17a3de4129fe98636f976d3516944a10a7da401eaa0219597"
+            },
+            "manifest": {
+              "schema": "agent-platform.reviewed-source-manifest.v1",
+              "reviewedTreeSha": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+              "entryCount": 159,
+              "blobCount": 129,
+              "sha256": "6edb08a2feec1a31237af4a33e11a5c39a6d900a4547875227da2653f306d115"
+            },
+            "publisherAuthenticated": true,
+            "nativeAuthenticationEstablished": false,
+            "nativePermissionGranted": false,
+            "acceptanceEstablished": false
+          },
+          "qualification": "common-M proof; no hosted Gang gate",
+          "PR": false,
+          "merge": false,
+          "activation": false,
+          "calls": 103
+        }
+      },
+      "educationMergeDecision": {
+        "ownerLocator": "Root-education-owner-pr14.merge-once.intent.json",
+        "sha256": "127a2f56e3b9e6db3c303320865c85c2dc73545966618b3c8336adbf948b2e82",
+        "bytes": 2168,
+        "value": {
+          "schema": "odi.Root-explicit-expected-head-Education-owner-merge-decision.v1",
+          "atUtc": "2026-10-18T12:26:54.892017+00:00",
+          "producer": "/root",
+          "repository": "park-kyungchan/education-platform",
+          "PR": 14,
+          "expectedHead": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+          "expectedBase": "af61d9707b22b2434fb64db2bc28e25b8985558f",
+          "decision": "MERGE_ONCE_EXPECTED_HEAD_VIA_NATIVE_GITHUB_MERGE_API",
+          "method": "merge",
+          "treeMustReadBack": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+          "authenticatedReviewStatus": 56629241903,
+          "allThreeActualRequiredChecks": "success",
+          "checks": [
+            {
+              "id": 117673602967,
+              "name": "Canonical source checks",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+              "details_url": "https://github.com/park-kyungchan/education-platform/actions/runs/39126825940/job/117673602967"
+            },
+            {
+              "id": 117673603229,
+              "name": "Exact head native independent review",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+              "details_url": "https://github.com/park-kyungchan/education-platform/actions/runs/39126825940/job/117673603229"
+            },
+            {
+              "id": 117673777497,
+              "name": "Source and native review gate",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+              "details_url": "https://github.com/park-kyungchan/education-platform/actions/runs/39126825940/job/117673777497"
+            }
+          ],
+          "rules": "Observed24868697 strict checks +PR/merge only, no auto-merge enabled; actualreviews/inline empty in002 capture. No bypass requested.",
+          "scope": "Existing approved exact-source integration. Explicit Lead decision with current0 findings and actual published independent review. Native activation/domain/human/whole Acceptance separate.",
+          "afterMerge": "Read actual newM/parents/tree/ref. Require exact same reviewed tree before explicit reuse/successor proof. Main owner gate review status forM must be separately published; no old proof/status or failed CI replay."
+        }
+      },
+      "gangMergeDecision": {
+        "ownerLocator": "Root-gang-owner-pr5.merge-once.intent.json",
+        "sha256": "2fbb2442482eafd06af8e541a262d4fa19818b78ee256391b5d2e85737a2bc4d",
+        "bytes": 1730,
+        "value": {
+          "schema": "odi.Root-explicit-expected-head-Gang-retained-source-merge-decision.v1",
+          "atUtc": "2026-10-18T12:29:53.694609+00:00",
+          "producer": "/root",
+          "repository": "park-kyungchan/gang-a",
+          "PR": 5,
+          "expectedHead": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+          "expectedBase": "7b5cf56dd6f19ffe56d180b61c03d8366f5f98b1",
+          "decision": "MERGE_ONCE_EXPECTED_HEAD_VIA_NATIVE_GITHUB_MERGE_API",
+          "method": "merge",
+          "treeMustReadBack": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+          "authenticatedReviewStatus": 56629280363,
+          "actualValidateCheck": {
+            "id": 117673811676,
+            "name": "validate",
+            "status": "completed",
+            "conclusion": "success",
+            "head_sha": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+            "details_url": "https://github.com/park-kyungchan/gang-a/actions/runs/39126899283/job/117673811676"
+          },
+          "ownerDependency": {
+            "EducationOwnerContractMerged": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+            "reviewedTreeUnchanged": true,
+            "EducationMainProofAndCI": "separate pending qualification; not claimed passed here",
+            "basis": "Gang navigation source dependency is actual merged canonical owner contract. Its own exactH source/freeze/review/auth/check prerequisites passed. No native/domain cutover or whole Engineering Acceptance follows."
+          },
+          "rules": "Actual main rules[]; no automatic merge enabled; actualreviews/inline[] in002capture. Explicit API merge only.",
+          "currentFindingsSHA256": "2c77ff1f7d04b8d7a2c4f027cafc56b63ee88c791166ea5e94ae57ab142a59b4",
+          "afterMerge": "ActualM/parents/tree/ref readback and explicit identical-tree/currentzero reuse binding; retain old129paths127blobs/sourceMhumanholds. Actual mainfreezeCI later; no nativeactivation/Goal action."
+        }
+      },
+      "sourceFindings": {
+        "ownerLocator": "gang-owner-typed-successor-prep/independent-review/current-findings.actual.json",
+        "sha256": "2c77ff1f7d04b8d7a2c4f027cafc56b63ee88c791166ea5e94ae57ab142a59b4",
+        "bytes": 3385,
+        "value": {
+          "schema": "odi.gang-owner-typed-successor.current-independent-findings.v1",
+          "atUtc": "2026-10-18T10:41:39.536Z",
+          "reviewer": {
+            "runtime": "native-codex",
+            "taskAddress": "/root/gang_successor_review",
+            "namespace": "codex-native-collaboration-task-address"
+          },
+          "sources": [
+            {
+              "repository": "park-kyungchan/education-platform",
+              "head": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+              "tree": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+              "reviewedSourceManifestSha256": "a347f0ea1a7f25c0aeb7ecd21fcabcb2e0099df722b5beb9394c1db11071a63f",
+              "requiredFindings": [],
+              "unresolvedRequiredFindings": 0,
+              "reviewStatus": "complete",
+              "conclusion": "pass"
+            },
+            {
+              "repository": "park-kyungchan/gang-a",
+              "head": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+              "tree": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+              "reviewedSourceManifestSha256": "6edb08a2feec1a31237af4a33e11a5c39a6d900a4547875227da2653f306d115",
+              "requiredFindings": [],
+              "unresolvedRequiredFindings": 0,
+              "reviewStatus": "complete",
+              "conclusion": "pass"
+            }
+          ],
+          "assessment": [
+            "Education owner relation is now consumed by existing readSourceMap: fixed maintained root/repository, exact imported baseline, 129/127 denominator, exactly two governance paths and historical reference-only source are checked before existing status/module/check routes return. Existing denial tests cover missing/mismatched ownership, source ambiguity, freeze drift, native parity and authority/retirement escalation.",
+            "Gang successor removes old added ordinary maintenance prose, preserves all original baseline README prose and adds one navigation link to canonical consumed Education JSON. Required native YAML and inline typed freeze remain byte-identical to the historical prepared candidate.",
+            "Gang exact tree retains 129 paths and 127 identical frozen blobs/modes. Existing freeze check log is exact successor head under Bun1.4.2 with 14 self-tests (12 negative and 2 positive). Education retains its separate Bun1.4.3 runtime and integrated CI/provider closure unchanged.",
+            "Actual source originals, student/native owners, historical d604 unknown parity, human semantic disposition, non-cutover and non-retirement holds remain intact. No new framework, namespace, store, runtime port, CI Agent or global language rule is introduced."
+          ],
+          "checks": {
+            "source": "../scoped-checks.actual.json",
+            "allSixScopedChecksPassed": true,
+            "allSixLogHashesIndependentlyRecomputed": true,
+            "noFullChecksRepeated": true,
+            "syntheticPublicationTestsAreActualAuthenticatedReviewStatus": false
+          },
+          "limits": [
+            "Local exact-source independent review only; no remote currentness reauthentication, authenticated native-independent-review status, publication permission, native adoption, live parity or whole Acceptance is established.",
+            "Full canonical Git tree manifests independently recomputed; complete baseline-to-head diffs and all changed file bodies reviewed. Unchanged file bodies were not exhaustively reread.",
+            "Historical 04-R exact prerequisite and ROOT/REVIEW receiver source tuples were consumed from selected Work87074 source context; those historical receivers are not this reviewer native receipt or native authorship authentication."
+          ],
+          "nativePermissionGranted": false
+        }
+      },
+      "sourcePeerProvenance": {
+        "ownerLocator": "gang-owner-typed-successor-prep/independent-review/provenance.successor.actual.json",
+        "sha256": "14ec025cb6819efab9ab77fe4d1b4ae53cd8da57e9fa42ae011fc1d06befe344",
+        "bytes": 4625,
+        "value": {
+          "schema": "odi.gang-owner-typed-successor.actual-independent-peer-provenance.v1",
+          "atUtc": "2026-10-18T10:41:39.536Z",
+          "work": {
+            "repository": "park-kyungchan/agent-platform",
+            "commit": "87074a9f3f140e7c6cac7f0a250cf41c9ef46aaa",
+            "taskIds": [
+              "ODI-07-GANG-OWNER",
+              "ODI-07-GANG-OWNER-REVIEW"
+            ],
+            "specRevision": 1,
+            "activePlanRevision": 2,
+            "historicalTaskPlanRevision": 1
+          },
+          "identity": {
+            "namespace": "codex-native-collaboration-task-address",
+            "reviewer": {
+              "runtime": "native-codex",
+              "taskAddress": "/root/gang_successor_review",
+              "nativeEntityTaskId": null,
+              "nativeEntityRunId": null,
+              "nativeSessionId": null
+            },
+            "author": {
+              "runtime": "native-codex",
+              "taskAddress": "/root",
+              "nativeEntityTaskId": null,
+              "nativeEntityRunId": null,
+              "nativeSessionId": null
+            },
+            "independence": "Fresh separately delegated native collaboration reviewer task; reviewer did not author source. Addresses are actual native collaboration task identities, not entity Task/Run IDs or proof of distinct native sessions.",
+            "authenticatedPublisherObserved": false
+          },
+          "scope": "Fresh exact-source independent review of new6bc318/2e6f288; not reuse of olddcf314/3f0af3f review.",
+          "literalPeerOutputs": [
+            {
+              "path": "education.owner-raw.actual.json",
+              "sha256": "587ba36d7f23c2700260696c9b09144ad93c787fe0fb6aa52f52e6f113d1bc78",
+              "byteLength": 773,
+              "repository": "park-kyungchan/education-platform",
+              "head": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+              "tree": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+              "manifest": {
+                "schema": "agent-platform.reviewed-source-manifest.v1",
+                "reviewedTreeSha": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+                "entryCount": 1259,
+                "blobCount": 1089,
+                "sha256": "a347f0ea1a7f25c0aeb7ecd21fcabcb2e0099df722b5beb9394c1db11071a63f"
+              }
+            },
+            {
+              "path": "gang.owner-raw.actual.json",
+              "sha256": "6c1bc454db1fc75a3dad288c4f32a58845d07bab705fdd702d3e350ef4a06574",
+              "byteLength": 756,
+              "repository": "park-kyungchan/gang-a",
+              "head": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+              "tree": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+              "manifest": {
+                "schema": "agent-platform.reviewed-source-manifest.v1",
+                "reviewedTreeSha": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+                "entryCount": 159,
+                "blobCount": 129,
+                "sha256": "6edb08a2feec1a31237af4a33e11a5c39a6d900a4547875227da2653f306d115"
+              }
+            }
+          ],
+          "currentFindings": {
+            "path": "current-findings.actual.json",
+            "sha256": "2c77ff1f7d04b8d7a2c4f027cafc56b63ee88c791166ea5e94ae57ab142a59b4"
+          },
+          "independentObservation": {
+            "path": "independent-read.actual.json",
+            "sha256": "d7689935c822d5eff45f20e532261e385667f7ec6a33d75ce073434165eb3599"
+          },
+          "context": {
+            "assignment": {
+              "path": "../lens-source-gang-successor.assignment.actual.json",
+              "sha256": "20f26dbde96973081c116b56433ea53013806fcdcfc50a367df15bb8821b9661"
+            },
+            "directBindingsAndTypedOriginals": {
+              "path": "../direct-binding-and-decision-originals.actual.json",
+              "sha256": "79f63abdb7a8193cedefe80d6b8edc1daaeeeb954cbb71974d5e32b6a807cced"
+            },
+            "educationPolicy": {
+              "source": "architecture/common-ci-provider.json#/policy",
+              "sha256": "3b96c6325270d920c1ef838fc5a32a6373293eaed0ccaad2c1456f06567bbcde"
+            },
+            "gangPolicy": {
+              "workCommit": "87074a9f3f140e7c6cac7f0a250cf41c9ef46aaa",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-REVIEW-CONTRACT.json",
+              "fragment": "#/content/review/policies/gangProposal",
+              "adopted": true
+            }
+          },
+          "effects": "Read-only local source/Git/canonical validator and existing check-log reads; only private OPS review artifacts written. No source/index/ref edits, network writes, install, status/PR/merge, native/Goal/evaluation/payment effects.",
+          "next": "Root retains current-source adjudication, portable canonical custody and authenticated publication ordering; no publication performed.",
+          "supersedesPrivateProvenance": {
+            "path": "provenance.actual.json",
+            "sha256": "a497c78c89b7ebfe1f5921f8e5ceffc3171ba3224b1ca7283a4a1b6988d6b78b",
+            "reason": "Original emission spread overwrote artifact sha256 with manifest sha256 in private provenance only. Literal raw/current findings bytes and source verdict are unchanged. Correct raw byte hashes now independently read from disk; preserve original artifact."
+          }
+        }
+      },
+      "educationRaw": {
+        "ownerLocator": "gang-owner-typed-successor-prep/independent-review/education.owner-raw.actual.json",
+        "sha256": "587ba36d7f23c2700260696c9b09144ad93c787fe0fb6aa52f52e6f113d1bc78",
+        "bytes": 773,
+        "value": {
+          "schema": "owner-scoped-native-review-output.v1",
+          "binding": {
+            "repository": "park-kyungchan/education-platform",
+            "projectId": "education-platform",
+            "domainId": "education",
+            "semanticOwner": "education-platform",
+            "scope": "month-end-source-redesign"
+          },
+          "headSha": "6bc31886fea36d441f7f88bf880d0e61189b952f",
+          "reviewedTreeSha": "5d53eee61d926dcd3494647a9fa129a97587dfd4",
+          "reviewedSourceManifestSha256": "a347f0ea1a7f25c0aeb7ecd21fcabcb2e0099df722b5beb9394c1db11071a63f",
+          "reviewer": {
+            "runtime": "native-codex",
+            "taskId": "/root/gang_successor_review"
+          },
+          "author": {
+            "runtime": "native-codex",
+            "taskId": "/root"
+          },
+          "conclusion": "pass",
+          "unresolvedFindings": 0,
+          "reviewStatus": "complete",
+          "findings": []
+        }
+      },
+      "gangRaw": {
+        "ownerLocator": "gang-owner-typed-successor-prep/independent-review/gang.owner-raw.actual.json",
+        "sha256": "6c1bc454db1fc75a3dad288c4f32a58845d07bab705fdd702d3e350ef4a06574",
+        "bytes": 756,
+        "value": {
+          "schema": "owner-scoped-native-review-output.v1",
+          "binding": {
+            "repository": "park-kyungchan/gang-a",
+            "projectId": "gang-a",
+            "domainId": "education",
+            "semanticOwner": "education-platform",
+            "scope": "retained-gang-source-maintenance"
+          },
+          "headSha": "2e6f288a34909f6bcb9503fe2d4bbb92bfb5a207",
+          "reviewedTreeSha": "16ba15719cc22364d4b45b4fa2aa4656d34df479",
+          "reviewedSourceManifestSha256": "6edb08a2feec1a31237af4a33e11a5c39a6d900a4547875227da2653f306d115",
+          "reviewer": {
+            "runtime": "native-codex",
+            "taskId": "/root/gang_successor_review"
+          },
+          "author": {
+            "runtime": "native-codex",
+            "taskId": "/root"
+          },
+          "conclusion": "pass",
+          "unresolvedFindings": 0,
+          "reviewStatus": "complete",
+          "findings": []
+        }
+      },
+      "workSharedPublication": {
+        "ownerLocator": "Root-work-audit-publish-once-002/actual-publication.json",
+        "sha256": "4c926e53283ff6b47ec7fd685d2474e3cb5200e3b155c8a1903326d4b1386e3e",
+        "bytes": 6318,
+        "value": {
+          "atUtc": "2026-10-18T12:50:48.038Z",
+          "repo": "park-kyungchan/agent-platform",
+          "ref": "refs/heads/work/ontology-driven-platform-integration-20261017",
+          "head": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+          "tree": "1b460058d831a4e6145e2ce9d0c7598716c7f72d",
+          "previousRemote": "790195d7cd75651ddc395db825cabcb73f05901e",
+          "observedGitHubAPIPrincipal": {
+            "id": 241037670,
+            "login": "park-kyungchan",
+            "type": "User"
+          },
+          "rawReadbacks": [
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/effects/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-FIVE-FILE-INSTALL-ONCE.json",
+              "gitBlob": "73a9224e104003ca80b45a41654dcba11e41215b",
+              "sha256": "8d6b83567b3a63a5f67a525c624813d7c47df95a03f5d06232182810061b62b0",
+              "bytes": 830
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION.json",
+              "gitBlob": "fc27b03e837c5af1a3d686ff322804a3e8c7240c",
+              "sha256": "138c589721e18fdd0eab8097cefbc34a890b20db9d6f87a7867b4153639dea72",
+              "bytes": 771
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/ODI-08-ACADEMY-SOURCE-FRESHNESS-NATIVE-READ.json",
+              "gitBlob": "4775637dfe5c763fb1a28279140530fd15edc349",
+              "sha256": "b1f549b1ea37d522659df00ea0ef68b5b2056589eed433b482cc47f9d24d9892",
+              "bytes": 958
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/ODI-08-ACADEMY-SOURCE-FRESHNESS-ROOT-RECEIVER-20261018.json",
+              "gitBlob": "86fc932ee2dedb0ec64e07541864350bb6173152",
+              "sha256": "de097e2e7f1210976da0a69fb5b2ed3b4f8512da1eb3c121f0a0fbb17a47a93a",
+              "bytes": 607
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/codex-harness-engineering%3Aevidence%3Astanding-typed-guidance-installed.json",
+              "gitBlob": "863b051ffbbab64adf7d3058f4c7dc4522376ac4",
+              "sha256": "80df077829476a7a3a2d17b86b0f73037729aa7020a508a958810c50055ac0de",
+              "bytes": 531
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/codex-harness-engineering%3Averification%3Astanding-typed-guidance-installed.json",
+              "gitBlob": "9c88cc9efe4b8efd88feb0019c361a4d58fa682d",
+              "sha256": "719b706323f8e9004e9a22b8dfaf53e443c3bc20bb9d6d8ba60bf6082d68d408",
+              "bytes": 542
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-CURRENT-ROOT-SELECTOR-CONSUMED-OBSERVATION.json",
+              "gitBlob": "10c1c409c6c80604e0e1cbb862425f42e7b6065f",
+              "sha256": "5c09794387bdb45c77f8c5d50228322965e15ddae2cae44b8bbd4c58f5a3f900",
+              "bytes": 5159
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-NATIVE-EXECUTION-RECEIPT.json",
+              "gitBlob": "b53b84b8fd31e28b78bf04e7272fe6ae9d15ed11",
+              "sha256": "53325c63299856015984391e3711bb202cad6b6e1b3002bf916084569656439b",
+              "bytes": 7654
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-RESULT.json",
+              "gitBlob": "29fd6f31214b5026629a0871cc8f7c4607d6fc88",
+              "sha256": "8c5846a1b87812bbbec97e8846cce60952e470bff2c6d0d28946751278aca039",
+              "bytes": 16725
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION-VERIFICATION.json",
+              "gitBlob": "087cc0221d54c6c5a10bbab7d0addc93834c8c41",
+              "sha256": "920727c9a6a32e84861ec912e55a08c248eecd0cd365637b9f331c433b096af1",
+              "bytes": 4158
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-08-ACADEMY-SOURCE-FRESHNESS-ROOT-ACK-20261018.json",
+              "gitBlob": "e4d985bf0bcbef6c4385120f97b62ec55acd43cf",
+              "sha256": "71039b4ad4a99e2b1ee32b34ea5c0cf502b2521d4e8f690084ef188bb34f299a",
+              "bytes": 5626
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-08-ACADEMY-SOURCE-FRESHNESS-SHARED-SOURCE-BINDING-20261018.json",
+              "gitBlob": "b089b121403226e44f2ece3121aa605f9214c643",
+              "sha256": "a01cf36a3c33785697db2260039292781142297613b258bfd283652756c32470",
+              "bytes": 10901
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-02-STANDING-TYPED-GUIDANCE-ADOPTION.json",
+              "gitBlob": "bae574e7a2da74a52d4ba4424cb3efb1415a1841",
+              "sha256": "8e9dc5e13919bd104b7ddae669d406c3c26b7ff4df1c7c3dd43d40531eb28bf4",
+              "bytes": 2243
+            },
+            {
+              "commit": "eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-08-ACADEMY-SOURCE-FRESHNESS.json",
+              "gitBlob": "4e687a3fe61011602f674fed1d7538ad641b22f9",
+              "sha256": "7f2b387993dcc71d583f48672e638ac20068e4e475e6d4ae506bd9c4f54061dc",
+              "bytes": 2002
+            }
+          ],
+          "sharedGitDeliveryConfirmed": true,
+          "independentReceiverCreated": false,
+          "nativeActorAuthenticationEstablished": false,
+          "nativePermissionGranted": false,
+          "LocalWorkRecordsMutated": false,
+          "PR": false,
+          "AcceptanceDecision": null,
+          "noReplay": true
+        }
+      },
+      "retryIntent": {
+        "ownerLocator": "Root-education-owner-M8611-main-failed-jobs-once/Root-decision-and-request.intent.json",
+        "sha256": "dc734c2d65d38343aef09f782ecb7ab56370fd95142c65113f5f7a92da343f4c",
+        "bytes": 595,
+        "value": {
+          "atUtc": "2026-10-18T13:13:58.013046+00:00",
+          "producer": "/root",
+          "decision": "ONE_FAILED_JOBS_ONLY_RERUN_AFTER_ACTUAL_EXACT_M_PROOF_PASS",
+          "repo": "park-kyungchan/education-platform",
+          "run": 39127324658,
+          "priorAttempt": 1,
+          "head": "8611a84705f1fe796d6d9a1a3efe8fc1d26a1c9e",
+          "proofReceiptSHA256": "2b7ec3f1026132838fceb0c2b939d7a191da11d6b8645e033a242f801ee6f176",
+          "statusId": 56630715517,
+          "scope": "Only failed exactMreview and dependentaggregate; prior sourcepassed retained, no fullworkflow/newmodel/evaluation retry",
+          "maximumPOSTs": 1,
+          "noRetryOnUnknown": true
+        }
+      },
+      "retryResponse": {
+        "ownerLocator": "Root-education-owner-M8611-main-failed-jobs-once/request.response.json",
+        "sha256": "4e43941434208e37014c3385cdf969bfd4b0880ca8b84b055ba35167dde7f5af",
+        "bytes": 1742,
+        "value": {
+          "code": 0,
+          "stdout": "HTTP/2.0 201 Created\nAccess-Control-Allow-Origin: *\nAccess-Control-Expose-Headers: ETag, Link, Location, Retry-After, X-GitHub-OTP, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Used, X-RateLimit-Resource, X-RateLimit-Reset, X-OAuth-Scopes, X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type, X-GitHub-SSO, X-GitHub-Request-Id, Deprecation, Sunset, Warning\nCache-Control: private, max-age=60, s-maxage=60\nContent-Length: 2\nContent-Security-Policy: default-src 'none'\nContent-Type: application/json; charset=utf-8\nDate: Sun, 18 Oct 2026 13:13:58 GMT\nEtag: \"df3a2e224e139dd02e9bf4e98973da679c5400f941276da553cdbdf2b22ed3d6\"\nGithub-Authentication-Token-Expiration: 2027-01-15 20:18:59 UTC\nReferrer-Policy: origin-when-cross-origin, strict-origin-when-cross-origin\nServer: github.com\nStrict-Transport-Security: max-age=31536000; includeSubdomains; preload\nVary: Accept, Authorization, Cookie, X-GitHub-OTP,Accept-Encoding, Accept, X-Requested-With\nX-Accepted-Oauth-Scopes: \nX-Content-Type-Options: nosniff\nX-Frame-Options: deny\nX-Github-Api-Version-Selected: 2022-11-28\nX-Github-Edge-Region: southeastasia\nX-Github-Media-Type: github.v3; format=json\nX-Github-Request-Id: CE2A:31A342:73B2F:B4AB8:6AD4C616\nX-Oauth-Scopes: admin:gpg_key, admin:org, admin:org_hook, admin:public_key, admin:repo_hook, admin:ssh_signing_key, audit_log, codespace, copilot, delete:packages, delete_repo, gist, notifications, project, repo, user, workflow, write:discussion, write:network_configurations, write:packages\nX-Ratelimit-Limit: 5000\nX-Ratelimit-Remaining: 4998\nX-Ratelimit-Reset: 1792332836\nX-Ratelimit-Resource: core\nX-Ratelimit-Used: 2\nX-Xss-Protection: 0\n\n{}",
+          "stderr": ""
+        }
+      },
+      "currentRootAssignment": {
+        "ownerLocator": "odi07-source-outcome-reconciliation.assignment.actual.json",
+        "sha256": "951d8ecff36f2bab2a7cbb4bdcfb1a178519e2063bf5ceb08a534880c94c416c",
+        "bytes": 3018,
+        "value": {
+          "atUtc": "2026-10-18T13:32:34.355503+00:00",
+          "target": "lens-source w7:pN",
+          "prompt": "[ROOT-NEXT-BOUNDED-ODI07-ACTUAL-SOURCE-OUTCOME-METADATA] Root pulled M8611 proof. It is now CONSUMED: exact R1 e2ee694e0b5721f9824224e76c0dbd254ac8108b reviewref published, authenticated M status56630715517, canonical gatePASS; single failed-jobs endpoint retry consumed, actual main39127324658 attempt2 all3jobsSUCCESS. Gang PR5 already explicitly merged Mc4475511b347e9fdc83a7ebbc4b5a1779fa1be6e, main39127533223SUCCESS. NO REPLAY/no further publication/PR/merge/retry/build/activation.\nNext existing ODI-07-GANG-OWNER and ODI-07-GANG-OWNER-REVIEW bounded source-outcome record reconciliation ONLY. Read public canonical Work at eeff0040f789ec1a5648d74143a5ce50b7b74efb (275/29; now shared pub002 actual4c926e53283ff6b47ec7fd685d2474e3cb5200e3b155c8a1903326d4b1386e3e), current Task contracts/originals/source bindings. Prepare typed JSON candidate source facts/result/verification/currentness and exact allowed Work transitions for actual Education6bc->M8611 and Gang2e6->Mc447 reviewed source/CI/integration milestones. Existing Task IDs/revisions/oldPlan1 preserved. Do not rewrite historical initial native producer/reviewer occurrence or completed executionEvidenceId to new source sourcefact. Distinguish original native-review Task outcome from current immutable exact-H peer/source/authenticated Git status/explicit M integration and Source CI. Existing reviews genuine; do not fabricate new native author/Task/Run or infer activation/human/wholeGoal acceptance. If existing Task contract is not satisfied by current exact source outcome, keep truthful remaining gate; do not force formal completion.\nWrites restricted to E/odi07-source-outcome-reconciliation-prep/ new exclusive OPS directory and any isolated candidate Git objects/branch; no common Work HEAD/index/shared refs or source checkout modifications. Root serializes actual CAS. Root e83d65ec724d79e528df2cc471ff5398e6da9775 normal-event candidate is NOT integrated; do not touch it. Build at eeff and declare exact path ownership. Read actual Root bindings388efb3ef325b953b8dff8325bfbff18387182f6a1158fa9694e374c6489aebd / ffff110e5fbe606e7708445455eda964a474bf0a317becd854ff2d4aabb2d8b3 and Root-education-owner-M8611-manual-publication.once/actual-publication.json SHA2b7ec3f1026132838fceb0c2b939d7a191da11d6b8645e033a242f801ee6f176 + main after-M-proof artifact. Preserve all original H raw proof/status/old CI failed attempt.\nSave bounded immutable result E/odi07-source-outcome-reconciliation.preparation.actual.json with actual candidate commit/tree, exact modified paths, pins/checks and remaining gates. Then WAIT; no native completion prompt/steering/next-task request to Lead. Lead will pull at next priority boundary. No CI-agent interview (ponytail owns), no new Work/Goal/eval/payment or global prerequisites. Continue only this finite record scope.",
+          "scope": "existing ODI07 source outcome metadata preparation only; pull-only"
+        }
+      },
+      "originalNativeFinal": {
+        "ownerLocator": "original-native-independent-review/originalNativeFinal",
+        "sha256": "63d6948c892b88b55c3158c37925eece06d6e83fd5a9e0f9857944c52b437483",
+        "bytes": 808,
+        "value": {
+          "schema": "odi07.actual-native-review-completion-observation.v1",
+          "nativeSessionId": "01a149a6-5080-76e3-b094-2816479f55a9",
+          "nativeTurnId": "01a149ba-2065-7101-b55c-e131b8d26bea",
+          "nativeFinalMessageId": "msg_025e4cc173b7bdf5016ad3644eb3408191981dfd55b0c23d2b",
+          "completed": true,
+          "nativeFinalSha256": "613e57df57bfc83dc5f4d38bd4d6af2ebab78149aa0bd33b7baf97857f9afe95",
+          "nativeFinalBytes": 5125,
+          "completedAtUtc": "2026-10-17T12:04:50.558Z",
+          "finalPhase": "final_answer",
+          "sourceLine": 291,
+          "terminalSourceLine": 294,
+          "status": "completed",
+          "processExitCode": null,
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "extractionCorrection": "Native CLI phase is final_answer, not final. These additions use the same already-frozen prefix and preserve initial observation bytes."
+        }
+      },
+      "originalRootReviewAssessment": {
+        "ownerLocator": "original-native-independent-review/originalRootReviewAssessment",
+        "sha256": "c9823bf1734067a67c2e0c6ca6254741234a1bae23997b27d90193d2f3ce312a",
+        "bytes": 1228,
+        "value": {
+          "schema": "odi07.Root-actual-native11-source-review-assessment.v1",
+          "atUtc": "2026-10-17T12:19:51.414181+00:00",
+          "nativeSessionId": "01a149a6-5080-76e3-b094-2816479f55a9",
+          "nativeTurnId": "01a149ba-2065-7101-b55c-e131b8d26bea",
+          "nativeFinalMessageId": "msg_025e4cc173b7bdf5016ad3644eb3408191981dfd55b0c23d2b",
+          "parentSha256": "613e57df57bfc83dc5f4d38bd4d6af2ebab78149aa0bd33b7baf97857f9afe95",
+          "sourceConclusions": "Both exactdcf/3f sourceheads independentlypassed/current0; Root admits source-only localVerification evidence, NOTshared/formal/wholeGoalAcceptance.",
+          "actualRawRolePins": [
+            {
+              "owner": "education",
+              "sha256": "44826cc317a67381ca242f92c854433bfe225b4b8bf39c09a4c10706fdb5450e",
+              "bytes": 1040
+            },
+            {
+              "owner": "gang",
+              "sha256": "14c41078511b445531b5a9ddcb3aa0eca3c199982833ed027b1bbb5e6d731c8c",
+              "bytes": 1023
+            }
+          ],
+          "limits": "No unchangedfilebodyreviewclaim. Requiredselectedcontext/sourcevalues+38responseactualtools andhash/manifestsobserved; cognition/authnotinferred. QA/pinsprojection defectproperlypreservedandactualfullQAconsumed. Separate currentmandatorypublisher fixesP07-1/P07-2 mustpassbeforeanyeffects.",
+          "GoalComplete": false
+        }
+      }
+    }
+  }
+}

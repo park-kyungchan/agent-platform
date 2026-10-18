@@ -17,11 +17,11 @@
     "taskId": "ODI-07-GANG-OWNER"
   },
   "title": "Prepare exact Gang maintained-source owner relation and retained CI freeze",
-  "nextAction": "Root adopts/qualifies planned child and exact tested3file candidate80758 before source commits; then independently review/publish current exact source/checks beforePR and explicit owner-ordered merge. Preserve native/domain/month-end/retirement holds; no codeport or new store.",
+  "nextAction": "Own maintained-source owner/freeze purpose locally complete under historical Root f2a671 typed source exit and WHOLE-SOURCE-VERIFICATION. See ODI-07-GANG-OWNER-HOST-CURRENTNESS. Preserve original contracts/partial history and consumed source effects; no replay. Shared audit/formal completion pending. Original native REVIEW01a149a6 remains planned/unverified; no substitution or redispatch. Both predecessor Goals were explicitly retired; current host Root owns its separate active continuation. Native/domain/human/parent07/whole Acceptance remain separate.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -45,5 +45,7 @@
     "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "ODI-07-GANG-OWNER-WHOLE-SOURCE-VERIFICATION"
+  ]
 }

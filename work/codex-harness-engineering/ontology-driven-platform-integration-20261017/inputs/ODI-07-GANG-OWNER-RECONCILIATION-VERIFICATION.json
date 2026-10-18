@@ -1,0 +1,74 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "odi07-source-outcome/ODI-07-GANG-OWNER-RECONCILIATION-VERIFICATION@eeff0040f789ec1a5648d74143a5ce50b7b74efb",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:odi07-source-outcome-task-boundaries-20261018",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T13:47:12.318Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:8c6020f6cf5bbaeb73958f8a6f3d0741ce8b28a131743e502e7f5e9ae4f5b914",
+        "common-harness:task:8bb5a6f78f41ff7da59a7dc081bb47fdde4fdc544a9744f87a6104813898cd7d"
+      ],
+      "criteria": [
+        {
+          "id": "current-source-milestones-recorded",
+          "status": "pass",
+          "message": "Current reviewed source/publication/explicit integration/Source CI result is durable and distinct from original native execution.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-actual-source-outcome-20261018"
+          ]
+        },
+        {
+          "id": "owner-original-contract-successor-exit-adjudication",
+          "status": "unverified",
+          "message": "Root typed successor/exit adjudication required: immutable original contract fixes historical3file postimages and says child stays planned; source milestones do not silently alter that contract.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-actual-source-outcome-20261018"
+          ]
+        },
+        {
+          "id": "original-native-review-occurrence-execution-receipt-join",
+          "status": "unverified",
+          "message": "Root qualifies original native01a149a6 occurrence and execution receipt/Verification join from original observed final; new source peer/Git status/merge/CI is not a replacement. Do not redispatch.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:odi07-actual-source-outcome-20261018"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ACTUAL-SOURCE-OUTCOME.json",
+          "sha256": "7bf48a61bb7c39c88d6c5ba73debe831b035a9aba26a09a930af8cf6c09eca84"
+        },
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-07-GANG-OWNER-ACTUAL-SOURCE-VERIFICATION.json",
+          "sha256": "cd8e10ddd7f5340c180a13742ba69f37c56481d8f77c195744d299377ece4096"
+        }
+      ],
+      "runtime": {
+        "name": "Bun bounded Task-contract reconciliation",
+        "version": "1.4.3"
+      },
+      "details": {
+        "partialSourceVerificationOnly": true,
+        "TaskStatePromotion": false,
+        "formalCompletion": false,
+        "sourceGitPublicationIsWorkSharedAudit": false
+      }
+    }
+  }
+}
