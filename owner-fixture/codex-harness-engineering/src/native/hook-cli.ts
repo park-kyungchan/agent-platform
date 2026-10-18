@@ -30,9 +30,11 @@ export function admitsCurrentHomeContext(input: HookInput, registry: HookBinding
   return true;
 }
 
-export async function runNativeHook(inputText: string, bindingsPath: string, options: { contextOnly?: boolean; bindingsSha256?: string } = {}): Promise<string> {
+export async function runNativeHook(inputText: string, bindingsPath: string, options: { contextOnly?: boolean; bindingsSha256?: string; selectedSessionOnly?: boolean } = {}): Promise<string> {
   if (!bindingsPath || Buffer.byteLength(inputText) > 8 * 1024 * 1024)
     throw Error("BOUNDED_NATIVE_HOOK_INPUT_REQUIRED");
+  if (options.contextOnly && options.selectedSessionOnly)
+    throw Error("DISTINCT_CONTEXT_ONLY_AND_SELECTED_SESSION_MODES_REQUIRED");
   const source = await readNativeAdapterSourceClosure();
   await source.verify();
   const value: unknown = JSON.parse(inputText);
@@ -65,7 +67,7 @@ export async function runNativeHook(inputText: string, bindingsPath: string, opt
     const binding = resolveHookBinding(input.cwd, bindings);
     if (!binding || !resolveSessionGitWorkSelection(input, bindings, binding)) return "";
   }
-  const result = await handleHook(value, { bindings });
+  const result = await handleHook(value, { bindings, selectedSessionOnly: options.selectedSessionOnly });
   await source.verify();
   return result.stdout;
 }
@@ -82,7 +84,7 @@ if (import.meta.main) {
   try {
     const args = Bun.argv.slice(2), index = args.indexOf("--bindings");
     if (index < 0 || !args[index + 1]) throw Error("EXPLICIT_BINDINGS_REQUIRED");
-    const stdout = await runNativeHook(await readNativeInput(), args[index + 1]!, { contextOnly: args.includes("--context-only"), bindingsSha256: args[args.indexOf("--bindings-sha256") + 1] });
+    const stdout = await runNativeHook(await readNativeInput(), args[index + 1]!, { contextOnly: args.includes("--context-only"), selectedSessionOnly: args.includes("--selected-session-only"), bindingsSha256: args[args.indexOf("--bindings-sha256") + 1] });
     if (stdout) process.stdout.write(stdout + "\n");
   } catch {
     // No private paths/event payload/errors and no exit2 continuation request.
