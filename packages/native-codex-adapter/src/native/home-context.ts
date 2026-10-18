@@ -9,6 +9,7 @@ import {
   realpathSync,
 } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import type { HookBinding, NativeContextLoader, NativeWorkCheckoutObservation } from "./hooks.ts";
 import type {
   CompactGitWorkContext,
@@ -731,6 +732,312 @@ function selectedHomeRoute(
   return { executionReady: true, effectfulWorkCwd: observation.cwd, observation: pin };
 }
 
+/** Complete semantic view, before choosing a wire representation. Not native admission. */
+export interface HomeContextViewV2 {
+  schema: "codex.home-context.projection.v2";
+  deliveryPolicy: NativeGitWorkDeliveryPolicy;
+  sourceOwnerProjectRoot: string;
+  nativeCodexHome: string;
+  codeOwner: HomeContextContractV2["codeOwner"];
+  selectedWorkRoute: ReturnType<typeof selectedHomeRoute>;
+  actualNativeCwd: string;
+  northStar: string;
+  priorities: string[];
+  ownership: Pointer[];
+  preferences: {
+    implementation: { language: string; runtime: string };
+    canonicalArtifacts: {
+      extensions: string[];
+      language: string;
+      nativeRequiredFormatsAllowed: boolean;
+    };
+    conversation: { language: string };
+    ontology: { ownership: string; organization: string };
+    excludedDomains: string[];
+  };
+  selectedWork: SelectedGitWorkContext | ObjectValue;
+  recordPolicy: HomeContextContract["recordPolicy"];
+  boundaries: {
+    authority: "none";
+    nativePermissionGranted: false;
+    executionReady: boolean;
+    captureHomeRawPrompts: false;
+    exactCwdOnly: true;
+    excludedDomainsRemainExcluded: true;
+    newModelBudgetGranted: false;
+    directoryMoveAuthorized: false;
+  };
+  sources: [{ path: string; sha256: string }, { path: string; sha256: string }];
+  omitted: string[];
+  selectedCapabilities?: unknown;
+  semanticOwners?: unknown;
+  projectEntrypoints?: unknown;
+  canonicalSourcePaths?: unknown;
+}
+
+const homeV2Prefix =
+  "Source-owned Home bootstrap. Preserve actualNativeCwd. Only selectedWorkRoute can identify an observed Work checkout; executionReady is source qualification and grants no native permission. Configured capabilities do not prove callable/authenticated tools. This hook does not capture or accept the prompt.\n";
+const homeCompactPrefix =
+  "Source-only Home v2 (home.v1; decodeHomeContextProjection). Preserve native cwd; only observed checkout routes Work. No native permission or prompt capture; configured capabilities are not authenticated tools.\n";
+const homeOptionalKeys = [
+  "selectedCapabilities",
+  "semanticOwners",
+  "projectEntrypoints",
+  "canonicalSourcePaths",
+] as const;
+
+interface EncodedHomeContextProjectionV2 {
+  schema: "codex.home-context.projection.v2";
+  encoding: "home.v1";
+  maxChars: number;
+  locations: [string, string, string];
+  checkout: [] | [string, string, string];
+  purpose: [string, string[]];
+  ownership: [string, string, string][];
+  preferences: [[string, string], [string[], string, boolean], string, [string, string], string[]];
+  selectedWork: HomeContextViewV2["selectedWork"];
+  recordPolicy: [string[], string, string, string, string];
+  sources: [string, string, string];
+  authority: "none";
+  nativePermissionGranted: false;
+  selectedCapabilities?: unknown;
+  semanticOwners?: unknown;
+  projectEntrypoints?: unknown;
+  canonicalSourcePaths?: unknown;
+}
+
+/**
+ * home.v1 is a finite v2 envelope layout, not a Work codec. Tuples keep all values:
+ * locations=[native Home, fixed code owner root, actual cwd]; checkout=[] or
+ * [observed Work cwd, owner-relative receipt path, SHA256]; purpose=[northStar,priorities];
+ * ownership rows=[scope,owner,reference]; preferences=[implementation,artifacts,
+ * conversation,ontology,excludedDomains], with each nested record in declaration order;
+ * recordPolicy follows HomeContextContract.recordPolicy declaration order;
+ * sources=[owner-relative Home source path, Home SHA256, profile SHA256]. The profile
+ * path is exactly native Home/harness/profile.json. Fixed policy/boundary constants,
+ * the duplicate owner root/executionReady and absent optional labels are reconstructed.
+ * selectedWork and present optional values are embedded unchanged, never abbreviated.
+ */
+function encodeHomeContextProjection(view: HomeContextViewV2): EncodedHomeContextProjectionV2 {
+  const {
+    implementation: i,
+    canonicalArtifacts: a,
+    conversation: c,
+    ontology: o,
+  } = view.preferences;
+  const policy = view.recordPolicy,
+    route = view.selectedWorkRoute;
+  return {
+    schema: view.schema,
+    encoding: "home.v1",
+    maxChars: view.deliveryPolicy.maxChars,
+    locations: [view.nativeCodexHome, view.codeOwner.root, view.actualNativeCwd],
+    checkout: route.executionReady
+      ? [
+          route.effectfulWorkCwd!,
+          relative(view.codeOwner.root, route.observation!.path),
+          route.observation!.sha256,
+        ]
+      : [],
+    purpose: [view.northStar, view.priorities],
+    ownership: view.ownership.map(({ scope, owner, reference }) => [scope, owner, reference]),
+    preferences: [
+      [i.language, i.runtime],
+      [a.extensions, a.language, a.nativeRequiredFormatsAllowed],
+      c.language,
+      [o.ownership, o.organization],
+      view.preferences.excludedDomains,
+    ],
+    selectedWork: view.selectedWork,
+    recordPolicy: [
+      policy.distinctions,
+      policy.materialBoundary,
+      policy.tinyWork,
+      policy.sources,
+      policy.ontologyPromotion,
+    ],
+    sources: [
+      relative(view.codeOwner.root, view.sources[0].path),
+      view.sources[0].sha256,
+      view.sources[1].sha256,
+    ],
+    authority: "none",
+    nativePermissionGranted: false,
+    ...Object.fromEntries(
+      homeOptionalKeys.filter((key) => Object.hasOwn(view, key)).map((key) => [key, view[key]]),
+    ),
+  };
+}
+
+/** Pure bounded inverse of home.v1; authenticates neither Work nor checkout facts.
+ * Runtime source/tuple/receipt guards retain admission; this never observes/adopts a route. */
+export function decodeHomeContextProjection(value: unknown): HomeContextViewV2 {
+  try {
+    const data = row(value);
+    const wireChars = homeCompactPrefix.length + JSON.stringify(data).length;
+    if (wireChars > 12000) throw Error();
+    exactKeys(
+      data,
+      [
+        "schema",
+        "encoding",
+        "maxChars",
+        "locations",
+        "checkout",
+        "purpose",
+        "ownership",
+        "preferences",
+        "selectedWork",
+        "recordPolicy",
+        "sources",
+        "authority",
+        "nativePermissionGranted",
+      ],
+      [...homeOptionalKeys],
+    );
+    if (
+      data.schema !== "codex.home-context.projection.v2" ||
+      data.encoding !== "home.v1" ||
+      data.authority !== "none" ||
+      data.nativePermissionGranted !== false ||
+      !Number.isSafeInteger(data.maxChars) ||
+      Number(data.maxChars) < 2000 ||
+      Number(data.maxChars) > 12000 ||
+      wireChars > Number(data.maxChars)
+    )
+      throw Error();
+    const tuple = (value: unknown, length: number): unknown[] => {
+      if (!Array.isArray(value) || value.length !== length) throw Error();
+      return value;
+    };
+    const boolean = (value: unknown): boolean => {
+      if (typeof value !== "boolean") throw Error();
+      return value;
+    };
+    const digest = (value: unknown): string => {
+      if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) throw Error();
+      return value;
+    };
+    const local = (root: string, value: unknown): string => {
+      const path = text(value, 1024);
+      if (
+        isAbsolute(path) ||
+        path.split("/").some((part) => !part || part === "." || part === "..") ||
+        path.includes("\\")
+      )
+        throw Error();
+      return pointer(resolve(root, path));
+    };
+    const locations = tuple(data.locations, 3),
+      nativeCodexHome = pointer(locations[0]),
+      ownerRoot = pointer(locations[1]),
+      actualNativeCwd = pointer(locations[2]),
+      purpose = tuple(data.purpose, 2),
+      preferences = tuple(data.preferences, 5),
+      implementation = tuple(preferences[0], 2),
+      artifacts = tuple(preferences[1], 3),
+      ontology = tuple(preferences[3], 2),
+      policy = tuple(data.recordPolicy, 5),
+      sources = tuple(data.sources, 3),
+      selectedWork = row(data.selectedWork);
+    if (
+      !["held", "source-qualified"].includes(String(selectedWork.status)) ||
+      selectedWork.authority !== "none" ||
+      selectedWork.nativePermissionGranted !== false ||
+      !Array.isArray(data.checkout) ||
+      ![0, 3].includes(data.checkout.length)
+    )
+      throw Error();
+    const checkout = data.checkout,
+      executionReady = checkout.length === 3;
+    if (executionReady && selectedWork.status !== "source-qualified") throw Error();
+    if (!Array.isArray(data.ownership) || data.ownership.length > 20) throw Error();
+    return {
+      schema: "codex.home-context.projection.v2",
+      deliveryPolicy: {
+        policyVersion: "v2",
+        maxChars: Number(data.maxChars),
+        versionCapChars: 12000,
+        qualification: "source-only-not-native-admission",
+      },
+      sourceOwnerProjectRoot: ownerRoot,
+      nativeCodexHome,
+      codeOwner: { projectId: "codex-harness-engineering", root: ownerRoot },
+      selectedWorkRoute: executionReady
+        ? {
+            executionReady,
+            effectfulWorkCwd: pointer(checkout[0]),
+            observation: { path: local(ownerRoot, checkout[1]), sha256: digest(checkout[2]) },
+          }
+        : { executionReady },
+      actualNativeCwd,
+      northStar: text(purpose[0], 1600),
+      priorities: list(purpose[1], 10, 300),
+      ownership: data.ownership.map((value) => {
+        const [scope, owner, reference] = tuple(value, 3);
+        return { scope: text(scope), owner: text(owner), reference: pointer(reference) };
+      }),
+      preferences: {
+        implementation: {
+          language: text(implementation[0], 80),
+          runtime: text(implementation[1], 80),
+        },
+        canonicalArtifacts: {
+          extensions: list(artifacts[0], 10, 30),
+          language: text(artifacts[1], 80),
+          nativeRequiredFormatsAllowed: boolean(artifacts[2]),
+        },
+        conversation: { language: text(preferences[2], 100) },
+        ontology: { ownership: text(ontology[0], 100), organization: text(ontology[1], 100) },
+        excludedDomains: list(preferences[4], 40, 120),
+      },
+      selectedWork,
+      recordPolicy: {
+        distinctions: list(policy[0], 15, 100),
+        materialBoundary: text(policy[1]),
+        tinyWork: text(policy[2]),
+        sources: text(policy[3]),
+        ontologyPromotion: text(policy[4]),
+      },
+      boundaries: {
+        authority: "none",
+        nativePermissionGranted: false,
+        executionReady,
+        captureHomeRawPrompts: false,
+        exactCwdOnly: true,
+        excludedDomainsRemainExcluded: true,
+        newModelBudgetGranted: false,
+        directoryMoveAuthorized: false,
+      },
+      sources: [
+        { path: local(ownerRoot, sources[0]), sha256: digest(sources[1]) },
+        { path: resolve(nativeCodexHome, "harness/profile.json"), sha256: digest(sources[2]) },
+      ],
+      omitted: homeOptionalKeys.filter((key) => !Object.hasOwn(data, key)),
+      ...Object.fromEntries(
+        homeOptionalKeys.filter((key) => Object.hasOwn(data, key)).map((key) => [key, data[key]]),
+      ),
+    };
+  } catch {
+    throw Error("INVALID_HOME_PROJECTION_ENCODING");
+  }
+}
+
+/** Prospective source-only sizing, also used after runtime source/checkout guards. */
+export function renderHomeContextProjectionV2(view: HomeContextViewV2): string {
+  const ordinary = homeV2Prefix + JSON.stringify(view);
+  if (ordinary.length <= view.deliveryPolicy.maxChars) return ordinary;
+  const payload = JSON.stringify(encodeHomeContextProjection(view)),
+    result = homeCompactPrefix + payload;
+  // Oversized required views are returned only to the caller's existing hold path.
+  if (
+    result.length <= view.deliveryPolicy.maxChars &&
+    !isDeepStrictEqual(decodeHomeContextProjection(JSON.parse(payload)), view)
+  )
+    throw Error("HOME_PROJECTION_ROUNDTRIP_MISMATCH");
+  return result;
+}
+
 /** Read-only bootstrap: never reads the Home prompt or updates a semantic Work. */
 export function projectHomeContext(options: {
   binding: HookBinding;
@@ -803,7 +1110,7 @@ export function projectHomeContext(options: {
       ],
     };
     const prefix = v2
-      ? "Source-owned Home bootstrap. Preserve actualNativeCwd. Only selectedWorkRoute can identify an observed Work checkout; executionReady is source qualification and grants no native permission. Configured capabilities do not prove callable/authenticated tools. This hook does not capture or accept the prompt.\n"
+      ? homeV2Prefix
       : "Source-owned Home bootstrap. Preserve actualNativeCwd; enter sourceOwnerProjectRoot for effectful Work. Configured capabilities do not prove callable/authenticated tools. This hook does not capture or accept the prompt.\n";
     const optionalContext = Object.entries({
       selectedCapabilities,
@@ -822,7 +1129,10 @@ export function projectHomeContext(options: {
     // Reserve every omission label before fitting optional data so a later
     // omission cannot push otherwise valid essential context over the cap.
     const omitted = optionalContext.map(([key]) => key),
-      render = () => `${prefix}${JSON.stringify({ ...context, omitted })}`;
+      render = () =>
+        v2
+          ? renderHomeContextProjectionV2({ ...context, omitted } as unknown as HomeContextViewV2)
+          : `${prefix}${JSON.stringify({ ...context, omitted })}`;
     let held = options.selectedWork?.status === "held" || (v2 && !options.selectedWork);
     if (render().length > maxChars && options.selectedWork) {
       // Hold the complete required payload. Never drop clauses, decisions, or

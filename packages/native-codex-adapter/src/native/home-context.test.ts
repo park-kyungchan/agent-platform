@@ -5,12 +5,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   projectHomeContext,
+  decodeHomeContextProjection,
+  renderHomeContextProjectionV2,
   readHomeContextContractValue,
   type HomeContextContract,
   type HomeContextContractV2,
   type SelectedGitWorkContext,
+  type HomeContextViewV2,
 } from "./home-context.ts";
 import type { HookBinding } from "./hooks.ts";
+import rootHomeFixture from "./fixtures/root-home-wrapper.json";
+import {
+  decodeCompactGitWorkContext,
+  type MetadataPackedGitWorkContext,
+} from "@palantirkc/work-continuity/git-work";
 
 test("optional omission labels preserve essential Home context at the exact budget boundary", async () => {
   const parent = await realpath(await mkdtemp(join(tmpdir(), "codex-home-budget-")));
@@ -115,6 +123,16 @@ test("optional omission labels preserve essential Home context at the exact budg
     const contextBytes = await readFile(contextPath),
       profileBytes = await readFile(profilePath);
     const full = projectHomeContext({ binding, cwd: home });
+    // Golden bytes from exact a8ca predecessor on this same fixture. Only the
+    // temporary root, its two content hashes and requested budget are normalized.
+    const normalized = (value: string) =>
+      value
+        .replaceAll(parent, "<FIXTURE>")
+        .replaceAll(createHash("sha256").update(contextBytes).digest("hex"), "<CONTEXT-SHA>")
+        .replaceAll(createHash("sha256").update(profileBytes).digest("hex"), "<PROFILE-SHA>");
+    expect(createHash("sha256").update(normalized(full.text)).digest("hex")).toBe(
+      "97adfc9132594135e729be2930ca43f55b1ff512daf0274f93c0d30d5a399351",
+    );
     expect(full.status).toBe("current");
     const prefixEnd = full.text.indexOf("\n") + 1,
       prefix = full.text.slice(0, prefixEnd),
@@ -136,6 +154,11 @@ test("optional omission labels preserve essential Home context at the exact budg
     ).toBeGreaterThan(budget);
 
     const bounded = projectHomeContext({ binding, cwd: home, maxChars: budget });
+    expect(
+      createHash("sha256")
+        .update(normalized(bounded.text).replaceAll(String(budget), "<BUDGET>"))
+        .digest("hex"),
+    ).toBe("ac552728c9307a1badd7179040c4833505f4fb7ece2b01d47029558987ba4997");
     expect(bounded.status).toBe("current");
     expect(bounded.chars).toBe(bounded.text.length);
     expect(bounded.chars).toBeLessThanOrEqual(budget);
@@ -328,8 +351,299 @@ async function hostHomeFixture() {
 }
 
 function homeProjection(text: string) {
-  return JSON.parse(text.slice(text.indexOf("\n") + 1));
+  const value = JSON.parse(text.slice(text.indexOf("\n") + 1));
+  return value.encoding === "home.v1" ? decodeHomeContextProjection(value) : value;
 }
+
+const rootHomeView = () =>
+  structuredClone(rootHomeFixture.requiredView) as unknown as HomeContextViewV2;
+const rootWork = () =>
+  structuredClone(
+    rootHomeFixture.requiredView.selectedWork,
+  ) as unknown as MetadataPackedGitWorkContext;
+const homeWire = (text: string) => JSON.parse(text.slice(text.indexOf("\n") + 1));
+
+test("exact unapplied Root payload fits complete Home v2 with lossless Work and optional sizing margin", () => {
+  const view = rootHomeView();
+  const oldPrefix =
+    "Source-owned Home bootstrap. Preserve actualNativeCwd. Only selectedWorkRoute can identify an observed Work checkout; executionReady is source qualification and grants no native permission. Configured capabilities do not prove callable/authenticated tools. This hook does not capture or accept the prompt.\n";
+  expect((oldPrefix + JSON.stringify(view)).length).toBe(12871);
+  const compact = JSON.stringify(view.selectedWork);
+  expect(compact.length).toBe(9592);
+  expect(
+    createHash("sha256")
+      .update(compact + "\n")
+      .digest("hex"),
+  ).toBe(rootHomeFixture.originalCompactSha256);
+  const rendered = renderHomeContextProjectionV2(view),
+    wire = homeWire(rendered),
+    decoded = decodeHomeContextProjection(wire);
+  expect(wire.encoding).toBe("home.v1");
+  expect(rendered.length).toBeLessThanOrEqual(11700);
+  expect(decoded).toEqual(view);
+  expect(JSON.stringify(wire.selectedWork)).toBe(compact);
+  expect(JSON.stringify(decoded.selectedWork)).toBe(compact);
+  const work = decodeCompactGitWorkContext(rootWork());
+  expect(work.normative).toHaveLength(3);
+  expect(work.decisions).toHaveLength(20);
+  expect(work.sources).toHaveLength(33);
+  expect(rootHomeFixture.requiredView.selectedWork.historicalEffects).toEqual([
+    126,
+    5,
+    [
+      "ODI-03-FIRST-USE-DISPATCH:call_3fd95b21a92a4155b427824de0fb5b10",
+      "ODI-04-PRODUCER-DISPATCH:native-message:46",
+      "codex-harness-engineering:effect:04r-dispatch",
+      "ODI-05-MEMORY-REVIEW-DISPATCH-07",
+      "ODI-05-CALLER-RUN12-NATIVE-EFFECT",
+    ],
+    [],
+    9,
+  ]);
+  // Independently fit the four optional values without changing mandatory data.
+  const fitted = rootHomeView();
+  for (const [key, value] of Object.entries(rootHomeFixture.optional)) {
+    const index = fitted.omitted.indexOf(key);
+    (fitted as unknown as Record<string, unknown>)[key] = value;
+    fitted.omitted.splice(index, 1);
+    if (renderHomeContextProjectionV2(fitted).length > 12000) {
+      delete (fitted as unknown as Record<string, unknown>)[key];
+      fitted.omitted.splice(index, 0, key);
+    }
+  }
+  const final = renderHomeContextProjectionV2(fitted);
+  expect(final.length).toBeLessThanOrEqual(11850);
+  expect(homeProjection(final)).toEqual(fitted);
+  expect(JSON.stringify(homeProjection(final).selectedWork)).toBe(compact);
+  console.log(
+    JSON.stringify({
+      classification: "static-exact-Root-source-data-not-native-execution",
+      baselineChars: 12871,
+      requiredChars: rendered.length,
+      finalChars: final.length,
+      finalMargin: 12000 - final.length,
+      selectedWorkChars: compact.length,
+    }),
+  );
+});
+
+test("Home v2 codec preserves literal markers, Unicode, escaping, empty arrays and held state", () => {
+  const view = rootHomeView();
+  view.northStar = '한글 🦉 "quote" \\ ~0:owner home.v1 \ud800';
+  view.priorities = [];
+  Object.assign(view, {
+    selectedCapabilities: {},
+    semanticOwners: [],
+    projectEntrypoints: [],
+    canonicalSourcePaths: [],
+  });
+  view.omitted = [];
+  view.selectedWork = {
+    ...view.selectedWork,
+    status: "held",
+    holdReasons: ["LATEST_RELEVANT_UNKNOWN"],
+  };
+  view.selectedWorkRoute = { executionReady: false };
+  view.boundaries.executionReady = false;
+  const decoded = decodeHomeContextProjection(homeWire(renderHomeContextProjectionV2(view)));
+  expect(decoded).toEqual(view);
+  expect(decoded.selectedWorkRoute).toEqual({ executionReady: false });
+  expect(decoded.boundaries.nativePermissionGranted).toBe(false);
+});
+
+for (const mutation of [
+  "version",
+  "schema",
+  "extra",
+  "location-index",
+  "tuple-arity",
+  "path-parent",
+  "path-absolute",
+  "path-empty",
+  "digest",
+  "permission",
+  "budget",
+  "oversized",
+  "held-route",
+] as const) {
+  test(`Home v2 decoder refuses malformed ${mutation} without exposing data`, () => {
+    const wire = homeWire(renderHomeContextProjectionV2(rootHomeView()));
+    switch (mutation) {
+      case "version":
+        wire.encoding = "home.v99";
+        break;
+      case "schema":
+        wire.schema = "foreign";
+        break;
+      case "extra":
+        wire.privateExtra = "PRIVATE-SENTINEL";
+        break;
+      case "location-index":
+        wire.locations[0] = 0;
+        break;
+      case "tuple-arity":
+        wire.checkout.pop();
+        break;
+      case "path-parent":
+        wire.sources[0] = "../PRIVATE-SENTINEL";
+        break;
+      case "path-absolute":
+        wire.sources[0] = "/PRIVATE-SENTINEL";
+        break;
+      case "path-empty":
+        wire.sources[0] = "";
+        break;
+      case "digest":
+        wire.sources[1] = "x".repeat(64);
+        break;
+      case "permission":
+        wire.nativePermissionGranted = true;
+        break;
+      case "budget":
+        wire.maxChars = 2000;
+        break;
+      case "oversized":
+        wire.selectedWork.padding = "PRIVATE-SENTINEL".repeat(1000);
+        break;
+      case "held-route":
+        wire.selectedWork.status = "held";
+        break;
+    }
+    expect(() => decodeHomeContextProjection(wire)).toThrow(/^INVALID_HOME_PROJECTION_ENCODING$/);
+  });
+}
+
+for (const mutation of [
+  "owner-root",
+  "profile-path",
+  "boundary",
+  "delivery",
+  "omission",
+  "extra",
+] as const) {
+  test(`Home v2 renderer refuses lossy encoding of ${mutation}`, () => {
+    const view = rootHomeView();
+    switch (mutation) {
+      case "owner-root":
+        view.sourceOwnerProjectRoot = "/different-owner";
+        break;
+      case "profile-path":
+        view.sources[1].path = "/different-profile";
+        break;
+      case "boundary":
+        Object.assign(view.boundaries, { captureHomeRawPrompts: true });
+        break;
+      case "delivery":
+        view.deliveryPolicy.policyVersion = "v1";
+        break;
+      case "omission":
+        view.omitted.reverse();
+        break;
+      case "extra":
+        Object.assign(view, { newUnknownMeaning: "retain-me" });
+        break;
+    }
+    expect(() => renderHomeContextProjectionV2(view)).toThrow("HOME_PROJECTION_ROUNDTRIP_MISMATCH");
+  });
+}
+
+for (const value of ["undefined", "NaN"] as const) {
+  test(`Home v2 renderer rejects serialized optional ${value} loss`, () => {
+    const view = rootHomeView();
+    view.selectedCapabilities =
+      value === "undefined"
+        ? undefined
+        : { S1: { enabled: false, meaning: "source-safe", observedScore: NaN } };
+    view.omitted = view.omitted.filter((key) => key !== "selectedCapabilities");
+    expect(Object.hasOwn(view, "selectedCapabilities")).toBe(true);
+    expect(() => renderHomeContextProjectionV2(view)).toThrow("HOME_PROJECTION_ROUNDTRIP_MISMATCH");
+  });
+}
+
+test("isolated canonical Home loader delivers exact Root Work and keeps stale/held guards", async () => {
+  const f = await hostHomeFixture();
+  try {
+    const view = rootHomeView(),
+      selectedWork = rootWork(),
+      [repositoryId, commit, projectId, workId] = selectedWork.metadata as [
+        string,
+        string,
+        string,
+        string,
+        number,
+      ];
+    f.binding.projectId = projectId;
+    f.binding.workId = workId;
+    Object.assign(f.contract, {
+      projectId,
+      northStar: view.northStar,
+      priorities: view.priorities,
+      ownership: view.ownership,
+      recordPolicy: view.recordPolicy,
+    });
+    Object.assign(f.contract.selectedWork, { repositoryId, commit, projectId, workId });
+    const receipt = { ...f.receipt, repositoryId, commit, projectId, workId };
+    await f.pinReceipt(receipt);
+    await writeFile(
+      f.profilePath,
+      JSON.stringify({
+        ...view.preferences,
+        selectedCapabilities: rootHomeFixture.optional.selectedCapabilities,
+        nativeBinding: {
+          semanticOwners: rootHomeFixture.optional.semanticOwners,
+          projectEntrypoints: rootHomeFixture.optional.projectEntrypoints,
+        },
+      }),
+    );
+    const before = await Promise.all([readFile(f.contextPath), readFile(f.profilePath)]),
+      observed: unknown[] = [];
+    const options = {
+      ...f.options,
+      selectedWork,
+      observeCheckout: (receipt: unknown) => {
+        observed.push(receipt);
+      },
+    };
+    const result = projectHomeContext(options),
+      decoded = homeProjection(result.text);
+    expect(result.status).toBe("current");
+    expect(homeWire(result.text).encoding).toBe("home.v1");
+    expect(result.chars).toBeLessThanOrEqual(12000);
+    expect(observed).toEqual([receipt]);
+    expect(decoded.selectedWork).toEqual(selectedWork);
+    expect(decoded.preferences).toEqual(view.preferences);
+    expect(decoded.recordPolicy).toEqual(view.recordPolicy);
+    expect(decoded.selectedWorkRoute.effectfulWorkCwd).toBe(f.checkout);
+    expect(
+      new Set([
+        decoded.nativeCodexHome,
+        decoded.actualNativeCwd,
+        decoded.codeOwner.root,
+        decoded.selectedWorkRoute.effectfulWorkCwd,
+      ]).size,
+    ).toBe(4);
+    expect(decoded.sources).toEqual([
+      { path: f.contextPath, sha256: createHash("sha256").update(before[0]!).digest("hex") },
+      { path: f.profilePath, sha256: createHash("sha256").update(before[1]!).digest("hex") },
+    ]);
+    observed.length = 0;
+    const held = projectHomeContext({
+      ...options,
+      selectedWork: { ...selectedWork, status: "held", holdReasons: ["LATEST_RELEVANT_UNKNOWN"] },
+    });
+    expect(held.status).toBe("held");
+    expect(homeProjection(held.text).selectedWork.holdReasons).toEqual(["LATEST_RELEVANT_UNKNOWN"]);
+    expect(homeProjection(held.text).selectedWorkRoute).toEqual({ executionReady: false });
+    expect(observed).toEqual([]);
+    const stale = structuredClone(selectedWork);
+    stale.metadata[1] = "b".repeat(40);
+    expect(projectHomeContext({ ...options, selectedWork: stale }).status).toBe("repair-required");
+    expect(observed).toEqual([]);
+    expect(await Promise.all([readFile(f.contextPath), readFile(f.profilePath)])).toEqual(before);
+  } finally {
+    await f.cleanup();
+  }
+});
 
 test("Home v2 separates native Home, entrypoint, fixed code owner and source-only selected Work", async () => {
   const f = await hostHomeFixture();
