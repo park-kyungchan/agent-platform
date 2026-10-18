@@ -91,7 +91,7 @@ test("a standalone canonical source fixture reports explicit unverified native b
     nativePermissionGranted: false,
     modules: 3,
     skills: 2,
-    skillFiles: 9,
+    skillFiles: 11,
     nativeDeploymentSource: "not-inspected",
   });
   expect(result.residuals.length).toBeGreaterThan(0);
