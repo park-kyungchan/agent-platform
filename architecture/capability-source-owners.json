@@ -550,12 +550,12 @@
       "sourcePins": [
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-codex-adapter/src/native/home-context.ts",
-          "sha256": "b04f44608bbf355d7591b482000c024f95e2ac61d241b9e9bf41fb29f66e6243",
+          "sha256": "8b850985287a73938323c831e866ebe2ef34162ed8b4e8ba5f4028f9823776a5",
           "relativePath": "packages/native-codex-adapter/src/native/home-context.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-codex-adapter/src/native/hooks.ts",
-          "sha256": "6ce6ac5e09f4086ecf4ba294822081a0d859f786c13357b1e1d9e0ea80bed9be",
+          "sha256": "9d1f8f3365d8ebc78c03c0365ae555db32a0c2b455f23649564e361d266b2c74",
           "relativePath": "packages/native-codex-adapter/src/native/hooks.ts"
         },
         {

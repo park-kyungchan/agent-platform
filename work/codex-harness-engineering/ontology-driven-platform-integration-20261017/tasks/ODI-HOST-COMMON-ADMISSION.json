@@ -17,11 +17,11 @@
     "taskId": "ODI-HOST-COMMON-ADMISSION"
   },
   "title": "Separate host native Home, code owner and selected Work context contracts",
-  "nextAction": "Implement the narrow backward-compatible common native Codex home/binding contract successor and meaningful positive/negative checks; preserve source guards and historical bindings.",
+  "nextAction": "Local common implementation and received source/check evidence are durable in Input ODI-HOST-COMMON-SOURCE-RESULT; do not repeat this source dispatch. Root must integrate exact provider/registry/fixture pins, obtain independent final source review and publication, and separately verify actual native host caller. Verification/shared/formal/Acceptance remain pending.",
   "state": {
-    "execution": "planned",
+    "execution": "complete",
     "verification": "pending",
-    "localAudit": "intent-durable",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
