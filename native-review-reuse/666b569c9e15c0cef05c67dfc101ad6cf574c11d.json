@@ -1,0 +1,50 @@
+{
+  "schema": "agent-platform.identical-tree-independent-review-reuse.v1",
+  "recordClass": "explicit-successor-binding",
+  "bindingProducer": "/root",
+  "rootProjectionOnly": true,
+  "newIndependentReviewPerformed": false,
+  "recordedAtUtc": "2026-10-18T03:11:28.058241+00:00",
+  "originalReviewRecordedAtUtc": "2026-10-18T02:41:53.630643+00:00",
+  "original": {
+    "head": "c519a900b743f02655ff81fb5e1e75f91651d243",
+    "tree": "81e01c83095ddf8129eb336f85d93b7015e0ee1c",
+    "manifestSha256": "bb8d0aca3caf57120e46deb939d128d4c4a40c3190dd4efe71694499c64c0e28",
+    "resultSha256": "32c1a12973ee57fc3030a9fd59496d548d749fe2e0c0fcf2849c1a0c7728805c",
+    "authenticatedStatusId": 56616032128,
+    "resultCommit": "463139bc850b8d3d5fb389033478f8ca8d0d614b",
+    "resultPath": "native-review-results/c519a900b743f02655ff81fb5e1e75f91651d243.json",
+    "receiptCommit": "6ddb517d3009fcfe1aff5851930ce3533d1f2af6",
+    "receiptPath": "native-reviews/c519a900b743f02655ff81fb5e1e75f91651d243.json",
+    "receiptSha256": "e7e72e83e70269a3250dccba3148b92c26be77b7640208f476f3087f1633da2e"
+  },
+  "successor": {
+    "head": "666b569c9e15c0cef05c67dfc101ad6cf574c11d",
+    "tree": "81e01c83095ddf8129eb336f85d93b7015e0ee1c",
+    "manifestSha256": "bb8d0aca3caf57120e46deb939d128d4c4a40c3190dd4efe71694499c64c0e28",
+    "pullRequest": 34,
+    "parents": [
+      "b3a2a8c2235b994407a903e4c3d3d907fdaa014c",
+      "c519a900b743f02655ff81fb5e1e75f91651d243"
+    ],
+    "resultSha256": "4320b5684874b663750d88cd52646d02d8a34c64c4915bcb2c1008e87822628b"
+  },
+  "treeIdentityConfirmed": true,
+  "originalReviewUnchanged": true,
+  "currentUnresolvedFindings": 0,
+  "meaning": "Root fills only after actual explicit expected-head merge with actualparents/tree/manifest/current0. M result is separately labeled deterministic Root projection of unchanged original independent assessment; no new review/evaluation execution or time rewrite. H raw32c1 remains immutable.",
+  "nativeCliSessionId": null,
+  "nativeTaskId": null,
+  "nativeRunId": null,
+  "nativeAuthenticationEstablished": false,
+  "nativePermissionGranted": false,
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "/root/integrated_harness_review"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "/root"
+  },
+  "projectionMeaning": "Accountable Root deterministic head-only projection of unchanged completed independent assessment; no new reviewer execution, CLI session, native Task/Run or review timestamp."
+}
