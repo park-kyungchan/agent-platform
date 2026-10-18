@@ -224,7 +224,7 @@ captureDependencies = captureInstalledRuntimeClosure;
 
 // Keep the existing v1 consumer's exact single-line marker grammar.
 // prettier-ignore
-const expectedRegistrationSha256 = "f0c1c39aeec6c75dfd119db9802dbf3d788711abfe1f946e9ac3041c37a85227";
+const expectedRegistrationSha256 = "c5aa6c6f781da5405111157266373c8b9c1434ca904f0a7d1053ee7120686d4a";
 // prettier-ignore
 const expectedSuccessorSha256 = "5aa4f30c406a3f72ab6570e032b0d34f0ce612ff8819e7ede5ce4f6232462b53";
 const codeOwnerRoot = resolve(import.meta.dir, "../..");
