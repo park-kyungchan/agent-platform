@@ -1,0 +1,63 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "codex-harness-engineering:verification:run12-current-memory-caller-receiver",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-lead",
+    "locator": "/home/palantirkc/operations/orchestrator-history-audit-20261017T003728Z/approved-execution/odi05-run12-shared-receiver-actual-v1/root-shared-canonical-read.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:run12-current-memory-caller-receiver",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-18T01:30:16.749Z",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:39e29dedd85ab6d5802e5a646eb765856138da9f314233c1ac7af6a9b1a965f9"
+      ],
+      "criteria": [
+        {
+          "id": "actual-root-shared-canonical-read",
+          "status": "pass",
+          "message": "Pinned actual Root read proof matches freshly reread immutable H3 receipt/intent/result/passing Task Verification; publication proof separately captured.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:run12-shared-canonical-read"
+          ]
+        },
+        {
+          "id": "different-runtime-exact-payload-join",
+          "status": "pass",
+          "message": "Actual Codex receiver and source-normalized Hermes producer share exact H3 commit/path/fragment/full-blob hash; native resource IDs unexposed/null and no authentication/permission inference.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:run12-current-memory-caller-receiver"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-05-CALLER-RUN12-SHARED-READ.json",
+          "sha256": "d610221f4a08b0fed05d06b676ccacc4cbdd1219cce0977d777f1650b1d8a23d"
+        }
+      ],
+      "runtime": {
+        "name": "canonical-source-receiver-verification",
+        "version": "fixed-common3b-owner08"
+      },
+      "details": {
+        "projectionAuthor": "/root/harness_successor_independent_review",
+        "sourceOwner": "native-codex-lead",
+        "nativeAuthenticationEstablished": false,
+        "nativePermissionGranted": false,
+        "sharedDeliveryConfirmedForThisReceiverTask": false,
+        "wholeGoalAcceptanceEstablished": false
+      }
+    }
+  }
+}

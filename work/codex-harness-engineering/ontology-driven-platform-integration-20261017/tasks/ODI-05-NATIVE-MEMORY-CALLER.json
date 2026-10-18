@@ -17,13 +17,13 @@
     "taskId": "ODI-05-NATIVE-MEMORY-CALLER"
   },
   "title": "Use current canonical Memory in a useful fresh native Hermes task",
-  "nextAction": "Run12 useful native H2 context/Memory result and independent bounded Verification are durable; native occurrence is consumed—do not replay. Shared Git payload/actual independent receiver and formal audit remain pending. Continue accepted Plan2 estate/source delivery without changing whole-Goal acceptance or prior fences.",
+  "nextAction": "Run12 is consumed and its exact H3 payload has actual shared publication/canonical Codex receiver readback. Preserve all original execution/verification/effect evidence. Receiver Task own H4 delivery/audit and whole-Goal/domain Acceptance remain separate; never replay.",
   "state": {
     "execution": "complete",
     "verification": "passed",
     "localAudit": "result-durable",
-    "sharedAudit": "pending",
-    "formalCompletion": "audit-synchronization-pending"
+    "sharedAudit": "delivery-confirmed",
+    "formalCompletion": "complete"
   },
   "executionClass": "native-effect",
   "dependsOn": [
