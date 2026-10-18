@@ -17,7 +17,7 @@
     "taskId": "ODI-05-NATIVE-MEMORY-CALLER"
   },
   "title": "Use current canonical Memory in a useful fresh native Hermes task",
-  "nextAction": "After reviewed code/owner activation and current G2 qualification, admit one fresh Hermes turn: invoke canonical read-memory CLI with per-instance policy, use its source-attributed result for the bounded common-harness/repository investigation, and return useful findings. Correlate native-created stored key, marker, tool argv/stdout, durable response and usage; retain current authority/originals, unknown-usage exception and effect fences. Deliver independent verification and actual shared/receiver receipts separately; no old occurrence/G1 reuse or uncertain dispatch replay. Detailed existing contract pins and pre-dispatch checks: OPS odi05-native-memory-caller-task-record-preparation-v1/contract-binding.PROPOSAL.json.",
+  "nextAction": "After reviewed code/owner activation and current G2 guards, admit one fresh Hermes turn: canonical read-memory CLI + instance policy for source-attributed bounded harness/repo findings. Correlate stored key/marker/tool argv+stdout/durable response/usage. Retain authority/originals, unknown-usage exception and effect fences. No old/G1 reuse or uncertain resend. Independent verification and shared/receiver receipts stay separate.",
   "state": {
     "execution": "planned",
     "verification": "pending",
