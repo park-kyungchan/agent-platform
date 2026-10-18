@@ -17,13 +17,13 @@
     "taskId": "ODI-05-NATIVE-MEMORY-CALLER"
   },
   "title": "Use current canonical Memory in a useful fresh native Hermes task",
-  "nextAction": "After reviewed code/owner activation and current G2 guards, admit one fresh Hermes turn: canonical read-memory CLI + instance policy for source-attributed bounded harness/repo findings. Correlate stored key/marker/tool argv+stdout/durable response/usage. Retain authority/originals, unknown-usage exception and effect fences. No old/G1 reuse or uncertain resend. Independent verification and shared/receiver receipts stay separate.",
+  "nextAction": "Run12 useful native H2 context/Memory result and independent bounded Verification are durable; native occurrence is consumed—do not replay. Shared Git payload/actual independent receiver and formal audit remain pending. Continue accepted Plan2 estate/source delivery without changing whole-Goal acceptance or prior fences.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
-    "formalCompletion": "pending"
+    "formalCompletion": "audit-synchronization-pending"
   },
   "executionClass": "native-effect",
   "dependsOn": [
@@ -42,6 +42,17 @@
     "ODI-DECISION-CONTINUE-UNKNOWN-BUDGET-DELEGATION",
     "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
   ],
-  "effectIds": [],
-  "verificationEvidenceIds": []
+  "effectIds": [
+    "ODI-05-CALLER-RUN12-NATIVE-EFFECT"
+  ],
+  "verificationEvidenceIds": [
+    "codex-harness-engineering:verification:run12-current-memory-caller"
+  ],
+  "runtimeId": "native-hermes:20261018_075237_f00a9d",
+  "occurrence": {
+    "runtimeId": "native-hermes:20261018_075237_f00a9d",
+    "attemptId": "afac05587261438cb2bde45a719c52af",
+    "occurrenceId": "call_bcc68df029d8447eb12788ae53fa28c4"
+  },
+  "executionEvidenceId": "ODI-05-CALLER-RUN12-NATIVE-EXECUTION"
 }
