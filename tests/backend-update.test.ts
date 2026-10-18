@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { validatePolicy, backendImageArguments, backendServiceSelectionPython, backendJobCompleted, backendPrepareMayRetry, correlateBackendTransaction, evaluateBackendSnapshot, preparedCandidateFromSnapshot, type BackendJob, type BackendSnapshot, type BackendTransaction, type BackendUpdatePolicy, type PreparedBackendCandidate } from '../src/adapters/backend-update';
+import { fontReadabilityIdentity, validatePolicy, backendImageArguments, backendServiceSelectionPython, backendJobCompleted, backendPrepareMayRetry, correlateBackendTransaction, evaluateBackendSnapshot, preparedCandidateFromSnapshot, type BackendJob, type BackendSnapshot, type BackendTransaction, type BackendUpdatePolicy, type PreparedBackendCandidate } from '../src/adapters/backend-update';
 import { backendIdentity } from '../src/update/cli';
 import type { HermesTarget } from '../src/adapters/ssh';
 
@@ -281,4 +281,24 @@ print(json.dumps(rows))
     expect(run.exitCode).toBe(0);
     expect(JSON.parse(run.stdout.toString())).toEqual([true,true,true,false,false,false,false]);
   });
+});
+
+
+describe('opt-in exact font-derived release',()=>{
+ const font=fontReadabilityIdentity;
+ const variant:BackendUpdatePolicy={...policy,botDesktop:true,releaseTag:font.releaseTag,fontReadability:true,overlay:{path:`${policy.updaterRoot}/overlays/${font.patchSha256}.patch`,sha256:font.patchSha256}};
+ test('requires explicit exact tuple; no arbitrary Bot/release overlay is admitted',()=>{
+  expect(()=>validatePolicy(target,variant)).not.toThrow();
+  expect(backendImageArguments(variant,font.sha)).toContain('--font-readability');
+  expect(()=>backendImageArguments(variant,sha)).toThrow('source SHA');
+  for(const change of [{fontReadability:false},{botDesktop:false},{releaseTag:'v0.22.1'},{overlay:policy.overlay}])expect(()=>validatePolicy(target,{...variant,...change})).toThrow();
+ });
+ test('prepared readback requires derived stamp and font evidence; reported same image is insufficient',()=>{
+  const observed=snapshot();const candidate=observed.candidate! as PreparedBackendCandidate & {actual_image_id:string};
+  Object.assign(candidate,{sha:font.sha,tag:`hermes-agent:main-${font.sha}-desktop-overlay-${font.patchSha256}`,overlay_sha256:font.patchSha256,bot_desktop_label:'1',actual_stamp:{commit:font.sha,dirty:true,displayVersion:'0.22.2',overlaySha256:font.patchSha256,overlayTreeSha:'a'.repeat(40)}});
+  expect(()=>preparedCandidateFromSnapshot(variant,font.sha,observed)).toThrow('diagnostic');
+  candidate.validation_evidence!.fonts={path:policy.updaterRoot+'/reports/font.json',sha256:'c'.repeat(64),actualSha256:'c'.repeat(64)};
+  expect(()=>preparedCandidateFromSnapshot(variant,font.sha,observed)).not.toThrow();
+  candidate.actual_stamp!.dirty=false;expect(()=>preparedCandidateFromSnapshot(variant,font.sha,observed)).toThrow('release version');
+ });
 });

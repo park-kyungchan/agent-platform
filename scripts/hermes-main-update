@@ -11,6 +11,21 @@ UPSTREAM="https://github.com/NousResearch/hermes-agent.git"
 UPDATER="$ROOT/.main-updater"
 OVERLAY_DIR="$UPDATER/overlays"
 OVERLAY_ALLOWED_PATHS=("Dockerfile" "hermes_cli/dashboard_auth/middleware.py" "hermes_cli/dashboard_auth/prefix.py" "hermes_cli/dashboard_auth/routes.py" "hermes_cli/web_routers/status.py" "agent/evaluation_accounting.py" "agent/chat_completion_helpers.py" "agent/aux_accounting.py" "hermes_cli/oneshot.py" "agent/codex_runtime.py" "agent/auxiliary_client.py" "agent/conversation_loop.py" "agent/prompt_builder.py" "hermes_cli/runtime_provider.py" "hermes_cli/auth_codex.py" "hermes_cli/auth.py" "agent/evaluation_operational.py" "model_tools.py" "agent/turn_context.py" "tools/bot_mode_dm.py" "hermes_cli/kanban_db_dispatch.py" "tools/computer_use/cua_backend_capture.py")
+# One reviewed release-derived font fix; arbitrary Bot/release overlays stay forbidden.
+FONT_SOURCE_SHA="d923a5eb487a17c0a68801bba9ef0f56c81040a8"
+FONT_RELEASE_TAG="v0.22.2"
+FONT_PATCH_SHA="d9d7d4bb8f446f80ffd7402d9ad685b829f454c3fd1d91c5d1589616ae8d2ee2"
+FONT_BASE_SHA="f443976f0409c819993fe6d7e80ef932d3550cc350b9ea49423b8fa35a11490e"
+FONT_RESULT_SHA="6758a01f8d4c581e95d0712b9ad61696791a6ab5a4732972281dee555f35c212"
+font_tuple_valid() {
+  [[ "$1" == "$FONT_SOURCE_SHA" && "$2" == 1 && "$3" == "$FONT_RELEASE_TAG" && "$4" == "$FONT_PATCH_SHA" ]]
+}
+font_request_valid() {
+  [[ "${FONT_READABILITY:-0}" == 1 && "${OVERLAY_MODE:-0}" == 1 ]] && font_tuple_valid "$1" "${BOT_DESKTOP:-0}" "${RELEASE_TAG:-}" "$2"
+}
+font_dockerfile_valid() {
+  [[ -f "$WORKTREE/Dockerfile" && ! -L "$WORKTREE/Dockerfile" ]] && [[ "$(sha256sum -- "$WORKTREE/Dockerfile" | awk '{print $1}')" == "$1" ]]
+}
 OVERLAY_ADDED_POLICY='{"agent/evaluation_accounting.py":["35555419a3d28a73eb129991c4383cdd545ee340ef399dc22d5eb22dd58ce1f4","1e328a828ad99e95de0768f6784a6965526ee94a4fd7be397fc7a9755b8ea9d9","00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09"],"agent/evaluation_operational.py":["f9163dfa2aeb4f3ab22c465db928a73d597e82a9b798be07aad7defd18585195","a932a93451534c86a6d5b283b3ec6399a35f2c196b1e86a8f48b307601ab6844","cd8385e338710b9567389bf66374f4a9668604f645b2e38e63b5cb053f03db9c"]}'
 
 overlay_added_path() {
@@ -121,8 +136,12 @@ valid_overlay_sha() {
 
 set_candidate_tag() {
   if [[ "${OVERLAY_MODE:-0}" == 1 ]]; then
-    [[ "${BOT_DESKTOP:-0}" != 1 ]] || die "--bot-desktop cannot be combined with an overlay"
-    CANDIDATE_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-overlay-${OVERLAY_SHA256}"
+    if [[ "${BOT_DESKTOP:-0}" == 1 ]]; then
+      font_request_valid "$CANDIDATE_SHA" "$OVERLAY_SHA256" || die "--bot-desktop cannot be combined with an arbitrary overlay"
+      CANDIDATE_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-desktop-overlay-${OVERLAY_SHA256}"
+    else
+      CANDIDATE_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-overlay-${OVERLAY_SHA256}"
+    fi
   elif [[ "${BOT_DESKTOP:-0}" == 1 ]]; then
     CANDIDATE_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-desktop"
   else
@@ -190,7 +209,7 @@ import re, sys
 path = sys.argv[1]
 matches = []
 for line in open(path, encoding="utf-8"):
-    m = re.match(r"^\s*image:\s*(hermes-agent:main-(?:[0-9a-f]{40}-overlay-[0-9a-f]{64}|[0-9a-f]{40}-desktop|[0-9a-f]{7,40}))\s*$", line)
+    m = re.match(r"^\s*image:\s*(hermes-agent:main-(?:[0-9a-f]{40}-(?:desktop-)?overlay-[0-9a-f]{64}|[0-9a-f]{40}-desktop|[0-9a-f]{7,40}))\s*$", line)
     if m:
         matches.append(m.group(1))
 if len(matches) != 1:
@@ -256,8 +275,13 @@ PY
     CURRENT_OVERLAY_TREE_SHA="$stamp_tree"
   fi
   if [[ "$CURRENT_OVERLAY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
-    [[ "$CURRENT_BOT_DESKTOP" == 0 ]] || die "running desktop variant cannot also carry an overlay"
-    expected_tag="${IMAGE_PREFIX}${CURRENT_SHA}-overlay-${CURRENT_OVERLAY_SHA256}"
+    if [[ "$CURRENT_BOT_DESKTOP" == 1 ]]; then
+      font_tuple_valid "$CURRENT_SHA" "$CURRENT_BOT_DESKTOP" "$CURRENT_RELEASE_TAG" "$CURRENT_OVERLAY_SHA256" || die "running desktop variant has an unapproved overlay"
+      python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("dirty") is True and d.get("baseVersion")=="0.22.2" and d.get("displayVersion")=="0.22.2" and d.get("distance")==0 else 1)' <<<"$stamp_output" || die "font-derived runtime stamp is not honest"
+      expected_tag="${IMAGE_PREFIX}${CURRENT_SHA}-desktop-overlay-${CURRENT_OVERLAY_SHA256}"
+    else
+      expected_tag="${IMAGE_PREFIX}${CURRENT_SHA}-overlay-${CURRENT_OVERLAY_SHA256}"
+    fi
   elif [[ "$CURRENT_BOT_DESKTOP" == 1 ]]; then
     expected_tag="${IMAGE_PREFIX}${CURRENT_SHA}-desktop"
   else
@@ -391,7 +415,7 @@ doc["last_phase"] = phase
 doc["result"] = result
 doc["pid"] = os.getppid()
 doc["current"] = {"sha": current_sha, "tag": current_tag, "overlay_sha256": os.environ.get("CURRENT_OVERLAY_SHA256", ""), "overlay_tree_sha": os.environ.get("CURRENT_OVERLAY_TREE_SHA", ""), "bot_desktop": os.environ.get("CURRENT_BOT_DESKTOP") == "1", "release_tag": os.environ.get("CURRENT_RELEASE_TAG") or None}
-doc["candidate"] = {"sha": candidate_sha, "tag": candidate_tag, "overlay_sha256": os.environ.get("OVERLAY_SHA256", ""), "overlay_tree_sha": os.environ.get("OVERLAY_TREE_SHA", ""), "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None}
+doc["candidate"] = {"sha": candidate_sha, "tag": candidate_tag, "overlay_sha256": os.environ.get("OVERLAY_SHA256", ""), "overlay_tree_sha": os.environ.get("OVERLAY_TREE_SHA", ""), "font_readability": os.environ.get("FONT_READABILITY") == "1", "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None}
 tmp = path + ".tmp"
 with open(tmp, "w", encoding="utf-8") as handle:
     json.dump(doc, handle, indent=2, sort_keys=True)
@@ -484,8 +508,12 @@ prepare_worktree() {
   if [[ "$OVERLAY_MODE" == 1 ]]; then
     select_overlay_identity
     local path base_file_mode applied_file_mode
-    local -a base_file_modes=() changed_paths=()
-    for path in "${OVERLAY_ALLOWED_PATHS[@]}"; do
+    local -a base_file_modes=() changed_paths=() allowed_paths=("${OVERLAY_ALLOWED_PATHS[@]}")
+    if [[ "${FONT_READABILITY:-0}" == 1 ]]; then
+      font_request_valid "$CANDIDATE_SHA" "$OVERLAY_SHA256" && font_dockerfile_valid "$FONT_BASE_SHA" || die "font overlay upstream or Dockerfile base differs"
+      allowed_paths=("Dockerfile")
+    fi
+    for path in "${allowed_paths[@]}"; do
       base_file_mode="$(git -C "$WORKTREE" ls-files -s -- "$path" | awk 'NR==1 {print $1}')"
       if overlay_added_path "$path" && [[ -z "$base_file_mode" ]]; then
         base_file_mode="absent"
@@ -497,7 +525,7 @@ prepare_worktree() {
     git -C "$WORKTREE" apply --check --whitespace=error-all "$OVERLAY_FILE" || die "pinned overlay does not apply cleanly to upstream SHA"
     git -C "$WORKTREE" apply --whitespace=error-all "$OVERLAY_FILE" || die "could not apply pinned overlay"
     local -a present_paths=()
-    for path in "${OVERLAY_ALLOWED_PATHS[@]}"; do
+    for path in "${allowed_paths[@]}"; do
       if overlay_added_path "$path" && [[ ! -e "$WORKTREE/$path" && ! -L "$WORKTREE/$path" ]]; then continue; fi
       [[ -f "$WORKTREE/$path" && ! -L "$WORKTREE/$path" ]] || die "overlay replaced an allowlisted regular file with a non-regular file: $path"
       if overlay_added_path "$path"; then
@@ -508,10 +536,12 @@ prepare_worktree() {
     local accounting_digest="" operational_digest=""
     if [[ -f "$WORKTREE/agent/evaluation_accounting.py" ]]; then accounting_digest="$(sha256sum -- "$WORKTREE/agent/evaluation_accounting.py" | awk '{print $1}')"; fi
     if [[ -f "$WORKTREE/agent/evaluation_operational.py" ]]; then operational_digest="$(sha256sum -- "$WORKTREE/agent/evaluation_operational.py" | awk '{print $1}')"; fi
+    if [[ "${FONT_READABILITY:-0}" != 1 ]]; then
     case "$accounting_digest:$operational_digest" in
       ":"|"35555419a3d28a73eb129991c4383cdd545ee340ef399dc22d5eb22dd58ce1f4:"|"1e328a828ad99e95de0768f6784a6965526ee94a4fd7be397fc7a9755b8ea9d9:f9163dfa2aeb4f3ab22c465db928a73d597e82a9b798be07aad7defd18585195"|"00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09:a932a93451534c86a6d5b283b3ec6399a35f2c196b1e86a8f48b307601ab6844"|"00e9bc3ef1ac3b52181afbf26c6122f4d1706c4af3c34accf53974e005b93b09:cd8385e338710b9567389bf66374f4a9668604f645b2e38e63b5cb053f03db9c") ;;
       *) die "added overlay module generation mismatch" ;;
     esac
+    fi
     local applied_patch_sha
     applied_patch_sha="$(sha256sum -- "$OVERLAY_FILE" | awk '{print $1}')"
     [[ "$applied_patch_sha" == "$OVERLAY_SHA256" ]] || die "overlay changed while being applied"
@@ -520,10 +550,13 @@ prepare_worktree() {
     for path in "${changed_paths[@]}"; do
       overlay_path_allowed "$path" || die "overlay changed a path outside the exact allowlist: $path"
     done
+    if [[ "${FONT_READABILITY:-0}" == 1 ]]; then
+      [[ "${#changed_paths[@]}" == 1 && "${changed_paths[0]}" == Dockerfile ]] && font_dockerfile_valid "$FONT_RESULT_SHA" || die "font overlay postimage differs"
+    fi
     git -C "$WORKTREE" diff --check HEAD || die "overlay has whitespace errors"
     git -C "$WORKTREE" add -- "${present_paths[@]}"
     local i=0
-    for path in "${OVERLAY_ALLOWED_PATHS[@]}"; do
+    for path in "${allowed_paths[@]}"; do
       applied_file_mode="$(git -C "$WORKTREE" ls-files -s -- "$path" | awk 'NR==1 {print $1}')"
       if [[ "${base_file_modes[$i]}" == "absent" ]]; then
         [[ -z "$applied_file_mode" || "$applied_file_mode" == "100644" ]] || die "added overlay module has an unexpected mode"
@@ -555,6 +588,8 @@ candidate_image_valid() {
   revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image" 2>/dev/null)" || return 1
   [[ "$revision" == "$CANDIDATE_SHA" ]] || return 1
   bot_desktop_image_valid "$image" "${BOT_DESKTOP:-0}" || return 1
+  if [[ "${FONT_READABILITY:-0}" == 1 ]]; then font_request_valid "$CANDIDATE_SHA" "$OVERLAY_SHA256" || return 1; fi
+  if [[ "$OVERLAY_MODE" == 1 && "${BOT_DESKTOP:-0}" == 1 ]]; then font_request_valid "$CANDIDATE_SHA" "$OVERLAY_SHA256" || return 1; fi
   overlay_label="$(docker image inspect --format '{{index .Config.Labels "io.nousresearch.hermes.overlay.sha256"}}' "$image" 2>/dev/null)" || return 1
   [[ "$overlay_label" == "<no value>" ]] && overlay_label=""
   if [[ "$OVERLAY_MODE" == 1 ]]; then
@@ -577,7 +612,7 @@ candidate_image_valid() {
     [[ -z "$stamp_overlay" && -z "$stamp_tree" ]] || return 1
   fi
   if [[ -n "${RELEASE_TAG:-}" ]]; then
-    python3 -c 'import json,sys; d=json.load(sys.stdin); version=sys.argv[1][1:]; raise SystemExit(0 if d.get("baseVersion")==version and d.get("displayVersion")==version and d.get("distance")==0 and d.get("dirty") is False else 1)' "$RELEASE_TAG" <<<"$stamp_output" || return 1
+    python3 -c 'import json,sys; d=json.load(sys.stdin); version=sys.argv[1][1:]; raise SystemExit(0 if d.get("baseVersion")==version and d.get("displayVersion")==version and d.get("distance")==0 and d.get("dirty") is (sys.argv[2]=="1") else 1)' "$RELEASE_TAG" "${FONT_READABILITY:-0}" <<<"$stamp_output" || return 1
   fi
 }
 
@@ -644,6 +679,12 @@ with open(tmp, "w", encoding="utf-8") as handle:
 os.chmod(tmp, 0o644)
 os.replace(tmp, path)
 PY
+  local -a font_args=()
+  if [[ "${FONT_READABILITY:-0}" == 1 ]]; then
+    font_request_valid "$CANDIDATE_SHA" "$OVERLAY_SHA256" || die "font build tuple changed"
+    font_args=(--build-arg HERMES_BOT_DESKTOP=1 --label io.nousresearch.hermes.bot-desktop=1)
+    python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); raise SystemExit(0 if d.get("dirty") is True else 1)' "$stamp_path" || die "font-derived install stamp must be dirty"
+  fi
   TEMP_TAG="${IMAGE_PREFIX}${CANDIDATE_SHA}-overlay-build-${RUN_ID}-${BASHPID}"
   docker buildx build \
     --load \
@@ -652,6 +693,7 @@ PY
     --build-arg "HERMES_GIT_SHA=$CANDIDATE_SHA" \
     --label "org.opencontainers.image.revision=$CANDIDATE_SHA" \
     --label "io.nousresearch.hermes.overlay.sha256=$OVERLAY_SHA256" \
+    "${font_args[@]}" \
     --tag "$TEMP_TAG" \
     "$WORKTREE"
   candidate_image_valid "$TEMP_TAG" || die "temporary overlay image failed label, install-stamp, or upstream provenance verification"
@@ -841,6 +883,36 @@ run_isolated_hermes_diagnostic() {
 }
 
 
+# A fresh container is required even on a diagnostic cache hit. A chmod in a
+# live container upper layer does not repair the immutable candidate image.
+FONT_SMOKE_PY='import hashlib,json,os,pathlib,shutil,stat,tempfile
+assert os.getuid()==10000 and os.getgid()==10000,"Font probe must run as runtime UID/GID"
+expected={"/opt/hermes/hermes_cli/web_dist/fonts/Collapse-Bold.woff2":"cb1bc6803168cffb3ef7b8113f95f82480a6d0f46d6e37edc854259377c6c00b","/opt/hermes/hermes_cli/web_dist/fonts/Collapse-Regular.woff2":"ce8c481f56da3a46074ab696c16481bea49ea83e75e7eb7cb42fd2114593f33a","/opt/hermes/hermes_cli/web_dist/fonts/Mondwest-Regular.woff2":"9cf6e6e1cba70f7e991a92ce4225785725b6cc9a48cc77cbfaabeba26c18f072","/opt/hermes/hermes_cli/web_dist/fonts/RulesCompressed-Medium.woff2":"d865cf7154121265d3d65c0931ec27dc289aa438cd62ffad2f38e05ae79956a3","/opt/hermes/hermes_cli/web_dist/fonts/RulesCompressed-Regular.woff2":"3bcbc330183f49cd49c72d4cdb3d1fbc675cf4e3000b06fd1c606ffc31b73e5f","/opt/hermes/hermes_cli/web_dist/fonts/RulesExpanded-Bold.woff2":"f2295406de2272086d5395af32b50ac51b15d75294c25a04094c8b1f85757931","/opt/hermes/hermes_cli/web_dist/fonts/RulesExpanded-Regular.woff2":"e8062ac4889b0f05de94035571e86991b6efd03539775cfe0790e37da75434db","/opt/hermes/hermes_cli/web_dist/fonts-terminal/JetBrainsMono-Bold.woff2":"08863c7964612257a90bd821e3127dc5ccb0b5046f881673a1ade5809eb21d0f","/opt/hermes/hermes_cli/web_dist/fonts-terminal/JetBrainsMono-Italic.woff2":"9f158b85eca345daeee01dfffa602709a905ea08b0cc60dbf6153cbbd97da08f","/opt/hermes/hermes_cli/web_dist/fonts-terminal/JetBrainsMono-Regular.woff2":"f1a7a03672cdd494ce0d5543fac6e4360fe22403c6de297fdc2e55a815f7baff"}
+roots=[pathlib.Path("/opt/hermes/hermes_cli/web_dist/fonts"),pathlib.Path("/opt/hermes/hermes_cli/web_dist/fonts-terminal")]
+assert all(p.is_dir() and not p.is_symlink() for p in roots),"Unsafe font directory"
+actual={str(p) for root in roots for p in root.glob("*.woff2")}
+assert actual==set(expected),"Font asset set differs"
+with tempfile.TemporaryDirectory(prefix="font-read-") as tmp:
+ for index,(name,digest) in enumerate(sorted(expected.items())):
+  p=pathlib.Path(name);m=p.lstat()
+  assert stat.S_ISREG(m.st_mode) and stat.S_IMODE(m.st_mode)==0o644,"Font is not a public regular asset"
+  body=p.read_bytes();assert hashlib.sha256(body).hexdigest()==digest,"Font bytes differ"
+  destination=pathlib.Path(tmp)/str(index);shutil.copyfile(p,destination)
+  assert hashlib.sha256(destination.read_bytes()).hexdigest()==digest,"Font copy differs"
+print(json.dumps({"schema":1,"check":"font-readability","result":"passed","uid":10000,"files":len(expected),"fresh_container":True,"live_data_mounted":False},sort_keys=True))
+'
+run_font_readability_diagnostic() {
+  local output="$1" image_id
+  image_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" || return 1
+  [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+  timeout 60s docker run --rm --network none --read-only --user 10000:10000 \
+    --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777 \
+    --entrypoint /opt/hermes/.venv/bin/python "$image_id" -I -B -c "$FONT_SMOKE_PY" >"$output" 2>&1 || return 1
+  python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); raise SystemExit(0 if d=={"schema":1,"check":"font-readability","result":"passed","uid":10000,"files":10,"fresh_container":True,"live_data_mounted":False} else 1)' "$output" || return 1
+  [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$image_id" ]] || return 1
+  chmod 600 "$output"
+}
+
 validation_key() {
   sha256sum "$0" | awk '{print $1}'
 }
@@ -849,7 +921,7 @@ validation_cache_valid() {
   [[ -f "$STATE" ]] || return 1
   local evidence
   evidence="$(python3 - "$STATE" "$CANDIDATE_SHA" "$CANDIDATE_TAG" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" "$(validation_key)" <<'PY'
-import hashlib, json, sys
+import hashlib, json, os, sys
 path, sha, tag, overlay, tree, key = sys.argv[1:]
 with open(path, encoding="utf-8") as handle:
     item = json.load(handle).get("candidate") or {}
@@ -859,7 +931,7 @@ if not (item.get("status") == "prepared" and item.get("sha") == sha
         and item.get("validation_key") == key):
     raise SystemExit(1)
 paths = []
-for name in ("doctor", "plugin"):
+for name in (("doctor", "plugin", "fonts") if os.environ.get("FONT_READABILITY")=="1" else ("doctor", "plugin")):
     evidence = item.get("validation_evidence", {}).get(name, {})
     p = evidence.get("path", "")
     try:
@@ -918,6 +990,12 @@ resume_recorded_candidate() {
 
 validate_runtime_image() {
   local stage="$1"
+  VALIDATION_FONT_LOG=""
+  if [[ "${FONT_READABILITY:-0}" == 1 ]]; then
+    font_request_valid "$CANDIDATE_SHA" "$OVERLAY_SHA256" || return 1
+    VALIDATION_FONT_LOG="$REPORTS/$RUN_ID-$stage-font-readability.json"
+    run_font_readability_diagnostic "$VALIDATION_FONT_LOG" || { record_phase "$stage-validation" failed "fresh UID10000 font read failed"; return 1; }
+  fi
   if validation_cache_valid; then
     record_phase "$stage-validation" passed "cache hit: same immutable image, validator, and hashed diagnostic evidence"
     printf '%s validation reused for the same immutable image and validator.\n' "$stage"
@@ -1015,11 +1093,11 @@ write_candidate_state() {
     candidate_image_valid "$ADOPT_IMAGE_ID" || die "adopted image failed final source, patch, tree, install-stamp, or provenance validation"
     [[ "$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")" == "$ADOPT_IMAGE_ID" ]] || die "candidate tag no longer resolves to the adopted image ID"
   fi
-  python3 - "$STATE" "$CURRENT_SHA" "$CURRENT_TAG" "$CURRENT_IMAGE_ID" "$CURRENT_OVERLAY_SHA256" "$CURRENT_OVERLAY_TREE_SHA" "$CANDIDATE_SHA" "$CANDIDATE_TAG" "$candidate_image_id" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" "$REPORT" "$RUN_ID" "$candidate_status" "$(validation_key)" "${VALIDATION_DOCTOR_LOG:-}" "${VALIDATION_PLUGIN_LOG:-}" <<'PY'
+  python3 - "$STATE" "$CURRENT_SHA" "$CURRENT_TAG" "$CURRENT_IMAGE_ID" "$CURRENT_OVERLAY_SHA256" "$CURRENT_OVERLAY_TREE_SHA" "$CANDIDATE_SHA" "$CANDIDATE_TAG" "$candidate_image_id" "$OVERLAY_SHA256" "$OVERLAY_TREE_SHA" "$REPORT" "$RUN_ID" "$candidate_status" "$(validation_key)" "${VALIDATION_DOCTOR_LOG:-}" "${VALIDATION_PLUGIN_LOG:-}" "${VALIDATION_FONT_LOG:-}" <<'PY'
 import hashlib, json, os, sys
 (path, current_sha, current_tag, current_id, current_overlay, current_tree,
  candidate_sha, candidate_tag, candidate_id, candidate_overlay, candidate_tree,
- report, run_id, status, validator_key, doctor_log, plugin_log) = sys.argv[1:]
+ report, run_id, status, validator_key, doctor_log, plugin_log, font_log) = sys.argv[1:]
 try:
     with open(path, encoding="utf-8") as f:
         state = json.load(f)
@@ -1032,13 +1110,13 @@ state.update({
                 "bot_desktop": os.environ.get("CURRENT_BOT_DESKTOP") == "1", "release_tag": os.environ.get("CURRENT_RELEASE_TAG") or None},
     "candidate": {"sha": candidate_sha, "tag": candidate_tag, "image_id": candidate_id,
                   "overlay_sha256": candidate_overlay or None, "overlay_tree_sha": candidate_tree or None,
-                  "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None,
+                  "font_readability": os.environ.get("FONT_READABILITY") == "1", "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None,
                   "report": report, "prepared_run": run_id, "status": status, "source_verified": True,
                   "validation_key": validator_key if status == "prepared" else None},
 })
 if status == "prepared":
     state["candidate"]["validation_evidence"] = {}
-    for name, evidence_path in (("doctor", doctor_log), ("plugin", plugin_log)):
+    for name, evidence_path in (("doctor", doctor_log), ("plugin", plugin_log)) + ((("fonts", font_log),) if font_log else ()):
         with open(evidence_path, "rb") as handle:
             digest = hashlib.sha256(handle.read()).hexdigest()
         state["candidate"]["validation_evidence"][name] = {"path": evidence_path, "sha256": digest}
@@ -1107,7 +1185,7 @@ save_and_write_compose() {
 import os, re, sys
 source, target, image = sys.argv[1:]
 text = open(source, encoding="utf-8").read()
-pattern = re.compile(r"^(\s*image:\s*)hermes-agent:main-(?:[0-9a-f]{40}-overlay-[0-9a-f]{64}|[0-9a-f]{40}-desktop|[0-9a-f]{7,40})(\s*)$", re.MULTILINE)
+pattern = re.compile(r"^(\s*image:\s*)hermes-agent:main-(?:[0-9a-f]{40}-(?:desktop-)?overlay-[0-9a-f]{64}|[0-9a-f]{40}-desktop|[0-9a-f]{7,40})(\s*)$", re.MULTILINE)
 updated, count = pattern.subn(lambda m: m.group(1) + image + m.group(2), text)
 service = None
 lines = updated.splitlines(keepends=True)
@@ -1230,7 +1308,7 @@ doc = {
                  "bot_desktop": os.environ.get("CURRENT_BOT_DESKTOP") == "1", "release_tag": os.environ.get("CURRENT_RELEASE_TAG") or None},
     "current": {"sha": new_sha, "tag": new_tag, "image_id": new_id,
                 "overlay_sha256": new_overlay or None, "overlay_tree_sha": new_tree or None,
-                "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None},
+                "font_readability": os.environ.get("FONT_READABILITY") == "1", "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None},
     "preupdate_protection": {"mode": "external-hostinger-snapshot", "assumed_present": True, "local_backup_created": False},
     "report": report,
     "services": ["hermes-serve"],
@@ -1268,7 +1346,7 @@ doc = {
                  "bot_desktop": os.environ.get("CURRENT_BOT_DESKTOP") == "1", "release_tag": os.environ.get("CURRENT_RELEASE_TAG") or None},
     "current": {"sha": new_sha, "tag": new_tag, "image_id": new_id,
                 "overlay_sha256": new_overlay or None, "overlay_tree_sha": new_tree or None,
-                "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None},
+                "font_readability": os.environ.get("FONT_READABILITY") == "1", "bot_desktop": os.environ.get("BOT_DESKTOP") == "1", "release_tag": os.environ.get("RELEASE_TAG") or None},
     "data_restored": False,
 }
 def atomic(path, value):
@@ -1382,7 +1460,7 @@ prepare_latest() {
     ensure_repo
     if [[ "$OVERLAY_MODE" == 1 ]]; then
       prepare_worktree
-      if [[ "$CURRENT_TAG" == "$CANDIDATE_TAG" && "$CURRENT_OVERLAY_TREE_SHA" == "$OVERLAY_TREE_SHA" ]] && all_services_healthy_for_image "$CURRENT_IMAGE_ID"; then
+      if [[ "${FONT_READABILITY:-0}" != 1 && "$CURRENT_TAG" == "$CANDIDATE_TAG" && "$CURRENT_OVERLAY_TREE_SHA" == "$OVERLAY_TREE_SHA" ]] && all_services_healthy_for_image "$CURRENT_IMAGE_ID"; then
         record_phase complete passed "already current with verified overlay tree"
         printf 'Already at the pinned upstream and overlay identities; nothing to build.\n'
         return 0
@@ -1451,6 +1529,9 @@ deploy_candidate() {
   actual_id="$(docker image inspect --format '{{.Id}}' "$CANDIDATE_TAG")"
   [[ "$actual_id" == "$recorded_id" ]] || die "candidate image ID no longer matches its prepared state"
   candidate_image_valid "$CANDIDATE_TAG" || die "candidate labels, install stamp, or provenance no longer match prepared source and overlay identity"
+  if [[ "${FONT_READABILITY:-0}" == 1 ]]; then
+    run_font_readability_diagnostic "$REPORTS/$RUN_ID-preflight-font-readability.json" || die "candidate fresh-image font read failed"
+  fi
   if [[ "$CURRENT_TAG" == "$CANDIDATE_TAG" ]] && all_services_healthy_for_image "$CURRENT_IMAGE_ID"; then
     record_phase complete passed "candidate already running"
     printf 'Candidate is already running.\n'
@@ -1625,6 +1706,9 @@ PY
     export OVERLAY_SHA256 OVERLAY_TREE_SHA
   fi
   CANDIDATE_SHA="$previous_sha"
+  FONT_READABILITY=0
+  if font_tuple_valid "$CANDIDATE_SHA" "$BOT_DESKTOP" "$RELEASE_TAG" "$OVERLAY_SHA256"; then FONT_READABILITY=1; fi
+  export FONT_READABILITY
   set_candidate_tag
   expected_tag="$CANDIDATE_TAG"
   [[ "$previous_tag" == "$expected_tag" ]] || die "previous tag does not match its saved source and overlay identities"
@@ -1633,6 +1717,9 @@ PY
   candidate_image_valid "$previous_tag" || die "previous image source, overlay, install stamp, or provenance no longer matches state"
   RUN_ID="$(timestamp)-rollback-${previous_sha:0:12}"
   RUN_LOG="$LOGS/$RUN_ID.log"; touch "$RUN_LOG"; chmod 600 "$RUN_LOG"; exec > >(tee -a "$RUN_LOG") 2>&1
+  if [[ "${FONT_READABILITY:-0}" == 1 ]]; then
+    run_font_readability_diagnostic "$REPORTS/$RUN_ID-font-readability.json" || die "rollback font image is not readable by UID10000"
+  fi
   PHASE=rollback
   record_phase "$PHASE" running "$CANDIDATE_TAG"
   save_and_write_compose
@@ -1677,6 +1764,7 @@ start_job_command() {
   [[ "${FORCE_REBUILD:-0}" == 1 ]] && args+=(--force-rebuild)
   [[ -n "${REQUESTED_SHA:-}" && "$JOB_ACTION" != status ]] && args+=(--sha "$REQUESTED_SHA")
   [[ "$BOT_DESKTOP" == 1 ]] && args+=(--bot-desktop)
+  [[ "${FONT_READABILITY:-0}" == 1 ]] && args+=(--font-readability)
   [[ -n "$RELEASE_TAG" ]] && args+=(--release-tag "$RELEASE_TAG")
   if [[ "$OVERLAY_MODE" == 1 && "$JOB_ACTION" != status ]]; then args+=(--overlay-file "$OVERLAY_FILE" --overlay-sha256 "$OVERLAY_SHA256"); fi
   [[ -n "$ADOPT_IMAGE_ID" ]] && args+=(--adopt-image-id "$ADOPT_IMAGE_ID")
@@ -1698,7 +1786,7 @@ doc = {
     "unit": unit,
     "action": action,
     "launched_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-    "bot_desktop": os.environ.get("BOT_DESKTOP") == "1",
+    "font_readability": os.environ.get("FONT_READABILITY") == "1", "bot_desktop": os.environ.get("BOT_DESKTOP") == "1",
     "release_tag": os.environ.get("RELEASE_TAG") or None,
 }
 if requested_sha:
@@ -1816,7 +1904,12 @@ fixed content-addressed path under .main-updater/overlays, and may change only:
   hermes_cli/version_info.py
   hermes_cli/web_routers/status.py
 Overlay tags include the full upstream SHA and patch digest.
-Dockerfile is allowlisted only for the authorized dependency-cache optimization.
+Dockerfile overlays remain restricted to reviewed dependency-cache changes.
+The opt-in --font-readability exception requires exactly v0.22.2/d923a5e,
+--bot-desktop and the reviewed d9d7d4 font patch. It uses a distinct
+-desktop-overlay- tag and dirty=true overlay stamp, never a pristine release.
+No other Bot Screen or release overlay is accepted. Every font candidate check
+uses a fresh network-disabled UID10000 container even on diagnostic cache hits.
 Built candidates are durably recorded before runtime validation. A retry reuses
 their immutable image without fetching source or rebuilding. Only prepared
 candidates can deploy. Diagnostic reuse requires the same image ID, updater
@@ -1847,6 +1940,7 @@ shift || true
 APPROVE_DEPLOY=0
 FORCE_REBUILD=0
 BOT_DESKTOP=0
+FONT_READABILITY=0
 RELEASE_TAG=""
 ADOPT_IMAGE_ID=""
 REQUESTED_SHA=""
@@ -1860,7 +1954,7 @@ CURRENT_OVERLAY_SHA256=""
 CURRENT_OVERLAY_TREE_SHA=""
 CURRENT_BOT_DESKTOP=0
 CURRENT_RELEASE_TAG=""
-export BOT_DESKTOP RELEASE_TAG CURRENT_BOT_DESKTOP CURRENT_RELEASE_TAG
+export BOT_DESKTOP FONT_READABILITY RELEASE_TAG CURRENT_BOT_DESKTOP CURRENT_RELEASE_TAG
 export OVERLAY_SHA256 OVERLAY_TREE_SHA CURRENT_OVERLAY_SHA256 CURRENT_OVERLAY_TREE_SHA
 REQUESTED_UNIT=""
 JOB_ACTION=""
@@ -1869,6 +1963,7 @@ while (($#)); do
   case "$1" in
     --approve-deploy) APPROVE_DEPLOY=1 ;;
     --force-rebuild) FORCE_REBUILD=1 ;;
+    --font-readability) FONT_READABILITY=1 ;;
     --bot-desktop) BOT_DESKTOP=1 ;;
     --release-tag)
       shift
@@ -1910,8 +2005,11 @@ while (($#)); do
   esac
   shift
 done
+if [[ "$FONT_READABILITY" == 1 ]]; then
+  font_tuple_valid "$REQUESTED_SHA" "$BOT_DESKTOP" "$RELEASE_TAG" "$REQUESTED_OVERLAY_SHA256" && [[ -n "$REQUESTED_OVERLAY_FILE" ]] || die "font readability requires the exact reviewed release/Desktop/overlay tuple"
+fi
 if [[ "$BOT_DESKTOP" == 1 || -n "$RELEASE_TAG" ]]; then
-  [[ -z "$REQUESTED_OVERLAY_FILE" && -z "$REQUESTED_OVERLAY_SHA256" ]] || die "Bot Screen and release-tag options require pristine official source; overlays are excluded"
+  [[ "$FONT_READABILITY" == 1 || ( -z "$REQUESTED_OVERLAY_FILE" && -z "$REQUESTED_OVERLAY_SHA256" ) ]] || die "Bot Screen and release-tag options require pristine official source; overlays are excluded"
   case "$COMMAND" in
     prepare|deploy|update) ;;
     start) [[ "$JOB_ACTION" == prepare || "$JOB_ACTION" == deploy || "$JOB_ACTION" == update ]] || die "source variant options require a prepare, deploy, or update job" ;;
@@ -1949,10 +2047,13 @@ case "$COMMAND" in
     trap - EXIT
     remove_worktree
     if [[ "$OVERLAY_MODE" == 1 ]]; then
-      exec "$0" deploy --sha "$CANDIDATE_SHA" --overlay-file "$OVERLAY_FILE" --overlay-sha256 "$OVERLAY_SHA256" --approve-deploy
+      overlay_args=()
+      if [[ "${FONT_READABILITY:-0}" == 1 ]]; then overlay_args=(--font-readability --bot-desktop --release-tag "$RELEASE_TAG"); fi
+      exec "$0" deploy --sha "$CANDIDATE_SHA" --overlay-file "$OVERLAY_FILE" --overlay-sha256 "$OVERLAY_SHA256" "${overlay_args[@]}" --approve-deploy
     else
       source_args=()
       [[ "$BOT_DESKTOP" == 1 ]] && source_args+=(--bot-desktop)
+      [[ "${FONT_READABILITY:-0}" == 1 ]] && source_args+=(--font-readability)
       [[ -n "$RELEASE_TAG" ]] && source_args+=(--release-tag "$RELEASE_TAG")
       exec "$0" deploy --sha "$CANDIDATE_SHA" "${source_args[@]}" --approve-deploy
     fi

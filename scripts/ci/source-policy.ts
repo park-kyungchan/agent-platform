@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dir, '../..');
 const exact = new Set([
   '.gitignore', 'AGENTS.md', 'README.md', 'project.json', 'package.json', 'bun.lock', 'tsconfig.json', '.github/workflows/source.yml',
-  'scripts/hermes-main-update', 'scripts/ci/infrastructure-release.ts', 'scripts/ci/source-policy.ts', 'scripts/ci/deployment-syntax.ts',
+  'scripts/hermes-main-update', 'deployments/hermes-font-readability.patch', 'scripts/ci/infrastructure-release.ts', 'scripts/ci/source-policy.ts', 'scripts/ci/deployment-syntax.ts',
   ...['targets', 'native-agent-workflow', 'update-workflow', 'port-and-lifecycle-policy', 'backend-update-policy', 'desktop-update-target', 'runtime-path-index'].map(name => `architecture/${name}.json`),
   'releases/palantirkc-ontology-0.2.0.tgz', 'releases/palantirkc-ontology-0.2.0.json',
   'releases/palantirkc-infrastructure-operations-0.0.0-2f8ca5da92d1.tgz', 'releases/palantirkc-infrastructure-operations-0.0.0-2f8ca5da92d1.json',

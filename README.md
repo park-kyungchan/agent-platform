@@ -51,3 +51,25 @@ release verification, shell syntax and mandatory native Compose configuration
 validation. It performs no deployment or model evaluation. The responsible Lead
 reviews exact source and checks before any explicit merge; automatic merge is
 prohibited.
+
+
+### Opt-in v0.22.2 font-derived backend
+
+`fontReadability` defaults to false. It admits only upstream
+`d923a5eb487a17c0a68801bba9ef0f56c81040a8`, official `v0.22.2`, Bot Desktop,
+and `deployments/hermes-font-readability.patch` SHA256
+`d9d7d4bb8f446f80ffd7402d9ad685b829f454c3fd1d91c5d1589616ae8d2ee2`
+at the updater's existing content-addressed overlay path. Source and patch
+staging, independent review, helper/policy adoption and native promotion remain
+separate authorized actions. The source default policy does not enable it.
+
+The native `--font-readability` flag records a **derived**
+`-desktop-overlay-<digest>` image and `dirty=true` install stamp; it cannot
+replace the pristine release/Desktop image. General Bot/release overlays remain
+rejected. The updater verifies the exact Dockerfile base and postimage, the
+Desktop build feature and overlay tree. Every candidate validation, including
+cache hits and rollback promotion, starts a fresh network-disabled UID10000
+container and opens/hashes/copies the ten fixed public font assets without live
+profile/data mounts. A repair in a running container's upper layer is not proof
+that a fresh container from that image is readable. No PM sync/GC, profile,
+credential or service action follows from checking this source.

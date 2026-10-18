@@ -16,6 +16,8 @@ export interface BackendUpdatePolicy {
   overlay?: { path: string; sha256: string };
   /** Official Dockerfile opt-in; keeps source pristine and gives the image a distinct tag. */
   botDesktop?: boolean;
+  /** Default off: exact v0.22.2 Desktop font-derived overlay only. */
+  fontReadability?: boolean;
   /** Published release already verified by the requesting project; native Git must match its SHA. */
   releaseTag?: string;
   updaterLock?: { device: number; inode: number };
@@ -43,7 +45,7 @@ export interface PreparedBackendCandidate extends BackendImage {
   job?: BackendJob;
   /** Independent native readback, separate from the updater's saved candidate claims. */
   bot_desktop_label?: string;
-  actual_stamp?: { commit?: string; dirty?: boolean; displayVersion?: string | null };
+  actual_stamp?: { commit?: string; dirty?: boolean; displayVersion?: string | null; overlaySha256?:string; overlayTreeSha?:string };
 }
 export interface GatewayOwner {
   hostPid: number;
@@ -103,6 +105,7 @@ export interface BackendJob {
   requested_sha: string;
   overlay_sha256?: string;
   bot_desktop?: boolean;
+  font_readability?: boolean;
   release_tag?: string | null;
   mainPid: number;
 }
@@ -120,6 +123,7 @@ interface JobCheckpoint {
   sha: string;
   overlaySha256: string | null;
   botDesktop?: boolean;
+  fontReadability?: boolean;
   releaseTag?: string | null;
   helperSha256: string;
   requestedAtUtc: string;
@@ -131,6 +135,19 @@ const shaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^[0-9a-f]{64}$/;
 const imagePattern = /^sha256:[0-9a-f]{64}$/;
 const releaseTagPattern = /^v(?:0|[1-9]\d{0,2})\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/;
+export const fontReadabilityIdentity = Object.freeze({
+  sha: 'd923a5eb487a17c0a68801bba9ef0f56c81040a8', releaseTag: 'v0.22.2',
+  patchSha256: 'd9d7d4bb8f446f80ffd7402d9ad685b829f454c3fd1d91c5d1589616ae8d2ee2',
+});
+function isFontPolicy(policy: BackendUpdatePolicy): boolean {
+  return policy.fontReadability === true && policy.botDesktop === true && policy.releaseTag === fontReadabilityIdentity.releaseTag && policy.overlay?.sha256 === fontReadabilityIdentity.patchSha256;
+}
+function imageTag(policy: BackendUpdatePolicy, sha: string): string {
+  return `hermes-agent:main-${sha}${policy.botDesktop ? '-desktop' : ''}${policy.overlay ? '-overlay-' + policy.overlay.sha256 : ''}`;
+}
+export function releaseStampMatches(policy: BackendUpdatePolicy, stamp: {dirty?:boolean;displayVersion?:string|null}): boolean {
+  return (!policy.fontReadability || isFontPolicy(policy)) && (!policy.releaseTag || stamp.dirty === (policy.fontReadability === true) && stamp.displayVersion === policy.releaseTag.slice(1));
+}
 const literal = (value: unknown) => `json.loads(${JSON.stringify(JSON.stringify(value))})`;
 
 export function validatePolicy(target: HermesTarget, policy: BackendUpdatePolicy): void {
@@ -143,9 +160,11 @@ export function validatePolicy(target: HermesTarget, policy: BackendUpdatePolicy
   if (!['https://github.com/NousResearch/hermes-agent', 'https://github.com/NousResearch/hermes-agent.git'].includes(policy.upstream)) throw new Error('Backend upstream must be NousResearch/hermes-agent');
   if (policy.overlay && (!digestPattern.test(policy.overlay.sha256) || policy.overlay.path !== `${policy.updaterRoot}/overlays/${policy.overlay.sha256}.patch`)) throw new Error('Overlay must use its content-addressed native path');
   if (policy.botDesktop !== undefined && typeof policy.botDesktop !== 'boolean') throw new Error('Bot desktop must be a boolean');
-  if (policy.botDesktop && policy.overlay) throw new Error('Official bot desktop variant requires pristine source without an overlay');
+  if (policy.fontReadability !== undefined && typeof policy.fontReadability !== 'boolean') throw new Error('Font readability must be a boolean');
+  if (policy.fontReadability && !isFontPolicy(policy)) throw new Error('Font readability requires the exact reviewed release/Desktop/overlay tuple');
+  if (policy.botDesktop && policy.overlay && !isFontPolicy(policy)) throw new Error('Official bot desktop variant requires pristine source without an overlay');
   if (policy.releaseTag !== undefined && !releaseTagPattern.test(policy.releaseTag)) throw new Error('Expected a canonical stable release tag');
-  if (policy.releaseTag && policy.overlay) throw new Error('Official release tag requires pristine source without an overlay');
+  if (policy.releaseTag && policy.overlay && !isFontPolicy(policy)) throw new Error('Official release tag requires pristine source without an overlay');
   if (policy.pollIntervalMs !== undefined && (!Number.isFinite(policy.pollIntervalMs) || policy.pollIntervalMs < 1 || policy.pollIntervalMs > 20_000)) throw new Error('Backend poll interval must be between 1 and 20000 ms');
   if (policy.jobTimeoutMs !== undefined && (!Number.isFinite(policy.jobTimeoutMs) || policy.jobTimeoutMs < 1 || policy.jobTimeoutMs > 6 * 60 * 60 * 1000)) throw new Error('Backend job timeout must be positive and at most six hours');
   if (policy.requiredActiveAdapters !== undefined && (!Array.isArray(policy.requiredActiveAdapters) || !policy.requiredActiveAdapters.length || new Set(policy.requiredActiveAdapters).size !== policy.requiredActiveAdapters.length || policy.requiredActiveAdapters.some(name => !/^[a-zA-Z0-9_.:-]+$/.test(name)))) throw new Error('Required active adapter names must be nonempty, unique identifiers');
@@ -284,11 +303,11 @@ export function evaluateBackendSnapshot(target: HermesTarget, policy: BackendUpd
     updaterLockIdentity: !policy.updaterLock || (snapshot.updaterLock.device === policy.updaterLock.device && snapshot.updaterLock.inode === policy.updaterLock.inode),
     boundedServices: snapshot.containers.length === policy.services.length && policy.services.every(s => snapshot.containers.filter(c => c.service === s).length === 1),
     sameImmutableImage: snapshot.containers.every(c => c.imageId === intended?.imageId && imagePattern.test(c.imageId)),
-    nativeCurrentImage: snapshot.current?.sha === sha && snapshot.current.image_id === intended?.imageId && (snapshot.current.overlay_sha256 ?? null) === (policy.overlay?.sha256 ?? null),
+    nativeCurrentImage: (!policy.fontReadability || sha === fontReadabilityIdentity.sha && snapshot.current?.tag === imageTag(policy, sha)) && snapshot.current?.sha === sha && snapshot.current.image_id === intended?.imageId && (snapshot.current.overlay_sha256 ?? null) === (policy.overlay?.sha256 ?? null),
     healthyImagesAtPinnedCommit: snapshot.containers.every(c => c.running && c.health === 'healthy' && c.revision === sha && c.stamp.commit === sha && c.provenance.revision === sha && (c.overlaySha256 ?? null) === (c.stamp.overlaySha256 ?? null)),
     expectedOverlay: !policy.overlay || snapshot.containers.every(c => c.overlaySha256 === policy.overlay?.sha256),
     requestedBotDesktop: !policy.botDesktop || snapshot.containers.every(c => c.botDesktop === true),
-    requestedReleaseVersion: !policy.releaseTag || snapshot.containers.every(c => c.stamp.dirty === false && c.stamp.displayVersion === policy.releaseTag!.slice(1)),
+    requestedReleaseVersion: !policy.releaseTag || snapshot.containers.every(c => releaseStampMatches(policy, c.stamp)),
     sharedDataMount: snapshot.containers.every(c => c.dataSource === intended?.dataSource),
     exactSingletonOwner: snapshot.gatewayLock.held && snapshot.gatewayLock.holders.length === 1 && !!owner && owner.containerId === intended?.containerId && owner.matchingFdCount > 0 && owner.uid === target.nativeUid,
     ownerSlotIdentity: !!owner && !!intended?.rootSlot.up && intended.rootSlot.localPid === owner.localPid && intended.namespace === owner.namespace,
@@ -360,7 +379,7 @@ print(json.dumps(out))
 
 /** Result=success on a collected systemd unit is deliberately not completion evidence. */
 export function correlateBackendTransaction(job: BackendJob, transactions: BackendTransaction[]): BackendTransaction | null {
-  const matches = transactions.filter(tx => tx.pid === job.mainPid && tx.candidate.sha === job.requested_sha && (tx.candidate.overlay_sha256 || null) === (job.overlay_sha256 || null) && (!job.bot_desktop || tx.candidate.tag === `hermes-agent:main-${job.requested_sha}-desktop`) && tx.history[0] && Date.parse(tx.history[0].at) >= Date.parse(job.launched_at) - 2000);
+  const matches = transactions.filter(tx => tx.pid === job.mainPid && tx.candidate.sha === job.requested_sha && (tx.candidate.overlay_sha256 || null) === (job.overlay_sha256 || null) && (!job.bot_desktop || tx.candidate.tag === `hermes-agent:main-${job.requested_sha}-desktop${job.overlay_sha256 ? '-overlay-' + job.overlay_sha256 : ''}`) && tx.history[0] && Date.parse(tx.history[0].at) >= Date.parse(job.launched_at) - 2000);
   if (matches.length > 1) throw new Error('Ambiguous native updater transaction correlation');
   return matches[0] ?? null;
 }
@@ -389,7 +408,8 @@ finally:os.close(fd)
 }
 export function backendImageArguments(policy: BackendUpdatePolicy, sha: string): string[] {
   validateSha(sha);
-  return ['--sha', sha, ...(policy.botDesktop ? ['--bot-desktop'] : []), ...(policy.releaseTag ? ['--release-tag', policy.releaseTag] : []), ...(policy.overlay ? ['--overlay-file', policy.overlay.path, '--overlay-sha256', policy.overlay.sha256] : [])];
+  if (policy.fontReadability && (!isFontPolicy(policy) || sha !== fontReadabilityIdentity.sha)) throw new Error('Font readability source SHA differs');
+  return ['--sha', sha, ...(policy.fontReadability ? ['--font-readability'] : []), ...(policy.botDesktop ? ['--bot-desktop'] : []), ...(policy.releaseTag ? ['--release-tag', policy.releaseTag] : []), ...(policy.overlay ? ['--overlay-file', policy.overlay.path, '--overlay-sha256', policy.overlay.sha256] : [])];
 }
 async function startOrResumeJob(target: HermesTarget, policy: BackendUpdatePolicy, action: 'prepare' | 'deploy', sha: string, runDir: string, preconditions?: BackendSnapshot): Promise<BackendJob> {
   await mkdir(runDir, { recursive: true });
@@ -397,7 +417,7 @@ async function startOrResumeJob(target: HermesTarget, policy: BackendUpdatePolic
   let checkpoint: JobCheckpoint | null;
   try { checkpoint = JSON.parse(await readFile(checkpointPath, 'utf8')); }
   catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; checkpoint = null; }
-  if (checkpoint && (checkpoint.action !== action || checkpoint.sha !== sha || checkpoint.overlaySha256 !== (policy.overlay?.sha256 ?? null) || (checkpoint.botDesktop ?? false) !== (policy.botDesktop ?? false) || (checkpoint.releaseTag ?? null) !== (policy.releaseTag ?? null) || checkpoint.helperSha256 !== policy.helperSha256)) throw new Error('Run directory is already pinned to a different backend candidate');
+  if (checkpoint && (checkpoint.action !== action || checkpoint.sha !== sha || checkpoint.overlaySha256 !== (policy.overlay?.sha256 ?? null) || (checkpoint.botDesktop ?? false) !== (policy.botDesktop ?? false) || (checkpoint.fontReadability ?? false) !== (policy.fontReadability ?? false) || (checkpoint.releaseTag ?? null) !== (policy.releaseTag ?? null) || checkpoint.helperSha256 !== policy.helperSha256)) throw new Error('Run directory is already pinned to a different backend candidate');
   if (checkpoint?.job) {
     const progress = await readJobProgress(target, policy, checkpoint.job, runDir);
     if (backendPrepareMayRetry(checkpoint.job, correlateBackendTransaction(checkpoint.job, progress.transactions), progress.unitActive)) {
@@ -407,7 +427,7 @@ async function startOrResumeJob(target: HermesTarget, policy: BackendUpdatePolic
   }
   if (!checkpoint) {
     const baselineJobs = await remote<string[]>(target, 'job-baseline', pythonContext(target, policy) + `\nimport pathlib\nprint(json.dumps([p.name for p in pathlib.Path(policy['updaterRoot']).joinpath('jobs').glob('*.json')]))\n`, runDir);
-    checkpoint = { schemaVersion: 1, action, sha, overlaySha256: policy.overlay?.sha256 ?? null, botDesktop: policy.botDesktop ?? false, releaseTag: policy.releaseTag ?? null, helperSha256: policy.helperSha256, requestedAtUtc: new Date().toISOString(), baselineJobs };
+    checkpoint = { schemaVersion: 1, action, sha, overlaySha256: policy.overlay?.sha256 ?? null, botDesktop: policy.botDesktop ?? false, fontReadability: policy.fontReadability ?? false, releaseTag: policy.releaseTag ?? null, helperSha256: policy.helperSha256, requestedAtUtc: new Date().toISOString(), baselineJobs };
     await saveJson(checkpointPath, checkpoint);
   } else {
     // A disconnect after launch must recover that job instead of creating a second writer.
@@ -419,7 +439,7 @@ for path in pathlib.Path(policy['updaterRoot']).joinpath('jobs').glob('*.json'):
  job=json.loads(path.read_text())
  requested_at=datetime.datetime.fromisoformat(checkpoint['requestedAtUtc'].replace('Z','+00:00')).timestamp()
  launched_at=datetime.datetime.fromisoformat(job['launched_at'].replace('Z','+00:00')).timestamp()
- if job.get('action')==checkpoint['action'] and job.get('requested_sha')==checkpoint['sha'] and (job.get('overlay_sha256') or None)==checkpoint['overlaySha256'] and bool(job.get('bot_desktop',False))==bool(checkpoint.get('botDesktop',False)) and (job.get('release_tag') or None)==checkpoint.get('releaseTag') and launched_at>=requested_at-5:
+ if job.get('action')==checkpoint['action'] and job.get('requested_sha')==checkpoint['sha'] and (job.get('overlay_sha256') or None)==checkpoint['overlaySha256'] and bool(job.get('bot_desktop',False))==bool(checkpoint.get('botDesktop',False)) and bool(job.get('font_readability',False))==bool(checkpoint.get('fontReadability',False)) and (job.get('release_tag') or None)==checkpoint.get('releaseTag') and launched_at>=requested_at-5:
   job['mainPid']=int(subprocess.check_output(['systemctl','show',job['unit'],'--property=ExecMainPID','--value'],text=True,timeout=5).strip() or '0');matches.append(job)
 assert len(matches)<=1,'Ambiguous recovered job'
 if matches:assert matches[0]['mainPid']>0,'Recovered job already collected; reconcile transaction receipts before continuing'
@@ -451,7 +471,7 @@ job['mainPid']=int(subprocess.check_output(['systemctl','show',unit,'--property=
 assert job['mainPid']>0,'Native job PID unavailable; reconcile receipts instead of relaunching'
 print(json.dumps(job))
 `, runDir);
-  if (launched.action !== action || launched.requested_sha !== sha || (launched.overlay_sha256 ?? null) !== (policy.overlay?.sha256 ?? null) || (launched.bot_desktop ?? false) !== (policy.botDesktop ?? false) || (launched.release_tag ?? null) !== (policy.releaseTag ?? null)) throw new Error('Native launch receipt differs from the requested backend pin');
+  if (launched.action !== action || launched.requested_sha !== sha || (launched.overlay_sha256 ?? null) !== (policy.overlay?.sha256 ?? null) || (launched.bot_desktop ?? false) !== (policy.botDesktop ?? false) || (launched.font_readability ?? false) !== (policy.fontReadability ?? false) || (launched.release_tag ?? null) !== (policy.releaseTag ?? null)) throw new Error('Native launch receipt differs from the requested backend pin');
   checkpoint.job = launched;
   await saveJson(checkpointPath, checkpoint);
   return launched;
@@ -492,12 +512,14 @@ async function awaitJob(target: HermesTarget, policy: BackendUpdatePolicy, job: 
 
 export function preparedCandidateFromSnapshot(policy: BackendUpdatePolicy, sha: string, snapshot: BackendSnapshot): PreparedBackendCandidate {
   validateSha(sha);
+  backendImageArguments(policy, sha);
   const candidate = snapshot.candidate as (PreparedBackendCandidate & { actual_image_id?: string; bot_desktop_label?: string; actual_stamp?: Record<string, unknown> }) | null;
-  const expectedTag = `hermes-agent:main-${sha}${policy.botDesktop ? '-desktop' : ''}${policy.overlay ? '-overlay-' + policy.overlay.sha256 : ''}`;
+  const expectedTag = imageTag(policy, sha);
   if (!candidate || candidate.status !== 'prepared' || candidate.sha !== sha || candidate.tag !== expectedTag || candidate.source_verified !== true || !imagePattern.test(candidate.image_id) || candidate.actual_image_id !== candidate.image_id || candidate.validation_key !== policy.helperSha256 || snapshot.helperSha256 !== policy.helperSha256 || (candidate.overlay_sha256 ?? null) !== (policy.overlay?.sha256 ?? null) || (policy.overlay && !shaPattern.test(candidate.overlay_tree_sha ?? ''))) throw new Error('Native candidate lacks matching immutable prepared evidence');
+  if (policy.fontReadability && (sha !== fontReadabilityIdentity.sha || !isFontPolicy(policy) || candidate.actual_stamp?.overlaySha256 !== policy.overlay?.sha256 || candidate.actual_stamp?.overlayTreeSha !== candidate.overlay_tree_sha)) throw new Error('Font-derived candidate source/stamp differs');
   if (policy.botDesktop && candidate.bot_desktop_label !== '1') throw new Error('Native candidate lacks the requested official bot desktop variant');
-  if (policy.releaseTag && (candidate.actual_stamp?.commit !== sha || candidate.actual_stamp?.dirty !== false || candidate.actual_stamp?.displayVersion !== policy.releaseTag.slice(1))) throw new Error('Native candidate release version is not independently verified');
-  for (const name of ['doctor', 'plugin']) {
+  if (policy.releaseTag && (candidate.actual_stamp?.commit !== sha || !releaseStampMatches(policy, candidate.actual_stamp ?? {}))) throw new Error('Native candidate release version is not independently verified');
+  for (const name of (policy.fontReadability ? ['doctor', 'plugin', 'fonts'] : ['doctor', 'plugin'])) {
     const evidence = candidate.validation_evidence?.[name];
     if (!evidence || !evidence.path.startsWith(policy.updaterRoot + '/reports/') || evidence.path.split('/').includes('..') || !digestPattern.test(evidence.sha256) || evidence.actualSha256 !== evidence.sha256) throw new Error('Native candidate diagnostic evidence changed or is missing');
   }
@@ -505,8 +527,9 @@ export function preparedCandidateFromSnapshot(policy: BackendUpdatePolicy, sha: 
 }
 export async function prepareBackend(target: HermesTarget, policy: BackendUpdatePolicy, sha: string, runDir: string): Promise<PreparedBackendCandidate> {
   validatePolicy(target, policy); validateSha(sha);
+  backendImageArguments(policy, sha);
   const snapshot = await inspectBackend(target, policy, runDir);
-  if (snapshot.containers.every(c => c.running && c.health === 'healthy' && c.revision === sha && (c.overlaySha256 ?? null) === (policy.overlay?.sha256 ?? null) && (!policy.botDesktop || c.botDesktop === true) && (!policy.releaseTag || (c.stamp.dirty === false && c.stamp.displayVersion === policy.releaseTag.slice(1))))) {
+  if (!policy.fontReadability && snapshot.containers.every(c => c.running && c.health === 'healthy' && c.revision === sha && (c.overlaySha256 ?? null) === (policy.overlay?.sha256 ?? null) && (!policy.botDesktop || c.botDesktop === true) && releaseStampMatches(policy, c.stamp))) {
     const current = snapshot.current;
     if (!current || current.sha !== sha || snapshot.containers.some(c => c.imageId !== current.image_id)) throw new Error('Running backend differs from native recorded state');
     return { ...current, status: 'already-current', source_verified: true, helperSha256: snapshot.helperSha256 };
