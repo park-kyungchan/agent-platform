@@ -24,6 +24,12 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.3.14
+      - name: Require committed native source-author metadata for this exact source
+        run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
+        env:
+          COMMON_CI_REPOSITORY: ${{ github.repository }}
+          COMMON_CI_PROJECT_ID: agent-platform
+          COMMON_CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify canonical source in finite owner QA tree
         run: bun ci/source-check.ts
         env:

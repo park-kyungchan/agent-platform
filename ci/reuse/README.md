@@ -14,6 +14,91 @@ failure and preserves the failing command's exit code. It never resets source.
 Package scripts are trusted caller code, executed without interpreting action
 inputs as shell source. Their effects remain the caller's responsibility.
 
+## Required native source-author metadata
+
+New versions of this action require a committed `.github/source-author.json`
+before dependency installation or any owner script. The optional path input
+`source-author-metadata` selects another exact repository-relative JSON path;
+it never disables the requirement. Historical full-SHA action references retain
+their historical behavior. Update consumers explicitly to a reviewed successor.
+
+The single canonical contract and reader are `ci/reuse/source-author.ts`.
+Source ownership (`repository`, code-owner Project and domain) stays distinct
+from the author's logical Domain/Project/Work/Task. Native Codex author `threadId`
+and native Hermes author `sessionId` are separate fields; unavailable native
+Task/Run IDs are explicit `null`, never copied from logical IDs. Published
+metadata contains no cwd, home, profile, account, credential or raw event/session.
+Only the actual native author can supply these original observations. A GitHub
+actor, Git commit author name or publisher account is not a native author ID.
+
+In the native Codex process, prepare an exact scope JSON with two-space
+indentation and one final newline, for example:
+
+```json
+{
+  "sourceOwner": {
+    "repository": "fixture/owner",
+    "projectId": "fixture-owner",
+    "domainId": "fixture-domain"
+  },
+  "logicalWork": {
+    "domainId": "native-harness",
+    "projectId": "fixture-integration",
+    "workId": "fictional-work",
+    "taskId": "fictional-task"
+  }
+}
+```
+
+Run the reviewed common CLI from the authoring checkout:
+
+```sh
+bun --no-env-file --no-install /reviewed/common/ci/reuse/source-author-cli.ts capture /exact/scope.json
+```
+
+The CLI reads the actual `CODEX_THREAD_ID` and current Git HEAD as `sourceBaseSha`.
+It prints the record only after validation; the native owner records that
+successful output in `.github/source-author.json` with the source change. It
+does not write files or publish anything. Capture refuses missing native identity
+and CI/GitHub Actions environments. Do not fill an unknown author ID manually
+to pass CI. For Hermes, its native owner can call `captureHermesHookSourceAuthor`
+with only the documented observed `pre_llm_call` `session_id` and exact
+`extra.task_id`/`extra.run_id` fields, filling unexposed extras with `null`.
+The API refuses CI capture and unexpected raw-event fields; it creates no hook,
+profile, provider, store or native permission.
+
+Before publication, call the same verifier against the newly committed exact
+source. Set `COMMON_CI_REPOSITORY`, `COMMON_CI_PROJECT_ID`, and
+`COMMON_CI_SOURCE_SHA` to the actual owner and full source commit, then run:
+
+```sh
+bun --no-env-file --no-install /reviewed/common/ci/reuse/source-author-cli.ts verify
+```
+
+Use a complete Git history (`fetch-depth: 0` in CI). The reader verifies that the
+declared source base is an available ancestor, the metadata is a regular committed
+Git blob, working bytes match that blob, and source owner Project/domain match
+the committed `project.json`. Duplicate keys, extra/private fields, unsafe paths,
+missing native identity and substituted logical IDs refuse. The generated JSON
+representation is closed: two-space indentation and exactly one final newline.
+
+The execution/publication readback binds the authoritative current `sourceHead`
+and tree to the exact metadata path, Git blob and SHA-256. A record committed in
+that tree cannot also contain its own future HEAD/tree/hash; these are observed
+by the verifier afterwards. The runner repeats this readback after every owner
+command and refuses drift. Keep the resulting readback with exact source review
+and publication evidence. The common repository's own source workflow requires
+the same record before its source checks.
+
+This is required, source-attributed provenance, not cryptographic authentication
+of a native author or proof that one author wrote every line of a merged tree.
+The native owner must refresh the captured author/Work for each new authoring
+attempt; the base and readback preserve its scope. CI cannot manufacture missing
+originals. Publisher authentication and independent exact-head review remain the
+existing separate owner gates. No user exception for an older PR is silently
+carried into future action versions, and source success grants no native/domain
+activation or human Acceptance.
+
 For a source job, use `contents: read`, `persist-credentials: false` on checkout,
 and a complete reviewed common commit in the action's `uses:` reference. Pass
 that checkout's exact SHA explicitly: authored PR head and prospective merge

@@ -1,0 +1,26 @@
+{
+  "schema": "agent-platform.source-author-metadata.v1",
+  "sourceOwner": {
+    "repository": "park-kyungchan/agent-platform",
+    "projectId": "agent-platform",
+    "domainId": "native-harness"
+  },
+  "logicalWork": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "taskId": "ODI-HOST-INTEGRATION"
+  },
+  "sourceBaseSha": "ff8e5d56612fab5ce41d4ed9e8b4947987943d4a",
+  "author": {
+    "runtime": "native-codex",
+    "threadId": "01a15358-42e5-7770-bb93-cd081b0b7601",
+    "sessionId": null,
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "observedVia": "CODEX_THREAD_ID"
+  },
+  "capturedAtUtc": "2026-10-19T09:37:30.627Z",
+  "nativeAuthorshipAuthenticated": false,
+  "publisherIdentityInferred": false
+}
