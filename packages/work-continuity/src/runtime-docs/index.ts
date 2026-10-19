@@ -1,11 +1,16 @@
 import { createHash } from "node:crypto";
+import { constants } from "node:fs";
 import { open } from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   normalizeDocumentationAlias,
   parseDocumentationRequest,
   validateDocumentationRegistry,
 } from "./validation.ts";
 import type {
+  DocumentationExtractRead,
+  DocumentationExtractReadOptions,
   DocumentationPlan,
   DocumentationReader,
   DocumentationRoute,
@@ -51,6 +56,9 @@ export function createDocumentationReader(input: unknown): DocumentationReader {
   const reader: DocumentationReader = {
     registry,
     registrySha256: createHash("sha256").update(serialized).digest("hex"),
+    readSelectedExtract(input, options) {
+      return readSelectedExtract(reader, input, options);
+    },
     select(input, observations = {}) {
       const request = parseDocumentationRequest(input);
       const result: DocumentationPlan = {
@@ -180,5 +188,100 @@ export async function readDocumentationRegistry(
     );
   } finally {
     await file.close();
+  }
+}
+
+/** Read only the selected source-owned extract. This does not retrieve, store or
+ * authenticate documents, and an extract digest never stands for an HTTP body. */
+async function readSelectedExtract(
+  reader: DocumentationReader,
+  input: unknown,
+  options: DocumentationExtractReadOptions,
+): Promise<DocumentationExtractRead> {
+  const plan = reader.select(input, options.observations);
+  const result: DocumentationExtractRead = { plan, excerpt: null };
+  const gap = (message: string): DocumentationExtractRead => {
+    plan.evidenceGaps.push(message);
+    return result;
+  };
+  const route = plan.primary;
+  if (!route) return result;
+  if (
+    plan.retrieval === "VERIFY_INSTALLED_VERSION_AND_READ" ||
+    plan.retrieval === "READ_VERSION_MATCHED_SOURCE" ||
+    plan.evidenceGaps.includes("requested-version-differs-from-installed-version")
+  )
+    return gap("retained-extract-applicable-version-unverified");
+  const version =
+    plan.request.freshness === "installed"
+      ? options.observations?.installedVersion
+      : plan.request.targetVersion;
+  const needsCurrentness =
+    plan.request.freshness === "latest" ||
+    route.freshnessPolicy === "revalidate" ||
+    SENSITIVE_TOPICS.has(route.topic);
+  // A caller's raw-body cache observation cannot validate this Markdown extract.
+  plan.retrieval = needsCurrentness ? "REVALIDATE_SELECTED_PAGE" : "READ_SELECTED_PAGE";
+  const extract = route.retainedExtract;
+  if (!extract) return gap("retained-extract-unavailable; bounded-official-lookup-required");
+  const observed = options.revalidation;
+  const currentExtractObserved =
+    observed?.observedInCurrentTask === true &&
+    observed.canonicalUrl === route.canonicalUrl &&
+    observed.extractSha256 === extract.extractSha256 &&
+    (observed.targetVersion ?? undefined) === (version ?? undefined);
+  if (version && !route.documentationVersion && !currentExtractObserved) {
+    plan.retrieval = "READ_VERSION_MATCHED_SOURCE";
+    return gap("retained-extract-applicable-version-unverified");
+  }
+  if (needsCurrentness && !currentExtractObserved)
+    return gap("retained-extract-needs-targeted-current-task-revalidation");
+  let file;
+  try {
+    const directory =
+      options.directory instanceof URL ? fileURLToPath(options.directory) : options.directory;
+    file = await open(
+      join(directory, extract.fileName),
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    );
+    const stat = await file.stat();
+    if (!stat.isFile() || stat.size !== extract.extractBytes)
+      return gap("retained-extract-file-or-byte-budget-mismatch");
+    const bytes = Buffer.alloc(extract.extractBytes + 1);
+    let offset = 0;
+    while (offset < bytes.length) {
+      const { bytesRead } = await file.read(bytes, offset, bytes.length - offset, offset);
+      if (!bytesRead) break;
+      offset += bytesRead;
+    }
+    if (offset !== extract.extractBytes)
+      return gap("retained-extract-file-or-byte-budget-mismatch");
+    const content = bytes.subarray(0, offset);
+    if (createHash("sha256").update(content).digest("hex") !== extract.extractSha256)
+      return gap("retained-extract-hash-mismatch");
+    const lines = new TextDecoder("utf-8", { fatal: true }).decode(content).split("\n");
+    if (extract.lineRanges.some(([, end]) => end > lines.length))
+      return gap("retained-extract-section-missing");
+    const text = extract.lineRanges
+      .map(([start, end]) => lines.slice(start - 1, end).join("\n"))
+      .join("\n\n");
+    if (Array.from(text).length > plan.limits.maxExcerptChars)
+      return gap("retained-extract-excerpt-budget");
+    plan.retrieval = "REUSE_MATCHING_PAGE";
+    result.excerpt = {
+      kind: "retained-markdown-extract",
+      canonicalUrl: route.canonicalUrl,
+      extractSha256: extract.extractSha256,
+      excerptSha256: createHash("sha256").update(text).digest("hex"),
+      text,
+      retrievedAt: extract.retrievedAt,
+      etag: extract.etag,
+      lastModified: extract.lastModified,
+    };
+    return result;
+  } catch {
+    return gap("retained-extract-unreadable; bounded-official-lookup-required");
+  } finally {
+    await file?.close();
   }
 }

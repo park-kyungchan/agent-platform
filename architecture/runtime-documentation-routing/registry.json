@@ -73,6 +73,14 @@
     "github.copilot": {
       "kind": "agent-service",
       "index": "https://docs.github.com/en/copilot/concepts/copilot-surfaces/copilot-on-github"
+    },
+    "typesafe.ai": {
+      "kind": "structured-decision-model",
+      "index": "https://docs.typesafe.ai/llms.txt"
+    },
+    "vercel.ai-gateway": {
+      "kind": "model-gateway",
+      "index": "https://vercel.com/docs/ai-gateway"
     }
   },
   "sources": {
@@ -257,6 +265,125 @@
       "url": "https://hermes-agent.nousresearch.com/docs/user-guide/features/bot-screen",
       "status": "page-opened-limited-content",
       "checkedOn": "2026-10-18",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-coding-agents": {
+      "url": "https://docs.typesafe.ai/introduction/coding-agents",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-state": {
+      "url": "https://docs.typesafe.ai/concepts/state",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-primitives": {
+      "url": "https://docs.typesafe.ai/primitives",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-confidence": {
+      "url": "https://docs.typesafe.ai/confidence",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-fan-out": {
+      "url": "https://docs.typesafe.ai/patterns/fan-out",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-api": {
+      "url": "https://docs.typesafe.ai/api",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-score": {
+      "url": "https://docs.typesafe.ai/primitives/score",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-skill-suggestion": {
+      "url": "https://docs.typesafe.ai/cookbooks/skill_suggestion",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-composite-scoring": {
+      "url": "https://docs.typesafe.ai/patterns/composite-scoring",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-intent-routing": {
+      "url": "https://docs.typesafe.ai/patterns/intent-routing",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-citation-check": {
+      "url": "https://docs.typesafe.ai/cookbooks/citation_check",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-models": {
+      "url": "https://docs.typesafe.ai/models",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-sde-cascade": {
+      "url": "https://docs.typesafe.ai/cookbooks/sde_cascade",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-llm-guardrails": {
+      "url": "https://docs.typesafe.ai/cookbooks/llm_guardrails",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-rag-passages": {
+      "url": "https://docs.typesafe.ai/cookbooks/classifying_rag_passages",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-confidence-routing": {
+      "url": "https://docs.typesafe.ai/patterns/confidence-routing",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
+      "rawBytesVerified": false,
+      "bodySha256": null
+    },
+    "jev-docs-20261019-basic-memory": {
+      "url": "https://docs.typesafe.ai/cookbooks/basic_memory",
+      "status": "content-read",
+      "checkedOn": "2026-10-19",
       "rawBytesVerified": false,
       "bodySha256": null
     }
@@ -2233,6 +2360,579 @@
       "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
       "pageId": "user-guide/multi-profile-gateways",
       "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "typesafe.ai.coding-agent-role",
+      "surface": "typesafe.ai",
+      "topic": "coding-agent-role",
+      "aliases": ["coding-agents", "jev-role"],
+      "canonicalUrl": "https://docs.typesafe.ai/introduction/coding-agents",
+      "preferredUrl": "https://docs.typesafe.ai/introduction/coding-agents",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-coding-agents",
+      "checkedOn": "2026-10-19",
+      "notes": "Jev supplies typed judgments inside an existing agent; the native coding model and its permissions retain their owner. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 5c80a4455e85495f78247810aba53a6c0bab54535cfd8191c63cccdd1a5b94c4; lines 66-99. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "coding-agents.md",
+        "extractSha256": "5c80a4455e85495f78247810aba53a6c0bab54535cfd8191c63cccdd1a5b94c4",
+        "extractBytes": 6347,
+        "lineRanges": [[66, 99]],
+        "retrievedAt": "2026-10-19T00:30:57.621644+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.state",
+      "surface": "typesafe.ai",
+      "topic": "state",
+      "aliases": ["shared-state"],
+      "canonicalUrl": "https://docs.typesafe.ai/concepts/state",
+      "preferredUrl": "https://docs.typesafe.ai/concepts/state",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-state",
+      "checkedOn": "2026-10-19",
+      "notes": "Place the admitted facts and related content in a named state; separate evidence from the question. Exclude current language/modality support claims. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 39d43c6224326e641e905cff93ac0545405a954a2f515378eafcbf7fdb5612b1; lines 67-88, 113-120. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "state.md",
+        "extractSha256": "39d43c6224326e641e905cff93ac0545405a954a2f515378eafcbf7fdb5612b1",
+        "extractBytes": 5816,
+        "lineRanges": [
+          [67, 88],
+          [113, 120]
+        ],
+        "retrievedAt": "2026-10-19T00:30:57.327419+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.primitives",
+      "surface": "typesafe.ai",
+      "topic": "primitives",
+      "aliases": ["questions", "choice-noul-score"],
+      "canonicalUrl": "https://docs.typesafe.ai/primitives",
+      "preferredUrl": "https://docs.typesafe.ai/primitives",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-primitives",
+      "checkedOn": "2026-10-19",
+      "notes": "Choose Choice for one of a fixed set, Score for a descriptive scale, and Noul for a yes probability; decompose independent criteria. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 1da718f1b749b95a542b112e34e64855fe4efc9c5c96c723c36c906ee8f18685; lines 67-86, 110-118. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "primitives.md",
+        "extractSha256": "1da718f1b749b95a542b112e34e64855fe4efc9c5c96c723c36c906ee8f18685",
+        "extractBytes": 17610,
+        "lineRanges": [
+          [67, 86],
+          [110, 118]
+        ],
+        "retrievedAt": "2026-10-19T00:30:57.215566+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.question-design",
+      "surface": "typesafe.ai",
+      "topic": "question-design",
+      "aliases": ["criterion-decomposition"],
+      "canonicalUrl": "https://docs.typesafe.ai/primitives",
+      "preferredUrl": "https://docs.typesafe.ai/primitives",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-primitives",
+      "checkedOn": "2026-10-19",
+      "notes": "Ask one coherent judgment with its complete meaning in instructions and explicit named state paths; identifiers alone carry no question meaning. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 1da718f1b749b95a542b112e34e64855fe4efc9c5c96c723c36c906ee8f18685; lines 80-86, 103-105, 138-141. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "primitives.md",
+        "extractSha256": "1da718f1b749b95a542b112e34e64855fe4efc9c5c96c723c36c906ee8f18685",
+        "extractBytes": 17610,
+        "lineRanges": [
+          [80, 86],
+          [103, 105],
+          [138, 141]
+        ],
+        "retrievedAt": "2026-10-19T00:30:57.215566+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.parallel-batching",
+      "surface": "typesafe.ai",
+      "topic": "parallel-batching",
+      "aliases": ["fan-out", "batching"],
+      "canonicalUrl": "https://docs.typesafe.ai/patterns/fan-out",
+      "preferredUrl": "https://docs.typesafe.ai/patterns/fan-out",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-fan-out",
+      "checkedOn": "2026-10-19",
+      "notes": "Batch independent questions over the same state, then compose or route in code; model answers never grant execution authority. Cookbook speed and cost multipliers are not deployment measurements. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 1b6cffb1ed998e3a4a8a12b3967ab505ebf8bb5a0831ee605e3d4eb8fbe745ff; lines 66-82. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "fan-out.md",
+        "extractSha256": "1b6cffb1ed998e3a4a8a12b3967ab505ebf8bb5a0831ee605e3d4eb8fbe745ff",
+        "extractBytes": 4970,
+        "lineRanges": [[66, 82]],
+        "retrievedAt": "2026-10-19T00:30:57.931567+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.confidence-meaning",
+      "surface": "typesafe.ai",
+      "topic": "confidence-meaning",
+      "aliases": ["uncertainty"],
+      "canonicalUrl": "https://docs.typesafe.ai/confidence",
+      "preferredUrl": "https://docs.typesafe.ai/confidence",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-confidence",
+      "checkedOn": "2026-10-19",
+      "notes": "Retain distributions and uncertainty; Noul is a yes probability and has no separate native confidence. Exact formulas and transport fields are a separate currentness-sensitive topic. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 6bb4b444f88677bde691dbc906c72587222f9fd3171bedece5751e604992828f; lines 67-82, 142-144. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "confidence.md",
+        "extractSha256": "6bb4b444f88677bde691dbc906c72587222f9fd3171bedece5751e604992828f",
+        "extractBytes": 12556,
+        "lineRanges": [
+          [67, 82],
+          [142, 144]
+        ],
+        "retrievedAt": "2026-10-19T00:30:57.373341+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.score-rubrics",
+      "surface": "typesafe.ai",
+      "topic": "score-rubrics",
+      "aliases": ["rubric-design"],
+      "canonicalUrl": "https://docs.typesafe.ai/primitives/score",
+      "preferredUrl": "https://docs.typesafe.ai/primitives/score",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-score",
+      "checkedOn": "2026-10-19",
+      "notes": "Use concrete independently meaningful levels and one dimension per Score; retain uncertainty and check known examples. Exclude numeric level limits and historical example outcomes from compatibility claims. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 153c8bda09b94c5a51bddb2c7b83d141e6f85d817b9385e91cbb866f1d3ef6df; lines 181-192, 202-204. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "score.md",
+        "extractSha256": "153c8bda09b94c5a51bddb2c7b83d141e6f85d817b9385e91cbb866f1d3ef6df",
+        "extractBytes": 21630,
+        "lineRanges": [
+          [181, 192],
+          [202, 204]
+        ],
+        "retrievedAt": "2026-10-19T00:30:58.200590+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.skill-ranking",
+      "surface": "typesafe.ai",
+      "topic": "skill-ranking",
+      "aliases": ["source-ranking-method"],
+      "canonicalUrl": "https://docs.typesafe.ai/cookbooks/skill_suggestion",
+      "preferredUrl": "https://docs.typesafe.ai/cookbooks/skill_suggestion",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-skill-suggestion",
+      "checkedOn": "2026-10-19",
+      "notes": "Illustrative Choice shortlist plus candidate-specific Noul fit judgments; thresholds, roster size and historical quality/cost results are examples and require own evaluation before use. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 6e3315605ef794d5acc107940774f22c6a06f6e573ed9aabc85708d896e8161c; lines 468-482, 600-614. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "skill-suggestion.md",
+        "extractSha256": "6e3315605ef794d5acc107940774f22c6a06f6e573ed9aabc85708d896e8161c",
+        "extractBytes": 40607,
+        "lineRanges": [
+          [468, 482],
+          [600, 614]
+        ],
+        "retrievedAt": "2026-10-19T00:30:58.487724+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.api",
+      "surface": "typesafe.ai",
+      "topic": "api",
+      "aliases": ["schema", "request-body", "limits"],
+      "canonicalUrl": "https://docs.typesafe.ai/api",
+      "preferredUrl": "https://docs.typesafe.ai/api",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-api",
+      "checkedOn": "2026-10-19",
+      "notes": "Current endpoint, request/response schema, fields, compression, limits and errors; retained content is dated evidence and requires targeted current-task compatibility validation before a changed API implementation. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 61b19736c890a59d306d91b32efb0e5410b4617adbf0d170e6b9d9fcd62a28bd; lines 48-144. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "revalidate",
+      "retainedExtract": {
+        "fileName": "api.md",
+        "extractSha256": "61b19736c890a59d306d91b32efb0e5410b4617adbf0d170e6b9d9fcd62a28bd",
+        "extractBytes": 12718,
+        "lineRanges": [[48, 144]],
+        "retrievedAt": "2026-10-19T00:30:58.236626+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.confidence-formulas",
+      "surface": "typesafe.ai",
+      "topic": "confidence-formulas",
+      "aliases": ["native-confidence-formula"],
+      "canonicalUrl": "https://docs.typesafe.ai/confidence",
+      "preferredUrl": "https://docs.typesafe.ai/confidence",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-confidence",
+      "checkedOn": "2026-10-19",
+      "notes": "Exact native confidence formulas and answer-field semantics require validation against the current applicable API/SDK; do not substitute cookbook-derived confidence for returned native provenance. Extract provenance remains in the existing source-owner evidence; no raw HTTP body or immutable Evidence Foundry admission is claimed.",
+      "sectionSelection": "Use retained Markdown only at exact extract SHA256 6bb4b444f88677bde691dbc906c72587222f9fd3171bedece5751e604992828f; lines 140-178. Otherwise inspect actual current headings before selecting a bounded section.",
+      "freshnessPolicy": "revalidate",
+      "retainedExtract": {
+        "fileName": "confidence.md",
+        "extractSha256": "6bb4b444f88677bde691dbc906c72587222f9fd3171bedece5751e604992828f",
+        "extractBytes": 12556,
+        "lineRanges": [[140, 178]],
+        "retrievedAt": "2026-10-19T00:30:57.373341+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.models",
+      "surface": "typesafe.ai",
+      "topic": "models",
+      "aliases": ["jev-version", "release-facts", "model-capabilities"],
+      "canonicalUrl": "https://docs.typesafe.ai/models",
+      "preferredUrl": "https://docs.typesafe.ai/models",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-models",
+      "checkedOn": "2026-10-19",
+      "notes": "Official model page was read on October19: versioned release, aliases, context and direct TypeSafe price facts are dated observations requiring targeted current-task validation before a changed decision. jev-latest and jev-preview name different releases in this extract. Direct TypeSafe prices do not establish Vercel Gateway billing or native compatibility. No model/configuration change follows from this route.",
+      "sectionSelection": "Read only exact-hash retained models.md sections: model facts lines44-60, context65-75, aliases103-113 and listing134-137. Revalidate the one applicable current fact before reuse.",
+      "freshnessPolicy": "revalidate",
+      "retainedExtract": {
+        "fileName": "models.md",
+        "extractSha256": "ab6445736f239610a1ed8794ae0c83589dfc71756e9ba32b8afe0e8a317ce5bc",
+        "extractBytes": 9206,
+        "lineRanges": [
+          [44, 60],
+          [65, 75],
+          [103, 113],
+          [134, 137]
+        ],
+        "retrievedAt": "2026-10-19T01:08:05.688061+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.sdk-javascript",
+      "surface": "typesafe.ai",
+      "topic": "sdk-javascript",
+      "aliases": ["sdk", "sdk-version"],
+      "canonicalUrl": "https://docs.typesafe.ai/sdk/javascript",
+      "preferredUrl": "https://docs.typesafe.ai/sdk/javascript",
+      "fallbackUrl": null,
+      "evidenceStatus": "index-listed",
+      "sourceId": null,
+      "checkedOn": "2026-10-19",
+      "notes": "Official llms index membership only. Observe the actual installed package and its source/types before changing the existing SDK integration; refresh only the applicable method/schema/release fact.",
+      "sectionSelection": "Select the actual relevant heading after targeted retrieval; no retained full page or invented anchor is claimed.",
+      "freshnessPolicy": "revalidate"
+    },
+    {
+      "id": "vercel.ai-gateway.typesafe-api",
+      "surface": "vercel.ai-gateway",
+      "topic": "typesafe-api",
+      "aliases": ["gateway-jev", "decision-routing", "model-routing", "decision-fallbacks"],
+      "canonicalUrl": "https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe",
+      "preferredUrl": "https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe",
+      "fallbackUrl": null,
+      "evidenceStatus": "page-opened-limited-content",
+      "sourceId": null,
+      "checkedOn": "2026-10-19",
+      "notes": "Retained local extract contains Gateway TypeSafe transport and conditional fallback documentation, but its original retrieval metadata was not admitted by this lane. Exact routing/provider fallback response model, headers, combined billing and latency are version-sensitive. Preserve the existing Gateway and native model; source reading grants no route/config change.",
+      "sectionSelection": "Retained vercel-typesafe.md lines303-310 and374-379 describe transport;480-543 describe fallback model identity, sentinel confidence and combined usage. Use exact local extract digest in evidencePins and a bounded section; revalidate the selected applicable current fact before changing routing.",
+      "freshnessPolicy": "revalidate",
+      "retainedExtract": {
+        "fileName": "vercel-typesafe.md",
+        "extractSha256": "ce04e7890dbe0df30929b2fc366d5ec4da7ea457e1c4228c5d14322a72c4c17c",
+        "extractBytes": 23639,
+        "lineRanges": [
+          [303, 310],
+          [374, 379],
+          [480, 543]
+        ],
+        "retrievedAt": null,
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.intent-routing",
+      "surface": "typesafe.ai",
+      "topic": "intent-routing",
+      "aliases": ["handler-routing"],
+      "canonicalUrl": "https://docs.typesafe.ai/patterns/intent-routing",
+      "preferredUrl": "https://docs.typesafe.ai/patterns/intent-routing",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-intent-routing",
+      "checkedOn": "2026-10-19",
+      "notes": "Classify intent and complexity to suggest a deterministic handler, specialist context or unresolved case. Example thresholds and throughput claims require own evaluation; this pattern does not create a second native dispatcher. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "intent-routing.md",
+        "extractSha256": "63ba1733e347e097bd4d424c58c6468d3113aac2c1eabd1c0252b9d28f708614",
+        "extractBytes": 4983,
+        "lineRanges": [
+          [63, 76],
+          [108, 109]
+        ],
+        "retrievedAt": "2026-10-19T01:08:05.688410+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.confidence-routing",
+      "surface": "typesafe.ai",
+      "topic": "confidence-routing",
+      "aliases": ["confidence-gates"],
+      "canonicalUrl": "https://docs.typesafe.ai/patterns/confidence-routing",
+      "preferredUrl": "https://docs.typesafe.ai/patterns/confidence-routing",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-confidence-routing",
+      "checkedOn": "2026-10-19",
+      "notes": "Use confidence alongside the answer to propose consequence-specific routing. The 0.6/0.85 example thresholds are illustrative and do not certify calibration, grant permission or require new user confirmations. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "confidence-routing.md",
+        "extractSha256": "4f755d33da63c31e23c5f1d1f7df20d32438dacf885123bea0d25dd2badda87f",
+        "extractBytes": 4537,
+        "lineRanges": [
+          [63, 76],
+          [101, 102]
+        ],
+        "retrievedAt": "2026-10-19T01:08:05.688884+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.composite-scoring",
+      "surface": "typesafe.ai",
+      "topic": "composite-scoring",
+      "aliases": ["weighted-ranking"],
+      "canonicalUrl": "https://docs.typesafe.ai/patterns/composite-scoring",
+      "preferredUrl": "https://docs.typesafe.ai/patterns/composite-scoring",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-composite-scoring",
+      "checkedOn": "2026-10-19",
+      "notes": "Score independent dimensions and combine explicit weights in code. Example normalization and weights are application choices; keep uncertainty and validate with own cases. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "composite-scoring.md",
+        "extractSha256": "f3b8d1497277a07a6f544cc886d721e45d0c2ec92a2b7a18f109cd0a508380a7",
+        "extractBytes": 4156,
+        "lineRanges": [
+          [63, 78],
+          [95, 95]
+        ],
+        "retrievedAt": "2026-10-19T01:08:06.547163+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.citation-check",
+      "surface": "typesafe.ai",
+      "topic": "citation-check",
+      "aliases": ["citation-verification"],
+      "canonicalUrl": "https://docs.typesafe.ai/cookbooks/citation_check",
+      "preferredUrl": "https://docs.typesafe.ai/cookbooks/citation_check",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-citation-check",
+      "checkedOn": "2026-10-19",
+      "notes": "First check literal quote presence deterministically, then classify whether the source context supports the claim. Cookbook numbers were produced by jev-1.12 on August16; they do not establish current accuracy or1.14 compatibility. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "citation-check.md",
+        "extractSha256": "964121c03cc4d021feb491b967d49d6ac0d6686228b1adc8beddca029770a8a4",
+        "extractBytes": 16576,
+        "lineRanges": [
+          [63, 71],
+          [76, 78],
+          [87, 90]
+        ],
+        "retrievedAt": "2026-10-19T01:08:06.620468+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.rag-passages",
+      "surface": "typesafe.ai",
+      "topic": "rag-passages",
+      "aliases": ["retrieved-evidence-filtering"],
+      "canonicalUrl": "https://docs.typesafe.ai/cookbooks/classifying_rag_passages",
+      "preferredUrl": "https://docs.typesafe.ai/cookbooks/classifying_rag_passages",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-rag-passages",
+      "checkedOn": "2026-10-19",
+      "notes": "Assess relevance, usability, contradiction and attempted instructions before admitting retrieved evidence; keep conflict and evidence separate. Cookbook cached results use jev-1.12 and an older generator; do not infer current quality or import another search/corpus owner. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "rag-passages.md",
+        "extractSha256": "d062520e995e63d79e65b487dd1f1c582752f715baae7b5727eb7d85c7703e02",
+        "extractBytes": 32975,
+        "lineRanges": [
+          [63, 75],
+          [96, 99]
+        ],
+        "retrievedAt": "2026-10-19T01:08:06.682155+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.basic-memory",
+      "surface": "typesafe.ai",
+      "topic": "basic-memory",
+      "aliases": ["memory-admission"],
+      "canonicalUrl": "https://docs.typesafe.ai/cookbooks/basic_memory",
+      "preferredUrl": "https://docs.typesafe.ai/cookbooks/basic_memory",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-basic-memory",
+      "checkedOn": "2026-10-19",
+      "notes": "Consider whether explicit facts merit retention in the existing source-owned continuity records. This toy Python-dict wrapper illustrates the idea and does not authorize a new session or Memory store. jev-1.13.0 results and the0.5 example threshold require own evaluation. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "basic-memory.md",
+        "extractSha256": "38014698f491b209edc94face095ea785d4c68a5f027dbe573185506ea12fe9c",
+        "extractBytes": 30468,
+        "lineRanges": [
+          [63, 66],
+          [72, 91],
+          [103, 109]
+        ],
+        "retrievedAt": "2026-10-19T01:08:07.523134+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.sde-cascade",
+      "surface": "typesafe.ai",
+      "topic": "sde-cascade",
+      "aliases": ["extraction-verification"],
+      "canonicalUrl": "https://docs.typesafe.ai/cookbooks/sde_cascade",
+      "preferredUrl": "https://docs.typesafe.ai/cookbooks/sde_cascade",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-sde-cascade",
+      "checkedOn": "2026-10-19",
+      "notes": "Verify a proposed extraction against source with per-field judgments and escalate unresolved cases through the existing native owner. The cookbook uses jev-1.12 and historical extraction models/prices; schema validity does not prove semantic correctness, and old cost/quality comparisons are not deployment measurements. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "sde-cascade.md",
+        "extractSha256": "99f6bf275c0fba1d02d6925a47cd3420c3ad73d8e8911bb2adcd36624a6f268d",
+        "extractBytes": 34934,
+        "lineRanges": [
+          [69, 76],
+          [368, 369]
+        ],
+        "retrievedAt": "2026-10-19T01:08:07.865668+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.llm-guardrails",
+      "surface": "typesafe.ai",
+      "topic": "llm-guardrails",
+      "aliases": ["message-risk-screening"],
+      "canonicalUrl": "https://docs.typesafe.ai/cookbooks/llm_guardrails",
+      "preferredUrl": "https://docs.typesafe.ai/cookbooks/llm_guardrails",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-llm-guardrails",
+      "checkedOn": "2026-10-19",
+      "notes": "Separate hazard probability, severity and explicit routing policy as advisory judgments. Cookbook jev-1.12 examples do not prove jailbreak resistance, calibrated safety or permission; native trust and source guards remain authoritative. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "general",
+      "retainedExtract": {
+        "fileName": "llm-guardrails.md",
+        "extractSha256": "8cd282e1e66bbd2308a6c17cd96f2c97a978e5635c3dbe89a65f9dabd7d66e16",
+        "extractBytes": 23832,
+        "lineRanges": [
+          [70, 79],
+          [88, 91]
+        ],
+        "retrievedAt": "2026-10-19T01:08:07.405654+00:00",
+        "etag": null,
+        "lastModified": null
+      }
+    },
+    {
+      "id": "typesafe.ai.direct-pricing",
+      "surface": "typesafe.ai",
+      "topic": "direct-pricing",
+      "aliases": ["price", "pricing", "direct-price"],
+      "canonicalUrl": "https://docs.typesafe.ai/models",
+      "preferredUrl": "https://docs.typesafe.ai/models",
+      "fallbackUrl": null,
+      "evidenceStatus": "content-read",
+      "sourceId": "jev-docs-20261019-models",
+      "checkedOn": "2026-10-19",
+      "notes": "Direct TypeSafe model pricing is a dated official-source observation, with input billing and free output stated in the selected section. Refresh the applicable fact for a new cost decision. It does not establish Gateway prices, actual invoices or cumulative ledger state. The retained digest identifies a Markdown extract, not raw HTTP bytes, installed compatibility or Evidence Foundry admission. Native owners retain decisions, execution and permissions.",
+      "sectionSelection": "Use the retained exact-hash Markdown and only its structured lineRanges; do not import the entire page or corpus.",
+      "freshnessPolicy": "revalidate",
+      "retainedExtract": {
+        "fileName": "models.md",
+        "extractSha256": "ab6445736f239610a1ed8794ae0c83589dfc71756e9ba32b8afe0e8a317ce5bc",
+        "extractBytes": 9206,
+        "lineRanges": [[49, 60]],
+        "retrievedAt": "2026-10-19T01:08:05.688061+00:00",
+        "etag": null,
+        "lastModified": null
+      }
     }
   ],
   "policy": {
@@ -2246,6 +2946,9 @@
     "Source documentation is not installed runtime, authenticated capability or behavior verification.",
     "Two expected-predicate misses retain complete original bodies and separate readback results in the source-owned review.",
     "Oct18 Client/Backend routes add official-index membership and a limited Desktop page read only. The three web opens (index, Desktop, multi-connection page) do not establish full body review or raw response-byte verification. No new native Scrapling capture, Evidence Foundry blob, installed v0.22.2 compatibility or live host pointer is admitted; historical sources/captures retain their bytes and dates.",
-    "Separate Oct18 Bot Mode/Screen side review recorded four opens over two unique pages (two initial plus two follow-ups), no discovery search. That is not a single max3-fetch operation. Two Bot routes carry partial-page evidence from that review; backend source and client visual/lease/action observations remain separate. No body digest, documentationVersion or native permission is certified."
+    "Separate Oct18 Bot Mode/Screen side review recorded four opens over two unique pages (two initial plus two follow-ups), no discovery search. That is not a single max3-fetch operation. Two Bot routes carry partial-page evidence from that review; backend source and client visual/lease/action observations remain separate. No body digest, documentationVersion or native permission is certified.",
+    "October19 Jev routes reuse the retained official public Markdown extracts identified by the bounded source-owner report. Their hashes identify extracts, not raw HTTP bodies, authenticated installed SDK/model compatibility or Evidence Foundry admission. Historical registry/capture bytes, dates and provenance remain unchanged.",
+    "Stable concept routes reuse only their exact source-bound sections. Model/price/API/schema/SDK/release/fallback implementation facts require targeted applicable currentness checks. This registry grants no model/configuration/permission/Goal changes.",
+    "October19 expanded TypeSafe pattern/cookbook/model extracts retain exact hashes and source-bound ranges. Cookbook1.12/1.13 examples, thresholds, cached results and price comparisons are illustrative. The direct-price/model routes require targeted currentness checks and never establish Gateway billing, current installed compatibility or another native loop/Memory owner."
   ]
 }

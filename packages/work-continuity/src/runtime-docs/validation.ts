@@ -18,6 +18,8 @@ const SURFACE_HOSTS: Record<DocumentationSurface, readonly string[]> = {
   "github.actions": ["docs.github.com"],
   "github.codespaces": ["docs.github.com"],
   "github.copilot": ["docs.github.com"],
+  "typesafe.ai": ["docs.typesafe.ai"],
+  "vercel.ai-gateway": ["vercel.com"],
 };
 const ALLOWED_HOSTS = new Set(Object.values(SURFACE_HOSTS).flat());
 const DIGEST = /^[a-f0-9]{64}$/;
@@ -253,6 +255,7 @@ export function validateDocumentationRegistry(
       "pageId",
       "freshnessPolicy",
       "documentationVersion",
+      "retainedExtract",
     ]);
     if (typeof r.surface !== "string" || !Object.hasOwn(input.surfaces, r.surface))
       throw Error("INVALID_ROUTE_SURFACE");
@@ -286,6 +289,53 @@ export function validateDocumentationRegistry(
         !["general", "revalidate"].includes(r.freshnessPolicy))
     )
       throw Error("INVALID_FRESHNESS_POLICY");
+    if (r.retainedExtract !== undefined) {
+      const extract = r.retainedExtract;
+      if (!object(extract)) throw Error("INVALID_RETAINED_EXTRACT");
+      keys(extract, [
+        "fileName",
+        "extractSha256",
+        "extractBytes",
+        "lineRanges",
+        "retrievedAt",
+        "etag",
+        "lastModified",
+      ]);
+      if (
+        typeof extract.fileName !== "string" ||
+        !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,199}\.md$/.test(extract.fileName) ||
+        typeof extract.extractSha256 !== "string" ||
+        !DIGEST.test(extract.extractSha256) ||
+        !Number.isSafeInteger(extract.extractBytes) ||
+        Number(extract.extractBytes) < 1 ||
+        Number(extract.extractBytes) > 262_144 ||
+        !Array.isArray(extract.lineRanges) ||
+        extract.lineRanges.length < 1 ||
+        extract.lineRanges.length > 16 ||
+        !(
+          extract.retrievedAt === null ||
+          (typeof extract.retrievedAt === "string" &&
+            !Number.isNaN(Date.parse(extract.retrievedAt)))
+        ) ||
+        extract.etag !== null ||
+        extract.lastModified !== null
+      )
+        throw Error("INVALID_RETAINED_EXTRACT");
+      let previousEnd = 0;
+      for (const range of extract.lineRanges) {
+        if (
+          !Array.isArray(range) ||
+          range.length !== 2 ||
+          !Number.isSafeInteger(range[0]) ||
+          !Number.isSafeInteger(range[1]) ||
+          range[0] <= previousEnd ||
+          range[1] < range[0] ||
+          range[1] > 262_144
+        )
+          throw Error("INVALID_RETAINED_EXTRACT_RANGES");
+        previousEnd = range[1];
+      }
+    }
     for (const alias of [r.topic, ...r.aliases]) {
       text(alias, "TOPIC_ALIAS", 250);
       const key = `${r.surface}:${normalizeDocumentationAlias(alias)}`;

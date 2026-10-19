@@ -9,6 +9,8 @@ export const DOCUMENTATION_SURFACES = [
   "github.actions",
   "github.codespaces",
   "github.copilot",
+  "typesafe.ai",
+  "vercel.ai-gateway",
 ] as const;
 export type DocumentationSurface = (typeof DOCUMENTATION_SURFACES)[number];
 export const DOCUMENTATION_HOSTS = [
@@ -51,6 +53,7 @@ export interface DocumentationRoute {
   pageId?: string;
   freshnessPolicy?: "general" | "revalidate";
   documentationVersion?: string;
+  retainedExtract?: DocumentationRetainedExtract;
 }
 export interface DocumentationSource {
   url: string;
@@ -125,4 +128,45 @@ export interface DocumentationReader {
   readonly registry: DeepReadonly<DocumentationRegistry>;
   readonly registrySha256: string;
   select(request: unknown, observations?: DocumentationObservations): DocumentationPlan;
+  readSelectedExtract(
+    request: unknown,
+    options: DocumentationExtractReadOptions,
+  ): Promise<DocumentationExtractRead>;
+}
+
+/** A source-owned Markdown extract, distinct from an original HTTP response body.
+ * The caller supplies its directory; the registry never chooses a host path. */
+export interface DocumentationRetainedExtract {
+  fileName: string;
+  extractSha256: string;
+  extractBytes: number;
+  lineRanges: [number, number][];
+  retrievedAt: string | null;
+  etag: null;
+  lastModified: null;
+}
+export interface DocumentationExtractReadOptions {
+  directory: string | URL;
+  observations?: DocumentationObservations;
+  /** Caller-supplied current-task evidence, not authenticated by this reader.
+   * It must name the exact retained representation and applicable version. */
+  revalidation?: {
+    canonicalUrl: string;
+    extractSha256: string;
+    observedInCurrentTask: true;
+    targetVersion?: string;
+  };
+}
+export interface DocumentationExtractRead {
+  plan: DocumentationPlan;
+  excerpt: {
+    kind: "retained-markdown-extract";
+    canonicalUrl: string;
+    extractSha256: string;
+    excerptSha256: string;
+    text: string;
+    retrievedAt: string | null;
+    etag: null;
+    lastModified: null;
+  } | null;
 }

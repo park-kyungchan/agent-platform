@@ -35,7 +35,8 @@
         "src/context/",
         "src/workspace/",
         "src/runtime-index.ts",
-        "src/git-work/"
+        "src/git-work/",
+        "src/jev/"
       ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/projects/codex-harness-engineering",
       "nativeEntrypoints": [
@@ -138,17 +139,17 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/runtime-docs/index.ts",
-          "sha256": "72b4a6ef5faa84978d1a041e8d0b7f1191365c041f796b737db4ca549931c536",
+          "sha256": "1ee40c31cdcdaabcc003396c50b6c4662a12799f7c36d7f1d3cdbb0448a99031",
           "relativePath": "packages/work-continuity/src/runtime-docs/index.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/runtime-docs/types.ts",
-          "sha256": "dd3a897c221c30ab404323604a7bb56664373ec7d26ccf1682d7bb55c4872846",
+          "sha256": "ea4c29c10018bc56849d3b97b1f5024a174b962e6565e6e860a920618d1d973b",
           "relativePath": "packages/work-continuity/src/runtime-docs/types.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/runtime-docs/validation.ts",
-          "sha256": "6072f6095cc4a4f7230181dd3d6f4f9883a128af409163c593c83d1c4babc341",
+          "sha256": "e1a60a52676f0be3cf66c3274fe9d1d498947445e9979ec77a9dc3de43073d29",
           "relativePath": "packages/work-continuity/src/runtime-docs/validation.ts"
         },
         {
@@ -185,6 +186,26 @@
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/workspace/recovery.ts",
           "sha256": "6367efc9c3aa4dea1378d6a883d46e8d32698730c5318091ef3e3e010942c1aa",
           "relativePath": "packages/work-continuity/src/workspace/recovery.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/contract.ts",
+          "sha256": "d29b5f7faab6a39b9ae30319119a5b4a38c0b15682b3d54b81d6d8a2ea8ffbfb",
+          "relativePath": "packages/work-continuity/src/jev/contract.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/policy.ts",
+          "sha256": "7604e70cfdb1a1888126ef64695fe8c0d8cd5699ada2453e3337874e1e125a49",
+          "relativePath": "packages/work-continuity/src/jev/policy.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/consume.ts",
+          "sha256": "19385e6e7cdd3b21500b656c380deb841f14f709472e7ad71171a5886925a045",
+          "relativePath": "packages/work-continuity/src/jev/consume.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/index.ts",
+          "sha256": "d497fda76d021d6d5acb2ab9c402bb4ceac2db1c84c6446ffb0a5a1d942eb104",
+          "relativePath": "packages/work-continuity/src/jev/index.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
@@ -577,7 +598,8 @@
         "native/plugins/",
         "src/platform-rearchitecture/",
         "src/platform-current-work/",
-        "src/source-provider/"
+        "src/source-provider/",
+        "native/jev/"
       ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/projects/hermes-harness-engineering",
       "nativeEntrypoints": [
@@ -586,7 +608,7 @@
         "src/ontology-driven/native-bundle.ts",
         "src/ontology-driven/provider-source.ts"
       ],
-      "ownerBoundary": "Nine v1 ontology/adoption providers remain compatible. Canonical source owns legacy Work reader contracts, separate current Git Work/RuntimeIndex context and source-guarded pre_llm_call wire integration with exact owner-pinned bindings, plus the finite v2 source/compiler closure. Missing native fields stay null; no legacy fallback is inferred. Native Hermes owns invocation, approval, activation, profiles, sessions, Task/Run, credentials, mutable Work/evidence/learning data and lifecycle; no second runtime.",
+      "ownerBoundary": "Nine v1 ontology/adoption providers remain compatible. Canonical source owns legacy Work reader contracts, separate current Git Work/RuntimeIndex context and source-guarded pre_llm_call wire integration with exact owner-pinned bindings, plus the finite v2 source/compiler closure. Missing native fields stay null; no legacy fallback is inferred. Native Hermes owns invocation, approval, activation, profiles, sessions, Task/Run, credentials, mutable Work/evidence/learning data and lifecycle; no second runtime. The native/jev source bridge transports Codex-owned Jev semantic request definitions and shared accounting through the existing pinned native caller. Codex retains semantic policy and accountable dispatch; native Hermes retains credentials, runtime, profiles and stores. Source admission grants no execution, authentication or lifecycle authority.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/native-hermes-adapter",
       "packageManifest": {
@@ -818,6 +840,31 @@
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/output-policy.ts",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/output-policy.ts",
           "sha256": "972616fb87070e4f23949d04dfb8e170512c149d2265a1910160925cb107315a"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/native/jev/semantic_caller.py",
+          "sha256": "d4dd5c91598869f436009a4ba50de67d430b7be04b584da29a8f86d44e2dcca5",
+          "relativePath": "packages/native-hermes-adapter/native/jev/semantic_caller.py"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/native/jev/shared_accounting.py",
+          "sha256": "321334992a3a9eb2c51d167a18b970d492b99b11e1ed188bb6021c0eb2516ef3",
+          "relativePath": "packages/native-hermes-adapter/native/jev/shared_accounting.py"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/native/jev/test_result_receipts.py",
+          "sha256": "dcb27cb001917ea3cb58f77d1382658d654e2b811619bc5f5d1cd5c8e8850b05",
+          "relativePath": "packages/native-hermes-adapter/native/jev/test_result_receipts.py"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/native/jev/test_semantic_caller.py",
+          "sha256": "49a42047a1d11543d8390416dac5a78afeb11c879097a7c3e1526f4b44f98b7b",
+          "relativePath": "packages/native-hermes-adapter/native/jev/test_semantic_caller.py"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/native/jev/test_shared_accounting.py",
+          "sha256": "60f2985bd66f916146e4ddef0ba21286c5f5a1e45ab5db88e3fbddff2037315d",
+          "relativePath": "packages/native-hermes-adapter/native/jev/test_shared_accounting.py"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
