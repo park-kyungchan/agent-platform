@@ -181,8 +181,8 @@ async function nativePluginSourceCheck(root: string) {
 
 const finiteOwnerSources = [
   ...[
-    "src/legacy/harness/owner-context-loader.ts",
-    "src/legacy/harness/provider-closure.ts",
+    "src/native/context-owner.ts",
+    "src/native/context-provider.ts",
     "src/native/provider-closure.ts",
     "src/native/hook-cli.ts",
     ...nativeCodexModules.map((name) => `src/native/${name}.ts`),
@@ -280,8 +280,8 @@ async function prepareQaTree() {
     throw Error("Invalid finite source-only fixture");
   const expected = new Set([
     ...[
-      "src/legacy/harness/owner-context-loader.ts",
-      "src/legacy/harness/provider-closure.ts",
+      "src/native/context-owner.ts",
+      "src/native/context-provider.ts",
       "src/native/provider-closure.ts",
       "src/native/hook-cli.ts",
       ...nativeCodexModules.map((name) => `src/native/${name}.ts`),
@@ -530,7 +530,7 @@ async function sourceChecks() {
   const closureProbe = join(qaBase, "source-closure-probe.ts");
   await writeFile(
     closureProbe,
-    `import {loadCodexOwnerContext} from ${JSON.stringify(join(codex, "src/legacy/harness/owner-context-loader.ts"))};\nimport {readNativeAdapterSourceClosure} from ${JSON.stringify(join(codex, "src/native/provider-closure.ts"))};\nimport {observeHermesContextProvider} from ${JSON.stringify(join(hermes, "src/ontology-driven/provider-source.ts"))};\nconst context=await loadCodexOwnerContext();await context.verifyCurrentSourceClosure();\nconst native=await readNativeAdapterSourceClosure();const hermes=await observeHermesContextProvider(${JSON.stringify(hermes)});await hermes.verify();\nif(native.providerRoot!==${JSON.stringify(common)}||!context.sourcePins.length||!context.gitWork||['resolveGitWorkSelection','openGitWork','readGitWorkContext','compactGitWorkContext','decodeCompactGitWorkContext'].some(name=>typeof context.gitWork[name]!=='function'))throw Error('Source owner closure or fixed Git Work API absent');\nconst home=await import(${JSON.stringify(join(common, "packages/native-codex-adapter/src/native/home-context.ts"))});\nif(['readHomeContextContractValue','gitWorkDeliveryPolicy'].some(name=>typeof home[name]!=='function'))throw Error('Source owner Home or delivery-policy API absent');\nconsole.log(JSON.stringify({recordClass:'source-only-finite-owner-closure',contextPins:context.sourcePins.length,nativePins:native.pins.length,hermesPins:hermes.pins.length,gitWorkApiSourceProven:true,homeValueApiSourceProven:true,sourceDeliveryPolicyApiSourceProven:true,nativePermissionGranted:false}));\n`,
+    `import {loadCodexOwnerContext} from ${JSON.stringify(join(codex, "src/native/context-owner.ts"))};\nimport {readNativeAdapterSourceClosure} from ${JSON.stringify(join(codex, "src/native/provider-closure.ts"))};\nimport {observeHermesContextProvider} from ${JSON.stringify(join(hermes, "src/ontology-driven/provider-source.ts"))};\nconst context=await loadCodexOwnerContext();await context.verifyCurrentSourceClosure();\nconst native=await readNativeAdapterSourceClosure();const hermes=await observeHermesContextProvider(${JSON.stringify(hermes)});await hermes.verify();\nif(native.providerRoot!==${JSON.stringify(common)}||!context.sourcePins.length||!context.gitWork||['resolveGitWorkSelection','openGitWork','readGitWorkContext','compactGitWorkContext','decodeCompactGitWorkContext'].some(name=>typeof context.gitWork[name]!=='function'))throw Error('Source owner closure or fixed Git Work API absent');\nconst home=await import(${JSON.stringify(join(common, "packages/native-codex-adapter/src/native/home-context.ts"))});\nif(['readHomeContextContractValue','gitWorkDeliveryPolicy'].some(name=>typeof home[name]!=='function'))throw Error('Source owner Home or delivery-policy API absent');\nconsole.log(JSON.stringify({recordClass:'source-only-finite-owner-closure',contextPins:context.sourcePins.length,nativePins:native.pins.length,hermesPins:hermes.pins.length,gitWorkApiSourceProven:true,homeValueApiSourceProven:true,sourceDeliveryPolicyApiSourceProven:true,nativePermissionGranted:false}));\n`,
   );
   await run(common, [process.execPath, closureProbe]);
   // Source-only adversarial proof uses QA copies and in-memory registration overlays.
@@ -541,7 +541,7 @@ async function sourceChecks() {
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
-import {readRegisteredContextProvider} from ${JSON.stringify(join(codex, "src/legacy/harness/provider-closure.ts"))};
+import {readRegisteredContextProvider} from ${JSON.stringify(join(codex, "src/native/context-provider.ts"))};
 const root=${JSON.stringify(codex)},provider=${JSON.stringify(common)};
 const registrationPath=join(root,'architecture/context-provider.json'),module=join(root,'src/continuity/index.ts');
 const original=JSON.parse(await readFile(registrationPath,'utf8'));
@@ -597,7 +597,7 @@ console.log(JSON.stringify({recordClass:'source-only-context-provider-v4-adversa
     firstImportProbe,
     `import {strict as assert} from 'node:assert';
 await import(${JSON.stringify(join(common, "packages/work-continuity/src/git-work/index.ts"))});
-const {loadCodexOwnerContext}=await import(${JSON.stringify(join(codex, "src/legacy/harness/owner-context-loader.ts"))});
+const {loadCodexOwnerContext}=await import(${JSON.stringify(join(codex, "src/native/context-owner.ts"))});
 await assert.rejects(()=>loadCodexOwnerContext(),/imported before its observed source closure/);
 console.log(JSON.stringify({recordClass:'source-only-git-work-first-import-refusal',nativePermissionGranted:false}));
 `,
@@ -608,7 +608,7 @@ console.log(JSON.stringify({recordClass:'source-only-git-work-first-import-refus
     memoryFirstImportProbe,
     String.raw`import {strict as assert} from 'node:assert';
 await import(${JSON.stringify(join(common, "packages/work-continuity/src/workspace/recall-request.ts"))});
-const {loadCodexOwnerContext}=await import(${JSON.stringify(join(codex, "src/legacy/harness/owner-context-loader.ts"))});
+const {loadCodexOwnerContext}=await import(${JSON.stringify(join(codex, "src/native/context-owner.ts"))});
 await assert.rejects(()=>loadCodexOwnerContext(),/imported before its observed source closure/);
 console.log(JSON.stringify({recordClass:'source-only-memory-first-import-refusal',nativePermissionGranted:false}));
 `,
@@ -619,7 +619,7 @@ console.log(JSON.stringify({recordClass:'source-only-memory-first-import-refusal
     gitDriftProbe,
     String.raw`import {strict as assert} from 'node:assert';
 import {readFile,writeFile} from 'node:fs/promises';
-import {loadCodexOwnerContext} from ${JSON.stringify(join(codex, "src/legacy/harness/owner-context-loader.ts"))};
+import {loadCodexOwnerContext} from ${JSON.stringify(join(codex, "src/native/context-owner.ts"))};
 const path=${JSON.stringify(join(common, "packages/work-continuity/src/git-work/source.ts"))},bytes=await readFile(path),context=await loadCodexOwnerContext();
 try{await writeFile(path,Buffer.concat([bytes,Buffer.from('\n')]));await assert.rejects(()=>context.verifyCurrentSourceClosure(),/Context provider source changed/);}finally{await writeFile(path,bytes);}
 await context.verifyCurrentSourceClosure();

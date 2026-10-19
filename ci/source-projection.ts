@@ -105,8 +105,8 @@ export async function verifyProjectedSourceQa(input: ProjectionQaInput) {
       providerRoot: projectedProvider,
     };
     const ownerPaths = [
-      "src/legacy/harness/owner-context-loader.ts",
-      "src/legacy/harness/provider-closure.ts",
+      "src/native/context-owner.ts",
+      "src/native/context-provider.ts",
       "src/native/provider-closure.ts",
       "src/native/hook-cli.ts",
       ...["hooks", "home-context", "evaluation-ledger"].map((name) => `src/native/${name}.ts`),
@@ -202,7 +202,7 @@ export async function verifyProjectedSourceQa(input: ProjectionQaInput) {
       const script = `${preimport ? `await import(${JSON.stringify(resolve(root, "../agent-platform/packages/work-continuity/src/context/source.ts"))});` : ""}
 const {readNativeAdapterSourceClosure}=await import(${JSON.stringify(join(root, "src/native/provider-closure.ts"))});
 const native=await readNativeAdapterSourceClosure();await native.verify();
-const {loadCodexOwnerContext}=await import(${JSON.stringify(join(root, "src/legacy/harness/owner-context-loader.ts"))});
+const {loadCodexOwnerContext}=await import(${JSON.stringify(join(root, "src/native/context-owner.ts"))});
 const context=await loadCodexOwnerContext();await context.verifyCurrentSourceClosure();
 console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRoot:native.canonicalProviderRoot,sourceLocationId:native.sourceLocationId,contextPins:context.sourcePins.length,nativePins:native.pins.length}));`;
       return Bun.spawnSync([process.execPath, "--no-env-file", "-e", script], {
@@ -319,7 +319,7 @@ console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRo
 import {readFile,writeFile} from 'node:fs/promises';
 const {readNativeAdapterSourceClosure}=await import(${JSON.stringify(join(projected, "src/native/provider-closure.ts"))});
 const native=await readNativeAdapterSourceClosure();
-const {loadCodexOwnerContext}=await import(${JSON.stringify(join(projected, "src/legacy/harness/owner-context-loader.ts"))});
+const {loadCodexOwnerContext}=await import(${JSON.stringify(join(projected, "src/native/context-owner.ts"))});
 const context=await loadCodexOwnerContext();
 for(const [path,verify] of [[${JSON.stringify(join(projectedProvider, "packages/work-continuity/src/git-work/source.ts"))},()=>context.verifyCurrentSourceClosure()],
 [${JSON.stringify(join(projectedProvider, "packages/native-codex-adapter/src/native/home-context.ts"))},()=>native.verify()]]){

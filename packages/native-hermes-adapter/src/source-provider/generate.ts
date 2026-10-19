@@ -127,8 +127,8 @@ export function validateV1SourceGraph(sources: ReadonlyMap<string, Uint8Array>) 
 type FilePin = { path: string; sha256: string; bytes: number };
 type LinkPin = { path: string; target: string };
 const finiteOwnerPaths = [
-  "codex-harness-engineering/src/legacy/harness/owner-context-loader.ts",
-  "codex-harness-engineering/src/legacy/harness/provider-closure.ts",
+  "codex-harness-engineering/src/native/context-owner.ts",
+  "codex-harness-engineering/src/native/context-provider.ts",
   "codex-harness-engineering/src/native/provider-closure.ts",
   "codex-harness-engineering/src/native/hook-cli.ts",
   "codex-harness-engineering/src/native/hooks.ts",
@@ -378,6 +378,15 @@ export async function generateHermesSourceFixture(): Promise<SourceFixture> {
       await stageDependency(child, dirname(manifestPath));
   }
   await stageDependency("@palantirkc/ontology", canonicalRoot);
+  // The fictional lock must resolve with an empty offline cache. Bind every registry
+  // dependency to its byte-verified staged package; immutable Ontology stays a release.
+  const stagedRuntime = await captureInstalledRuntimeClosure(
+    providerRoot,
+    exact,
+    sha,
+    false,
+    modules.map((name) => join(providerRoot, packagePath, "src", name + ".ts")),
+  );
   const ownerPackage = {
     name: "@palantirkc/hermes-new-source-fictional-facade",
     private: true,
@@ -387,6 +396,11 @@ export async function generateHermesSourceFixture(): Promise<SourceFixture> {
     dependencies: {
       "@palantirkc/native-hermes-adapter": "file:../agent-platform/packages/native-hermes-adapter",
     },
+    overrides: Object.fromEntries(
+      stagedRuntime.dependencies
+        .filter(({ name }) => name !== "@palantirkc/ontology")
+        .map(({ name }) => [name, "file:../agent-platform/node_modules/" + name]),
+    ),
   };
   await put(join(codeOwnerRoot, "package.json"), json(ownerPackage));
   const install = Bun.spawn(
@@ -420,6 +434,12 @@ export async function generateHermesSourceFixture(): Promise<SourceFixture> {
   );
   for (const [path, bytes] of projection)
     if (!["package.json", "bun.lock"].includes(path)) await put(join(codeOwnerRoot, path), bytes);
+  if (
+    JSON.stringify(
+      JSON.parse(projection.get("source-successor.json")!.toString()).runtimeDependencies,
+    ) !== JSON.stringify(stagedRuntime)
+  )
+    throw Error("STAGED_FIXTURE_DEPENDENCIES_CHANGED_DURING_LOCK_GENERATION");
 
   const historicalQa = JSON.parse(
     (await exact(join(canonicalRoot, "owner-fixture/manifest.json"))).toString(),

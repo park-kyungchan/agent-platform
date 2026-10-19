@@ -4,20 +4,20 @@
   "sources": [
     {
       "owner": "codex-harness-engineering",
-      "path": "src/legacy/harness/owner-context-loader.ts",
-      "sha256": "cd958118d5a9b6c5d1d23397a16a140ca86ca338446b749aacc79dd1d0cd54e5",
+      "path": "src/native/context-owner.ts",
+      "sha256": "4b158db8a15800e20a784ed3dbeda17f32ce49a12f0ded1836957f0aaaff5b81",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {
       "owner": "codex-harness-engineering",
-      "path": "src/legacy/harness/provider-closure.ts",
+      "path": "src/native/context-provider.ts",
       "sha256": "f57c40c86e90eb28d25cf836b53b8b37f0bb388cefa1ee8510427cd767f8cae0",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {
       "owner": "codex-harness-engineering",
       "path": "src/native/provider-closure.ts",
-      "sha256": "cd58c0f9b873352f53daae1c19c7bda5c51b737e5efbfb605712c3d64751c864",
+      "sha256": "c3a3ddd7caa3824155f6ac9845e52ae122f5948b0cfd41933afd241f2c960ea5",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {
@@ -29,7 +29,7 @@
     {
       "owner": "codex-harness-engineering",
       "path": "src/native/hooks.ts",
-      "sha256": "7790b7942b947eb9320f9891542848c268e27f0fb7b99fc964d1663b7d1c5188",
+      "sha256": "a6838a951de9582a817bf4a7b151e14f9e190a029b29b71d210277c5d42159ba",
       "classification": "source-owned-code-only-no-runtime-or-user-data"
     },
     {

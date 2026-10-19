@@ -6,7 +6,7 @@ import {
   contextProviderRelativeSources,
   gitWorkProviderRelativeSources,
   memoryProviderRelativeSources,
-} from "../owner-fixture/codex-harness-engineering/src/legacy/harness/provider-closure";
+} from "../owner-fixture/codex-harness-engineering/src/native/context-provider";
 
 const common = resolve(import.meta.dir, ".."),
   policy = await Bun.file(common + "/architecture/runtime-filesystem-contract.json").json();
