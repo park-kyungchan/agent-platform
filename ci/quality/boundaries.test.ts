@@ -235,7 +235,7 @@ test("authored head and prospective merge both run full quality while native rev
   expect(
     workflow.jobs["quality"]!.steps.find((step) => step.uses?.startsWith("actions/checkout@"))
       ?.with?.["fetch-depth"],
-  ).toBeUndefined();
+  ).toBe(0);
   expect(
     workflow.jobs["native-review"]!.steps.some(
       (step) => step.run === "bun ci/source-check.ts --review",

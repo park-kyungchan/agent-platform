@@ -24,6 +24,12 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.3.14
+      - name: Require committed native source-author metadata for this exact source
+        run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
+        env:
+          COMMON_CI_REPOSITORY: ${{ github.repository }}
+          COMMON_CI_PROJECT_ID: agent-platform
+          COMMON_CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify canonical source in finite owner QA tree
         run: bun ci/source-check.ts
         env:
@@ -43,9 +49,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.3.14
+      - name: Require fresh authored-head metadata before quality commands
+        run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
+        env:
+          COMMON_CI_REPOSITORY: ${{ github.repository }}
+          COMMON_CI_PROJECT_ID: agent-platform
+          COMMON_CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install exact source quality dependencies
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Verify source quality and architecture contract
@@ -79,6 +92,12 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.3.14
+      - name: Require fresh ordered-merge metadata before integration commands
+        run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
+        env:
+          COMMON_CI_REPOSITORY: ${{ github.repository }}
+          COMMON_CI_PROJECT_ID: agent-platform
+          COMMON_CI_SOURCE_SHA: ${{ github.sha }}
       - name: Install exact prospective merge quality dependencies
         run: bun install --frozen-lockfile --ignore-scripts
       - name: Verify prospective merge quality and architecture
@@ -111,9 +130,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
           bun-version: 1.3.14
+      - name: Require fresh authored-head metadata before review receipt checks
+        run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
+        env:
+          COMMON_CI_REPOSITORY: ${{ github.repository }}
+          COMMON_CI_PROJECT_ID: agent-platform
+          COMMON_CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Read immutable native review receipt for this exact head
         run: bun ci/source-check.ts --review
         env:

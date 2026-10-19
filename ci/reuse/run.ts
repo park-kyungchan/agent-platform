@@ -1,5 +1,10 @@
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
+import {
+  defaultSourceAuthorPath,
+  sourceAuthorPath,
+  verifyCommittedSourceAuthor,
+} from "./source-author";
 
 export interface CallerSourceInput {
   workspace: string;
@@ -10,6 +15,7 @@ export interface CallerSourceInput {
   bunVersion: string;
   scripts: string[];
   installDependencies: boolean;
+  sourceAuthorMetadataPath: string;
 }
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -57,6 +63,9 @@ export function parseCallerSourceInput(env: NodeJS.ProcessEnv): CallerSourceInpu
     bunVersion,
     scripts: scripts as string[],
     installDependencies: env.COMMON_CI_INSTALL === "true",
+    sourceAuthorMetadataPath: sourceAuthorPath(
+      env.COMMON_CI_SOURCE_AUTHOR_METADATA ?? defaultSourceAuthorPath,
+    ),
   };
 }
 
@@ -95,6 +104,16 @@ export async function runCallerSource(input: CallerSourceInput): Promise<number>
   if (Bun.version !== input.bunVersion)
     throw Error("Caller-selected Bun version differs from execution");
   await verifyCheckout(input);
+  const readAuthor = () =>
+    verifyCommittedSourceAuthor({
+      workspace: input.workspace,
+      repository: input.repository,
+      projectId: input.projectId,
+      sourceHead: input.sourceSha,
+      metadataPath: input.sourceAuthorMetadataPath,
+    });
+  const authorReadback = await readAuthor();
+  console.log(JSON.stringify(authorReadback));
   const project = await jsonFile(input.workspace, "project.json");
   const manifest = await jsonFile(input.workspace, "package.json");
   if (
@@ -129,6 +148,8 @@ export async function runCallerSource(input: CallerSourceInput): Promise<number>
     const exitCode = await child.exited;
     if (exitCode !== 0) return exitCode;
     await verifyCheckout(input);
+    if (JSON.stringify(await readAuthor()) !== JSON.stringify(authorReadback))
+      throw Error("Source-author readback changed during caller checks");
   }
   console.log(
     `Caller source scripts passed: ${input.projectId} ${input.sourceSha} Bun ${input.bunVersion}`,
