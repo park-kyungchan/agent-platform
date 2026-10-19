@@ -203,8 +203,13 @@
           "relativePath": "packages/work-continuity/src/jev/consume.ts"
         },
         {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/workflows.ts",
+          "sha256": "e0bb311fb45dd833cb2004937428bcc29d3ee40325bbe9dfb5a00de396be5d9b",
+          "relativePath": "packages/work-continuity/src/jev/workflows.ts"
+        },
+        {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/index.ts",
-          "sha256": "d497fda76d021d6d5acb2ab9c402bb4ceac2db1c84c6446ffb0a5a1d942eb104",
+          "sha256": "a0198de5fdc0e5122804694ebd888dd84cf19523ad57a278df3c7209e4b0efd3",
           "relativePath": "packages/work-continuity/src/jev/index.ts"
         }
       ],
