@@ -1,0 +1,206 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-POSTDEPLOY-SOURCE-AUTHORITY-20261019",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering:actual-main:01a15321-24b7-7ad1-b1c3-ed528822cf5a",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/deploy-and-fresh-main-20261019/G3-postdeploy-source.task.actual.json#sha256=02c406499c9adc662af3b0a73892ff695b01964e3f9302e42cbd8f9ec3965edc",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "host-orchestrator.postdeploy-source-admission-provenance.v1",
+    "recordClass": "Source-owner capture of the exact current user approval and separately delegated source scope; no new user answer or native identity inferred.",
+    "logicalTask": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 3,
+      "taskId": "ODI-05-HERMES-POSTDEPLOY-SOURCE-ADMISSION-20261019"
+    },
+    "wholePurpose": "Carry actual user outcomes through permitted native/domain operation with accepted WHY, Ontology Data/Logic/Action/Security and truthful exact source/verification/delivery/Acceptance boundaries. Prevent context/decision loss; optimization serves useful work.",
+    "acceptedWHY": "Prevent losing purpose and accepted user decisions across sessions; deliver useful work through actual owners with complete semantics and truthful bounded evidence.",
+    "actualDelegation": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/deploy-and-fresh-main-20261019/G3-postdeploy-source.task.actual.json",
+      "bytes": 7641,
+      "sha256": "02c406499c9adc662af3b0a73892ff695b01964e3f9302e42cbd8f9ec3965edc"
+    },
+    "actualAuthority": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/deploy-and-fresh-main-20261019/authority.actual.json",
+      "bytes": 2228,
+      "sha256": "c2af688fe9901860a3c55a087ee48de66bd787d1a067a1ccc902dde60d83812e",
+      "actualUserText": "남은 조건 승인, 배포 보류도 문제 해결해서 배포한 후에 진행하자. pane 새로 띄워서 main 최신으로 시작하기를 원함.",
+      "acceptedScope": "Resolve actual previously retained deployment technical conditions, deploy through existing maintained helper after exact target/receipt/lock reconciliation, then continue remaining work from actual fresh MAIN in new pane on latest source main. No repeated general approval question.",
+      "interpretationLimits": "This is actual authorization, not proof of technical preconditions, actual caller/data identity, external feature PR delivery or missing mathematical/domain facts. Preserve owners, originals, unknown effects, native model/effort/auth/permissions/hooks trust, no manual provider calls. Do not replay completed maintenance or prepared build. No original Goal lifecycle resurrection inferred."
+    },
+    "actualTimingSource": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/deploy-and-fresh-main-20261019/user-TUI-idle.answer.actual.json",
+      "bytes": 806,
+      "sha256": "76a9d19ac5c7d2a031d3701b00ea6e3e296ceb62fc8c0661a25064d0c73fbb54"
+    },
+    "deployment": {
+      "job": "20261019T080340Z-3117369-deploy",
+      "transaction": "20261019T080342Z-38d55b90dab7",
+      "sourceSha": "38d55b90dab7b37d7f26f0450b61851463fb1329",
+      "imageId": "sha256:b0090f8689ae10182f84132a53adbf5afa9f16bf8f9a44b69f651d4ed94cd8ec",
+      "receipt": "/docker/hermes-agent-2q3y/.main-updater/receipts/20261019T080342Z-38d55b90dab7.json",
+      "verified": "/home/palantirkc/projects/codex-harness-engineering/.private/deploy-and-fresh-main-20261019/postdeployment-verification.actual.json",
+      "scope": "Exact supported once deployment complete, target healthy; gateway overall startup diagnosis ongoing separately. No deployment/restart/helper action is yours.",
+      "verificationSource": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/deploy-and-fresh-main-20261019/postdeployment-verification.actual.json",
+        "bytes": 9190,
+        "sha256": "9cb84901b80dddad6f6f0c37652de54b7868ccdf023b1d8ef0e9a82a95f75d83"
+      },
+      "meaning": "Exact deployment/readback is source evidence from MAIN, not a new deployment effect or proof of current native caller/source adoption."
+    },
+    "historicalTask": {
+      "record": {
+        "path": "tasks/ODI-05-HERMES-NATIVE-CURRENTNESS.json",
+        "sha256": "532dd689c5512994521c61426634a774d70f26a0dc33a27541c4f78836f57142"
+      },
+      "specRevision": 1,
+      "planRevision": 2,
+      "nativeQualification": "Still pending, separate from this source-only Task; no relabeling or completion claim."
+    },
+    "sourceBase": {
+      "commit": "ff8e5d56612fab5ce41d4ed9e8b4947987943d4a",
+      "tree": "da5a9fc40ea741764eff15dea667372de75f3452",
+      "implementationChanges": false
+    },
+    "sourceAnalysis": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/deploy-and-fresh-main-20261019/G3-context-cap-analysis.result.actual.json",
+      "sha256": "05df55281018f16637a942c271f0721a75bb4cb689002ffa773066095f1ca3a2"
+    },
+    "plan2Applicability": {
+      "original": "plans/ODI-PLAN@2.json#/clauses",
+      "preservedByteExact": true,
+      "coverage": [
+        {
+          "clause": 0,
+          "preservedBy": [
+            "ODI-PLAN@3#/clauses/0",
+            "ODI-PLAN@3#/clauses/2",
+            "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
+          ],
+          "obligations": [
+            "ODI-07",
+            "ODI-HOST-ESTATE-CONTINUATION"
+          ],
+          "scope": "Keep exact common owner/topology source and no six-profile inference; preserve immutable Tasks/effects. Estate review remains its own obligation, not an artificial gate on this isolated source record."
+        },
+        {
+          "clause": 1,
+          "preservedBy": [
+            "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+            "ODI-PLAN@3#/clauses/5"
+          ],
+          "obligations": [
+            "ODI-02-LONG-WORK-SKILL",
+            "ODI-07"
+          ],
+          "scope": "Existing long-work Task is complete and never replayed. CI bottleneck/estate work retains its owners; deferred CI-agent interview is not this Task or a universal prerequisite."
+        },
+        {
+          "clause": 2,
+          "preservedBy": [
+            "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY",
+            "ODI-PLAN@3#/clauses/4"
+          ],
+          "obligations": [
+            "ODI-07",
+            "ODI-HOST-ESTATE-CONTINUATION"
+          ],
+          "scope": "Four historical contracts stay operational-context-owned; mathCrew/clinic stay Education-owned. No re-porting, retirement or domain effects here; their exact consumer/custody oracles remain."
+        },
+        {
+          "clause": 3,
+          "preservedBy": [
+            "ODI-PLAN@3#/clauses/2",
+            "ODI-PLAN@3#/clauses/4"
+          ],
+          "obligations": [
+            "ODI-05",
+            "ODI-05-CONTEXT-CONTINUITY",
+            "ODI-05-HERMES-NATIVE-CURRENTNESS"
+          ],
+          "scope": "This distinct source-only preparation preserves pending native qualification, full Memory/IDs/recovery/shared receiver gaps and consumed native04/A10/11. Actual cutover requires equivalence/native admission; no generic profile/runtime/client/credential bridge."
+        },
+        {
+          "clause": 4,
+          "preservedBy": [
+            "ODI-PLAN@3#/clauses/4",
+            "ODI-DECISION-POST-INTERVIEW-EXECUTION"
+          ],
+          "obligations": [
+            "ODI-HOST-ESTATE-CONTINUATION",
+            "ODI-08"
+          ],
+          "scope": "Full estate beyond19 and existing domain outcomes remain open under their owners; retain recoverable history/releases/data and real compatibility consumers. No universal migration wait or month-end redo."
+        },
+        {
+          "clause": 5,
+          "preservedBy": [
+            "ODI-PLAN@3#/clauses/5",
+            "ODI-DECISION-FINAL-APPROVAL"
+          ],
+          "obligations": [
+            "ODI-09",
+            "ODI-10",
+            "ODI-HOST-INTEGRATION"
+          ],
+          "scope": "Lead serializes pins/CAS, exact independent review, authenticated status before PR, required checks, explicit expected-head merge and separate native activation. Whole recovery/portability/cost and engineering/operator/domain Acceptance remain distinct and pending."
+        },
+        {
+          "clause": 6,
+          "preservedBy": [
+            "ODI-DECISION-COST",
+            "ODI-DECISION-EVALUATION-BUDGET-DELEGATED-40M32R48H",
+            "ODI-HOST-DECISION-NO-EVAL"
+          ],
+          "obligations": [
+            "ODI-09"
+          ],
+          "scope": "Ordinary source preparation is not evaluation. Original suite start, reported/unknown/unreserved history and paid0 remain; oldUSD14 and native usage unknown holds remain. No provider call, suite/budget/Goal renewal or effect replay."
+        }
+      ]
+    },
+    "dependencies": {
+      "declaredTaskDependencies": [],
+      "reason": "Actual assigned source-only preparation uses already admitted immutable source. No milestone of incomplete native qualification/gateway/domain/global Memory is required to author/validate these two records. Native activation retains all real source/caller/data prerequisites.",
+      "pendingNativeTask": "ODI-05-HERMES-NATIVE-CURRENTNESS",
+      "universalGatewayMemoryDomainGate": false
+    },
+    "nativeCaller": {
+      "runtime": "native-hermes",
+      "profileId": null,
+      "sessionId": null,
+      "agentId": null,
+      "nativeProjectId": null,
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "cwd": null
+    },
+    "nativeBindingCreated": false,
+    "ownersAndFences": [
+      "Hermes default Lead retains R&D/Ontology/Wiki/internal measurement; MAIN owns infrastructure orchestration, no project-role takeover",
+      "Academy semantic/source/lower IDs and external MCP/month-end futurePR owner retained; do not duplicate features or resurrect old Leads/WorkLeads/frontend/live workflows",
+      "Native Codex/Hermes own models/auth/tools/loop/sessions/retries/delegation/trust; no second runtime/scheduler/provider client/session or Memory store",
+      "PR43/PR12 and observed parent Task delivery qualified; opaque child semantics/global context adoption unaccepted, no replay to manufacture it",
+      "Old sharedUSD14/native qualification budgets/usage unknown held; no reuse/new benchmark/stress/manual provider call",
+      "Foreground directly requested work first, memory/PSI before starts, serialize heavy work, no queue wait deadline/global limits/swapoff",
+      "p5/p6/unrelatedw5:p1 untouched; predecessor pane retained read-only, user focus preserved",
+      "No outgoing status/completion/next-task prompts to predecessor or old Leads; durable result paths suffice. No further fresh MAIN loop."
+    ],
+    "authority": "Source-only record preparation assigned by actual MAIN; no source-proof-derived native permission",
+    "nativePermissionGranted": false,
+    "AcceptanceDecision": null,
+    "minimalDecisionAdmission": "Actual MAIN explicitly permits one minimal Decision when required by the existing schema for truthful normative authority. validateRecordSources requires its exact answer fragment in an actual-user-answer Input; source-owner-capture origin remains explicit."
+  }
+}

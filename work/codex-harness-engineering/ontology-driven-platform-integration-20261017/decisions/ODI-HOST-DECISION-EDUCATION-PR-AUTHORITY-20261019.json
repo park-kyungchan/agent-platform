@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-HOST-DECISION-EDUCATION-PR-AUTHORITY-20261019",
+  "status": "accepted",
+  "answer": "수학 R4가 뭔지 모르겠는데? 교육 원본 사용해도 됨. 교사 검토에 관한 기존 결정/자료 위치나 지금 확정할 판단 기준들에 대해서는, 변경사항 올라올 때마다 내가 repo에 PR 올려놓을게. 일단 지금 \"- academy-workbench #18 (https://github.com/park-kyungchan/academy-workbench/pull/18) — 9fdcca3\n- education-platform #15 (https://github.com/park-kyungchan/education-platform/pull/15) — daee459\n\n둘 다 미병합·auto-merge 비활성입니다. 소스 CI는 모두 통과했습니다. Native-review gate는 해당 head의 검토 status 미등록으로 실패 상태이며, 이후 검토·merge는 srv1873899의 Herdr 담당으로 남겼습니다\n\" 올라왔음. 너가 merge해서 작업 진행하면 돼.",
+  "meaning": "Education originals are authorized. Inspect and independently review current PR18/PR15 source and resolve findings before explicit exact-head merge. The user does not establish an R4 human disposition; future teacher/criterion updates arrive through user PRs. No teacher, mathematical or domain Acceptance is inferred.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-USER-UNATTENDED-ANSWERS-20261019.json",
+    "fragment": "#/content/actualCapture/answers/0/actualAnswer"
+  },
+  "supersedes": []
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-HOST-DECISION-MANDATORY-CI-AUTHOR-20261019",
+  "status": "accepted",
+  "answer": "그리고 향후 공통하네스(CI) Workflow에 이러한 메타데이터도 반드시 추가하도록 해야돼.",
+  "meaning": "Future canonical common CI workflows and affected consumers must require actual source-author/native identity and logical Work/Task/source binding metadata. Native thread/session differs from nullable native Task/Run; authoritative source head/tree and exact metadata Git blob/hash are read back after commit/publication without self-reference. GHA cannot invent original authorship; no credentials/raw sessions/private data are published. Existing independent review gates remain. This WSL exception does not silently extend to future defaults.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-USER-WSL-OVERRIDE-CI-20261019.json",
+    "fragment": "#/content/actualCapture/actualAdditionalInstruction"
+  },
+  "supersedes": []
+}

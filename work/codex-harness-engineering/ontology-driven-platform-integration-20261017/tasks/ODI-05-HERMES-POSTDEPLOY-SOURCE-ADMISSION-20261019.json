@@ -1,0 +1,45 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-05-HERMES-POSTDEPLOY-SOURCE-ADMISSION-20261019",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 3,
+    "taskId": "ODI-05-HERMES-POSTDEPLOY-SOURCE-ADMISSION-20261019"
+  },
+  "title": "Prepare isolated postdeployment Hermes source and caller admission",
+  "nextAction": "Prevent purpose/decision loss: prepare only current postdeployment source/caller admission, not native qualification. Verify provenance inputs/ODI-HERMES-POSTDEPLOY-SOURCE-AUTHORITY-20261019.json#/content, exact source Task/Spec1/Plan3 and complete metadata.v1; measure source fit under unchanged12000chars with532chars fixed wrapper plus unknown actual-native JSON. Keep original ODI-05 Spec1/Plan2 and pending native result unchanged; Plan2 applicability/remaining obligations stay in provenance and retained originals. Current Hermes profile/session/cwd/Task/Run and target v2 registration/bindings remain unobserved: no executable selection or activation. Hermes default Lead owns R&D/Ontology/Wiki/internal measurement; native/data/domain owners remain. Preserve all consumed/uncertain fences and prior H3/Run12; no replay, guard/cache bypass, runtime/config/auth writes, manual provider/Jev helper or oldUSD14/evaluation renewal. Preserve model/effort/auth/permissions/trust. Root owns exact review/integration; local checks are not shared delivery, native consumption or Acceptance. Independent source preparation has no global gateway/Memory/domain gate.",
+  "state": {
+    "execution": "running",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-POSTDEPLOY-SOURCE-ADMISSION-20261019",
+    "ODI-DECISION-POST-INTERVIEW-EXECUTION",
+    "ODI-DECISION-FINAL-APPROVAL",
+    "ODI-DECISION-COST",
+    "ODI-DECISION-GLOBAL-TYPED-ENGINEERING",
+    "ODI-DECISION-TYPED-NATIVE-FORMAT-CLARIFICATION",
+    "ODI-HOST-DECISION-IDENTITY",
+    "ODI-HOST-DECISION-APPROVAL",
+    "ODI-HOST-DECISION-RESUME",
+    "ODI-HOST-DECISION-NO-EVAL"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": []
+}
