@@ -7,7 +7,7 @@ description: Control and verify native Hermes sessions through Herdr, including 
 
 User instructions and existing authorization take precedence. Dated restrictions from the recorded evaluation do not become blanket restrictions for other tasks. This is a thin extension of the installed `herdr` skill. Read that skill first and require `HERDR_ENV=1` before inspecting or controlling Herdr. Use its installed-CLI discovery and terminal mechanics; do not implement a second agent loop, scheduler, MCP client, tool registry, or credential bridge.
 
-Read [control.md](references/control.md) for Hermes launch, correlation, interruption and recovery. Read [deployment.md](references/deployment.md) when selecting local/native versus SSH/Docker control. Read [documentation.md](references/documentation.md) when using Runtime Index routes or reconciling documentation with the installed release.
+Read only the references needed for the requested boundary: [control.md](references/control.md) for launch/input, correlation or recovery; [deployment.md](references/deployment.md) for transport selection and dated deployment evidence; [documentation.md](references/documentation.md) for Runtime Index routes and installed-release comparison. A documentation question does not require loading historical launch records or starting a session.
 
 For post-turn self-improvement, background skill/memory writes or source-pinned skill drift, read [native-learning.json](references/native-learning.json). It separates official guidance, version-qualified behavior and required native observations; Herdr adds no Memory engine.
 

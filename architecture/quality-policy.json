@@ -129,6 +129,12 @@
       "sha256": "6e17438f0acd55fdc3b513dbd6f466ea3650c6abfc33cafca8afd24def100cbe",
       "capabilityId": "native-codex-source",
       "reason": "Exact common-owned Herdr-Hermes native-learning knowledge reference; partial official guidance, version-qualified implementation and required actual evidence stay distinct. Source definition only; no native permission or activation."
+    },
+    {
+      "path": "packages/native-hermes-adapter/native/jev/contract.schema.json",
+      "sha256": "559ee9ced57197c5d902dbf3222c27438144084c8cb20011d07f05806f7e8d8e",
+      "capabilityId": "native-hermes-context",
+      "reason": "Exact request-schema definition used by the admitted native/jev bridge. Codex retains Jev semantic policy; native Hermes retains credentials/runtime/data custody. Source definition only; no execution permission, activation or new model budget."
     }
   ],
   "stagedSources": [

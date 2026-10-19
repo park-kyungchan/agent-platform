@@ -319,9 +319,9 @@ describe("real docs CLI transport", () => {
 });
 
 describe("portable docs-only Runtime Index", () => {
-  test("selects all98 registered routes and their aliases without execution admission", () => {
+  test("selects all120 registered routes and their aliases without execution admission", () => {
     const reader = createDocumentationReader(registry);
-    expect(reader.registry.routes).toHaveLength(98);
+    expect(reader.registry.routes).toHaveLength(120);
     for (const route of registry.routes) {
       for (const topic of [route.topic, ...route.aliases]) {
         const plan = reader.select({ surface: route.surface, topic });
@@ -609,7 +609,7 @@ describe("portable docs-only Runtime Index", () => {
     expect(reader.select({ surface: "codex.cli", topic: "hooks" }).primary?.canonicalUrl).toBe(
       original,
     );
-    expect(reader.registry.routes).toHaveLength(98);
+    expect(reader.registry.routes).toHaveLength(120);
     expect(Object.isFrozen(reader.registry.routes)).toBe(true);
     expect(Object.isFrozen(selected.primary)).toBe(true);
     expect(() =>
