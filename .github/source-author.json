@@ -11,16 +11,16 @@
     "workId": "ontology-driven-platform-integration-20261017",
     "taskId": "ODI-HOST-INTEGRATION"
   },
-  "sourceBaseSha": "1f4b7f0ed2da4ae30f1b0933825489b586b75178",
+  "sourceBaseSha": "7644cb123cd13d2caa7500ef181d09e3e02543bd",
   "author": {
     "runtime": "native-codex",
-    "threadId": "01a15324-5dd0-7153-b432-8ddf25bdf6f6",
+    "threadId": "01a15321-24b7-7ad1-b1c3-ed528822cf5a",
     "sessionId": null,
     "nativeTaskId": null,
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-19T09:55:20.842Z",
+  "capturedAtUtc": "2026-10-19T10:09:34.637Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
