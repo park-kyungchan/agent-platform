@@ -347,6 +347,58 @@ describe("native requested/resolved/postcondition receipt", () => {
     });
     expect(receipt.status).toBe("native-postcondition-failed");
   });
+  test("internally valid child ancestry must extend the exact parent lineage", () => {
+    const parent: NativeBinding = {
+      ...binding(),
+      sessionId: "parent",
+      parentSessionId: "A",
+      lineageSessionIds: ["root", "A", "parent"],
+    };
+    const p = prepareWorkflowDecision({
+      requestId: "nested:1",
+      event: { ...event(), binding: parent },
+      lens: lens(),
+      workflow: delegation(),
+    });
+    if (p.status !== "prepared") throw Error("fixture");
+    const advice = normalizeWorkflowReply(p, reply(p), current(p));
+    const run = (ancestor: string) =>
+      recordNativeDelegationReceipt({
+        prepared: p,
+        advice,
+        current: current(p),
+        observation: {
+          ...observation(),
+          childBinding: {
+            ...observation().childBinding!,
+            parentSessionId: "parent",
+            lineageSessionIds: ["root", ancestor, "parent", "child"],
+          },
+        },
+      });
+    expect(run("A").status).toBe("verified-native-delegation");
+    expect(run("B").status).toBe("held");
+    expect(run("B").reason).toBe("native-child-parent-lineage-mismatch");
+  });
+  test("unexposed native profile stays null; a non-null contradictory native profile cannot verify", () => {
+    const p = prepare(delegation()),
+      advice = normalizeWorkflowReply(p, reply(p), current(p));
+    const run = (profileId: string | null) =>
+      recordNativeDelegationReceipt({
+        prepared: p,
+        advice,
+        current: current(p),
+        observation: {
+          ...observation(),
+          childBinding: { ...observation().childBinding!, profileId },
+        },
+      });
+    expect(run(null).status).toBe("verified-native-delegation");
+    expect(run(null).observation.childBinding!.profileId).toBeNull();
+    expect(run("sol-low").status).toBe("verified-native-delegation");
+    expect(run("sol-ultra").status).toBe("held");
+    expect(run("sol-ultra").reason).toBe("native-child-profile-mismatch");
+  });
 });
 
 describe("criterion-bound result review and extraction cascade", () => {
@@ -425,6 +477,30 @@ describe("criterion-bound result review and extraction cascade", () => {
     delete (raw.answers as Record<string, unknown>).q0;
     expect(() => normalizeWorkflowReply(p, raw, current(p))).toThrow("SEMANTIC_ANSWER_COVERAGE");
   });
+  test("adversarial criterion and extraction field IDs are refused before a negative judgment could be omitted", () => {
+    for (const id of ["__proto__", "constructor", "prototype"]) {
+      const criterion = review();
+      criterion.criteria[0]!.id = id;
+      expect(() => prepare(criterion)).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
+      const extraction: WorkflowInput = {
+        ...review(),
+        kind: "extraction",
+        fields: [{ id, value: "unverified", sourceEvidenceIds: ["source"] }],
+      };
+      expect(() => prepare(extraction)).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
+    }
+    const p = prepare(review());
+    const negative = normalizeWorkflowReply(
+      p,
+      reply(p, { "criterion:source-check:support": 0.1 }),
+      current(p),
+    );
+    expect(negative.disposition).toBe("escalate-to-native-owner");
+    expect(Object.getPrototypeOf(negative.criterionSignals)).toBeNull();
+    expect(Object.getPrototypeOf(negative.fieldSignals)).toBeNull();
+    expect(Object.getPrototypeOf(negative.rawJudgments)).toBeNull();
+    expect(Object.values(negative.criterionSignals)).toEqual([{ support: 0.1, conflict: 0.02 }]);
+  });
 });
 
 describe("deterministic local-first retrieval and source-owned continuity", () => {
@@ -471,6 +547,18 @@ describe("deterministic local-first retrieval and source-owned continuity", () =
       ],
     });
     expect(normalizeWorkflowReply(stale, reply(stale), current(stale)).status).toBe("abstained");
+  });
+  test("reserved candidate/profile IDs cannot enter evidence signal maps or finite profile criteria", () => {
+    expect(() =>
+      prepare({
+        kind: "retrieval",
+        query: "source",
+        candidates: [{ ...evidence("__proto__"), localMatch: "ambiguous", knownConflict: false }],
+      }),
+    ).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
+    const workflow = delegation();
+    workflow.profiles[0]!.profileId = "__proto__";
+    expect(() => prepare(workflow)).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
   });
   test("supported continuity nomination never supplies missing owner derivation/authority/Memory admission", () => {
     const p = prepare({

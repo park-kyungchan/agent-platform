@@ -12,7 +12,7 @@ import {
 import {
   canonicalJson,
   semanticDigest,
-  validateNativeBinding,
+  prepareChildSemanticPacket,
   prepareSemanticDecision,
   normalizeSemanticReply,
 } from "./policy.ts";
@@ -157,7 +157,10 @@ const bounded = <T>(xs: T[], max = 6): void => {
   if (!Array.isArray(xs) || !xs.length || xs.length > max) throw Error("WORKFLOW_ITEMS_BOUND");
 };
 const uniqueIds = (xs: { id: string }[]): void => {
-  if (xs.some((x) => !identifier(x.id)) || new Set(xs.map((x) => x.id)).size !== xs.length)
+  if (
+    xs.some((x) => !identifier(x.id) || ["__proto__", "constructor", "prototype"].includes(x.id)) ||
+    new Set(xs.map((x) => x.id)).size !== xs.length
+  )
     throw Error("WORKFLOW_UNIQUE_IDS_REQUIRED");
 };
 const clone = <T>(x: T): T => JSON.parse(canonicalJson(x)) as T;
@@ -272,9 +275,9 @@ function baseAdvice(p: PreparedWorkflowDecision): WorkflowAdvice {
     selectedProfile: null,
     selectedEvidenceIds: [],
     nominationIds: [],
-    criterionSignals: {},
-    fieldSignals: {},
-    rawJudgments: {},
+    criterionSignals: Object.create(null),
+    fieldSignals: Object.create(null),
+    rawJudgments: Object.create(null),
     currentEvidenceRefs: [],
     deterministic: false,
     executionAuthorityGranted: false,
@@ -465,7 +468,7 @@ export function normalizeWorkflowReply(
       reason: "workflow-source-task-or-owner-currentness-mismatch",
     };
   const decision = normalizeSemanticReply(prepared, raw);
-  advice.rawJudgments = decision.judgments;
+  advice.rawJudgments = Object.assign(Object.create(null), decision.judgments);
   advice.currentEvidenceRefs = [...current.evidenceRefs];
   const workflow = prepared.workflow,
     policy = prepared.workflowPolicy;
@@ -652,19 +655,21 @@ export function recordNativeDelegationReceipt(input: {
     canonicalJson(o.resolvedProfile) !== canonicalJson(expected)
   )
     return result("held", "native-resolved-profile-mismatch");
-  try {
-    validateNativeBinding(o.childBinding);
-  } catch {
-    return result("held", "actual-native-child-binding-required");
-  }
   const parent = p.request.state.binding as unknown as NativeBinding;
-  if (
-    o.childBinding.sessionId === parent.sessionId ||
-    o.childBinding.runtime !== parent.runtime ||
-    o.childBinding.parentSessionId !== parent.sessionId ||
-    (parent.rootSessionId !== null && o.childBinding.rootSessionId !== parent.rootSessionId)
-  )
-    return result("held", "native-child-parent-mismatch");
+  try {
+    prepareChildSemanticPacket({
+      parentBinding: parent,
+      childBinding: o.childBinding,
+      parentLens: p.request.state.requiredContext as unknown as WholeLens,
+      childTaskGoal: p.workflow.taskPacket.goal,
+    });
+  } catch {
+    return result("held", "native-child-parent-lineage-mismatch");
+  }
+  // A source catalog option is not proof that the native API exposes that ID.
+  // Preserve an unexposed profile as null; reject an actual contradictory ID.
+  if (o.childBinding.profileId !== null && o.childBinding.profileId !== expected.profileId)
+    return result("held", "native-child-profile-mismatch");
   if (
     o.status !== "observed" ||
     !Array.isArray(o.postconditions) ||
