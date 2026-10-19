@@ -263,5 +263,19 @@
       "The baseline audit found stale staged unit/README and retired readiness helpers; current resolution belongs to separate owner readback, not this source CI.",
       "The baseline audit found code-server live singular data/workspace versus declared absent plural data/workspaces; current resolution belongs to its owner and authorizes no data move here."
     ]
-  }
+  },
+  "sourceProviderProjections": [
+    {
+      "id": "herdr-runtime-codex-source",
+      "classification": "explicit-runtime-source-checkout-only",
+      "canonicalConsumerRoot": "/home/palantirkc/projects/codex-harness-engineering",
+      "canonicalProviderRoot": "/home/palantirkc/projects/agent-platform",
+      "consumerRoot": "/home/palantirkc/code/shared/codex-harness-engineering",
+      "providerRoot": "/home/palantirkc/code/shared/agent-platform",
+      "providerProjectId": "agent-platform",
+      "packages": ["@palantirkc/work-continuity", "@palantirkc/native-codex-adapter"],
+      "authority": "none",
+      "nativePermissionGranted": false
+    }
+  ]
 }

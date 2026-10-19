@@ -503,3 +503,51 @@ test("an undeclared Docker socket bind cannot join the accepted persistent sourc
     verifyRuntimeLayout(f.root, { trackedPaths: [], nativeSourceRoot: native }),
   ).rejects.toThrow("undeclared persistent/private mount");
 });
+
+test("the explicit runtime source projection preserves canonical owner and historical custody", async () => {
+  const f = await fixture();
+  const beforeOwner = f.project.payload.details.sourceOwnerRoot;
+  const beforeHistorical = structuredClone(f.contract.nativeSourceProjects[0].historicalSource);
+  expect((await verifyRuntimeLayout(f.root, { trackedPaths: [] })).status).toBe("pass");
+  expect(f.contract.sourceProviderProjections).toHaveLength(1);
+  const projection = f.contract.sourceProviderProjections[0]!;
+  expect(projection.canonicalProviderRoot).toBe(beforeOwner);
+  expect(projection.providerRoot).not.toBe(beforeOwner);
+  expect(projection.nativePermissionGranted).toBe(false);
+  expect(f.contract.nativeSourceProjects[0].historicalSource).toEqual(beforeHistorical);
+  expect(beforeHistorical.classification).toBe("history-only-no-provider-fallback");
+});
+
+test.each([
+  "missing",
+  "extra",
+  "duplicate",
+  "unknown-id",
+  "canonical-owner",
+  "consumer",
+  "provider",
+  "traversal",
+  "authority",
+  "native-permission",
+  "extra-key",
+  "package",
+])("explicit source projection rejects %s without changing owner metadata", async (kind) => {
+  const f = await fixture();
+  const projections = f.contract.sourceProviderProjections as unknown as Record<string, unknown>[];
+  const entry = projections[0]!;
+  if (kind === "missing") projections.pop();
+  if (kind === "extra" || kind === "duplicate") projections.push(structuredClone(entry));
+  if (kind === "unknown-id") entry.id = "automatic-home-fallback";
+  if (kind === "canonical-owner") entry.canonicalProviderRoot = entry.providerRoot;
+  if (kind === "consumer") entry.consumerRoot = "/foreign/codex-harness-engineering";
+  if (kind === "provider") entry.providerRoot = "/foreign/agent-platform";
+  if (kind === "traversal") entry.providerRoot = String(entry.providerRoot) + "/../agent-platform";
+  if (kind === "authority") entry.authority = "execute";
+  if (kind === "native-permission") entry.nativePermissionGranted = true;
+  if (kind === "extra-key") entry.fallback = true;
+  if (kind === "package") (entry.packages as string[]).push("@foreign/provider");
+  await f.save();
+  await expect(verifyRuntimeLayout(f.root, { trackedPaths: [] })).rejects.toThrow(
+    "source provider projection",
+  );
+});
