@@ -1,0 +1,87 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "69a0f92622ff68948112c85ef74defadac8bebc9",
+  "reviewedTreeSha": "26208e029c8abd73b204bc46a7074c2829d4ea06",
+  "reviewedSourceManifestSha256": "4b3c04257473e67da78828d177a95d27d3ce497ac59adee1d1d2df215e6beff2",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a15358-42e5-7770-bb93-cd081b0b7601"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a15321-24b7-7ad1-b1c3-ed528822cf5a"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "reviewStatus": "complete",
+  "findings": [],
+  "identityFieldSemantics": {
+    "legacyTaskIdField": "The immutable legacy review identity taskId slots contain real observed native Codex THREAD identifiers. They do not assert an exposed native Task or Run.",
+    "actualReviewerThreadId": "01a15358-42e5-7770-bb93-cd081b0b7601",
+    "actualAuthorThreadId": "01a15321-24b7-7ad1-b1c3-ed528822cf5a",
+    "actualNativeTaskId": null,
+    "actualNativeRunId": null,
+    "sourceAuthorAuthenticated": false,
+    "publisherIdentityIsNotNativeAuthorAuthentication": true,
+    "logicalWorkIsNotNativeCallerIdentity": true,
+    "authorRole": "Current exact committed native source composition, preserving original G3 producer and subsequent reviewed Root/G3 successor lineage; no claim of all-line authorship, original domain data authorship or WSL exception."
+  },
+  "actualNativeTaskId": null,
+  "actualNativeRunId": null,
+  "authorMetadataGitBlob": "7e584e5ddc5009a71d3ec86cb506af68f36d543f",
+  "authorMetadataSha256": "e64738e862a8af6f5297f2c03e390ec518f9e716077b62644fc1b5f95032cd6e",
+  "pairedReviewedOwner": {
+    "repository": "park-kyungchan/codex-harness-engineering",
+    "headSha": "9cae10d98b3c3c7b6b9f616df013281f583e1d58",
+    "treeSha": "9b8124e16cb94408c42a542f1083b952e2984195",
+    "reviewedSourceManifestSha256": "1cf68bba7e90e7cb10b74b75a10fab91b89f7cef2942dccac9d716b3a3158e72",
+    "meaning": "Paired reviewed owner fixture/native module source only, not actual owner activation or source FF."
+  },
+  "reviewEvidence": [
+    {
+      "artifact": "legacy-native-replacement-proposal.independent-review.actual.json",
+      "sha256": "d8bb800d78ac3f92cf2f67131e12cd2427c72b1973ca37d258b44f7cd37f610a"
+    },
+    {
+      "artifact": "legacy-native-retirement-test-generator.v2.independent-review.actual.json",
+      "sha256": "65660045db4fb86824632af945a4e237edf43d71160675e8f8915ba1e245792a"
+    },
+    {
+      "artifact": "legacy-native-retirement-offline-fixture.v3.independent-review.actual.json",
+      "sha256": "87ad79872c08442d669951f4423331b3a15c9f6a1640a19d452ef1836750e5fa"
+    },
+    {
+      "artifact": "legacy-native-retirement-host-test-timeout.v4.independent-review.actual.json",
+      "sha256": "fe07a6cff41b8c92533fdb36ab1ca8151c404d4ea5627bb4671635ee8466e1fa"
+    },
+    {
+      "artifact": "legacy-native-retirement-quality.v5.independent-review.actual.json",
+      "sha256": "7f5f010f951a1d54a5d1df6eee62685ab660e2a9fd8123b7f1bdd76259e92591"
+    },
+    {
+      "artifact": "legacy-native-retirement-qa.timeout-v4-checks.actual.json",
+      "sha256": "ae0a473870d379bacce3bc601be4362095fd0951cfec2e7a6d2c8672ca866829"
+    },
+    {
+      "artifact": "legacy-native-retirement-qa.remaining-common-checks.actual.json",
+      "sha256": "89e80832073ed3869b3292a01b052431adc550a00fb5ccfdfcb127fd8f02e528"
+    },
+    {
+      "artifact": "legacy-native-retirement-qa.quality-v5-check.actual.json",
+      "sha256": "6b977a7774fa18cf8bd4285b2c75a929950c2e7395a8a1050edaa53b671c27d6"
+    }
+  ],
+  "limitations": [
+    "Exact committed source review only; current native caller/session/profile/Task/Run, trust/load/hooks, behavior and domain Acceptance are not established.",
+    "Root owns immutable proof publication, actual authenticated publisher/readback, current hosted H/M checks, expected-head normal merge and later paired canonical/native source adoption. None was performed by this reviewer.",
+    "Current Common full-source1110PASS/7maintainedskip evidence is reused on independently proved semantic format equivalence from5991 tofd04; not falsely relabeled as a fresh exact-H full source run. Latest exact-v5 required quality14PASS is retained.",
+    "Original failed QA and missed registry-pin correction remain in audit history; all current required source review findings are resolved. No old effect or closed budget/native session is replayed.",
+    "No provider/model/Jev/evaluation/newbudget/Goal or native runtime/auth/trust/configuration/source adoption effects. Whole ODI Work remains active."
+  ]
+}
