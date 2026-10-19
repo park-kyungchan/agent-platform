@@ -1,0 +1,43 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "c36e9178a5631a60ba6b8a4ca646b8b3ea0f4b2a",
+  "reviewedTreeSha": "f14326daedf85f7300b4bef2d0217f818ff69220",
+  "reviewedSourceManifestSha256": "eff2baf5ec2fb8dc395595da264c5de0320628f8eed6b4be1c8f5a31b2a600e4",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a15321-24b7-7ad1-b1c3-ed528822cf5a"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a15358-42e5-7770-bb93-cd081b0b7601"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "reviewStatus": "complete",
+  "findings": [],
+  "identityFieldSemantics": {
+    "legacyTaskIdFields": "Observed actual native Codex THREAD identifiers, not native Task resource IDs.",
+    "actualReviewerThreadId": "01a15321-24b7-7ad1-b1c3-ed528822cf5a",
+    "actualAuthorThreadId": "01a15358-42e5-7770-bb93-cd081b0b7601",
+    "actualNativeTaskId": null,
+    "actualNativeRunId": null,
+    "nativeAuthorshipAuthenticated": false,
+    "gitPublisherNotNativeAuthorAuthentication": true
+  },
+  "actualReviewEvidence": {
+    "path": "/home/palantirkc/projects/codex-harness-engineering/.private/long-autonomy-execution-20261019/common-source-projection-main-independent-review.actual.json",
+    "bytes": 5678,
+    "sha256": "613251680c2371c83109344ce3ae4595b15bf2457309f9c644ff61f21e6285a1"
+  },
+  "limitations": [
+    "Hosted checks and explicit expected-head merge pending.",
+    "Actual paired host/container source adoption, native caller/full context/hooks/use and whole-domain acceptance remain separate.",
+    "Git publisher authentication does not authenticate native authorship; actual Task/Run remain unexposed null."
+  ]
+}
