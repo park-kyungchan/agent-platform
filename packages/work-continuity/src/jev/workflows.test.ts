@@ -1,0 +1,597 @@
+import { describe, expect, test } from "bun:test";
+import { JEV_MODEL, type SemanticEvent, type WholeLens, type NativeBinding } from "./contract.ts";
+import { canonicalJson } from "./policy.ts";
+import {
+  prepareWorkflowDecision,
+  normalizeWorkflowReply,
+  recordNativeDelegationReceipt,
+  type WorkflowInput,
+  type WorkflowEvidence,
+  type PreparedWorkflowDecision,
+  type CurrentWorkflowBinding,
+  type NativeDelegationObservation,
+} from "./workflows.ts";
+
+const binding = (): NativeBinding => ({
+  runtime: "native-codex",
+  sessionId: "root",
+  agentId: null,
+  agentType: null,
+  parentSessionId: null,
+  rootSessionId: "root",
+  lineageSessionIds: ["root"],
+  profileId: null,
+  nativeTaskId: null,
+  nativeRunId: null,
+  logical: null,
+  admissionRef: "owner:root",
+});
+const lens = (): WholeLens => ({
+  currentAuthority: { text: "Improve scoped native Jev consumers.", sourceRefs: ["user:current"] },
+  wholeObjective: "Governed Ontology Data/Logic/Action/Security and useful native work.",
+  taskGoal: "Review a useful bounded child result.",
+  acceptedWhy: [
+    {
+      text: "Preserve purpose and original decisions across sessions.",
+      attribution: "current-user",
+      sourceRefs: ["user:why"],
+    },
+  ],
+  acceptedDecisions: [{ id: "decision:owners", revision: "1", sourceRefs: ["user:owners"] }],
+  owners: [
+    { role: "native", id: "codex" },
+    { role: "domain", id: "hermes-default" },
+  ],
+  dependencies: [{ id: "common-source", revision: "source-v1", currentness: "current" }],
+  completedEffectRefs: ["effect:old-routing-consumed"],
+  uncertainEffectRefs: ["effect:unknown"],
+  remainingAcceptance: ["whole:operator-delivery"],
+});
+const event = (): SemanticEvent => ({
+  eventId: "event:1",
+  kind: "worker_result",
+  binding: binding(),
+  sourceRevision: "source-v1",
+  materialRevision: "result-v1",
+  material: true,
+  privacy: "admitted",
+  externalEvidence: false,
+  facts: {
+    observed: "Actual parent-owned source/check result; child initial plaintext unavailable.",
+  },
+});
+const evidence = (id = "source"): WorkflowEvidence => ({
+  id,
+  sourceRef: `source:${id}`,
+  sha256: "a".repeat(64),
+  revision: "1",
+  currentness: "current",
+  admissionRef: "owner:source",
+  content: "Exact useful source and independently observed result.",
+});
+const delegation = (): Extract<WorkflowInput, { kind: "delegation" }> => ({
+  kind: "delegation",
+  taskPacket: {
+    id: "task:source-review",
+    goal: "Review exact owned source.",
+    packetDigest: "b".repeat(64),
+    requiredPostconditionIds: ["exact-source-reviewed"],
+  },
+  profiles: [
+    {
+      profileId: "sol-low",
+      model: "gpt-6.1-sol",
+      effort: "low",
+      availability: "available",
+      applicability: "applicable",
+      authorizationRef: "user:child-profiles",
+      sourceRefs: ["native:profile-catalog"],
+    },
+    {
+      profileId: "sol-ultra",
+      model: "gpt-6.1-sol",
+      effort: "ultra",
+      availability: "available",
+      applicability: "applicable",
+      authorizationRef: "user:child-profiles",
+      sourceRefs: ["native:profile-catalog"],
+    },
+  ],
+});
+const review = (): Extract<WorkflowInput, { kind: "worker_review" }> => ({
+  kind: "worker_review",
+  resultId: "result:1",
+  resultDigest: "c".repeat(64),
+  evidence: [evidence()],
+  criteria: [
+    {
+      id: "source-check",
+      description: "Exact source checks passed and evidence is current.",
+      evidenceIds: ["source"],
+    },
+  ],
+});
+const prepare = (workflow: WorkflowInput): PreparedWorkflowDecision => {
+  const result = prepareWorkflowDecision({
+    requestId: "request:1",
+    event: event(),
+    lens: lens(),
+    workflow,
+  });
+  if (result.status !== "prepared") throw Error(`expected prepared, got ${result.status}`);
+  return result;
+};
+const current = (p: PreparedWorkflowDecision): CurrentWorkflowBinding => ({
+  authorized: true,
+  bindingDigest: p.bindingDigest,
+  sourceRevision: p.sourceRevision,
+  workflowDigest: p.workflowDigest,
+  evidenceRefs: ["native:fresh-owner-source-task-check"],
+});
+const reply = (
+  p: PreparedWorkflowDecision,
+  signals: Record<string, number> = {},
+  selected = "sol-low",
+  confidence = 0.95,
+): Record<string, unknown> => ({
+  schema: "jev.semantic-result.v1",
+  status: "ok",
+  requestId: p.request.requestId,
+  stateDigest: p.request.stateDigest,
+  purpose: "semantic_bundle",
+  requestedModel: JEV_MODEL,
+  returnedModel: JEV_MODEL,
+  sourcePostconditionVerified: true,
+  executionAuthorityGranted: false,
+  automaticWrite: false,
+  answers: Object.fromEntries(
+    Object.entries(p.request.questions).map(([key, q]) => [
+      key,
+      q.type === "noul"
+        ? {
+            type: "noul",
+            noul:
+              signals[p.questionMeanings[key]!] ??
+              (p.questionMeanings[key]!.endsWith(":conflict") ? 0.02 : 0.98),
+          }
+        : {
+            type: "choice",
+            choice: selected,
+            confidence,
+            probabilities: Object.fromEntries(
+              Object.keys(q.criteria).map((id) => [id, id === selected ? 1 : 0]),
+            ),
+          },
+    ]),
+  ),
+});
+const observation = (): NativeDelegationObservation => ({
+  observationId: "native:dispatch-observation",
+  taskPacketDigest: delegation().taskPacket.packetDigest,
+  requestedProfile: { profileId: "sol-low", model: "gpt-6.1-sol", effort: "low" },
+  resolvedProfile: { profileId: "sol-low", model: "gpt-6.1-sol", effort: "low" },
+  childBinding: {
+    ...binding(),
+    sessionId: "child",
+    parentSessionId: "root",
+    lineageSessionIds: ["root", "child"],
+    admissionRef: "owner:child",
+  },
+  status: "observed",
+  postconditions: [
+    { id: "exact-source-reviewed", satisfied: true, evidenceRefs: ["result:checked-source"] },
+  ],
+  evidenceRefs: ["native:requested-profile", "native:resolved-profile"],
+});
+
+describe("ongoing parent-owned complete-profile recommendation", () => {
+  test("every actual task prepares its own complete finite catalog with whole purpose/WHY and nullable native IDs", () => {
+    const p = prepare(delegation());
+    expect(canonicalJson(p.request.state.requiredContext)).toBe(canonicalJson(lens()));
+    expect(canonicalJson(p.request.state.binding)).toBe(canonicalJson(binding()));
+    expect(
+      Object.keys(
+        p.request.questions[p.selectionQuestionId!]!.type === "choice"
+          ? (p.request.questions[p.selectionQuestionId!] as { criteria: object }).criteria
+          : {},
+      ),
+    ).toEqual(["sol-low", "sol-ultra", "__abstain"]);
+    const changed = delegation();
+    changed.taskPacket.packetDigest = "d".repeat(64);
+    expect(prepare(changed).reuseKey).not.toBe(p.reuseKey);
+    const advice = normalizeWorkflowReply(p, reply(p), current(p));
+    expect(advice.selectedProfile?.effort).toBe("low");
+    expect(advice.executionAuthorityGranted).toBe(false);
+    expect(advice.taskCompletionGranted).toBe(false);
+  });
+  test("unavailable profiles never enter Choice and low-confidence or abstention has no effect", () => {
+    const workflow = delegation();
+    workflow.profiles[0]!.availability = "unknown";
+    const p = prepare(workflow);
+    expect(JSON.stringify(p.request.questions[p.selectionQuestionId!]!)).not.toContain(
+      '"sol-low":',
+    );
+    expect(normalizeWorkflowReply(p, reply(p, {}, "sol-ultra", 0.2), current(p)).status).toBe(
+      "abstained",
+    );
+    expect(
+      normalizeWorkflowReply(p, reply(p, {}, "__abstain"), current(p)).selectedProfile,
+    ).toBeNull();
+  });
+  test("private/carrier/unchanged events suppress paid preparation without a profile replay", () => {
+    const input = { requestId: "r", event: event(), lens: lens(), workflow: delegation() };
+    expect(
+      prepareWorkflowDecision({ ...input, event: { ...event(), privacy: "private" } }).status,
+    ).toBe("skipped");
+    expect(
+      prepareWorkflowDecision({ ...input, event: { ...event(), kind: "carrier" } }).status,
+    ).toBe("skipped");
+    const p = prepareWorkflowDecision(input);
+    if (p.status !== "prepared") throw Error("fixture");
+    expect(prepareWorkflowDecision({ ...input, previousConsumedReuseKey: p.reuseKey })).toEqual({
+      status: "skipped",
+      reason: "unchanged",
+      reuseKey: p.reuseKey,
+    });
+  });
+  test("available but inapplicable or unknown applicability profiles never enter recommendations or receipts", () => {
+    for (const applicability of ["inapplicable", "unknown"] as const) {
+      const workflow = delegation();
+      workflow.profiles[0]!.applicability = applicability;
+      const p = prepare(workflow);
+      const question = p.request.questions[p.selectionQuestionId!]!;
+      if (question.type !== "choice") throw Error("fixture");
+      expect(Object.keys(question.criteria)).not.toContain("sol-low");
+      const advice = normalizeWorkflowReply(p, reply(p, {}, "sol-ultra"), current(p));
+      const forged = { ...advice, selectedProfile: workflow.profiles[0]! };
+      expect(
+        recordNativeDelegationReceipt({
+          prepared: p,
+          advice: forged,
+          current: current(p),
+          observation: observation(),
+        }).status,
+      ).toBe("held");
+      workflow.profiles[1]!.applicability = applicability;
+      expect(
+        prepareWorkflowDecision({ requestId: "held", event: event(), lens: lens(), workflow })
+          .status,
+      ).toBe("held");
+    }
+  });
+  test("fresh source/task/owner drift or changed prepared candidate cannot yield advice", () => {
+    const p = prepare(delegation());
+    expect(
+      normalizeWorkflowReply(p, reply(p), { ...current(p), sourceRevision: "source-v2" }).status,
+    ).toBe("held");
+    const raw = reply(p);
+    if (p.workflow.kind !== "delegation") throw Error("fixture");
+    p.workflow.profiles[0]!.effort = "ultra";
+    expect(normalizeWorkflowReply(p, raw, current(p)).status).toBe("held");
+  });
+});
+
+describe("native requested/resolved/postcondition receipt", () => {
+  test("actual observation verifies without inventing Task/Run IDs, dispatch or completion", () => {
+    const p = prepare(delegation()),
+      a = normalizeWorkflowReply(p, reply(p), current(p));
+    const receipt = recordNativeDelegationReceipt({
+      prepared: p,
+      advice: a,
+      current: current(p),
+      observation: observation(),
+    });
+    expect(receipt.status).toBe("verified-native-delegation");
+    expect(receipt.observation.childBinding?.nativeTaskId).toBeNull();
+    expect(receipt.observation.childBinding?.nativeRunId).toBeNull();
+    expect(receipt.taskCompletionGranted).toBe(false);
+    expect(receipt.retryAllowed).toBe(false);
+  });
+  test("native fallback, wrong packet, foreign child, missing required postcondition and unknown outcomes are distinct", () => {
+    const p = prepare(delegation()),
+      a = normalizeWorkflowReply(p, reply(p), current(p));
+    const run = (o: NativeDelegationObservation) =>
+      recordNativeDelegationReceipt({
+        prepared: p,
+        advice: a,
+        current: current(p),
+        observation: o,
+      });
+    expect(
+      run({
+        ...observation(),
+        resolvedProfile: { profileId: "sol-ultra", model: "gpt-6.1-sol", effort: "ultra" },
+      }).status,
+    ).toBe("held");
+    expect(run({ ...observation(), taskPacketDigest: "d".repeat(64) }).status).toBe("held");
+    expect(
+      run({
+        ...observation(),
+        childBinding: {
+          ...observation().childBinding!,
+          sessionId: "foreign",
+          rootSessionId: "foreign",
+          parentSessionId: null,
+          lineageSessionIds: ["foreign"],
+        },
+      }).status,
+    ).toBe("held");
+    expect(
+      run({
+        ...observation(),
+        postconditions: [{ id: "unrelated", satisfied: true, evidenceRefs: ["source:unrelated"] }],
+      }).status,
+    ).toBe("native-postcondition-failed");
+    expect(
+      run({ ...observation(), status: "unknown", childBinding: null, resolvedProfile: null })
+        .status,
+    ).toBe("native-outcome-unknown");
+  });
+  test("postcondition IDs are compared structurally, including delimiter characters", () => {
+    const workflow = delegation();
+    workflow.taskPacket.requiredPostconditionIds = ["a|b", "c"];
+    const p = prepare(workflow),
+      advice = normalizeWorkflowReply(p, reply(p), current(p));
+    const receipt = recordNativeDelegationReceipt({
+      prepared: p,
+      advice,
+      current: current(p),
+      observation: {
+        ...observation(),
+        postconditions: ["a", "b|c"].map((id) => ({
+          id,
+          satisfied: true,
+          evidenceRefs: ["native:proof"],
+        })),
+      },
+    });
+    expect(receipt.status).toBe("native-postcondition-failed");
+  });
+  test("internally valid child ancestry must extend the exact parent lineage", () => {
+    const parent: NativeBinding = {
+      ...binding(),
+      sessionId: "parent",
+      parentSessionId: "A",
+      lineageSessionIds: ["root", "A", "parent"],
+    };
+    const p = prepareWorkflowDecision({
+      requestId: "nested:1",
+      event: { ...event(), binding: parent },
+      lens: lens(),
+      workflow: delegation(),
+    });
+    if (p.status !== "prepared") throw Error("fixture");
+    const advice = normalizeWorkflowReply(p, reply(p), current(p));
+    const run = (ancestor: string) =>
+      recordNativeDelegationReceipt({
+        prepared: p,
+        advice,
+        current: current(p),
+        observation: {
+          ...observation(),
+          childBinding: {
+            ...observation().childBinding!,
+            parentSessionId: "parent",
+            lineageSessionIds: ["root", ancestor, "parent", "child"],
+          },
+        },
+      });
+    expect(run("A").status).toBe("verified-native-delegation");
+    expect(run("B").status).toBe("held");
+    expect(run("B").reason).toBe("native-child-parent-lineage-mismatch");
+  });
+  test("unexposed native profile stays null; a non-null contradictory native profile cannot verify", () => {
+    const p = prepare(delegation()),
+      advice = normalizeWorkflowReply(p, reply(p), current(p));
+    const run = (profileId: string | null) =>
+      recordNativeDelegationReceipt({
+        prepared: p,
+        advice,
+        current: current(p),
+        observation: {
+          ...observation(),
+          childBinding: { ...observation().childBinding!, profileId },
+        },
+      });
+    expect(run(null).status).toBe("verified-native-delegation");
+    expect(run(null).observation.childBinding!.profileId).toBeNull();
+    expect(run("sol-low").status).toBe("verified-native-delegation");
+    expect(run("sol-ultra").status).toBe("held");
+    expect(run("sol-ultra").reason).toBe("native-child-profile-mismatch");
+  });
+});
+
+describe("criterion-bound result review and extraction cascade", () => {
+  test("aggregate satisfaction cannot hide a failing exact criterion", () => {
+    const p = prepare(review());
+    const advice = normalizeWorkflowReply(
+      p,
+      reply(p, { task_scope_satisfaction: 1, "criterion:source-check:support": 0.3 }),
+      current(p),
+    );
+    expect(advice.disposition).toBe("escalate-to-native-owner");
+    expect(advice.criterionSignals["source-check"]!.support).toBe(0.3);
+    expect(advice.taskCompletionGranted).toBe(false);
+  });
+  test("only evidence bound to required criteria gates support; unused stale evidence does not hold independent work", () => {
+    const w = review();
+    w.evidence.push({ ...evidence("unused"), currentness: "stale" });
+    const p = prepare(w);
+    expect(normalizeWorkflowReply(p, reply(p), current(p)).disposition).toBe("review-supported");
+    w.evidence[0]!.currentness = "unknown";
+    const changed = prepare(w);
+    expect(normalizeWorkflowReply(changed, reply(changed), current(changed)).disposition).toBe(
+      "escalate-to-native-owner",
+    );
+  });
+  test("shared-state independent per-field evidence checks gate extraction escalation", () => {
+    const w: WorkflowInput = {
+      ...review(),
+      kind: "extraction",
+      fields: [{ id: "source-count", value: 168, sourceEvidenceIds: ["source"] }],
+    };
+    const p = prepare(w);
+    expect(Object.values(p.questionMeanings)).toContain("field:source-count:support");
+    expect(
+      normalizeWorkflowReply(p, reply(p, { "field:source-count:support": 0.4 }), current(p))
+        .disposition,
+    ).toBe("escalate-to-native-owner");
+    expect(normalizeWorkflowReply(p, reply(p), current(p)).disposition).toBe("verify-extraction");
+    expect(normalizeWorkflowReply(p, reply(p), current(p)).memoryAdmissionGranted).toBe(false);
+    expect(new Set(Object.values(p.questionMeanings)).size).toBe(
+      Object.keys(p.request.questions).length,
+    );
+  });
+  test("an extracted field cannot hide an unsupported criterion with a similar ID", () => {
+    const w: WorkflowInput = {
+      ...review(),
+      kind: "extraction",
+      criteria: [
+        {
+          id: "field:count",
+          description: "Required independent source condition.",
+          evidenceIds: ["source"],
+        },
+      ],
+      fields: [{ id: "count", value: 168, sourceEvidenceIds: ["source"] }],
+    };
+    const p = prepare(w);
+    const advice = normalizeWorkflowReply(
+      p,
+      reply(p, { "criterion:field:count:support": 0.1, "field:count:support": 0.99 }),
+      current(p),
+    );
+    expect(advice.criterionSignals["field:count"]!.support).toBe(0.1);
+    expect(advice.fieldSignals.count!.support).toBe(0.99);
+    expect(advice.disposition).toBe("escalate-to-native-owner");
+  });
+  test("foreign evidence IDs, duplicate criterion IDs and incomplete response coverage are refused", () => {
+    const w = review();
+    w.criteria[0]!.evidenceIds = ["absent"];
+    expect(() => prepare(w)).toThrow("WORKFLOW_CRITERION_EVIDENCE_REQUIRED");
+    const duplicate = review();
+    duplicate.criteria.push({ ...duplicate.criteria[0]! });
+    expect(() => prepare(duplicate)).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
+    const p = prepare(review()),
+      raw = reply(p);
+    delete (raw.answers as Record<string, unknown>).q0;
+    expect(() => normalizeWorkflowReply(p, raw, current(p))).toThrow("SEMANTIC_ANSWER_COVERAGE");
+  });
+  test("adversarial criterion and extraction field IDs are refused before a negative judgment could be omitted", () => {
+    for (const id of ["__proto__", "constructor", "prototype"]) {
+      const criterion = review();
+      criterion.criteria[0]!.id = id;
+      expect(() => prepare(criterion)).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
+      const extraction: WorkflowInput = {
+        ...review(),
+        kind: "extraction",
+        fields: [{ id, value: "unverified", sourceEvidenceIds: ["source"] }],
+      };
+      expect(() => prepare(extraction)).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
+    }
+    const p = prepare(review());
+    const negative = normalizeWorkflowReply(
+      p,
+      reply(p, { "criterion:source-check:support": 0.1 }),
+      current(p),
+    );
+    expect(negative.disposition).toBe("escalate-to-native-owner");
+    expect(Object.getPrototypeOf(negative.criterionSignals)).toBeNull();
+    expect(Object.getPrototypeOf(negative.fieldSignals)).toBeNull();
+    expect(Object.getPrototypeOf(negative.rawJudgments)).toBeNull();
+    expect(Object.values(negative.criterionSignals)).toEqual([{ support: 0.1, conflict: 0.02 }]);
+  });
+});
+
+describe("deterministic local-first retrieval and source-owned continuity", () => {
+  test("unique exact current local match returns without transport, while ambiguity produces source-bound screening", () => {
+    const w: Extract<WorkflowInput, { kind: "retrieval" }> = {
+      kind: "retrieval",
+      query: "exact source identifier",
+      candidates: [{ ...evidence(), localMatch: "exact", knownConflict: false }],
+    };
+    const result = prepareWorkflowDecision({
+      requestId: "local:1",
+      event: event(),
+      lens: lens(),
+      workflow: w,
+    });
+    expect(result.status).toBe("local");
+    if (result.status === "local") {
+      expect(result.advice.selectedEvidenceIds).toEqual(["source"]);
+      expect(result.advice.deterministic).toBe(true);
+    }
+    w.candidates[0]!.localMatch = "ambiguous";
+    w.candidates.push({ ...evidence("other"), localMatch: "ambiguous", knownConflict: false });
+    const p = prepare(w);
+    const advice = normalizeWorkflowReply(
+      p,
+      reply(p, { "evidence:other:conflict": 0.9 }),
+      current(p),
+    );
+    expect(advice.selectedEvidenceIds).toEqual(["source"]);
+    expect(canonicalJson(p.request.state.workflow)).toBe(canonicalJson(w));
+  });
+  test("known conflict or stale source never becomes a deterministic shortcut or accepted evidence", () => {
+    const p = prepare({
+      kind: "retrieval",
+      query: "source",
+      candidates: [{ ...evidence(), localMatch: "exact", knownConflict: true }],
+    });
+    expect(normalizeWorkflowReply(p, reply(p), current(p)).selectedEvidenceIds).toEqual([]);
+    const stale = prepare({
+      kind: "retrieval",
+      query: "source",
+      candidates: [
+        { ...evidence(), currentness: "stale", localMatch: "exact", knownConflict: false },
+      ],
+    });
+    expect(normalizeWorkflowReply(stale, reply(stale), current(stale)).status).toBe("abstained");
+  });
+  test("reserved candidate/profile IDs cannot enter evidence signal maps or finite profile criteria", () => {
+    expect(() =>
+      prepare({
+        kind: "retrieval",
+        query: "source",
+        candidates: [{ ...evidence("__proto__"), localMatch: "ambiguous", knownConflict: false }],
+      }),
+    ).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
+    const workflow = delegation();
+    workflow.profiles[0]!.profileId = "__proto__";
+    expect(() => prepare(workflow)).toThrow("WORKFLOW_UNIQUE_IDS_REQUIRED");
+  });
+  test("supported continuity nomination never supplies missing owner derivation/authority/Memory admission", () => {
+    const p = prepare({
+      kind: "continuity",
+      nominations: [
+        {
+          id: "why",
+          topicId: "odi:purpose",
+          text: "Purpose is useful governed native work.",
+          sourceRefs: ["user:why"],
+          derivationRef: null,
+          authorityRef: null,
+        },
+      ],
+    });
+    const advice = normalizeWorkflowReply(p, reply(p), current(p));
+    expect(advice.nominationIds).toEqual(["why"]);
+    expect(advice.disposition).toBe("nominate-for-owner-review");
+    expect(advice.memoryAdmissionGranted).toBe(false);
+    expect(advice.executionAuthorityGranted).toBe(false);
+  });
+  test("unknown required dependency and oversized mandatory packet hold rather than truncate original WHY", () => {
+    const l = lens();
+    l.dependencies[0]!.currentness = "unknown";
+    expect(
+      prepareWorkflowDecision({ requestId: "r", event: event(), lens: l, workflow: review() }),
+    ).toEqual({ status: "held", reason: "workflow-dependency-currentness-unavailable" });
+    const w = review();
+    w.evidence = Array.from({ length: 6 }, (_, i) => ({
+      ...evidence(`source-${i}`),
+      content: "x".repeat(11000),
+    }));
+    w.criteria[0]!.evidenceIds = ["source-0"];
+    expect(() => prepare(w)).toThrow("WORKFLOW_MANDATORY_CONTEXT_BOUND");
+  });
+});
