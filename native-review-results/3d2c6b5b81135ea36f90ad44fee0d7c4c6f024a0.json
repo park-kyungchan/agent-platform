@@ -1,0 +1,109 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "3d2c6b5b81135ea36f90ad44fee0d7c4c6f024a0",
+  "reviewedTreeSha": "26208e029c8abd73b204bc46a7074c2829d4ea06",
+  "reviewedSourceManifestSha256": "4b3c04257473e67da78828d177a95d27d3ce497ac59adee1d1d2df215e6beff2",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a15358-42e5-7770-bb93-cd081b0b7601"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a15321-24b7-7ad1-b1c3-ed528822cf5a"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "reviewStatus": "complete",
+  "findings": [],
+  "reviewedAtUtc": "2026-10-19T17:51:09.815914+00:00",
+  "identityFieldSemantics": {
+    "legacyTaskIdField": "Immutable legacy review taskId slots contain actual observed native Codex THREAD identifiers, not exposed native Task/Run IDs.",
+    "actualReviewerThreadId": "01a15358-42e5-7770-bb93-cd081b0b7601",
+    "actualAuthorThreadId": "01a15321-24b7-7ad1-b1c3-ed528822cf5a",
+    "actualNativeTaskId": null,
+    "actualNativeRunId": null,
+    "sourceAuthorAuthenticated": false,
+    "publisherIdentityIsNotNativeAuthorAuthentication": true,
+    "logicalWorkIsNotNativeCallerIdentity": true,
+    "authorRole": "Current inherited native source composition authored by Root, verified in committed source-author metadata through the real authored second parent H and actual ordered merge M. GitHub merge author/committer are distinct Git identities. No all-line, G3-origin, domain-data or native-authentication claim."
+  },
+  "actualNativeTaskId": null,
+  "actualNativeRunId": null,
+  "authorMetadataGitBlob": "7e584e5ddc5009a71d3ec86cb506af68f36d543f",
+  "authorMetadataSha256": "e64738e862a8af6f5297f2c03e390ec518f9e716077b62644fc1b5f95032cd6e",
+  "actualMergeSource": {
+    "headSha": "3d2c6b5b81135ea36f90ad44fee0d7c4c6f024a0",
+    "orderedParents": [
+      "080f5ea96dfd0cb26a3965a9d036abc3329786fc",
+      "69a0f92622ff68948112c85ef74defadac8bebc9"
+    ],
+    "reviewedAuthoredSecondParent": "69a0f92622ff68948112c85ef74defadac8bebc9",
+    "authoredHImmediateParent": "080f5ea96dfd0cb26a3965a9d036abc3329786fc",
+    "mergeTreeEqualsReviewedH": true,
+    "recursiveManifest": {
+      "schema": "agent-platform.reviewed-source-manifest.v1",
+      "reviewedTreeSha": "26208e029c8abd73b204bc46a7074c2829d4ea06",
+      "entryCount": 1360,
+      "blobCount": 1193,
+      "sha256": "4b3c04257473e67da78828d177a95d27d3ce497ac59adee1d1d2df215e6beff2"
+    },
+    "gitMergeAuthor": {
+      "date": "2026-10-19T17:44:49Z",
+      "name": "park-kyungchan"
+    },
+    "gitMergeCommitter": {
+      "date": "2026-10-19T17:44:49Z",
+      "name": "GitHub"
+    },
+    "gitSignatureVerification": {
+      "reason": "valid",
+      "verified": true
+    },
+    "gitSignatureDoesNotAuthenticateNativeAuthor": true,
+    "sourceAuthorCanonicalReadback": "PASS",
+    "sourceAuthorAuthenticated": false
+  },
+  "reviewEvidence": [
+    {
+      "artifact": "legacy-native-retirement.exact-M-source-custody.actual.json",
+      "bytes": 8240,
+      "sha256": "8f89ae02d57b91786a60182bb79c85ca7c0f708ebb7248c820e7271aa613a8b1"
+    },
+    {
+      "artifact": "legacy-native-retirement.exact-head-independent-review.actual.json",
+      "bytes": 31593,
+      "sha256": "718154553d5abd9a691b5b71cd18365dcc76e2fcdd57bd22f4a7d60d6b71d3b2"
+    },
+    {
+      "artifact": "legacy-native-retirement.PR-CI.readonly-review.actual.json",
+      "bytes": 16796,
+      "sha256": "78b65990768fa5c69aa4208374176f2ac25cc21cd333af3d423e69fde4f0aaec"
+    },
+    {
+      "artifact": "legacy-native-retirement.common.merge.result.actual.json",
+      "bytes": 1264,
+      "sha256": "c21c9a39e295a911e742249edde128f76407b4144756b3da0d45c9dbf6f9b4e8"
+    }
+  ],
+  "limitations": [
+    "Actual M source review only. Current native caller/session/profile/Task/Run, trust/load/hooks, behavior and domain Acceptance are not established.",
+    "All source blobs and modes are exactly the previously reviewed H full tree. Original 58-path source review and reviewed v2/v3/v4/v5 successors/QA remain valid on this explicit identical-tree basis, with no full test replay.",
+    "Actual hosted Common H run39295641087 succeeded in all five jobs. Actual main run39296759474 remains separate: its native receipt job failed before actual M proof publication, while observed quality passed and source was still running. No rerun or global main-CI success is asserted.",
+    "Root owns M proof publication, authenticated status and canonical remote-gate readback, actual current main CI reconciliation and later paired canonical/native adoption. None is performed by this reviewer.",
+    "Whole ODI purpose, actual user decisions, native/domain/source owners, all historical and uncertain effects, closed budgets and automatic Jev held/no-retry outcome are preserved. No Goal/provider/model/evaluation/auth/trust/runtime/cleanup/deployment effects."
+  ],
+  "pairedReviewedOwner": {
+    "repository": "park-kyungchan/codex-harness-engineering",
+    "headSha": "b267ff86048613b1f6d0bc39f918048861af3156",
+    "authoredH": "9cae10d98b3c3c7b6b9f616df013281f583e1d58",
+    "treeSha": "9b8124e16cb94408c42a542f1083b952e2984195",
+    "reviewedSourceManifestSha256": "1cf68bba7e90e7cb10b74b75a10fab91b89f7cef2942dccac9d716b3a3158e72",
+    "meaning": "Actual separately reviewed CodeX M composition, not canonical/native activation."
+  }
+}
