@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-HOST-DECISION-WSL-AUTHOR-EXCEPTION-20261019",
+  "status": "accepted",
+  "answer": "이 부분은 내 WSL2 로컬에서 진행했으니까 user override로 그냥 진행해",
+  "meaning": "Explicitly except missing original native-author provenance for the two named WSL-created PRs and bounded reviewed repairs in their delivery lineage. Original WSL author remains unknown. Exact independent source review, zero required findings, current checks and explicit expected-head merge still apply. No fabricated author/legacy passing receipt, persistent check disablement or native permission follows.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HOST-USER-WSL-OVERRIDE-CI-20261019.json",
+    "fragment": "#/content/actualCapture/actualUserOverride"
+  },
+  "supersedes": []
+}
