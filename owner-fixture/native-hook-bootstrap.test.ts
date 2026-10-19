@@ -27,8 +27,8 @@ return {stdout:JSON.stringify({hookSpecificOutput:{hookEventName:'SessionStart',
 `);
   for (const name of ["provider-closure", "hook-cli", ...names])
     await write(join(owner, "src/native/" + name + ".ts"), await readFile(join(import.meta.dir, "codex-harness-engineering/src/native/" + name + ".ts"), "utf8"));
-  await write(join(owner, "src/legacy/harness/owner-context-loader.ts"), "export const loadCodexOwnerContext=()=>({});\n");
-  await write(join(owner, "src/legacy/harness/provider-closure.ts"), await readFile(join(import.meta.dir, "codex-harness-engineering/src/legacy/harness/provider-closure.ts"), "utf8"));
+  await write(join(owner, "src/native/context-owner.ts"), "export const loadCodexOwnerContext=()=>({});\n");
+  await write(join(owner, "src/native/context-provider.ts"), await readFile(join(import.meta.dir, "codex-harness-engineering/src/native/context-provider.ts"), "utf8"));
   await write(join(owner, "package.json"), JSON.stringify({ type: "module", dependencies: { "@palantirkc/native-codex-adapter": "file:../agent-platform/packages/native-codex-adapter" } }));
   await write(join(owner, "bun.lock"), "synthetic-owner-lock");
   await mkdir(join(owner, "node_modules/@palantirkc"), { recursive: true });

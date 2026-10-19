@@ -77,7 +77,7 @@
         {
           "id": "codex-context",
           "registration": "../codex-harness-engineering/architecture/context-provider.json",
-          "ownerGuard": "../codex-harness-engineering/src/legacy/harness/owner-context-loader.ts"
+          "ownerGuard": "../codex-harness-engineering/src/native/context-owner.ts"
         },
         {
           "id": "codex-native-source",

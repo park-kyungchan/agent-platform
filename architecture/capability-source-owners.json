@@ -9,7 +9,7 @@
     {
       "id": "codex-context",
       "registration": "../codex-harness-engineering/architecture/context-provider.json",
-      "ownerGuard": "../codex-harness-engineering/src/legacy/harness/owner-context-loader.ts",
+      "ownerGuard": "../codex-harness-engineering/src/native/context-owner.ts",
       "meaning": "Context provider exact source resolution and first-import drift refusal."
     },
     {
@@ -564,7 +564,7 @@
         "src/native/hook-cli.ts",
         "src/native/hooks.ts",
         "src/native/provider-closure.ts",
-        "src/legacy/harness/owner-context-loader.ts"
+        "src/native/context-owner.ts"
       ],
       "ownerBoundary": "Canonical hooks require the fixed-owner context loader. The reviewed builtin-only owner guard/hook-cli fixture projection verifies source before dynamic common import and before/after every event when separately adopted. Context v1/v2/v3 readers and legacy owner-only mode remain distinct. Code roots never come from Work/binding data. Native trust/config/CLI/ledgers stay owner; historical selected manifests and closed budgets are not renewed.",
       "nativePermissionGranted": false,
@@ -818,7 +818,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/source-provider/generate.ts",
-          "sha256": "846360cf4b5eb224309d06c68c41d257ed0bac2ba2d77c69ad47b092eba7f0c9",
+          "sha256": "fd04db85dc6f5d07501ffc1b6880ef1bd4b03a7f69c1daa883d8cecef82fee5d",
           "relativePath": "packages/native-hermes-adapter/src/source-provider/generate.ts"
         },
         {
@@ -1022,12 +1022,12 @@
   "consumerSourceGuards": [
     {
       "id": "codex-native-context",
-      "path": "../codex-harness-engineering/src/legacy/harness/owner-context-loader.ts",
+      "path": "../codex-harness-engineering/src/native/context-owner.ts",
       "meaning": "Exact code-owner context source closure and native first-import refusal; selected Work/data root does not choose code."
     },
     {
       "id": "codex-legacy-work",
-      "path": "../codex-harness-engineering/src/legacy/harness/context.ts",
+      "path": "../codex-harness-engineering/src/native/profile-context.ts",
       "meaning": "Registered Codex source/provider proof plus original first-import refusal; registered Hermes helper20SOURCEpins and old8adapter pins in known imported-closure identity. No new universal Hermes first-import claim."
     },
     {

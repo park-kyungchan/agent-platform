@@ -2,7 +2,7 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { constants } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
-import { selectRegisteredProviderLocation } from "../legacy/harness/provider-closure";
+import { selectRegisteredProviderLocation } from "./context-provider";
 
 // Builtins and pure owner bootstrap only; no provider implementation is imported here.
 const root = resolve(import.meta.dir, "../.."),
@@ -110,7 +110,7 @@ export async function readNativeAdapterSourceClosure() {
         Bun.resolveSync(name + "/" + module, dirname(resolve(root, "src/native/" + module + ".ts"))) !== expected)
       throw Error("NATIVE_PACKAGE_RESOLUTION_CHANGED");
   }
-  for (const path of ["src/legacy/harness/owner-context-loader.ts", "src/legacy/harness/provider-closure.ts",
+  for (const path of ["src/native/context-owner.ts", "src/native/context-provider.ts",
     "src/native/provider-closure.ts", "src/native/hook-cli.ts"])
     pins.push((await source(resolve(root, path))).pin);
   const frozen = Object.freeze(pins.map((pin) => Object.freeze({ ...pin })));

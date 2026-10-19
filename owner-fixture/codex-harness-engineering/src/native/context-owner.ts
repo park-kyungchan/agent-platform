@@ -3,10 +3,10 @@ import {constants} from 'node:fs';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
-import {readRegisteredContextProvider,type ProviderPin} from './provider-closure';
+import {readRegisteredContextProvider,type ProviderPin} from './context-provider';
 
 /** Code ownership is this module's immutable location, never a Work/binding data root. */
-export const codexContextCodeOwnerRoot=resolve(import.meta.dir,'../../..');
+export const codexContextCodeOwnerRoot=resolve(import.meta.dir,'../..');
 const ownerPaths=['index','types','validation','source','store','context','boundary','sections'].map(name=>resolve(codexContextCodeOwnerRoot,'src/continuity/'+name+'.ts'));
 const hash=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 async function readExact(path:string){
@@ -34,8 +34,8 @@ async function observe(){
  for(const pin of pins)if((await readExact(pin.path)).pin.sha256!==pin.sha256)throw Error('Context provider changed during observation');
  return {pins,gitWorkModulePath:provider.gitWorkModulePath,signature:hash(Buffer.from(JSON.stringify(pins)))};
 }
-type IndexApi=typeof import('../../continuity/index');
-type SectionsApi=typeof import('../../continuity/sections');
+type IndexApi=typeof import('../continuity/index');
+type SectionsApi=typeof import('../continuity/sections');
 type GitWorkApi=typeof import('@palantirkc/work-continuity/git-work');
 export interface LoadedCodexOwnerContext {index:IndexApi;sections:SectionsApi;gitWork?:GitWorkApi;sourcePins:ProviderPin[];verifyCurrentSourceClosure():Promise<void>}
 let loaded:LoadedCodexOwnerContext|undefined,signature:string|undefined,pending:Promise<LoadedCodexOwnerContext>|undefined;

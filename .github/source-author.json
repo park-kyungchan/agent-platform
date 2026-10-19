@@ -9,18 +9,18 @@
     "domainId": "native-harness",
     "projectId": "codex-harness-engineering",
     "workId": "ontology-driven-platform-integration-20261017",
-    "taskId": "ODI-HOST-INTEGRATION"
+    "taskId": "ODI-CURRENT-NATIVE-LEGACY-RETIREMENT-20261019"
   },
-  "sourceBaseSha": "5c81e7a3cadc6541e4d0cf7200c0f4f9665a174a",
+  "sourceBaseSha": "080f5ea96dfd0cb26a3965a9d036abc3329786fc",
   "author": {
     "runtime": "native-codex",
-    "threadId": "01a15358-42e5-7770-bb93-cd081b0b7601",
+    "threadId": "01a15321-24b7-7ad1-b1c3-ed528822cf5a",
     "sessionId": null,
     "nativeTaskId": null,
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-19T12:25:20.011Z",
+  "capturedAtUtc": "2026-10-19T15:52:39.576Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
