@@ -290,6 +290,34 @@ async function verifyDeploymentSource(
   }
 }
 
+/** One reviewed runtime source checkout pair; it does not change canonical ownership. */
+export function validateSourceProviderProjections(value: unknown): void {
+  const expected = {
+    id: "herdr-runtime-codex-source",
+    classification: "explicit-runtime-source-checkout-only",
+    canonicalConsumerRoot: "/home/palantirkc/projects/codex-harness-engineering",
+    canonicalProviderRoot: "/home/palantirkc/projects/agent-platform",
+    consumerRoot: "/home/palantirkc/code/shared/codex-harness-engineering",
+    providerRoot: "/home/palantirkc/code/shared/agent-platform",
+    providerProjectId: "agent-platform",
+    packages: ["@palantirkc/work-continuity", "@palantirkc/native-codex-adapter"],
+    authority: "none",
+    nativePermissionGranted: false,
+  };
+  requireValue(
+    Array.isArray(value) && value.length === 1,
+    "Exactly one explicit source provider projection required.",
+  );
+  const actual = object(value[0]);
+  requireValue(
+    Object.keys(actual).sort().join("|") === Object.keys(expected).sort().join("|") &&
+      Object.entries(expected).every(
+        ([key, field]) => JSON.stringify(actual[key]) === JSON.stringify(field),
+      ),
+    "Explicit source provider projection identity or authority differs.",
+  );
+}
+
 export async function verifyRuntimeLayout(
   directory: string,
   options: LayoutOptions = {},
@@ -308,6 +336,7 @@ export async function verifyRuntimeLayout(
       contract.sourceRegistry === "architecture/capability-source-owners.json",
     "Invalid canonical layout contract or native authority claim.",
   );
+  validateSourceProviderProjections(contract.sourceProviderProjections);
   const rootPackage = object(await jsonFile(root, "package.json"));
   requireValue(
     rootPackage.name === contract.commonPackage,
