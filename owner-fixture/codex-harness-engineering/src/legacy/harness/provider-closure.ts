@@ -1,4 +1,4 @@
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, basename } from "node:path";
 export interface ProviderPin {
   path: string;
   sha256: string;
@@ -10,6 +10,8 @@ export interface ProviderRead {
 export interface ContextProviderProof {
   pins: ProviderPin[];
   providerRoot?: string;
+  canonicalProviderRoot?: string;
+  sourceLocationId?: string;
   /** Present only for the exact fixed Git Work export proven by a v3 registration. */
   gitWorkModulePath?: string;
 }
@@ -43,6 +45,40 @@ const legacyContextProviderRelativeSources = contextProviderRelativeSources.filt
 );
 const packageName = "@palantirkc/work-continuity";
 const gitWorkModuleRelativePath = "packages/work-continuity/src/git-work/index.ts";
+/** Closed source-only declaration; selection never reads cwd, HOME, Work or native identity. */
+export function selectRegisteredProviderLocation(root: string, value: {
+  consumerRoot: unknown; providerRoot: unknown; sourceProjections: unknown;
+}): { providerRoot: string; canonicalProviderRoot: string; sourceLocationId: string } {
+  const exactRoot = (path: unknown): path is string => typeof path === "string" &&
+    path.startsWith("/") && resolve(path) === path && !path.includes("\\") && !path.includes("\0");
+  const fail = () => { throw Error("Unregistered source provider location"); };
+  if (!exactRoot(value.consumerRoot) || !exactRoot(value.providerRoot) ||
+      basename(value.consumerRoot) !== "codex-harness-engineering" ||
+      basename(dirname(value.consumerRoot)) !== "projects" ||
+      value.providerRoot !== resolve(value.consumerRoot, "../agent-platform") ||
+      !Array.isArray(value.sourceProjections) || value.sourceProjections.length !== 1) return fail();
+  const projection = value.sourceProjections[0];
+  if (!projection || typeof projection !== "object" || Array.isArray(projection) ||
+      Object.keys(projection).sort().join("|") !==
+        "authority|canonicalConsumerRoot|canonicalProviderRoot|classification|consumerRoot|id|nativePermissionGranted|packages|providerProjectId|providerRoot" ||
+      projection.id !== "herdr-runtime-codex-source" ||
+      projection.classification !== "explicit-runtime-source-checkout-only" ||
+      projection.canonicalConsumerRoot !== value.consumerRoot ||
+      projection.canonicalProviderRoot !== value.providerRoot ||
+      projection.consumerRoot !== resolve(value.consumerRoot, "../../code/shared/codex-harness-engineering") ||
+      projection.providerRoot !== resolve(value.consumerRoot, "../../code/shared/agent-platform") ||
+      projection.consumerRoot === value.consumerRoot ||
+      projection.providerProjectId !== "agent-platform" ||
+      JSON.stringify(projection.packages) !== JSON.stringify(["@palantirkc/work-continuity", "@palantirkc/native-codex-adapter"]) ||
+      projection.authority !== "none" || projection.nativePermissionGranted !== false) return fail();
+  const canonical = root === value.consumerRoot;
+  if (!canonical && root !== projection.consumerRoot) return fail();
+  const providerRoot = canonical ? value.providerRoot : projection.providerRoot;
+  if (providerRoot !== resolve(root, "../agent-platform")) return fail();
+  return { providerRoot, canonicalProviderRoot: value.providerRoot,
+    sourceLocationId: canonical ? "canonical-host-source" : projection.id };
+}
+
 /** Exact source-owner bridge only. No arbitrary package/module/Home routing. */
 export async function readRegisteredContextProvider(
   root: string,
@@ -61,7 +97,10 @@ export async function readRegisteredContextProvider(
   if (registration.bytes.byteLength > 2097152 || registration.pin.sha256 !== match[1])
     throw Error("Pinned context provider registration changed");
   const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(registration.bytes));
-  const version4 = value?.schema === "codex.context-provider-source-closure.v4";
+  const version5 = value?.schema === "codex.context-provider-source-closure.v5";
+  const version4 = version5 || value?.schema === "codex.context-provider-source-closure.v4";
+  const location = version5 ? selectRegisteredProviderLocation(root, value) : undefined;
+  const providerRoot = location?.providerRoot ?? value?.providerRoot;
   const version3 = version4 || value?.schema === "codex.context-provider-source-closure.v3";
   const version2 = version3 || value?.schema === "codex.context-provider-source-closure.v2";
   const requiredSources = version4
@@ -82,6 +121,7 @@ export async function readRegisteredContextProvider(
     "authority",
     "nativePermissionGranted",
     ...(version3 ? ["gitWorkModulePath"] : []),
+    ...(version5 ? ["sourceProjections"] : []),
   ];
   if (
     !value ||
@@ -91,9 +131,10 @@ export async function readRegisteredContextProvider(
       "codex.context-provider-source-closure.v2",
       "codex.context-provider-source-closure.v3",
       "codex.context-provider-source-closure.v4",
+      "codex.context-provider-source-closure.v5",
     ].includes(value.schema) ||
-    value.consumerRoot !== root ||
-    value.providerRoot !== resolve(root, "../agent-platform") ||
+    (!version5 && value.consumerRoot !== root) ||
+    providerRoot !== resolve(root, "../agent-platform") ||
     value.providerProjectId !== "agent-platform" ||
     value.packageName !== packageName ||
     value.modulePath !== "packages/work-continuity/src/context/index.ts" ||
@@ -120,13 +161,54 @@ export async function readRegisteredContextProvider(
   const pins: ProviderPin[] = [registration.pin];
   const sources = new Map<string, ProviderRead>();
   for (const pin of value.sourcePins) {
-    const path = resolve(value.providerRoot, pin.path),
+    const path = resolve(providerRoot, pin.path),
       source = await readSource(path);
     if (source.bytes.byteLength > 2097152 || source.pin.sha256 !== pin.sha256)
       throw Error("Context provider source changed");
     pins.push(source.pin);
     sources.set(pin.path, source);
   }
+  validateContextProviderMetadata(sources, value.providerRoot, version4 ? 4 : version3 ? 3 : version2 ? 2 : 1);
+  const expected = resolve(providerRoot, value.modulePath),
+    actual = Bun.resolveSync(packageName + "/context", dirname(module));
+  // readSource performs exact canonical containment/type/2MiB checks. Resolution imports no code.
+  if (actual !== expected)
+    throw Error("Context provider package resolves outside registered canonical module");
+  const gitWorkModulePath = version3
+    ? resolve(providerRoot, gitWorkModuleRelativePath)
+    : undefined;
+  if (
+    gitWorkModulePath &&
+    Bun.resolveSync(packageName + "/git-work", dirname(module)) !== gitWorkModulePath
+  )
+    throw Error("Git Work provider package resolves outside registered canonical module");
+  if (version4 && Bun.resolveSync(packageName + "/memory/recall-request", dirname(module)) !==
+      resolve(providerRoot, memoryModuleRelativePath))
+    throw Error("Memory provider package resolves outside registered canonical module");
+  await recheckContextProvider({ pins }, readSource);
+  return {
+    pins,
+    providerRoot,
+    ...(location ? { canonicalProviderRoot: location.canonicalProviderRoot, sourceLocationId: location.sourceLocationId } : {}),
+    ...(gitWorkModulePath ? { gitWorkModulePath } : {}),
+  };
+}
+export async function recheckContextProvider(
+  proof: ContextProviderProof,
+  readSource: (path: string) => Promise<ProviderRead>,
+): Promise<void> {
+  for (const pin of proof.pins) {
+    const source = await readSource(pin.path);
+    if (source.bytes.byteLength > 2097152 || source.pin.sha256 !== pin.sha256)
+      throw Error("Context provider changed during read");
+  }
+}
+
+/** Pure semantic validation, also used by dry source composition. It observes no target runtime. */
+export function validateContextProviderMetadata(
+  sources: ReadonlyMap<string, ProviderRead>, canonicalProviderRoot: string, version: 1 | 2 | 3 | 4,
+): void {
+  const version2 = version >= 2, version3 = version >= 3, version4 = version >= 4;
   const json = (path: string) =>
     JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(sources.get(path)!.bytes));
   const project = json("project.json"),
@@ -136,7 +218,7 @@ export async function readRegisteredContextProvider(
   if (
     project.kind !== "project" ||
     project.projectId !== "agent-platform" ||
-    project.payload?.details?.sourceOwnerRoot !== value.providerRoot ||
+    project.payload?.details?.sourceOwnerRoot !== canonicalProviderRoot ||
     project.payload?.ontologyPackage?.name !== "@palantirkc/ontology" ||
     project.payload?.ontologyPackage?.version !== "0.2.0" ||
     upper.name !== "@palantirkc/ontology" ||
@@ -161,36 +243,4 @@ export async function readRegisteredContextProvider(
           "file:releases/palantirkc-ontology-0.2.0.tgz")
   )
     throw Error("Context provider immutable owner/package/Ontology binding differs");
-  const expected = resolve(value.providerRoot, value.modulePath),
-    actual = Bun.resolveSync(packageName + "/context", dirname(module));
-  // readSource performs exact canonical containment/type/2MiB checks. Resolution imports no code.
-  if (actual !== expected)
-    throw Error("Context provider package resolves outside registered canonical module");
-  const gitWorkModulePath = version3
-    ? resolve(value.providerRoot, gitWorkModuleRelativePath)
-    : undefined;
-  if (
-    gitWorkModulePath &&
-    Bun.resolveSync(packageName + "/git-work", dirname(module)) !== gitWorkModulePath
-  )
-    throw Error("Git Work provider package resolves outside registered canonical module");
-  if (version4 && Bun.resolveSync(packageName + "/memory/recall-request", dirname(module)) !==
-      resolve(value.providerRoot, memoryModuleRelativePath))
-    throw Error("Memory provider package resolves outside registered canonical module");
-  await recheckContextProvider({ pins }, readSource);
-  return {
-    pins,
-    providerRoot: value.providerRoot,
-    ...(gitWorkModulePath ? { gitWorkModulePath } : {}),
-  };
-}
-export async function recheckContextProvider(
-  proof: ContextProviderProof,
-  readSource: (path: string) => Promise<ProviderRead>,
-): Promise<void> {
-  for (const pin of proof.pins) {
-    const source = await readSource(pin.path);
-    if (source.bytes.byteLength > 2097152 || source.pin.sha256 !== pin.sha256)
-      throw Error("Context provider changed during read");
-  }
 }

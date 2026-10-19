@@ -2,8 +2,9 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { constants } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { createHash } from "node:crypto";
+import { selectRegisteredProviderLocation } from "../legacy/harness/provider-closure";
 
-// Builtins only: the native entrypoint imports this guard before any provider implementation.
+// Builtins and pure owner bootstrap only; no provider implementation is imported here.
 const root = resolve(import.meta.dir, "../.."),
   common = resolve(root, "../agent-platform"),
   name = "@palantirkc/native-codex-adapter";
@@ -73,10 +74,12 @@ export async function readNativeAdapterSourceClosure() {
   const registration = await source(resolve(root, "architecture/native-codex-provider.json"));
   if (registration.pin.sha256 !== marker[1]) throw Error("NATIVE_SOURCE_REGISTRATION_CHANGED");
   const value = row(JSON.parse(registration.bytes.toString()));
-  if (value.schema !== "codex.native-adapter-source-closure.v1" || value.consumerRoot !== root ||
-      value.providerRoot !== common || value.packageName !== name || value.authority !== "none" ||
+  const version2 = value.schema === "codex.native-adapter-source-closure.v2";
+  const location = version2 ? selectRegisteredProviderLocation(root, { consumerRoot: value.consumerRoot, providerRoot: value.providerRoot, sourceProjections: value.sourceProjections }) : undefined;
+  if ((!version2 && value.schema !== "codex.native-adapter-source-closure.v1") || (!version2 && value.consumerRoot !== root) ||
+      (location?.providerRoot ?? value.providerRoot) !== common || value.packageName !== name || value.authority !== "none" ||
       value.nativePermissionGranted !== false || Object.keys(value).sort().join("|") !==
-      "authority|consumerRoot|nativePermissionGranted|packageName|providerRoot|schema|sourcePins")
+      (version2 ? "authority|consumerRoot|nativePermissionGranted|packageName|providerRoot|schema|sourcePins|sourceProjections" : "authority|consumerRoot|nativePermissionGranted|packageName|providerRoot|schema|sourcePins"))
     throw Error("NATIVE_SOURCE_SCOPE_CHANGED");
   if (!Array.isArray(value.sourcePins) || value.sourcePins.length !== required.length)
     throw Error("EXACT_NATIVE_PROVIDER_SOURCE_SET_REQUIRED");
@@ -120,5 +123,5 @@ export async function readNativeAdapterSourceClosure() {
         throw Error("NATIVE_PACKAGE_RESOLUTION_CHANGED");
   };
   await verify();
-  return Object.freeze({ pins: frozen, providerRoot: common, verify });
+  return Object.freeze({ pins: frozen, providerRoot: common, ...(location ? { canonicalProviderRoot: location.canonicalProviderRoot, sourceLocationId: location.sourceLocationId } : {}), verify });
 }

@@ -28,7 +28,15 @@ async function codexClosureFixture() {
     join(owner, "src/legacy/harness/owner-context-loader.ts"),
     "export const loadCodexOwnerContext=()=>({});",
   );
-  await put(join(owner, "src/legacy/harness/provider-closure.ts"), "export const guard = true;");
+  await put(
+    join(owner, "src/legacy/harness/provider-closure.ts"),
+    await readFile(
+      join(
+        repository,
+        "owner-fixture/codex-harness-engineering/src/legacy/harness/provider-closure.ts",
+      ),
+    ),
+  );
   await put(
     join(owner, "package.json"),
     JSON.stringify({

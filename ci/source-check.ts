@@ -1,5 +1,6 @@
 import { validateReceiptWithEvidence } from "./quality/receipt-validation-gate";
 import { runIndependentPackageTests } from "./package-tests";
+import { verifyLiveSourceProjectionAgreement, verifyProjectedSourceQa } from "./source-projection";
 export { validateIndependentReviewReceipt } from "./quality/receipt-validator";
 import { createHash } from "node:crypto";
 import {
@@ -234,6 +235,10 @@ async function liveOwnerFixtureCheck(refresh = false, requireOwners = false) {
       classification: "source-owned-code-only-no-runtime-or-user-data",
     });
   }
+  await verifyLiveSourceProjectionAgreement(
+    sourceRoot,
+    resolve(sourceRoot, "..", "codex-harness-engineering"),
+  );
   if (refresh) {
     for (const row of rows) await writeFile(join(fixtureRoot, row.owner, row.path), row.bytes);
     await writeJson(join(fixtureRoot, "manifest.json"), {
@@ -416,6 +421,17 @@ async function sourceChecks() {
   await nativePluginSourceCheck(sourceRoot);
   const { qaBase, common, codex, hermes, hermesProviderRoot, hermesQaLineage } =
     await prepareQaTree();
+  console.log(
+    JSON.stringify(
+      await verifyProjectedSourceQa({
+        common,
+        ownerFixture: join(common, "owner-fixture/codex-harness-engineering"),
+        contextPaths,
+        nativePaths: nativeCodexPaths,
+        contextModules,
+      }),
+    ),
+  );
   // Resolve the scope from the installed QA tree; a clean checkout needs no root dependencies.
   const { readQualityScope, readTrackedMarkdown, testFile } = (await import(
     join(common, "ci/quality/scope.ts")
