@@ -17,7 +17,7 @@
     "taskId": "ODI-HOST-INTEGRATION"
   },
   "title": "Integrate and deliver the approved whole host program",
-  "nextAction": "Root serializes shared source pins and canonical transitions, integrates reviewed native/continuity/estate results, verifies actual consumers/operator flow and preserves whole-work acceptance distinctions.",
+  "nextAction": "Continue the same whole approved Work using current captured user decisions: integrate independently reviewed source, explicit exact-head merge, owner application and useful use verification. Preserve Plan3/WHY/owners, same cumulative USD14, held automatic advice, completed/uncertain effect fences and separate native/domain/human Acceptance. Retained PR18/G1/deployment receipt metadata is in ODI-HOST-USER-UNATTENDED-ANSWERS-20261019; no effect replay.",
   "state": {
     "execution": "running",
     "verification": "pending",
@@ -33,7 +33,14 @@
     "ODI-HOST-DECISION-NO-EVAL",
     "ODI-HOST-DECISION-PANES",
     "ODI-HOST-DECISION-APPROVAL",
-    "ODI-HOST-DECISION-RESUME"
+    "ODI-HOST-DECISION-RESUME",
+    "ODI-HOST-DECISION-EDUCATION-PR-AUTHORITY-20261019",
+    "ODI-HOST-DECISION-JEV-SAME-BUDGET-20261019",
+    "ODI-HOST-DECISION-WHOLE-EXECUTION-20261019",
+    "ODI-HOST-DECISION-WINDOWS-AVAILABLE-20261019",
+    "ODI-HOST-DECISION-DATA-WORK-AUTHORITY-20261019",
+    "ODI-HOST-DECISION-WSL-AUTHOR-EXCEPTION-20261019",
+    "ODI-HOST-DECISION-MANDATORY-CI-AUTHOR-20261019"
   ],
   "effectIds": [],
   "verificationEvidenceIds": []

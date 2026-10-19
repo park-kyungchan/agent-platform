@@ -1,0 +1,49 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HOST-USER-WSL-OVERRIDE-CI-20261019",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "native-codex-root",
+    "kind": "native-user-message",
+    "locator": "Actual user conversation in native Codex thread 01a15321-24b7-7ad1-b1c3-ed528822cf5a; override and subsequent instruction captured at 2026-10-19T09:23:58.907950Z; question item [\"request_user_input_async\",\"call_2e3286480ea74658ac5cfa3dd686c173\",0]"
+  },
+  "content": {
+    "sourceReceipt": {
+      "path": ".private/long-autonomy-execution-20261019/user-override-and-ci-metadata.actual.json",
+      "bytes": 2161,
+      "sha256": "140d2bcc3c0450338d5df2ed1cb814d1e1692358bf44c4a59d690d3bb7014804"
+    },
+    "actualCapture": {
+      "schema": "host-orchestrator.actual-user-source-author-override-and-ci-successor.v1",
+      "atUtc": "2026-10-19T09:23:58.907950Z",
+      "originalQuestion": "Two exact Academy PR heads lack original native-author identity/handoff metadata outside Git.",
+      "actualUserOverride": "이 부분은 내 WSL2 로컬에서 진행했으니까 user override로 그냥 진행해",
+      "questionItemId": "[\"request_user_input_async\",\"call_2e3286480ea74658ac5cfa3dd686c173\",0]",
+      "actualAdditionalInstruction": "그리고 향후 공통하네스(CI) Workflow에 이러한 메타데이터도 반드시 추가하도록 해야돼.",
+      "scope": {
+        "sourcePrs": [
+          {
+            "repository": "park-kyungchan/academy-workbench",
+            "number": 18,
+            "originalHead": "9fdcca39eba163b154e80df351f94ae3e284a8fa"
+          },
+          {
+            "repository": "park-kyungchan/education-platform",
+            "number": 15,
+            "originalHead": "daee459b5c7298982288ac2204deae05d3e71ce5"
+          }
+        ],
+        "waived": "Missing original WSL native-author provenance requirement for these PRs and reviewed bounded repairs in their delivery lineage. No invented IDs or passing legacy provenance receipt.",
+        "retained": "Actual independent source review, genuine findings resolution, required source checks, explicit exact-head Lead merge; no automatic merge, source/runtime/auth/trust permission changes or hidden persistent check disablement.",
+        "futureCi": "Add mandatory source-author/native identity and Work/Task/source binding metadata collection/validation in canonical common CI owner and affected consumers. Separate actual native thread/session from nullable Task/Run. Record exact source commit/tree at immutable publication boundary without self-reference; do not put credentials, raw session content or private user data in Git.",
+        "currentReviewFinding": "PR18 exact original head independently reproduced nonzero native read exit treated as observed success. Repair before merge; user identity override does not waive a code defect."
+      },
+      "authority": "Actual user statements, captured verbatim; implementation interpretations are explicitly scoped above."
+    },
+    "captureBoundary": "Original capture belongs to actual MAIN thread; exact statements are copied unchanged. User exception is limited to these WSL-created PR delivery lineages. It does not fabricate original native identity, source-review approval, native permission or teacher/math Acceptance."
+  }
+}
