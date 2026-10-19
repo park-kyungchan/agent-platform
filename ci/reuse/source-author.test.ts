@@ -86,11 +86,22 @@ test("the new shared action and common workflow require author metadata without 
   ).toEqual([]);
   const workflow = Bun.YAML.parse(
     await readFile(join(import.meta.dir, "../../.github/workflows/source.yml"), "utf8"),
-  ) as { jobs: { source: { steps: { run?: string }[] } } };
-  const commands = workflow.jobs.source.steps.flatMap((step) => (step.run ? [step.run] : []));
-  expect(
-    commands.findIndex((command) => command.includes("source-author-cli.ts verify")),
-  ).toBeLessThan(commands.findIndex((command) => command === "bun ci/source-check.ts"));
+  ) as {
+    jobs: Record<
+      string,
+      { steps: { run?: string; uses?: string; with?: Record<string, unknown> }[] }
+    >;
+  };
+  for (const name of ["source", "quality", "merge-integration", "native-review"]) {
+    const steps = workflow.jobs[name]!.steps;
+    expect(
+      steps.find((step) => step.uses?.startsWith("actions/checkout@"))?.with?.["fetch-depth"],
+    ).toBe(0);
+    const commands = steps.flatMap((step) => (step.run ? [step.run] : []));
+    expect(commands.findIndex((command) => command.includes("source-author-cli.ts verify"))).toBe(
+      0,
+    );
+  }
 });
 
 test("missing, ambiguous, private or logical-as-native fields refuse", () => {
@@ -186,6 +197,30 @@ async function fixture() {
   return { root, input, value, commit };
 }
 
+async function mergeFixture(f: Awaited<ReturnType<typeof fixture>>, reverse = false) {
+  const authoredHead = await sourceAuthorGit(f.root, ["rev-parse", "HEAD"]);
+  await sourceAuthorGit(f.root, ["checkout", "--detach", f.value.sourceBaseSha]);
+  await writeFile(join(f.root, "target-only.ts"), "export const target = true;\n");
+  const targetHead = await f.commit();
+  if (reverse) await sourceAuthorGit(f.root, ["checkout", "--detach", authoredHead]);
+  await sourceAuthorGit(f.root, [
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.invalid",
+    "merge",
+    "--no-ff",
+    "-m",
+    "Fictional prospective merge",
+    reverse ? targetHead : authoredHead,
+  ]);
+  return {
+    authoredHead,
+    targetHead,
+    sourceHead: await sourceAuthorGit(f.root, ["rev-parse", "HEAD"]),
+  };
+}
+
 test("committed readback binds actual head/tree and exact metadata blob/hash without self-reference", async () => {
   const f = await fixture(),
     readback = await verifyCommittedSourceAuthor(f.input);
@@ -196,6 +231,140 @@ test("committed readback binds actual head/tree and exact metadata blob/hash wit
   );
   expect(readback.metadataSha256).toBe(createHash("sha256").update(encode(f.value)).digest("hex"));
   expect(readback.metadata.sourceBaseSha).not.toBe(readback.sourceHead);
+});
+
+test("a later source commit cannot reuse unchanged metadata from a previous native attempt", async () => {
+  const f = await fixture();
+  await writeFile(join(f.root, "later.ts"), "export const laterAuthor = true;\n");
+  const sourceHead = await f.commit();
+  await expect(verifyCommittedSourceAuthor({ ...f.input, sourceHead })).rejects.toThrow();
+});
+
+test("recapture on the actual immediate authoring base admits the next native attempt", async () => {
+  const f = await fixture();
+  const value = captureCodexSourceAuthor(
+    selection,
+    f.input.sourceHead,
+    { CODEX_THREAD_ID: "00000000-0000-4000-8000-000000000002" },
+    "2026-10-19T01:00:00.000Z",
+  );
+  await writeFile(join(f.root, "later.ts"), "export const laterAuthor = true;\n");
+  await writeFile(join(f.root, ".github/source-author.json"), encode(value));
+  const sourceHead = await f.commit();
+  const readback = await verifyCommittedSourceAuthor({ ...f.input, sourceHead });
+  expect(readback.metadata).toEqual(value);
+  expect(readback.nativeAuthorshipAuthenticated).toBe(false);
+});
+
+test("a changed metadata blob cannot nominate an arbitrary older ancestor as its authoring base", async () => {
+  const f = await fixture();
+  await writeFile(
+    join(f.root, ".github/source-author.json"),
+    encode({ ...f.value, capturedAtUtc: "2026-10-19T01:00:00.000Z" }),
+  );
+  const sourceHead = await f.commit();
+  await expect(verifyCommittedSourceAuthor({ ...f.input, sourceHead })).rejects.toThrow();
+});
+
+test("a clean ordered prospective merge retains its fresh authored second-parent metadata", async () => {
+  const f = await fixture();
+  const merge = await mergeFixture(f);
+  const index = await readFile(join(f.root, ".git/index"));
+  const readback = await verifyCommittedSourceAuthor({ ...f.input, sourceHead: merge.sourceHead });
+  expect(readback.metadata).toEqual(f.value);
+  expect(readback.metadataGitBlob).toBe(
+    await sourceAuthorGit(f.root, [
+      "rev-parse",
+      merge.authoredHead + ":.github/source-author.json",
+    ]),
+  );
+  expect(await sourceAuthorGit(f.root, ["rev-parse", "HEAD"])).toBe(merge.sourceHead);
+  expect(await readFile(join(f.root, ".git/index"))).toEqual(index);
+  expect(await sourceAuthorGit(f.root, ["status", "--porcelain=v1"])).toBe("");
+});
+
+test("a prospective merge cannot launder stale second-parent metadata or reverse parent roles", async () => {
+  const stale = await fixture();
+  await writeFile(join(stale.root, "later.ts"), "export const laterAuthor = true;\n");
+  await stale.commit();
+  const staleMerge = await mergeFixture(stale);
+  await expect(
+    verifyCommittedSourceAuthor({ ...stale.input, sourceHead: staleMerge.sourceHead }),
+  ).rejects.toThrow();
+  const reversed = await fixture();
+  const reversedMerge = await mergeFixture(reversed, true);
+  await expect(
+    verifyCommittedSourceAuthor({ ...reversed.input, sourceHead: reversedMerge.sourceHead }),
+  ).rejects.toThrow();
+});
+
+test("a manually edited merge tree cannot carry forward a fresh authored-parent blob", async () => {
+  const f = await fixture();
+  const merge = await mergeFixture(f);
+  await writeFile(join(f.root, "unattributed-merge-edit.ts"), "export const manualEdit = true;\n");
+  await sourceAuthorGit(f.root, ["add", "."]);
+  const tampered = await sourceAuthorGit(f.root, [
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.invalid",
+    "commit-tree",
+    await sourceAuthorGit(f.root, ["write-tree"]),
+    "-p",
+    merge.targetHead,
+    "-p",
+    merge.authoredHead,
+    "-m",
+    "Fictional manual merge edit",
+  ]);
+  await sourceAuthorGit(f.root, ["checkout", "--detach", tampered]);
+  await expect(verifyCommittedSourceAuthor({ ...f.input, sourceHead: tampered })).rejects.toThrow();
+  await writeFile(
+    join(f.root, ".github/source-author.json"),
+    encode(captureCodexSourceAuthor(selection, tampered, env, "2026-10-19T02:00:00.000Z")),
+  );
+  const recaptured = await f.commit();
+  expect(
+    (await verifyCommittedSourceAuthor({ ...f.input, sourceHead: recaptured })).metadata
+      .sourceBaseSha,
+  ).toBe(tampered);
+});
+
+test("unsupported nested or octopus merges and configured external drivers refuse", async () => {
+  const f = await fixture();
+  const merge = await mergeFixture(f);
+  const mergedTree = await sourceAuthorGit(f.root, ["rev-parse", "HEAD^{tree}"]);
+  for (const parents of [
+    [merge.targetHead, merge.sourceHead],
+    [merge.targetHead, merge.authoredHead, f.value.sourceBaseSha],
+  ]) {
+    const sourceHead = await sourceAuthorGit(f.root, [
+      "-c",
+      "user.name=Fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "commit-tree",
+      mergedTree,
+      ...parents.flatMap((parent) => ["-p", parent]),
+      "-m",
+      "Fictional unsupported merge topology",
+    ]);
+    await sourceAuthorGit(f.root, ["checkout", "--detach", sourceHead]);
+    await expect(verifyCommittedSourceAuthor({ ...f.input, sourceHead })).rejects.toThrow();
+  }
+  await sourceAuthorGit(f.root, ["checkout", "--detach", merge.sourceHead]);
+  await sourceAuthorGit(f.root, ["config", "merge.fixture.driver", "touch .external-driver-ran"]);
+  await expect(
+    verifyCommittedSourceAuthor({ ...f.input, sourceHead: merge.sourceHead }),
+  ).rejects.toThrow();
+  expect(await Bun.file(join(f.root, ".external-driver-ran")).exists()).toBe(false);
+});
+
+test("depth-one source history cannot qualify a fresh-looking metadata record", async () => {
+  const f = await fixture();
+  const shallow = join(f.root, "shallow-copy");
+  await sourceAuthorGit(f.root, ["clone", "--quiet", "--depth=1", "file://" + f.root, shallow]);
+  await expect(verifyCommittedSourceAuthor({ ...f.input, workspace: shallow })).rejects.toThrow();
 });
 
 test("wrong repository/project/head, missing/unsafe path and modified working bytes refuse", async () => {

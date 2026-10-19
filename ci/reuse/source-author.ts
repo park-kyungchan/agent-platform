@@ -247,6 +247,94 @@ async function regularBytes(path: string): Promise<Buffer> {
   }
 }
 
+async function commitParents(root: string, head: string): Promise<string[]> {
+  const [observedHead, ...parents] = (
+    await sourceAuthorGit(root, ["rev-list", "--parents", "-n", "1", head])
+  ).split(" ");
+  if (observedHead !== head || !parents.every(oid))
+    throw Error("Exact source-author commit parents required");
+  return parents;
+}
+
+async function verifyProjectOwner(
+  root: string,
+  head: string,
+  metadata: SourceAuthorMetadata,
+): Promise<void> {
+  const project: unknown = JSON.parse(
+    await sourceAuthorGit(root, ["show", head + ":project.json"]),
+  );
+  if (
+    !project ||
+    typeof project !== "object" ||
+    !("schemaVersion" in project) ||
+    !("kind" in project) ||
+    !("projectId" in project) ||
+    !("domainId" in project) ||
+    project.schemaVersion !== "1.0.0" ||
+    project.kind !== "project" ||
+    project.projectId !== metadata.sourceOwner.projectId ||
+    project.domainId !== metadata.sourceOwner.domainId
+  )
+    throw Error("Source-author owner differs from the committed project");
+}
+
+/** Authored heads recapture against their parent; only clean ordered merges inherit attribution. */
+async function verifyFreshSourceAuthor(
+  root: string,
+  head: string,
+  tree: string,
+  path: string,
+  entry: string,
+  metadata: SourceAuthorMetadata,
+  blob: string,
+): Promise<void> {
+  if ((await sourceAuthorGit(root, ["rev-parse", "--is-shallow-repository"])) !== "false")
+    throw Error("Complete source-author history required");
+  const parents = await commitParents(root, head);
+  if (parents.length !== 1 && parents.length !== 2)
+    throw Error("An authored head or ordered two-parent merge is required");
+  const authoredHead = parents.length === 1 ? head : parents[1]!;
+  const authoredParents = parents.length === 1 ? parents : await commitParents(root, authoredHead);
+  if (authoredParents.length !== 1 || authoredParents[0] !== metadata.sourceBaseSha)
+    throw Error("Source-author base must be the actual immediate authoring parent");
+  const priorEntry = await sourceAuthorGit(root, [
+    "ls-tree",
+    "-z",
+    metadata.sourceBaseSha,
+    "--",
+    path,
+  ]);
+  if (priorEntry.split("\t")[0]?.split(" ")[2] === blob)
+    throw Error("A new native authoring attempt requires a changed metadata blob");
+  await sourceAuthorGit(root, [
+    "merge-base",
+    "--is-ancestor",
+    metadata.sourceBaseSha,
+    authoredHead,
+  ]);
+  if (parents.length === 2) {
+    if ((await sourceAuthorGit(root, ["ls-tree", "-z", authoredHead, "--", path])) !== entry)
+      throw Error("Merged metadata must be the fresh authored second-parent record");
+    await verifyProjectOwner(root, authoredHead, metadata);
+    // External merge drivers are owner commands, not metadata-only Git object computation.
+    const configNames = await sourceAuthorGit(root, ["config", "--null", "--name-only", "--list"]);
+    if (configNames.split("\0").some((name) => /^merge\..*\.driver$/is.test(name)))
+      throw Error("Only built-in mechanical merge drivers are supported");
+    const mechanicalTree = await sourceAuthorGit(root, [
+      "-c",
+      "merge.renormalize=false",
+      "merge-tree",
+      "--write-tree",
+      "--no-messages",
+      parents[0]!,
+      authoredHead,
+    ]);
+    if (!oid(mechanicalTree) || mechanicalTree !== tree)
+      throw Error("Source merge tree differs from the clean ordered mechanical merge");
+  }
+}
+
 /** Bind committed attribution to the actual execution/publication head; no committed self-hash. */
 export async function verifyCommittedSourceAuthor(input: {
   workspace: string;
@@ -281,30 +369,21 @@ export async function verifyCommittedSourceAuthor(input: {
   if (bytes.length !== size || !bytes.equals(working))
     throw Error("Working source-author bytes differ from the committed blob");
   const metadata = validateSourceAuthorMetadata(parseSourceAuthorJson(bytes));
-  const project: unknown = JSON.parse(
-    await sourceAuthorGit(root, ["show", input.sourceHead + ":project.json"]),
-  );
   if (
     metadata.sourceOwner.repository !== input.repository ||
-    metadata.sourceOwner.projectId !== input.projectId ||
-    !project ||
-    typeof project !== "object" ||
-    !("schemaVersion" in project) ||
-    !("kind" in project) ||
-    !("projectId" in project) ||
-    !("domainId" in project) ||
-    project.schemaVersion !== "1.0.0" ||
-    project.kind !== "project" ||
-    project.projectId !== input.projectId ||
-    project.domainId !== metadata.sourceOwner.domainId
+    metadata.sourceOwner.projectId !== input.projectId
   )
     throw Error("Source-author owner differs from the authoritative caller");
-  await sourceAuthorGit(root, [
-    "merge-base",
-    "--is-ancestor",
-    metadata.sourceBaseSha,
+  await verifyProjectOwner(root, input.sourceHead, metadata);
+  await verifyFreshSourceAuthor(
+    root,
     input.sourceHead,
-  ]);
+    sourceTree,
+    path,
+    entry,
+    metadata,
+    metadataGitBlob,
+  );
   if (
     (await sourceAuthorGit(root, ["rev-parse", "HEAD"])) !== input.sourceHead ||
     !(await regularBytes(join(root, path))).equals(bytes)

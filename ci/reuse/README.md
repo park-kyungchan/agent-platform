@@ -78,7 +78,27 @@ bun --no-env-file --no-install /reviewed/common/ci/reuse/source-author-cli.ts ve
 Use a complete Git history (`fetch-depth: 0` in CI). The reader verifies that the
 declared source base is an available ancestor, the metadata is a regular committed
 Git blob, working bytes match that blob, and source owner Project/domain match
-the committed `project.json`. Duplicate keys, extra/private fields, unsafe paths,
+the committed `project.json`. A normal authored head must have exactly one
+parent: `sourceBaseSha` must equal that immediate parent, and the metadata blob
+must be new or different from the parent's blob. Capture again before each new
+authoring commit, from its actual base checkout; retaining an earlier record or
+changing its timestamp while keeping an older ancestor as base refuses.
+
+The only inherited-attribution topology is a clean two-parent prospective merge:
+the first parent is the target base and the second is the authored head. That
+authored head must satisfy the single-parent freshness rule, its own committed
+Project must match the metadata owner, and the merge must retain exactly its
+metadata blob. Git `merge-tree --write-tree --no-messages` must produce exactly
+the merge's committed tree from those ordered parents. This requires that Git
+plumbing capability, full history, a shared merge base and a conflict-free
+built-in merge; missing capabilities, shallow history, external configured merge
+drivers, manual merge edits, nested authored-parent merges, root and octopus
+heads refuse. Renormalization is disabled for this object computation. It may
+add immutable Git objects; it does not update worktree, index, refs or config.
+After manual conflict resolution, make a normal metadata-bearing authoring
+commit with a fresh capture against the resolved commit before publication.
+
+Duplicate keys, extra/private fields, unsafe paths,
 missing native identity and substituted logical IDs refuse. The generated JSON
 representation is closed: two-space indentation and exactly one final newline.
 

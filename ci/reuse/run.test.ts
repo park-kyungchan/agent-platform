@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { captureCodexSourceAuthor } from "./source-author";
+import { captureCodexSourceAuthor, sourceAuthorGit } from "./source-author";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -207,6 +207,31 @@ test("missing or unsafe required author metadata refuses before the caller scrip
     expect((await f.run({ COMMON_CI_SOURCE_AUTHOR_METADATA: path })).exitCode).toBe(1);
     expect(await Bun.file(join(f.owner, ".result.json")).exists()).toBe(false);
   }
+});
+
+test("stale author metadata refuses before dependency installation or any owner script", async () => {
+  const f = await fixture(true);
+  await writeFile(join(f.owner, "later.ts"), "export const anotherNativeAttempt = true;\n");
+  await sourceAuthorGit(f.owner, ["add", "."]);
+  await sourceAuthorGit(f.owner, [
+    "-c",
+    "user.name=Fixture",
+    "-c",
+    "user.email=fixture@example.invalid",
+    "commit",
+    "-qm",
+    "Fictional later native author without recapture",
+  ]);
+  const sourceHead = await sourceAuthorGit(f.owner, ["rev-parse", "HEAD"]);
+  const result = await f.run({ COMMON_CI_SOURCE_SHA: sourceHead, COMMON_CI_INSTALL: "true" });
+  expect({
+    exitCode: result.exitCode,
+    installed: await Bun.file(
+      join(f.owner, "node_modules/fixture-dependency/package.json"),
+    ).exists(),
+    ownerExecuted: await Bun.file(join(f.owner, ".result.json")).exists(),
+  }).toEqual({ exitCode: 1, installed: false, ownerExecuted: false });
+  expect(result.stderr).toContain("Caller source checks refused");
 });
 
 test("tracked source mutation refuses continuation and preserves the changed bytes", async () => {
