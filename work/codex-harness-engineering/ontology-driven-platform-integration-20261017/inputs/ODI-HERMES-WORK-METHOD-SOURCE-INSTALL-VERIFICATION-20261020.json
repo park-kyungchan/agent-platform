@@ -1,0 +1,110 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-VERIFICATION-20261020",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root-operation-observation",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.readback.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:hermes-work-method-source-install-20261020",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-20T15:39:56.444513+00:00",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:ffe715fbfc5bb928fec965aa628a252d09a56653130156218c3c688ae1046443"
+      ],
+      "criteria": [
+        {
+          "id": "actual-once-tool-custody",
+          "status": "pass",
+          "message": "Actual once intent/claim/raw-before-normalized result and Codex thread/exec70263/completion7ff342 custody; consumed800 no replay.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:hermes-work-method-source-install-20261020"
+          ]
+        },
+        {
+          "id": "fixed-native-artifacts-readback",
+          "status": "pass",
+          "message": "Actual fixedtarget/image/UIDGID and all792files8aliases123dirs exact hashes/bytes/modes/containment and beforeafternamespace metadata.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:hermes-work-method-source-install-20261020"
+          ]
+        },
+        {
+          "id": "immutable-prefix-terminal-integrity",
+          "status": "pass",
+          "message": "Actual445B claim,1031B immutable pendingreceipt,250612B verifiedprefix and251057B fullterminal one-way receipt pin verified; no uncertainty/persistencefailure.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:hermes-work-method-source-install-20261020"
+          ]
+        },
+        {
+          "id": "maintained-runtime-closure",
+          "status": "pass",
+          "message": "Actual installed compiled read-work-method existing maintained provider.verify before/through/after source read;53source635dependencies closure source-qualified. Bounded map chunk text discarded.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:hermes-work-method-source-install-20261020"
+          ]
+        },
+        {
+          "id": "expected-bindings-integrity",
+          "status": "pass",
+          "message": "Actual filemanifest includes both expectedbinding files/map matching exact deliveredpayload. Expected historical profile/session selectors remain separate from currentnativeE/auth/use.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:hermes-work-method-source-install-20261020"
+          ]
+        },
+        {
+          "id": "bounded-install-outcome",
+          "status": "pass",
+          "message": "Original4 dependencies and originalfences retained. SessionPrepare unverified and FirstRead pending; backend IDsnull, actualuse/finitecoverage/generalCI/whole/domainAcceptance not granted.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:hermes-work-method-source-install-20261020"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ACTUAL-20261020.json",
+          "sha256": "7df4cdb0d7fab8ae8bb225315647bd1bf4797bbc9a417abae7c4a8492a69f866"
+        }
+      ],
+      "runtime": {
+        "name": "native-codex-owner-observed-install-postverification-source",
+        "version": "existing-common-git-work-v1"
+      },
+      "details": {
+        "actualInstallOccurrence": {
+          "runtimeId": "native-codex-tool-execution:01a158f3-8946-7bf2-b06a-311d4224970d",
+          "attemptId": "exec-process:70263",
+          "occurrenceId": "exec-output:7ff342"
+        },
+        "actualPostverifyReadbackSha256": "cf0d14fe949217b4b8b9e5e00e70ed3afe07da8fbba9d567d7a2f7ede2e8e9d0",
+        "actualPostverifyToolSha256": "328204d97d7e5518894a3dc0a4ab1fcb934f8661682563d93e578598161cc3c9",
+        "actualIndependentSourceReviewSha256": "9ad15410c05012fdd77b595114b1adb422ea813df5fcd2150bb3ef536936af05",
+        "nativeAuthorshipAuthenticated": false,
+        "sourceProjectionAuthorThreadId": "01a15906-95e4-76f3-9838-09a6cab51437",
+        "sourceProjectionIsNewNativeExecution": false,
+        "nativeUseEstablished": false,
+        "actualEObserved": false,
+        "finiteCoverageClosed": false,
+        "generalCiReleased": false,
+        "wholeAcceptanceEstablished": false,
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeEventId": null,
+        "nativeAttemptResourceId": null,
+        "actualOwnerMilestoneDecisionSha256": "367bbdc346f3e8e653e34c5ff7b1ba346dfee808ff31fe0d1f99c98967a6561d"
+      }
+    }
+  }
+}

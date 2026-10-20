@@ -1,0 +1,1591 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ACTUAL-20261020",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root-operation-observation",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.readback.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "odi.native-install-actual-source-capture.v1",
+    "capturedAtUtc": "2026-10-20T15:39:56.444513+00:00",
+    "scope": "Exact existing native Install Task, once-effect and separately observed read-only postverification; no user-data/config/store/credential contents.",
+    "intent": {
+      "originalIntent": {
+        "schema": "odi.actual-root-native-install-once-intent.v1",
+        "atUtc": "2026-10-20T15:04:58.446199Z",
+        "ownerThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+        "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+        "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+        "finalPrewrite": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.final-prewrite.actual.json",
+          "bytes": 6468,
+          "sha256": "f3ab6516cd690b86b0116f6ab9be2a923d0f3f32816dca5976a2df0e5f3590bd"
+        },
+        "sourceCaller": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-caller.v2.draft.actual.py",
+          "bytes": 17943,
+          "sha256": "d65874e9c206af281710bb640cec245868558a1d45166f733cdda30e50a99fa0"
+        },
+        "target": {
+          "Id": "4189cb30782e97cf38b97a0f91a99e14cb9dd1696990d2583c61304acde9d360",
+          "Image": "sha256:1acfd8025bbc868e5d9dc668577e33d01a6a42211c5b7dc320564ab74568af25",
+          "Running": true
+        },
+        "namespace": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020",
+        "uidGid": "10000:10000",
+        "helper": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.namespace-delivery-helper-repair-build/native-namespace-delivery.helper.repaired.unqualified.js",
+          "bytes": 35183,
+          "sha256": "acb7a425a322a79129dfd4538767855e5aece26b170e2cf0b80aab791bc85c02"
+        },
+        "contract": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.namespace-delivery-build/native-namespace-delivery.contract.actual.json",
+          "bytes": 1104,
+          "sha256": "daaea2ef613f4e7a494f24097f044cede7b48d2edc2384e835f9746e25ab56c9"
+        },
+        "payload": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.namespace-delivery-build/native-namespace-delivery.payload.actual.json",
+          "bytes": 8442135,
+          "sha256": "fd482092599e22a09e2aee61ac907cefcc3a00e278c36bc81b346759ccdb2df8"
+        },
+        "payloadBytes": 8442135,
+        "transport": "Fixed docker exec, exact compiled helper eval program argument, payload-only stdin then EOF; no shell/tty/remote-selected command",
+        "knownEffectScope": "Exclusive namespace claim and fixed800 artifact writes plus truthful claim/journal/receipt. No activation/provider/prompt/config/trust/updater/store effects.",
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeEventId": null,
+        "nativeAttemptId": null,
+        "nativeOccurrence": null,
+        "automaticRetryAllowed": false,
+        "onAmbiguous": "No retry/reclaim/replay. Reconcile exact target/once result/claim/journal/receipt and lock metadata."
+      },
+      "exclusiveDispatchClaim": {
+        "schema": "odi.actual-root-native-install-dispatch-once-claim.v1",
+        "atUtc": "2026-10-20T15:04:58.473459Z",
+        "ownerThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+        "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+        "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+        "intent": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-intent.actual.json",
+          "bytes": 2884,
+          "sha256": "bd1d489ab53a5ea88ca78cf00a07dcd6d1065538c14de47a70be0a64162e51ea"
+        },
+        "namespace": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020",
+        "immutable": true,
+        "isNativeResourceId": false,
+        "automaticRetryAllowed": false
+      }
+    },
+    "result": {
+      "rawOutcome": {
+        "schema": "odi.actual-root-native-install-once-raw-child-outcome.v1",
+        "atUtc": "2026-10-20T15:05:13.876840Z",
+        "startedAtUtc": "2026-10-20T15:04:58.479547Z",
+        "ownerThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+        "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+        "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+        "intent": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-intent.actual.json",
+          "bytes": 2884,
+          "sha256": "bd1d489ab53a5ea88ca78cf00a07dcd6d1065538c14de47a70be0a64162e51ea"
+        },
+        "dispatchClaim": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-claim.actual.json",
+          "bytes": 781,
+          "sha256": "f281266dd62cd85df9d70a700136518777b28118097af04c02c01345303d4391"
+        },
+        "childExitCode": 0,
+        "childCommunicateCompleted": true,
+        "hostTransportPid": 1131033,
+        "hostTransportPidIsNativeResourceId": false,
+        "launchOrWaitFailureClass": null,
+        "stdoutBytes": 1231,
+        "stdoutSha256": "147c3af5173e9da62bb55c960b4dd74fc0358b0b1ffe94ec7679efea66194d8d",
+        "stderrBytesSuppressed": 0,
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "rawStdoutOrStderrPersisted": false,
+        "enclosingExecToolIds": null,
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeEventId": null,
+        "nativeAttemptId": null,
+        "nativeOccurrence": null,
+        "nativeInstallAttemptConsumed": true,
+        "automaticRetryAllowed": false
+      },
+      "normalizedResult": {
+        "schema": "odi.actual-root-native-install-once-child-result.v1",
+        "atUtc": "2026-10-20T15:05:13.878155Z",
+        "startedAtUtc": "2026-10-20T15:04:58.479547Z",
+        "ownerThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+        "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+        "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+        "intent": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-intent.actual.json",
+          "bytes": 2884,
+          "sha256": "bd1d489ab53a5ea88ca78cf00a07dcd6d1065538c14de47a70be0a64162e51ea"
+        },
+        "dispatchClaim": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-claim.actual.json",
+          "bytes": 781,
+          "sha256": "f281266dd62cd85df9d70a700136518777b28118097af04c02c01345303d4391"
+        },
+        "rawChildOutcome": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-child-outcome.actual.json",
+          "bytes": 1620,
+          "sha256": "9a375fed2391d442d9b2c788c161eebe64dc985ed0eaf5484ae3a02781106b5a"
+        },
+        "nativeToolRawIds": "Root must separately append actual enclosing exec_command session/chunk/completion metadata; not exposed inside this caller",
+        "childExitCode": 0,
+        "launchOrWaitFailureClass": null,
+        "helperObservation": {
+          "schema": "hermes.namespace-delivery-receipt.v1",
+          "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+          "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+          "payloadSha256": "e067ad0014223196b3a11f6109c3f17e564c0a129ddf26d2f93d57642c2ddbd6",
+          "status": "delivered-awaiting-owner-verification",
+          "reason": null,
+          "namespaceCreated": true,
+          "claimDurable": true,
+          "completed": 800,
+          "uncertain": null,
+          "legacyManifestUnchanged": true,
+          "receipt": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+            "bytes": 1031,
+            "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+          },
+          "journal": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+            "bytes": 251057,
+            "sha256": "b07b047222e2c860a5b6ea50f4c067c25720372ac4c729baaf83320daf98d1dc",
+            "scope": "terminal"
+          },
+          "terminalState": "confirmed",
+          "persistenceFailure": false,
+          "runtimeClosureVerification": "required-separate-owner-step",
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null,
+          "nativePermissionGranted": false,
+          "executionAuthorityGranted": false,
+          "nativeActivation": false,
+          "nativeUseEstablished": false,
+          "retryAllowed": false
+        },
+        "outputParseFailure": null,
+        "stdoutBytes": 1231,
+        "stdoutSha256": "147c3af5173e9da62bb55c960b4dd74fc0358b0b1ffe94ec7679efea66194d8d",
+        "stderrBytesSuppressed": 0,
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeEventId": null,
+        "nativeAttemptId": null,
+        "nativeOccurrence": null,
+        "nativeInstallAttemptConsumed": true,
+        "runtimeClosureVerification": "required-separate-owner-step",
+        "nativeUseEstablished": false,
+        "generalCiReleased": false,
+        "wholeWorkComplete": false,
+        "automaticRetryAllowed": false
+      },
+      "actualToolDispatch": {
+        "schema": "odi.genuine-native-tool-dispatch-observation.v1",
+        "ownerThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+        "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+        "classification": "Actual enclosing Codex tool/process metadata; session_id is a tool process correlation, not a Hermes session/Run/Attempt resource.",
+        "actualCall": {
+          "tool": "exec_command",
+          "arguments": {
+            "cmd": "python3 .private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-caller.v2.draft.actual.py",
+            "workdir": "/home/palantirkc/projects/codex-harness-engineering",
+            "yield_time_ms": 1000,
+            "max_output_tokens": 2200
+          },
+          "result": {
+            "chunk_id": "500b2b",
+            "wall_time_seconds": 1.001942284,
+            "session_id": 70263,
+            "original_token_count": 0,
+            "output": ""
+          },
+          "observedAtUtc": "2026-10-20T15:04:59.468Z"
+        },
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeEventId": null,
+        "nativeAttemptId": null,
+        "nativeInstallInFlight": true,
+        "automaticRetryAllowed": false
+      },
+      "actualToolCompletion": {
+        "schema": "odi.actual-native-install-enclosing-tool-completion.v1",
+        "atUtc": "2026-10-20T15:05:49.212Z",
+        "ownerThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+        "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+        "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+        "actualCalls": [
+          {
+            "tool": "exec_command",
+            "arguments": {
+              "cmd": "python3 .private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-caller.v2.draft.actual.py",
+              "workdir": "/home/palantirkc/projects/codex-harness-engineering",
+              "yield_time_ms": 1000,
+              "max_output_tokens": 2200
+            },
+            "result": {
+              "chunk_id": "500b2b",
+              "wall_time_seconds": 1.001942284,
+              "session_id": 70263,
+              "original_token_count": 0,
+              "output": ""
+            },
+            "observedAtUtc": "2026-10-20T15:04:59.468Z"
+          },
+          {
+            "tool": "write_stdin",
+            "arguments": {
+              "session_id": 70263,
+              "chars": "",
+              "yield_time_ms": 1000,
+              "max_output_tokens": 2400
+            },
+            "result": {
+              "chunk_id": "7ff342",
+              "wall_time_seconds": 1.192e-05,
+              "exit_code": 0,
+              "original_token_count": 117,
+              "output": "{\"result\": {\"path\": \"/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-result.actual.json\", \"bytes\": 3548, \"sha256\": \"d43c2f6e13ab3e6af0103beb89f7d228f2d237eedb3accf04783199db3f7877e\"}, \"childExitCode\": 0, \"helperStatus\": \"delivered-awaiting-owner-verification\", \"completed\": 800, \"nativeInstallAttemptConsumed\": true, \"runtimeClosureVerified\": false, \"retryAllowed\": false}\n"
+            },
+            "observedAtUtc": "2026-10-20T15:05:20.717Z"
+          }
+        ],
+        "nativeOccurrence": {
+          "runtimeId": "native-codex-tool-execution:01a158f3-8946-7bf2-b06a-311d4224970d",
+          "attemptId": "exec-process:70263",
+          "occurrenceId": "exec-output:7ff342"
+        },
+        "correlationSemantics": "Owner-declared generic source correlation of the actual Codex thread, enclosing exec process session70263 and completion output chunk7ff342. These are raw tool metadata, not Hermes backend Task/Run/event/Attempt resource IDs or a claim that chunk IDs alone authenticate arbitrary effects. Join exact invocation/source/input/intent/claim/raw/normalized child result and later target postverification.",
+        "initialDispatchChunkId": "500b2b",
+        "actualCompletionChunkId": "7ff342",
+        "enclosingToolExitCode": 0,
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeEventId": null,
+        "nativeAttemptId": null,
+        "storedHermesSessionIdIsAttemptId": false,
+        "nativeInstallAttemptConsumed": true,
+        "nativeInstallInFlight": false,
+        "runtimeClosureVerified": false,
+        "nativeUseEstablished": false,
+        "finiteCoverageClosed": false,
+        "generalCiReleased": false,
+        "wholeWorkComplete": false,
+        "automaticRetryAllowed": false
+      }
+    },
+    "postverification": {
+      "actualV3Readback": {
+        "schema": "odi.fixed-native-install-postverification-result.v1",
+        "status": "fixed-readback-and-source-closure-observed",
+        "reason": null,
+        "actualOnceResult": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-result.actual.json",
+          "bytes": 3548,
+          "sha256": "d43c2f6e13ab3e6af0103beb89f7d228f2d237eedb3accf04783199db3f7877e"
+        },
+        "actualToolIds": null,
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeEventId": null,
+        "nativeAttemptId": null,
+        "nativeInstallTaskCompleted": false,
+        "nativeFirstReadExecuted": false,
+        "actualEObserved": false,
+        "receivedOrUsedEstablished": false,
+        "nativePermissionGranted": false,
+        "generalRelease": false,
+        "retryAllowed": false,
+        "rootResult": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-result.actual.json",
+          "bytes": 3548,
+          "sha256": "d43c2f6e13ab3e6af0103beb89f7d228f2d237eedb3accf04783199db3f7877e"
+        },
+        "rootOutcomeMetadata": {
+          "childExitCode": 0,
+          "launchOrWaitFailureClass": null,
+          "stdoutBytes": 1231,
+          "stdoutSha256": "147c3af5173e9da62bb55c960b4dd74fc0358b0b1ffe94ec7679efea66194d8d",
+          "stderrBytesSuppressed": 0,
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "outputParseFailure": null,
+          "nativeInstallAttemptConsumed": true,
+          "automaticRetryAllowed": false
+        },
+        "rawChildOutcome": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-child-outcome.actual.json",
+          "bytes": 1620,
+          "sha256": "9a375fed2391d442d9b2c788c161eebe64dc985ed0eaf5484ae3a02781106b5a"
+        },
+        "helperObservation": {
+          "schema": "hermes.namespace-delivery-receipt.v1",
+          "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+          "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+          "payloadSha256": "e067ad0014223196b3a11f6109c3f17e564c0a129ddf26d2f93d57642c2ddbd6",
+          "status": "delivered-awaiting-owner-verification",
+          "reason": null,
+          "namespaceCreated": true,
+          "claimDurable": true,
+          "completed": 800,
+          "uncertain": null,
+          "legacyManifestUnchanged": true,
+          "receipt": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+            "bytes": 1031,
+            "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+          },
+          "journal": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+            "bytes": 251057,
+            "sha256": "b07b047222e2c860a5b6ea50f4c067c25720372ac4c729baaf83320daf98d1dc",
+            "scope": "terminal"
+          },
+          "terminalState": "confirmed",
+          "persistenceFailure": false,
+          "runtimeClosureVerification": "required-separate-owner-step",
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null,
+          "nativePermissionGranted": false,
+          "executionAuthorityGranted": false,
+          "nativeActivation": false,
+          "nativeUseEstablished": false,
+          "retryAllowed": false
+        },
+        "commandOutcomes": [
+          {
+            "stage": "raw-read-outcome",
+            "role": "target-before",
+            "hostClientPid": 1147012,
+            "hostClientInFlight": false,
+            "communicateCompleted": true,
+            "exitCode": 0,
+            "failureClass": null,
+            "stdoutBytes": 171,
+            "stdoutSha256": "d3671f52906079e2bc33c650adc038ab9204e7475341667f8782157de563b998",
+            "stderrBytesSuppressed": 0,
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "nativeTaskId": null,
+            "nativeRunId": null,
+            "nativeEventId": null,
+            "nativeAttemptId": null
+          },
+          {
+            "stage": "raw-read-outcome",
+            "role": "fixed-namespace-readback",
+            "hostClientPid": 1147019,
+            "hostClientInFlight": false,
+            "communicateCompleted": true,
+            "exitCode": 0,
+            "failureClass": null,
+            "stdoutBytes": 2664,
+            "stdoutSha256": "f14cc99cce572913916f31a151faa0e67ee73f3a46bf9ec5ed24c8b40e50c738",
+            "stderrBytesSuppressed": 0,
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "nativeTaskId": null,
+            "nativeRunId": null,
+            "nativeEventId": null,
+            "nativeAttemptId": null
+          },
+          {
+            "stage": "raw-read-outcome",
+            "role": "compiled-source-closure-bounded-map",
+            "hostClientPid": 1147050,
+            "hostClientInFlight": false,
+            "communicateCompleted": true,
+            "exitCode": 0,
+            "failureClass": null,
+            "stdoutBytes": 12001,
+            "stdoutSha256": "65b4f1c3833edbe6684f274464c6f3943e0fe3b19ec28a7577326259258cc039",
+            "stderrBytesSuppressed": 0,
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "nativeTaskId": null,
+            "nativeRunId": null,
+            "nativeEventId": null,
+            "nativeAttemptId": null
+          },
+          {
+            "stage": "raw-read-outcome",
+            "role": "fixed-namespace-readback-after-closure",
+            "hostClientPid": 1147159,
+            "hostClientInFlight": false,
+            "communicateCompleted": true,
+            "exitCode": 0,
+            "failureClass": null,
+            "stdoutBytes": 2664,
+            "stdoutSha256": "f14cc99cce572913916f31a151faa0e67ee73f3a46bf9ec5ed24c8b40e50c738",
+            "stderrBytesSuppressed": 0,
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "nativeTaskId": null,
+            "nativeRunId": null,
+            "nativeEventId": null,
+            "nativeAttemptId": null
+          },
+          {
+            "stage": "raw-read-outcome",
+            "role": "target-after",
+            "hostClientPid": 1147211,
+            "hostClientInFlight": false,
+            "communicateCompleted": true,
+            "exitCode": 0,
+            "failureClass": null,
+            "stdoutBytes": 171,
+            "stdoutSha256": "d3671f52906079e2bc33c650adc038ab9204e7475341667f8782157de563b998",
+            "stderrBytesSuppressed": 0,
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "nativeTaskId": null,
+            "nativeRunId": null,
+            "nativeEventId": null,
+            "nativeAttemptId": null
+          }
+        ],
+        "lastHostClientInFlight": false,
+        "targetBefore": {
+          "Id": "4189cb30782e97cf38b97a0f91a99e14cb9dd1696990d2583c61304acde9d360",
+          "Image": "sha256:1acfd8025bbc868e5d9dc668577e33d01a6a42211c5b7dc320564ab74568af25",
+          "Running": true
+        },
+        "nativeReadInFlight": false,
+        "namespaceReadback": {
+          "schema": "odi.fixed-namespace-postdelivery-readback.v1",
+          "status": "readback-verified",
+          "reason": null,
+          "fileCount": 792,
+          "aliasCount": 8,
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null,
+          "nativePermissionGranted": false,
+          "nativeUseEstablished": false,
+          "retryAllowed": false,
+          "controlsBefore": {
+            "home": [
+              2049,
+              834137,
+              10000,
+              10000,
+              448
+            ],
+            "socket": [
+              2049,
+              788129,
+              10000,
+              10000,
+              384
+            ],
+            "lock": [
+              2049,
+              787782,
+              10000,
+              10000,
+              384
+            ]
+          },
+          "namespaceBefore": [
+            2049,
+            2161603,
+            10000,
+            10000,
+            448
+          ],
+          "legacyBefore": {
+            "path": "/opt/data/workspace/hermes-harness-audit/platform/current/current-work.json",
+            "bytes": 5324,
+            "sha256": "8b0b29dd8cd00db93bdd092a5e8519b5f6462d922df659a5f9d929f79c6d5911"
+          },
+          "claimPin": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-claim.json",
+            "bytes": 445,
+            "sha256": "5e73ade3a92e56140c5a2ab854a9f3f6665c4fd1559dc4d1a42dccb05e551ce5"
+          },
+          "receiptPin": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+            "bytes": 1031,
+            "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+          },
+          "journalPin": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+            "bytes": 251057,
+            "sha256": "b07b047222e2c860a5b6ea50f4c067c25720372ac4c729baaf83320daf98d1dc",
+            "scope": "terminal"
+          },
+          "verifiedPrefix": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+            "bytes": 250612,
+            "sha256": "7a5a56e5fc455a8b813d3609774cd3b3e80e4ce8defe208d87563c8250fedeb2",
+            "scope": "verified-prefix"
+          },
+          "terminal": {
+            "state": "terminal",
+            "scope": "artifact-and-receipt-outcome",
+            "status": "delivered-awaiting-owner-verification",
+            "completed": 800,
+            "uncertain": null,
+            "reason": null,
+            "persistenceFailure": false,
+            "receiptOutcome": "persisted-and-verified",
+            "receipt": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+              "bytes": 1031,
+              "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+            }
+          },
+          "directoryCount": 123,
+          "fileManifestSha256": "de8aad92af4b6e03630d0739e192dcaff1eef2915b641d28c061f5966b84df22",
+          "aliasManifestSha256": "fa05130a162c1e93d3f63f9c335365ae79980c2f48cf845a5b7c463cff896c0a",
+          "checkedPayloadBytes": 6200359,
+          "legacyAfter": {
+            "path": "/opt/data/workspace/hermes-harness-audit/platform/current/current-work.json",
+            "bytes": 5324,
+            "sha256": "8b0b29dd8cd00db93bdd092a5e8519b5f6462d922df659a5f9d929f79c6d5911"
+          },
+          "namespaceAfter": [
+            2049,
+            2161603,
+            10000,
+            10000,
+            448
+          ],
+          "controlsAfter": {
+            "home": [
+              2049,
+              834137,
+              10000,
+              10000,
+              448
+            ],
+            "socket": [
+              2049,
+              788129,
+              10000,
+              10000,
+              384
+            ],
+            "lock": [
+              2049,
+              787782,
+              10000,
+              10000,
+              384
+            ]
+          }
+        },
+        "runtimeClosure": {
+          "schema": "hermes.work-method-source-response.v1",
+          "status": "source-qualified",
+          "binding": {
+            "sourceMapSha256": "64003cedc00b4df3a45be528c0c2ff617dfeadd6bc1cc79d3da1fba29abcbecd",
+            "sourceId": "@map",
+            "logical": {
+              "domainId": "native-harness",
+              "projectId": "codex-harness-engineering",
+              "workId": "ontology-driven-platform-integration-20261017",
+              "taskId": "ODI-HERMES-WORK-METHOD-FIRST-READ-NATIVE-20261020"
+            },
+            "documentSha256": "64003cedc00b4df3a45be528c0c2ff617dfeadd6bc1cc79d3da1fba29abcbecd",
+            "totalBytes": 111284
+          },
+          "policy": {
+            "policyVersion": "hermes.current-work-output.v2",
+            "maxChars": 12000,
+            "capChars": 12000
+          },
+          "chunk": {
+            "offsetBytes": 0,
+            "nextOffsetBytes": 10075,
+            "last": false,
+            "textBytes": 10075,
+            "textSha256": "fc7f6618a7fd180ef4091aa504840d9a683ef21e881bb079652163a7cf07ff52"
+          },
+          "rawResponseBytes": 12001,
+          "rawResponseSha256": "65b4f1c3833edbe6684f274464c6f3943e0fe3b19ec28a7577326259258cc039",
+          "sourceClosureObserved": true,
+          "completeMapReceivedOrUsed": false,
+          "nativeFirstReadExecuted": false,
+          "actualEObserved": false,
+          "nativePermissionGranted": false
+        },
+        "namespaceReadbackAfterClosure": {
+          "schema": "odi.fixed-namespace-postdelivery-readback.v1",
+          "status": "readback-verified",
+          "reason": null,
+          "fileCount": 792,
+          "aliasCount": 8,
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null,
+          "nativePermissionGranted": false,
+          "nativeUseEstablished": false,
+          "retryAllowed": false,
+          "controlsBefore": {
+            "home": [
+              2049,
+              834137,
+              10000,
+              10000,
+              448
+            ],
+            "socket": [
+              2049,
+              788129,
+              10000,
+              10000,
+              384
+            ],
+            "lock": [
+              2049,
+              787782,
+              10000,
+              10000,
+              384
+            ]
+          },
+          "namespaceBefore": [
+            2049,
+            2161603,
+            10000,
+            10000,
+            448
+          ],
+          "legacyBefore": {
+            "path": "/opt/data/workspace/hermes-harness-audit/platform/current/current-work.json",
+            "bytes": 5324,
+            "sha256": "8b0b29dd8cd00db93bdd092a5e8519b5f6462d922df659a5f9d929f79c6d5911"
+          },
+          "claimPin": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-claim.json",
+            "bytes": 445,
+            "sha256": "5e73ade3a92e56140c5a2ab854a9f3f6665c4fd1559dc4d1a42dccb05e551ce5"
+          },
+          "receiptPin": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+            "bytes": 1031,
+            "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+          },
+          "journalPin": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+            "bytes": 251057,
+            "sha256": "b07b047222e2c860a5b6ea50f4c067c25720372ac4c729baaf83320daf98d1dc",
+            "scope": "terminal"
+          },
+          "verifiedPrefix": {
+            "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+            "bytes": 250612,
+            "sha256": "7a5a56e5fc455a8b813d3609774cd3b3e80e4ce8defe208d87563c8250fedeb2",
+            "scope": "verified-prefix"
+          },
+          "terminal": {
+            "state": "terminal",
+            "scope": "artifact-and-receipt-outcome",
+            "status": "delivered-awaiting-owner-verification",
+            "completed": 800,
+            "uncertain": null,
+            "reason": null,
+            "persistenceFailure": false,
+            "receiptOutcome": "persisted-and-verified",
+            "receipt": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+              "bytes": 1031,
+              "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+            }
+          },
+          "directoryCount": 123,
+          "fileManifestSha256": "de8aad92af4b6e03630d0739e192dcaff1eef2915b641d28c061f5966b84df22",
+          "aliasManifestSha256": "fa05130a162c1e93d3f63f9c335365ae79980c2f48cf845a5b7c463cff896c0a",
+          "checkedPayloadBytes": 6200359,
+          "legacyAfter": {
+            "path": "/opt/data/workspace/hermes-harness-audit/platform/current/current-work.json",
+            "bytes": 5324,
+            "sha256": "8b0b29dd8cd00db93bdd092a5e8519b5f6462d922df659a5f9d929f79c6d5911"
+          },
+          "namespaceAfter": [
+            2049,
+            2161603,
+            10000,
+            10000,
+            448
+          ],
+          "controlsAfter": {
+            "home": [
+              2049,
+              834137,
+              10000,
+              10000,
+              448
+            ],
+            "socket": [
+              2049,
+              788129,
+              10000,
+              10000,
+              384
+            ],
+            "lock": [
+              2049,
+              787782,
+              10000,
+              10000,
+              384
+            ]
+          }
+        },
+        "targetAfter": {
+          "Id": "4189cb30782e97cf38b97a0f91a99e14cb9dd1696990d2583c61304acde9d360",
+          "Image": "sha256:1acfd8025bbc868e5d9dc668577e33d01a6a42211c5b7dc320564ab74568af25",
+          "Running": true
+        }
+      },
+      "actualEnclosingToolCompletion": {
+        "schema": "odi.actual-main-postverify-enclosing-tool-observation.v1",
+        "atUtc": "2026-10-20T15:29:12.135978Z",
+        "ownerThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+        "actualToolCalls": {
+          "dispatch": {
+            "chunk_id": "b0ad41",
+            "wall_time_seconds": 1.001194108,
+            "session_id": 49549,
+            "original_token_count": 0,
+            "output": ""
+          },
+          "completion": {
+            "chunk_id": "81090a",
+            "wall_time_seconds": 1.166e-05,
+            "exit_code": 0,
+            "original_token_count": 84,
+            "output": "{\"schema\":\"odi.fixed-native-install-postverification-result.v1\",\"status\":\"fixed-readback-and-source-closure-observed\",\"reason\":null,\"nativeInstallTaskCompleted\":false,\"nativeFirstReadExecuted\":false,\"actualEObserved\":false,\"receivedOrUsedEstablished\":false,\"nativePermissionGranted\":false,\"generalRelease\":false,\"retryAllowed\":false}\n"
+          }
+        },
+        "meaning": "Actual enclosing Codex exec process/session and output chunk; not Hermes backend Task/Run/Event/Attempt or native idle metadata. No model call or helper replay.",
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "nativeEventId": null,
+        "nativeAttemptId": null,
+        "helperOnceConsumed": true,
+        "nativeUseEstablished": false,
+        "generalCiReleased": false,
+        "wholeWorkComplete": false
+      },
+      "observationJournal": [
+        {
+          "stage": "root-results-validated",
+          "rootResult": {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-result.actual.json",
+            "bytes": 3548,
+            "sha256": "d43c2f6e13ab3e6af0103beb89f7d228f2d237eedb3accf04783199db3f7877e"
+          },
+          "rawChildOutcome": {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-child-outcome.actual.json",
+            "bytes": 1620,
+            "sha256": "9a375fed2391d442d9b2c788c161eebe64dc985ed0eaf5484ae3a02781106b5a"
+          },
+          "contractSha256": "7299a76d1b9022e3719c6d294d5fee897c3255ed4c3dc4b4e46fbc95db8b7333",
+          "fixedManifestSha256": "9c4d95025cefc6bdaa65cad9e96a63660be870112093140bb1590ed5faf4e9e8"
+        },
+        {
+          "stage": "read-intent",
+          "role": "target-before",
+          "argvSha256": "1cc874f0d3bb07f089d25bb596e76d22f56787f2d05a44b55384651bdcf57713",
+          "stdinBytes": 0,
+          "stdinSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "stage": "raw-read-outcome",
+          "role": "target-before",
+          "hostClientPid": 1147012,
+          "hostClientInFlight": false,
+          "communicateCompleted": true,
+          "exitCode": 0,
+          "failureClass": null,
+          "stdoutBytes": 171,
+          "stdoutSha256": "d3671f52906079e2bc33c650adc038ab9204e7475341667f8782157de563b998",
+          "stderrBytesSuppressed": 0,
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null
+        },
+        {
+          "stage": "validated-target",
+          "role": "target-before",
+          "observation": {
+            "Id": "4189cb30782e97cf38b97a0f91a99e14cb9dd1696990d2583c61304acde9d360",
+            "Image": "sha256:1acfd8025bbc868e5d9dc668577e33d01a6a42211c5b7dc320564ab74568af25",
+            "Running": true
+          }
+        },
+        {
+          "stage": "read-intent",
+          "role": "fixed-namespace-readback",
+          "argvSha256": "3d8cd21d8d1eff4233dcd1d27cf2d3e56e0ba2ab72a360c6fb5a6ff05484e719",
+          "stdinBytes": 178251,
+          "stdinSha256": "d58c495678b2bc3f305c861ecc03639ffc1377c7fd8df87e45c7c255e43ed111"
+        },
+        {
+          "stage": "raw-read-outcome",
+          "role": "fixed-namespace-readback",
+          "hostClientPid": 1147019,
+          "hostClientInFlight": false,
+          "communicateCompleted": true,
+          "exitCode": 0,
+          "failureClass": null,
+          "stdoutBytes": 2664,
+          "stdoutSha256": "f14cc99cce572913916f31a151faa0e67ee73f3a46bf9ec5ed24c8b40e50c738",
+          "stderrBytesSuppressed": 0,
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null
+        },
+        {
+          "stage": "namespace-report-preserved",
+          "role": "namespaceReadback",
+          "observation": {
+            "schema": "odi.fixed-namespace-postdelivery-readback.v1",
+            "status": "readback-verified",
+            "reason": null,
+            "fileCount": 792,
+            "aliasCount": 8,
+            "nativeTaskId": null,
+            "nativeRunId": null,
+            "nativeEventId": null,
+            "nativeAttemptId": null,
+            "nativePermissionGranted": false,
+            "nativeUseEstablished": false,
+            "retryAllowed": false,
+            "controlsBefore": {
+              "home": [
+                2049,
+                834137,
+                10000,
+                10000,
+                448
+              ],
+              "socket": [
+                2049,
+                788129,
+                10000,
+                10000,
+                384
+              ],
+              "lock": [
+                2049,
+                787782,
+                10000,
+                10000,
+                384
+              ]
+            },
+            "namespaceBefore": [
+              2049,
+              2161603,
+              10000,
+              10000,
+              448
+            ],
+            "legacyBefore": {
+              "path": "/opt/data/workspace/hermes-harness-audit/platform/current/current-work.json",
+              "bytes": 5324,
+              "sha256": "8b0b29dd8cd00db93bdd092a5e8519b5f6462d922df659a5f9d929f79c6d5911"
+            },
+            "claimPin": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-claim.json",
+              "bytes": 445,
+              "sha256": "5e73ade3a92e56140c5a2ab854a9f3f6665c4fd1559dc4d1a42dccb05e551ce5"
+            },
+            "receiptPin": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+              "bytes": 1031,
+              "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+            },
+            "journalPin": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+              "bytes": 251057,
+              "sha256": "b07b047222e2c860a5b6ea50f4c067c25720372ac4c729baaf83320daf98d1dc",
+              "scope": "terminal"
+            },
+            "verifiedPrefix": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+              "bytes": 250612,
+              "sha256": "7a5a56e5fc455a8b813d3609774cd3b3e80e4ce8defe208d87563c8250fedeb2",
+              "scope": "verified-prefix"
+            },
+            "terminal": {
+              "state": "terminal",
+              "scope": "artifact-and-receipt-outcome",
+              "status": "delivered-awaiting-owner-verification",
+              "completed": 800,
+              "uncertain": null,
+              "reason": null,
+              "persistenceFailure": false,
+              "receiptOutcome": "persisted-and-verified",
+              "receipt": {
+                "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+                "bytes": 1031,
+                "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+              }
+            },
+            "directoryCount": 123,
+            "fileManifestSha256": "de8aad92af4b6e03630d0739e192dcaff1eef2915b641d28c061f5966b84df22",
+            "aliasManifestSha256": "fa05130a162c1e93d3f63f9c335365ae79980c2f48cf845a5b7c463cff896c0a",
+            "checkedPayloadBytes": 6200359,
+            "legacyAfter": {
+              "path": "/opt/data/workspace/hermes-harness-audit/platform/current/current-work.json",
+              "bytes": 5324,
+              "sha256": "8b0b29dd8cd00db93bdd092a5e8519b5f6462d922df659a5f9d929f79c6d5911"
+            },
+            "namespaceAfter": [
+              2049,
+              2161603,
+              10000,
+              10000,
+              448
+            ],
+            "controlsAfter": {
+              "home": [
+                2049,
+                834137,
+                10000,
+                10000,
+                448
+              ],
+              "socket": [
+                2049,
+                788129,
+                10000,
+                10000,
+                384
+              ],
+              "lock": [
+                2049,
+                787782,
+                10000,
+                10000,
+                384
+              ]
+            }
+          }
+        },
+        {
+          "stage": "read-intent",
+          "role": "compiled-source-closure-bounded-map",
+          "argvSha256": "8b0b776f2a2cdb5b951502ac0f9abf2988f0b591f8ac64b422232e5866369151",
+          "stdinBytes": 733,
+          "stdinSha256": "72540dec94a3e849b43f20b49060ec08fa59b3322937c1945a462474b584b510"
+        },
+        {
+          "stage": "raw-read-outcome",
+          "role": "compiled-source-closure-bounded-map",
+          "hostClientPid": 1147050,
+          "hostClientInFlight": false,
+          "communicateCompleted": true,
+          "exitCode": 0,
+          "failureClass": null,
+          "stdoutBytes": 12001,
+          "stdoutSha256": "65b4f1c3833edbe6684f274464c6f3943e0fe3b19ec28a7577326259258cc039",
+          "stderrBytesSuppressed": 0,
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null
+        },
+        {
+          "stage": "closure-metadata-only",
+          "observation": {
+            "schema": "hermes.work-method-source-response.v1",
+            "status": "source-qualified",
+            "binding": {
+              "sourceMapSha256": "64003cedc00b4df3a45be528c0c2ff617dfeadd6bc1cc79d3da1fba29abcbecd",
+              "sourceId": "@map",
+              "logical": {
+                "domainId": "native-harness",
+                "projectId": "codex-harness-engineering",
+                "workId": "ontology-driven-platform-integration-20261017",
+                "taskId": "ODI-HERMES-WORK-METHOD-FIRST-READ-NATIVE-20261020"
+              },
+              "documentSha256": "64003cedc00b4df3a45be528c0c2ff617dfeadd6bc1cc79d3da1fba29abcbecd",
+              "totalBytes": 111284
+            },
+            "policy": {
+              "policyVersion": "hermes.current-work-output.v2",
+              "maxChars": 12000,
+              "capChars": 12000
+            },
+            "chunk": {
+              "offsetBytes": 0,
+              "nextOffsetBytes": 10075,
+              "last": false,
+              "textBytes": 10075,
+              "textSha256": "fc7f6618a7fd180ef4091aa504840d9a683ef21e881bb079652163a7cf07ff52"
+            },
+            "rawResponseBytes": 12001,
+            "rawResponseSha256": "65b4f1c3833edbe6684f274464c6f3943e0fe3b19ec28a7577326259258cc039",
+            "sourceClosureObserved": true,
+            "completeMapReceivedOrUsed": false,
+            "nativeFirstReadExecuted": false,
+            "actualEObserved": false,
+            "nativePermissionGranted": false
+          }
+        },
+        {
+          "stage": "read-intent",
+          "role": "fixed-namespace-readback-after-closure",
+          "argvSha256": "3d8cd21d8d1eff4233dcd1d27cf2d3e56e0ba2ab72a360c6fb5a6ff05484e719",
+          "stdinBytes": 178251,
+          "stdinSha256": "d58c495678b2bc3f305c861ecc03639ffc1377c7fd8df87e45c7c255e43ed111"
+        },
+        {
+          "stage": "raw-read-outcome",
+          "role": "fixed-namespace-readback-after-closure",
+          "hostClientPid": 1147159,
+          "hostClientInFlight": false,
+          "communicateCompleted": true,
+          "exitCode": 0,
+          "failureClass": null,
+          "stdoutBytes": 2664,
+          "stdoutSha256": "f14cc99cce572913916f31a151faa0e67ee73f3a46bf9ec5ed24c8b40e50c738",
+          "stderrBytesSuppressed": 0,
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null
+        },
+        {
+          "stage": "namespace-report-preserved",
+          "role": "namespaceReadbackAfterClosure",
+          "observation": {
+            "schema": "odi.fixed-namespace-postdelivery-readback.v1",
+            "status": "readback-verified",
+            "reason": null,
+            "fileCount": 792,
+            "aliasCount": 8,
+            "nativeTaskId": null,
+            "nativeRunId": null,
+            "nativeEventId": null,
+            "nativeAttemptId": null,
+            "nativePermissionGranted": false,
+            "nativeUseEstablished": false,
+            "retryAllowed": false,
+            "controlsBefore": {
+              "home": [
+                2049,
+                834137,
+                10000,
+                10000,
+                448
+              ],
+              "socket": [
+                2049,
+                788129,
+                10000,
+                10000,
+                384
+              ],
+              "lock": [
+                2049,
+                787782,
+                10000,
+                10000,
+                384
+              ]
+            },
+            "namespaceBefore": [
+              2049,
+              2161603,
+              10000,
+              10000,
+              448
+            ],
+            "legacyBefore": {
+              "path": "/opt/data/workspace/hermes-harness-audit/platform/current/current-work.json",
+              "bytes": 5324,
+              "sha256": "8b0b29dd8cd00db93bdd092a5e8519b5f6462d922df659a5f9d929f79c6d5911"
+            },
+            "claimPin": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-claim.json",
+              "bytes": 445,
+              "sha256": "5e73ade3a92e56140c5a2ab854a9f3f6665c4fd1559dc4d1a42dccb05e551ce5"
+            },
+            "receiptPin": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+              "bytes": 1031,
+              "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+            },
+            "journalPin": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+              "bytes": 251057,
+              "sha256": "b07b047222e2c860a5b6ea50f4c067c25720372ac4c729baaf83320daf98d1dc",
+              "scope": "terminal"
+            },
+            "verifiedPrefix": {
+              "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-journal.jsonl",
+              "bytes": 250612,
+              "sha256": "7a5a56e5fc455a8b813d3609774cd3b3e80e4ce8defe208d87563c8250fedeb2",
+              "scope": "verified-prefix"
+            },
+            "terminal": {
+              "state": "terminal",
+              "scope": "artifact-and-receipt-outcome",
+              "status": "delivered-awaiting-owner-verification",
+              "completed": 800,
+              "uncertain": null,
+              "reason": null,
+              "persistenceFailure": false,
+              "receiptOutcome": "persisted-and-verified",
+              "receipt": {
+                "path": "/opt/data/runtime/harness/current-git-work/odi-20261017/work-method-20261020/.namespace-delivery-receipt.json",
+                "bytes": 1031,
+                "sha256": "e1e9b6ddf919d0e63013fa183df7f671458404205fee53e27eb3b3c5716a65f8"
+              }
+            },
+            "directoryCount": 123,
+            "fileManifestSha256": "de8aad92af4b6e03630d0739e192dcaff1eef2915b641d28c061f5966b84df22",
+            "aliasManifestSha256": "fa05130a162c1e93d3f63f9c335365ae79980c2f48cf845a5b7c463cff896c0a",
+            "checkedPayloadBytes": 6200359,
+            "legacyAfter": {
+              "path": "/opt/data/workspace/hermes-harness-audit/platform/current/current-work.json",
+              "bytes": 5324,
+              "sha256": "8b0b29dd8cd00db93bdd092a5e8519b5f6462d922df659a5f9d929f79c6d5911"
+            },
+            "namespaceAfter": [
+              2049,
+              2161603,
+              10000,
+              10000,
+              448
+            ],
+            "controlsAfter": {
+              "home": [
+                2049,
+                834137,
+                10000,
+                10000,
+                448
+              ],
+              "socket": [
+                2049,
+                788129,
+                10000,
+                10000,
+                384
+              ],
+              "lock": [
+                2049,
+                787782,
+                10000,
+                10000,
+                384
+              ]
+            }
+          }
+        },
+        {
+          "stage": "read-intent",
+          "role": "target-after",
+          "argvSha256": "1cc874f0d3bb07f089d25bb596e76d22f56787f2d05a44b55384651bdcf57713",
+          "stdinBytes": 0,
+          "stdinSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "stage": "raw-read-outcome",
+          "role": "target-after",
+          "hostClientPid": 1147211,
+          "hostClientInFlight": false,
+          "communicateCompleted": true,
+          "exitCode": 0,
+          "failureClass": null,
+          "stdoutBytes": 171,
+          "stdoutSha256": "d3671f52906079e2bc33c650adc038ab9204e7475341667f8782157de563b998",
+          "stderrBytesSuppressed": 0,
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "nativeTaskId": null,
+          "nativeRunId": null,
+          "nativeEventId": null,
+          "nativeAttemptId": null
+        },
+        {
+          "stage": "validated-target",
+          "role": "target-after",
+          "observation": {
+            "Id": "4189cb30782e97cf38b97a0f91a99e14cb9dd1696990d2583c61304acde9d360",
+            "Image": "sha256:1acfd8025bbc868e5d9dc668577e33d01a6a42211c5b7dc320564ab74568af25",
+            "Running": true
+          }
+        },
+        {
+          "stage": "postverify-terminal",
+          "status": "fixed-readback-and-source-closure-observed",
+          "reason": null
+        }
+      ],
+      "independentSourceReview": {
+        "schema": "odi.native-install-postverify-independent-source-review.v1",
+        "recordClass": "verification",
+        "atUtc": "2026-10-20T15:27:57.033546+00:00",
+        "actualReviewerThreadId": "01a15949-3011-71d0-a74a-24070eff4669",
+        "sourceDraft": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.draft.actual.py",
+          "bytes": 207293,
+          "sha256": "ea50ab4db91abfea9f6d2f9bdc1c29f701e263117215b85478b68d20a1e58730"
+        },
+        "sourcePlan": {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.source-plan.actual.json",
+          "bytes": 25003,
+          "sha256": "691c93e734d89fe10de75225b2b838b756f7c869e9d878268f5be69654101801"
+        },
+        "conclusion": "pass",
+        "unresolvedFindings": 0,
+        "qualificationBoundary": "SOURCE-only exact frozen postverify v3 independent review. Pass means reviewed fixed readonly verifier source, literal manifest and supported response contracts have no current source findings. It does not execute, observe actual postverification/closure, authenticate/use/admit FirstRead, pass canonical Install verification or release general CI/whole Goal."
+      }
+    },
+    "originalSourcePins": {
+      "intent": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-intent.actual.json",
+        "bytes": 2884,
+        "sha256": "bd1d489ab53a5ea88ca78cf00a07dcd6d1065538c14de47a70be0a64162e51ea"
+      },
+      "dispatchClaim": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-claim.actual.json",
+        "bytes": 781,
+        "sha256": "f281266dd62cd85df9d70a700136518777b28118097af04c02c01345303d4391"
+      },
+      "rawOutcome": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-child-outcome.actual.json",
+        "bytes": 1620,
+        "sha256": "9a375fed2391d442d9b2c788c161eebe64dc985ed0eaf5484ae3a02781106b5a"
+      },
+      "normalizedResult": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-result.actual.json",
+        "bytes": 3548,
+        "sha256": "d43c2f6e13ab3e6af0103beb89f7d228f2d237eedb3accf04783199db3f7877e"
+      },
+      "installToolDispatch": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.actual-tool-dispatch.actual.json",
+        "bytes": 1083,
+        "sha256": "8764e9a673cd31d61c74949889a7b2051b2c14888bca30749e18d38992117224"
+      },
+      "installToolCompletion": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.actual-tool-completion.actual.json",
+        "bytes": 2966,
+        "sha256": "9e60307475bb38e912c899254d48bd9572fb972ac8057a5727810f7b4b7d8841"
+      },
+      "postverification": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.readback.actual.json",
+        "bytes": 12093,
+        "sha256": "cf0d14fe949217b4b8b9e5e00e70ed3afe07da8fbba9d567d7a2f7ede2e8e9d0"
+      },
+      "postverifyToolCompletion": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.actual-tool-completion.actual.json",
+        "bytes": 1301,
+        "sha256": "328204d97d7e5518894a3dc0a4ab1fcb934f8661682563d93e578598161cc3c9"
+      },
+      "postverifyObservationJournal": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.observations.actual.jsonl",
+        "bytes": 11418,
+        "sha256": "fbd783f9963126ab97333863f23f0789074e3543267cb9aff010996e8245a180"
+      },
+      "postverifyIndependentSourceReview": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.independent-review.actual.json",
+        "bytes": 20715,
+        "sha256": "9ad15410c05012fdd77b595114b1adb422ea813df5fcd2150bb3ef536936af05"
+      },
+      "ownerLocalMilestoneDecision": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.owner-local-milestone-decision.actual.json",
+        "bytes": 6347,
+        "sha256": "367bbdc346f3e8e653e34c5ff7b1ba346dfee808ff31fe0d1f99c98967a6561d"
+      }
+    },
+    "sourceHeads": {
+      "qualifiedAppliedSource": "1c7aae2d3ef38fd9678ca63310189cb79947e51c",
+      "qualifiedAppliedTree": "756e76e5bca038e0aab73d2ee928b6edbb45604d",
+      "repairedHelperSource": "700658132c473af2cdcf442b5095e029cd68e1ee",
+      "runtimeBundlesAndRawDataBuildSource": "1756548080ce81bb9fc3644e3f421a0572af3cc0",
+      "runtimeSourcePins": 53,
+      "runtimeDependencyPins": 635,
+      "wholeRuntimeAndHelperSourceTreesEqual": false
+    },
+    "sourceNormalization": {
+      "class": "Root-adopted source-owned generic occurrence correlation, not a runtime resource allocation",
+      "producerOccurrence": {
+        "runtimeId": "native-codex-tool-execution:01a158f3-8946-7bf2-b06a-311d4224970d",
+        "attemptId": "exec-process:70263",
+        "occurrenceId": "exec-output:7ff342"
+      },
+      "rawObservedRootThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+      "rawObservedToolProcessSessionId": 70263,
+      "rawObservedDispatchChunkId": "500b2b",
+      "rawObservedCompletionChunkId": "7ff342",
+      "postverifyToolProcessSessionId": 49549,
+      "postverifyCompletionChunkId": "81090a",
+      "postverifyOccurrenceReplacesInstallOccurrence": false,
+      "storedHermesSessionIdIsAttemptId": false,
+      "nativeAuthenticationEstablished": false,
+      "nativePermissionGranted": false,
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "nativeEventId": null,
+      "nativeAttemptResourceId": null,
+      "mapping": "runtimeId scopes the genuine native Codex tool execution to its observed Root thread; attemptId labels exec process70263; occurrenceId labels actual completion output7ff342. All source/intent/claim/raw/result/tool/postverify joins retained. No global uniqueness or native authentication is inferred from a chunk alone.",
+      "ownerDecisionClass": "Source/native operation owner technical verification judgment, not a new human answer or domain Acceptance."
+    },
+    "evidence": {
+      "schemaVersion": "1.0.0",
+      "kind": "evidence",
+      "id": "codex-harness-engineering:evidence:hermes-work-method-source-install-20261020",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-20T15:39:56.444513+00:00",
+      "payload": {
+        "claim": "The exact native Install once completed800 and the separately reviewed v3 native readback verified all792files8aliases123directories, receipt/journal integrity, controls/legacy preservation and maintained registered runtime source closure.",
+        "method": "Source projection of genuine Root install exec70263/completion7ff342 and separate read-only postverify exec49549/completion81090a, retaining bounded original metadata and whole-source pins.",
+        "sourceUrl": "file:///home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.readback.actual.json",
+        "fetchedAt": "2026-10-20T15:29:12.135978Z",
+        "upstreamRevision": "1c7aae2d3ef38fd9678ca63310189cb79947e51c",
+        "result": {
+          "outcome": "success",
+          "processExitCode": 0,
+          "contentMatched": true,
+          "details": {
+            "installedArtifactCount": 800,
+            "fileCount": 792,
+            "aliasCount": 8,
+            "directoryCount": 123,
+            "bytesReadBack": 6200359
+          }
+        },
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "success",
+            "details": {
+              "meaning": "One observed native install operation, not a backend Attempt resource ID",
+              "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020"
+            }
+          }
+        ],
+        "limitations": [
+          "Only the exact bounded namespace source installation is verified; no native FirstRead, actual pre_llm_call E, full map receive/use, authentication, owner admission, finite coverage or domain Acceptance is inferred.",
+          "Both binding files remain EXPECTED source selectors. Historical canonical API profile /opt/data, profile_name default, owned SID and policycwd do not prove a current shell callback mapping.",
+          "Native Hermes backend Task/Run/event/Attempt resource IDs were not exposed and remain null. Generic occurrence is actual native Codex tool metadata, not a stored Hermes session ID.",
+          "Original helper/postverify outputs saying nativeInstallTaskCompleted=false are preserved as captured observations; those programs did not update canonical Task state. This source successor separately records the now-verified bounded milestone.",
+          "Shared audit/formal completion and general CI/whole Goal remain pending. No prior operation or helper may be replayed."
+        ],
+        "details": {
+          "sourceHeads": {
+            "qualifiedAppliedSource": "1c7aae2d3ef38fd9678ca63310189cb79947e51c",
+            "qualifiedAppliedTree": "756e76e5bca038e0aab73d2ee928b6edbb45604d",
+            "repairedHelperSource": "700658132c473af2cdcf442b5095e029cd68e1ee",
+            "runtimeBundlesAndRawDataBuildSource": "1756548080ce81bb9fc3644e3f421a0572af3cc0",
+            "runtimeSourcePins": 53,
+            "runtimeDependencyPins": 635,
+            "wholeRuntimeAndHelperSourceTreesEqual": false
+          },
+          "sourceNormalization": {
+            "class": "Root-adopted source-owned generic occurrence correlation, not a runtime resource allocation",
+            "producerOccurrence": {
+              "runtimeId": "native-codex-tool-execution:01a158f3-8946-7bf2-b06a-311d4224970d",
+              "attemptId": "exec-process:70263",
+              "occurrenceId": "exec-output:7ff342"
+            },
+            "rawObservedRootThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+            "rawObservedToolProcessSessionId": 70263,
+            "rawObservedDispatchChunkId": "500b2b",
+            "rawObservedCompletionChunkId": "7ff342",
+            "postverifyToolProcessSessionId": 49549,
+            "postverifyCompletionChunkId": "81090a",
+            "postverifyOccurrenceReplacesInstallOccurrence": false,
+            "storedHermesSessionIdIsAttemptId": false,
+            "nativeAuthenticationEstablished": false,
+            "nativePermissionGranted": false,
+            "nativeTaskId": null,
+            "nativeRunId": null,
+            "nativeEventId": null,
+            "nativeAttemptResourceId": null,
+            "mapping": "runtimeId scopes the genuine native Codex tool execution to its observed Root thread; attemptId labels exec process70263; occurrenceId labels actual completion output7ff342. All source/intent/claim/raw/result/tool/postverify joins retained. No global uniqueness or native authentication is inferred from a chunk alone."
+          },
+          "postverifyOriginalSourcePin": {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.readback.actual.json",
+            "bytes": 12093,
+            "sha256": "cf0d14fe949217b4b8b9e5e00e70ed3afe07da8fbba9d567d7a2f7ede2e8e9d0"
+          },
+          "ownerLocalMilestoneDecisionPin": {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.owner-local-milestone-decision.actual.json",
+            "bytes": 6347,
+            "sha256": "367bbdc346f3e8e653e34c5ff7b1ba346dfee808ff31fe0d1f99c98967a6561d"
+          }
+        }
+      }
+    },
+    "consumedEffectInventory": {
+      "completedEffectIds": [
+        "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020"
+      ],
+      "uncertainEffectIds": []
+    },
+    "preserved": {
+      "original9FencesCompleted": 126,
+      "historicalUncertainCount": 5,
+      "SessionPrepareConsumed": true,
+      "observedCompletedCountIncludingInstall": 128,
+      "SessionPrepareVerification": "unverified",
+      "FirstReadOriginalFiveDependenciesUnchanged": true,
+      "firstReadReceiverOrActualEObserved": false,
+      "nativeUseEstablished": false,
+      "finiteCoverageClosed": false,
+      "generalCiReleased": false,
+      "wholeWorkComplete": false,
+      "AGY": "temporarily prohibited",
+      "cumulativeUsd14Usage": "unknown/paid advice held",
+      "servingRuntimeAndControls": "349/model/effort/auth/permissions/trust retained"
+    },
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "nativeEventId": null,
+    "nativeAttemptResourceId": null,
+    "ownerLocalMilestoneDecision": {
+      "schema": "odi.actual-owner-native-install-local-milestone-decision.v1",
+      "atUtc": "2026-10-20T15:37:59.311583Z",
+      "ownerThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+      "actorId": "orch-main-next",
+      "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+      "operationId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020",
+      "targetRef": "common-harness:task:ffe715fbfc5bb928fec965aa628a252d09a56653130156218c3c688ae1046443",
+      "decision": "Actual original Install operation execution-and-verification milestone is eligible for truthful canonical complete/passed/result-durable source records. Canonical records are still pending review/publication/integration; this does not claim they are already applied.",
+      "decisionClass": "Source/native operation owner technical verification judgment, not a new human answer or domain Acceptance.",
+      "sourceHead": "1c7aae2d3ef38fd9678ca63310189cb79947e51c",
+      "canonicalSourceRevisionPending": true,
+      "stateEligible": {
+        "execution": "complete",
+        "verification": "passed",
+        "localAudit": "result-durable",
+        "sharedAudit": "pending",
+        "formalCompletion": "pending"
+      },
+      "criteria": [
+        {
+          "id": "actual-once-tool-custody",
+          "status": "pass",
+          "basis": "Actual once intent/claim/raw-before-normalized result and Codex thread/exec70263/completion7ff342 custody; consumed800 no replay."
+        },
+        {
+          "id": "fixed-native-artifacts-readback",
+          "status": "pass",
+          "basis": "Actual fixedtarget/image/UIDGID and all792files8aliases123dirs exact hashes/bytes/modes/containment and beforeafternamespace metadata."
+        },
+        {
+          "id": "immutable-prefix-terminal-integrity",
+          "status": "pass",
+          "basis": "Actual445B claim,1031B immutable pendingreceipt,250612B verifiedprefix and251057B fullterminal one-way receipt pin verified; no uncertainty/persistencefailure."
+        },
+        {
+          "id": "maintained-runtime-closure",
+          "status": "pass",
+          "basis": "Actual installed compiled read-work-method existing maintained provider.verify before/through/after source read;53source635dependencies closure source-qualified. Bounded map chunk text discarded."
+        },
+        {
+          "id": "expected-bindings-integrity",
+          "status": "pass",
+          "basis": "Actual filemanifest includes both expectedbinding files/map matching exact deliveredpayload. Expected historical profile/session selectors remain separate from currentnativeE/auth/use."
+        },
+        {
+          "id": "bounded-install-outcome",
+          "status": "pass",
+          "basis": "Original4 dependencies and originalfences retained. SessionPrepare unverified and FirstRead pending; backend IDsnull, actualuse/finitecoverage/generalCI/whole/domainAcceptance not granted."
+        }
+      ],
+      "postverifyInvocation": {
+        "toolSessionId": 49549,
+        "completionChunkId": "81090a",
+        "exitCode": 0,
+        "meaning": "Owner postverification only; Install occurrence stays exec70263/completion7ff342."
+      },
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "nativeEventId": null,
+      "nativeAttemptResourceId": null,
+      "nativeUseEstablished": false,
+      "finiteCoverageClosed": false,
+      "generalCiReleased": false,
+      "domainOrHumanAcceptance": false,
+      "wholeWorkComplete": false,
+      "AGY": "PROHIBITED",
+      "USD14PaidAdvice": "HELD_USAGE_UNKNOWN",
+      "evidence": [
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-intent.actual.json",
+          "bytes": 2884,
+          "sha256": "bd1d489ab53a5ea88ca78cf00a07dcd6d1065538c14de47a70be0a64162e51ea"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-claim.actual.json",
+          "bytes": 781,
+          "sha256": "f281266dd62cd85df9d70a700136518777b28118097af04c02c01345303d4391"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-child-outcome.actual.json",
+          "bytes": 1620,
+          "sha256": "9a375fed2391d442d9b2c788c161eebe64dc985ed0eaf5484ae3a02781106b5a"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.once-result.actual.json",
+          "bytes": 3548,
+          "sha256": "d43c2f6e13ab3e6af0103beb89f7d228f2d237eedb3accf04783199db3f7877e"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.actual-tool-completion.actual.json",
+          "bytes": 2966,
+          "sha256": "9e60307475bb38e912c899254d48bd9572fb972ac8057a5727810f7b4b7d8841"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.readback.actual.json",
+          "bytes": 12093,
+          "sha256": "cf0d14fe949217b4b8b9e5e00e70ed3afe07da8fbba9d567d7a2f7ede2e8e9d0"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.actual-tool-completion.actual.json",
+          "bytes": 1301,
+          "sha256": "328204d97d7e5518894a3dc0a4ab1fcb934f8661682563d93e578598161cc3c9"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.postverify.v3.independent-review.actual.json",
+          "bytes": 20715,
+          "sha256": "9ad15410c05012fdd77b595114b1adb422ea813df5fcd2150bb3ef536936af05"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install-postverify-owner-method/receive-use.actual.json",
+          "bytes": 4930,
+          "sha256": "14794a6ad10410a118e54a8d440459a023ae65176cedff03677e416747a4e19b"
+        },
+        {
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.progress054.route-readback.actual.json",
+          "bytes": 1550,
+          "sha256": "a79282357ca97ffe69f37feb4f379afdff234e9916040f30a26c552c80fce36e"
+        }
+      ]
+    }
+  }
+}
