@@ -5,6 +5,8 @@ import { currentWorkDiagnostic, type CurrentWorkDiagnosticStage } from "./diagno
 declare const HERMES_PLATFORM_REGISTRATION_SHA256: string;
 declare const HERMES_PLATFORM_PROVIDER_ROOT: string;
 declare const HERMES_PLATFORM_REGISTRATION_PATH: string;
+declare const HERMES_WORK_METHOD_SOURCE_BINDING:
+  import("./work-method-source.ts").WorkMethodSourceBinding | undefined;
 
 // Static compiled owner constants only. Request data never chooses a module, root or registration.
 if (import.meta.main) {
@@ -26,17 +28,29 @@ if (import.meta.main) {
     });
     await source.verify();
     stage = "implementation";
-    const { readHermesWorkMethod } = await import("./work-method.ts");
+    const sourceRead = request.schema === "hermes.work-method-source-request.v1";
+    const read = sourceRead
+      ? (await import("./work-method-source.ts")).readHermesWorkMethodSource
+      : (await import("./work-method.ts")).readHermesWorkMethod;
     stage = "source-readback";
     await source.verify();
     stage = "context";
-    const response = await readHermesWorkMethod(request, {
+    const options = {
       verifySourceClosure: async () => {
         stage = "source-readback";
         await source.verify();
         stage = "context";
       },
-    });
+    };
+    const response = sourceRead
+      ? await (read as typeof import("./work-method-source.ts").readHermesWorkMethodSource)(
+          request,
+          typeof HERMES_WORK_METHOD_SOURCE_BINDING === "undefined"
+            ? undefined
+            : HERMES_WORK_METHOD_SOURCE_BINDING,
+          options,
+        )
+      : await (read as typeof import("./work-method.ts").readHermesWorkMethod)(request, options);
     stage = "source-readback";
     await source.verify();
     console.log(JSON.stringify(response));

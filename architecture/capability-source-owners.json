@@ -233,9 +233,17 @@
       "id": "ontology-foundation",
       "packagePath": "packages/ontology",
       "semanticOwner": "ontology-foundation",
-      "canonicalSource": ["src/", "schemas/", "scripts/generate.ts"],
+      "canonicalSource": [
+        "src/",
+        "schemas/",
+        "scripts/generate.ts"
+      ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/projects/ontology-foundation",
-      "nativeEntrypoints": ["src/index.ts", "scripts/generate.ts", "scripts/release-local.ts"],
+      "nativeEntrypoints": [
+        "src/index.ts",
+        "scripts/generate.ts",
+        "scripts/release-local.ts"
+      ],
       "ownerBoundary": "Canonical schemas/declarations/generator are common source. Existing native release adapter assembles new versions only; published0.1.0/0.2.0 tarballs/receipts remain immutable and existing consumers retain pins.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/ontology-source",
@@ -341,9 +349,17 @@
       "id": "evidence-foundry",
       "packagePath": "packages/evidence-foundry",
       "semanticOwner": "evidence-foundry",
-      "canonicalSource": ["src/", "schemas/", "scripts/generate.ts"],
+      "canonicalSource": [
+        "src/",
+        "schemas/",
+        "scripts/generate.ts"
+      ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/projects/evidence-foundry",
-      "nativeEntrypoints": ["src/cli.ts", "src/service.ts", "src/index.ts"],
+      "nativeEntrypoints": [
+        "src/cli.ts",
+        "src/service.ts",
+        "src/index.ts"
+      ],
       "ownerBoundary": "Core requires explicit per-instance real semantic-owner policy before Store.initialize; old service/index subclass binds its own relative project.json and preserves constructor/open/default or explicit data roots. Native workflows, stores, exclusion policy and credentials stay with owner.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/evidence-foundry-core",
@@ -454,9 +470,15 @@
       "id": "research-capture",
       "packagePath": "packages/research-capture",
       "semanticOwner": "scrapling-research",
-      "canonicalSource": ["src/capture.ts", "src/bundle.ts", "src/upstream.ts"],
+      "canonicalSource": [
+        "src/capture.ts",
+        "src/bundle.ts",
+        "src/upstream.ts"
+      ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/projects/scrapling-research",
-      "nativeEntrypoints": ["src/cli.ts"],
+      "nativeEntrypoints": [
+        "src/cli.ts"
+      ],
       "ownerBoundary": "Only3implementation modules are canonical here. Schema/generated/index/immutable 0.1.0 files are pinned read-only dependency copies from research owner; CLI/setup/update/smoke/Python/runtime/output roots remain owner. Direct core capture callers must supply an explicit root.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/research-capture-core",
@@ -512,9 +534,14 @@
       "id": "infrastructure-domain",
       "packagePath": "packages/infrastructure-operations",
       "semanticOwner": "vps-operations",
-      "canonicalSource": ["src/domain/"],
+      "canonicalSource": [
+        "src/domain/"
+      ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/projects/vps-operations",
-      "nativeEntrypoints": ["src/cli.ts", "src/adapters/"],
+      "nativeEntrypoints": [
+        "src/cli.ts",
+        "src/adapters/"
+      ],
       "ownerBoundary": "Six pure domain modules are canonical common code. Nine SSH/container/runtime/native adapter modules and CLI remain owner; no lifecycle or remote permission is implied.",
       "nativePermissionGranted": false,
       "packageName": "@palantirkc/infrastructure-operations",
@@ -704,7 +731,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/build.ts",
-          "sha256": "a989b252d876c4b5f084ec1faa58c70515940b3aec29d80c2cda665e79e1c589",
+          "sha256": "0718cda412121377558bf8b943e077cf850f82e6653fc286636a868611109eb8",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/build.ts"
         },
         {
@@ -724,7 +751,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/provider.ts",
-          "sha256": "59b7cf06d5e6e359c4180899800363912ae3e24bf3a103a94a1b750e111a3f96",
+          "sha256": "be315afd0bd4ef856ac3687acc382f750a5dcc47622c83d4a69ff667fef7bee7",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/provider.ts"
         },
         {
@@ -879,13 +906,18 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/work-method.ts",
-          "sha256": "e01743c798030d2534fbf4a7dab4718924fe62232495b551771b93802262de5f",
+          "sha256": "686c40c6fae682bab4fdaff5a44fdb673414ffead746719260f323b72430fbcb",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/work-method.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts",
-          "sha256": "0cac4b0c2af5966e372237a48262537db500f2d8dce24dceebe1cb2e30cc416a",
+          "sha256": "497fa33555dfceff0db57ba3fbd325e685fe2eef889c32c37241c560c191edd3",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/work-method-source.ts",
+          "sha256": "eb091a98b9ff8fc5fa082f867c856c3ce273d6e4a3745549f6fc4b6970fae9c6",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/work-method-source.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
@@ -925,7 +957,10 @@
       "id": "operational-context",
       "packagePath": "packages/operational-context",
       "semanticOwner": "backend-ontology and SharedWiki operational-v1 domain owners",
-      "canonicalSource": ["src/backend/", "src/shared-wiki/"],
+      "canonicalSource": [
+        "src/backend/",
+        "src/shared-wiki/"
+      ],
       "nativeEntrypoints": [
         "/opt/data/workspace/backend-ontology/runtime/query.ts",
         "/opt/data/workspace/backend-ontology/runtime/intent-context/cli.ts",

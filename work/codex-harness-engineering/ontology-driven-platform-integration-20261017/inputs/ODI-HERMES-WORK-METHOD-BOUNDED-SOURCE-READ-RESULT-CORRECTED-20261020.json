@@ -1,0 +1,386 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-RESULT-CORRECTED-20261020",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/root-bounded-reader-result-records.authoring.v4.actual.json"
+  },
+  "content": {
+    "classification": "Actual Root source-owner capture of passing bounded source implementation checks at exact candidate A. Original worker/dependencies/method/failed attempts retained. Shared/formal/native/use/coverage/general acceptance remain separate.",
+    "observation": {
+      "schemaVersion": "1.0.0",
+      "kind": "evidence",
+      "id": "codex-harness-engineering:evidence:hermes-work-method-bounded-source-read-20261020",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-20T05:41:55.197185Z",
+      "payload": {
+        "claim": "The exact candidate A bounded Hermes immutable-source read implementation and minimal central owner-pin successor passed existing Root handoff/import/quality/source checks. This is a source-only implementation milestone.",
+        "method": "Actual Root execution of existing required checks on clean isolated immutable A; original QA failure diagnosed as private package-local lookup absence and corrected with three existing same-version private links before one justified quality rerun and first source check. No maintained code/policy/lock change or model call.",
+        "sourceUrl": "https://github.com/park-kyungchan/agent-platform/commit/6a2cef0aac80f1865128c36b1eb46529d7e1ce71",
+        "fetchedAt": "2026-10-20T05:41:55.197185Z",
+        "upstreamRevision": "6a2cef0aac80f1865128c36b1eb46529d7e1ce71",
+        "result": {
+          "outcome": "success",
+          "processExitCode": 0,
+          "contentMatched": true,
+          "details": {
+            "sourceOnly": true,
+            "qualityChecksPassed": 14,
+            "sourceCommandsPassed": 27,
+            "handoffTestsPassed": 39,
+            "boundedSourceTestFileSelected": true,
+            "nativeModelCalls": 0,
+            "nativeBehaviorVerified": false,
+            "finiteCoverageClosed": false,
+            "generalWorkReleased": false
+          }
+        },
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "failure",
+            "details": {
+              "scope": "Original whole quality check failed at isolated-ontology-build; exact original result retained. Missing-import explanation is from the separate later diagnostic below.",
+              "result": {
+                "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.check-quality.actual.json",
+                "bytes": 248728,
+                "sha256": "abce6007e18a39789fe5873097837df90ba3af383d38a8cc22ebbafc140d2e1e"
+              },
+              "originalCommand": {
+                "name": "isolated-ontology-build",
+                "exitCode": 1,
+                "stderrBytes": 343,
+                "stderrSha256": "026e02b08050b36789c37edd6371c38c78af2229cc32f6b80a1ffbac1a8af087",
+                "originalRawStderrAvailable": false
+              },
+              "laterDiagnostic": {
+                "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.ontology-build-diagnostic.actual.json",
+                "bytes": 1805,
+                "sha256": "f90588563cfda255cbaffb3ac1d305de84cd341a50312800bfc419e203e00fe1",
+                "attribution": "Separate later diagnostic, not original quality command stderr",
+                "commandExitCode": 1,
+                "stderrBytes": 343,
+                "stderrSha256": "527857383decee36a81c9282a6e683230ccb50c4f5381b4001b50c7c683e0a88",
+                "errorExcerpt": "error: Cannot find package 'json-schema-to-typescript' from '/tmp/ontology-build-zTqFkV/ontology/scripts/generate.ts'"
+              }
+            },
+            "error": "Original isolated-ontology-build command exited 1. Original stderr text was not retained; only its 343-byte length and SHA256 026e02b08050b36789c37edd6371c38c78af2229cc32f6b80a1ffbac1a8af087 are available."
+          },
+          {
+            "attempt": 2,
+            "outcome": "success",
+            "details": {
+              "scope": "After exact private3link correction, justified quality rerun and first source check both pass; earlier handoff/import checks retained",
+              "result": {
+                "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.required-qa-attempt2.actual.json",
+                "bytes": 1380,
+                "sha256": "e259c359d54510cdbdbf7f6bd4dce20485b653482765d0c7c5986bc5ef1f5735"
+              }
+            }
+          }
+        ],
+        "limitations": [
+          "Source-only A checks and implementation behavior in existing source/compiled fixtures; no actual native installation/receive/use or automatic native lifecycle enforcement.",
+          "A is a local immutable checked-code candidate; independent exact final source review/authenticated publication/required CI/manual expected-head merge and separate owner application remain pending.",
+          "Whole ODI/source/native/shared/formal/operator/Engineering/domain/human acceptance remain separate; same USD14 usage and native Task/event correlation unknown, paid judgment held."
+        ],
+        "details": {
+          "actualSourceOwnerObservation": {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.actual-qa-source-observation.actual.json",
+            "bytes": 5853,
+            "sha256": "64ed7dda4a5aa4b3d5dcac8a1002a54651c864e72c27139f2ae12941f3f40ba9"
+          },
+          "actualCanonicalWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "actualSourceOwnerCapture": true,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null,
+          "sourceOnly": true,
+          "workerSourceAndAuthorRemainOriginal": {
+            "commit": "f23c2b0d91376e3d4d437e5bf832cc085ca87066",
+            "tree": "f523512f730cec359c300b6dd2ebbfee6bd525d3"
+          }
+        }
+      }
+    },
+    "verification": {
+      "schemaVersion": "1.0.0",
+      "kind": "verification",
+      "id": "codex-harness-engineering:verification:hermes-work-method-bounded-source-read-20261020",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-20T05:41:55.197185Z",
+      "payload": {
+        "targetRefs": [
+          "common-harness:task:3dbd97eef16eb39bbf23000610b901dc8da2391a83258ee2d9651621771e7d69"
+        ],
+        "criteria": [
+          {
+            "id": "exact-source-and-task",
+            "status": "pass",
+            "message": "Exact A head/tree, raw Task/blob/instruction and scoped15/allowed17paths, registry53pins and actual Root author bound; target identity alone does not version source.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hermes-work-method-bounded-source-read-20261020"
+            ]
+          },
+          {
+            "id": "maintained-source-checks",
+            "status": "pass",
+            "message": "Actual Root existing handoff/import checks,14quality checks and27source-CI commands passed. Original private lookup failure/correction and exact outputs retained.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hermes-work-method-bounded-source-read-20261020"
+            ]
+          },
+          {
+            "id": "bounded-source-contract",
+            "status": "pass",
+            "message": "Source CI actually selected bounded source tests alongside legacy/provider tests and source first-import/drift/compiled fixtures; complete response caps unchanged. Native installation/use/finite coverage remain unverified.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hermes-work-method-bounded-source-read-20261020"
+            ]
+          }
+        ],
+        "inputHashes": [
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020.json",
+            "sha256": "d08fd09f7ddd892ad3c1e61f8056159796519fe8b882ac421668cca6ff52c2a8"
+          },
+          {
+            "path": "architecture/capability-source-owners.json",
+            "sha256": "0f7a689fa2219b051b9dccd127b6fbc3ae1d88051d05acd3d52ed6fc00bc2dd4"
+          },
+          {
+            "path": ".github/source-author.json",
+            "sha256": "ee45d92cc70f5885709ae86abe0d029391490abf3372da0f6ac86dfb7e936e2b"
+          },
+          {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.actual-qa-source-observation.actual.json",
+            "sha256": "64ed7dda4a5aa4b3d5dcac8a1002a54651c864e72c27139f2ae12941f3f40ba9"
+          },
+          {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.check-handoff.actual.json",
+            "sha256": "fbccfb39f6db833f777cb830b2ceb2b30d0d8a97d7ae7301a3c315852fc6e13c"
+          },
+          {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.check-imports.actual.json",
+            "sha256": "b750032460e543e5825cf6a6a09392c58657734499e954335da9d254412cb724"
+          },
+          {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.check-quality-attempt2.actual.json",
+            "sha256": "3e20d8852015dc90d2ee7250449208d0ca3a341813488f798877ac8bd76cf3b8"
+          },
+          {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.check-source-attempt2.actual.json",
+            "sha256": "dd3efb8dc38972a5deac81567be3c670ec1cb7c27768bc24a81ff76f61878e99"
+          }
+        ],
+        "runtime": {
+          "name": "existing-root-source-owner-verification",
+          "version": "Bun1.4.3-source-only"
+        },
+        "details": {
+          "classification": "Actual Root passing A source Verification; original failure/preparation provenance retained, no native authority or Acceptance.",
+          "actualCanonicalWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "actualSourceOwnerCapture": true,
+          "actualQaCapturedAt": "2026-10-20T05:41:55.197185Z",
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null,
+          "sourceTaskAtCheck": {
+            "kind": "git",
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "6a2cef0aac80f1865128c36b1eb46529d7e1ce71",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020.json",
+            "sha256": "d08fd09f7ddd892ad3c1e61f8056159796519fe8b882ac421668cca6ff52c2a8"
+          },
+          "sourceTaskRawBlob": "9fa0485d91210b53c7a4fcc2f19d29e45d9644b6",
+          "sourceTaskRawBytes": 1888,
+          "exactTaskInstructionSource": {
+            "kind": "git",
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "6a2cef0aac80f1865128c36b1eb46529d7e1ce71",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020.json",
+            "sha256": "d08fd09f7ddd892ad3c1e61f8056159796519fe8b882ac421668cca6ff52c2a8",
+            "fragment": "#/nextAction"
+          },
+          "exactTaskInstructionSha256": "619cd6822a72ef541fbc3d0764f3d5840b61bfb046370c95951a6312c3ea349e",
+          "exactTaskInstructionUtf8Bytes": 255,
+          "checkedCodeHead": "6a2cef0aac80f1865128c36b1eb46529d7e1ce71",
+          "checkedCodeTree": "32d49c858a69eff335154b23dd42609884f78138",
+          "targetIdentityDoesNotVersionSource": true,
+          "actualQa": {
+            "status": "pass",
+            "commands": [
+              [
+                "/usr/local/bin/bun",
+                "--no-env-file",
+                "--no-install",
+                "run",
+                "check:handoff"
+              ],
+              [
+                "/usr/local/bin/bun",
+                "--no-env-file",
+                "--no-install",
+                "run",
+                "check:imports"
+              ],
+              [
+                "/usr/local/bin/bun",
+                "--no-env-file",
+                "--no-install",
+                "run",
+                "check:quality"
+              ],
+              [
+                "/usr/local/bin/bun",
+                "--no-env-file",
+                "--no-install",
+                "run",
+                "check:source"
+              ]
+            ],
+            "exitCodes": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "counts": {
+              "qualityChecks": 14,
+              "sourceCommands": 27,
+              "handoffTests": 39,
+              "canonicalTestFiles": 41,
+              "qualityTestFiles": 18
+            },
+            "inputSourceSnapshot": {
+              "sourceHead": "6a2cef0aac80f1865128c36b1eb46529d7e1ce71",
+              "sourceTree": "32d49c858a69eff335154b23dd42609884f78138",
+              "registrySha256": "0f7a689fa2219b051b9dccd127b6fbc3ae1d88051d05acd3d52ed6fc00bc2dd4",
+              "qualityReport": {
+                "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.quality-report-attempt2.actual.json",
+                "bytes": 238203,
+                "sha256": "c948b00c6b011352b00c3dfdf2b1e33123f1c4177a16eff404630f230146d0c1"
+              }
+            },
+            "outputEvidence": {
+              "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.actual-qa-source-observation.actual.json",
+              "bytes": 5853,
+              "sha256": "64ed7dda4a5aa4b3d5dcac8a1002a54651c864e72c27139f2ae12941f3f40ba9"
+            },
+            "allRequiredChecksPassed": true
+          },
+          "scope": "Source-only; shared/formal/native/domain acceptance pending.",
+          "nativeBehaviorVerified": false,
+          "nativePermissionGranted": false,
+          "executionAuthorityGranted": false,
+          "retryAllowed": false,
+          "generalWorkReleased": false,
+          "finiteCoverageClosed": false,
+          "provenanceCorrection": {
+            "finding": "HBSR-PROVENANCE-01",
+            "capturedAtUtc": "2026-10-20T06:16:03.407664Z",
+            "actualRootWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+            "originalInput": {
+              "kind": "git",
+              "repositoryId": "park-kyungchan/agent-platform",
+              "commit": "8cc1366955b4200aa5f7964acd6fba1305fd8d31",
+              "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-RESULT-20261020.json",
+              "sha256": "558b1494edce0ed6065a49ae5f466b3fddc296761aceb74e639c1162b032eb51"
+            },
+            "originalInputRetainedByteExact": true,
+            "meaning": "This new immutable source-owner Input corrects diagnostic attribution in the original retained Result Input; it does not replace original bytes, rerun QA, reopen the Task, or establish native/shared/formal acceptance."
+          }
+        }
+      }
+    },
+    "originalTaskInput": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "6a2cef0aac80f1865128c36b1eb46529d7e1ce71",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020-PACKET.json",
+      "sha256": "f898e6c183f4aea01c95c9733f663f4bb4a0e955bcf4718be6830e9046209240"
+    },
+    "originalTaskInstructionText": "Implement only the bounded guarded Hermes source-read bootstrap in Input ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020-PACKET; retain exact source, checks and unknown native IDs. No runtime install, activation, paid judgment or general-work release.",
+    "workerSource": {
+      "commit": "f23c2b0d91376e3d4d437e5bf832cc085ca87066",
+      "tree": "f523512f730cec359c300b6dd2ebbfee6bd525d3"
+    },
+    "contextRefs": {
+      "rootMethod": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/root-bounded-reader-integration-work-method.receive-use.actual.json",
+        "sha256": "25db483d418b22f539aa2d2d7f12096abc72b215d5531f2fb77f11ae881848fc"
+      },
+      "rootCli": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/root-bounded-reader-integration-work-method.actual-admission-call.result.actual.json",
+        "sha256": "4039dbdd39834fc3a90f3b09f67d3688be3a4337ab26bc4304adab88d184785f"
+      },
+      "workerImplementation": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-work-method-source-read.implementation.actual.json",
+        "sha256": "cd794619488144a97016d406bf62f64863278c711208ca1f8260e5c341e23ff7"
+      },
+      "workerIndependentReview": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-source-read.independent-review.result.actual.json",
+        "sha256": "db44e65d8cc38a9d08d8cdf8ba2a63d3b78dd247db9419cb31881d81d091f3fb"
+      },
+      "scopeReconciliation": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.integration.readonly-state-reconciliation.actual.json",
+        "sha256": "1fbb344ffabae2ac3c3b62b2526b57cd6517a476076ea237ceeb0e1490eaec55"
+      },
+      "privateDependencies": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.private-qa-projection.actual.json",
+        "sha256": "e5877ab855841bee42a00d011600df07fc319034e59673931b5e8a2393662d4e"
+      },
+      "actualRootQa": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-a.actual-qa-source-observation.actual.json",
+        "bytes": 5853,
+        "sha256": "64ed7dda4a5aa4b3d5dcac8a1002a54651c864e72c27139f2ae12941f3f40ba9"
+      },
+      "privateLookupCorrection": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.private-qa-ontology-lookup.actual.json",
+        "sha256": "ec789b08a77b830a749759eeb17809df19594b372dd564a38456bab274405f85"
+      },
+      "priorRejectedArtifactPrecheck": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.candidate-b.artifact-precheck.actual.json",
+        "sha256": "ecc4a33903537f52f41d4a72df6a86b50d54491b03404b6458f411d6cbc6e140"
+      }
+    },
+    "sourceOnlyState": {
+      "execution": "complete",
+      "verification": "passed",
+      "localAudit": "result-durable",
+      "sharedAudit": "pending",
+      "formalCompletion": "pending"
+    },
+    "holds": "Root c:task method use succeeded; A source QA passed; no native-install/general-release implication. Independent final exact review/publication/CI/merge/application remain pending. Failed host helper/no retry preserved after separate as-is settlement. Whole ODI WHY/owners/H16-H49/domain/PR17-19/MCP-image-Linux/recovery, successor-only structural consolidation/ff55+7inputs+3qualifications, CI interview-pending/no CI changes,9fences126consumed5uncertain/USD14unknown/current controls/serving349 retained. OldLead-only conditional Pause/fallback; successor Goal continues.",
+    "provenanceCorrection": {
+      "finding": "HBSR-PROVENANCE-01",
+      "capturedAtUtc": "2026-10-20T06:16:03.407664Z",
+      "actualRootWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+      "originalInput": {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "8cc1366955b4200aa5f7964acd6fba1305fd8d31",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-RESULT-20261020.json",
+        "sha256": "558b1494edce0ed6065a49ae5f466b3fddc296761aceb74e639c1162b032eb51"
+      },
+      "originalInputRetainedByteExact": true,
+      "meaning": "This new immutable source-owner Input corrects diagnostic attribution in the original retained Result Input; it does not replace original bytes, rerun QA, reopen the Task, or establish native/shared/formal acceptance."
+    }
+  }
+}

@@ -12,6 +12,7 @@ import { buildHermesPlatformSource } from "./build.ts";
 import { syntheticMemoryOwner } from "./tests/memory-caller.fixture.ts";
 import * as commonContext from "../../../work-continuity/src/context/index.ts";
 import * as commonWorkMethod from "../../../work-continuity/src/work-method.ts";
+import { fixture as methodFixture } from "./tests/work-method.fixture.ts";
 
 const source = resolve(import.meta.dir, "../../../..");
 test("existing common context API forwards the single canonical work-method implementation", () => {
@@ -128,10 +129,12 @@ test("v2 platform denominator includes transitive contracts, generator, dependen
       changed,
       (await readFile(changed, "utf8")) + "\n// Synthetic post-admission drift.\n",
     );
-    await expect(observed.verify()).rejects.toThrow("CLOSURE_CHANGED");
-    await expect(
-      observeHermesPlatformSource(f.path, { providerRoot: f.root, registrationSha256: f.sha256 }),
-    ).rejects.toThrow("CLOSURE_DRIFT");
+    await Promise.resolve(expect(observed.verify()).rejects.toThrow("CLOSURE_CHANGED"));
+    await Promise.resolve(
+      expect(
+        observeHermesPlatformSource(f.path, { providerRoot: f.root, registrationSha256: f.sha256 }),
+      ).rejects.toThrow("CLOSURE_DRIFT"),
+    );
   } finally {
     await f.cleanup();
   }
@@ -151,12 +154,14 @@ test("current Work source guard refuses an omitted or changed common work-method
     };
     const reducedBytes = JSON.stringify(reduced, null, 2) + "\n";
     await writeFile(f.path, reducedBytes);
-    await expect(
-      observeHermesPlatformSource(f.path, {
-        providerRoot: f.root,
-        registrationSha256: sourceDigest(reducedBytes),
-      }),
-    ).rejects.toThrow("CLOSURE_DRIFT");
+    await Promise.resolve(
+      expect(
+        observeHermesPlatformSource(f.path, {
+          providerRoot: f.root,
+          registrationSha256: sourceDigest(reducedBytes),
+        }),
+      ).rejects.toThrow("CLOSURE_DRIFT"),
+    );
     await writeFile(f.path, JSON.stringify(f.registration, null, 2) + "\n");
     await writeFile(
       join(f.root, path),
@@ -165,16 +170,20 @@ test("current Work source guard refuses an omitted or changed common work-method
     const installedProjection = f.registration.dependencies.some(
       (dependency) => dependency.name === "@palantirkc/work-continuity",
     );
-    await expect(observed.verify()).rejects.toThrow(
-      installedProjection ? "INSTALLED_WORKSPACE_PROJECTION_DRIFT" : "CLOSURE_CHANGED",
+    await Promise.resolve(
+      expect(observed.verify()).rejects.toThrow(
+        installedProjection ? "INSTALLED_WORKSPACE_PROJECTION_DRIFT" : "CLOSURE_CHANGED",
+      ),
     );
-    await expect(
-      observeHermesPlatformSource(f.path, {
-        providerRoot: f.root,
-        registrationSha256: f.sha256,
-      }),
-    ).rejects.toThrow(
-      installedProjection ? "INSTALLED_WORKSPACE_PROJECTION_DRIFT" : "CLOSURE_DRIFT",
+    await Promise.resolve(
+      expect(
+        observeHermesPlatformSource(f.path, {
+          providerRoot: f.root,
+          registrationSha256: f.sha256,
+        }),
+      ).rejects.toThrow(
+        installedProjection ? "INSTALLED_WORKSPACE_PROJECTION_DRIFT" : "CLOSURE_DRIFT",
+      ),
     );
   } finally {
     await f.cleanup();
@@ -241,21 +250,25 @@ test("first-import loader denies source/dependency drift and a forged reduced de
     const reduced = { ...f.registration, sourcePins: f.registration.sourcePins.slice(1) },
       bytes = JSON.stringify(reduced, null, 2) + "\n";
     await writeFile(f.path, bytes);
-    await expect(
-      observeHermesPlatformSource(f.path, {
-        providerRoot: f.root,
-        registrationSha256: sourceDigest(bytes),
-      }),
-    ).rejects.toThrow("CLOSURE_DRIFT");
+    await Promise.resolve(
+      expect(
+        observeHermesPlatformSource(f.path, {
+          providerRoot: f.root,
+          registrationSha256: sourceDigest(bytes),
+        }),
+      ).rejects.toThrow("CLOSURE_DRIFT"),
+    );
     await writeFile(f.path, JSON.stringify(f.registration, null, 2) + "\n");
     const dependency = f.registration.dependencyPins.find((p) => p.path.endsWith("package.json"))!;
     await writeFile(
       join(f.root, dependency.path),
       (await readFile(join(f.root, dependency.path), "utf8")) + "\n",
     );
-    await expect(
-      observeHermesPlatformSource(f.path, { providerRoot: f.root, registrationSha256: f.sha256 }),
-    ).rejects.toThrow("CLOSURE_DRIFT");
+    await Promise.resolve(
+      expect(
+        observeHermesPlatformSource(f.path, { providerRoot: f.root, registrationSha256: f.sha256 }),
+      ).rejects.toThrow("CLOSURE_DRIFT"),
+    );
   } finally {
     await f.cleanup();
   }
@@ -272,6 +285,30 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
         runtimeIndex: { schema: "native-harness.runtime-index.v1", entries: [] },
       });
     await writeFile(bindingsPath, bindingsBytes);
+    const method = methodFixture();
+    const dataBase = join(f.root, "source-data");
+    await mkdir(dataBase);
+    const original = "Complete original WHY 한국어 😀";
+    await writeFile(join(dataBase, "original"), original);
+    const sourceMapBytes =
+      JSON.stringify({
+        schema: "hermes.work-method-source-map.v1",
+        logical: method.admission.packet.logical,
+        actorId: method.selection.actorId,
+        routeId: method.selection.routeId,
+        native: method.selection.native,
+        cwd: method.selection.cwd,
+        entries: [
+          {
+            id: "original",
+            path: "original",
+            sha256: sourceDigest(original),
+            bytes: Buffer.byteLength(original),
+          },
+        ],
+      }) + "\n";
+    const runtimeMapPath = join(dataBase, "map.json");
+    await writeFile(runtimeMapPath, sourceMapBytes);
     const request = {
       registrationPath: f.path,
       registrationSha256: f.sha256,
@@ -282,36 +319,53 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       runtimeRegistrationPath: join(f.root, "runtime-registration.json"),
       currentWorkBindings: { runtimePath: bindingsPath, sha256: sourceDigest(bindingsBytes) },
       currentWorkOutputVersion: "v2" as const,
+      workMethodSourceBinding: {
+        dataBase,
+        runtimeMapPath,
+        mapSha256: sourceDigest(sourceMapBytes),
+      },
     };
-    await expect(
-      buildHermesPlatformSource({ ...request, currentWorkOutputVersion: "unknown" as "v2" }),
-    ).rejects.toThrow("EXPLICIT_CURRENT_WORK_OUTPUT_VERSION_REQUIRED");
-    await expect(
-      buildHermesPlatformSource({ ...request, currentWorkMaxChars: 12001 }),
-    ).rejects.toThrow("INVALID_CURRENT_WORK_OUTPUT_BUDGET");
-    await expect(
-      buildHermesPlatformSource({
-        ...request,
-        currentWorkOutputVersion: "v1",
-        currentWorkMetadataEncoding: "metadata.v1",
-      }),
-    ).rejects.toThrow("EXPLICIT_CURRENT_WORK_METADATA_ENCODING_REQUIRED");
-    await expect(
-      buildHermesPlatformSource({
-        ...request,
-        currentWorkOutputVersion: "v1",
-        currentWorkMaxChars: 6001,
-      }),
-    ).rejects.toThrow("INVALID_CURRENT_WORK_OUTPUT_BUDGET");
-    await expect(
-      buildHermesPlatformSource({
-        ...request,
-        compiler: { ...request.compiler, sha256: "0".repeat(64) },
-      }),
-    ).rejects.toThrow("COMPILER_PIN_DRIFT");
-    await expect(
-      buildHermesPlatformSource({ ...request, runtimeProviderRoot: "/home/synthetic-owner" }),
-    ).rejects.toThrow("PC_INDEPENDENT");
+    await Promise.resolve(
+      expect(
+        buildHermesPlatformSource({ ...request, currentWorkOutputVersion: "unknown" as "v2" }),
+      ).rejects.toThrow("EXPLICIT_CURRENT_WORK_OUTPUT_VERSION_REQUIRED"),
+    );
+    await Promise.resolve(
+      expect(buildHermesPlatformSource({ ...request, currentWorkMaxChars: 12001 })).rejects.toThrow(
+        "INVALID_CURRENT_WORK_OUTPUT_BUDGET",
+      ),
+    );
+    await Promise.resolve(
+      expect(
+        buildHermesPlatformSource({
+          ...request,
+          currentWorkOutputVersion: "v1",
+          currentWorkMetadataEncoding: "metadata.v1",
+        }),
+      ).rejects.toThrow("EXPLICIT_CURRENT_WORK_METADATA_ENCODING_REQUIRED"),
+    );
+    await Promise.resolve(
+      expect(
+        buildHermesPlatformSource({
+          ...request,
+          currentWorkOutputVersion: "v1",
+          currentWorkMaxChars: 6001,
+        }),
+      ).rejects.toThrow("INVALID_CURRENT_WORK_OUTPUT_BUDGET"),
+    );
+    await Promise.resolve(
+      expect(
+        buildHermesPlatformSource({
+          ...request,
+          compiler: { ...request.compiler, sha256: "0".repeat(64) },
+        }),
+      ).rejects.toThrow("COMPILER_PIN_DRIFT"),
+    );
+    await Promise.resolve(
+      expect(
+        buildHermesPlatformSource({ ...request, runtimeProviderRoot: "/home/synthetic-owner" }),
+      ).rejects.toThrow("PC_INDEPENDENT"),
+    );
     const built = await buildHermesPlatformSource(request);
     expect(built.bundles).toHaveLength(6);
     expect(built.bundles.some((bundle) => bundle.name === "read-work-method.js")).toBe(true);
@@ -343,6 +397,44 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       await writeFile(join(f.root, bundle.name), bundle.bytes);
     }
     await writeFile(request.runtimeRegistrationPath, built.nativeRegistration.bytes);
+    const sourcePayload = {
+      schema: "hermes.work-method-source-request.v1",
+      event: method.event,
+      selection: {
+        cwd: method.selection.cwd,
+        native: method.selection.native,
+        actorId: method.selection.actorId,
+        routeId: method.selection.routeId,
+        logical: method.admission.packet.logical,
+      },
+      sourceMapSha256: sourceDigest(sourceMapBytes),
+      target: { kind: "mapped-source", id: "original" },
+      cursor: { offsetBytes: 0, expectedDocumentSha256: null },
+      outputVersion: "v2",
+    };
+    const invokeSource = async () => {
+      const child = Bun.spawn([compiler, "--no-env-file", join(f.root, "read-work-method.js")], {
+        stdin: new Blob([JSON.stringify(sourcePayload)]),
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      return {
+        code: await child.exited,
+        out: await new Response(child.stdout).text(),
+        error: await new Response(child.stderr).text(),
+      };
+    };
+    const delivered = await invokeSource();
+    expect(delivered.code).toBe(0);
+    expect(delivered.error).toBe("");
+    expect(JSON.parse(delivered.out).chunk.text).toBe(original);
+    expect(JSON.parse(delivered.out).receivedOrUsedEstablishedByDelivery).toBe(false);
+    await writeFile(runtimeMapPath, "{}");
+    const drift = await invokeSource();
+    expect(drift.code).toBe(2);
+    expect(JSON.parse(drift.out).chunk).toBeNull();
+    expect(JSON.parse(drift.out).holdReasons).toEqual(["SOURCE_MAP_NOT_CURRENT"]);
+    await writeFile(runtimeMapPath, sourceMapBytes);
     const memory = await syntheticMemoryOwner();
     const invokeMemory = async (payload: unknown) => {
       const child = Bun.spawn([compiler, "--no-env-file", join(f.root, "read-memory.js")], {
@@ -737,20 +829,27 @@ test("actual native Work importer rejects a stale same-export projection before 
     expect(
       await readFile(join(f.root, "packages/work-continuity/src/git-work/context.ts"), "utf8"),
     ).toBe(fresh);
-    await expect(captureHermesPlatformSource(f.root)).rejects.toThrow(
-      "INSTALLED_WORKSPACE_PROJECTION_DRIFT",
+    await Promise.resolve(
+      expect(captureHermesPlatformSource(f.root)).rejects.toThrow(
+        "INSTALLED_WORKSPACE_PROJECTION_DRIFT",
+      ),
     );
-    await expect(
-      buildHermesPlatformSource({
-        registrationPath: f.path,
-        registrationSha256: f.sha256,
-        providerRoot: f.root,
-        compiler: { path: join(f.root, "compiler-must-not-be-inspected"), sha256: "0".repeat(64) },
-        legacyManifestSha256: "1".repeat(64),
-        runtimeProviderRoot: f.root,
-        runtimeRegistrationPath: join(f.root, "runtime-registration.json"),
-      }),
-    ).rejects.toThrow("INSTALLED_WORKSPACE_PROJECTION_DRIFT");
+    await Promise.resolve(
+      expect(
+        buildHermesPlatformSource({
+          registrationPath: f.path,
+          registrationSha256: f.sha256,
+          providerRoot: f.root,
+          compiler: {
+            path: join(f.root, "compiler-must-not-be-inspected"),
+            sha256: "0".repeat(64),
+          },
+          legacyManifestSha256: "1".repeat(64),
+          runtimeProviderRoot: f.root,
+          runtimeRegistrationPath: join(f.root, "runtime-registration.json"),
+        }),
+      ).rejects.toThrow("INSTALLED_WORKSPACE_PROJECTION_DRIFT"),
+    );
   } finally {
     await f.cleanup();
   }
@@ -771,8 +870,10 @@ test("native importer readback rejects an unadmitted lookup root even after reso
       dereference: false,
       verbatimSymlinks: true,
     });
-    await expect(captureHermesPlatformSource(f.root)).rejects.toThrow(
-      "UNADMITTED_WORKSPACE_LOOKUP_ROOT",
+    await Promise.resolve(
+      expect(captureHermesPlatformSource(f.root)).rejects.toThrow(
+        "UNADMITTED_WORKSPACE_LOOKUP_ROOT",
+      ),
     );
   } finally {
     await f.cleanup();
