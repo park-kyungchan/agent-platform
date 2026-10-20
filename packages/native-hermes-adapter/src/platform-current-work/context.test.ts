@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import * as gitWork from "@palantirkc/work-continuity/git-work";
@@ -17,6 +17,12 @@ import {
   type HermesCurrentWorkOptions,
 } from "./context.ts";
 import { readHermesNativeWorkHook } from "./hook-context.ts";
+import { createHash } from "node:crypto";
+import {
+  readHermesWorkMethodSource,
+  type WorkMethodSourceBinding,
+  type WorkMethodSessionSourceMap,
+} from "./work-method-source.ts";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -919,4 +925,350 @@ test("native v1/v2 ordinary and metadata responses honor every supported seriali
     }
   }
   expect([...statuses].sort()).toEqual(["held", "source-qualified"]);
+});
+
+// Proposed source-only callback cases; synthetic fixtures are not native evidence.
+type CallbackOptions = Parameters<typeof readHermesNativeWorkHook>[2] & {
+  workMethodSourceBinding?: WorkMethodSourceBinding;
+  compiledRegistrationSha256?: string;
+  bindingsSha256?: string;
+};
+const callbackSha = (text: string) => createHash("sha256").update(text).digest("hex");
+async function callbackFixture(minimal = false) {
+  const owner = await fixture(); // Existing roots/afterEach owns cleanup.
+  const dataBase = join(owner.root, "callback-data");
+  await mkdir(dataBase);
+  const mapPath = join(dataBase, "map.json");
+  const map: WorkMethodSessionSourceMap = {
+    schema: "hermes.work-method-session-source-map.v1",
+    scope: {
+      kind: "session-source",
+      runtime: "native-hermes",
+      profileId: minimal ? "a" : "canonical-gateway-profile",
+      sessionId: minimal ? "a" : "callback-session",
+    },
+    logical: { domainId: "a", projectId: "a", workId: "a", taskId: "a" },
+    actorId: "a",
+    routeId: "a",
+    entries: [{ id: "original", path: "original", sha256: callbackSha("source"), bytes: 6 }],
+  };
+  await writeFile(join(dataBase, "original"), "source");
+  const sourceBinding: WorkMethodSourceBinding = {
+    dataBase,
+    runtimeMapPath: mapPath,
+    mapSha256: "",
+  };
+  const payload = {
+    ...nativePayload(),
+    profile: minimal ? "a" : "shell-profile-name",
+    session_id: map.scope.sessionId,
+    cwd: minimal ? "/a" : "/synthetic/callback-cwd",
+    extra: { ...nativePayload().extra } as Record<string, unknown>,
+  };
+  if (minimal)
+    for (const key of ["agent_id", "project_id", "task_id", "run_id", "turn_id"])
+      payload.extra[key] = null;
+  const bindings = {
+    schema: "hermes.real-callback-source-hook-bindings.v1",
+    kind: "stableSessionSource",
+    shellSelection: {
+      profileName: payload.profile,
+      sessionId: payload.session_id,
+      cwd: payload.cwd,
+    },
+    sourceSelection: {
+      scope: structuredClone(map.scope),
+      logical: structuredClone(map.logical),
+      actorId: map.actorId,
+      routeId: map.routeId,
+    },
+  };
+  let checks = 0;
+  let atCheck: ((n: number) => Promise<void>) | undefined;
+  const options: CallbackOptions = {
+    ...owner.provider,
+    outputVersion: "v2",
+    maxChars: 12000,
+    workMethodSourceBinding: sourceBinding,
+    compiledRegistrationSha256: "1".repeat(64),
+    bindingsSha256: "2".repeat(64),
+    verifySourceClosure: async () => {
+      checks++;
+      await atCheck?.(checks);
+      await owner.provider.verifySourceClosure();
+    },
+  };
+  const saveMap = async (value: unknown = map) => {
+    const text = JSON.stringify(value, null, 2) + "\n";
+    await writeFile(mapPath, text);
+    sourceBinding.mapSha256 = callbackSha(text);
+    return text;
+  };
+  await saveMap();
+  const read = (
+    wire: unknown = payload,
+    selected: unknown = bindings,
+    changes: Partial<CallbackOptions> = {},
+  ) => readHermesNativeWorkHook(wire, selected, { ...options, ...changes });
+  const probeMap = () =>
+    readHermesWorkMethodSource(
+      {
+        schema: "hermes.work-method-session-source-request.v1",
+        ...bindings.sourceSelection,
+        sourceMapSha256: sourceBinding.mapSha256,
+        target: { kind: "mapped-source", id: "@map" },
+        cursor: { offsetBytes: 0, expectedDocumentSha256: null },
+        outputVersion: "v2",
+        maxChars: 12000,
+      },
+      sourceBinding,
+      options,
+    );
+  return {
+    owner,
+    map,
+    mapPath,
+    sourceBinding,
+    payload,
+    bindings,
+    options,
+    read,
+    saveMap,
+    probeMap,
+    checks: () => checks,
+    onCheck: (fn: typeof atCheck) => {
+      atCheck = fn;
+    },
+    resetChecks: () => {
+      checks = 0;
+    },
+  };
+}
+const callbackFalseFlags = [
+  "nativeInvocationVerified",
+  "ownerProfileMappingVerified",
+  "nativeAuthenticationEstablished",
+  "receivedOrUsedEstablishedByProjection",
+  "ownerAdmissionEstablished",
+  "nativePermissionGranted",
+  "executionAuthorityGranted",
+] as const;
+function expectedCallback(f: Awaited<ReturnType<typeof callbackFixture>>) {
+  const extra = Object.fromEntries(
+    ["agent_id", "project_id", "task_id", "run_id", "turn_id"].map((key) => [
+      key,
+      f.payload.extra[key] ?? null,
+    ]),
+  );
+  return {
+    schema: "hermes.real-callback-identity-context.v1",
+    kind: "stableSessionSource",
+    logical: f.bindings.sourceSelection.logical,
+    actorId: f.map.actorId,
+    routeId: f.map.routeId,
+    wireEvent: {
+      hook_event_name: "pre_llm_call",
+      profile: f.payload.profile,
+      session_id: f.payload.session_id,
+      cwd: f.payload.cwd,
+      extra,
+    },
+    declaredSourceScope: f.bindings.sourceSelection.scope,
+    sourceProvenance: {
+      compiledRegistrationSha256: f.options.compiledRegistrationSha256,
+      bindingsSha256: f.options.bindingsSha256,
+      sourceMapSha256: f.sourceBinding.mapSha256,
+    },
+    ...Object.fromEntries(callbackFalseFlags.map((key) => [key, false])),
+  };
+}
+
+test("callback opt-in is closed, explicitly v2 and requires each compiled input", async () => {
+  const f = await callbackFixture();
+  expect((await f.probeMap()).status).toBe("source-qualified"); // Real map API, no mock.
+  for (const bad of [
+    { ...f.bindings, kind: "other" },
+    { ...f.bindings, unexpected: true },
+    { ...f.bindings, runtimeIndex: {} },
+    { ...f.bindings, shellSelection: { ...f.bindings.shellSelection, taskId: null } },
+    { ...f.bindings, sourceSelection: { ...f.bindings.sourceSelection, event: {} } },
+  ])
+    await expect(f.read(f.payload, bad)).rejects.toThrow();
+  for (const changes of [
+    { outputVersion: undefined },
+    { outputVersion: "v1" as const },
+    { metadataEncoding: "metadata.v1" as const },
+    { workMethodSourceBinding: undefined },
+    { compiledRegistrationSha256: undefined },
+    { bindingsSha256: "invalid" },
+    { maxChars: 1023 },
+    { maxChars: 12001 },
+  ])
+    await expect(f.read(f.payload, f.bindings, changes)).rejects.toThrow();
+});
+
+test("callback retains actual IDs and raw profile while excluding private payloads", async () => {
+  const f = await callbackFixture();
+  for (const turn of ["first-actual-turn", "second-actual-turn"]) {
+    f.payload.extra.task_id = `task-${turn}`;
+    f.payload.extra.run_id = `run-${turn}`;
+    f.payload.extra.turn_id = turn;
+    const response = await f.read(),
+      value = JSON.parse(response.context!);
+    expect(Object.keys(response)).toEqual(["context"]);
+    expect(value).toEqual(expectedCallback(f));
+    expect(value.wireEvent.profile).not.toBe(value.declaredSourceScope.profileId);
+    expect(value.wireEvent.extra.turn_id).not.toBe(value.wireEvent.extra.run_id);
+    for (const key of callbackFalseFlags) expect(value[key]).toBe(false);
+    for (const secret of ["PRIVATE-NATIVE-PROMPT", "PRIVATE-NATIVE-HISTORY"])
+      expect(JSON.stringify(response)).not.toContain(secret);
+  }
+  for (const key of ["agent_id", "project_id", "run_id"]) delete f.payload.extra[key];
+  const missing = JSON.parse((await f.read()).context!);
+  expect(missing.wireEvent.extra.agent_id).toBeNull();
+  expect(missing.wireEvent.extra.project_id).toBeNull();
+  expect(missing.wireEvent.extra.run_id).toBeNull();
+  expect(f.owner.counters().reads).toBe(0);
+});
+
+test("valid foreign callbacks return before closure, Git or map reads; invalid matched IDs hold", async () => {
+  const f = await callbackFixture();
+  const foreign = [
+    { ...f.payload, profile: "foreign" },
+    { ...f.payload, session_id: "foreign" },
+    { ...f.payload, cwd: "/foreign/cwd" },
+    { ...f.payload, hook_event_name: "on_session_start" },
+  ];
+  // If any foreign branch tries the real map reader it must fail, rather than return {}.
+  await rm(f.mapPath);
+  for (const wire of foreign) expect(await f.read(wire)).toEqual({});
+  for (const workMethodSourceBinding of [
+    { ...f.sourceBinding, mapSha256: "invalid" },
+    { ...f.sourceBinding, dataBase: "relative" },
+    { ...f.sourceBinding, runtimeMapPath: "/foreign/map.json" },
+    { ...f.sourceBinding, unexpected: true },
+  ])
+    await expect(f.read(foreign[0], f.bindings, { workMethodSourceBinding })).rejects.toThrow();
+  expect(f.checks()).toBe(0);
+  expect(f.owner.counters().reads).toBe(0);
+  await expect(f.read()).rejects.toThrow(); // Positive witness: selected missing map holds.
+  await f.saveMap();
+  for (const wire of [
+    { ...f.payload, cwd: "relative" },
+    { ...f.payload, extra: { ...f.payload.extra, turn_id: "\u0000invalid" } },
+  ])
+    await expect(f.read(wire)).rejects.toThrow();
+});
+
+test("callback rejects a valid source map for another session before closure, Git or map reads", async () => {
+  const f = await callbackFixture();
+  const shellSession = f.payload.session_id;
+  const sourceSession = "foreign-source-session";
+  f.map.scope.sessionId = sourceSession;
+  f.bindings.sourceSelection.scope.sessionId = sourceSession;
+  await f.saveMap();
+  const probe = await f.probeMap(); // Real source reader proves map B is valid independently.
+  expect(probe.status).toBe("source-qualified");
+  expect(probe.binding?.sourceId).toBe("@map");
+  expect(probe.binding?.sourceMapSha256).toBe(f.sourceBinding.mapSha256);
+  expect(probe.binding?.documentSha256).toBe(f.sourceBinding.mapSha256);
+  expect(f.bindings.shellSelection.sessionId).toBe(shellSession); // Shell and event remain A.
+  expect(f.bindings.sourceSelection.scope.sessionId).toBe(sourceSession);
+  expect(shellSession).not.toBe(sourceSession);
+  expect(f.bindings.shellSelection.profileName).not.toBe(f.map.scope.profileId);
+  f.resetChecks(); // Discard only the qualification probe's closure count.
+  await expect(f.read()).rejects.toThrow("CALLBACK_SOURCE_SESSION_MISMATCH");
+  expect(f.checks()).toBe(0);
+  expect(f.owner.counters().reads).toBe(0);
+  await rm(f.mapPath); // A real missing map must not change the structural mismatch outcome.
+  await expect(f.read()).rejects.toThrow("CALLBACK_SOURCE_SESSION_MISMATCH");
+  expect(f.checks()).toBe(0);
+  expect(f.owner.counters().reads).toBe(0);
+});
+
+test("callback uses exact real map scope, logical identity and compiled hash", async () => {
+  const f = await callbackFixture();
+  for (const bad of [
+    { ...f.map, schema: "hermes.work-method-source-map.v1" },
+    { ...f.map, scope: { ...f.map.scope, profileId: "foreign" } },
+    { ...f.map, scope: { ...f.map.scope, sessionId: "foreign" } },
+    { ...f.map, logical: { ...f.map.logical, taskId: "foreign" } },
+    { ...f.map, actorId: "foreign" },
+    { ...f.map, routeId: "foreign" },
+  ]) {
+    await f.saveMap(bad);
+    expect((await f.probeMap()).status).toBe("held");
+    await expect(f.read()).rejects.toThrow();
+  }
+  await f.saveMap();
+  f.sourceBinding.mapSha256 = "0".repeat(64);
+  expect((await f.probeMap()).status).toBe("held");
+  await expect(f.read()).rejects.toThrow();
+});
+
+test("callback rejects a symlink map and drift at its final closure boundary", async () => {
+  const f = await callbackFixture();
+  const text = await readFile(f.mapPath, "utf8"),
+    copy = join(f.sourceBinding.dataBase, "map-copy.json");
+  await writeFile(copy, text);
+  await rm(f.mapPath);
+  await symlink(copy, f.mapPath);
+  await expect(f.read()).rejects.toThrow();
+  await rm(f.mapPath);
+  await f.saveMap();
+  f.resetChecks();
+  await f.read();
+  const finalCheck = f.checks();
+  expect(finalCheck).toBeGreaterThanOrEqual(3); // map API has two checks; hook adds final publication guard.
+  f.resetChecks();
+  f.onCheck(async (n) => {
+    if (n === finalCheck) await writeFile(f.mapPath, "changed\n");
+  });
+  await expect(f.read()).rejects.toThrow(); // Requires final map re-read, not just earlier map validation.
+});
+
+test("callback checks inner and escaped outer budgets without a 1024-byte success assumption", async () => {
+  const f = await callbackFixture(true),
+    large = await f.read(),
+    inner = large.context!;
+  const outerLength = JSON.stringify(large).length;
+  expect(JSON.parse(inner)).toEqual(expectedCallback(f));
+  expect(inner.length).toBeLessThanOrEqual(1024);
+  expect(outerLength).toBeGreaterThan(1024);
+  await expect(f.read(f.payload, f.bindings, { maxChars: 1024 })).rejects.toThrow();
+  const exact = await f.read(f.payload, f.bindings, { maxChars: outerLength });
+  expect(exact).toEqual(large);
+  await expect(f.read(f.payload, f.bindings, { maxChars: outerLength - 1 })).rejects.toThrow();
+  expect(
+    JSON.stringify(await f.read(f.payload, f.bindings, { maxChars: 12000 })).length,
+  ).toBeLessThanOrEqual(12000);
+  // Escaping witness: all values satisfy identity length/path bounds, but outer wire exceeds v2 cap.
+  f.payload.profile = "\\".repeat(256);
+  f.bindings.shellSelection.profileName = f.payload.profile;
+  f.payload.cwd = "/" + "\\".repeat(2047);
+  f.bindings.shellSelection.cwd = f.payload.cwd;
+  for (const key of ["agent_id", "project_id", "task_id", "run_id", "turn_id"])
+    f.payload.extra[key] = "\\".repeat(256);
+  const expected = JSON.stringify(expectedCallback(f));
+  expect(expected.length).toBeLessThanOrEqual(12000);
+  expect(JSON.stringify({ context: expected }).length).toBeGreaterThan(12000);
+  await expect(f.read()).rejects.toThrow();
+});
+
+test("callback opt-in leaves original v1 null tuple matching and default output unchanged", async () => {
+  const f = await fixture();
+  f.selected.native.nativeTaskId = null;
+  f.index.entries[0]!.nativeTaskId = null;
+  const wire = nativePayload({ ...event, nativeTaskId: null });
+  const original = await readHermesNativeWorkHook(wire, hookBindings(f), f.provider);
+  expect(JSON.parse(original.context!).schema).toBe("hermes.current-git-work-context.v1");
+  expect(original.context!.length).toBeLessThanOrEqual(6000);
+  expect(JSON.parse(original.context!)).not.toHaveProperty("wireEvent");
+  expect(
+    await readHermesNativeWorkHook(
+      { ...wire, extra: { ...wire.extra, task_id: "observed-new-task" } },
+      hookBindings(f),
+      f.provider,
+    ),
+  ).toEqual({});
 });

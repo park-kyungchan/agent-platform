@@ -742,12 +742,12 @@
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
-          "sha256": "fca4602e9eab1c69cc2076ac92c06b4021f677a8bf3d93bf7869b06816f01e97"
+          "sha256": "1db622f5947c2ccf7907ad4d3fad7e4b5bf6f9489b77119f0a3ecf3bbd427776"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
-          "sha256": "78f50cff6a5e06285ee4791a50143013a40ee93e485fb26eef3b9d8ffad47d07"
+          "sha256": "a521be26300e12262b76a321a0dbb5a9771be3d9c38573b1ecf3b24943eb62f7"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/provider.ts",
