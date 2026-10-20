@@ -160,3 +160,69 @@ verify the mapping, loaded source, genuine invocation and current identities bef
 E -> U0 -> Q -> U1 -> R and full owner admission. The existing full-event evaluator
 continues to require literal joins and holds differing identity domains. Building
 this capability does not install, configure, trust, invoke or adopt it in a runtime.
+
+## Finite namespace delivery
+
+`platform-current-work/delivery.ts` adds `deliverHermesNamespace(contract, payload)`
+for one initial source delivery. The existing fourteen-file facade delivery API and
+its consumed operations retain their contracts. This helper creates no native
+session, agent loop, provider request, scheduler or native store.
+
+The source owner compiles an exact `NamespaceDeliveryContract` into the small
+`native-delivery.ts` entrypoint using `HERMES_NAMESPACE_DELIVERY_CONTRACT`. Unbound
+entrypoints hold before reading stdin or touching a target. There are no runtime
+target/command arguments: stdin contains only a closed finite payload. The common
+algorithm has no instance-specific namespace. The compiled owner binding selects
+the operation/Task label, fixed namespace, exact existing parent device/inode/mode/
+UID/GID, current executable path/bytes/hash, protected legacy manifest path/bytes/
+hash, reviewed payload digest, layout and artifact write ceiling. These are source
+bindings, never authentication or native permission.
+
+The owner constructs payload files from the existing guarded
+`buildHermesPlatformSource` result and captured original source/dependency bytes:
+the rebased `nativeRegistration`, every registered source/dependency file, exactly
+six named bundles, selected immutable DATA, and explicitly listed resolver aliases.
+Each regular file has canonical base64 bytes, SHA256, byte count and mode0600/0644.
+Aliases can target only declared dependency roots inside the new namespace; they
+cannot be parents of delivered artifacts or escape through another alias. Source
+commit, host/runtime registration hashes, compiler hash and each build bundle pin
+remain explicit provenance. Source-only provenance is not a native receipt.
+
+Limits are 4,096 files, 256 aliases, 8,192 derived directories, 8MiB per file,
+64MiB decoded total, 96MiB stdin and 16MiB metadata journal. Existing source-reader
+and compiler limits are unchanged. The helper checks the exact runtime registration
+layout, complete registered payload bytes and bundle names before its first write.
+It never downloads dependencies, invokes a package manager, executes payload code
+or accepts an executable callback.
+
+The first mutation is an exclusive namespace mkdir under the verified held parent.
+The first file is an exclusive durable source-owned claim; it is never removed or
+reclaimed. Every artifact is created through held no-follow directory descriptors
+and `O_EXCL`, with fsync and exact readback. The legacy manifest is hashed without
+parsing its contents and rechecked during delivery. Gateway/control locks, active
+manifests, profile/config/trust and existing projections are not written. Existing
+namespace/claim means reconciliation, including an identical previous attempt;
+there is no automatic resume, replacement, retry or rollback.
+
+Intent/completion records are fsynced into a bounded metadata-only journal. A final
+receipt is attempted independently even when journal completion fails. A returned
+`persistenceFailure` or `uncertain` path requires the existing owner to reconcile the
+exact native tool outcome and on-disk evidence; storage failure cannot be turned
+into a durable-success claim. The caller must retain the returned metadata even
+when native transport or post-operation checks fail. Operation/Task labels and
+these claim/journal files are source-owned one-shot work records; native Task/Run/
+event/attempt IDs remain null until the native owner supplies genuine receipts.
+
+Delivery returns `delivered-awaiting-owner-verification`. The required separate
+owner post-step uses the maintained `observeHermesPlatformSource` with the fixed
+runtime provider/registration paths and returned registration digest, then calls
+`verify()`. This establishes the resolver/importer/immutable Ontology0.2.0 closure
+without helper-selected execution. The owner records that actual verification
+separately; byte delivery alone does not pass it.
+
+This new helper must be independently source/build pinned. An older53-source
+registration does not cover these new files. No active owner registration is edited
+by adding the helper. Optional current-work/source bindings must be omitted from a
+build when absent, never passed as null. Actual shell correspondence, both bindings,
+approved invocation, hook trust/activation, first read/use and coverage remain under
+their existing native/source owners; delivery supplies none of those observations.
