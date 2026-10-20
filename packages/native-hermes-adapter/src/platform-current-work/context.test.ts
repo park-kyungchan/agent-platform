@@ -1160,6 +1160,32 @@ test("valid foreign callbacks return before closure, Git or map reads; invalid m
     await expect(f.read(wire)).rejects.toThrow();
 });
 
+test("callback rejects a valid source map for another session before closure, Git or map reads", async () => {
+  const f = await callbackFixture();
+  const shellSession = f.payload.session_id;
+  const sourceSession = "foreign-source-session";
+  f.map.scope.sessionId = sourceSession;
+  f.bindings.sourceSelection.scope.sessionId = sourceSession;
+  await f.saveMap();
+  const probe = await f.probeMap(); // Real source reader proves map B is valid independently.
+  expect(probe.status).toBe("source-qualified");
+  expect(probe.binding?.sourceId).toBe("@map");
+  expect(probe.binding?.sourceMapSha256).toBe(f.sourceBinding.mapSha256);
+  expect(probe.binding?.documentSha256).toBe(f.sourceBinding.mapSha256);
+  expect(f.bindings.shellSelection.sessionId).toBe(shellSession); // Shell and event remain A.
+  expect(f.bindings.sourceSelection.scope.sessionId).toBe(sourceSession);
+  expect(shellSession).not.toBe(sourceSession);
+  expect(f.bindings.shellSelection.profileName).not.toBe(f.map.scope.profileId);
+  f.resetChecks(); // Discard only the qualification probe's closure count.
+  await expect(f.read()).rejects.toThrow("CALLBACK_SOURCE_SESSION_MISMATCH");
+  expect(f.checks()).toBe(0);
+  expect(f.owner.counters().reads).toBe(0);
+  await rm(f.mapPath); // A real missing map must not change the structural mismatch outcome.
+  await expect(f.read()).rejects.toThrow("CALLBACK_SOURCE_SESSION_MISMATCH");
+  expect(f.checks()).toBe(0);
+  expect(f.owner.counters().reads).toBe(0);
+});
+
 test("callback uses exact real map scope, logical identity and compiled hash", async () => {
   const f = await callbackFixture();
   for (const bad of [

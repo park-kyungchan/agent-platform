@@ -89,6 +89,7 @@ async function readRealCallbackSource(
     throw Error("EXACT_CALLBACK_SOURCE_SCOPE_REQUIRED");
   id(scope.profileId);
   id(scope.sessionId);
+  if (shell.sessionId !== scope.sessionId) throw Error("CALLBACK_SOURCE_SESSION_MISMATCH");
   closed(logical, ["domainId", "projectId", "workId", "taskId"]);
   for (const value of Object.values(logical)) id(value);
   if (
