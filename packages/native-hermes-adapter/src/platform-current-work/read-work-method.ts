@@ -28,7 +28,9 @@ if (import.meta.main) {
     });
     await source.verify();
     stage = "implementation";
-    const sourceRead = request.schema === "hermes.work-method-source-request.v1";
+    const sourceRead =
+      request.schema === "hermes.work-method-source-request.v1" ||
+      request.schema === "hermes.work-method-session-source-request.v1";
     const read = sourceRead
       ? (await import("./work-method-source.ts")).readHermesWorkMethodSource
       : (await import("./work-method.ts")).readHermesWorkMethod;
