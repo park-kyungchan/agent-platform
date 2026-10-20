@@ -1,0 +1,63 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-SESSION-SOURCE-INTEGRATION-SCOPE-20261020",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "kind": "source-owner-capture",
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-session-source.scope-registration.root-authoring.actual.json"
+  },
+  "content": {
+    "purpose": "Explicit finite mechanical integration successor for the SAME planned SOURCE Task. Six selected design paths plus exactly two native-hermes-context registry hashes are needed to qualify actual source through existing guarded focused/full checks. Root remains sole implementer/integrator.",
+    "originalInput": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "65bdcbbe47942fa512dc66407979e5421255fed6",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SESSION-SOURCE-20261020-PACKET.json",
+      "sha256": "4f458e93e624bcf5acd500fd36c776d43c023e9ac174f1c13e3d6efba38dd54e"
+    },
+    "selectedDesign": {
+      "kind": "snapshot",
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-work-method.native-event-projection.minimal-design.v2.actual.json",
+      "sha256": "56fd92930c9fa8a81fb6ff2f100128a65f63b0221ba6c5273f90d39206a0d60e"
+    },
+    "ownedImplementationPaths": [
+      "packages/native-hermes-adapter/src/platform-current-work/work-method-source.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/work-method-source.test.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/provider.test.ts",
+      "docs/hermes-work-method-source-read.md",
+      ".github/source-author.json",
+      "architecture/capability-source-owners.json"
+    ],
+    "registryScope": {
+      "path": "architecture/capability-source-owners.json",
+      "preimageSha256": "0f7a689fa2219b051b9dccd127b6fbc3ae1d88051d05acd3d52ed6fc00bc2dd4",
+      "capabilityId": "native-hermes-context",
+      "sourcePinsCountUnchanged": 53,
+      "replaceOnlyTheseTwoHashes": [
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts",
+          "sha256": "497fa33555dfceff0db57ba3fbd325e685fe2eef889c32c37241c560c191edd3",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/work-method-source.ts",
+          "sha256": "eb091a98b9ff8fc5fa082f867c856c3ce273d6e4a3745549f6fc4b6970fae9c6",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/work-method-source.ts"
+        }
+      ],
+      "otherRegistryValuesUnchanged": true
+    },
+    "preEffectSourceOwnerSelection": true,
+    "originalInputAndCompletedHistoryPreserved": true,
+    "freshOwnRootCTaskRequiredBeforeAllSevenPathImplementation": true,
+    "laterSeparateGates": "Native consumer registration/markers, package/lock/build/namespace/install/firstread/use and finitecoverage are separately qualified/admitted. No package/lock/native code/config/hooks/profiles/stores/provider/model/trust/Goal/pane effects included.",
+    "verification": "Existing focused module tests, handoff/import/quality/source checks, exact independent review/normalCI/manualexpectedheadmerge/separateownerapply. No new suite/benchmark/evaluation.",
+    "wholeWorkFences": "Full ODI Data/Logic/Action/Security/WHY/owners/estate/Memory/H16H49/PR17PR19/domain/retainedoutcomes/ff55successor scope;9fences126consumed5uncertain/serving349/USD14unknownpaidheld/currentnativecontrols/oldRootsafePause retained; no generalrelease/newMAIN."
+  }
+}
