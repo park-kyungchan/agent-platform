@@ -19,9 +19,9 @@
   "title": "Map compatible Codex/Hermes projection/admission delta",
   "nextAction": "Execute only the exact bootstrap packet in Input ODI-WORK-METHOD-NATIVE-COMPATIBILITY-20261020-PACKET. Retain assigned durable result, actual IDs/unknowns and checks; no general work/adoption/paid judgment claim. Lead integrates exact source review/publication and owner use.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -32,5 +32,7 @@
     "ODI-DECISION-LONG-AUTONOMY-20261020"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "ODI-COMMON-WORK-METHOD-SOURCE-BOOTSTRAP-VERIFICATION-20261020"
+  ]
 }
