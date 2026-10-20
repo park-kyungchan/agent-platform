@@ -1,3 +1,4 @@
+import type { WorkMethodSourceBinding } from "./work-method-source.ts";
 import { readJsonRequest } from "../platform-rearchitecture/input.ts";
 import { observeHermesPlatformSource, readExactFile, sourceDigest } from "./provider.ts";
 import { currentWorkDiagnostic, type CurrentWorkDiagnosticStage } from "./diagnostics.ts";
@@ -8,6 +9,7 @@ declare const HERMES_CURRENT_WORK_BINDINGS_PATH: string | undefined;
 declare const HERMES_CURRENT_WORK_BINDINGS_SHA256: string | undefined;
 declare const HERMES_CURRENT_WORK_OUTPUT_VERSION: "v1" | "v2" | undefined;
 declare const HERMES_CURRENT_WORK_MAX_CHARS: number | undefined;
+declare const HERMES_WORK_METHOD_SOURCE_BINDING: WorkMethodSourceBinding | undefined;
 declare const HERMES_CURRENT_WORK_METADATA_ENCODING: "metadata.v1" | undefined;
 
 // Builtin-only bootstrap modules precede the implementation import. Data never chooses executable code.
@@ -60,6 +62,12 @@ try {
     stage = "context";
     const response = await readHermesNativeWorkHook(payload, bindings, {
       verifySourceClosure: verify,
+      workMethodSourceBinding:
+        typeof HERMES_WORK_METHOD_SOURCE_BINDING === "undefined"
+          ? undefined
+          : HERMES_WORK_METHOD_SOURCE_BINDING,
+      compiledRegistrationSha256: HERMES_PLATFORM_REGISTRATION_SHA256,
+      bindingsSha256: HERMES_CURRENT_WORK_BINDINGS_SHA256,
       outputVersion:
         typeof HERMES_CURRENT_WORK_OUTPUT_VERSION === "undefined"
           ? "v1"

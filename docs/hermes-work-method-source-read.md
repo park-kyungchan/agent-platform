@@ -45,8 +45,8 @@ Receivers must cover every required source byte, verify the complete reassembled
 hash and original/selected mapping, and actually read/use the Task, whole WHY,
 current user scope, fences and producer/receiver prerequisite evidence. Only actual
 owner observations may later form a common receipt/admission. Transport success or
-`source-qualified` does not supply that evidence. The current native hook reads
-current Work context; this route does not silently activate WorkMethod injection.
+`source-qualified` does not supply that evidence. The default native hook reads
+current Work context; a source request does not silently activate WorkMethod injection.
 
 Any application needs independently reviewed source/build/registration/compiler
 and dependency successors, a freshly pinned pending install Task and native-owner
@@ -86,3 +86,77 @@ to the existing evaluator. A changed derived document rejects a continuation's
 old digest. None of these later observations retroactively admits earlier session
 creation, installation or source-read effects. Those actions require their own
 exact native owner, Task, source and effect gates.
+
+## Explicit real-callback identity projection
+
+The existing native hook has a separate opt-in bindings schema,
+`hermes.real-callback-source-hook-bindings.v1`, with exactly these fields:
+
+```json
+{
+  "schema": "hermes.real-callback-source-hook-bindings.v1",
+  "kind": "stableSessionSource",
+  "shellSelection": {
+    "profileName": "observed-shell-name",
+    "sessionId": "observed-session",
+    "cwd": "/exact/observed/cwd"
+  },
+  "sourceSelection": {
+    "scope": {
+      "kind": "session-source",
+      "runtime": "native-hermes",
+      "profileId": "declared-canonical-profile",
+      "sessionId": "observed-session"
+    },
+    "logical": {
+      "domainId": "selected-domain",
+      "projectId": "selected-project",
+      "workId": "selected-work",
+      "taskId": "selected-task"
+    },
+    "actorId": "selected-actor",
+    "routeId": "selected-route"
+  }
+}
+```
+
+These illustrative values are not native observations. The source owner must pin this
+file through existing `currentWorkBindings`, also supply the existing compiled
+`workMethodSourceBinding`, and explicitly select output v2. The v2 budget is
+1,024..12,000 characters; `metadata.v1` is a different representation and is not
+accepted for this projection. Both compiled provenance hashes and the closed map
+binding must be valid. A map alone does not enable the branch. The original
+`hermes.current-git-work-hook-bindings.v1` exact tuple/null/default behavior stays
+unchanged, with no fallback from a failed legacy match.
+
+For `pre_llm_call`, the direct API validates the closed binding and observed identity,
+then matches the shell profile **name**, session and cwd before reading a map or Git.
+Valid foreign selectors return `{}`. The compiled entry still performs its existing
+registration/source/bindings guards before importing implementation code. The new
+branch copies only `hook_event_name`, `profile`, `session_id`, `cwd`, and
+`extra.{agent_id,project_id,task_id,run_id,turn_id}`. Missing optional IDs stay null;
+observed Task, Run and turn remain distinct. Prompt, history, tool input, provider,
+credential and native-store contents are not projected. The unchanged 1 MiB raw
+request limit can safely hold an oversized callback instead of recording it.
+
+The existing session-map API validates the declared source selection using `@map`;
+its bounded chunk is discarded. No complete map/original receive-use is claimed.
+Source/bindings and the exact map are checked again immediately before returning
+`{context: JSON.stringify(inner)}`. The inner object has schema
+`hermes.real-callback-identity-context.v1`, kind, declared logical/actor/route,
+`wireEvent`, `declaredSourceScope`, and three provenance hashes. Both the inner JSON
+and the complete serialized outer response must fit the selected budget, including
+escaping. Overflow holds rather than clipping or raising the cap. Refusals retain
+closed diagnostics without echoing private inputs.
+
+`nativeInvocationVerified`, `ownerProfileMappingVerified`,
+`nativeAuthenticationEstablished`, `receivedOrUsedEstablishedByProjection`,
+`ownerAdmissionEstablished`, `nativePermissionGranted`, and
+`executionAuthorityGranted` are always false. A compiled test or caller-supplied JSON
+does not authenticate a native invocation. In particular, the shell profile name and
+cwd are separate from the declared canonical gateway profile/policy cwd; no hidden
+coercion or correspondence proof is supplied. An actual native owner must separately
+verify the mapping, loaded source, genuine invocation and current identities before
+E -> U0 -> Q -> U1 -> R and full owner admission. The existing full-event evaluator
+continues to require literal joins and holds differing identity domains. Building
+this capability does not install, configure, trust, invoke or adopt it in a runtime.
