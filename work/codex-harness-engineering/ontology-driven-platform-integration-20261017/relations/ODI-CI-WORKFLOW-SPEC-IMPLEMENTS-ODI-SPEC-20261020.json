@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "relation",
+  "id": "ODI-CI-WORKFLOW-SPEC-IMPLEMENTS-ODI-SPEC-20261020",
+  "relation": "implements",
+  "from": {
+    "kind": "spec",
+    "id": "ODI-CI-WORKFLOW-SPEC",
+    "revision": 1
+  },
+  "to": {
+    "kind": "spec",
+    "id": "ODI-SPEC",
+    "revision": 1
+  }
+}

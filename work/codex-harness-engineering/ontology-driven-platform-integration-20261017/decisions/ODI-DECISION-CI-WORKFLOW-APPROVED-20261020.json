@@ -1,0 +1,27 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-CI-WORKFLOW-APPROVED-20261020",
+  "status": "accepted",
+  "answer": "palantirkc \ucabd\uc740 \ub108\uc758 \uad8c\uace0\ub300\ub85c \uc9c4\ud589\ud558\uace0, \ucd5c\uc885 \uc2b9\uc778\ud55c\ub2e4. \uc0c8 pane \uc5f4\uc5b4\uc11c \uc9c4\ud589\ud558\ub294 \uac83 \uc78a\uc9c0\ub9d0\uace0, \ub2e4 \uc0ac\uc6a9\ud55c pane\uc740 close \ud574\ub77c.",
+  "meaning": "Reviewed R3 is approved. Fully retire obsolete palantirkc sync, preserve history and retain no manual mutation path. Keep current weekly discovery/security signals and native owner intake. Execute approved units in newly owned panes and close only owned finished panes after durable results. Existing Work/owners/common-first exact method and effect gates remain; no suite/auto merge/Goal lifecycle/runtime-role deployment.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-CI-WORKFLOW-APPROVAL-20261020.json",
+    "fragment": "#/content/originalText",
+    "sha256": "13d6b9921ff6c7fff4b2f0232a934d832cc829eb8c02a8ffc5562e3632602b6a"
+  },
+  "selectionContext": {
+    "text": "Reviewed R3 is approved. Fully retire obsolete palantirkc sync, preserve history and retain no manual mutation path. Keep current weekly discovery/security signals and native owner intake. Execute approved units in newly owned panes and close only owned finished panes after durable results. Existing Work/owners/common-first exact method and effect gates remain; no suite/auto merge/Goal lifecycle/runtime-role deployment.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-CI-WORKFLOW-APPROVAL-20261020.json",
+      "fragment": "#/content/selectionContext",
+      "sha256": "13d6b9921ff6c7fff4b2f0232a934d832cc829eb8c02a8ffc5562e3632602b6a"
+    }
+  },
+  "supersedes": []
+}

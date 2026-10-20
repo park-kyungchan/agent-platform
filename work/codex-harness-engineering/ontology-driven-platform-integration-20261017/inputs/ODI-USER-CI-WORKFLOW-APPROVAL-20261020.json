@@ -1,0 +1,1222 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-USER-CI-WORKFLOW-APPROVAL-20261020",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "current-user",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/operations/ci-actions-analysis-20261020/approval.json#/originalUserText"
+  },
+  "content": {
+    "originalText": "palantirkc \ucabd\uc740 \ub108\uc758 \uad8c\uace0\ub300\ub85c \uc9c4\ud589\ud558\uace0, \ucd5c\uc885 \uc2b9\uc778\ud55c\ub2e4. \uc0c8 pane \uc5f4\uc5b4\uc11c \uc9c4\ud589\ud558\ub294 \uac83 \uc78a\uc9c0\ub9d0\uace0, \ub2e4 \uc0ac\uc6a9\ud55c pane\uc740 close \ud574\ub77c.",
+    "selectionContext": "Reviewed R3 is approved. Fully retire obsolete palantirkc sync, preserve history and retain no manual mutation path. Keep current weekly discovery/security signals and native owner intake. Execute approved units in newly owned panes and close only owned finished panes after durable results. Existing Work/owners/common-first exact method and effect gates remain; no suite/auto merge/Goal lifecycle/runtime-role deployment.",
+    "approval": {
+      "recordClass": "Direct current-user final approval, bounded to the reviewed CI proposal and explicit pane lifecycle instruction",
+      "observedAtUtc": "2026-10-20T06:07:04.225158+00:00",
+      "originalUserText": "palantirkc \ucabd\uc740 \ub108\uc758 \uad8c\uace0\ub300\ub85c \uc9c4\ud589\ud558\uace0, \ucd5c\uc885 \uc2b9\uc778\ud55c\ub2e4. \uc0c8 pane \uc5f4\uc5b4\uc11c \uc9c4\ud589\ud558\ub294 \uac83 \uc78a\uc9c0\ub9d0\uace0, \ub2e4 \uc0ac\uc6a9\ud55c pane\uc740 close \ud574\ub77c.",
+      "proposalRevision": 3,
+      "proposalSha256": "adc3506c5213601aaab992e2b76d9f07232d9acc60d36b2d32f8577d559cb81e",
+      "scopeApproved": true,
+      "legacyWorkflowDecision": "Fully retire palantirkc subtree synchronization workflow; preserve Git history; no retained manual mutation entrypoint",
+      "dependencyPolicyDecision": "Keep current weekly discovery/security signals and native-owner intake as proposed; no blanket bot or notification disable",
+      "paneInstruction": {
+        "openNewPanesForExecution": true,
+        "closeOwnedFinishedPanesAfterDurableResult": true,
+        "preserveOtherSessions": true
+      },
+      "runtimeRoleProposalSeparatelyApproved": false,
+      "newModelEvaluationSuiteGranted": false
+    },
+    "proposalR3": {
+      "recordClass": "Draft implementation scope for interview and native Antigravity independent review; not formal Work admission",
+      "revision": 3,
+      "createdAtUtc": "2026-10-20T05:11:54.976880+00:00",
+      "status": "revised-after-native-Argon-review-awaiting-delta-review-and-user-approval",
+      "goal": "Improve reliability, diagnosis and adoption of the existing common-Harness CI across the VPS estate without weakening controls or interfering with current/successor orchestration.",
+      "existingWork": {
+        "repositoryId": "park-kyungchan/agent-platform",
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-platform-integration-20261017",
+        "issueId": "ODI-ISSUE-20261017",
+        "spec": {
+          "id": "ODI-SPEC",
+          "revision": 1
+        },
+        "plan": {
+          "id": "ODI-PLAN",
+          "revision": 4
+        },
+        "owningBranch": "work/odi-host-continuation-20261018",
+        "observedCommit": "0f13c9474b9fdb01eaed733c27995b9131ba95b0",
+        "relatedExistingTasks": [
+          "ODI-07-EDUCATION-CI-CONSUMER",
+          "ODI-07-MATH-CI-CONSUMER",
+          "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020",
+          "ODI-07",
+          "ODI-HOST-ESTATE-CONTINUATION"
+        ],
+        "existingCompletedTaskHistoryMustRemainUnchanged": true,
+        "ownerRouteAcknowledgement": {
+          "correlation": "CI_WORKFLOW_20261020_ROUTE",
+          "evidence": "evidence/owner-route-relay.json",
+          "scope": "Current owner supplied the existing route and prerequisites; no implementation approval or native execution admission"
+        },
+        "observationSemantics": "The observed commit is a historical Work-record snapshot, not a current implementation base or activation target. Re-observe each owner before a consequential write."
+      },
+      "admission": {
+        "implementationScopeApproval": null,
+        "newFormalIdsAssigned": false,
+        "strategy": "Continue the existing Work. First map each unit to existing unfinished ODI-07 / ODI-HOST-ESTATE-CONTINUATION / topology scope. Reuse suitable records or let the owning Lead admit a distinct child Task only after interview approval; never duplicate completed consumer Tasks.",
+        "nativeLeadOwnsAdmissionAndSharedSourceSerialization": true,
+        "readerIsNotIdAllocator": true,
+        "specPlanRule": "Keep ODI-SPEC@1, ODI-PLAN@4 and completed Task revision pins as historical records. The owner determines after approval whether existing criteria cover each change; only a semantic change needs an explicit successor revision and updated current pointer.",
+        "readerCommands": [
+          "bun run harness start <request.json>",
+          "bun run harness validate <snapshot.json>",
+          "bun run harness context <request.json>",
+          "bun run harness transition <before.json> <after.json>"
+        ],
+        "nativeExecutionAdmissionCommand": "bun run cli work-method admit <input.json> --input-sha256 <SHA>",
+        "nativeExecutionAdmissionOwner": "Codex-owned project CLI; revalidate installed/current source before invocation",
+        "futureSuccessorReceiverLocator": "/home/palantirkc/orchestrator/current-work.json",
+        "successorCurrentlyObserved": false,
+        "startCommandSemantics": "harness start is pure read-only qualification, not lifecycle execution or ID allocation. Keep it among readerCommands.",
+        "beforeEachWrite": [
+          "Re-observe the current owning Work ref and actual source repository head; do not use the historical0f13 snapshot as a perpetual CAS value.",
+          "Bind the approved Work/Task/Spec/Plan and exact implementation repository/base/expected head.",
+          "Use the existing owner Root serialization and native supported compare-before-update/expected-head integration. Preserve concurrent third-state changes; no global file lock service or universal filesystem CAS."
+        ]
+      },
+      "workUnits": [
+        {
+          "key": "publication-order",
+          "formalTaskId": null,
+          "targetRepositoryIds": [
+            "park-kyungchan/agent-platform",
+            "park-kyungchan/academy-workbench",
+            "park-kyungchan/education-platform",
+            "park-kyungchan/math-research-module"
+          ],
+          "proposedSourceOwner": "Existing common CI and native review publishers, under the same Work",
+          "candidateExistingTaskRelation": {
+            "existingWorkId": "ontology-driven-platform-integration-20261017",
+            "candidateExistingTaskIds": [
+              "ODI-07",
+              "ODI-HOST-ESTATE-CONTINUATION"
+            ],
+            "decision": "Owner determines reuse versus a distinct child Task after user scope approval. These are links, not newly assigned IDs.",
+            "completedTaskPinsPreserved": true
+          },
+          "scope": [
+            "PR path: publish immutable exact-head independent review and authenticated latest status before opening a ready PR. Draft status alone does not suppress pull_request CI.",
+            "Main path: native Lead qualifies the exact resulting merge commit; reuse requires actual tree equality, an explicit successor binding and current zero unresolved findings.",
+            "Evaluate a standard Actions job-dependency change so review verification runs after applicable source/quality/integration jobs. Handle skipped main-only/PR-only jobs explicitly and keep the aggregate fail-closed when source or review fails. Do not replace publication proof with sleep, fixed wait, a custom observer or scheduler.",
+            "After confirmed publication, reconcile and explicitly rerun only the affected job if a main arrival race remains; retain the failed attempt and do not promise zero future timing failures.",
+            "Link the existing owner work for PR17 and PR19. Re-read their current heads and outstanding findings, publish genuine exact-head review through the owner, and preserve completed CI-consumer Tasks. This proposal review is not code-review evidence for either PR."
+          ],
+          "criterion": "Demonstrate the admitted PR publication path and source-then-review evaluation on representative exact-source cases; preserve invalid/missing/latest-held/wrong-publisher rejection and actual source failures. Report residual main timing races separately.",
+          "dependsOn": []
+        },
+        {
+          "key": "dependency-registration",
+          "formalTaskId": null,
+          "targetRepositoryIds": [
+            "park-kyungchan/agent-platform"
+          ],
+          "proposedSourceOwner": "Canonical package/architecture registry and existing native owner intake",
+          "candidateExistingTaskRelation": {
+            "existingWorkId": "ontology-driven-platform-integration-20261017",
+            "candidateExistingTaskIds": [
+              "ODI-07",
+              "ODI-HOST-ESTATE-CONTINUATION"
+            ],
+            "decision": "Owner determines reuse versus a distinct child Task after user scope approval. These are links, not newly assigned IDs.",
+            "completedTaskPinsPreserved": true
+          },
+          "scope": [
+            "Re-read PR38/current successor source and repair the actual operational-context manifest registration discrepancy through the canonical owner/generator. Review intended dependency meaning, not only a recomputed hash.",
+            "Preserve bot provenance. A native owner may take over the proposed change with truthful source-author metadata; never pretend the bot was a native agent.",
+            "Include all affected source registration/build/dependency pins and consumer closures required by the existing package/bun.lock contract; serialize their integration. Source pin preparation does not activate current runtimes.",
+            "Define a repeatable owner intake path for future dependency proposals, keeping current weekly discovery/security alerts. Additional grouping/cadence/intake changes require a selected scoped design; no blanket bot disable, automatic merge or blanket notification suppression."
+          ],
+          "criterion": "Intended dependency change, canonical registration and affected source-owner closures agree; intentionally stale/incorrect identity remains rejected. Demonstrate one owner intake case and preserve discovery/security signals. Do not claim all unadmitted bot PRs will have zero initial failure emails.",
+          "dependsOn": []
+        },
+        {
+          "key": "fixture-lock-investigation",
+          "formalTaskId": null,
+          "targetRepositoryIds": [
+            "park-kyungchan/agent-platform"
+          ],
+          "proposedSourceOwner": "Native Codex synthetic fixture source owner",
+          "candidateExistingTaskRelation": {
+            "existingWorkId": "ontology-driven-platform-integration-20261017",
+            "candidateExistingTaskIds": [
+              "ODI-07"
+            ],
+            "decision": "Owner determines reuse versus a distinct child Task after user scope approval. These are links, not newly assigned IDs.",
+            "completedTaskPinsPreserved": true
+          },
+          "scope": [
+            "Investigate the exact hooks.test.ts:498 assertion and reported label/stack mismatch using synthetic inputs and bounded process/runner metadata.",
+            "If fixture maintenance interference is established, correct only fixture-local Git preparation. Never weaken hooks trust, change host Git configuration or broadly exclude .git / *.lock / genuine writes from detection.",
+            "If the hypothesis remains unsupported, record inconclusive/no-fix disposition with its evidence and stop speculative edits. Other qualified CI units remain deliverable."
+          ],
+          "criterion": "A supported minimal correction preserves real-write detection under independent positive/negative controls, or a truthful bounded investigation disposition records no demonstrated fix. No-fix is not reported as behavior improvement.",
+          "dependsOn": []
+        },
+        {
+          "key": "diagnostics",
+          "formalTaskId": null,
+          "targetRepositoryIds": [
+            "park-kyungchan/agent-platform"
+          ],
+          "proposedSourceOwner": "Common reusable CI and existing Work Evidence/evaluation owners",
+          "candidateExistingTaskRelation": {
+            "existingWorkId": "ontology-driven-platform-integration-20261017",
+            "candidateExistingTaskIds": [
+              "ODI-07"
+            ],
+            "decision": "Owner determines reuse versus a distinct child Task after user scope approval. These are links, not newly assigned IDs.",
+            "completedTaskPinsPreserved": true
+          },
+          "scope": [
+            "Expose bounded stage/reason codes without credentials, private inputs, raw native review content or arbitrary exception dumps.",
+            "Retain run/attempt/job/step identities and failed attempts after rerun success; distinguish consequential aggregate failure from another independent incident.",
+            "Classify default-branch-head, open-pr-head, superseded-or-closed-head and unknown lifecycle observations with timestamps; missing data remains unknown.",
+            "Predeclare representative baseline/candidate criteria through existing quality contracts where substantial; create no parallel incident store or runtime loop."
+          ],
+          "criterion": "The operator can distinguish source, access/runtime, review readiness, source registration and aggregate consequences from bounded evidence; historical branch failures are not presented as current defects.",
+          "dependsOn": []
+        },
+        {
+          "key": "estate-coverage-mapping",
+          "formalTaskId": null,
+          "targetRepositoryIds": [
+            "park-kyungchan/academy-workbench",
+            "park-kyungchan/agent-platform",
+            "park-kyungchan/bible-commentary-station",
+            "park-kyungchan/codex-harness-engineering",
+            "park-kyungchan/daniel-prayer-operations",
+            "park-kyungchan/dc-gang-a",
+            "park-kyungchan/education-platform",
+            "park-kyungchan/gang-a",
+            "park-kyungchan/hermes-profile-dc-context",
+            "park-kyungchan/hermes-profile-dc-contract-audit",
+            "park-kyungchan/hermes-profile-dc-gang-a-dev",
+            "park-kyungchan/hermes-profile-dc-review",
+            "park-kyungchan/hermes-profile-default",
+            "park-kyungchan/hermes-profile-ontology-platform",
+            "park-kyungchan/housing-board-module",
+            "park-kyungchan/math-education",
+            "park-kyungchan/math-research-module",
+            "park-kyungchan/palantirkc",
+            "park-kyungchan/park-kyungchan.github.io",
+            "park-kyungchan/vps-operations"
+          ],
+          "proposedSourceOwner": "Existing estate Task and named repository semantic owners",
+          "candidateExistingTaskRelation": {
+            "existingWorkId": "ontology-driven-platform-integration-20261017",
+            "candidateExistingTaskIds": [
+              "ODI-HOST-ESTATE-CONTINUATION",
+              "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
+            ],
+            "decision": "Owner determines reuse versus a distinct child Task after user scope approval. These are links, not newly assigned IDs.",
+            "completedTaskPinsPreserved": true
+          },
+          "scope": [
+            "Map the 12 repositories with run history and 8 no-run repositories to current canonical source owner, active versus historical role and required check policy.",
+            "Treat no-run as unknown coverage, not passed verification. Link legacy profile repository consolidation; preserve Hermes Lead research/development ownership and avoid duplicating active CI in historical copies.",
+            "Propose a bounded owner-specific coverage change only where current usefulness is established. This mapping is not a prerequisite for unrelated verified common CI releases."
+          ],
+          "criterion": "Every observed repository has an evidenced owner/role/coverage disposition or an explicit unknown; any newly proposed CI has a named consumer and effect boundary.",
+          "dependsOn": []
+        },
+        {
+          "key": "legacy-automation",
+          "formalTaskId": null,
+          "targetRepositoryId": "park-kyungchan/palantirkc",
+          "targetWorkflowPath": ".github/workflows/sync-subprojects.yml",
+          "proposedSourceOwner": "palantirkc workflow owner, coordinated under existing Work ontology-driven-platform-integration-20261017",
+          "candidateExistingTaskRelation": {
+            "existingWorkId": "ontology-driven-platform-integration-20261017",
+            "candidateExistingTaskIds": [
+              "ODI-HOST-ESTATE-CONTINUATION",
+              "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
+            ],
+            "decision": "Owner determines reuse versus a distinct child Task after user scope approval. These are links, not newly assigned IDs.",
+            "completedTaskPinsPreserved": true
+          },
+          "scope": [
+            "After approval, establish the owner-supported reversible fence against new automatic sync triggers, then remove obsolete schedule/repository_dispatch automation through exact reviewed source. Any retained manual path must not silently swallow pull errors or permit an unapproved main mutation.",
+            "Re-observe exact workflow/run IDs and each job/step effect state. Historical queued/pending IDs are evidence, not cancellation targets to replay later.",
+            "Reconcile any started/uncertain Git mutation before a lifecycle action. Cancel only freshly verified not-started obsolete runs through the native GitHub surface and retain exact receipts.",
+            "Do not connect/register a runner that can consume the old queue until trigger retirement and pending-run reconciliation are verified. This proposal does not authorize broad runner registration or root-host execution of repository code.",
+            "Preserve source/history, meaningful existing checks and unrelated workflows. No repository/domain deletion follows."
+          ],
+          "criterion": "Unwanted automatic mutation cannot start, obsolete unstarted queued runs are reconciled, and any retained useful required check has an explicit source owner and execution plan.",
+          "dependsOn": []
+        },
+        {
+          "key": "successor-adoption",
+          "formalTaskId": null,
+          "targetRepositoryIds": [],
+          "proposedSourceOwner": "Current Lead and actual successor native owner, under the existing Work",
+          "candidateExistingTaskRelation": {
+            "existingWorkId": "ontology-driven-platform-integration-20261017",
+            "candidateExistingTaskIds": [
+              "ODI-HOST-ESTATE-CONTINUATION",
+              "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
+            ],
+            "decision": "Owner determines reuse versus a distinct child Task after user scope approval. These are links, not newly assigned IDs.",
+            "completedTaskPinsPreserved": true
+          },
+          "scope": [
+            "Qualify each independently useful unit using its own actual dependency closure, exact changed source, relevant checks, independent code review, authenticated publication and Lead expected-head merge. Do not wait for unrelated coverage mapping, legacy retirement or an inconclusive fixture investigation.",
+            "Stage A: prepare the exact selected change/consumer pins and existing Work Evidence handoff package as soon as qualified. Mark source-ready/offered separately from receiver readback.",
+            "Stage B: resolve the actual current receiver from the owner current-work locator. At its safe checkpoint, obtain selected Work/Task/version readback and explicit owner adoption. A missing successor holds only this readback stage.",
+            "For GitHub CI consumption, verify the workflow or reusable-action commit pin and an actual authorized consumer run. For successor source context, verify the exact source/Work/Task readback. Native runtime configuration activation is not applicable for a CI-only change; never add a restart just to claim adoption.",
+            "Preserve active runs under their original pins. Retain currently adopted source if a candidate is not qualified. No hot patch, custom observer, automatic merge or Goal lifecycle action follows."
+          ],
+          "criterion": "Each selected unit has separate source-ready, offered, receiver-readback and consumer-used evidence. Partial adoption does not claim estate-wide completion; unrelated pending units remain visible.",
+          "dependsOn": [],
+          "dependencyRule": "For each offered unit require that unit and only its real contract/source dependencies to be qualified. The template itself has no global all-units barrier.",
+          "stages": [
+            "source-ready",
+            "offered",
+            "receiver-readback",
+            "consumer-used"
+          ]
+        }
+      ],
+      "executionIsolation": {
+        "afterApproval": "Task-specific branch/worktree and native task instruction; associate logical Work/Task with actual Herdr server/pane/session once launched.",
+        "sharedSource": "Respect current Root holds and existing common-release/adoption dependencies. Before each write re-observe the correct source owner/ref and expected head; integrate with supported native expected-head/CAS under that owner. Do not freeze future writes to a historical Work-manifest hash or introduce universal filesystem CAS.",
+        "paneIsNotWorkId": true,
+        "ArgonReviewPane": "A proposal reviewer before formal task admission; does not create a new Work or adopt an implementation.",
+        "activeSessions": "No restart, kill, native config change or Goal lifecycle operation follows from this proposal.",
+        "fallback": "Preserve the currently adopted version if candidate integration/adoption is not qualified.",
+        "logicalToExecutionBinding": "After admission bind actual Work/Task, source repository/base, branch/worktree, native session and Herdr server/pane separately. A Task may move panes; a pane may host multiple Tasks over time. A pane never allocates identity."
+      },
+      "successorAvailability": "Every independently qualified change becomes available for explicit selected-version readback at the next safe checkpoint. Unrelated legacy/coverage/investigation work does not gate availability; a running consumer finishes under its current pin.",
+      "verification": {
+        "source": [
+          "Affected package checks",
+          "check:handoff and check:imports for common source changes",
+          "Git Work validation and transition for record integration",
+          "Affected source quality and exact review publication checks"
+        ],
+        "behavior": [
+          "Per-unit positive and negative controls and exact source pins; no global all-unit gate",
+          "PR publication before ready PR; native review scheduled after applicable source checks",
+          "Missing/invalid/held/wrong-publisher review still rejected; Draft alone does not suppress CI",
+          "Current dependency/registry coherence and a truthful future intake case",
+          "Supported fixture correction or explicit inconclusive/no-fix disposition",
+          "Bounded reason/lifecycle diagnostics with failed attempts retained",
+          "Obsolete automatic triggers and freshly observed queue reconciled before any matching runner activation",
+          "Separate source-ready, successor readback and actual GitHub consumer-use evidence"
+        ],
+        "nativeModelEvaluation": "No model evaluation suite is granted. The user requested this native Argon High proposal review and its bounded clarification/refinement; it is not implementation code review publication."
+      },
+      "authoritySequence": [
+        "Draft concrete scope",
+        "Native Argon/high review and refine",
+        "Obtain user interview scope approval",
+        "Existing Lead admits/reuses IDs and bound Spec/Plan/Tasks",
+        "Isolated implementation and independent verification",
+        "Lead serial integration and owner activation",
+        "Successor readback/use and separate acceptance"
+      ],
+      "relatedRuntimeRoleProposal": {
+        "path": "/home/palantirkc/operations/runtime-role-proposal-20261020/proposal.json",
+        "sha256": "ff55aa7c602f019fb1b3312fadbb53ffe98193660425703e1aa0dcc52889a2ab",
+        "boundary": "Reference only. Approval/admission of this CI scope does not approve, admit or activate the separate runtime-role/container rearchitecture proposal."
+      },
+      "effectsExecuted": [],
+      "acceptance": null,
+      "updatedAtUtc": "2026-10-20T05:57:26.180809+00:00",
+      "reviewBasis": {
+        "nativeReview": "evidence/native-argon-r2-review.json",
+        "nativeReviewedRevision": 2,
+        "reviewedRevisionSha256": "5f5935f4ef31b1451f3697b130dab18c0e990e02442bf5ee4cef8424277eaec6",
+        "parentDisposition": "evidence/review-reconciliation.json",
+        "deltaReviewPending": true
+      }
+    },
+    "latestApprovedPacket": {
+      "schema": "odi.actual-user-source-message.v1",
+      "atUtc": "2026-10-20T06:08:08.883Z",
+      "correlation": "CI_WORKFLOW_20261020",
+      "kind": "FINAL_APPROVED_SOURCE_ADMISSION_REQUESTED_NATIVE_METHOD_GATES_RETAINED",
+      "originalText": "CI_WORKFLOW_20261020_FINAL_APPROVED \u2014 Direct user just approved: \"palantirkc \ucabd\uc740 \ub108\uc758 \uad8c\uace0\ub300\ub85c \uc9c4\ud589\ud558\uace0, \ucd5c\uc885 \uc2b9\uc778\ud55c\ub2e4. \uc0c8 pane \uc5f4\uc5b4\uc11c \uc9c4\ud589\ud558\ub294 \uac83 \uc78a\uc9c0\ub9d0\uace0, \ub2e4 \uc0ac\uc6a9\ud55c pane\uc740 close \ud574\ub77c.\" Approval packet /home/palantirkc/operations/ci-actions-analysis-20261020/approval.json binds reviewedR3 SHA256 adc3506c5213601aaab992e2b76d9f07232d9acc60d36b2d32f8577d559cb81e. Full old sync workflow retirement is selected (no manual mutation path); preserve Git history. Current weekly dependency discovery/security signals remain. Please NOW admit/reuse CI Task IDs/Spec/Plan relations under the existing Work using your supported source writer and provide CI_WORKFLOW_20261020_EXECUTION_ROUTE with exact record commit, assigned/reused Task IDs per publication/registration/fixture/diagnostics/coverage/legacy/adoption, current implementation base/allowed source paths, existing Root serialization/expected-head terms, and native work-method admission receipt or exact prerequisite hold. We will execute in newly created owned panes and isolated task worktrees, no writes to your active source/provider/config, and close finished owned panes after retaining results. Please identify the review/merge owner and fastest permitted separate integration path for palantirkc retirement (workflow disable and safe unstarted queue cancellation included in approved scope), without reviving runners or blocking safe source preparation. No native suite, automatic merge, old/successor Goal lifecycle change or runtime-role deployment follows. Current own helper thread01a1571b-2ee3-7832-8dd6-5894635f40b4 has a bounded CI native Goal now; your original Goal and old-Lead conditional Pause remain unchanged. Do not duplicate the existing Work or reclassify completed CI consumer Tasks.",
+      "existingWorkId": "ontology-driven-platform-integration-20261017",
+      "actualRootThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+      "goalLifecycleChange": false,
+      "runtimeRoleDeploymentAuthorized": false
+    },
+    "latestPrerequisitePacket": {
+      "schema": "odi.actual-user-source-message.v1",
+      "atUtc": "2026-10-20T06:12:26.664Z",
+      "correlation": "CI_WORKFLOW_20261020",
+      "originalText": "CI_WORKFLOW_20261020_PREREQUISITES \u2014 Independent read-only reconnaissance found palantirkc source deletion PR is blocked by existing required gates with self-hosted/linux and runners0 (ruleset19550804 no bypass actors). Existing legacy lead:bootstrap is pure read but returns UNKNOWN/DRIFT due absent /root/harness-upstream authority and unrelated July active-session carrier. We will not overwrite that carrier, alterHOME, register a runner or bypass gates. A native GitHub workflow disable + reconciliation/cancellation of freshly verified unstarted runs can functionally retire all triggers immediately under the approved legacy Task, separately from source deletion/census cleanup. Please include whether supported common-work admission can authorize that bounded runtime operation first, while source retirement checks/governance resolve separately, and whether a standard GitHub-hosted pure-source gate migration is an approved necessary prerequisite (with exact source/check proof, no root execution). Current fresh source palantirkc mainf1845231...; pending39374586111 jobs0 and queued39236726646 job118116594544 runner0/steps[]; all must refresh before effects. Our finished Argon pane w6:p2 was durably recorded and closed; newly created execution pane w6:p3 now starts the native CLI, no source modifications yet. Please provide exact Task/current-work-method route when ready; source prep can remain isolated from your active installed source.",
+      "kind": "EXACT_PREREQUISITE_ROUTING_REQUEST_NO_ROOT_EFFECT_YET",
+      "nativeIdsAreSenderReported": true,
+      "newPaneOwnerReported": "w6:p3",
+      "actualRootGoalLifecycleChange": false
+    },
+    "sourcePins": [
+      {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/CI_WORKFLOW_20261020.final-approved.source.actual.json",
+        "bytes": 2253,
+        "sha256": "c53a066054a0b70f211a3f62ce9df81d6b582507194f9f55e368affc66283303"
+      },
+      {
+        "path": "/home/palantirkc/operations/ci-actions-analysis-20261020/approval.json",
+        "bytes": 1066,
+        "sha256": "56e4b489eab5a943b9c19df95b19475bb3b2e10dfbc12fd135d756d5667ea76f"
+      },
+      {
+        "path": "/home/palantirkc/operations/ci-actions-analysis-20261020/proposal.json",
+        "bytes": 22027,
+        "sha256": "adc3506c5213601aaab992e2b76d9f07232d9acc60d36b2d32f8577d559cb81e"
+      },
+      {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/CI_WORKFLOW_20261020.prerequisites.source.actual.json",
+        "bytes": 1793,
+        "sha256": "ae003d3526a4d5d9534d2cd2bc655c9ec422660d41862db34664387439888762"
+      }
+    ],
+    "classification": "Actual Root source-owner capture and admission of exact final-approved R3 CI scope into planned same-Work contracts. Earlier proposal pending fields are preserved historical originals superseded by actual final approval. No CI/native execution or shared/formal completion is established.",
+    "nativeAuthorshipIndependentlyAuthenticated": false,
+    "preparedByActualThreadId": "01a156c2-bf11-7d10-9c08-967e5394c85d",
+    "intendedCanonicalWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+    "actualCanonicalWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+    "units": [
+      {
+        "key": "publication-order",
+        "formalTaskId": "ODI-CI-PUBLICATION-ORDER-20261020",
+        "targetRepositoryIds": [
+          "park-kyungchan/agent-platform",
+          "park-kyungchan/academy-workbench",
+          "park-kyungchan/education-platform",
+          "park-kyungchan/math-research-module"
+        ],
+        "proposedSourceOwner": "Existing common CI and native review publishers, under the same Work",
+        "candidateExistingTaskRelation": {
+          "existingWorkId": "ontology-driven-platform-integration-20261017",
+          "candidateExistingTaskIds": [
+            "ODI-07",
+            "ODI-HOST-ESTATE-CONTINUATION"
+          ],
+          "decision": "Prepare distinct bounded child Task after actual final approval; no one-to-one unfinished Task fit and completed CI consumers stay immutable.",
+          "completedTaskPinsPreserved": true
+        },
+        "scope": [
+          "PR path: publish immutable exact-head independent review and authenticated latest status before opening a ready PR. Draft status alone does not suppress pull_request CI.",
+          "Main path: native Lead qualifies the exact resulting merge commit; reuse requires actual tree equality, an explicit successor binding and current zero unresolved findings.",
+          "Evaluate a standard Actions job-dependency change so review verification runs after applicable source/quality/integration jobs. Handle skipped main-only/PR-only jobs explicitly and keep the aggregate fail-closed when source or review fails. Do not replace publication proof with sleep, fixed wait, a custom observer or scheduler.",
+          "After confirmed publication, reconcile and explicitly rerun only the affected job if a main arrival race remains; retain the failed attempt and do not promise zero future timing failures.",
+          "Link the existing owner work for PR17 and PR19. Re-read their current heads and outstanding findings, publish genuine exact-head review through the owner, and preserve completed CI-consumer Tasks. This proposal review is not code-review evidence for either PR."
+        ],
+        "criterion": "Demonstrate the admitted PR publication path and source-then-review evaluation on representative exact-source cases; preserve invalid/missing/latest-held/wrong-publisher rejection and actual source failures. Report residual main timing races separately.",
+        "dependsOn": [],
+        "parentTaskId": "ODI-07",
+        "nativeExecutionBinding": {
+          "actualNativeThreadId": null,
+          "actualPaneId": null,
+          "actualTerminalId": null,
+          "actualSessionId": null,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null
+        },
+        "methodAdmission": {
+          "status": "HELD_NOT_ADMITTED",
+          "sameWholeWorkCommonFirst": {
+            "decisionId": "ODI-DECISION-COMMON-FIRST-20261020",
+            "activeWholePlan": "ODI-PLAN@4",
+            "logicalPrerequisite": {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            },
+            "closedOwnerAttestedGeneralRelease": null
+          },
+          "ciOwnerExactLogicalTaskPacketReceipt": null,
+          "ciOwnerFreshSourceActorRouteCurrentness": null,
+          "ciOwnerNativeThreadSessionTaskRunEvent": null,
+          "rootHermes18PathMethodNotReusableForCi": true,
+          "cliEligibleWouldNotGrantAuthority": true,
+          "ordinaryCiIsNotBootstrap": "No relabeling CI implementation, remote workflow disable/cancellation or source retirement as common bootstrap to bypass the retained general-release gate.",
+          "registrationPreparationException": "This assignment authorizes only source registration preparation now; it establishes no implementation/native effects or general-work release."
+        },
+        "dependencies": {
+          "ordinaryImplementationPrerequisite": [
+            {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            }
+          ],
+          "otherCiUnits": [],
+          "perUnitRule": "No global all-seven barrier. Qualify each own actual source/dependencies; an inconclusive fixture or absent adoption receiver holds only its own affected stage."
+        },
+        "stageEvidence": {
+          "sourceReady": null,
+          "offered": null,
+          "receiverReadback": null,
+          "consumerUsed": null
+        },
+        "reviewAndMergeOwner": {
+          "canonicalWorkSourceWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "canonicalWorkSourceWriterPane": "w3:pJ",
+          "sourceCandidateAuthor": "Actual future isolated native author only; metadata captured from own observed thread/session, no borrowing Root or logical Task ID.",
+          "integrationPublisher": "Root serializes shared Common/native pins and current expected-head; corresponding repository owner participates; no automatic merge."
+        },
+        "allowedImplementationSourcePaths": {
+          "park-kyungchan/agent-platform": [
+            ".github/workflows/source.yml",
+            "ci/source-check.ts",
+            "ci/review-gate.test.ts",
+            "ci/quality/receipt-validation-gate.ts",
+            "ci/quality/receipt-validator.ts",
+            "ci/quality/receipt-validator.test.ts",
+            "ci/quality/harness-scenarios/ci-oracles.test.ts",
+            "ci/reuse/README.md",
+            ".github/source-author.json"
+          ],
+          "park-kyungchan/academy-workbench": [
+            ".github/workflows/source.yml",
+            ".github/source-author.json"
+          ],
+          "park-kyungchan/education-platform": [
+            ".github/workflows/source.yml",
+            ".github/source-author.json"
+          ],
+          "park-kyungchan/math-research-module": [
+            ".github/workflows/source.yml",
+            ".github/source-author.json"
+          ]
+        },
+        "conditionalOwnerClosure": "Actual changed source registration/build/consumer closure must be read and narrowed in the fresh owner method before writes. A newly discovered path is not silently allowed; source qualification/integration remains Root-serialized.",
+        "relatedOriginalConsumerTasks": [
+          "ODI-07-EDUCATION-CI-CONSUMER",
+          "ODI-07-MATH-CI-CONSUMER"
+        ],
+        "relatedPr17Pr19": "Read exact current repository/head/findings through each existing owner; proposal/native Argon review is not implementation review and does not reopen completed consumer Tasks."
+      },
+      {
+        "key": "dependency-registration",
+        "formalTaskId": "ODI-CI-DEPENDENCY-REGISTRATION-20261020",
+        "targetRepositoryIds": [
+          "park-kyungchan/agent-platform"
+        ],
+        "proposedSourceOwner": "Canonical package/architecture registry and existing native owner intake",
+        "candidateExistingTaskRelation": {
+          "existingWorkId": "ontology-driven-platform-integration-20261017",
+          "candidateExistingTaskIds": [
+            "ODI-07",
+            "ODI-HOST-ESTATE-CONTINUATION"
+          ],
+          "decision": "Prepare distinct bounded child Task after actual final approval; no one-to-one unfinished Task fit and completed CI consumers stay immutable.",
+          "completedTaskPinsPreserved": true
+        },
+        "scope": [
+          "Re-read PR38/current successor source and repair the actual operational-context manifest registration discrepancy through the canonical owner/generator. Review intended dependency meaning, not only a recomputed hash.",
+          "Preserve bot provenance. A native owner may take over the proposed change with truthful source-author metadata; never pretend the bot was a native agent.",
+          "Include all affected source registration/build/dependency pins and consumer closures required by the existing package/bun.lock contract; serialize their integration. Source pin preparation does not activate current runtimes.",
+          "Define a repeatable owner intake path for future dependency proposals, keeping current weekly discovery/security alerts. Additional grouping/cadence/intake changes require a selected scoped design; no blanket bot disable, automatic merge or blanket notification suppression."
+        ],
+        "criterion": "Intended dependency change, canonical registration and affected source-owner closures agree; intentionally stale/incorrect identity remains rejected. Demonstrate one owner intake case and preserve discovery/security signals. Do not claim all unadmitted bot PRs will have zero initial failure emails.",
+        "dependsOn": [],
+        "parentTaskId": "ODI-07",
+        "nativeExecutionBinding": {
+          "actualNativeThreadId": null,
+          "actualPaneId": null,
+          "actualTerminalId": null,
+          "actualSessionId": null,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null
+        },
+        "methodAdmission": {
+          "status": "HELD_NOT_ADMITTED",
+          "sameWholeWorkCommonFirst": {
+            "decisionId": "ODI-DECISION-COMMON-FIRST-20261020",
+            "activeWholePlan": "ODI-PLAN@4",
+            "logicalPrerequisite": {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            },
+            "closedOwnerAttestedGeneralRelease": null
+          },
+          "ciOwnerExactLogicalTaskPacketReceipt": null,
+          "ciOwnerFreshSourceActorRouteCurrentness": null,
+          "ciOwnerNativeThreadSessionTaskRunEvent": null,
+          "rootHermes18PathMethodNotReusableForCi": true,
+          "cliEligibleWouldNotGrantAuthority": true,
+          "ordinaryCiIsNotBootstrap": "No relabeling CI implementation, remote workflow disable/cancellation or source retirement as common bootstrap to bypass the retained general-release gate.",
+          "registrationPreparationException": "This assignment authorizes only source registration preparation now; it establishes no implementation/native effects or general-work release."
+        },
+        "dependencies": {
+          "ordinaryImplementationPrerequisite": [
+            {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            }
+          ],
+          "otherCiUnits": [],
+          "perUnitRule": "No global all-seven barrier. Qualify each own actual source/dependencies; an inconclusive fixture or absent adoption receiver holds only its own affected stage."
+        },
+        "stageEvidence": {
+          "sourceReady": null,
+          "offered": null,
+          "receiverReadback": null,
+          "consumerUsed": null
+        },
+        "reviewAndMergeOwner": {
+          "canonicalWorkSourceWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "canonicalWorkSourceWriterPane": "w3:pJ",
+          "sourceCandidateAuthor": "Actual future isolated native author only; metadata captured from own observed thread/session, no borrowing Root or logical Task ID.",
+          "integrationPublisher": "Root serializes shared Common/native pins and current expected-head; corresponding repository owner participates; no automatic merge."
+        },
+        "allowedImplementationSourcePaths": {
+          "park-kyungchan/agent-platform": [
+            "packages/operational-context/package.json",
+            "bun.lock",
+            "package.json",
+            "architecture/capability-source-owners.json",
+            "architecture/quality-policy.json",
+            "ci/quality/architecture-quality.ts",
+            "ci/quality/architecture-quality.test.ts",
+            "ci/reuse/README.md",
+            ".github/source-author.json"
+          ]
+        },
+        "conditionalOwnerClosure": "Actual changed source registration/build/consumer closure must be read and narrowed in the fresh owner method before writes. A newly discovered path is not silently allowed; source qualification/integration remains Root-serialized.",
+        "currentLocalSourceFact": "Canonical local1e528 operational-context manifest Zod4.6.5 is currently consistent with its registry. Cached botb46bbabf... Zod4.6.7 is historical evidence, not verified current PR38/successor. Re-observe actual proposal/head/intended meaning before any bounded owner change; preserve bot provenance/weekly signals and actual native takeover author.",
+        "unchangedSignalsPaths": [
+          ".github/dependabot.yml"
+        ],
+        "blanketBotCadenceNotificationChangesAuthorized": false
+      },
+      {
+        "key": "fixture-lock-investigation",
+        "formalTaskId": "ODI-CI-FIXTURE-INVESTIGATION-20261020",
+        "targetRepositoryIds": [
+          "park-kyungchan/agent-platform"
+        ],
+        "proposedSourceOwner": "Native Codex synthetic fixture source owner",
+        "candidateExistingTaskRelation": {
+          "existingWorkId": "ontology-driven-platform-integration-20261017",
+          "candidateExistingTaskIds": [
+            "ODI-07"
+          ],
+          "decision": "Prepare distinct bounded child Task after actual final approval; no one-to-one unfinished Task fit and completed CI consumers stay immutable.",
+          "completedTaskPinsPreserved": true
+        },
+        "scope": [
+          "Investigate the exact hooks.test.ts:498 assertion and reported label/stack mismatch using synthetic inputs and bounded process/runner metadata.",
+          "If fixture maintenance interference is established, correct only fixture-local Git preparation. Never weaken hooks trust, change host Git configuration or broadly exclude .git / *.lock / genuine writes from detection.",
+          "If the hypothesis remains unsupported, record inconclusive/no-fix disposition with its evidence and stop speculative edits. Other qualified CI units remain deliverable."
+        ],
+        "criterion": "A supported minimal correction preserves real-write detection under independent positive/negative controls, or a truthful bounded investigation disposition records no demonstrated fix. No-fix is not reported as behavior improvement.",
+        "dependsOn": [],
+        "parentTaskId": "ODI-07",
+        "nativeExecutionBinding": {
+          "actualNativeThreadId": null,
+          "actualPaneId": null,
+          "actualTerminalId": null,
+          "actualSessionId": null,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null
+        },
+        "methodAdmission": {
+          "status": "HELD_NOT_ADMITTED",
+          "sameWholeWorkCommonFirst": {
+            "decisionId": "ODI-DECISION-COMMON-FIRST-20261020",
+            "activeWholePlan": "ODI-PLAN@4",
+            "logicalPrerequisite": {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            },
+            "closedOwnerAttestedGeneralRelease": null
+          },
+          "ciOwnerExactLogicalTaskPacketReceipt": null,
+          "ciOwnerFreshSourceActorRouteCurrentness": null,
+          "ciOwnerNativeThreadSessionTaskRunEvent": null,
+          "rootHermes18PathMethodNotReusableForCi": true,
+          "cliEligibleWouldNotGrantAuthority": true,
+          "ordinaryCiIsNotBootstrap": "No relabeling CI implementation, remote workflow disable/cancellation or source retirement as common bootstrap to bypass the retained general-release gate.",
+          "registrationPreparationException": "This assignment authorizes only source registration preparation now; it establishes no implementation/native effects or general-work release."
+        },
+        "dependencies": {
+          "ordinaryImplementationPrerequisite": [
+            {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            }
+          ],
+          "otherCiUnits": [],
+          "perUnitRule": "No global all-seven barrier. Qualify each own actual source/dependencies; an inconclusive fixture or absent adoption receiver holds only its own affected stage."
+        },
+        "stageEvidence": {
+          "sourceReady": null,
+          "offered": null,
+          "receiverReadback": null,
+          "consumerUsed": null
+        },
+        "reviewAndMergeOwner": {
+          "canonicalWorkSourceWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "canonicalWorkSourceWriterPane": "w3:pJ",
+          "sourceCandidateAuthor": "Actual future isolated native author only; metadata captured from own observed thread/session, no borrowing Root or logical Task ID.",
+          "integrationPublisher": "Root serializes shared Common/native pins and current expected-head; corresponding repository owner participates; no automatic merge."
+        },
+        "allowedImplementationSourcePaths": {
+          "park-kyungchan/agent-platform": [
+            "packages/native-codex-adapter/src/native/hooks.test.ts",
+            ".github/source-author.json"
+          ]
+        },
+        "conditionalOwnerClosure": "Actual changed source registration/build/consumer closure must be read and narrowed in the fresh owner method before writes. A newly discovered path is not silently allowed; source qualification/integration remains Root-serialized.",
+        "readOnlyRuntimeBoundaryPaths": [
+          "packages/native-codex-adapter/src/native/hooks.ts"
+        ],
+        "allowedFixCondition": "Only source-evidenced fixture-local Git preparation in hooks.test.ts. No demonstrated hypothesis => explicit inconclusive/no-fix result; no hooks trust/config or broad .git/*.lock/write exclusion."
+      },
+      {
+        "key": "diagnostics",
+        "formalTaskId": "ODI-CI-DIAGNOSTICS-20261020",
+        "targetRepositoryIds": [
+          "park-kyungchan/agent-platform"
+        ],
+        "proposedSourceOwner": "Common reusable CI and existing Work Evidence/evaluation owners",
+        "candidateExistingTaskRelation": {
+          "existingWorkId": "ontology-driven-platform-integration-20261017",
+          "candidateExistingTaskIds": [
+            "ODI-07"
+          ],
+          "decision": "Prepare distinct bounded child Task after actual final approval; no one-to-one unfinished Task fit and completed CI consumers stay immutable.",
+          "completedTaskPinsPreserved": true
+        },
+        "scope": [
+          "Expose bounded stage/reason codes without credentials, private inputs, raw native review content or arbitrary exception dumps.",
+          "Retain run/attempt/job/step identities and failed attempts after rerun success; distinguish consequential aggregate failure from another independent incident.",
+          "Classify default-branch-head, open-pr-head, superseded-or-closed-head and unknown lifecycle observations with timestamps; missing data remains unknown.",
+          "Predeclare representative baseline/candidate criteria through existing quality contracts where substantial; create no parallel incident store or runtime loop."
+        ],
+        "criterion": "The operator can distinguish source, access/runtime, review readiness, source registration and aggregate consequences from bounded evidence; historical branch failures are not presented as current defects.",
+        "dependsOn": [],
+        "parentTaskId": "ODI-07",
+        "nativeExecutionBinding": {
+          "actualNativeThreadId": null,
+          "actualPaneId": null,
+          "actualTerminalId": null,
+          "actualSessionId": null,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null
+        },
+        "methodAdmission": {
+          "status": "HELD_NOT_ADMITTED",
+          "sameWholeWorkCommonFirst": {
+            "decisionId": "ODI-DECISION-COMMON-FIRST-20261020",
+            "activeWholePlan": "ODI-PLAN@4",
+            "logicalPrerequisite": {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            },
+            "closedOwnerAttestedGeneralRelease": null
+          },
+          "ciOwnerExactLogicalTaskPacketReceipt": null,
+          "ciOwnerFreshSourceActorRouteCurrentness": null,
+          "ciOwnerNativeThreadSessionTaskRunEvent": null,
+          "rootHermes18PathMethodNotReusableForCi": true,
+          "cliEligibleWouldNotGrantAuthority": true,
+          "ordinaryCiIsNotBootstrap": "No relabeling CI implementation, remote workflow disable/cancellation or source retirement as common bootstrap to bypass the retained general-release gate.",
+          "registrationPreparationException": "This assignment authorizes only source registration preparation now; it establishes no implementation/native effects or general-work release."
+        },
+        "dependencies": {
+          "ordinaryImplementationPrerequisite": [
+            {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            }
+          ],
+          "otherCiUnits": [],
+          "perUnitRule": "No global all-seven barrier. Qualify each own actual source/dependencies; an inconclusive fixture or absent adoption receiver holds only its own affected stage."
+        },
+        "stageEvidence": {
+          "sourceReady": null,
+          "offered": null,
+          "receiverReadback": null,
+          "consumerUsed": null
+        },
+        "reviewAndMergeOwner": {
+          "canonicalWorkSourceWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "canonicalWorkSourceWriterPane": "w3:pJ",
+          "sourceCandidateAuthor": "Actual future isolated native author only; metadata captured from own observed thread/session, no borrowing Root or logical Task ID.",
+          "integrationPublisher": "Root serializes shared Common/native pins and current expected-head; corresponding repository owner participates; no automatic merge."
+        },
+        "allowedImplementationSourcePaths": {
+          "park-kyungchan/agent-platform": [
+            "ci/quality/run.ts",
+            "ci/quality/progress.ts",
+            "ci/quality/failure-locations.test.ts",
+            "ci/reuse/run.ts",
+            "ci/reuse/run.test.ts",
+            ".github/actions/bun-source/action.yml",
+            "ci/reuse/README.md",
+            ".github/workflows/source.yml",
+            ".github/source-author.json"
+          ]
+        },
+        "conditionalOwnerClosure": "Actual changed source registration/build/consumer closure must be read and narrowed in the fresh owner method before writes. A newly discovered path is not silently allowed; source qualification/integration remains Root-serialized."
+      },
+      {
+        "key": "estate-coverage-mapping",
+        "formalTaskId": "ODI-CI-ESTATE-COVERAGE-20261020",
+        "targetRepositoryIds": [
+          "park-kyungchan/academy-workbench",
+          "park-kyungchan/agent-platform",
+          "park-kyungchan/bible-commentary-station",
+          "park-kyungchan/codex-harness-engineering",
+          "park-kyungchan/daniel-prayer-operations",
+          "park-kyungchan/dc-gang-a",
+          "park-kyungchan/education-platform",
+          "park-kyungchan/gang-a",
+          "park-kyungchan/hermes-profile-dc-context",
+          "park-kyungchan/hermes-profile-dc-contract-audit",
+          "park-kyungchan/hermes-profile-dc-gang-a-dev",
+          "park-kyungchan/hermes-profile-dc-review",
+          "park-kyungchan/hermes-profile-default",
+          "park-kyungchan/hermes-profile-ontology-platform",
+          "park-kyungchan/housing-board-module",
+          "park-kyungchan/math-education",
+          "park-kyungchan/math-research-module",
+          "park-kyungchan/palantirkc",
+          "park-kyungchan/park-kyungchan.github.io",
+          "park-kyungchan/vps-operations"
+        ],
+        "proposedSourceOwner": "Existing estate Task and named repository semantic owners",
+        "candidateExistingTaskRelation": {
+          "existingWorkId": "ontology-driven-platform-integration-20261017",
+          "candidateExistingTaskIds": [
+            "ODI-HOST-ESTATE-CONTINUATION",
+            "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
+          ],
+          "decision": "Prepare distinct bounded child Task after actual final approval; no one-to-one unfinished Task fit and completed CI consumers stay immutable.",
+          "completedTaskPinsPreserved": true
+        },
+        "scope": [
+          "Map the 12 repositories with run history and 8 no-run repositories to current canonical source owner, active versus historical role and required check policy.",
+          "Treat no-run as unknown coverage, not passed verification. Link legacy profile repository consolidation; preserve Hermes Lead research/development ownership and avoid duplicating active CI in historical copies.",
+          "Propose a bounded owner-specific coverage change only where current usefulness is established. This mapping is not a prerequisite for unrelated verified common CI releases."
+        ],
+        "criterion": "Every observed repository has an evidenced owner/role/coverage disposition or an explicit unknown; any newly proposed CI has a named consumer and effect boundary.",
+        "dependsOn": [],
+        "parentTaskId": "ODI-HOST-ESTATE-CONTINUATION",
+        "nativeExecutionBinding": {
+          "actualNativeThreadId": null,
+          "actualPaneId": null,
+          "actualTerminalId": null,
+          "actualSessionId": null,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null
+        },
+        "methodAdmission": {
+          "status": "HELD_NOT_ADMITTED",
+          "sameWholeWorkCommonFirst": {
+            "decisionId": "ODI-DECISION-COMMON-FIRST-20261020",
+            "activeWholePlan": "ODI-PLAN@4",
+            "logicalPrerequisite": {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            },
+            "closedOwnerAttestedGeneralRelease": null
+          },
+          "ciOwnerExactLogicalTaskPacketReceipt": null,
+          "ciOwnerFreshSourceActorRouteCurrentness": null,
+          "ciOwnerNativeThreadSessionTaskRunEvent": null,
+          "rootHermes18PathMethodNotReusableForCi": true,
+          "cliEligibleWouldNotGrantAuthority": true,
+          "ordinaryCiIsNotBootstrap": "No relabeling CI implementation, remote workflow disable/cancellation or source retirement as common bootstrap to bypass the retained general-release gate.",
+          "registrationPreparationException": "This assignment authorizes only source registration preparation now; it establishes no implementation/native effects or general-work release."
+        },
+        "dependencies": {
+          "ordinaryImplementationPrerequisite": [
+            {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            }
+          ],
+          "otherCiUnits": [],
+          "perUnitRule": "No global all-seven barrier. Qualify each own actual source/dependencies; an inconclusive fixture or absent adoption receiver holds only its own affected stage."
+        },
+        "stageEvidence": {
+          "sourceReady": null,
+          "offered": null,
+          "receiverReadback": null,
+          "consumerUsed": null
+        },
+        "reviewAndMergeOwner": {
+          "canonicalWorkSourceWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "canonicalWorkSourceWriterPane": "w3:pJ",
+          "sourceCandidateAuthor": "Actual future isolated native author only; metadata captured from own observed thread/session, no borrowing Root or logical Task ID.",
+          "integrationPublisher": "Root serializes shared Common/native pins and current expected-head; corresponding repository owner participates; no automatic merge."
+        },
+        "allowedImplementationSourcePaths": {
+          "park-kyungchan/agent-platform": [
+            "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-CI-ESTATE-COVERAGE-RESULT-20261020.json",
+            "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/ODI-CI-ESTATE-COVERAGE-VERIFICATION-20261020.json"
+          ]
+        },
+        "futureResultPathsOnly": "Prospective same-Task result/evidence locators only. No result/pass/actual use records are fabricated in this preparation. Root must own fresh result scope/admission and write only actual observations.",
+        "perRepositoryImplementationWritesAuthorized": false,
+        "coverageFacts": "R3 denominator20 with12run/8no-run is proposal/source evidence; current per-repository head/owner/role/coverage must be observed, no-run unknown. No broad20-repository audit performed now."
+      },
+      {
+        "key": "legacy-automation",
+        "formalTaskId": "ODI-CI-LEGACY-SYNC-RETIREMENT-20261020",
+        "targetRepositoryId": "park-kyungchan/palantirkc",
+        "targetWorkflowPath": ".github/workflows/sync-subprojects.yml",
+        "proposedSourceOwner": "palantirkc workflow owner, coordinated under existing Work ontology-driven-platform-integration-20261017",
+        "candidateExistingTaskRelation": {
+          "existingWorkId": "ontology-driven-platform-integration-20261017",
+          "candidateExistingTaskIds": [
+            "ODI-HOST-ESTATE-CONTINUATION",
+            "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
+          ],
+          "decision": "Prepare distinct bounded child Task after actual final approval; no one-to-one unfinished Task fit and completed CI consumers stay immutable.",
+          "completedTaskPinsPreserved": true
+        },
+        "scope": [
+          "After approval, establish the owner-supported reversible fence against new automatic sync triggers, then remove obsolete schedule/repository_dispatch automation through exact reviewed source. Any retained manual path must not silently swallow pull errors or permit an unapproved main mutation.",
+          "Re-observe exact workflow/run IDs and each job/step effect state. Historical queued/pending IDs are evidence, not cancellation targets to replay later.",
+          "Reconcile any started/uncertain Git mutation before a lifecycle action. Cancel only freshly verified not-started obsolete runs through the native GitHub surface and retain exact receipts.",
+          "Do not connect/register a runner that can consume the old queue until trigger retirement and pending-run reconciliation are verified. This proposal does not authorize broad runner registration or root-host execution of repository code.",
+          "Preserve source/history, meaningful existing checks and unrelated workflows. No repository/domain deletion follows."
+        ],
+        "criterion": "Unwanted automatic mutation cannot start, obsolete unstarted queued runs are reconciled, and any retained useful required check has an explicit source owner and execution plan.",
+        "dependsOn": [],
+        "parentTaskId": "ODI-HOST-ESTATE-CONTINUATION",
+        "nativeExecutionBinding": {
+          "actualNativeThreadId": null,
+          "actualPaneId": null,
+          "actualTerminalId": null,
+          "actualSessionId": null,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null
+        },
+        "methodAdmission": {
+          "status": "HELD_NOT_ADMITTED",
+          "sameWholeWorkCommonFirst": {
+            "decisionId": "ODI-DECISION-COMMON-FIRST-20261020",
+            "activeWholePlan": "ODI-PLAN@4",
+            "logicalPrerequisite": {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            },
+            "closedOwnerAttestedGeneralRelease": null
+          },
+          "ciOwnerExactLogicalTaskPacketReceipt": null,
+          "ciOwnerFreshSourceActorRouteCurrentness": null,
+          "ciOwnerNativeThreadSessionTaskRunEvent": null,
+          "rootHermes18PathMethodNotReusableForCi": true,
+          "cliEligibleWouldNotGrantAuthority": true,
+          "ordinaryCiIsNotBootstrap": "No relabeling CI implementation, remote workflow disable/cancellation or source retirement as common bootstrap to bypass the retained general-release gate.",
+          "registrationPreparationException": "This assignment authorizes only source registration preparation now; it establishes no implementation/native effects or general-work release."
+        },
+        "dependencies": {
+          "ordinaryImplementationPrerequisite": [
+            {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            }
+          ],
+          "otherCiUnits": [],
+          "perUnitRule": "No global all-seven barrier. Qualify each own actual source/dependencies; an inconclusive fixture or absent adoption receiver holds only its own affected stage."
+        },
+        "stageEvidence": {
+          "sourceReady": null,
+          "offered": null,
+          "receiverReadback": null,
+          "consumerUsed": null
+        },
+        "reviewAndMergeOwner": {
+          "canonicalWorkSourceWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "canonicalWorkSourceWriterPane": "w3:pJ",
+          "sourceCandidateAuthor": "Actual future isolated native author only; metadata captured from own observed thread/session, no borrowing Root or logical Task ID.",
+          "integrationPublisher": "Root serializes shared Common/native pins and current expected-head; corresponding repository owner participates; no automatic merge."
+        },
+        "allowedImplementationSourcePaths": {
+          "park-kyungchan/palantirkc": [
+            ".github/workflows/sync-subprojects.yml"
+          ]
+        },
+        "runtimeAndSourceStages": {
+          "targetRepositoryId": "park-kyungchan/palantirkc",
+          "exactWorkflowPath": ".github/workflows/sync-subprojects.yml",
+          "sourcePin": {
+            "kind": "git",
+            "repositoryId": "park-kyungchan/palantirkc",
+            "commit": "f1845231c2c36d4d059e0cfd60e90a706491d05a",
+            "path": ".github/workflows/sync-subprojects.yml",
+            "sha256": "bc0b1ac40a3db239d9297356818aac9cc8a84f411a8a22e6ec7fe184872454a9",
+            "bytes": 4612,
+            "blobOid": "fbe23369ad92e1c62418ce512d56a4144f7089d0"
+          },
+          "userSelection": "FULL_RETIREMENT_NO_RETAINED_MANUAL_MUTATION_PATH_PRESERVE_GIT_HISTORY",
+          "stages": [
+            {
+              "stage": "runtime-fence",
+              "approvedScope": true,
+              "actualStatus": "not-executed-by-this-helper",
+              "requires": [
+                "actual existing common-first/general-release prerequisite satisfied at its supported owner boundary",
+                "CI owner fresh exact legacy Task method receipt, current actor/source/event facts; CLI eligibility alone grants no permission",
+                "fresh native GitHub workflow ID/path/state + all relevant current run/job/step effect observations"
+              ],
+              "action": "Disable only this exact workflow using supported native GitHub workflow disable. Read back disabled state and exact receipt before dependent actions. A timeout/ambiguous result means no retry until exact reconciliation."
+            },
+            {
+              "stage": "fresh-unstarted-queue-reconciliation",
+              "dependsOnlyOn": [
+                "runtime-fence readback and actual own supported effect gates"
+              ],
+              "action": "Refresh only runs belonging to the exact disabled workflow. Cancel only freshly verified obsolete NOT-STARTED runs after inspecting relevant jobs/steps and reconciling any started/uncertain Git mutation. Historical run IDs are evidence, never baked cancel targets. Unknown/started holds that action; retain receipts/failed attempts, no automatic retry.",
+              "historicalSenderReportedEvidenceOnly": {
+                "pendingRunId": "39374586111",
+                "queuedRunId": "39236726646",
+                "queuedJobId": "118116594544",
+                "safeAsCurrentTargets": false
+              }
+            },
+            {
+              "stage": "source-retirement",
+              "independentFrom": "Unrelated publication/dependency/fixture/diagnostics/estate units; runtime retirement receipt is distinct from eventual source cleanup.",
+              "sourceAllowedPaths": [
+                ".github/workflows/sync-subprojects.yml"
+              ],
+              "action": "After exact owner source/base readback, create isolated Task branch/worktree and remove obsolete workflow, including schedule/repository_dispatch/workflow_dispatch mutation path; preserve Git history and unrelated meaningful workflows. Independent exact review, authenticated publication, existing required checks and explicit Lead expected-head manual merge; no direct main push/auto merge."
+            },
+            {
+              "stage": "source-gate-necessary-prerequisite",
+              "status": "SOURCE_PROPOSAL_ONLY_NOT_ADMITTED_IMPLEMENTATION",
+              "senderReportedProblem": "Existing required ruleset19550804 gates self-hosted/linux and runners0; no bypass actors. Not independently queried by this helper.",
+              "possibleBoundedRemedy": "Propose standard GitHub-hosted pure-source gates for exact existing required gate names/policies only after reading their exact maintained source and verifying no repository code/root-host runner execution. Root/owner must select exact paths and current expected head before separate source admission. No ruleset bypass, runner registration or blanket required-check removal.",
+              "exactAdditionalAllowedSourcePaths": [],
+              "runtimeFenceNeedWaitForSourcePr": false,
+              "globalMethodGateStillApplies": true
+            }
+          ],
+          "legacyBootstrapRefusalRetained": "Sender reports legacy Lead bootstrap UNKNOWN/DRIFT: absent /root/harness-upstream plus unrelated July active-session carrier. Do not repair HOME/carrier or treat refusal as current common admission.",
+          "weeklyDiscoverySecuritySignalsRetained": true,
+          "runnerRegistrationAllowed": false,
+          "rootRepositoryCodeExecutionAllowed": false,
+          "runtimeEffectsAlreadyProven": false
+        }
+      },
+      {
+        "key": "successor-adoption",
+        "formalTaskId": "ODI-CI-SUCCESSOR-ADOPTION-20261020",
+        "targetRepositoryIds": [],
+        "proposedSourceOwner": "Current Lead and actual successor native owner, under the existing Work",
+        "candidateExistingTaskRelation": {
+          "existingWorkId": "ontology-driven-platform-integration-20261017",
+          "candidateExistingTaskIds": [
+            "ODI-HOST-ESTATE-CONTINUATION",
+            "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
+          ],
+          "decision": "Prepare distinct bounded child Task after actual final approval; no one-to-one unfinished Task fit and completed CI consumers stay immutable.",
+          "completedTaskPinsPreserved": true
+        },
+        "scope": [
+          "Qualify each independently useful unit using its own actual dependency closure, exact changed source, relevant checks, independent code review, authenticated publication and Lead expected-head merge. Do not wait for unrelated coverage mapping, legacy retirement or an inconclusive fixture investigation.",
+          "Stage A: prepare the exact selected change/consumer pins and existing Work Evidence handoff package as soon as qualified. Mark source-ready/offered separately from receiver readback.",
+          "Stage B: resolve the actual current receiver from the owner current-work locator. At its safe checkpoint, obtain selected Work/Task/version readback and explicit owner adoption. A missing successor holds only this readback stage.",
+          "For GitHub CI consumption, verify the workflow or reusable-action commit pin and an actual authorized consumer run. For successor source context, verify the exact source/Work/Task readback. Native runtime configuration activation is not applicable for a CI-only change; never add a restart just to claim adoption.",
+          "Preserve active runs under their original pins. Retain currently adopted source if a candidate is not qualified. No hot patch, custom observer, automatic merge or Goal lifecycle action follows."
+        ],
+        "criterion": "Each selected unit has separate source-ready, offered, receiver-readback and consumer-used evidence. Partial adoption does not claim estate-wide completion; unrelated pending units remain visible.",
+        "dependsOn": [],
+        "dependencyRule": "For each offered unit require that unit and only its real contract/source dependencies to be qualified. The template itself has no global all-units barrier.",
+        "stages": [
+          "source-ready",
+          "offered",
+          "receiver-readback",
+          "consumer-used"
+        ],
+        "parentTaskId": "ODI-HOST-ESTATE-CONTINUATION",
+        "nativeExecutionBinding": {
+          "actualNativeThreadId": null,
+          "actualPaneId": null,
+          "actualTerminalId": null,
+          "actualSessionId": null,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null
+        },
+        "methodAdmission": {
+          "status": "HELD_NOT_ADMITTED",
+          "sameWholeWorkCommonFirst": {
+            "decisionId": "ODI-DECISION-COMMON-FIRST-20261020",
+            "activeWholePlan": "ODI-PLAN@4",
+            "logicalPrerequisite": {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            },
+            "closedOwnerAttestedGeneralRelease": null
+          },
+          "ciOwnerExactLogicalTaskPacketReceipt": null,
+          "ciOwnerFreshSourceActorRouteCurrentness": null,
+          "ciOwnerNativeThreadSessionTaskRunEvent": null,
+          "rootHermes18PathMethodNotReusableForCi": true,
+          "cliEligibleWouldNotGrantAuthority": true,
+          "ordinaryCiIsNotBootstrap": "No relabeling CI implementation, remote workflow disable/cancellation or source retirement as common bootstrap to bypass the retained general-release gate.",
+          "registrationPreparationException": "This assignment authorizes only source registration preparation now; it establishes no implementation/native effects or general-work release."
+        },
+        "dependencies": {
+          "ordinaryImplementationPrerequisite": [
+            {
+              "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+              "milestone": "execution-and-verification"
+            }
+          ],
+          "otherCiUnits": [],
+          "perUnitRule": "No global all-seven barrier. Qualify each own actual source/dependencies; an inconclusive fixture or absent adoption receiver holds only its own affected stage."
+        },
+        "stageEvidence": {
+          "sourceReady": null,
+          "offered": null,
+          "receiverReadback": null,
+          "consumerUsed": null
+        },
+        "reviewAndMergeOwner": {
+          "canonicalWorkSourceWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "canonicalWorkSourceWriterPane": "w3:pJ",
+          "sourceCandidateAuthor": "Actual future isolated native author only; metadata captured from own observed thread/session, no borrowing Root or logical Task ID.",
+          "integrationPublisher": "Root serializes shared Common/native pins and current expected-head; corresponding repository owner participates; no automatic merge."
+        },
+        "allowedImplementationSourcePaths": {
+          "park-kyungchan/agent-platform": [
+            "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-CI-SUCCESSOR-ADOPTION-RESULT-20261020.json",
+            "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/evidence/ODI-CI-SUCCESSOR-ADOPTION-VERIFICATION-20261020.json"
+          ]
+        },
+        "futureResultPathsOnly": "Prospective same-Task result/evidence locators only. No result/pass/actual use records are fabricated in this preparation. Root must own fresh result scope/admission and write only actual observations.",
+        "selectedOfferedUnit": null,
+        "actualReceiver": null,
+        "selectedConsumerRepositoryAndPaths": null,
+        "noAllUnitsBarrier": "Template depends on no other CI unit en masse. Before each offer, pin only selected unit and its real qualifying closure; source-ready/offered may proceed without a receiver, receiver-readback/use remains separately held. No runtime restart/config activation for CI-only source."
+      }
+    ],
+    "sourceWorkReference": {
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "0f13c9474b9fdb01eaed733c27995b9131ba95b0",
+      "readOnlyQualifiedSnapshotNotPerpetualCas": true
+    },
+    "nativeMethodPrerequisite": {
+      "status": "HELD_NOT_ADMITTED",
+      "sameWholeWorkCommonFirst": {
+        "decisionId": "ODI-DECISION-COMMON-FIRST-20261020",
+        "activeWholePlan": "ODI-PLAN@4",
+        "logicalPrerequisite": {
+          "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+          "milestone": "execution-and-verification"
+        },
+        "closedOwnerAttestedGeneralRelease": null
+      },
+      "ciOwnerExactLogicalTaskPacketReceipt": null,
+      "ciOwnerFreshSourceActorRouteCurrentness": null,
+      "ciOwnerNativeThreadSessionTaskRunEvent": null,
+      "rootHermes18PathMethodNotReusableForCi": true,
+      "cliEligibleWouldNotGrantAuthority": true,
+      "ordinaryCiIsNotBootstrap": "No relabeling CI implementation, remote workflow disable/cancellation or source retirement as common bootstrap to bypass the retained general-release gate.",
+      "registrationPreparationException": "This assignment authorizes only source registration preparation now; it establishes no implementation/native effects or general-work release."
+    },
+    "senderReportedExecutionContextOnly": {
+      "existingCiHelperThreadId": "01a1571b-2ee3-7832-8dd6-5894635f40b4",
+      "boundedCiGoal": "user/owner reported; no genuine Goal readback by helper",
+      "newExecutionPane": "w6:p3 sender-reported, not successor MAIN and not native identity proof for any new Task",
+      "finishedReviewPane": "w6:p2 sender reports closed after retained result",
+      "actualTaskLaunchBindings": null
+    },
+    "preservedWholeWork": {
+      "wholePurpose": "Whole approved ODI Data/Logic/Action/Security useful delivery; full estate beyond20/native5; Memory/current decisions/context/identity/recovery; H16/H49; semantic/kinetic/domain consumers; PR17/19 exact review/merge/owner use; retained MCP/image/Linux; distinct Engineering/operator/domain Acceptance.",
+      "wholeWhy": "Whole operational view; Lead integrates incomplete requests. Fragmented Memory/current decisions cost tokens/time. >72h repo delay is user report. Use original cookbook; no new rubric.",
+      "owners": [
+        {
+          "role": "source",
+          "id": "agent-platform"
+        },
+        {
+          "role": "source",
+          "id": "codex-harness-engineering"
+        },
+        {
+          "role": "native",
+          "id": "native-codex"
+        },
+        {
+          "role": "native",
+          "id": "native-hermes"
+        },
+        {
+          "role": "domain",
+          "id": "ontology-foundation"
+        },
+        {
+          "role": "data",
+          "id": "codex-harness-engineering"
+        }
+      ],
+      "allEightCodexRoutes": true,
+      "onlyCTaskOwnerAdmissionSupported": true,
+      "allEightHermesRoutesStillUnproved": true,
+      "sourceSuccessorScope": "Same successor-only topology+STRUCTURALCONSOLIDATION Task, exactff55 proposal/7classifiedinputs/3qualifications; BOTH/purpose+operational Palantir Data/Logic/Action/Security required, architecture/storage still not implementation acceptance. No current MAIN substantive migration.",
+      "fences": {
+        "groups": 9,
+        "completedConsumed": 126,
+        "uncertainIds": [
+          "ACADEMY-RUNNING-P1-READ-ONCE1-20261016",
+          "ODI-05-MEMORY-REVIEW-DISPATCH-05",
+          "ODI-05-MEMORY-REVIEW-USER-RESUME-06",
+          "codex-harness-engineering:effect:ods-20261012-original-parent-inflight-usage",
+          "codex-harness-engineering:effect:ods-20261012-unexpected-local-hermes-bootstrap"
+        ],
+        "noReplay": true
+      },
+      "budget": {
+        "capUsd": 14,
+        "usageUsd": null,
+        "paidJudgmentHeld": true,
+        "reset": false
+      },
+      "native": "servingHermes349/current model-effort-auth-permissions-hooks trust and existing native/domain/data/defaultHermesLead R&D ownership retained. Future Client/Backend official RELEASE only.",
+      "oldLead": "Separate conditional oldLead self-Pause/fallback only after safe actual successor ACK/CAS/genuine Goal-plan/inflight reconciliation/closeout; successor Goal continues. No new MAIN, Pause or queue here.",
+      "ciWorkflow": {
+        "latestApproval": {
+          "path": "/home/palantirkc/operations/ci-actions-analysis-20261020/approval.json",
+          "bytes": 1066,
+          "sha256": "56e4b489eab5a943b9c19df95b19475bb3b2e10dfbc12fd135d756d5667ea76f"
+        },
+        "legacySelection": "full retirement; no manual mutation path",
+        "weeklyDiscoverySecurity": "retained",
+        "supersedes": "Prior CI interview-pending texts only; preserve them as original source history. Other Work scope/effect/native/common-first gates unchanged."
+      }
+    },
+    "actualSourceOwnerCapture": true,
+    "actualRootCapture": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/ci-workflow-approved-registration.root-authoring.actual.json",
+      "bytes": 5368,
+      "sha256": "a2cecfc3cbe007545bd16b2a61a7cc0d9f3f21c75df34689258dd3a250f01ac3"
+    }
+  }
+}

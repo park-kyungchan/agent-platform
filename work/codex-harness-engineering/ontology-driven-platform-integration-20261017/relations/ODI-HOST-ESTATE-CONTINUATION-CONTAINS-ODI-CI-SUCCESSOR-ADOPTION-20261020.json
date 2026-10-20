@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "relation",
+  "id": "ODI-HOST-ESTATE-CONTINUATION-CONTAINS-ODI-CI-SUCCESSOR-ADOPTION-20261020",
+  "relation": "contains",
+  "from": {
+    "kind": "task",
+    "id": "ODI-HOST-ESTATE-CONTINUATION"
+  },
+  "to": {
+    "kind": "task",
+    "id": "ODI-CI-SUCCESSOR-ADOPTION-20261020"
+  }
+}
