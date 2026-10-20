@@ -192,8 +192,22 @@ Limits are 4,096 files, 256 aliases, 8,192 derived directories, 8MiB per file,
 64MiB decoded total, 96MiB stdin and 16MiB metadata journal. Existing source-reader
 and compiler limits are unchanged. The helper checks the exact runtime registration
 layout, complete registered payload bytes and bundle names before its first write.
+Every path must round-trip as UTF-8, each encoded component is at most255 bytes,
+namespace-relative paths at most1,024 bytes, compiled absolute pins at most2,048
+bytes and combined artifact paths at most4,095 bytes. Full intent/completion event
+bytes and bounded terminal/failure metadata must fit the unchanged16MiB journal
+before the namespace can be claimed. Invalid inputs cannot consume the once fence
+by overflowing a known filesystem or journal bound during delivery.
 It never downloads dependencies, invokes a package manager, executes payload code
 or accepts an executable callback.
+
+The executable pathname alone cannot prove which image is running. The helper
+intentionally opens the single literal `/proc/self/exe` magic link, hashes the held
+regular-file descriptor, checks stable image metadata and keeps it held through
+delivery. This loaded image must match the compiler pin as well as the named path.
+An owner-bit-masking umask is refused before mkdir; the helper never changes the
+process umask. Every newly created directory is verified as owned mode0700 through
+held no-follow descriptors without a path-following chmod.
 
 The first mutation is an exclusive namespace mkdir under the verified held parent.
 The first file is an exclusive durable source-owned claim; it is never removed or
@@ -204,8 +218,20 @@ manifests, profile/config/trust and existing projections are not written. Existi
 namespace/claim means reconciliation, including an identical previous attempt;
 there is no automatic resume, replacement, retry or rollback.
 
-Intent/completion records are fsynced into a bounded metadata-only journal. A final
-receipt is attempted independently even when journal completion fails. A returned
+Intent/completion records are fsynced into a bounded metadata-only journal. An
+immutable receipt snapshot is attempted independently after artifact work, even
+when journal verification fails. It has `terminalState: pending`, a null self-pin
+and, when verified, a `journal.scope: verified-prefix` pin covering only the first
+`bytes` of the journal. That prefix remains valid when a terminal is later appended;
+it never claims to hash the final journal or itself. After the receipt write and
+readback outcome is known, the journal terminal records that outcome and pins the
+receipt bytes one-way. Receipt allocation/write/readback failures therefore produce
+a partial terminal even if stdout is lost. The returned verified whole-journal pin
+has `scope: terminal` and `terminalState: confirmed`; these are not retroactively
+written into the immutable snapshot. Missing/failed terminal persistence leaves
+pending/unknown reconciliation, never a completed delivery inferred from the
+snapshot alone. The terminal scope covers artifact and receipt outcome, not later
+descriptor teardown, native transport or separate owner verification. A returned
 `persistenceFailure` or `uncertain` path requires the existing owner to reconcile the
 exact native tool outcome and on-disk evidence; storage failure cannot be turned
 into a durable-success claim. The caller must retain the returned metadata even
