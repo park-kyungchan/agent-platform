@@ -1,0 +1,322 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-USER-DIR-TOPOLOGY-20261020",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "native-user-message",
+    "locator": "Actual user messages retained verbatim in this Input and DIR_TOPOLOGY_20261020.source-request.actual.json; registered by current sole MAIN."
+  },
+  "content": {
+    "correlation": "DIR_TOPOLOGY_20261020",
+    "capturedAtUtc": "2026-10-20T02:58:06.756Z",
+    "messages": [
+      {
+        "kind": "original-request",
+        "originalText": "User-requested successor scope addition; correlation DIR_TOPOLOGY_20261020. The user explicitly asks you to include the confusing /home/palantirkc directory/runtime topology in the work scope, apply the existing common harness, assign the appropriate stable logical ID using its current rules, connect existing related records, and arrange execution by the successor Orchestrator in a new pane. Preserve your existing Goal and current work/checkpoint; this is a scope addition and successor handoff request, not a Pause/restart/close instruction. Please retain exact separation of logical IDs, native thread IDs, Herdr pane IDs, process IDs, and paths. Do not invent parallel ID/state systems.\n\nRead-only observed infrastructure facts (2026-10-20, srv1873899):\n1. Current root Codex/Herdr processes share the host mount namespace with host PID 1 (systemd). They run on the VPS host. Current Orchestrator is native thread 01a156bc-f195-7f42-b71b-43e786bbb04f at w3:pJ.\n2. Host /home/palantirkc is an ordinary directory on /dev/sda1 ext4 (uid/gid 0:0, inode 1782). Host /docker/herdr-runtime/home is a distinct directory (uid/gid 1000:1000, inode 525550). Live herdr-runtime Docker Mounts bind the latter to container /home/palantirkc RW. Host /home/palantirkc is not the source of that mount.\n3. Host /home/palantirkc/projects/agent-platform and /docker/herdr-runtime/home/code/shared/agent-platform are distinct directories (inodes 77447 and 526647), not symlinks. Container default working_dir is /home/palantirkc/code/shared/agent-platform, backed by the second path. Container home has its own .codex/.config/.local/.agents. This is separate from host root /root/.codex and the new /root/.local/bin CLI entrypoints. Current container process metadata shows only tini, supervisord, sshd, not a Herdr agent process.\n4. /home/projects and /home/palantirkc/projects are distinct directories. Host /home/palantirkc/worktrees has 35 immediate directories. /docker/herdr-runtime/home/code also has shared, worktrees and orchestrator-ready-20261016-211321. Their canonical ownership, repo/worktree lineage and source-of-truth relations need existing harness records rather than assumptions from names.\n5. /docker/herdr-runtime/build is a symlink to deployment. /docker/herdr-runtime/deployment/compose.yaml declares the observed home bind and loopback SSH 127.0.0.1:2222->container22. Live compose_config_files label includes compose.yaml and '-' (stdin overlay), so file text alone is incomplete deployment provenance; inspect live immutable image and effective mounts before changes.\n6. /docker/vscode-server/docker-compose.yml declares /docker/vscode/config:/config, but no code-server container appears in docker ps -a and code-server is not on host PATH. The code-server YAML/file existence is not evidence of a running service. Meanwhile /docker/vscode/config/tools/npm-global -> /usr/local/lib/nodejs/npm-global and node/current -> /usr/local/lib/nodejs/node-v24.21.0-linux-x64 are symlinks to shared host tools; a legacy directory name does not establish current tool ownership.\n7. Existing host runtime/tool subprocesses retain the old inherited PATH and may resolve npm Codex. Fresh bash -lc and bash -ic resolve /root/.local/bin/codex -> verified independent native 0.163.0. .bashrc/.profile hashes still match setup receipt; this is inherited environment versus new shell, not observed config drift. Preserve old packages and your native handoff pin.\n8. Hermes bind is host /docker/hermes-agent-2q3y/data -> container /opt/data; tsidp uses named volume srv1873899-tsidp_tsidp-state -> /data. These are other storage/ownership domains; do not merge data or extend writes from path-name similarity.\n\nPlease create/update a bounded successor-owned infrastructure topology task using the current common-harness Task/Work/Project/Domain contracts. Link it to existing VPS operations, runtime deployment, CLI native-path/integration setup, orchestrator handoff, repo/worktree and relevant source/ownership records where those relations actually exist. Acceptance should include: a canonical host/container/user/path/mount map; duplicates versus symlinks versus Git worktrees; declared versus observed runtime state; scoped recommendations and any later user decisions needed for migrations. Preserve existing service roles, host-key/Tailscale boundary, credentials and user-data contents. Do not perform migrations/deletions/container recreation or change code-server privileges merely from this request. Execute the substantive task in your successor pane after its existing ACK/CAS/native Goal-plan handoff. In your current handoff checkpoint, retain this source request and the observations.\n\nAt a natural checkpoint, reply starting DIR_TOPOLOGY_20261020_REPLY with the assigned stable ID, actual related IDs (or pending/unknown), canonical entrypoint/checkpoint path, and confirmation that successor scope includes it. No need to restate project transcripts."
+      },
+      {
+        "kind": "supplement-same-task",
+        "originalText": "DIR_TOPOLOGY_20261020 supplemental observations for the same successor task; do not create a duplicate task. Verified host passwd metadata has root (UID0, home /root) and no palantirkc account. The running herdr-runtime container passwd metadata has palantirkc UID/GID1000, home /home/palantirkc, shell /bin/bash. Comparing actual device/inode via the container init process root: host /home/palantirkc = dev2049 inode1782 uid0; host bind source /docker/herdr-runtime/home = dev2049 inode525550 uid1000; actual container /home/palantirkc = dev2049 inode525550 uid1000. This confirms the two same-spelled homes belong to different runtime/account contexts. Read-only Git common-directory metadata of the 35 immediate host worktrees folders found 16 direct worktrees: academy-workbench 3, education-platform 6, math-research-module 2, agent-platform 5; the other 19 folders are not direct Git roots (may be grouping directories; no stale/deletion inference). Add these observations to the same planned task/relations and successor checkpoint. Keep the original DIR_TOPOLOGY_20261020_REPLY result with stable ID, actual links and canonical checkpoint locator; I will report it to the user. Current work/Goal should continue until your own safe handoff checkpoint."
+      }
+    ],
+    "classification": "Exact user-requested successor-only scope and user-provided verified read-only observations. CurrentMAIN captures/registers/links only; no substantive topology investigation or migration performed.",
+    "requestedStableTaskId": "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020",
+    "assignedSuccessor": {
+      "role": "Sole actual successor Orchestrator after existing ACK/CAS/genuineGoal-plan handoff",
+      "nativeThreadId": null,
+      "herdrPaneId": null,
+      "processIds": null
+    },
+    "executionGates": [
+      "Actual common-harness adoption/finitecoverage before generalwork",
+      "Existing sole-MAIN ACK/CAS/genuine successorGoal+plan/oldcloseout+idle sequence",
+      "Substantive topology work assigned to successor pane only"
+    ],
+    "prohibitedEffects": [
+      "Migrations",
+      "Deletions",
+      "Container recreation",
+      "Code-server privilege/role changes",
+      "Credential/user-data contents inspection or copying",
+      "Merging unrelated storage/ownership domains by path-name similarity"
+    ],
+    "goalLifecycleChangeRequested": false,
+    "nativePermissionGranted": false,
+    "wholeWorkComplete": false,
+    "registrationContext": {
+      "classification": "Actual Root source registration and exact existing-record linkage. User-provided topology observations retained verbatim; current MAIN has not performed substantive topology investigation.",
+      "sourceCapture": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/DIR_TOPOLOGY_20261020.source-request.actual.json",
+        "sha256": "e4a3e203fffecd9aed9163a2e1350d1fd646d1e951164f24a762ec2bb5afd389"
+      },
+      "relatedSources": [
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "project.json",
+          "sha256": "35f5d54270f5ea4741f45136833c59fb028ece490b78c5b2339f33ff0b96c53a"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "architecture/capability-source-owners.json",
+          "sha256": "a94c7572afb5ef16ef7ebf5a4e224f738abbc78bb491837df47a95e78abf85d4"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "architecture/runtime-filesystem-contract.json",
+          "sha256": "227468a6b4091cc54c67340d05ed744db2c6d82c827ca89bbbb5c7895dc6b63a"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/herdr-runtime-integration/work.json",
+          "sha256": "38f05a4f53bf9095c73c0d99aaf707f5c540fa2ee5e3e6f1a456b01a014439fd"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/vps-operations",
+          "commit": "46fb5eda3abb7702a458ed216146501fa70a33ba",
+          "path": "project.json",
+          "sha256": "63e8fb3a59b82fa9c85bad436937db94167f25002eb6a5be2b50d0ea11ccfaf7"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/vps-operations",
+          "commit": "46fb5eda3abb7702a458ed216146501fa70a33ba",
+          "path": ".github/source-author.json",
+          "sha256": "04be04c122a87bfce87c5cb127913afbc5336b740d59da7e5900e9e02e2c73ab"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-03.json",
+          "sha256": "b4ceb2fe5683b47a194fd07fdf42196536ef2d545cdecc8b099889f0d4b1496a"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-04.json",
+          "sha256": "be51a8f7f8ec9e78fc0deb882ba29368fb27e412388c06f4f41ce366d3114c08"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-06.json",
+          "sha256": "678a5d46643b92751a46189e2dfc1047c62f5fbf1e4a681dde01b01ad5e6b731"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/herdr-runtime-integration/tasks/HRI-07.json",
+          "sha256": "fa619399d7b5315d9fa28d746086bbc1fae6a4b937d68e69d9b219837808410a"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HOST-INTEGRATION.json",
+          "sha256": "60ee217de29475af7a8634922df72133217b0fadc48e7cd24ffe79dfc90c4fee"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HOST-ESTATE-CONTINUATION.json",
+          "sha256": "0848c0079b22082cddcd974124d9cab77ec2642de79b038e67a971be063a2bdf"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-02-LONG-WORK-SKILL.json",
+          "sha256": "ade7fc31cd338374fe4b7d1f5c21a815a7ae90a923d313ec9421ca5b7868cef5"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-01.json",
+          "sha256": "4d4645b7336d2c87d11a35a7aab5b005c1521f193353f10036056eace8666276"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/agent-platform",
+          "commit": "bf7a5017844269417f6e5803f1567d35d494697b",
+          "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-WORK-METHOD-ADOPTION-20261020.json",
+          "sha256": "6a1f18850886609373bd3719ba3cfcb7f806f347279c8a06d9cf6c9cdf743d68"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/vps-operations",
+          "commit": "46fb5eda3abb7702a458ed216146501fa70a33ba",
+          "path": "deployments/herdr-runtime/README.md",
+          "sha256": "d738c576868f10f867ac6adbe1385f07d18381c3132a035e47a7fff09d43dbcb"
+        },
+        {
+          "kind": "git",
+          "repositoryId": "park-kyungchan/vps-operations",
+          "commit": "46fb5eda3abb7702a458ed216146501fa70a33ba",
+          "path": "deployments/herdr-runtime/compose.yaml",
+          "sha256": "d20152c4d3363eb33826a24d9ecd998ba58affa19f27717fdd69c8d11def92fb"
+        }
+      ],
+      "pendingSetupCorrelation": {
+        "correlation": "HERDR_SETUP_20261020_023248",
+        "logicalTaskId": null,
+        "canonicalSource": null,
+        "basis": "Actual setup receipt bytes hashed by Root and completion observation retained; matching canonical setup Task ID unresolved, no duplicate Task allocated.",
+        "setupReceipt": {
+          "kind": "snapshot",
+          "path": "/root/.local/share/herdr-setup/20261020T023248Z/receipt.json",
+          "sha256": "7d99a858841c0cda7e0421579ac365d57463e9e2d4610af995491e4709af8d21"
+        },
+        "rootCompletionObservation": {
+          "kind": "snapshot",
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/HERDR_SETUP_20261020_023248.completion.observation.actual.json",
+          "sha256": "d380c305292079923340186e97db26d42fa1ecae5f025aea1a98c19258095120"
+        },
+        "futureSuccessorNativeExecutable": "/root/.local/share/agent-cli/codex/0.163.0/bin/codex"
+      },
+      "sourceOwnerBoundary": {
+        "callerTuple": {
+          "domainId": "native-harness",
+          "projectId": "codex-harness-engineering",
+          "workId": "ontology-driven-platform-integration-20261017"
+        },
+        "infrastructureDomainId": "infrastructure",
+        "infrastructureProjectId": "vps-operations",
+        "infrastructureProjectArtifactId": "vps-operations:project:manifest",
+        "nativeAdapterOwner": "vps-operations",
+        "authorityGranted": false
+      },
+      "successorNativeThreadId": null,
+      "successorHerdrPaneId": null,
+      "successorProcessIds": null,
+      "actualRegisteringWriter": {
+        "runtime": "native-codex",
+        "threadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+        "nativeTaskId": null,
+        "nativeRunId": null,
+        "logicalTaskId": "ODI-COMMON-WORK-METHOD-CORE-20261020",
+        "scope": "Source continuity registration only; eventual topology Task remains planned for successor."
+      },
+      "registeredOnSourceBase": "bf7a5017844269417f6e5803f1567d35d494697b",
+      "relatedLinksInterpretation": [
+        {
+          "topic": "VPS operations",
+          "actual_ids": [
+            "infrastructure",
+            "vps-operations",
+            "vps-operations:project:manifest",
+            "ODI-HOST-INTEGRATION"
+          ],
+          "basis": "VPS Project and source-author plus Common infrastructure-domain owner registry. Project/artifact ID is not a Work/Task/native ID."
+        },
+        {
+          "topic": "Runtime deployment/filesystem",
+          "actual_ids": [
+            "herdr-runtime-integration",
+            "HRI-ISSUE-20261015",
+            "HRI-03",
+            "HRI-04",
+            "HRI-06",
+            "HRI-07"
+          ],
+          "basis": "Historical HRI source Work and Tasks: topology normalization, CI consistency, native Orchestrator/service readback, cross-host continuation. Completed historical states are not a new effect permission, current runtime/liveness proof or replay instruction."
+        },
+        {
+          "topic": "Orchestrator/whole estate/handoff",
+          "actual_ids": [
+            "ODI-HOST-INTEGRATION",
+            "ODI-HOST-ESTATE-CONTINUATION",
+            "ODI-01",
+            "ODI-02-LONG-WORK-SKILL",
+            "ODI-DECISION-LONG-AUTONOMY-20261020",
+            "ODI-DECISION-COMMON-FIRST-20261020"
+          ],
+          "basis": "Current ODI caller Work Tasks/decisions preserve full scope, originals/identity, long work source and actual successor/common-first requirements. No historical Plan revision retagging."
+        },
+        {
+          "topic": "Repo/worktree/source ownership",
+          "actual_ids": [
+            "park-kyungchan/agent-platform",
+            "park-kyungchan/codex-harness-engineering",
+            "park-kyungchan/vps-operations",
+            "herdr-runtime-codex-source",
+            "infrastructure-domain"
+          ],
+          "basis": "Repository/source-project/deployment projection contract names have their existing semantic types. Paths, aliases, branch/commit/tree/blob IDs and projection policy IDs are not interchangeable with native Task/Run/thread/pane/PID."
+        },
+        {
+          "topic": "CLI native-path/setup",
+          "correlation": "HERDR_SETUP_20261020_023248",
+          "logicalTaskId": null,
+          "canonicalSource": null,
+          "setupReceiptPath": null,
+          "bounded_search": {
+            "setupCorrelationTaskOnlySearchExitCode": 1,
+            "sourceRecordPaths": [],
+            "scope": "Only existing ODI/HRI Task records; no private/setup/runtime search",
+            "meaning": "No matching Task record within this bounded source scope; no global absence claim"
+          },
+          "basis": "Correlation comes from parent assignment. Existing user source contains related CLI/PATH observations but no helper-authenticated setup receipt. No matching canonical ODI/HRI Task was found in the bounded Task-only search. Root may attach an actual source-owned setup receipt if already available; do not invent/duplicate a Task."
+        }
+      ],
+      "orchestratorHandoffSources": [
+        {
+          "kind": "snapshot",
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/actual-new-main.handoff.packet.json",
+          "sha256": "4472bc79b5e7b5127b2a3abd31f0d62fca1837bd2c7183d6f9711915da8268e0"
+        },
+        {
+          "kind": "snapshot",
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/receiver-ack.actual.json",
+          "sha256": "2337b2127ba8719c1790ba092c25544da52365cb675f97db97b1a1b37d356504"
+        },
+        {
+          "kind": "snapshot",
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/effect-transfer.actual.json",
+          "sha256": "c224c3dc94873d487cb7d53e6e31806fb7c07239e9ada12ec4ff3c81b3e5f254"
+        },
+        {
+          "kind": "snapshot",
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/receiver-execution-ready.actual.json",
+          "sha256": "8002369ac88416d3729c235a2960355ba08638144119087df1cebe694c479b72"
+        },
+        {
+          "kind": "snapshot",
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/native-goal-plan013.actual.json",
+          "sha256": "59208df61a258b4175e776fafffff467dc7212cf206d14de521172b6562b9fcd"
+        },
+        {
+          "kind": "snapshot",
+          "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/history/main.checkpoint.actual/v000012-73761f900aa4016be9b2e713c43aeab5a618ade8b33674af210389fcfbb42415.json",
+          "sha256": "73761f900aa4016be9b2e713c43aeab5a618ade8b33674af210389fcfbb42415"
+        }
+      ],
+      "acceptanceFromActualRequest": [
+        "A source-bound canonical host/container/user/path/mount map after successor investigation.",
+        "Explicit duplicates versus symlinks versus Git worktree relationships and ownership/source lineage.",
+        "Declared deployment/source configuration versus actual observed runtime/image/effective mounts, with original user observations dated and attributed.",
+        "Scoped recommendations, retained owners/service roles and separately identified later user decisions for any migration.",
+        "No inferred account/tool/service existence, stale-folder deletion or storage ownership from path spelling, file existence, inherited PATH or historical source contracts."
+      ]
+    }
+  }
+}

@@ -11,7 +11,7 @@
     "workId": "ontology-driven-platform-integration-20261017",
     "taskId": "ODI-COMMON-WORK-METHOD-CORE-20261020"
   },
-  "sourceBaseSha": "e6b7f90a57f041ea557d3eb67a9e524b9a64df7a",
+  "sourceBaseSha": "bf7a5017844269417f6e5803f1567d35d494697b",
   "author": {
     "runtime": "native-codex",
     "threadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
@@ -20,7 +20,7 @@
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-20T02:37:28.776Z",
+  "capturedAtUtc": "2026-10-20T03:13:32.242Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
