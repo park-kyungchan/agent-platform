@@ -1,0 +1,60 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-NATIVE-20261020",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 4,
+    "taskId": "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-NATIVE-20261020"
+  },
+  "title": "Prepare one fresh native Hermes session metadata prerequisite under exact owner and once-effect gates",
+  "nextAction": "Read only Input ODI-HERMES-WORK-METHOD-SESSION-PREPARE-NATIVE-20261020-PACKET #/content/nativeContract. After actual source qualification/application and native owner/current gateway/auth/once-effect gates, prepare one fresh Task-owned Hermes session through existing supported session.create only. This is a native write with inventory/hook refresh, not provider-free or prompt.submit. Unknown/ambiguous outcome holds; no retry, guessed IDs, config/trust/store copying or general release.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-HERMES-WORK-METHOD-SESSION-SOURCE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-COMMON-WORK-METHOD-CORE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-WORK-METHOD-COVERAGE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-WORK-METHOD-NATIVE-COMPATIBILITY-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-ROOT-COMMON-WORK-METHOD-BOOTSTRAP-20261020",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-COMMON-FIRST-20261020",
+    "ODI-DECISION-LONG-AUTONOMY-20261020"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [
+    "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-ONCE-20261020"
+  ],
+  "verificationEvidenceIds": []
+}

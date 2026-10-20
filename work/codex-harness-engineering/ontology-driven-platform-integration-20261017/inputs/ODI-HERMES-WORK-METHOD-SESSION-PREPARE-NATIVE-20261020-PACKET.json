@@ -1,0 +1,214 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-NATIVE-20261020-PACKET",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "kind": "source-owner-capture",
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/common-followup-record-admission-v2.root-authoring.actual.json"
+  },
+  "content": {
+    "classification": "Private proposed future native-owner bootstrap packet, not actual invocation/admission/effect.",
+    "nativeContract": {
+      "classification": "Planned separate native metadata/session bootstrap. No session.create or actual Effect/occurrence allocated/executed in registration prep.",
+      "dependsOnNativeSourceSuccessor": "ODI-HERMES-WORK-METHOD-SESSION-SOURCE-20261020",
+      "sourceMilestones": [
+        {
+          "taskId": "ODI-HERMES-WORK-METHOD-SESSION-SOURCE-20261020",
+          "milestone": "execution-and-verification"
+        },
+        {
+          "taskId": "ODI-COMMON-WORK-METHOD-CORE-20261020",
+          "milestone": "execution-and-verification"
+        },
+        {
+          "taskId": "ODI-WORK-METHOD-COVERAGE-20261020",
+          "milestone": "execution-and-verification"
+        },
+        {
+          "taskId": "ODI-WORK-METHOD-NATIVE-COMPATIBILITY-20261020",
+          "milestone": "execution-and-verification"
+        },
+        {
+          "taskId": "ODI-ROOT-COMMON-WORK-METHOD-BOOTSTRAP-20261020",
+          "milestone": "execution-and-verification"
+        }
+      ],
+      "currentNativeGatewayAuthGate": [
+        "Actual native owner observes current fixed serving349 identity/source/profile/endpoint/capability/auth through existing supported owner surface; source pins in design are evidence, not current loaded/native proof.",
+        "Use existing authenticated native client with explicitly observed already-ready endpoint; omission may start/ensure gateway and is not authorized. No new provider client/gateway/helper/session store, endpoint/ticket/credential copying or Lead session hijack.",
+        "Observe own actual native logicalTask/identity and required current source/event/allowance facts; complete actual own method/owner/effect admission for this metadata bootstrap before create. Prior source-only c:task receipts do not grant Hermes creation authority. Unknown judgment/budget/event-dependent action remains held.",
+        "Inherit current model/effort/auth/permissions/hooks trust and existing controls; do not accept_hooks, change trust/config/policy/provider, restart/update services or register/activate runners."
+      ],
+      "onceEffectGate": {
+        "proposedPendingEffectId": "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-ONCE-20261020",
+        "actualEffectRecord": null,
+        "actualOccurrence": null,
+        "actualRuntimeId": null,
+        "actualNativeTaskId": null,
+        "actualRunId": null,
+        "actualEventId": null,
+        "requestId": null,
+        "intentReceipt": null,
+        "rule": "Before the one supported session.create, native owner retains exact request/target/source/intent and original native controls. A timeout/ambiguity is do-not-retry: reconcile exact native request/admission/session/inventory receipts before any dependent action. Do not compute/provisionally guess session ID, reuse latest/title/Lead fallback or replay old namespace installer."
+      },
+      "nativeWriteTruth": "session.create is separate from prompt.submit but stages/commits native session/policy/key/prefill state, attaches/subscribes, refreshes already-consented hooks and inventory/probes/housekeeping/passive update prefetch. It submits no model turn itself; no universal provider-free/network-free/zero-effect claim is justified.",
+      "allowedMetadataOutput": [
+        "genuinely returned canonical stored_session_id",
+        "genuinely selected current profile ID/name",
+        "actual request/receipt/admission status and source provenance",
+        "allowlisted epoch/sequence/gap/status when existing owner APIs expose them"
+      ],
+      "unknownsRemainNull": [
+        "nativeTaskId",
+        "nativeRunId",
+        "nativeEventId",
+        "future turnId",
+        "full pre_llm_call event",
+        "configuration/trust observation path",
+        "source install satisfaction",
+        "native receive/use/admission/general release"
+      ],
+      "privacy": "Filter exact own session metadata only; no transcripts/messages/history/tool inputs/user data/credential values/native-store or DB reads. Sequence/admission/execution_generation is not a turn ID/event UUID.",
+      "afterCreate": "Creation alone supplies no turn, method use, install, provider call judgment or native acceptance. Keep actual created session unused under original controls while exact new map/source/native owner installation/read gates proceed. Preserve unknowns and consumed once-effect receipt.",
+      "explicitlyExcluded": [
+        "prompt.submit/model inference/evaluation/paid judgment",
+        "hook/config/trust/model/provider/source store edits",
+        "existing nativeLead session attach/reuse or guessed selection",
+        "install/first-read/namespace mutation in this Task",
+        "general/CI execution, Goal/Pause/handoff lifecycle"
+      ]
+    },
+    "selectedDesign": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-work-method.native-event-projection.minimal-design.v2.actual.json",
+      "bytes": 20967,
+      "sha256": "56fd92930c9fa8a81fb6ff2f100128a65f63b0221ba6c5273f90d39206a0d60e"
+    },
+    "sessionOrderingSource": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-work-method.native-session-ordering.readonly-contract.actual.json",
+      "bytes": 19613,
+      "sha256": "234d2cece3a3801874a3ecb2119304ced6c1b1c5bc51448fa75de7033d3ee73d"
+    },
+    "sourcePrerequisiteTask": "ODI-HERMES-WORK-METHOD-SESSION-SOURCE-20261020",
+    "preparedByActualThreadId": "01a156c2-bf11-7d10-9c08-967e5394c85d",
+    "actualCanonicalWriterThreadId": null,
+    "nativeExecutionBinding": {
+      "threadId": null,
+      "sessionId": null,
+      "profileId": null,
+      "paneId": null,
+      "terminalId": null,
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "nativeEventId": null,
+      "turnId": null
+    },
+    "preservedWholeWork": {
+      "wholePurpose": "Whole approved ODI Data/Logic/Action/Security useful delivery; full estate beyond20/native5; Memory/current decisions/context/identity/recovery; H16/H49; semantic/kinetic/domain consumers; PR17/19 exact review/merge/owner use; retained MCP/image/Linux; distinct Engineering/operator/domain Acceptance.",
+      "wholeWhy": "Whole operational view; Lead integrates incomplete requests. Fragmented Memory/current decisions cost tokens/time. >72h repo delay is user report. Use original cookbook; no new rubric.",
+      "owners": [
+        {
+          "role": "source",
+          "id": "agent-platform"
+        },
+        {
+          "role": "source",
+          "id": "codex-harness-engineering"
+        },
+        {
+          "role": "native",
+          "id": "native-codex"
+        },
+        {
+          "role": "native",
+          "id": "native-hermes"
+        },
+        {
+          "role": "domain",
+          "id": "ontology-foundation"
+        },
+        {
+          "role": "data",
+          "id": "codex-harness-engineering"
+        }
+      ],
+      "allEightCodexRoutes": true,
+      "onlyCTaskOwnerAdmissionSupported": true,
+      "allEightHermesRoutesStillUnproved": true,
+      "sourceSuccessorScope": "Same successor-only topology+STRUCTURALCONSOLIDATION Task, exactff55 proposal/7classifiedinputs/3qualifications; BOTH/purpose+operational Palantir Data/Logic/Action/Security required, architecture/storage still not implementation acceptance. No current MAIN substantive migration.",
+      "fences": {
+        "groups": 9,
+        "completedConsumed": 126,
+        "uncertainIds": [
+          "ACADEMY-RUNNING-P1-READ-ONCE1-20261016",
+          "ODI-05-MEMORY-REVIEW-DISPATCH-05",
+          "ODI-05-MEMORY-REVIEW-USER-RESUME-06",
+          "codex-harness-engineering:effect:ods-20261012-original-parent-inflight-usage",
+          "codex-harness-engineering:effect:ods-20261012-unexpected-local-hermes-bootstrap"
+        ],
+        "noReplay": true
+      },
+      "budget": {
+        "capUsd": 14,
+        "usageUsd": null,
+        "paidJudgmentHeld": true,
+        "reset": false
+      },
+      "native": "servingHermes349/current model-effort-auth-permissions-hooks trust and existing native/domain/data/defaultHermesLead R&D ownership retained. Future Client/Backend official RELEASE only.",
+      "oldLead": "Separate conditional oldLead self-Pause/fallback only after safe actual successor ACK/CAS/genuine Goal-plan/inflight reconciliation/closeout; successor Goal continues. No new MAIN, Pause or queue here.",
+      "ciWorkflow": {
+        "latestApproval": {
+          "path": "/home/palantirkc/operations/ci-actions-analysis-20261020/approval.json",
+          "bytes": 1066,
+          "sha256": "56e4b489eab5a943b9c19df95b19475bb3b2e10dfbc12fd135d756d5667ea76f"
+        },
+        "legacySelection": "full retirement; no manual mutation path",
+        "weeklyDiscoverySecurity": "retained",
+        "supersedes": "Prior CI interview-pending texts only; preserve them as original source history. Other Work scope/effect/native/common-first gates unchanged."
+      }
+    },
+    "sourceAttribution": {
+      "source": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/CI_WORKFLOW_20261020.route-readbacks.provenance-successor.actual.json",
+        "bytes": 7414,
+        "sha256": "c90be92ecacb0e7605806f3f31fb4292301ff22ba6c6c9d0c4aabb3277e8e6d0"
+      },
+      "technicalRelayNativeThread": "01a1571b-2ee3-7832-8dd6-5894635f40b4",
+      "uiUserRoleIsHumanAuthorship": false,
+      "relaysAreNotExtraApproval": true,
+      "actualHumanCiApproval": "approval.json SHA56e4b489eab5a943b9c19df95b19475bb3b2e10dfbc12fd135d756d5667ea76f binds R3adc3506c...",
+      "newHermesBootstrapAuthority": "Existing actual user whole Goal/common-first authority plus Root engineering-selected v2/source Task allocation; not CI helper relay or CI scope extension.",
+      "oldMistakenClassification445348c3RetainedAsOriginal": true,
+      "nativeWorkerW6P3": "Technical owner reports closed after read-only source design, no CI method/occurrence; future actor bindingnull."
+    },
+    "currentMergedSourceBase": {
+      "currentMergedSourceBase": "65c87fbed8d7eea35e40cfe13496f75fae8526e0",
+      "tree": "cfe5288c630cc37333600c55a5aec42e255f9798",
+      "parents": [
+        "0f13c9474b9fdb01eaed733c27995b9131ba95b0",
+        "2b168cbc9f5982931d068a82422c38c7b87c863a"
+      ],
+      "checkedReviewedD": "2b168cbc9f5982931d068a82422c38c7b87c863a",
+      "sameReviewedTree": true,
+      "mergeReceipt": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-bounded-reader.pr53.merge.readback.actual.json",
+        "bytes": 641,
+        "sha256": "763be653e6653ab15735d9334af70e51bc383df1548ea8dfda8f346f455f9d18"
+      },
+      "MIndependentReview": "pending per actual Root message at freeze",
+      "MMainCi": "pending per actual Root message at freeze",
+      "MSourceOwnerApplication": "pending per actual Root message at freeze",
+      "newTaskRegistrationAndOwnMethod": "absent, Root future administrative/current-source writer required"
+    },
+    "actualRootAdministrativeCapture": {
+      "threadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+      "sourceCandidatePreparationSha256": "8838c5cf89e1b78994b7f2136f1ac728615e24305deb702572a336f1470a2ef7",
+      "selectedDesignSha256": "56fd92930c9fa8a81fb6ff2f100128a65f63b0221ba6c5273f90d39206a0d60e",
+      "scope": "Register exact candidate source/native bootstrap contracts; no Task execution or source/native method receipt inferred. Source6path implementation only after fresh own Root c:task; native prepare/install/use separatelyheld."
+    }
+  }
+}
