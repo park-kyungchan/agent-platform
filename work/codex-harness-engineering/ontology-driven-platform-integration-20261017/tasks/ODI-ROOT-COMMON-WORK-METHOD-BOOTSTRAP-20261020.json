@@ -1,0 +1,49 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-ROOT-COMMON-WORK-METHOD-BOOTSTRAP-20261020",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 4,
+    "taskId": "ODI-ROOT-COMMON-WORK-METHOD-BOOTSTRAP-20261020"
+  },
+  "title": "Read and apply the first exact Root source-bound work-method bootstrap",
+  "nextAction": "Read only Input ODI-COMMON-WORK-METHOD-SOURCE-BOOTSTRAP-20261020 #/content/rootBootstrapPacket for this exact Root Task. After the three source-producer execution-and-verification dependencies and current exact source-owner gates, use existing bounded source readers and the guarded v6 admission CLI with actual current Root/source observations. Read and apply the whole purpose/WHY, Spec1/Plan4/original decisions/owners, nine-fence index/five uncertainties and same cumulativeUSD14unknown. Retain absent current native event/protocol installation/receipt/use/coverage as held; record genuine receive/use only after Root actually observes it. No installation/refresh/injection, runtime/provider/native effect, general release or producer/native occurrence is authorized by this source-only Task.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    {
+      "taskId": "ODI-COMMON-WORK-METHOD-CORE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-WORK-METHOD-COVERAGE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-WORK-METHOD-NATIVE-COMPATIBILITY-20261020",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-COMMON-FIRST-20261020",
+    "ODI-DECISION-LONG-AUTONOMY-20261020"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

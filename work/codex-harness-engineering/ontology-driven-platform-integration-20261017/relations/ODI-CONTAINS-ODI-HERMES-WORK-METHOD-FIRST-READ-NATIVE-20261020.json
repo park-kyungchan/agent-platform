@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "relation",
+  "id": "ODI-CONTAINS-ODI-HERMES-WORK-METHOD-FIRST-READ-NATIVE-20261020",
+  "relation": "contains",
+  "from": {
+    "kind": "work",
+    "id": "ontology-driven-platform-integration-20261017"
+  },
+  "to": {
+    "kind": "task",
+    "id": "ODI-HERMES-WORK-METHOD-FIRST-READ-NATIVE-20261020"
+  }
+}
