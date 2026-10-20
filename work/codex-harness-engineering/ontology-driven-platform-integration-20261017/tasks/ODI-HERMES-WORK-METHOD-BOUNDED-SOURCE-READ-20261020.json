@@ -19,9 +19,9 @@
   "title": "Implement lossless bounded immutable-source reads for the existing Hermes common-method owner reader",
   "nextAction": "Implement only the bounded guarded Hermes source-read bootstrap in Input ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020-PACKET; retain exact source, checks and unknown native IDs. No runtime install, activation, paid judgment or general-work release.",
   "state": {
-    "execution": "running",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -49,5 +49,7 @@
     "ODI-DECISION-LONG-AUTONOMY-20261020"
   ],
   "effectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-VERIFICATION-20261020"
+  ]
 }
