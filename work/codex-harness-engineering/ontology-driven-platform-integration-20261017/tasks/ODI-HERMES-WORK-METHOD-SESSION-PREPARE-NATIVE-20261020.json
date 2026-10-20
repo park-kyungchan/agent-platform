@@ -17,11 +17,11 @@
     "taskId": "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-NATIVE-20261020"
   },
   "title": "Prepare one fresh native Hermes session metadata prerequisite under exact owner and once-effect gates",
-  "nextAction": "Read only Input ODI-HERMES-WORK-METHOD-SESSION-PREPARE-NATIVE-20261020-PACKET #/content/nativeContract. After actual source qualification/application and native owner/current gateway/auth/once-effect gates, prepare one fresh Task-owned Hermes session through existing supported session.create only. This is a native write with inventory/hook refresh, not provider-free or prompt.submit. Unknown/ambiguous outcome holds; no retry, guessed IDs, config/trust/store copying or general release.",
+  "nextAction": "DO NOT recreate or replay the consumed SessionPrepare once-effect. Actual native session/profile/policy-cwd metadata is preserved in Input ODI-HERMES-WORK-METHOD-SESSION-PREPARE-ACTUAL-20261020 #/content. Native operation succeeded; typed native occurrence verification remains unverified because native Task/Run/event/attempt IDs were not exposed. Install/actual method use/finite coverage remain separate.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "unverified",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -53,8 +53,7 @@
     "ODI-DECISION-LONG-AUTONOMY-20261020"
   ],
   "effectIds": [],
-  "pendingEffectIds": [
-    "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-ONCE-20261020"
-  ],
-  "verificationEvidenceIds": []
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": [],
+  "executionEvidenceId": "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-ACTUAL-OBSERVATION-20261020"
 }
