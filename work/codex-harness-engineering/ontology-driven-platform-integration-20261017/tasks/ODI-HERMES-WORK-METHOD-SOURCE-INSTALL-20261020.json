@@ -16,8 +16,8 @@
     "planRevision": 4,
     "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020"
   },
-  "title": "Install only an exact reviewed Common1e528 guarded work-method reader projection in the owned serving349 runtime",
-  "nextAction": "Install the exact reviewed guarded reader closure once in the selected new namespace; preserve existing runtime and controls.",
+  "title": "Install only the exact reviewed current Common guarded work-method reader projection in the owned serving349 new namespace",
+  "nextAction": "Read Input ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020-CURRENT-SOURCE-20261020 #/content/sourceContract. Preserve original four dependencies and pending once-effect. Qualify exact current registration/build/compiler ABI/helper/namespace and BOTH bindings, then install once through the supported exact target path. Source preparation is not native installation permission or actual use.",
   "state": {
     "execution": "planned",
     "verification": "pending",
