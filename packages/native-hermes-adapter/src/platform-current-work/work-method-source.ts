@@ -27,6 +27,22 @@ export interface WorkMethodSourceMap {
   /** Complete original/fragment mappings remain in the pinned map, never inferred from a chunk. */
   provenance?: unknown;
 }
+export interface WorkMethodSessionSourceScope {
+  kind: "session-source";
+  runtime: "native-hermes";
+  profileId: string;
+  sessionId: string;
+}
+/** Stable source selection only. A later owner document still binds its complete actual event. */
+export interface WorkMethodSessionSourceMap {
+  schema: "hermes.work-method-session-source-map.v1";
+  scope: WorkMethodSessionSourceScope;
+  logical: LogicalTask;
+  actorId: string;
+  routeId: string;
+  entries: WorkMethodSourceMap["entries"];
+  provenance?: unknown;
+}
 export interface WorkMethodSourceResponse {
   schema: "hermes.work-method-source-response.v1";
   status: "source-qualified" | "held";
@@ -97,7 +113,17 @@ function exactPath(value: unknown): asserts value is string {
 function contained(base: string, path: string) {
   need(path.startsWith(base + "/"), "SOURCE_PATH_ESCAPE");
 }
-function mapValue(bytes: Uint8Array): WorkMethodSourceMap {
+function sessionScope(value: unknown): asserts value is WorkMethodSessionSourceScope {
+  const scope = row(value);
+  closed(scope, ["kind", "runtime", "profileId", "sessionId"]);
+  need(
+    scope.kind === "session-source" && scope.runtime === "native-hermes",
+    "INVALID_SOURCE_SCOPE",
+  );
+  text(scope.profileId);
+  text(scope.sessionId);
+}
+function mapValue(bytes: Uint8Array): WorkMethodSourceMap | WorkMethodSessionSourceMap {
   const raw = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
   const value = row(JSON.parse(raw));
   // Reject duplicate keys/lossy spellings; owner emits one of these complete generated encodings.
@@ -105,32 +131,38 @@ function mapValue(bytes: Uint8Array): WorkMethodSourceMap {
     raw === JSON.stringify(value) + "\n" || raw === JSON.stringify(value, null, 2) + "\n",
     "UNAMBIGUOUS_SOURCE_MAP_REQUIRED",
   );
+  const session = value.schema === "hermes.work-method-session-source-map.v1";
+  need(session || value.schema === "hermes.work-method-source-map.v1", "INVALID_SOURCE_MAP");
   closed(
     value,
-    ["schema", "logical", "actorId", "routeId", "native", "cwd", "entries"],
+    session
+      ? ["schema", "scope", "logical", "actorId", "routeId", "entries"]
+      : ["schema", "logical", "actorId", "routeId", "native", "cwd", "entries"],
     ["provenance"],
   );
-  need(value.schema === "hermes.work-method-source-map.v1", "INVALID_SOURCE_MAP");
   logical(value.logical);
   text(value.actorId);
   text(value.routeId);
-  exactPath(value.cwd);
-  const native = row(value.native);
-  closed(native, [
-    "runtime",
-    "profileId",
-    "sessionId",
-    "agentId",
-    "nativeProjectId",
-    "nativeTaskId",
-    "nativeRunId",
-    "turnId",
-  ]);
-  need(native.runtime === "native-hermes", "INVALID_SOURCE_MAP");
-  text(native.profileId);
-  text(native.sessionId);
-  for (const key of ["agentId", "nativeProjectId", "nativeTaskId", "nativeRunId", "turnId"])
-    if (native[key] !== null) text(native[key]);
+  if (session) sessionScope(value.scope);
+  else {
+    exactPath(value.cwd);
+    const native = row(value.native);
+    closed(native, [
+      "runtime",
+      "profileId",
+      "sessionId",
+      "agentId",
+      "nativeProjectId",
+      "nativeTaskId",
+      "nativeRunId",
+      "turnId",
+    ]);
+    need(native.runtime === "native-hermes", "INVALID_SOURCE_MAP");
+    text(native.profileId);
+    text(native.sessionId);
+    for (const key of ["agentId", "nativeProjectId", "nativeTaskId", "nativeRunId", "turnId"])
+      if (native[key] !== null) text(native[key]);
+  }
   need(Array.isArray(value.entries) && value.entries.length <= 2048, "SOURCE_MAP_LIMIT");
   const ids = new Set<string>();
   let total = 0;
@@ -156,7 +188,7 @@ function mapValue(bytes: Uint8Array): WorkMethodSourceMap {
     total += Number(entry.bytes);
   }
   need(total <= 33_554_432, "SOURCE_MAP_TOTAL_LIMIT");
-  return value as unknown as WorkMethodSourceMap;
+  return value as unknown as WorkMethodSourceMap | WorkMethodSessionSourceMap;
 }
 function response(policy: CurrentWorkOutputPolicy): WorkMethodSourceResponse {
   return {
@@ -187,15 +219,29 @@ export async function readHermesWorkMethodSource(
     await options.verifySourceClosure();
     stage = "input";
     const request = row(structuredClone(input));
-    closed(
-      request,
-      ["schema", "event", "selection", "sourceMapSha256", "target", "cursor", "outputVersion"],
-      ["maxChars"],
-    );
+    const session = request.schema === "hermes.work-method-session-source-request.v1";
     need(
-      request.schema === "hermes.work-method-source-request.v1" && request.outputVersion === "v2",
+      session || request.schema === "hermes.work-method-source-request.v1",
       "INVALID_SOURCE_REQUEST",
     );
+    closed(
+      request,
+      session
+        ? [
+            "schema",
+            "scope",
+            "logical",
+            "actorId",
+            "routeId",
+            "sourceMapSha256",
+            "target",
+            "cursor",
+            "outputVersion",
+          ]
+        : ["schema", "event", "selection", "sourceMapSha256", "target", "cursor", "outputVersion"],
+      ["maxChars"],
+    );
+    need(request.outputVersion === "v2", "INVALID_SOURCE_REQUEST");
     const selectedPolicy = currentWorkOutputPolicy("v2", request.maxChars as number | undefined);
     need(selectedPolicy.valid, "INVALID_OUTPUT_POLICY");
     policy = selectedPolicy.policy;
@@ -209,25 +255,48 @@ export async function readHermesWorkMethodSource(
       digest(binding.mapSha256) && request.sourceMapSha256 === binding.mapSha256,
       "SOURCE_MAP_PIN_MISMATCH",
     );
-    const identity = hermesWorkMethodEventIdentity(request.event);
-    const selection = row(request.selection);
-    closed(selection, ["cwd", "native", "actorId", "routeId", "logical"]);
-    logical(selection.logical);
-    need(
-      selection.cwd === identity.actualCwd && isDeepStrictEqual(selection.native, identity.native),
-      "FOREIGN_NATIVE_TUPLE",
-    );
+    let identity: ReturnType<typeof hermesWorkMethodEventIdentity> | undefined;
+    let selection: Record<string, unknown> | undefined;
+    if (session) {
+      sessionScope(request.scope);
+      logical(request.logical);
+      text(request.actorId);
+      text(request.routeId);
+    } else {
+      identity = hermesWorkMethodEventIdentity(request.event);
+      selection = row(request.selection);
+      closed(selection, ["cwd", "native", "actorId", "routeId", "logical"]);
+      logical(selection.logical);
+      need(
+        selection.cwd === identity.actualCwd &&
+          isDeepStrictEqual(selection.native, identity.native),
+        "FOREIGN_NATIVE_TUPLE",
+      );
+    }
     stage = "map";
     const mapBytes = await readExactFile(binding.runtimeMapPath, fileLimit, binding.mapSha256);
     const map = mapValue(mapBytes);
-    need(
-      selection.actorId === map.actorId &&
-        selection.routeId === map.routeId &&
-        selection.cwd === map.cwd &&
-        isDeepStrictEqual(selection.logical, map.logical) &&
-        isDeepStrictEqual(identity.native, map.native),
-      "FOREIGN_SOURCE_SELECTION",
-    );
+    if (session) {
+      need(map.schema === "hermes.work-method-session-source-map.v1", "SOURCE_MAP_SCOPE_MISMATCH");
+      need(
+        request.actorId === map.actorId &&
+          request.routeId === map.routeId &&
+          isDeepStrictEqual(request.logical, map.logical) &&
+          isDeepStrictEqual(request.scope, map.scope),
+        "FOREIGN_SOURCE_SELECTION",
+      );
+    } else {
+      need(map.schema === "hermes.work-method-source-map.v1", "SOURCE_MAP_SCOPE_MISMATCH");
+      need(selection && identity, "INVALID_SOURCE_REQUEST");
+      need(
+        selection.actorId === map.actorId &&
+          selection.routeId === map.routeId &&
+          selection.cwd === map.cwd &&
+          isDeepStrictEqual(selection.logical, map.logical) &&
+          isDeepStrictEqual(identity.native, map.native),
+        "FOREIGN_SOURCE_SELECTION",
+      );
+    }
     const target = row(request.target);
     const cursor = row(request.cursor);
     closed(cursor, ["offsetBytes", "expectedDocumentSha256"]);
@@ -259,14 +328,25 @@ export async function readHermesWorkMethodSource(
         need(bytes.length === entry.bytes, "SOURCE_FILE_LENGTH_MISMATCH");
       }
     } else {
-      closed(target, ["kind", "request"]);
+      closed(target, session ? ["kind", "event", "request"] : ["kind", "request"]);
       need(target.kind === "validated-owner-document", "INVALID_SOURCE_TARGET");
+      stage = "input";
+      const actualEvent = session ? target.event : request.event;
+      if (map.schema === "hermes.work-method-session-source-map.v1") {
+        const actual = hermesWorkMethodEventIdentity(actualEvent);
+        need(
+          actual.native.runtime === map.scope.runtime &&
+            actual.native.profileId === map.scope.profileId &&
+            actual.native.sessionId === map.scope.sessionId,
+          "FOREIGN_NATIVE_TUPLE",
+        );
+      }
       const ownerRequest = row(target.request);
       const ownerAdmission = row(ownerRequest.admission);
       const ownerPacket = row(ownerAdmission.packet);
       const ownerSelection = row(ownerRequest.selection);
       need(
-        isDeepStrictEqual(ownerRequest.event, request.event) &&
+        isDeepStrictEqual(ownerRequest.event, actualEvent) &&
           isDeepStrictEqual(ownerPacket.logical, map.logical) &&
           ownerSelection.actorId === map.actorId &&
           ownerSelection.routeId === map.routeId,

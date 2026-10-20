@@ -2,9 +2,14 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { fixture, rebind, sha, verified } from "./tests/work-method.fixture.ts";
+import { fixture, rebind, ref, sha, verified } from "./tests/work-method.fixture.ts";
 import { readHermesWorkMethod, readHermesWorkMethodSourceDocument } from "./work-method.ts";
-import { readHermesWorkMethodSource, type WorkMethodSourceMap } from "./work-method-source.ts";
+import {
+  readHermesWorkMethodSource,
+  type WorkMethodSourceMap,
+  type WorkMethodSessionSourceMap,
+  type WorkMethodSourceBinding,
+} from "./work-method-source.ts";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -54,7 +59,13 @@ async function sourceFixture(text = '\uFEFFWhole WHY 한국어 😀 "\\\n\t'.rep
   await saveMap();
   return { root, owner, map, binding, request, saveMap, text };
 }
-async function collect(f: Awaited<ReturnType<typeof sourceFixture>>) {
+async function collect(f: {
+  binding: WorkMethodSourceBinding;
+  request: {
+    maxChars: number;
+    cursor: { offsetBytes: number; expectedDocumentSha256: string | null };
+  };
+}) {
   let previous = 0,
     result = "",
     calls = 0;
@@ -86,6 +97,225 @@ test("complete UTF8 originals roundtrip with BOM, multibyte scalars, escaping an
   const result = await collect(f);
   expect(result.calls).toBeGreaterThan(1);
   expect(result.text).toBe(f.text);
+});
+
+async function sessionFixture(text = '\uFEFFstable WHY 한국어 😀 "\\\n'.repeat(1200)) {
+  const root = await mkdtemp(join(tmpdir(), "work-method-session-source-"));
+  roots.push(root);
+  // Only a synthetic stable session tuple is known when this map is frozen.
+  const map: WorkMethodSessionSourceMap = {
+    schema: "hermes.work-method-session-source-map.v1",
+    scope: {
+      kind: "session-source",
+      runtime: "native-hermes",
+      profileId: "default",
+      sessionId: "native-session-A",
+    },
+    logical: { domainId: "d", projectId: "p", workId: "w", taskId: "bootstrap" },
+    actorId: "actor-A",
+    routeId: "owner-task",
+    entries: [
+      { id: "original", path: "original", sha256: sha(text), bytes: Buffer.byteLength(text) },
+    ],
+  };
+  const binding = { runtimeMapPath: join(root, "map.json"), dataBase: root, mapSha256: "" };
+  const request = {
+    schema: "hermes.work-method-session-source-request.v1",
+    scope: map.scope,
+    logical: map.logical,
+    actorId: map.actorId,
+    routeId: map.routeId,
+    sourceMapSha256: "",
+    target: { kind: "mapped-source", id: "original" } as Record<string, unknown>,
+    cursor: { offsetBytes: 0, expectedDocumentSha256: null as string | null },
+    outputVersion: "v2",
+    maxChars: 12000,
+  };
+  await writeFile(join(root, "original"), text);
+  const saveMap = async () => {
+    const bytes = JSON.stringify(map, null, 2) + "\n";
+    await writeFile(binding.runtimeMapPath, bytes);
+    binding.mapSha256 = request.sourceMapSha256 = sha(bytes);
+  };
+  await saveMap();
+  return { root, map, request, binding, saveMap, text };
+}
+
+test("session source reads complete originals without a speculative event or packet", async () => {
+  const f = await sessionFixture();
+  expect((await collect(f)).text).toBe(f.text);
+  f.request.cursor = { offsetBytes: 0, expectedDocumentSha256: null };
+  f.request.target.id = "@map";
+  const map = JSON.parse((await collect(f)).text);
+  expect(Object.keys(map).sort()).toEqual(
+    ["schema", "scope", "logical", "actorId", "routeId", "entries"].sort(),
+  );
+  expect(map.scope).toEqual(f.map.scope);
+});
+
+test("session request/map pairing and every stable scope field are closed and exact", async () => {
+  const f = await sessionFixture("source"),
+    old = await sourceFixture("old");
+  const variants = [
+    { ...f.request, event: fixture().event },
+    { ...f.request, scope: { ...f.request.scope, sessionId: null } },
+    { ...f.request, scope: { ...f.request.scope, profileId: "foreign" } },
+    { ...f.request, scope: { ...f.request.scope, turnId: null } },
+    { ...f.request, actorId: "foreign" },
+    { ...f.request, routeId: "foreign" },
+    { ...f.request, logical: { ...f.request.logical, taskId: "foreign" } },
+    { ...f.request, maxChars: 12001 },
+    { ...f.request, target: { kind: "mapped-source", id: "original", event: {} } },
+  ];
+  for (const request of variants) {
+    const held = await readHermesWorkMethodSource(request, f.binding, verified);
+    expect(held.status).toBe("held");
+    expect(held.chunk).toBeNull();
+  }
+  expect(
+    (
+      await readHermesWorkMethodSource(
+        { ...old.request, sourceMapSha256: f.binding.mapSha256 },
+        f.binding,
+        verified,
+      )
+    ).holdReasons,
+  ).toEqual(["SOURCE_MAP_SCOPE_MISMATCH"]);
+  expect(
+    (
+      await readHermesWorkMethodSource(
+        { ...f.request, sourceMapSha256: old.binding.mapSha256 },
+        old.binding,
+        verified,
+      )
+    ).holdReasons,
+  ).toEqual(["SOURCE_MAP_SCOPE_MISMATCH"]);
+  const bad = { ...f.map, native: fixture().selection.native };
+  const bytes = JSON.stringify(bad) + "\n";
+  await writeFile(f.binding.runtimeMapPath, bytes);
+  f.binding.mapSha256 = f.request.sourceMapSha256 = sha(bytes);
+  expect((await readHermesWorkMethodSource(f.request, f.binding, verified)).status).toBe("held");
+});
+
+test("a frozen session map admits only later fully joined owner data and detects document drift", async () => {
+  const f = await sessionFixture("source"),
+    mapBytes = await readFile(f.binding.runtimeMapPath);
+  // Event and receiver evidence are constructed after the immutable source map.
+  const owner = fixture(),
+    input = owner.admission;
+  owner.event.extra = { turn_id: "later-turn" };
+  owner.selection.native.turnId = "later-turn";
+  for (const native of [
+    input.packet.native,
+    input.expectedActor.native,
+    input.receipt.actor.native,
+  ])
+    native.turnId = "later-turn";
+  for (let n = 0; n < 5; n++) {
+    const prerequisite = {
+      producer: { ...input.packet.logical, taskId: "producer-" + n },
+      receiver: input.packet.logical,
+      milestone: "execution-and-verification" as const,
+      producerReceipt: ref("producer-" + n),
+      receiverReceipt: ref("synthetic-U0"),
+    };
+    input.packet.prerequisites.push(prerequisite);
+    input.prerequisites.push({
+      ...prerequisite,
+      currentness: "current",
+      producerSatisfied: true,
+      receiverUsed: true,
+    });
+  }
+  input.receipt.useEvidence = [ref("synthetic-U1-after-Q")];
+  rebind(owner);
+  f.request.target = { kind: "validated-owner-document", event: owner.event, request: owner };
+  const first = await readHermesWorkMethodSource(f.request, f.binding, verified);
+  const document = JSON.parse((await collect(f)).text);
+  expect(document.contracts).toEqual({
+    standing: input.standing,
+    packet: input.packet,
+    receipt: input.receipt,
+  });
+  expect(document.contracts.packet.prerequisites).toHaveLength(5);
+  expect(document.admission.status).toBe("owner-eligible");
+  expect(document.nativePermissionGranted).toBe(false);
+  expect(await readFile(f.binding.runtimeMapPath)).toEqual(mapBytes);
+  input.packet.task.text += " with later current context";
+  rebind(owner);
+  f.request.cursor = {
+    offsetBytes: first.chunk!.nextOffsetBytes,
+    expectedDocumentSha256: first.binding!.documentSha256,
+  };
+  expect((await readHermesWorkMethodSource(f.request, f.binding, verified)).holdReasons).toEqual([
+    "SOURCE_DOCUMENT_CHANGED",
+  ]);
+});
+
+test("session source delivery cannot bypass full-event, actor, packet or current-event joins", async () => {
+  const f = await sessionFixture("source");
+  const changes: ((owner: ReturnType<typeof fixture>) => void)[] = [
+    (o) => {
+      o.selection.cwd = "/foreign";
+    },
+    (o) => {
+      o.selection.native.turnId = "foreign";
+    },
+    (o) => {
+      o.admission.receipt.actor.native.sessionId = "foreign";
+    },
+    (o) => {
+      o.admission.packet.native.turnId = "foreign";
+      rebind(o);
+    },
+    (o) => {
+      o.admission.packet.task.sha256 = sha("foreign");
+    },
+    (o) => {
+      o.selection.packetSha256 = sha("foreign");
+    },
+    (o) => {
+      o.admission.currentEvent = {
+        eventId: null,
+        actorId: o.selection.actorId,
+        packetSha256: o.selection.packetSha256,
+        taskSha256: o.admission.packet.task.sha256,
+        source: ref("event"),
+        native: { ...o.admission.packet.native, sessionId: "foreign" },
+      };
+    },
+  ];
+  for (const change of changes) {
+    const owner = fixture();
+    change(owner);
+    f.request.target = { kind: "validated-owner-document", event: owner.event, request: owner };
+    const held = await readHermesWorkMethodSource(f.request, f.binding, verified);
+    expect(held.status).toBe("held");
+    expect(held.chunk).toBeNull();
+  }
+  const owner = fixture();
+  for (const event of [
+    { ...owner.event, session_id: "foreign" },
+    { ...owner.event, extra: { turn_id: "foreign" } },
+  ]) {
+    f.request.target = { kind: "validated-owner-document", event, request: owner };
+    expect((await readHermesWorkMethodSource(f.request, f.binding, verified)).status).toBe("held");
+  }
+});
+
+test("valid session delivery preserves held Common decisions and never grants authority", async () => {
+  const f = await sessionFixture("source"),
+    owner = fixture();
+  owner.admission.sources[0]!.currentness = "stale";
+  f.request.target = { kind: "validated-owner-document", event: owner.event, request: owner };
+  const document = JSON.parse((await collect(f)).text);
+  expect(document.admission.status).toBe("held");
+  expect(document.contracts.receipt.used).toBe(true);
+  expect(document.nativePermissionGranted).toBe(false);
+  f.request.cursor = { offsetBytes: 0, expectedDocumentSha256: null };
+  owner.admission.receipt.used = false;
+  rebind(owner);
+  expect(JSON.parse((await collect(f)).text).admission.status).toBe("held");
 });
 test("map itself is read through its independently compiled pin", async () => {
   const f = await sourceFixture("small");

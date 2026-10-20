@@ -9,9 +9,9 @@
     "domainId": "native-harness",
     "projectId": "codex-harness-engineering",
     "workId": "ontology-driven-platform-integration-20261017",
-    "taskId": "ODI-HOST-ESTATE-CONTINUATION"
+    "taskId": "ODI-HERMES-WORK-METHOD-CALLBACK-SOURCE-20261020"
   },
-  "sourceBaseSha": "65c87fbed8d7eea35e40cfe13496f75fae8526e0",
+  "sourceBaseSha": "ad2dfdc198067ab64220dafb5bd6bec983754485",
   "author": {
     "runtime": "native-codex",
     "threadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
@@ -20,7 +20,7 @@
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-20T07:06:54.583Z",
+  "capturedAtUtc": "2026-10-20T09:13:19.769Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }

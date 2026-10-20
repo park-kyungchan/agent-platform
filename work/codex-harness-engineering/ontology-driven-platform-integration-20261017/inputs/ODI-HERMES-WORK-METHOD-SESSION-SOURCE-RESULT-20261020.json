@@ -1,0 +1,193 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-SESSION-SOURCE-RESULT-20261020",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-session-source.actual-root-qa-observation.actual.json"
+  },
+  "content": {
+    "classification": "Source-only result based on genuine Root QA capture at exact0c85; administrative commit author separate.",
+    "observation": {
+      "schemaVersion": "1.0.0",
+      "kind": "evidence",
+      "id": "codex-harness-engineering:evidence:hermes-work-method-session-source-20261020",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-20T08:07:20.404199Z",
+      "payload": {
+        "claim": "Exact 0c85 stable session-source implementation passed existing source checks and independent exact seven-path review.",
+        "method": "Pinned genuine Root QA capture/outputs plus immutable code/Task/author and reviewer evidence; preparation helper ran no QA.",
+        "sourceUrl": "https://github.com/park-kyungchan/agent-platform/commit/0c85abf676f6c520ec402a570e2e190605df7860",
+        "fetchedAt": "2026-10-20T08:07:20.404199Z",
+        "upstreamRevision": "0c85abf676f6c520ec402a570e2e190605df7860",
+        "result": {
+          "outcome": "success",
+          "processExitCode": 0,
+          "contentMatched": true,
+          "details": {
+            "sourceOnly": true,
+            "requiredChecksPassed": 4,
+            "qualityChecksPassed": 14,
+            "sourceCommandsPassed": 27,
+            "focusedPassed": 49,
+            "focusedFailed": 0,
+            "focusedAssertions": 502,
+            "nativeModelCalls": 0
+          }
+        },
+        "attempts": [
+          {
+            "attempt": 1,
+            "outcome": "success",
+            "details": {
+              "scope": "All four required-check attempt1 outputs exit0. Focused49/review are separate evidence, not retries."
+            }
+          }
+        ],
+        "limitations": [
+          "Commit URL identifies checked local code, not hosted publication or an external fetch.",
+          "Code review preceded final source-CI; Root QA separately captures all final checks. Future result-record commit needs independent review.",
+          "Source fixtures do not prove actual native session/create/install/event/read/use, gateway/auth/quota, automatic injection, finite coverage, general release or whole acceptance."
+        ],
+        "details": {
+          "rootQaObservation": {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-session-source.actual-root-qa-observation.actual.json",
+            "bytes": 5450,
+            "sha256": "c97174957576cd3a40ae3682a97eec6b2b41ff545e638fee132a323200cf0572"
+          },
+          "actualCanonicalWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "actualSourceOwnerCapture": true,
+          "captureMeaning": "Existing Root QA capture only; fresh administrative commit author capture remains future.",
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null
+        }
+      }
+    },
+    "verification": {
+      "schemaVersion": "1.0.0",
+      "kind": "verification",
+      "id": "codex-harness-engineering:verification:hermes-work-method-session-source-20261020",
+      "projectId": "codex-harness-engineering",
+      "domainId": "native-harness",
+      "createdAt": "2026-10-20T08:07:20.404199Z",
+      "payload": {
+        "targetRefs": [
+          "common-harness:task:65403ab90afb3d792be0d26f9e571629a78002effa47f9666d7b407c0841f92c"
+        ],
+        "criteria": [
+          {
+            "id": "exact-source-task",
+            "status": "pass",
+            "message": "Exact code head/tree and raw Task/instruction/source-author are bound; target identity alone does not version source.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hermes-work-method-session-source-20261020"
+            ]
+          },
+          {
+            "id": "existing-source-checks",
+            "status": "pass",
+            "message": "Root capture records4required exit0,14quality/27source commands pass,49focused pass/0fail/502assertions.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hermes-work-method-session-source-20261020"
+            ]
+          },
+          {
+            "id": "independent-code-contract",
+            "status": "pass",
+            "message": "Exact seven-path review: zero unresolved findings; closed session-source preserves v1/full-event evaluator/caps and acyclic U0/Q/U1/R. Native behavior/result-record review separate.",
+            "evidenceRefs": [
+              "codex-harness-engineering:evidence:hermes-work-method-session-source-20261020"
+            ]
+          }
+        ],
+        "inputHashes": [
+          {
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HERMES-WORK-METHOD-SESSION-SOURCE-20261020.json",
+            "sha256": "3b7211201959f9d35c59134efd4f03126db154df698cbd6493705db0146c41aa"
+          },
+          {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-session-source.actual-root-qa-observation.actual.json",
+            "sha256": "c97174957576cd3a40ae3682a97eec6b2b41ff545e638fee132a323200cf0572"
+          },
+          {
+            "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-session-source.code-review.qualified.actual.json",
+            "sha256": "8193580658d2ad37fbbc392e498c7e2b2dfc054cf763869cf8e5e0b693a7839a"
+          }
+        ],
+        "runtime": {
+          "name": "existing-root-source-owner-verification",
+          "version": "Bun1.4.3-source-only"
+        },
+        "details": {
+          "checkedCodeHead": "0c85abf676f6c520ec402a570e2e190605df7860",
+          "checkedCodeTree": "9bfbbeb9e5cddb022af678910b4cdd26929ed53c",
+          "sourceTaskAtCheck": {
+            "kind": "git",
+            "repositoryId": "park-kyungchan/agent-platform",
+            "commit": "0c85abf676f6c520ec402a570e2e190605df7860",
+            "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HERMES-WORK-METHOD-SESSION-SOURCE-20261020.json",
+            "sha256": "3b7211201959f9d35c59134efd4f03126db154df698cbd6493705db0146c41aa"
+          },
+          "sourceTaskRawBlob": "96e9b8f10eae388c925cc9c33badb31d82e90262",
+          "sourceTaskRawBytes": 2229,
+          "instructionFragment": "#/nextAction",
+          "instructionSha256": "f351d34a52052dc3fcf750bc3ee85bbdc75580952e0cd6e6e8cb542a3f951f27",
+          "instructionUtf8Bytes": 448,
+          "targetIdentityDoesNotVersionSource": true,
+          "gitInputHashPathsResolveAtCheckedCodeHead": true,
+          "actualCanonicalWriterThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+          "actualSourceOwnerCapture": true,
+          "actualNativeTaskId": null,
+          "actualNativeRunId": null,
+          "actualNativeEventId": null,
+          "nativeBehaviorVerified": false,
+          "nativePermissionGranted": false,
+          "executionAuthorityGranted": false,
+          "retryAllowed": false,
+          "finiteCoverageClosed": false,
+          "generalWorkReleased": false
+        }
+      }
+    },
+    "originalTaskInstructionText": "Implement Input ODI-HERMES-WORK-METHOD-SESSION-SOURCE-INTEGRATION-SCOPE-20261020 #/content: selected six session-source design paths plus exactly two native-hermes-context registry hashes in architecture/capability-source-owners.json (53 pins unchanged). Preserve old v1/full-event evaluator/caps and acyclic U0 -> Q -> U1 -> R. Fresh own Root c:task before these seven paths; no native/config/provider/store/session/install/use or general release.",
+    "originalTaskInput": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "0c85abf676f6c520ec402a570e2e190605df7860",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SESSION-SOURCE-20261020-PACKET.json",
+      "sha256": "4f458e93e624bcf5acd500fd36c776d43c023e9ac174f1c13e3d6efba38dd54e"
+    },
+    "integrationScopeInput": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "0c85abf676f6c520ec402a570e2e190605df7860",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SESSION-SOURCE-INTEGRATION-SCOPE-20261020.json",
+      "sha256": "6a2f022e15ae67c2b4a5c9254b6dbdb0a0122fbd3de614a02d49d5d04b3b91f5"
+    },
+    "actualMethod": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/root-hermes-session-source-method.receive-use.actual.json",
+      "bytes": 5105,
+      "sha256": "ab19b0dc1dc085347acc58ae3f0bf579e95df44d74185a7b410c71943a9a9dbe"
+    },
+    "independentCodeReview": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-session-source.code-review.qualified.actual.json",
+      "bytes": 726,
+      "sha256": "8193580658d2ad37fbbc392e498c7e2b2dfc054cf763869cf8e5e0b693a7839a"
+    },
+    "sourceOnlyState": {
+      "execution": "complete",
+      "verification": "passed",
+      "localAudit": "result-durable",
+      "sharedAudit": "pending",
+      "formalCompletion": "pending"
+    },
+    "holds": "Source-only result; shared/formal, final result review/publication/CI/manual expected-head merge/owner application pending. Native install/SessionPrepare/FirstRead/event/use/finite coverage/general release not established. Whole ODI WHY/Spec1/Plan4/owners/H16/H49/domain/PR17-19/MCP-image-Linux/recovery; ff55 runtime-role qualifications/successor-only topology+structural consolidation; actual approved R3 CI seven independent units with own-method/effect holds; nine fences/126 consumed/five uncertain; serving349/current model-effort-auth-trust retained. SameUSD14 usage/native Task-event correlation unknown; paid held/no reset. Old Lead pause only after safe handoff; successor Goal continues."
+  }
+}

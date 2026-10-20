@@ -1,0 +1,246 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-CALLBACK-SOURCE-20261020-PACKET",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-callback-source.registration.root-capture.actual.json"
+  },
+  "content": {
+    "classification": "Actual Root source-owner capture and finite source-only selection for planned CALLBACK-SOURCE Task; no production code or native permission/use by registration.",
+    "purpose": "Preserve allowlisted real callback identity through existing bounded context; source capability is not genuine invocation/authentication/use.",
+    "selectedContract": {
+      "baseline": [
+        "v1 hook matches exact cwd/runtime/profile/session/agent/project/task/run. Null is exact; future observed task does not match previous null. No wildcard/fallback.",
+        "0c85 stable map selects declared source, not callback identity/authentication.",
+        "build.ts already defines HERMES_WORK_METHOD_SOURCE_BINDING from existing WorkMethodSourceBinding plus currentWorkBindings path/hash for all entrypoints.",
+        "Shell pre_llm consumes only context:string; it is after turn-start compaction and does not block provider work."
+      ],
+      "optIn": {
+        "proposedSchema": "hermes.real-callback-source-hook-bindings.v1",
+        "kind": "stableSessionSource",
+        "closedFields": {
+          "schema": "above schema",
+          "kind": "stableSessionSource",
+          "shellSelection": "{profileName:string,sessionId:string,cwd:exactAbsolutePath}",
+          "sourceSelection": "{scope:existing WorkMethodSessionSourceScope,logical:existing logicalTask,actorId:string,routeId:string}"
+        },
+        "closedness": "One exact shell selector; no runtimeIndex/selections, future task/run/turn/template/packet/receipt slots, arbitrary module/path/root or wildcard. Unknown/mixed schemas/keys hold.",
+        "compile": "Require both existing currentWorkBindings pin containing new schema and workMethodSourceBinding, explicit currentWorkOutputVersion=v2 and valid maxChars. Omission/map presence alone is not opt-in.",
+        "compatibility": "Old schema executes unchanged v1 exact tuple/cwd matching/default/output semantics. Failed v1 never routes to new mode. build.ts/options need no change; existing defines suffice."
+      },
+      "dataflow": [
+        "Keep existing builtin-only registration/source/bindings pre-import guards in native-hook.ts. Add only type-only binding declaration; pass existing compiled source binding and registration/bindings pins after guards.",
+        "New branch requires exact new schema/kind/v2 and compiled binding. Match actual shell profile NAME/session_id/cwd against shellSelection before Git/map/source-document reads. Unselected/non-pre_llm returns{}, without fallback.",
+        "Pick hook_event_name/profile/session_id/cwd and only extra.agent_id/project_id/task_id/run_id/turn_id from actual input into a new row. Do not clone whole extra or native contents. Reuse hermesWorkMethodEventIdentity for exact identity/path validation. Preserve every observed ID; absent optional IDs null.",
+        "Call existing readHermesWorkMethodSource with session-source-request.v1, declared sourceSelection, compiled map hash,target{kind:mapped-source,id:@map},cursor{offsetBytes:0,expectedDocumentSha256:null},outputVersion:v2 and existing verifier. Require source-qualified/exact map/logical/hash binding.",
+        "This call guards/parses the whole closed selector map; returned chunk is discarded, not delivered as Work. No claim of complete map/original/Task receive-use. Source scope validation is not canonical-profile-to-shell correspondence.",
+        "Recheck source/bindings/map after projection and before output, retaining native entry final verifier. Drift/symlink/foreign source suppresses context safely; no retry/stale cache.",
+        "Return {context:JSON.stringify(inner)}. Check inner and JSON.stringify(outer) against same v2 policy; escaping/multibyte overflow holds, never clips/raises cap."
+      ],
+      "output": {
+        "proposedSchema": "hermes.real-callback-identity-context.v1",
+        "fields": [
+          "schema",
+          "kind=stableSessionSource",
+          "declared logical/actorId/routeId",
+          "wireEvent:actual picked shell event",
+          "declaredSourceScope:map scope, not observed canonical identity",
+          "sourceProvenance:{compiledRegistrationSha256,bindingsSha256,sourceMapSha256}"
+        ],
+        "fixedFalse": [
+          "nativeInvocationVerified",
+          "ownerProfileMappingVerified",
+          "nativeAuthenticationEstablished",
+          "receivedOrUsedEstablishedByProjection",
+          "ownerAdmissionEstablished",
+          "nativePermissionGranted",
+          "executionAuthorityGranted"
+        ],
+        "privacy": "No prompt/history/tool_input/args/tools/model/provider/usage/native-store/credential fields or echoed raw errors. No event UUID/nonce/native Task/Run/turn generated.",
+        "proof": "Source hashes prove closure only. Native owner separately attests exact approved command/source, actual invocation/current tuple and receiving use. Manually supplied JSON is not authenticated native evidence."
+      },
+      "profileBoundary": {
+        "separate": "wireEvent.profile/shellSelection.profileName are actual shell NAME; declaredSourceScope.profileId is independently declared source scope. Canonical gateway actor.profile_id and callback/policy cwd remain separate facts.",
+        "noRelabel": "Matching session/map does not prove mapping; never rewrite event.profile/cwd/task/turn or omit observed fields.",
+        "gate": "Genuine current owner mapping proof must bind canonical profile/session to actual shell profile/cwd/turn/source invocation. Existing full evaluator still needs literal event/selection/map equality. If domains differ, owner-document remains held until Root reviews an explicit versioned mapping contract or selects an actually consistent observed identity domain; no hidden coercion here.",
+        "limit": "Captures truthful raw E metadata, not complete native-method bootstrap. Mapping proof/E/U0/Q/U1/R remain unknown until actual observations."
+      },
+      "guards": {
+        "sourceFirst": "No implementation import before current registration/bindings guard; type-only existing imports allowed. Data chooses no code/root.",
+        "map": "Reuse existing readHermesWorkMethodSource/readExactFile closure/currentness/no-follow/containment/closedJSON/strictUTF8 guards.1MiB request/map/file/document,2048 entries/32MiB total unchanged. No direct receipt/store IO.",
+        "input": "Existing readJsonRequest default1048576 bytes unchanged; oversized raw hook history safely holds without capture/replay.",
+        "output": "New mode explicitv2 policy1024..12000 chars, inner and whole serialized outer bounded. Oldv1 6000 behavior unchanged. No clipping/cap increase.",
+        "ids": "New session-observation selection deliberately excludes future IDs, while output preserves actual IDs. It is a distinct schema, not wildcarding any old/native admission tuple.",
+        "admission": "No native auth/receive-use/permission/effect claim. currentEvent.eventId differs from wire turn/sequence/hash; paid event/source/budget unknown stays held."
+      },
+      "exactFinitePaths": [
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
+          "change": "Pass existing compiled binding/provenance after source guard; no eager implementation import."
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
+          "change": "New closed types/branch/identity projection; reuse event parser+map API, exact shell selection and final cap; v1 unchanged."
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/context.test.ts",
+          "change": "Extend existing fixture/readHermesNativeWorkHook cases, no new suite."
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/provider.test.ts",
+          "change": "Extend existing buildHermesPlatformSource/compiled current-work-native-hook.js fixture tests."
+        },
+        {
+          "path": "docs/hermes-work-method-source-read.md",
+          "change": "Document source observation vs owner admission/profile/provenance limits."
+        },
+        {
+          "path": ".github/source-author.json",
+          "change": "Genuine Root current source Task/base/thread capture; native Task/Run unknownnull, no native-auth claim."
+        },
+        {
+          "path": "architecture/capability-source-owners.json",
+          "change": "Serialize exact changed existing hook source hashes; preserve53 finite pins/no executable inventory expansion."
+        }
+      ],
+      "unchanged": "build.ts already has both compiled inputs. work-method.ts full parser/evaluator and work-method-source.ts API unchanged. provider.ts/context.ts/core/native Python/backend/plugins/telemetry/trust/config unchanged. Necessary extra paths require explicit Root source scope before writes.",
+      "plannedSourceTests": [
+        {
+          "file": "context.test.ts",
+          "api": "readHermesNativeWorkHook(nativePayload(),bindings,options)",
+          "cases": "Retain608-657 v1 privacy/exactnull/foreign tuple tests; v1 nulltask vs observedtask stays unselected. New mode requires closed schema/kind/v2/both bindings; no mixed keys or fallback."
+        },
+        {
+          "file": "context.test.ts",
+          "api": "Existing fixture+explicit new binding+session map",
+          "cases": "Foreign shell profile/session/cwd returns{} before map/Git reads. Changing actual task/run/turn preserved; missing agent/project/run null. Invalid known IDs/cwd held; canonical declared scope remains distinct/mappingfalse."
+        },
+        {
+          "file": "context.test.ts",
+          "api": "Existing readHermesWorkMethodSource path",
+          "cases": "Wrong map schema/scope/logical/actor/route/hash or missing binding, source/map pre+post drift/symlink refuse. No complete document read-use/auth from @map check."
+        },
+        {
+          "file": "context.test.ts",
+          "api": "JSON.stringify inner/outer",
+          "cases": "Private prompt/history/tool/error sentinels absent; quote/backslash/multibyte and1024/12000 boundaries enforce whole response cap without clipping. Every auth/use/mapping flag false."
+        },
+        {
+          "file": "provider.test.ts",
+          "api": "buildHermesPlatformSource + existing compiled fixture/Bun.spawn",
+          "cases": "Both existing compiled bindings route explicit new mode; missing inputs hold. Pre-import registration drift prevents sentinel; post-read binding/map/source drift prevents result. Actual metafile closure/no PC roots unchanged."
+        },
+        {
+          "file": "Existing work-method-source.test.ts/work-method.test.ts",
+          "api": "Unchanged suites retained, no edits proposed",
+          "cases": "Legacy/session pairing, complete originals/UTF8/cursor and full event/actor/packet/currentEvent/prerequisite holds remain. Source fixtures are not native coverage."
+        }
+      ]
+    },
+    "sourceBasis": {
+      "repositoryRoot": "/home/palantirkc/projects/agent-platform",
+      "head": "0c85abf676f6c520ec402a570e2e190605df7860",
+      "tree": "9bfbbeb9e5cddb022af678910b4cdd26929ed53c",
+      "pins": [
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
+          "bytes": 3622,
+          "sha256": "78f50cff6a5e06285ee4791a50143013a40ee93e485fb26eef3b9d8ffad47d07"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/hook-context.ts",
+          "bytes": 4006,
+          "sha256": "fca4602e9eab1c69cc2076ac92c06b4021f677a8bf3d93bf7869b06816f01e97"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/work-method.ts",
+          "bytes": 11396,
+          "sha256": "686c40c6fae682bab4fdaff5a44fdb673414ffead746719260f323b72430fbcb"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/work-method-source.ts",
+          "bytes": 15897,
+          "sha256": "937550ef3b7231f1a556f98f0bb648acfac928eefbd4339d1ae31e39adb2ae04"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/build.ts",
+          "bytes": 13121,
+          "sha256": "0718cda412121377558bf8b943e077cf850f82e6653fc286636a868611109eb8"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/context.test.ts",
+          "bytes": 36641,
+          "sha256": "d2e5c8b841e3b78dcaabb2fd69f6387b8327770e1ef8265bacd3fc321012cc4e"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/provider.test.ts",
+          "bytes": 37823,
+          "sha256": "021b95bf5bff49d987aae8ab1cac886db84160653abdea9d4b2c25fbfe50a5f5"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/work-method-source.test.ts",
+          "bytes": 21424,
+          "sha256": "9000622b067cad5332ef26b0b7017fedd3e4d3a191375b81c159f32561b10684"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-current-work/output-policy.ts",
+          "bytes": 820,
+          "sha256": "972616fb87070e4f23949d04dfb8e170512c149d2265a1910160925cb107315a"
+        },
+        {
+          "path": "packages/native-hermes-adapter/src/platform-rearchitecture/input.ts",
+          "bytes": 1231,
+          "sha256": "121148f83ba469d6a05e3c200ece343f0d3c6cc8e1a18b0c15ad1a30231d6c20"
+        },
+        {
+          "path": "docs/hermes-work-method-source-read.md",
+          "bytes": 5737,
+          "sha256": "5933ee7f0703a780f5842b6b5b01c9c0e6c4e4a04734dff84d7c8ead12d69cd3"
+        }
+      ],
+      "nativeSourceReport": {
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-native-event-evidence.native-source-seam.actual.json",
+        "bytes": 19937,
+        "sha256": "4b6eb9998ce2e0c7bcd7982b1329a169d930f296bd1d9ec39c71caea72107b3d"
+      },
+      "method": "Immutable source/types/tests read only; no additional Docker/native RPC/config/store reads or execution."
+    },
+    "originalDesign": {
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-work-method.real-callback-projection.design.actual.json",
+      "bytes": 14815,
+      "sha256": "05940daccdd41bc3416169a5955239264354b84011723d34ea6e261dc391f22b"
+    },
+    "attribution": "0594/4b6e are technical /root/owner_coverage source evidence, not human approval. Root selects scope under wholeWork/common-first authority. selectedContract projects complete normative fields, not full design bytes; originals immutable.",
+    "currentSource": {
+      "readLocalResult": "b07f9772cef3a40172ce3e73816d2aa137068ece",
+      "checkedCode": "0c85abf676f6c520ec402a570e2e190605df7860",
+      "actualAdministrativeBase": "a905ab55ec9a0f7ed4c18305cc29e50b5362bab4",
+      "finalMergedMain": null,
+      "actualImplementationHead": null,
+      "hold": "a905 normal mainN integration/freshauthor/exactreview/status/remotegatePASS; PR55 exacthead requiredCIpending. Finalmergedmain notyetobserved. Code0c85 unchanged, no false QA rerun/nativepermission."
+    },
+    "reviewPreference": {
+      "decisionId": "ODI-DECISION-ARGON-HIGH-INDEPENDENT-REVIEW-20261020",
+      "source": {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "b07f9772cef3a40172ce3e73816d2aa137068ece",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-ARGON-HIGH-INDEPENDENT-REVIEW-20261020.json",
+        "sha256": "3a1272c0a0810577571c6ab842d0a92f2540ee57ede6a52dd94a2f6f17f1c053"
+      },
+      "contract": "Useful independent actual agy Argon effort high SOURCE proposal/patch review at THIS Domain/Project/Work/Issue/Spec1Plan4/Task/revision; actual native identity/quota/independence required. No idle burn/fallback. Unsupported formal method/enum stays unknown/held; no fake nativeCodex/Hermes/release.",
+      "actualNativeReviewerIdentity": null,
+      "actualQuota": null,
+      "formalMethodSupport": null
+    },
+    "beforeCode": "Real registration first, then fresh Root c:task receive/read/use/genuine owner CLI for7paths. task.text is concise nextAction, not entire Input;12000 cap unchanged. Five source deps are Task-specific, not fixed global cardinality.",
+    "preserved": "Whole original ODI Data/Logic/Action/Security WHY/all unfinished estate/CI/Memory/decisions/context/identity/recovery/H16/H49/semantic/kinetic/domain/PR17/19/MCP/image/Linux and distinct operator/Engineering/domain acceptance;ff55 seven inputs/three qualifications/BOTH purpose separation. Root sole MAIN genuine wholeGoal; Hermes Lead/native-data owners retained. Serving349/model/effort/auth/permissions/hooks trust unchanged;9fences126consumed5uncertain/USD14usageunknown/paid held; no replay/reset/new suite. Old Root safe-handoff conditional pause only; successor Goal continues.",
+    "continuity": "Original Spec1Plan4/decisions/108maps84originals retained. ff55 qualifications/successor-only topology+structural consolidation and actual approved R3 CI seven independent units ownmethod/effect held. Native bootstrap successor12f1db6f95de041bd6d38618c4457514f8353690a8d6c86e2ac58fb59f24ee49 retained for later owner resolution; no install/firstread records changed."
+  }
+}

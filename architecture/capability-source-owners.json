@@ -911,12 +911,12 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts",
-          "sha256": "497fa33555dfceff0db57ba3fbd325e685fe2eef889c32c37241c560c191edd3",
+          "sha256": "761f32e18dcb625c917f48ba6749db7afad56a2676d7324a080146af54ff604e",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/work-method-source.ts",
-          "sha256": "eb091a98b9ff8fc5fa082f867c856c3ce273d6e4a3745549f6fc4b6970fae9c6",
+          "sha256": "937550ef3b7231f1a556f98f0bb648acfac928eefbd4339d1ae31e39adb2ae04",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/work-method-source.ts"
         }
       ],

@@ -51,3 +51,38 @@ current Work context; this route does not silently activate WorkMethod injection
 Any application needs independently reviewed source/build/registration/compiler
 and dependency successors, a freshly pinned pending install Task and native-owner
 verification. Earlier host repair proof remains bound to its original source.
+
+## Stable session source selection
+
+When a future turn does not exist yet, the explicit
+`hermes.work-method-session-source-map.v1` map selects source using
+`scope: {kind:"session-source",runtime:"native-hermes",profileId,sessionId}`,
+`logical`, `actorId`, `routeId`, `entries` and optional passive `provenance`.
+Profile and session must be genuinely observed non-null identities. The closed map
+has no event, cwd, future turn, packet template, runtime slots or receipt state.
+The same compiled binding, no-follow reads, file limits, UTF-8 chunks and complete
+output cap apply. This map and the original full-tuple map cannot substitute for
+each other.
+
+The closed `hermes.work-method-session-source-request.v1` contains `scope`,
+`logical`, `actorId`, `routeId`, `sourceMapSha256`, `target`, `cursor`,
+`outputVersion:"v2"` and optional `maxChars`. A mapped-source target reads only
+the selected original or `@map`, without inventing a native event. Delivery keeps
+all authentication, use, admission, permission and execution flags false.
+
+For `{kind:"validated-owner-document",event,request}`, `event` is an actual
+identity-only observation and must exactly equal the complete existing owner
+request's event. Its profile/session must match the stable map. The unchanged
+owner evaluator still joins the full event, cwd, selection, actor, packet,
+receipt, current event, prerequisites and Common admission facts. Null remains an
+exact value. A valid held Common decision stays held inside the source document;
+source delivery does not change it.
+
+The evidence flow is acyclic: actual event/source prerequisites produce receiver
+use U0; the current packet Q references U0; actual complete Q read/use produces U1;
+receipt R references U1 and Q's digest. Q does not reference U1 or R, and R does
+not reference its own hash. The owner then supplies current source/admission facts
+to the existing evaluator. A changed derived document rejects a continuation's
+old digest. None of these later observations retroactively admits earlier session
+creation, installation or source-read effects. Those actions require their own
+exact native owner, Task, source and effect gates.
