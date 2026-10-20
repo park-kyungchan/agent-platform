@@ -1,0 +1,87 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-NATIVE-EXECUTION-RECEIPT-20261020",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "native-codex-root-operation-observation",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/successor-main.native-install.actual-tool-completion.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "common.git-prerequisite-receipt.v1",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 4,
+      "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020"
+    },
+    "occurrence": {
+      "runtimeId": "native-codex-tool-execution:01a158f3-8946-7bf2-b06a-311d4224970d",
+      "attemptId": "exec-process:70263",
+      "occurrenceId": "exec-output:7ff342"
+    },
+    "state": {
+      "execution": "complete",
+      "verification": "passed",
+      "localAudit": "result-durable",
+      "sharedAudit": "pending",
+      "formalCompletion": "pending"
+    },
+    "intent": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ACTUAL-20261020.json",
+      "fragment": "#/content/intent",
+      "sha256": "7df4cdb0d7fab8ae8bb225315647bd1bf4797bbc9a417abae7c4a8492a69f866"
+    },
+    "result": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ACTUAL-20261020.json",
+      "fragment": "#/content/result",
+      "sha256": "7df4cdb0d7fab8ae8bb225315647bd1bf4797bbc9a417abae7c4a8492a69f866"
+    },
+    "verification": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-VERIFICATION-20261020.json",
+      "fragment": "#/content",
+      "sha256": "2412f36dcff85524dffc0cbf45c6c0142b5b9f00f8e27c2f7e9f42fe39e02fef"
+    },
+    "sourceNormalization": {
+      "class": "Root-adopted source-owned generic occurrence correlation, not a runtime resource allocation",
+      "producerOccurrence": {
+        "runtimeId": "native-codex-tool-execution:01a158f3-8946-7bf2-b06a-311d4224970d",
+        "attemptId": "exec-process:70263",
+        "occurrenceId": "exec-output:7ff342"
+      },
+      "rawObservedRootThreadId": "01a158f3-8946-7bf2-b06a-311d4224970d",
+      "rawObservedToolProcessSessionId": 70263,
+      "rawObservedDispatchChunkId": "500b2b",
+      "rawObservedCompletionChunkId": "7ff342",
+      "postverifyToolProcessSessionId": 49549,
+      "postverifyCompletionChunkId": "81090a",
+      "postverifyOccurrenceReplacesInstallOccurrence": false,
+      "storedHermesSessionIdIsAttemptId": false,
+      "nativeAuthenticationEstablished": false,
+      "nativePermissionGranted": false,
+      "nativeTaskId": null,
+      "nativeRunId": null,
+      "nativeEventId": null,
+      "nativeAttemptResourceId": null,
+      "mapping": "runtimeId scopes the genuine native Codex tool execution to its observed Root thread; attemptId labels exec process70263; occurrenceId labels actual completion output7ff342. All source/intent/claim/raw/result/tool/postverify joins retained. No global uniqueness or native authentication is inferred from a chunk alone."
+    },
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "nativeEventId": null,
+    "nativeAttemptResourceId": null,
+    "nativeAuthenticationEstablished": false,
+    "nativePermissionGranted": false
+  }
+}

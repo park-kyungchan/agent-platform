@@ -17,11 +17,11 @@
     "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020"
   },
   "title": "Install only the exact reviewed current Common guarded work-method reader projection in the owned serving349 new namespace",
-  "nextAction": "Read Input ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020-CURRENT-SOURCE-20261020 #/content/sourceContract. Preserve original four dependencies and pending once-effect. Qualify exact current registration/build/compiler ABI/helper/namespace and BOTH bindings, then install once through the supported exact target path. Source preparation is not native installation permission or actual use.",
+  "nextAction": "DO NOT replay the consumed Install once-effect/helper/caller/claim. Read Input ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ACTUAL-20261020 and its exact native tool result and passing v3 postverification, then ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-NATIVE-EXECUTION-RECEIPT-20261020 and Task-target Verification. Continue original FirstRead only after actual current source/prerequisite receive-use and existing native owner admission. Installation is not actual E/method use/finite coverage, shared audit, formal completion or whole Acceptance.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -48,9 +48,18 @@
     "ODI-DECISION-COMMON-FIRST-20261020",
     "ODI-DECISION-LONG-AUTONOMY-20261020"
   ],
-  "effectIds": [],
-  "pendingEffectIds": [
+  "effectIds": [
     "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020"
   ],
-  "verificationEvidenceIds": []
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": [
+    "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-VERIFICATION-20261020"
+  ],
+  "runtimeId": "native-codex-tool-execution:01a158f3-8946-7bf2-b06a-311d4224970d",
+  "occurrence": {
+    "runtimeId": "native-codex-tool-execution:01a158f3-8946-7bf2-b06a-311d4224970d",
+    "attemptId": "exec-process:70263",
+    "occurrenceId": "exec-output:7ff342"
+  },
+  "executionEvidenceId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-NATIVE-EXECUTION-20261020"
 }

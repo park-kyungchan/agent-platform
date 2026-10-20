@@ -11,16 +11,16 @@
     "workId": "ontology-driven-platform-integration-20261017",
     "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020"
   },
-  "sourceBaseSha": "fed58e891aad3d775f54048edd445fe4b3c26844",
+  "sourceBaseSha": "1c7aae2d3ef38fd9678ca63310189cb79947e51c",
   "author": {
     "runtime": "native-codex",
-    "threadId": "01a1598c-f554-7313-8317-97db83e30ee3",
+    "threadId": "01a15906-95e4-76f3-9838-09a6cab51437",
     "sessionId": null,
     "nativeTaskId": null,
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-20T13:57:04.462Z",
+  "capturedAtUtc": "2026-10-20T15:40:12.129Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }

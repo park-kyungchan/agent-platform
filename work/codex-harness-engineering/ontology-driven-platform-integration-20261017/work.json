@@ -81,7 +81,8 @@
     "ODI-05-CALLER-RUN12-CONSUMED",
     "ODI-07-CONTRACT-ARCHIVE4-CONSUMED",
     "ODI-HOST-CONSUMED-EFFECTS",
-    "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-CONSUMED-20261020"
+    "ODI-HERMES-WORK-METHOD-SESSION-PREPARE-CONSUMED-20261020",
+    "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-CONSUMED-20261020"
   ],
   "continuity": {
     "schema": "common.git-work-continuity.v1",
@@ -138,6 +139,12 @@
         "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SESSION-PREPARE-ACTUAL-20261020.json",
         "fragment": "#/content/consumedEffectInventory",
         "sha256": "4e71440d75f7f3916b434d7cb5de8949c797d8983b73d2c7d0fa78ef2b16be22"
+      },
+      {
+        "kind": "snapshot",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ACTUAL-20261020.json",
+        "fragment": "#/content/consumedEffectInventory",
+        "sha256": "7df4cdb0d7fab8ae8bb225315647bd1bf4797bbc9a417abae7c4a8492a69f866"
       }
     ]
   }
