@@ -11,7 +11,7 @@
     "workId": "ontology-driven-platform-integration-20261017",
     "taskId": "ODI-HERMES-WORK-METHOD-CALLBACK-SOURCE-20261020"
   },
-  "sourceBaseSha": "a905ab55ec9a0f7ed4c18305cc29e50b5362bab4",
+  "sourceBaseSha": "ad2dfdc198067ab64220dafb5bd6bec983754485",
   "author": {
     "runtime": "native-codex",
     "threadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
@@ -20,7 +20,7 @@
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-20T08:40:07.569Z",
+  "capturedAtUtc": "2026-10-20T09:13:19.769Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }

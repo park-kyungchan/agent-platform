@@ -435,67 +435,6 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     expect(JSON.parse(drift.out).chunk).toBeNull();
     expect(JSON.parse(drift.out).holdReasons).toEqual(["SOURCE_MAP_NOT_CURRENT"]);
     await writeFile(runtimeMapPath, sourceMapBytes);
-    const sessionMapBytes =
-      JSON.stringify({
-        schema: "hermes.work-method-session-source-map.v1",
-        scope: {
-          kind: "session-source",
-          runtime: "native-hermes",
-          profileId: method.selection.native.profileId,
-          sessionId: method.selection.native.sessionId,
-        },
-        logical: method.admission.packet.logical,
-        actorId: method.selection.actorId,
-        routeId: method.selection.routeId,
-        entries: [
-          {
-            id: "original",
-            path: "original",
-            sha256: sourceDigest(original),
-            bytes: Buffer.byteLength(original),
-          },
-        ],
-      }) + "\n";
-    await writeFile(runtimeMapPath, sessionMapBytes);
-    const sessionBuilt = await buildHermesPlatformSource({
-      ...request,
-      workMethodSourceBinding: {
-        ...request.workMethodSourceBinding,
-        mapSha256: sourceDigest(sessionMapBytes),
-      },
-    });
-    const sessionReader = join(f.root, "read-work-method-session.js");
-    await writeFile(
-      sessionReader,
-      sessionBuilt.bundles.find((b) => b.name === "read-work-method.js")!.bytes,
-    );
-    const sessionPayload = {
-      schema: "hermes.work-method-session-source-request.v1",
-      scope: JSON.parse(sessionMapBytes).scope,
-      logical: method.admission.packet.logical,
-      actorId: method.selection.actorId,
-      routeId: method.selection.routeId,
-      sourceMapSha256: sourceDigest(sessionMapBytes),
-      target: { kind: "mapped-source", id: "original" },
-      cursor: { offsetBytes: 0, expectedDocumentSha256: null },
-      outputVersion: "v2",
-    };
-    const sessionChild = Bun.spawn([compiler, "--no-env-file", sessionReader], {
-      stdin: new Blob([JSON.stringify(sessionPayload)]),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [sessionCode, sessionOut, sessionError] = await Promise.all([
-      sessionChild.exited,
-      new Response(sessionChild.stdout).text(),
-      new Response(sessionChild.stderr).text(),
-    ]);
-    expect(sessionCode).toBe(0);
-    expect(sessionError).toBe("");
-    expect(JSON.parse(sessionOut).chunk.text).toBe(original);
-    expect(JSON.parse(sessionOut).ownerAdmissionEstablishedByDelivery).toBe(false);
-    expect(sessionBuilt.nativeActivation).toBe(false);
-    await writeFile(runtimeMapPath, sourceMapBytes);
     const memory = await syntheticMemoryOwner();
     const invokeMemory = async (payload: unknown) => {
       const child = Bun.spawn([compiler, "--no-env-file", join(f.root, "read-memory.js")], {
@@ -754,6 +693,92 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       stage: "source",
       reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
     });
+  } finally {
+    await f.cleanup();
+  }
+}, 60000);
+
+test("compiled stable session source reader preserves complete original text without establishing owner admission", async () => {
+  const f = await fixture();
+  try {
+    const compiler = await realpath(process.execPath);
+    const method = methodFixture();
+    const dataBase = join(f.root, "session-source-data");
+    await mkdir(dataBase);
+    const original = "Complete original WHY 한국어 😀";
+    await writeFile(join(dataBase, "original"), original);
+    const runtimeMapPath = join(dataBase, "map.json");
+    const runtimeRegistrationPath = join(f.root, "session-runtime-registration.json");
+    const sessionMapBytes =
+      JSON.stringify({
+        schema: "hermes.work-method-session-source-map.v1",
+        scope: {
+          kind: "session-source",
+          runtime: "native-hermes",
+          profileId: method.selection.native.profileId,
+          sessionId: method.selection.native.sessionId,
+        },
+        logical: method.admission.packet.logical,
+        actorId: method.selection.actorId,
+        routeId: method.selection.routeId,
+        entries: [
+          {
+            id: "original",
+            path: "original",
+            sha256: sourceDigest(original),
+            bytes: Buffer.byteLength(original),
+          },
+        ],
+      }) + "\n";
+    await writeFile(runtimeMapPath, sessionMapBytes);
+    const sessionBuilt = await buildHermesPlatformSource({
+      registrationPath: f.path,
+      registrationSha256: f.sha256,
+      providerRoot: f.root,
+      compiler: { path: compiler, sha256: sourceDigest(await readFile(compiler)) },
+      legacyManifestSha256: "1".repeat(64),
+      runtimeProviderRoot: f.root,
+      runtimeRegistrationPath,
+      currentWorkOutputVersion: "v2",
+      workMethodSourceBinding: {
+        dataBase,
+        runtimeMapPath,
+        mapSha256: sourceDigest(sessionMapBytes),
+      },
+    });
+    expect(sessionBuilt.bundles).toHaveLength(6);
+    await writeFile(runtimeRegistrationPath, sessionBuilt.nativeRegistration.bytes);
+    const sessionReader = join(f.root, "read-work-method-session.js");
+    await writeFile(
+      sessionReader,
+      sessionBuilt.bundles.find((b) => b.name === "read-work-method.js")!.bytes,
+    );
+    const sessionPayload = {
+      schema: "hermes.work-method-session-source-request.v1",
+      scope: JSON.parse(sessionMapBytes).scope,
+      logical: method.admission.packet.logical,
+      actorId: method.selection.actorId,
+      routeId: method.selection.routeId,
+      sourceMapSha256: sourceDigest(sessionMapBytes),
+      target: { kind: "mapped-source", id: "original" },
+      cursor: { offsetBytes: 0, expectedDocumentSha256: null },
+      outputVersion: "v2",
+    };
+    const sessionChild = Bun.spawn([compiler, "--no-env-file", sessionReader], {
+      stdin: new Blob([JSON.stringify(sessionPayload)]),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [sessionCode, sessionOut, sessionError] = await Promise.all([
+      sessionChild.exited,
+      new Response(sessionChild.stdout).text(),
+      new Response(sessionChild.stderr).text(),
+    ]);
+    expect(sessionCode).toBe(0);
+    expect(sessionError).toBe("");
+    expect(JSON.parse(sessionOut).chunk.text).toBe(original);
+    expect(JSON.parse(sessionOut).ownerAdmissionEstablishedByDelivery).toBe(false);
+    expect(sessionBuilt.nativeActivation).toBe(false);
   } finally {
     await f.cleanup();
   }
