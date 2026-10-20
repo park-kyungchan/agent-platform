@@ -29,6 +29,50 @@ const write = async (path: string, bytes: Uint8Array | string) => {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, bytes);
 };
+export type ProjectionContextVersion = "v5" | "v6";
+export const workMethodProjectionPath = "packages/work-continuity/src/work-method.ts";
+/** Finite source graph, independent of a caller's registration or mutable cwd. */
+export function contextProjectionPaths(version: ProjectionContextVersion): string[] {
+  assert(["v5", "v6"].includes(version), "Explicit supported context projection version required");
+  return [
+    "project.json",
+    "ontology-pin.json",
+    "package.json",
+    "bun.lock",
+    "packages/work-continuity/package.json",
+    "releases/palantirkc-ontology-0.2.0.tgz",
+    ...["index", "types", "validation", "source", "store", "context", "boundary", "sections"].map(
+      (name) => `packages/work-continuity/src/context/${name}.ts`,
+    ),
+    "packages/work-continuity/releases/palantirkc-ontology-0.2.0.tgz",
+    ...["index", "source", "records", "context", "types"].map(
+      (name) => `packages/work-continuity/src/git-work/${name}.ts`,
+    ),
+    "packages/work-continuity/src/logical-identity.ts",
+    "packages/work-continuity/src/operational-state.ts",
+    ...["recall-request", "lexical-recall", "qualification"].map(
+      (name) => `packages/work-continuity/src/workspace/${name}.ts`,
+    ),
+    ...(version === "v6" ? [workMethodProjectionPath] : []),
+  ];
+}
+function assertContextProjectionPins(value: unknown, version: ProjectionContextVersion) {
+  assert(Array.isArray(value), "Exact context projection source pins required");
+  const pins = value.map(record),
+    expected = contextProjectionPaths(version).sort();
+  assert.deepEqual(
+    pins.map((pin) => pin.path).sort(),
+    expected,
+    "Exact context projection source graph required",
+  );
+  for (const pin of pins) {
+    assert.deepEqual(Object.keys(pin).sort(), ["path", "sha256"]);
+    assert(
+      typeof pin.sha256 === "string" && /^[a-f0-9]{64}$/.test(pin.sha256),
+      "Exact context projection source digest required",
+    );
+  }
+}
 
 /** Source agreement only. Neither declarations nor fictional QA roots authenticate a native caller. */
 export function assertSourceProjectionAgreement(
@@ -43,7 +87,21 @@ export function assertSourceProjectionAgreement(
   assert.equal(policy.nativePermissionGranted, false);
   assert.equal(policy.verificationClass, "source-layout-only");
   const projection = record((policy.sourceProviderProjections as unknown[])[0]);
-  assert.equal(context.schema, "codex.context-provider-source-closure.v5");
+  assert(
+    [
+      "codex.context-provider-source-closure.v5",
+      "codex.context-provider-source-closure.v6",
+    ].includes(String(context.schema)),
+    "Explicit v5 or v6 context projection required",
+  );
+  if (
+    context.schema === "codex.context-provider-source-closure.v6" ||
+    context.sourcePins !== undefined
+  )
+    assertContextProjectionPins(
+      context.sourcePins,
+      context.schema === "codex.context-provider-source-closure.v6" ? "v6" : "v5",
+    );
   assert.equal(native.schema, "codex.native-adapter-source-closure.v2");
   for (const registration of [context, native]) {
     assert.equal(registration.consumerRoot, projection.canonicalConsumerRoot);
@@ -81,10 +139,39 @@ export interface ProjectionQaInput {
   contextPaths: readonly string[];
   nativePaths: readonly string[];
   contextModules: readonly string[];
+  /** Omission retains the legacy v5 exercise; current work-method graph opts into v6. */
+  contextVersion?: ProjectionContextVersion;
 }
 
 /** Temporary source-only exercise of the real finite guards, retaining a fictional canonical owner. */
 export async function verifyProjectedSourceQa(input: ProjectionQaInput) {
+  const contextVersion = input.contextVersion ?? "v5";
+  assert(
+    ["v5", "v6"].includes(contextVersion),
+    "Explicit supported context projection version required",
+  );
+  assert.deepEqual(
+    [...input.contextPaths].sort(),
+    contextProjectionPaths(contextVersion).sort(),
+    "Exact versioned QA context source graph required",
+  );
+  assert.deepEqual(
+    [...input.contextModules].sort(),
+    ["index", "types", "validation", "source", "store", "context", "boundary", "sections"].sort(),
+    "Exact finite QA context module graph required",
+  );
+  assert.deepEqual(
+    [...input.nativePaths].sort(),
+    [
+      "package.json",
+      "bun.lock",
+      "packages/native-codex-adapter/package.json",
+      ...["hooks", "home-context", "evaluation-ledger"].map(
+        (name) => `packages/native-codex-adapter/src/native/${name}.ts`,
+      ),
+    ].sort(),
+    "Exact finite QA native source graph required",
+  );
   const base = await mkdtemp(join(tmpdir(), "common-source-projection-"));
   try {
     const canonical = join(base, "projects/codex-harness-engineering"),
@@ -150,7 +237,7 @@ export async function verifyProjectedSourceQa(input: ProjectionQaInput) {
           paths.map(async (path) => ({ path, sha256: hash(await readFile(join(provider, path))) })),
         );
       const context = {
-        schema: "codex.context-provider-source-closure.v5",
+        schema: "codex.context-provider-source-closure." + contextVersion,
         consumerRoot: canonical,
         providerRoot: canonicalProvider,
         providerProjectId: "agent-platform",
@@ -204,7 +291,8 @@ const {readNativeAdapterSourceClosure}=await import(${JSON.stringify(join(root, 
 const native=await readNativeAdapterSourceClosure();await native.verify();
 const {loadCodexOwnerContext}=await import(${JSON.stringify(join(root, "src/native/context-owner.ts"))});
 const context=await loadCodexOwnerContext();await context.verifyCurrentSourceClosure();
-console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRoot:native.canonicalProviderRoot,sourceLocationId:native.sourceLocationId,contextPins:context.sourcePins.length,nativePins:native.pins.length}));`;
+if(${JSON.stringify(contextVersion)}==='v6'&&(!context.workMethod||['validateWorkMethodStanding','validateWorkMethodPacket','validateWorkMethodReceipt','workMethodPacketSha256','workMethodReceiptSha256','workMethodRequiredSources','decideWorkMethodAdmission','evaluateWorkMethodCoverage'].some(name=>typeof context.workMethod[name]!=='function')))throw Error('Versioned work-method owner API absent');
+console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRoot:native.canonicalProviderRoot,sourceLocationId:native.sourceLocationId,contextPins:context.sourcePins.length,nativePins:native.pins.length,workMethodAvailable:!!context.workMethod}));`;
       return Bun.spawnSync([process.execPath, "--no-env-file", "-e", script], {
         cwd: base,
         env: {
@@ -228,7 +316,8 @@ console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRo
         value.sourceLocationId,
         root === canonical ? "canonical-host-source" : projection.id,
       );
-      assert.equal(value.contextPins, 34);
+      assert.equal(value.contextPins, contextVersion === "v6" ? 35 : 34);
+      assert.equal(value.workMethodAvailable, contextVersion === "v6");
       valid.push(value);
     }
     for (const file of ["context-provider.json", "native-codex-provider.json"])
@@ -304,6 +393,37 @@ console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRo
     assert.notEqual(result.exitCode, 0);
     assert.match(result.stderr.toString(), /fresh process/);
     rejected++;
+    if (contextVersion === "v6") {
+      for (const mutate of [
+        (value: RecordValue) => {
+          value.sourcePins = (value.sourcePins as { path: string }[]).filter(
+            (pin) => pin.path !== workMethodProjectionPath,
+          );
+        },
+        (value: RecordValue) => {
+          value.schema = "codex.context-provider-source-closure.v5";
+        },
+      ]) {
+        const next = structuredClone(original);
+        mutate(next.context);
+        await publish(projected, next.context, next.native);
+        result = probe(projected);
+        assert.notEqual(result.exitCode, 0);
+        assert.match(result.stderr.toString(), /Exact immutable context provider source closure/);
+        rejected++;
+      }
+      await publish(projected, original.context, original.native);
+      const script = `await import(${JSON.stringify(join(projectedProvider, workMethodProjectionPath))});const {loadCodexOwnerContext}=await import(${JSON.stringify(join(projected, "src/native/context-owner.ts"))});await loadCodexOwnerContext();`;
+      result = Bun.spawnSync([process.execPath, "--no-env-file", "-e", script], {
+        cwd: base,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, BUN_OPTIONS: "", NODE_OPTIONS: "" },
+      });
+      assert.notEqual(result.exitCode, 0);
+      assert.match(result.stderr.toString(), /fresh process/);
+      rejected++;
+    }
     const source = join(projectedProvider, "packages/native-codex-adapter/src/native/hooks.ts"),
       outside = join(base, "foreign.ts");
     await write(outside, await readFile(source));
@@ -322,7 +442,7 @@ const native=await readNativeAdapterSourceClosure();
 const {loadCodexOwnerContext}=await import(${JSON.stringify(join(projected, "src/native/context-owner.ts"))});
 const context=await loadCodexOwnerContext();
 for(const [path,verify] of [[${JSON.stringify(join(projectedProvider, "packages/work-continuity/src/git-work/source.ts"))},()=>context.verifyCurrentSourceClosure()],
-[${JSON.stringify(join(projectedProvider, "packages/native-codex-adapter/src/native/home-context.ts"))},()=>native.verify()]]){
+[${JSON.stringify(join(projectedProvider, "packages/native-codex-adapter/src/native/home-context.ts"))},()=>native.verify()]${contextVersion === "v6" ? `,[${JSON.stringify(join(projectedProvider, workMethodProjectionPath))},()=>context.verifyCurrentSourceClosure()]` : ""}]){
  const bytes=await readFile(path);try{await writeFile(path,Buffer.concat([bytes,Buffer.from('\\n')]));await assert.rejects(verify,/changed|CHANGED/);}finally{await writeFile(path,bytes);}await verify();
 }`;
     const drift = Bun.spawnSync([process.execPath, "--no-env-file", "-e", driftScript], {
@@ -332,9 +452,10 @@ for(const [path,verify] of [[${JSON.stringify(join(projectedProvider, "packages/
       env: { ...process.env, BUN_OPTIONS: "", NODE_OPTIONS: "" },
     });
     assert.equal(drift.exitCode, 0, drift.stderr.toString());
-    rejected += 2;
+    rejected += contextVersion === "v6" ? 3 : 2;
     return {
-      recordClass: "fictional-source-only-v5-v2-projection-guard-proof",
+      recordClass: `fictional-source-only-${contextVersion}-v2-projection-guard-proof`,
+      contextVersion,
       valid,
       rejectedCases: rejected,
       canonicalOwnerDistinctFromProjectedPhysicalRoot: canonicalProvider !== projectedProvider,

@@ -1,4 +1,5 @@
 export type * from "./types";
+export * from "../work-method.ts";
 export { validateCheckpoint, validateWorkContextRequest } from "./validation";
 export { readCheckpoint, writeCheckpoint } from "./store";
 export { boundedProjection, readWorkContext } from "./context";

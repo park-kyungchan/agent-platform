@@ -36,7 +36,8 @@
         "src/workspace/",
         "src/runtime-index.ts",
         "src/git-work/",
-        "src/jev/"
+        "src/jev/",
+        "src/work-method.ts"
       ],
       "nativeAdapterOwnerRoot": "/home/palantirkc/projects/codex-harness-engineering",
       "nativeEntrypoints": [
@@ -64,7 +65,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/context/index.ts",
-          "sha256": "253266f9a01c9f35312d445490969870654317b4dc87f4893862e92ff0c696f9",
+          "sha256": "1f97dacb3e48481266ff396d1a7772e2df06165f2961462f31de1c0f48d62fd6",
           "relativePath": "packages/work-continuity/src/context/index.ts"
         },
         {
@@ -211,6 +212,11 @@
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/index.ts",
           "sha256": "a0198de5fdc0e5122804694ebd888dd84cf19523ad57a278df3c7209e4b0efd3",
           "relativePath": "packages/work-continuity/src/jev/index.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/work-method.ts",
+          "sha256": "1380c22390245aa3b19ee7e08553c0deb72fb74646abdeee367bdd068d743d56",
+          "relativePath": "packages/work-continuity/src/work-method.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
@@ -718,7 +724,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/provider.ts",
-          "sha256": "4e416060df208735e7f233a48cfc1d9eaa1eb5253c7f7f08001ab06807a94097",
+          "sha256": "59b7cf06d5e6e359c4180899800363912ae3e24bf3a103a94a1b750e111a3f96",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/provider.ts"
         },
         {
@@ -870,6 +876,16 @@
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/native/jev/test_shared_accounting.py",
           "sha256": "60f2985bd66f916146e4ddef0ba21286c5f5a1e45ab5db88e3fbddff2037315d",
           "relativePath": "packages/native-hermes-adapter/native/jev/test_shared_accounting.py"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/work-method.ts",
+          "sha256": "e01743c798030d2534fbf4a7dab4718924fe62232495b551771b93802262de5f",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/work-method.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts",
+          "sha256": "0cac4b0c2af5966e372237a48262537db500f2d8dce24dceebe1cb2e30cc416a",
+          "relativePath": "packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",

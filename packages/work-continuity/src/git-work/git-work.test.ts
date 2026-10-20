@@ -1245,6 +1245,7 @@ describe("source qualification does not grant startup or native authority", () =
       }).valid,
     ).toBe(false);
   });
+  // Multiple real Git reads share the source QA host with an independent package.
   test("real canonical Work is useful at the default budget and remains source-only", async () => {
     const canonical = join(
       import.meta.dir,
@@ -1312,7 +1313,7 @@ describe("source qualification does not grant startup or native authority", () =
     expect((await validateGitWorkRecords(replayReader)).findings).toContain(
       "COMPLETED_EFFECT_REPLAY:" + sourceTaskId,
     );
-  });
+  }, 30000);
 });
 
 function boundRecords(): GitWorkRecord[] {

@@ -10,8 +10,14 @@ import {
 } from "./provider.ts";
 import { buildHermesPlatformSource } from "./build.ts";
 import { syntheticMemoryOwner } from "./tests/memory-caller.fixture.ts";
+import * as commonContext from "../../../work-continuity/src/context/index.ts";
+import * as commonWorkMethod from "../../../work-continuity/src/work-method.ts";
 
 const source = resolve(import.meta.dir, "../../../..");
+test("existing common context API forwards the single canonical work-method implementation", () => {
+  for (const name of Object.keys(commonWorkMethod) as (keyof typeof commonWorkMethod)[])
+    expect(commonContext[name]).toBe(commonWorkMethod[name]);
+});
 async function fixture(importMarker = false, memoryImportDrift = false) {
   const root = await mkdtemp(join(tmpdir(), "hermes-platform-source-"));
   for (const path of platformSourcePaths) {
@@ -78,6 +84,14 @@ test("v2 platform denominator includes transitive contracts, generator, dependen
   try {
     for (const path of [
       "packages/work-continuity/src/runtime-index.ts",
+      "packages/work-continuity/src/work-method.ts",
+      "packages/work-continuity/src/context/index.ts",
+      "packages/work-continuity/src/context/validation.ts",
+      "packages/work-continuity/src/context/store.ts",
+      "packages/work-continuity/src/context/context.ts",
+      "packages/work-continuity/src/context/boundary.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/work-method.ts",
+      "packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts",
       "packages/work-continuity/src/workspace/recall-request.ts",
       "packages/work-continuity/src/workspace/lexical-recall.ts",
       "packages/work-continuity/src/workspace/qualification.ts",
@@ -118,6 +132,50 @@ test("v2 platform denominator includes transitive contracts, generator, dependen
     await expect(
       observeHermesPlatformSource(f.path, { providerRoot: f.root, registrationSha256: f.sha256 }),
     ).rejects.toThrow("CLOSURE_DRIFT");
+  } finally {
+    await f.cleanup();
+  }
+}, 30000);
+test("current Work source guard refuses an omitted or changed common work-method core", async () => {
+  const f = await fixture();
+  try {
+    const path = "packages/work-continuity/src/work-method.ts";
+    expect(f.registration.sourcePins.filter((pin) => pin.path === path)).toHaveLength(1);
+    const observed = await observeHermesPlatformSource(f.path, {
+      providerRoot: f.root,
+      registrationSha256: f.sha256,
+    });
+    const reduced = {
+      ...f.registration,
+      sourcePins: f.registration.sourcePins.filter((pin) => pin.path !== path),
+    };
+    const reducedBytes = JSON.stringify(reduced, null, 2) + "\n";
+    await writeFile(f.path, reducedBytes);
+    await expect(
+      observeHermesPlatformSource(f.path, {
+        providerRoot: f.root,
+        registrationSha256: sourceDigest(reducedBytes),
+      }),
+    ).rejects.toThrow("CLOSURE_DRIFT");
+    await writeFile(f.path, JSON.stringify(f.registration, null, 2) + "\n");
+    await writeFile(
+      join(f.root, path),
+      (await readFile(join(f.root, path), "utf8")) + "\n// Synthetic core drift.\n",
+    );
+    const installedProjection = f.registration.dependencies.some(
+      (dependency) => dependency.name === "@palantirkc/work-continuity",
+    );
+    await expect(observed.verify()).rejects.toThrow(
+      installedProjection ? "INSTALLED_WORKSPACE_PROJECTION_DRIFT" : "CLOSURE_CHANGED",
+    );
+    await expect(
+      observeHermesPlatformSource(f.path, {
+        providerRoot: f.root,
+        registrationSha256: f.sha256,
+      }),
+    ).rejects.toThrow(
+      installedProjection ? "INSTALLED_WORKSPACE_PROJECTION_DRIFT" : "CLOSURE_DRIFT",
+    );
   } finally {
     await f.cleanup();
   }
@@ -255,7 +313,8 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       buildHermesPlatformSource({ ...request, runtimeProviderRoot: "/home/synthetic-owner" }),
     ).rejects.toThrow("PC_INDEPENDENT");
     const built = await buildHermesPlatformSource(request);
-    expect(built.bundles).toHaveLength(5);
+    expect(built.bundles).toHaveLength(6);
+    expect(built.bundles.some((bundle) => bundle.name === "read-work-method.js")).toBe(true);
     expect(built.transitiveCompilerInputsVerified).toBe(true);
     expect(built.sourceClosureVerifiedBeforeAndAfter).toBe(true);
     expect(built.nativeActivation).toBe(false);
@@ -367,6 +426,7 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
       "read-current-work.js",
       "current-work-native-hook.js",
       "read-memory.js",
+      "read-work-method.js",
     ]) {
       const p = Bun.spawn([compiler, "--no-env-file", join(f.root, name)], {
         stdin: new Blob([marker]),
@@ -383,6 +443,21 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
         expect(code).toBe(0);
         expect(JSON.parse(out)).toEqual({});
         expect(JSON.parse(error).error).toBe("NATIVE_BOUNDARY_INPUT_OR_SOURCE_FAILED");
+      } else if (name === "read-work-method.js") {
+        expect(code).toBe(1);
+        expect(JSON.parse(out)).toEqual({
+          schema: "hermes.work-method-owner-reader-held.v1",
+          status: "held",
+          holdReasons: ["WORK_METHOD_INPUT_OR_SOURCE_HELD"],
+          nativeAuthenticationEstablished: false,
+          nativePermissionGranted: false,
+          executionAuthorityGranted: false,
+        });
+        expect(JSON.parse(error)).toEqual({
+          error: "CURRENT_WORK_INPUT_OR_SOURCE_FAILED",
+          stage: "input",
+          reason: "REQUEST_UNAVAILABLE_OR_INVALID",
+        });
       } else if (name === "read-current-work.js" || name === "read-memory.js") {
         expect(code).toBe(1);
         expect(JSON.parse(error)).toEqual({

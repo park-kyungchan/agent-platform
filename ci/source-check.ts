@@ -1,6 +1,12 @@
 import { validateReceiptWithEvidence } from "./quality/receipt-validation-gate";
 import { runIndependentPackageTests } from "./package-tests";
-import { verifyLiveSourceProjectionAgreement, verifyProjectedSourceQa } from "./source-projection";
+import {
+  contextProjectionPaths,
+  workMethodProjectionPath,
+  verifyLiveSourceProjectionAgreement,
+  verifyProjectedSourceQa,
+} from "./source-projection";
+import { validateSourceProviderProjections } from "./verify-runtime-layout";
 export { validateIndependentReviewReceipt } from "./quality/receipt-validator";
 import { createHash } from "node:crypto";
 import {
@@ -96,18 +102,7 @@ const gitWorkPaths = [
 const memoryPaths = ["recall-request", "lexical-recall", "qualification"].map(
   (name) => `packages/work-continuity/src/workspace/${name}.ts`,
 );
-const contextPaths = [
-  "project.json",
-  "ontology-pin.json",
-  "package.json",
-  "bun.lock",
-  "packages/work-continuity/package.json",
-  "releases/palantirkc-ontology-0.2.0.tgz",
-  ...contextModules.map((name) => `packages/work-continuity/src/context/${name}.ts`),
-  "packages/work-continuity/releases/palantirkc-ontology-0.2.0.tgz",
-  ...gitWorkPaths,
-  ...memoryPaths,
-];
+const contextPaths = contextProjectionPaths("v6");
 const nativeCodexPaths = [
   "package.json",
   "bun.lock",
@@ -261,7 +256,7 @@ async function prepareQaTree() {
   const qaBase = await mkdtemp(
     join(resolve(process.env.RUNNER_TEMP ?? tmpdir()), "agent-platform-source-"),
   );
-  const common = join(qaBase, "agent-platform");
+  const common = join(qaBase, "projects/agent-platform");
   await cp(sourceRoot, common, {
     recursive: true,
     dereference: false,
@@ -301,7 +296,7 @@ async function prepareQaTree() {
     const bytes = await readFile(path);
     if (bytes.length > 100_000 || sha(bytes) !== entry.sha256 || bytes.includes("/home/palantirkc"))
       throw Error("Finite native owner source fixture drifted");
-    const destination = join(qaBase, entry.owner, entry.path);
+    const destination = join(qaBase, "projects", entry.owner, entry.path);
     await mkdir(dirname(destination), { recursive: true });
     await writeFile(destination, bytes);
   }
@@ -312,7 +307,7 @@ async function prepareQaTree() {
   await writeJson(join(common, "project.json"), project);
   await run(common, [process.execPath, "install", "--frozen-lockfile", "--ignore-scripts"]);
   for (const owner of ["codex-harness-engineering"]) {
-    const root = join(qaBase, owner);
+    const root = join(qaBase, "projects", owner);
     await mkdir(join(root, "releases"), { recursive: true });
     await cp(
       join(common, "releases/palantirkc-ontology-0.2.0.tgz"),
@@ -333,9 +328,20 @@ async function prepareQaTree() {
     await run(root, [process.execPath, "install", "--ignore-scripts"]);
     await run(root, [process.execPath, "install", "--frozen-lockfile", "--ignore-scripts"]);
   }
-  const codex = join(qaBase, "codex-harness-engineering");
+  const codex = join(qaBase, "projects/codex-harness-engineering");
+  const policy = await json(join(common, "architecture/runtime-filesystem-contract.json"));
+  validateSourceProviderProjections(policy.sourceProviderProjections);
+  const sourceProjections = [
+    {
+      ...policy.sourceProviderProjections[0],
+      canonicalConsumerRoot: codex,
+      canonicalProviderRoot: common,
+      consumerRoot: join(qaBase, "code/shared/codex-harness-engineering"),
+      providerRoot: join(qaBase, "code/shared/agent-platform"),
+    },
+  ];
   const context = {
-    schema: "codex.context-provider-source-closure.v4",
+    schema: "codex.context-provider-source-closure.v6",
     consumerRoot: codex,
     providerRoot: common,
     providerProjectId: "agent-platform",
@@ -343,6 +349,7 @@ async function prepareQaTree() {
     modulePath: "packages/work-continuity/src/context/index.ts",
     gitWorkModulePath: "packages/work-continuity/src/git-work/index.ts",
     sourcePins: await sourcePins(common, contextPaths),
+    sourceProjections,
     authority: "none",
     nativePermissionGranted: false,
   };
@@ -358,11 +365,12 @@ async function prepareQaTree() {
     );
   }
   const native = {
-    schema: "codex.native-adapter-source-closure.v1",
+    schema: "codex.native-adapter-source-closure.v2",
     consumerRoot: codex,
     providerRoot: common,
     packageName: "@palantirkc/native-codex-adapter",
     sourcePins: await sourcePins(common, nativeCodexPaths),
+    sourceProjections,
     authority: "none",
     nativePermissionGranted: false,
   };
@@ -429,6 +437,7 @@ async function sourceChecks() {
         contextPaths,
         nativePaths: nativeCodexPaths,
         contextModules,
+        contextVersion: "v6",
       }),
     ),
   );
@@ -530,10 +539,22 @@ async function sourceChecks() {
   const closureProbe = join(qaBase, "source-closure-probe.ts");
   await writeFile(
     closureProbe,
-    `import {loadCodexOwnerContext} from ${JSON.stringify(join(codex, "src/native/context-owner.ts"))};\nimport {readNativeAdapterSourceClosure} from ${JSON.stringify(join(codex, "src/native/provider-closure.ts"))};\nimport {observeHermesContextProvider} from ${JSON.stringify(join(hermes, "src/ontology-driven/provider-source.ts"))};\nconst context=await loadCodexOwnerContext();await context.verifyCurrentSourceClosure();\nconst native=await readNativeAdapterSourceClosure();const hermes=await observeHermesContextProvider(${JSON.stringify(hermes)});await hermes.verify();\nif(native.providerRoot!==${JSON.stringify(common)}||!context.sourcePins.length||!context.gitWork||['resolveGitWorkSelection','openGitWork','readGitWorkContext','compactGitWorkContext','decodeCompactGitWorkContext'].some(name=>typeof context.gitWork[name]!=='function'))throw Error('Source owner closure or fixed Git Work API absent');\nconst home=await import(${JSON.stringify(join(common, "packages/native-codex-adapter/src/native/home-context.ts"))});\nif(['readHomeContextContractValue','gitWorkDeliveryPolicy'].some(name=>typeof home[name]!=='function'))throw Error('Source owner Home or delivery-policy API absent');\nconsole.log(JSON.stringify({recordClass:'source-only-finite-owner-closure',contextPins:context.sourcePins.length,nativePins:native.pins.length,hermesPins:hermes.pins.length,gitWorkApiSourceProven:true,homeValueApiSourceProven:true,sourceDeliveryPolicyApiSourceProven:true,nativePermissionGranted:false}));\n`,
+    `import {loadCodexOwnerContext} from ${JSON.stringify(join(codex, "src/native/context-owner.ts"))};\nimport {readNativeAdapterSourceClosure} from ${JSON.stringify(join(codex, "src/native/provider-closure.ts"))};\nimport {observeHermesContextProvider} from ${JSON.stringify(join(hermes, "src/ontology-driven/provider-source.ts"))};\nconst context=await loadCodexOwnerContext();await context.verifyCurrentSourceClosure();\nconst native=await readNativeAdapterSourceClosure();const hermes=await observeHermesContextProvider(${JSON.stringify(hermes)});await hermes.verify();\nif(native.providerRoot!==${JSON.stringify(common)}||!context.sourcePins.length||!context.gitWork||['resolveGitWorkSelection','openGitWork','readGitWorkContext','compactGitWorkContext','decodeCompactGitWorkContext'].some(name=>typeof context.gitWork[name]!=='function'))throw Error('Source owner closure or fixed Git Work API absent');\nconst home=await import(${JSON.stringify(join(common, "packages/native-codex-adapter/src/native/home-context.ts"))});\nif(['readHomeContextContractValue','gitWorkDeliveryPolicy'].some(name=>typeof home[name]!=='function'))throw Error('Source owner Home or delivery-policy API absent');\nif(!context.workMethod||['validateWorkMethodStanding','validateWorkMethodPacket','validateWorkMethodReceipt','workMethodPacketSha256','workMethodReceiptSha256','workMethodRequiredSources','decideWorkMethodAdmission','evaluateWorkMethodCoverage'].some(name=>typeof context.workMethod[name]!=='function'))throw Error('Source owner v6 Work method API absent');\nconsole.log(JSON.stringify({recordClass:'source-only-finite-owner-closure',contextPins:context.sourcePins.length,nativePins:native.pins.length,hermesPins:hermes.pins.length,gitWorkApiSourceProven:true,homeValueApiSourceProven:true,sourceDeliveryPolicyApiSourceProven:true,workMethodApiSourceProven:true,nativePermissionGranted:false}));\n`,
   );
   await run(common, [process.execPath, closureProbe]);
   // Source-only adversarial proof uses QA copies and in-memory registration overlays.
+  // The historical graph is data for the pure reader only. Current QA code is
+  // never rewritten/imported as a legacy implementation or declared native use.
+  const currentContextIndex = await readFile(
+    join(common, "packages/work-continuity/src/context/index.ts"),
+    "utf8",
+  );
+  const workMethodExports = [
+    ...currentContextIndex.matchAll(/^export \* from ["']\.\.\/work-method(?:\.ts)?["'];\r?\n/gm),
+  ];
+  if (workMethodExports.length !== 1)
+    throw Error("Exact additive work-method context index export required");
+  const legacyContextIndex = currentContextIndex.replace(workMethodExports[0]![0], "");
   const providerProbe = join(qaBase, "context-provider-proof-probe.ts");
   await writeFile(
     providerProbe,
@@ -548,6 +569,14 @@ const original=JSON.parse(await readFile(registrationPath,'utf8'));
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const gitPaths=${JSON.stringify(gitWorkPaths)};
 const memoryPaths=${JSON.stringify(memoryPaths)};
+const workMethodPath=${JSON.stringify(workMethodProjectionPath)};
+const legacyIndex=Buffer.from(${JSON.stringify(legacyContextIndex)});
+function legacyGraph(value,overlays,version){
+ value.schema='codex.context-provider-source-closure.'+version;
+ value.sourcePins=value.sourcePins.filter(pin=>pin.path!==workMethodPath);
+ if(version!=='v5')delete value.sourceProjections;
+ overlays.set(join(provider,'packages/work-continuity/src/context/index.ts'),legacyIndex);
+}
 async function proof(change,overlays=new Map(),driftPath){
  const value=structuredClone(original);change(value,overlays);
  for(const pin of value.sourcePins)if(overlays.has(join(provider,pin.path)))pin.sha256=hash(overlays.get(join(provider,pin.path)));
@@ -559,13 +588,14 @@ async function proof(change,overlays=new Map(),driftPath){
 }
 const current=await proof(()=>{});
 assert.equal(current.gitWorkModulePath,join(provider,'packages/work-continuity/src/git-work/index.ts'));
-assert.equal(current.pins.length,26);
-const v3=await proof(value=>{value.schema='codex.context-provider-source-closure.v3';value.sourcePins=value.sourcePins.filter(pin=>!memoryPaths.includes(pin.path));});
+assert.equal(current.pins.length,27);assert.equal(current.workMethodAvailable,true);
+for(const version of ['v4','v5']){const legacy=await proof((value,overlays)=>legacyGraph(value,overlays,version));assert.equal(legacy.pins.length,26);assert.equal(legacy.workMethodAvailable,undefined);}
+const v3=await proof((value,overlays)=>{legacyGraph(value,overlays,'v3');value.sourcePins=value.sourcePins.filter(pin=>!memoryPaths.includes(pin.path));});
 assert.equal(v3.pins.length,23);
-const v2=await proof(value=>{value.schema='codex.context-provider-source-closure.v2';delete value.gitWorkModulePath;value.sourcePins=value.sourcePins.filter(pin=>!gitPaths.includes(pin.path)&&!memoryPaths.includes(pin.path));});
+const v2=await proof((value,overlays)=>{legacyGraph(value,overlays,'v2');delete value.gitWorkModulePath;value.sourcePins=value.sourcePins.filter(pin=>!gitPaths.includes(pin.path)&&!memoryPaths.includes(pin.path));});
 assert.equal(v2.gitWorkModulePath,undefined);assert.equal(v2.pins.length,16);
 const v1=await proof((value,overlays)=>{
- value.schema='codex.context-provider-source-closure.v1';delete value.gitWorkModulePath;
+ legacyGraph(value,overlays,'v1');delete value.gitWorkModulePath;
  value.sourcePins=value.sourcePins.filter(pin=>!gitPaths.includes(pin.path)&&!memoryPaths.includes(pin.path)&&pin.path!=='packages/work-continuity/releases/palantirkc-ontology-0.2.0.tgz');
  const pkgPath=join(provider,'packages/work-continuity/package.json'),rootPath=join(provider,'package.json');
  const pkg=JSON.parse(${JSON.stringify(await readFile(join(common, "packages/work-continuity/package.json"), "utf8"))}),rootPkg=JSON.parse(${JSON.stringify(await readFile(join(common, "package.json"), "utf8"))});
@@ -588,7 +618,9 @@ await assert.rejects(()=>proof((value,overlays)=>{
  pkg.exports['./git-work']='./src/context/index.ts';overlays.set(path,Buffer.from(JSON.stringify(pkg)));
 }),/immutable owner\/package\/Ontology/);
 await assert.rejects(()=>proof(()=>{},new Map(),join(provider,'packages/work-continuity/src/git-work/source.ts')),/changed during read/);
-console.log(JSON.stringify({recordClass:'source-only-context-provider-v4-adversarial-proof',legacySchemasPreserved:3,rejectedCases:8,nativePermissionGranted:false}));
+await assert.rejects(()=>proof((value,overlays)=>overlays.set(join(provider,'packages/work-continuity/src/context/index.ts'),legacyIndex)),/requires its existing context index export/);
+await assert.rejects(()=>proof(value=>{value.schema='codex.context-provider-source-closure.v5';value.sourcePins=value.sourcePins.filter(pin=>pin.path!==workMethodPath);}),/requires the v6 source closure/);
+console.log(JSON.stringify({recordClass:'source-only-context-provider-v6-adversarial-proof',legacySchemasPreserved:5,legacyGraphsArePureReaderOverlays:true,rejectedCases:10,nativePermissionGranted:false}));
 `,
   );
   await run(common, [process.execPath, providerProbe]);
@@ -614,6 +646,17 @@ console.log(JSON.stringify({recordClass:'source-only-memory-first-import-refusal
 `,
   );
   await run(common, [process.execPath, memoryFirstImportProbe]);
+  const workMethodFirstImportProbe = join(qaBase, "work-method-first-import-probe.ts");
+  await writeFile(
+    workMethodFirstImportProbe,
+    String.raw`import {strict as assert} from 'node:assert';
+await import(${JSON.stringify(join(common, workMethodProjectionPath))});
+const {loadCodexOwnerContext}=await import(${JSON.stringify(join(codex, "src/native/context-owner.ts"))});
+await assert.rejects(()=>loadCodexOwnerContext(),/imported before its observed source closure/);
+console.log(JSON.stringify({recordClass:'source-only-work-method-first-import-refusal',nativePermissionGranted:false}));
+`,
+  );
+  await run(common, [process.execPath, workMethodFirstImportProbe]);
   const gitDriftProbe = join(qaBase, "git-work-source-drift-probe.ts");
   await writeFile(
     gitDriftProbe,
@@ -627,6 +670,19 @@ console.log(JSON.stringify({recordClass:'source-only-git-work-source-drift-refus
 `,
   );
   await run(common, [process.execPath, gitDriftProbe]);
+  const workMethodDriftProbe = join(qaBase, "work-method-source-drift-probe.ts");
+  await writeFile(
+    workMethodDriftProbe,
+    String.raw`import {strict as assert} from 'node:assert';
+import {readFile,writeFile} from 'node:fs/promises';
+import {loadCodexOwnerContext} from ${JSON.stringify(join(codex, "src/native/context-owner.ts"))};
+const path=${JSON.stringify(join(common, workMethodProjectionPath))},bytes=await readFile(path),context=await loadCodexOwnerContext();
+try{await writeFile(path,Buffer.concat([bytes,Buffer.from('\n')]));await assert.rejects(()=>context.verifyCurrentSourceClosure(),/Context provider source changed/);}finally{await writeFile(path,bytes);}
+await context.verifyCurrentSourceClosure();
+console.log(JSON.stringify({recordClass:'source-only-work-method-source-drift-refusal',nativePermissionGranted:false}));
+`,
+  );
+  await run(common, [process.execPath, workMethodDriftProbe]);
   const identityProbe = join(qaBase, "source-identity-probe.ts");
   await writeFile(
     identityProbe,
