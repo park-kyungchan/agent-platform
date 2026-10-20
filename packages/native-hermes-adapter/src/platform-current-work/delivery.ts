@@ -80,7 +80,15 @@ export interface NamespaceDeliveryReceipt {
   uncertain: string | null;
   legacyManifestUnchanged: boolean | null;
   receipt: { path: string; sha256: string; bytes: number } | null;
-  journal: { path: string; sha256: string; bytes: number } | null;
+  /** A persisted receipt pins the verified prefix; only the returned pin includes the terminal. */
+  journal: {
+    path: string;
+    sha256: string;
+    bytes: number;
+    scope: "verified-prefix" | "terminal";
+  } | null;
+  /** The immutable receipt precedes the terminal. Pending/missing terminal requires reconciliation. */
+  terminalState: "not-attempted" | "pending" | "confirmed" | "unknown";
   persistenceFailure: boolean;
   runtimeClosureVerification: "required-separate-owner-step";
   nativeTaskId: null;
@@ -118,13 +126,15 @@ function integer(value: unknown, max = Number.MAX_SAFE_INTEGER): asserts value i
   if (!Number.isSafeInteger(value) || Number(value) < 0 || Number(value) > max)
     fail("DELIVERY_INTEGER_REQUIRED");
 }
-function absolute(value: unknown): asserts value is string {
-  text(value, 2048);
+function absolute(value: unknown, max = 2048): asserts value is string {
+  text(value, max);
+  encodedPath(value, max);
   if (!isAbsolute(value) || resolve(value) !== value || value === "/")
     fail("EXACT_DELIVERY_PATH_REQUIRED");
 }
 function local(value: unknown): asserts value is string {
   text(value);
+  encodedPath(value, 1024);
   if (
     isAbsolute(value) ||
     value.includes("\\") ||
@@ -132,6 +142,13 @@ function local(value: unknown): asserts value is string {
     value.split("/").some((part) => part.startsWith(reserved))
   )
     fail("CONTAINED_DELIVERY_PATH_REQUIRED");
+}
+function encodedPath(value: string, max: number) {
+  const encoded = Buffer.from(value, "utf8");
+  if (encoded.toString("utf8") !== value || encoded.length > max)
+    fail("DELIVERY_ENCODED_PATH_REQUIRED");
+  if (value.split("/").some((part) => Buffer.byteLength(part, "utf8") > 255))
+    fail("DELIVERY_PATH_COMPONENT_LIMIT");
 }
 function canonical(value: unknown): string {
   if (value === null || typeof value !== "object") {
@@ -377,6 +394,8 @@ function validatePayload(value: unknown, c: NamespaceDeliveryContract) {
       if (path.startsWith(alias + "/")) fail("DELIVERY_ALIAS_PARENT_FORBIDDEN");
   }
   if (directories.size > namespaceDeliveryLimits.directories) fail("DELIVERY_DIRECTORY_LIMIT");
+  for (const path of [...files.keys(), ...directories, ...aliasNames])
+    encodedPath(join(c.namespace, path), 4095);
   if (namespacePayloadSha256(p as unknown as NamespaceDeliveryPayload) !== c.payloadSha256)
     fail("REVIEWED_DELIVERY_PAYLOAD_CHANGED");
   return {
@@ -389,8 +408,43 @@ function validatePayload(value: unknown, c: NamespaceDeliveryContract) {
   };
 }
 
+/** Reserve every planned event plus bounded failure/terminal metadata before the once fence. */
+function preflightJournal(
+  c: NamespaceDeliveryContract,
+  directories: string[],
+  files: Map<string, unknown>,
+  aliases: { path: string; target: string }[],
+) {
+  const events = [
+    ...directories.map((path) => ({ kind: "directory", path })),
+    ...[...files.keys()].map((path) => ({ kind: "file", path })),
+    ...aliases.map(({ path }) => ({ kind: "alias", path })),
+  ];
+  let bytes = 0,
+    longest = "";
+  for (const event of events) {
+    bytes += jsonBytes({ state: "intent", ...event }).length;
+    bytes += jsonBytes({ state: "complete", ...event }).length;
+    if (jsonBytes(event.path).length > jsonBytes(longest).length) longest = event.path;
+  }
+  // Three bounded terminal records cover a failed outcome and reconciliation metadata.
+  const terminalBytes = jsonBytes({
+    state: "terminal",
+    scope: "artifact-and-receipt-outcome",
+    status: "delivered-awaiting-owner-verification",
+    completed: namespaceDeliveryLimits.files + namespaceDeliveryLimits.aliases,
+    uncertain: longest,
+    reason: "X".repeat(256),
+    persistenceFailure: false,
+    receiptOutcome: "write-or-verification-failed",
+    receipt: { path: join(c.namespace, receiptName), sha256: "f".repeat(64), bytes: 1048576 },
+  }).length;
+  if (bytes + 3 * terminalBytes > namespaceDeliveryLimits.journalBytes)
+    fail("DELIVERY_JOURNAL_PREFLIGHT_LIMIT");
+}
+
 async function directory(path: string): Promise<FileHandle> {
-  absolute(path);
+  absolute(path, 4095);
   let held = await open("/", constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
   try {
     for (const part of path.split("/").slice(1)) {
@@ -410,6 +464,54 @@ async function directory(path: string): Promise<FileHandle> {
 async function identity(held: FileHandle): Promise<NamespaceDirectoryIdentity> {
   const s = await held.stat();
   return { dev: s.dev, ino: s.ino, uid: s.uid, gid: s.gid, mode: s.mode & 0o7777 };
+}
+async function privateDirectory(held: FileHandle, c: NamespaceDeliveryContract) {
+  const current = await identity(held);
+  if (current.uid !== c.uid || current.gid !== c.gid || current.mode !== 0o700)
+    fail("PRIVATE_DELIVERY_DIRECTORY_MODE_REQUIRED");
+}
+
+/** This one intentional proc magic link names the loaded image, not a replaceable executable path. */
+async function runningCompiler(c: NamespaceDeliveryContract) {
+  const held = await open("/proc/self/exe", constants.O_RDONLY);
+  try {
+    const before = await held.stat();
+    if (!before.isFile() || before.size !== c.compiler.bytes)
+      fail("EXACT_RUNNING_DELIVERY_COMPILER_REQUIRED");
+    const hash = createHash("sha256"),
+      buffer = Buffer.alloc(1024 * 1024);
+    let offset = 0;
+    while (offset < before.size) {
+      const { bytesRead } = await held.read(
+        buffer,
+        0,
+        Math.min(buffer.length, before.size - offset),
+        offset,
+      );
+      if (!bytesRead) fail("EXACT_RUNNING_DELIVERY_COMPILER_REQUIRED");
+      hash.update(buffer.subarray(0, bytesRead));
+      offset += bytesRead;
+    }
+    const after = await held.stat();
+    const stable = () => [
+      before.dev,
+      before.ino,
+      before.size,
+      before.mode,
+      before.mtimeMs,
+      before.ctimeMs,
+    ];
+    if (
+      hash.digest("hex") !== c.compiler.sha256 ||
+      canonical(stable()) !==
+        canonical([after.dev, after.ino, after.size, after.mode, after.mtimeMs, after.ctimeMs])
+    )
+      fail("EXACT_RUNNING_DELIVERY_COMPILER_REQUIRED");
+    return { held, fingerprint: stable() };
+  } catch (error) {
+    await held.close();
+    throw error;
+  }
 }
 async function same(path: string, held: FileHandle) {
   const named = await directory(path);
@@ -489,6 +591,7 @@ export async function deliverHermesNamespace(
     legacyManifestUnchanged: null,
     receipt: null,
     journal: null,
+    terminalState: "not-attempted",
     persistenceFailure: false,
     runtimeClosureVerification: "required-separate-owner-step",
     nativeTaskId: null,
@@ -504,7 +607,8 @@ export async function deliverHermesNamespace(
   let c: NamespaceDeliveryContract | undefined,
     parent: FileHandle | undefined,
     root: FileHandle | undefined,
-    journal: FileHandle | undefined;
+    journal: FileHandle | undefined,
+    compilerImage: Awaited<ReturnType<typeof runningCompiler>> | undefined;
   const journalDigest = createHash("sha256");
   let journalBytes = 0;
   const append = async (record: unknown) => {
@@ -533,11 +637,15 @@ export async function deliverHermesNamespace(
   try {
     c = validateContract(contractValue);
     const { files, aliases, directories } = validatePayload(payloadValue, c);
+    preflightJournal(c, directories, files, aliases);
     receipt.operationId = c.operationId;
     receipt.taskId = c.taskId;
     receipt.payloadSha256 = c.payloadSha256;
     if (process.getuid?.() !== c.uid || process.getgid?.() !== c.gid)
       fail("EXACT_DELIVERY_UID_GID_REQUIRED");
+    // Read only: never change process-global umask to make this operation succeed.
+    if (process.umask() & 0o700) fail("DELIVERY_OWNER_PERMISSIONS_MASKED");
+    compilerImage = await runningCompiler(c);
     const compiler = await readExactFile(c.compiler.path, 128 * 1024 * 1024, c.compiler.sha256);
     if (
       compiler.length !== c.compiler.bytes ||
@@ -570,11 +678,13 @@ export async function deliverHermesNamespace(
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
     // Exclusive mkdir is the first once fence. Never remove/reclaim it on failure.
+    if (process.umask() & 0o700) fail("DELIVERY_OWNER_PERMISSIONS_MASKED");
     await mkdir(childPath(parent, basename(c.namespace)), { mode: 0o700 });
     receipt.namespaceCreated = true;
     await parent.sync();
     await same(dirname(c.namespace), parent);
     root = await directory(c.namespace);
+    await privateDirectory(root, c);
     await root.sync();
     await exclusiveFile(
       root,
@@ -609,6 +719,7 @@ export async function deliverHermesNamespace(
       if (canonical(await identity(parent!)) !== canonical(c!.parent))
         fail("DELIVERY_PARENT_FINGERPRINT_CHANGED");
       await same(c!.namespace, root!);
+      await privateDirectory(root!, c!);
       await verifyLegacy();
     };
     const perform = async (
@@ -634,7 +745,19 @@ export async function deliverHermesNamespace(
     };
     for (const path of directories)
       await perform(path, "directory", async (h) => {
+        if (process.umask() & 0o700) fail("DELIVERY_OWNER_PERMISSIONS_MASKED");
         await mkdir(childPath(h, basename(path)), { mode: 0o700 });
+        const created = await open(
+          childPath(h, basename(path)),
+          constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+        );
+        try {
+          await privateDirectory(created, c!);
+          await same(join(c!.namespace, path), created);
+          await created.sync();
+        } finally {
+          await created.close();
+        }
         await h.sync();
       });
     for (const [path, file] of files) {
@@ -673,32 +796,43 @@ export async function deliverHermesNamespace(
         namespaceDeliveryLimits.fileBytes,
         file.pin.sha256,
       );
+    const actualImage = await compilerImage.held.stat();
+    if (
+      canonical(compilerImage.fingerprint) !==
+      canonical([
+        actualImage.dev,
+        actualImage.ino,
+        actualImage.size,
+        actualImage.mode,
+        actualImage.mtimeMs,
+        actualImage.ctimeMs,
+      ])
+    )
+      fail("EXACT_RUNNING_DELIVERY_COMPILER_REQUIRED");
     receipt.status = "delivered-awaiting-owner-verification";
   } catch (error) {
     receipt.status = receipt.namespaceCreated ? "partial" : "refused";
     receipt.reason =
-      error instanceof Error && /^[A-Z][A-Z0-9_]+$/u.test(error.message)
+      error instanceof Error && /^[A-Z][A-Z0-9_]{0,255}$/u.test(error.message)
         ? error.message
         : "DELIVERY_IO_OR_INPUT_REFUSAL";
   } finally {
     if (root && c) {
+      receipt.terminalState = "pending";
+      const journalPin = async (scope: "verified-prefix" | "terminal") => {
+        const expectedHash = journalDigest.copy().digest("hex"),
+          actual = await readHeldBytes(journal!, journalBytes);
+        if (sourceDigest(actual) !== expectedHash) fail("DELIVERY_JOURNAL_READBACK_FAILED");
+        return {
+          path: join(c!.namespace, journalName),
+          bytes: journalBytes,
+          sha256: expectedHash,
+          scope,
+        };
+      };
       if (journal) {
         try {
-          await append({
-            state: "terminal",
-            status: receipt.status,
-            completed: receipt.completed,
-            uncertain: receipt.uncertain,
-            reason: receipt.reason,
-          });
-          const expectedHash = journalDigest.digest("hex"),
-            actual = await readHeldBytes(journal, journalBytes);
-          if (sourceDigest(actual) !== expectedHash) fail("DELIVERY_JOURNAL_READBACK_FAILED");
-          receipt.journal = {
-            path: join(c.namespace, journalName),
-            bytes: journalBytes,
-            sha256: expectedHash,
-          };
+          receipt.journal = await journalPin("verified-prefix");
         } catch {
           receipt.persistenceFailure = true;
           receipt.status = "partial";
@@ -706,7 +840,8 @@ export async function deliverHermesNamespace(
         }
       }
       try {
-        // Persist partial/unknown progress even if an artifact or post-check failed. No rollback.
+        // This immutable pre-terminal snapshot never hashes itself or claims a final journal pin.
+        // A missing/failed terminal keeps reconciliation pending, even if artifact writes succeeded.
         const bytes = jsonBytes(receipt);
         await exclusiveFile(root, receiptName, bytes);
         await same(c.namespace, root);
@@ -720,13 +855,39 @@ export async function deliverHermesNamespace(
         receipt.status = "partial";
         receipt.reason ??= "DELIVERY_RECEIPT_PERSISTENCE_FAILED";
       }
+      if (journal) {
+        try {
+          // The receipt outcome is now known. The terminal pins that immutable snapshot one-way.
+          await append({
+            state: "terminal",
+            scope: "artifact-and-receipt-outcome",
+            status: receipt.status,
+            completed: receipt.completed,
+            uncertain: receipt.uncertain,
+            reason: receipt.reason,
+            persistenceFailure: receipt.persistenceFailure,
+            receiptOutcome: receipt.receipt
+              ? "persisted-and-verified"
+              : "write-or-verification-failed",
+            receipt: receipt.receipt,
+          });
+          receipt.journal = await journalPin("terminal");
+          receipt.terminalState = "confirmed";
+        } catch {
+          receipt.persistenceFailure = true;
+          receipt.status = "partial";
+          receipt.terminalState = "unknown";
+          receipt.reason ??= "DELIVERY_JOURNAL_PERSISTENCE_FAILED";
+        }
+      } else receipt.terminalState = "unknown";
     } else if (receipt.namespaceCreated) receipt.persistenceFailure = true;
-    for (const h of [journal, root, parent]) {
+    for (const h of [journal, root, parent, compilerImage?.held]) {
       try {
         await h?.close();
       } catch {
         receipt.persistenceFailure = true;
         receipt.status = receipt.namespaceCreated ? "partial" : "refused";
+        if (receipt.namespaceCreated) receipt.terminalState = "unknown";
         receipt.reason ??= "DELIVERY_DESCRIPTOR_CLOSE_FAILED";
       }
     }

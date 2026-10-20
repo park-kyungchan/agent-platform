@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, expect, test } from "bun:test";
 import {
   chmod,
+  copyFile,
   lstat,
   mkdir,
   mkdtemp,
@@ -13,7 +14,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
 import {
   deliverHermesNamespace,
@@ -146,6 +147,7 @@ test("finite delivery writes exact source/build/DATA/aliases and durable receipt
   expect(receipt.completed).toBe(f.payload.files.length + f.payload.aliases.length);
   expect(receipt.claimDurable).toBe(true);
   expect(receipt.persistenceFailure).toBe(false);
+  expect(receipt.terminalState).toBe("confirmed");
   expect(receipt.retryAllowed).toBe(false);
   expect(receipt.nativeTaskId).toBeNull();
   expect(receipt.nativeAttemptId).toBeNull();
@@ -162,9 +164,18 @@ test("finite delivery writes exact source/build/DATA/aliases and durable receipt
   const durable = await readFile(receipt.receipt!.path);
   expect(hash(durable)).toBe(receipt.receipt!.sha256);
   expect(durable.length).toBe(receipt.receipt!.bytes);
-  expect(JSON.parse(durable.toString()).completed).toBe(receipt.completed);
+  const snapshot = JSON.parse(durable.toString());
+  expect(snapshot.completed).toBe(receipt.completed);
+  expect(snapshot.terminalState).toBe("pending");
+  expect(snapshot.journal.scope).toBe("verified-prefix");
+  expect(snapshot.receipt).toBeNull();
   const journal = await readFile(receipt.journal!.path);
   expect(hash(journal)).toBe(receipt.journal!.sha256);
+  expect(receipt.journal!.scope).toBe("terminal");
+  expect(hash(journal.subarray(0, snapshot.journal.bytes))).toBe(snapshot.journal.sha256);
+  const terminal = JSON.parse(journal.toString().trim().split("\n").at(-1)!);
+  expect(terminal.receipt).toEqual(receipt.receipt);
+  expect(terminal.receiptOutcome).toBe("persisted-and-verified");
   expect(journal.toString()).not.toContain("fictional bundle");
 });
 
@@ -332,15 +343,18 @@ test("failed durable completion retains the exact possibly written artifact as u
   expect(hash(await readFile(join(f.namespace, f.source.path)))).toBe(f.source.sha256);
   expect(JSON.parse(await readFile(receipt.receipt.path, "utf8")).uncertain).toBe(f.source.path);
 });
-test("terminal journal failure still persists an independent partial receipt", async () => {
+test("terminal journal failure leaves the immutable receipt explicitly awaiting reconciliation", async () => {
   const f = await fixture(),
     receipt = await journalFault(f, "terminal");
   expect(receipt.status).toBe("partial");
   expect(receipt.persistenceFailure).toBe(true);
   expect(receipt.receipt).not.toBeNull();
   const durable = JSON.parse(await readFile(receipt.receipt.path, "utf8"));
-  expect(durable.status).toBe("partial");
-  expect(durable.persistenceFailure).toBe(true);
+  expect(receipt.terminalState).toBe("unknown");
+  expect(durable.terminalState).toBe("pending");
+  expect(durable.journal.scope).toBe("verified-prefix");
+  expect((await readFile(receipt.journal.path, "utf8")).includes('"state":"terminal"')).toBe(false);
+  expect((await deliverHermesNamespace(f.contract, f.payload)).status).toBe("refused");
   expect(hash(await readFile(f.legacy))).toBe(f.contract.legacyManifest.sha256);
 });
 test("same-size journal corruption is never reported with a verified journal hash", async () => {
@@ -417,6 +431,247 @@ test("bounded partial write has durable progress/receipt and cannot resume or ro
   expect((await deliverHermesNamespace(f.contract, f.payload)).status).toBe("refused");
   expect(await readFile(receipt.receipt!.path)).toEqual(before);
   expect(hash(await readFile(f.legacy))).toBe(f.contract.legacyManifest.sha256);
+});
+
+for (const stage of ["allocation", "write", "readback"] as const) {
+  test(
+    "receipt " + stage + " failure is durably terminal partial even when stdout is lost",
+    async () => {
+      const f = await fixture();
+      const code = `import {mock} from 'bun:test';
+import * as fs from 'node:fs/promises';
+const original=fs.open;
+mock.module('node:fs/promises',()=>({...fs,open:async(...args)=>{
+ const receipt=String(args[0]).endsWith('/.namespace-delivery-receipt.json');
+ if(receipt&&${stage === "allocation"})throw Error('FICTIONAL_RECEIPT_ALLOCATION_FAILED');
+ const h=await original(...args);
+ if(receipt&&${stage === "write"})h.writeFile=async()=>{throw Error('FICTIONAL_RECEIPT_WRITE_FAILED');};
+ if(receipt&&${stage === "readback"}){const read=h.read.bind(h);h.read=async(...args)=>{const r=await read(...args);if(r.bytesRead)args[0][0]^=1;return r;};}
+ return h;}}));
+const {deliverHermesNamespace}=await import(${JSON.stringify(join(import.meta.dir, "delivery.ts"))});
+await deliverHermesNamespace(${JSON.stringify(f.contract)},${JSON.stringify(f.payload)});
+// Deliberately retain no stdout receipt: recovery must use only the durable namespace.
+`;
+      const child = Bun.spawn([process.execPath, "--no-env-file", "-e", code], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [status, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect({ status, stdout, stderr }).toEqual({ status: 0, stdout: "", stderr: "" });
+      const records = (
+        await readFile(join(f.namespace, ".namespace-delivery-journal.jsonl"), "utf8")
+      )
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line));
+      const terminal = records.at(-1);
+      expect(records.filter((row) => row.state === "terminal")).toHaveLength(1);
+      expect(terminal.state).toBe("terminal");
+      expect(terminal.status).toBe("partial");
+      expect(terminal.persistenceFailure).toBe(true);
+      expect(terminal.receiptOutcome).toBe("write-or-verification-failed");
+      expect(terminal.reason).toBe("DELIVERY_RECEIPT_PERSISTENCE_FAILED");
+      expect(terminal.receipt).toBeNull();
+      expect((await deliverHermesNamespace(f.contract, f.payload)).status).toBe("refused");
+      expect(hash(await readFile(f.legacy))).toBe(f.contract.legacyManifest.sha256);
+    },
+  );
+}
+
+test("a same-size atomically replaced executable pathname cannot stand in for the actual running image hash", async () => {
+  const f = await fixture(),
+    executable = join(f.parent, "fictional-bun"),
+    replacement = join(f.parent, "fictional-bun-replacement");
+  await copyFile(compiler.path, executable);
+  await chmod(executable, 0o700);
+  const replacementBytes = await readFile(compiler.path);
+  replacementBytes[replacementBytes.length - 1] ^= 1;
+  await writeFile(replacement, replacementBytes, { mode: 0o700 });
+  const code = `import {rename,realpath} from 'node:fs/promises';
+const {deliverHermesNamespace,namespacePayloadSha256}=await import(${JSON.stringify(join(import.meta.dir, "delivery.ts"))});
+const c=${JSON.stringify(f.contract)},p=${JSON.stringify(f.payload)};
+await rename(${JSON.stringify(replacement)},${JSON.stringify(executable)});
+c.compiler={path:${JSON.stringify(executable)},bytes:${replacementBytes.length},sha256:${JSON.stringify(hash(replacementBytes))}};
+p.provenance.compilerSha256=c.compiler.sha256;c.payloadSha256=namespacePayloadSha256(p);
+console.log(JSON.stringify({namedPath:await realpath(c.compiler.path),receipt:await deliverHermesNamespace(c,p)}));`;
+  const child = Bun.spawn([executable, "--no-env-file", "-e", code], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [status, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ]);
+  expect({ status, stderr }).toEqual({ status: 0, stderr: "" });
+  const observed = JSON.parse(stdout);
+  expect(observed.namedPath).toBe(executable);
+  expect(observed.receipt.reason).toBe("EXACT_RUNNING_DELIVERY_COMPILER_REQUIRED");
+  expect(observed.receipt.status).toBe("refused");
+  expect(await exists(f.namespace)).toBe(false);
+  expect(hash(await readFile(compiler.path))).toBe(compiler.sha256);
+});
+
+for (const mask of [0o777, 0o400, 0o077, 0o022]) {
+  test(
+    "isolated owner umask " + mask.toString(8) + " is preserved and cannot create mode000",
+    async () => {
+      const f = await fixture(),
+        before = process.umask();
+      const code = `const {deliverHermesNamespace}=await import(${JSON.stringify(join(import.meta.dir, "delivery.ts"))});
+process.umask(${mask});const before=process.umask();
+const receipt=await deliverHermesNamespace(${JSON.stringify(f.contract)},${JSON.stringify(f.payload)});
+console.log(JSON.stringify({before,after:process.umask(),receipt}));`;
+      const child = Bun.spawn([process.execPath, "--no-env-file", "-e", code], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [status, stdout, stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ]);
+      expect({ status, stderr }).toEqual({ status: 0, stderr: "" });
+      const result = JSON.parse(stdout);
+      expect(result.before).toBe(mask);
+      expect(result.after).toBe(mask);
+      expect(process.umask()).toBe(before);
+      if (mask & 0o700) {
+        expect(result.receipt.reason).toBe("DELIVERY_OWNER_PERMISSIONS_MASKED");
+        expect(await exists(f.namespace)).toBe(false);
+      } else {
+        expect(result.receipt.status).toBe("delivered-awaiting-owner-verification");
+        const directories = new Set([f.namespace]);
+        for (const entry of f.payload.files) {
+          let parent = dirname(join(f.namespace, entry.path));
+          while (parent !== f.parent) {
+            directories.add(parent);
+            parent = dirname(parent);
+          }
+        }
+        for (const path of directories) expect((await lstat(path)).mode & 0o7777).toBe(0o700);
+      }
+    },
+  );
+}
+
+for (const component of ["x".repeat(256), "€".repeat(86), "\ud800", "\udfff"]) {
+  test("unrepresentable or overlong encoded component refuses before the once fence", async () => {
+    const f = await fixture();
+    f.payload.files.at(-1)!.path = "data/" + component;
+    f.contract.payloadSha256 = namespacePayloadSha256(f.payload);
+    const receipt = await deliverHermesNamespace(f.contract, f.payload);
+    expect(receipt.status).toBe("refused");
+    expect(["DELIVERY_PATH_COMPONENT_LIMIT", "DELIVERY_ENCODED_PATH_REQUIRED"]).toContain(
+      receipt.reason ?? "",
+    );
+    expect(await exists(f.namespace)).toBe(false);
+  });
+}
+test("255-byte ASCII and UTF8 components remain valid with exact file names", async () => {
+  for (const component of ["x".repeat(255), "€".repeat(85)]) {
+    const f = await fixture();
+    f.payload.files.at(-1)!.path = "data/" + component;
+    f.contract.payloadSha256 = namespacePayloadSha256(f.payload);
+    expect((await deliverHermesNamespace(f.contract, f.payload)).status).toBe(
+      "delivered-awaiting-owner-verification",
+    );
+    expect(await exists(join(f.namespace, "data", component))).toBe(true);
+  }
+});
+test("encoded whole-path and alias component bounds are checked before namespace creation", async () => {
+  const f = await fixture();
+  f.payload.files.at(-1)!.path = "data/" + Array(5).fill("€".repeat(80)).join("/");
+  f.contract.payloadSha256 = namespacePayloadSha256(f.payload);
+  expect((await deliverHermesNamespace(f.contract, f.payload)).reason).toBe(
+    "DELIVERY_ENCODED_PATH_REQUIRED",
+  );
+  expect(await exists(f.namespace)).toBe(false);
+  const g = await fixture();
+  g.payload.aliases[0]!.path = "agent-platform/node_modules/" + "x".repeat(256);
+  g.contract.payloadSha256 = namespacePayloadSha256(g.payload);
+  expect((await deliverHermesNamespace(g.contract, g.payload)).reason).toBe(
+    "DELIVERY_PATH_COMPONENT_LIMIT",
+  );
+  expect(await exists(g.namespace)).toBe(false);
+});
+test("valid namespace plus artifact parents beyond2048 bytes use the consistent4095-byte directory bound", async () => {
+  const f = await fixture(),
+    parent = join(f.parent, ...Array(7).fill("p".repeat(240)));
+  await mkdir(parent, { recursive: true, mode: 0o700 });
+  f.namespace = join(parent, "new-source");
+  f.contract.namespace = f.namespace;
+  const s = await lstat(parent);
+  f.contract.parent = { dev: s.dev, ino: s.ino, uid: s.uid, gid: s.gid, mode: s.mode & 0o7777 };
+  const registration = f.payload.files.find((p) => p.path === "platform-source-registration.json")!;
+  const parsed = JSON.parse(Buffer.from(registration.base64, "base64").toString());
+  parsed.providerRoot = join(f.namespace, "agent-platform");
+  Object.assign(registration, file(registration.path, JSON.stringify(parsed) + "\n"));
+  f.payload.provenance.runtimeRegistrationSha256 = registration.sha256;
+  const data = f.payload.files.at(-1)!;
+  data.path = "data/" + Array(3).fill("d".repeat(150)).join("/") + "/original";
+  expect(Buffer.byteLength(dirname(join(f.namespace, data.path)))).toBeGreaterThan(2048);
+  f.contract.payloadSha256 = namespacePayloadSha256(f.payload);
+  expect((await deliverHermesNamespace(f.contract, f.payload)).status).toBe(
+    "delivered-awaiting-owner-verification",
+  );
+  expect(hash(await readFile(join(f.namespace, data.path)))).toBe(data.sha256);
+});
+test("otherwise valid bounded artifacts that cannot fit the complete journal refuse before claiming", async () => {
+  const f = await fixture(),
+    prefix = "data/" + Array(3).fill("x".repeat(255)).join("/");
+  for (let n = 0; n < 4080; n++)
+    f.payload.files.push(
+      file(prefix + "/" + String(n).padStart(6, "0") + "y".repeat(234) + "/f", ""),
+    );
+  f.contract.maxArtifactWrites = f.payload.files.length + f.payload.aliases.length;
+  f.contract.payloadSha256 = namespacePayloadSha256(f.payload);
+  const receipt = await deliverHermesNamespace(f.contract, f.payload);
+  expect(receipt.reason).toBe("DELIVERY_JOURNAL_PREFLIGHT_LIMIT");
+  expect(receipt.status).toBe("refused");
+  expect(receipt.namespaceCreated).toBe(false);
+  expect(receipt.claimDurable).toBe(false);
+  expect(await exists(f.namespace)).toBe(false);
+});
+test("journal preflight counts JSON escaping rather than unescaped path length", async () => {
+  const f = await fixture(),
+    prefix = "data/" + Array(3).fill('"'.repeat(255)).join("/");
+  for (let n = 0; n < 2100; n++)
+    f.payload.files.push(
+      file(prefix + "/" + String(n).padStart(6, "0") + '"'.repeat(234) + "/f", ""),
+    );
+  const directories = new Set<string>();
+  for (const entry of f.payload.files) {
+    let path = dirname(entry.path);
+    while (path !== ".") {
+      directories.add(path);
+      path = dirname(path);
+    }
+  }
+  const events = [
+    ...[...directories].map((path) => ({ kind: "directory", path })),
+    ...f.payload.files.map(({ path }) => ({ kind: "file", path })),
+  ];
+  let encoded = 0,
+    plain = 0;
+  for (const event of events)
+    for (const state of ["intent", "complete"]) {
+      const json = JSON.stringify({ state, ...event }) + "\n";
+      encoded += Buffer.byteLength(json);
+      plain += Buffer.byteLength(json.replaceAll('\\"', '"'));
+    }
+  expect(plain).toBeLessThan(16 * 1024 * 1024);
+  expect(encoded).toBeGreaterThan(16 * 1024 * 1024);
+  f.contract.maxArtifactWrites = f.payload.files.length + f.payload.aliases.length;
+  f.contract.payloadSha256 = namespacePayloadSha256(f.payload);
+  expect((await deliverHermesNamespace(f.contract, f.payload)).reason).toBe(
+    "DELIVERY_JOURNAL_PREFLIGHT_LIMIT",
+  );
+  expect(await exists(f.namespace)).toBe(false);
 });
 
 test("one-shot entry holds without a compiled contract and accepts no request-selected target", async () => {
