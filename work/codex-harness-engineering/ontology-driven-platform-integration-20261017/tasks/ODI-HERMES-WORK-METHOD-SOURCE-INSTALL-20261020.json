@@ -1,0 +1,56 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 4,
+    "taskId": "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-20261020"
+  },
+  "title": "Install only an exact reviewed Common1e528 guarded work-method reader projection in the owned serving349 runtime",
+  "nextAction": "Install the exact reviewed guarded reader closure once in the selected new namespace; preserve existing runtime and controls.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-COMMON-WORK-METHOD-CORE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-WORK-METHOD-COVERAGE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-WORK-METHOD-NATIVE-COMPATIBILITY-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-ROOT-COMMON-WORK-METHOD-BOOTSTRAP-20261020",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-COMMON-FIRST-20261020",
+    "ODI-DECISION-LONG-AUTONOMY-20261020"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [
+    "ODI-HERMES-WORK-METHOD-SOURCE-INSTALL-ONCE-20261020"
+  ],
+  "verificationEvidenceIds": []
+}
