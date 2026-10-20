@@ -567,7 +567,7 @@ for (const component of ["x".repeat(256), "€".repeat(86), "\ud800", "\udfff"])
     const receipt = await deliverHermesNamespace(f.contract, f.payload);
     expect(receipt.status).toBe("refused");
     expect(["DELIVERY_PATH_COMPONENT_LIMIT", "DELIVERY_ENCODED_PATH_REQUIRED"]).toContain(
-      receipt.reason,
+      receipt.reason ?? "",
     );
     expect(await exists(f.namespace)).toBe(false);
   });
