@@ -19,9 +19,9 @@
   "title": "Implement a stable explicit session-source route while preserving full-event Hermes method semantics",
   "nextAction": "Implement Input ODI-HERMES-WORK-METHOD-SESSION-SOURCE-INTEGRATION-SCOPE-20261020 #/content: selected six session-source design paths plus exactly two native-hermes-context registry hashes in architecture/capability-source-owners.json (53 pins unchanged). Preserve old v1/full-event evaluator/caps and acyclic U0 -> Q -> U1 -> R. Fresh own Root c:task before these seven paths; no native/config/provider/store/session/install/use or general release.",
   "state": {
-    "execution": "planned",
-    "verification": "pending",
-    "localAudit": "intent-durable",
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
     "sharedAudit": "pending",
     "formalCompletion": "pending"
   },
@@ -54,5 +54,7 @@
   ],
   "effectIds": [],
   "pendingEffectIds": [],
-  "verificationEvidenceIds": []
+  "verificationEvidenceIds": [
+    "ODI-HERMES-WORK-METHOD-SESSION-SOURCE-VERIFICATION-20261020"
+  ]
 }
