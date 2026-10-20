@@ -1,0 +1,15 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "evidence",
+  "id": "ODI-ROOT-COMMON-WORK-METHOD-BOOTSTRAP-VERIFICATION-20261020",
+  "evidenceKind": "verification",
+  "source": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-ROOT-COMMON-WORK-METHOD-BOOTSTRAP-RESULT-20261020.json",
+    "fragment": "#/content/verification",
+    "sha256": "e83b1a90521b61b867cd93174374cb3301849dc3199b47d595062909af027543"
+  }
+}

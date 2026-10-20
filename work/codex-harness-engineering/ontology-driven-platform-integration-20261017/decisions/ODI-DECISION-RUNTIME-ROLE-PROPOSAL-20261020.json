@@ -1,0 +1,25 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-RUNTIME-ROLE-PROPOSAL-20261020",
+  "status": "accepted",
+  "answer": "Retain BOTH VPS Host and herdr-runtime with explicit purpose separation.",
+  "meaning": "At the earlier03:30 capture the user chose retaining BOTH VPS Host and herdr-runtime with explicit purpose separation; this exact answer is preserved. Earlier pending interview/staging fields describe that earlier source boundary. Later READY Input ODI-USER-RUNTIME-ROLE-PROPOSAL-READY-20261020 and actual Root-authored ODI-DECISION-RUNTIME-ROLE-PROPOSAL-READY-20261020 add seven actual inputs and differing authority, integrated workflow/Ontology/design-judgment direction and deferred storage, without accepting physical implementation architecture. Extend the SAME successor topology/consolidation Task through existing owners; exact source review8aa… is complete with required qualifications; Root owns current source-proposal-only package admission. No current-MAIN investigation, proposal-derived migration/deletion/restart, lifecycle effect, source/native/domain owner transfer or native acceptance. Original/supplement/Korean structural reasons and separately guarded later successor source consolidation, common finite adoption plus ACK/CAS/genuine Goal-plan, full ODI WHY/owners/9fences126consumed5uncertain/USD14unknown/current controls, serving349, oldLead-only conditionalPause/fallback and active successor Goal remain.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-RUNTIME-ROLE-PROPOSAL-20261020.json",
+    "fragment": "#/content/actualInterviewAnswer"
+  },
+  "selectionContext": {
+    "text": "User-requested deeper proposal; correlation RUNTIME_ROLE_PROPOSAL_20261020, extends the existing DIR_TOPOLOGY_20261020 directory/repo-consolidation scope rather than creating a duplicate by default. User wants an interview-driven proposal defining the VPS Host vs herdr-runtime responsibilities, for the successor Orchestrator to adopt via common-harness IDs and related work. Actual interview answer so far: retain BOTH host and container with explicit purpose separation; other role/storage answers are pending. No migration/deletion/restart is authorized by this proposal drafting task.\n\nImportant correction from read-only source audit: /docker/herdr-runtime/deployment/README.md already defines dedicated SSH+Herdr+Codex remote USER runtime (palantirkc UID1000), isolated from Hermes, hostroot/Tailscale as jump endpoint. Problem is declared design versus actual root-host-centered use, canonical source/working-copy ownership, entrypoint and session-context ambiguity. healthy currently checks SSH readiness; only tini/supervisord/sshd are running, so absence of Herdr is compatible with intended cold-readiness. Host root nativeCLI installations do not provision the container. Container helper codex-herdr explicitly uses codex --no-daemon to preserve pane context; generic codex/herdr-agent-start may need explicit launch semantics. Source Compose includes stdin overlay provenance to reconcile before rebuilding.\n\nI will prepare a bounded typed proposal/evidence/interview package under host /home/palantirkc/operations (staging only, not a new authoritative Work/Memory store), preserving facts versus user choices versus recommendations and excluding credentials/user-data contents. Please provide the actual existing logical Task/Work IDs, canonical source-owned handoff entrypoint and admission/update command contract for this scope at a natural checkpoint. If not yet registered, register/extend it using the existing common harness and make successor ownership explicit. Do not infer a selected architecture before interview answers. Include prior hermes-profile-* repo consolidation requirement and existing owner/effect fences; retain native roles and pending old-Lead-only conditional Pause instruction unchanged. Reply RUNTIME_ROLE_PROPOSAL_20261020_REPLY with IDs and canonical locators only; no transcript restatement.",
+    "source": {
+      "kind": "snapshot",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-RUNTIME-ROLE-PROPOSAL-20261020.json",
+      "fragment": "#/content/originalText"
+    }
+  },
+  "supersedes": []
+}
