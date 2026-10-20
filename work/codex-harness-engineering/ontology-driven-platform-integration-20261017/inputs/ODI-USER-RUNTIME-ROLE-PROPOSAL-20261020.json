@@ -1,0 +1,98 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-USER-RUNTIME-ROLE-PROPOSAL-20261020",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "native-user-message",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/root-bootstrap-result-and-continuity.authoring.actual.json"
+  },
+  "content": {
+    "schema": "odi.actual-user-runtime-role-proposal-source.v1",
+    "correlation": "RUNTIME_ROLE_PROPOSAL_20261020",
+    "sameTaskId": "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020",
+    "capturedAtUtc": "2026-10-20T03:30:56.318Z",
+    "originalText": "User-requested deeper proposal; correlation RUNTIME_ROLE_PROPOSAL_20261020, extends the existing DIR_TOPOLOGY_20261020 directory/repo-consolidation scope rather than creating a duplicate by default. User wants an interview-driven proposal defining the VPS Host vs herdr-runtime responsibilities, for the successor Orchestrator to adopt via common-harness IDs and related work. Actual interview answer so far: retain BOTH host and container with explicit purpose separation; other role/storage answers are pending. No migration/deletion/restart is authorized by this proposal drafting task.\n\nImportant correction from read-only source audit: /docker/herdr-runtime/deployment/README.md already defines dedicated SSH+Herdr+Codex remote USER runtime (palantirkc UID1000), isolated from Hermes, hostroot/Tailscale as jump endpoint. Problem is declared design versus actual root-host-centered use, canonical source/working-copy ownership, entrypoint and session-context ambiguity. healthy currently checks SSH readiness; only tini/supervisord/sshd are running, so absence of Herdr is compatible with intended cold-readiness. Host root nativeCLI installations do not provision the container. Container helper codex-herdr explicitly uses codex --no-daemon to preserve pane context; generic codex/herdr-agent-start may need explicit launch semantics. Source Compose includes stdin overlay provenance to reconcile before rebuilding.\n\nI will prepare a bounded typed proposal/evidence/interview package under host /home/palantirkc/operations (staging only, not a new authoritative Work/Memory store), preserving facts versus user choices versus recommendations and excluding credentials/user-data contents. Please provide the actual existing logical Task/Work IDs, canonical source-owned handoff entrypoint and admission/update command contract for this scope at a natural checkpoint. If not yet registered, register/extend it using the existing common harness and make successor ownership explicit. Do not infer a selected architecture before interview answers. Include prior hermes-profile-* repo consolidation requirement and existing owner/effect fences; retain native roles and pending old-Lead-only conditional Pause instruction unchanged. Reply RUNTIME_ROLE_PROPOSAL_20261020_REPLY with IDs and canonical locators only; no transcript restatement.",
+    "actualInterviewAnswer": "Retain BOTH VPS Host and herdr-runtime with explicit purpose separation.",
+    "pendingInterviewAnswers": [
+      "Other runtime roles",
+      "Storage/working-copy/source ownership choices"
+    ],
+    "selectedArchitecture": null,
+    "successorOnly": true,
+    "proposalDraftingAuthorizesMigrationDeletionRestart": false,
+    "sourceCapture": {
+      "kind": "snapshot",
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/RUNTIME_ROLE_PROPOSAL_20261020.source.actual.json",
+      "sha256": "4dcb2d42442bafe006d8cee97d3b7f5ac9a3a4880f1e4f6104d1b4ac6d4c1b42"
+    },
+    "attribution": "Actual user request relay and actual interview answer supplied to current MAIN. Source-audit observations remain attributed source statements, not new helper runtime probes.",
+    "relatedSourceRecords": [
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020.json",
+        "sha256": "1605b6745deddba634dff0f3b1bd1924ca5dcf19fdbef9c4d172e04d74031b60"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-OLD-LEAD-CONDITIONAL-PAUSE-20261020.json",
+        "sha256": "734111051a4477071dc2ad20cef8037162c58d0aeafbbda4d0427a1154dd4095"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-OLD-LEAD-CONDITIONAL-PAUSE-20261020.json",
+        "sha256": "16d9a7edc5954292062385c83712b87aaa0148dcacf3aae092387080303ea934"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-DIR-TOPOLOGY-20261020.json",
+        "sha256": "e0cc13bfb7130377a59dd42d570fd24220eb66556df0f1c7533eb83255d20ad3"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-DIR-TOPOLOGY-SCOPE-EXPANSION-20261020.json",
+        "sha256": "a41311c3c2117dae8505effdf42bcaec7517d8fa98cc552fe31a553a39fb2664"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-DIR-TOPOLOGY-STRUCTURAL-CONSOLIDATION-20261020.json",
+        "sha256": "e4ba3def263ffd795fd849c7e01b7543d9aaa03cddaa71cd6056672646aec77c"
+      }
+    ],
+    "admissionUpdateContract": {
+      "kind": "snapshot",
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/DIR_TOPOLOGY_20261020.admission-update-contract.actual.json",
+      "sha256": "f952e7dccfaecae5a990e9dcb14cd70718a5210111ec48b6f2ae1932566742ec"
+    },
+    "stagingPackage": {
+      "requestedStagingRoot": "/home/palantirkc/operations",
+      "path": null,
+      "sha256": null,
+      "currentness": "pending-source-package",
+      "authoritativeWorkOrMemoryStore": false,
+      "acceptedArchitecture": null
+    },
+    "priorStructuralConsolidationAuthority": "Prior actual successor-owned source planning/consolidation authority in ODI-DECISION-DIR-TOPOLOGY-STRUCTURAL-CONSOLIDATION-20261020 remains separate and guarded. This runtime-role proposal drafting grants no additional migration/deletion/restart permission.",
+    "currentMainInvestigatedOrMigrated": false,
+    "wholeWorkComplete": false,
+    "originalStagingAndPendingFieldsAreHistoricalAtEarlierCapture": true,
+    "latestReadyUserInputId": "ODI-USER-RUNTIME-ROLE-PROPOSAL-READY-20261020",
+    "latestSourceOwnerPackageInputId": "ODI-RUNTIME-ROLE-PROPOSAL-SOURCE-20261020"
+  }
+}

@@ -16,8 +16,8 @@
     "planRevision": 4,
     "taskId": "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
   },
-  "title": "Successor-owned directory and repository structural consolidation with topology proof",
-  "nextAction": "SUCCESSOR ONLY. After actual common-harness adoption/finite coverage and exact receiver ACK/CAS sole ownership with genuine successor Goal/plan, read both ODI-USER-DIR-TOPOLOGY-20261020 and ODI-USER-DIR-TOPOLOGY-SCOPE-EXPANSION-20261020, originals/supplement/testimony and related ODI-07/repository-direction/owner records. Establish canonical host/container/user/path/mount and repository destination ownership; distinguish source hermes-profile-* repositories from native runtime profiles. Plan and execute authorized owner-aligned source structural consolidation, retaining necessary content/history/evidence and updating consumers/remotes/worktrees/entrypoints; address other reasons from existing first-party records without inventing them. Verify adoption/reference integrity before retiring obsolete source paths. Preserve whole ODI WHY/owners/fences/USD14unknown, Hermes default Lead R&D/Ontology/measurement and native profiles/user data/credentials/serving349. No current-MAIN migration or blind directory/history/production-profile deletion. Current MAIN registers/links/checkpoints and continues its unchanged Goal/process until safe handoff. Read source-link clarification Input ODI-DIR-TOPOLOGY-SOURCE-LINK-CLARIFICATION-20261020 for exact setup evidence; its matching canonical setup Task remains unknown.",
+  "title": "Successor-owned runtime, directory and repository integration with structural consolidation",
+  "nextAction": "SUCCESSOR ONLY after actual common-harness finite adoption and exact ACK/CAS sole ownership with genuine successor Goal/plan. Read Inputs ODI-USER-DIR-TOPOLOGY-20261020, ODI-USER-DIR-TOPOLOGY-SCOPE-EXPANSION-20261020 and admitted ODI-RUNTIME-ROLE-PROPOSAL-SOURCE-20261020 (exactff55proposal,7verbatim classified inputs,6dependent proposal packages,8UNVERIFIED criteria,3source qualifications), plus CLI source-link clarification and existing ODI-07/repository-direction/owner records. Integrate canonical host/container/user/path/mount/repo ownership, runtime/native-context and Palantir-style data/logic/action/security consumers with necessary hermes-profile-* source structural consolidation/history/evidence/consumer/remotes/worktree/entrypoint updates. Retain BOTH environments and explicitpurpose; compare source sharing using holisticengineeringjudgment. Proposed placements/storage are not user implementation acceptance; validate actual UID/mount/host-action and sibling access mechanisms, never claim sandbox from clones/sharedUID/home. Verify adoption/reference closure before obsolete-source retirement. Preserve defaultHermesLead R&D/Ontology/measurement and nativeprofiles/data/credentials, wholeODI WHY/owners/9fences5unknown/USD14unknown/serving349/currentcontrols/SSH-Tailscale. No currentMAIN substantive topology/migration or blind history/profile/directory deletion; no deployments/migrations/model evaluation authorized by this new proposal. Preserve separate conditional oldLeadPause/fallback; successorGoalcontinues. Also retain historical initial runtime-role Input ODI-USER-RUNTIME-ROLE-PROPOSAL-20261020 and accepted BOTH-purpose-separation Decision. Its earlier pending interview/staging fields are historical; latest actual READY Input/Root source package govern current seven classified inputs. Recover original conditional Pause Decision ODI-DECISION-OLD-LEAD-CONDITIONAL-PAUSE-20261020 and fallback Input ODI-USER-OLD-LEAD-PAUSE-FALLBACK-20261020/Decision ODI-DECISION-OLD-LEAD-PAUSE-FALLBACK-20261020. Only old Lead thread01a156bc-f195-7f42-b71b-43e786bbb04f self-Pauses after verified successor ACK/CAS/genuine Goal-plan, inflight reconciliation and old checkpoint/closeout. Queue existing infrastructure thread01a1571b-2ee3-7832-8dd6-5894635f40b4 only if actual self-Pause is unavailable after that verified condition; no guessed pane, duplicate action, native-store/control changes or early Pause. Successor Goal continues.",
   "state": {
     "execution": "planned",
     "verification": "pending",
@@ -37,7 +37,11 @@
     "ODI-DECISION-COMMON-FIRST-20261020",
     "ODI-DECISION-LONG-AUTONOMY-20261020",
     "ODI-DECISION-DIR-TOPOLOGY-STRUCTURAL-CONSOLIDATION-20261020",
-    "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
+    "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY",
+    "ODI-DECISION-RUNTIME-ROLE-PROPOSAL-READY-20261020",
+    "ODI-DECISION-RUNTIME-ROLE-PROPOSAL-20261020",
+    "ODI-DECISION-OLD-LEAD-CONDITIONAL-PAUSE-20261020",
+    "ODI-DECISION-OLD-LEAD-PAUSE-FALLBACK-20261020"
   ],
   "effectIds": [],
   "pendingEffectIds": [],

@@ -1,0 +1,1236 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-RUNTIME-ROLE-PROPOSAL-SOURCE-20261020",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "Actual sole Root source-owner admission after exact package/source review; original staging package unchanged"
+  },
+  "content": {
+    "correlation": "RUNTIME_ROLE_PROPOSAL_20261020",
+    "sourceAdmission": {
+      "status": "admitted-immutable-proposal-and-evidence-for-existing-successor-task",
+      "actualRootThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+      "atUtc": "2026-10-20T03:53:55.608194Z",
+      "existingLogical": {
+        "domainId": "native-harness",
+        "projectId": "codex-harness-engineering",
+        "workId": "ontology-driven-platform-integration-20261017",
+        "issueId": "ODI-ISSUE-20261017",
+        "specId": "ODI-SPEC",
+        "specRevision": 1,
+        "planId": "ODI-PLAN",
+        "planRevision": 4,
+        "taskId": "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
+      },
+      "proposalInputId": "ODI-RUNTIME-ROLE-PROPOSAL-SOURCE-20261020",
+      "originalProposalSha256": "ff55aa7c602f019fb1b3312fadbb53ffe98193660425703e1aa0dcc52889a2ab",
+      "meaning": "Root has read the exact proposal, all seven interview inputs, source-reference review and all qualifications and binds them to this existing Task. Source admission preserves proposals and original input authority; it is not user architecture acceptance, native adoption, general release, formal completion or new effect authority.",
+      "actualImplementationAcceptance": null,
+      "selectedStorageMigration": null,
+      "formalSixSubtaskIds": null,
+      "formalSubtaskReason": "Six work.* keys remain proposal-local dependent work packages; current contracts require no duplicate Task or new Work merely to retain this proposal. Successor may decompose through the existing owner contract if needed.",
+      "successorOnlyExecution": true,
+      "trigger": "Actual common-harness finite adoption and exact sole-successor ACK/CAS/genuine Goal-plan handoff. Current MAIN does no substantive topology/consolidation/pilot/migration work."
+    },
+    "originalPackage": {
+      "artifactType": "infrastructure-runtime-role-proposal",
+      "artifactVersion": "1.0.0",
+      "createdAtUtc": "2026-10-20T03:38:34.257654+00:00",
+      "status": "review-ready-for-successor",
+      "title": "Operational Ontology boundaries for host coordination, project execution and native Hermes",
+      "purpose": "Make an integrated multi-CLI/Herdr/Hermes development workflow understandable, governable and verifiable across host and container runtimes while removing accidental directory/repository duplication.",
+      "registration": {
+        "formalProposalId": null,
+        "formalWorkId": null,
+        "formalTaskId": null,
+        "status": "awaiting-existing-common-harness-owner-admission",
+        "knownOwnerProjectReference": {
+          "id": "vps-operations:project:manifest",
+          "projectId": "vps-operations",
+          "domainId": "infrastructure",
+          "path": "/home/palantirkc/projects/vps-operations/project.json"
+        },
+        "requestCorrelations": [
+          "DIR_TOPOLOGY_20261020",
+          "RUNTIME_ROLE_PROPOSAL_20261020"
+        ],
+        "rule": "Correlations and artifact-local keys are not formal logical IDs. Extend the admitted existing scope if appropriate; otherwise allocate linked IDs through its actual source owner.",
+        "stagingOnly": true
+      },
+      "authority": {
+        "inputRef": "source.interview",
+        "authorizedNow": [
+          "Read-only deployment/runtime investigation",
+          "Interview and architecture recommendations",
+          "Write and deliver this proposal package"
+        ],
+        "notAuthorizedByThisProposal": [
+          "Container recreate or new deployments",
+          "Source/repository/data migration or deletion",
+          "Credential sharing or user-data inspection",
+          "Native trust/approval/model changes",
+          "Current Goal lifecycle changes"
+        ],
+        "separateExistingInstruction": "The prior conditional Pause of old Lead only remains a separate native handoff instruction; successor Goal continues. It is not executed by this proposal."
+      },
+      "sources": [
+        {
+          "key": "source.observations",
+          "kind": "observed-runtime-metadata",
+          "path": "/home/palantirkc/operations/runtime-role-proposal-20261020/evidence/observations.json",
+          "sha256": "0b61e576a896a7961c7b4a47b1ac3a71d3cc1b615e808efc28177e08022b5e72"
+        },
+        {
+          "key": "source.interview",
+          "kind": "actual-current-user-input",
+          "path": "/home/palantirkc/operations/runtime-role-proposal-20261020/interview.json",
+          "sha256": "d610db1863e5551f8ad512ba38be519ad267aa4e3e31ed145f918ce68fc28344"
+        },
+        {
+          "key": "deployment.README.md",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/README.md",
+          "sha256": "d738c576868f10f867ac6adbe1385f07d18381c3132a035e47a7fff09d43dbcb"
+        },
+        {
+          "key": "deployment.Dockerfile",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/Dockerfile",
+          "sha256": "43f6d37c0ad06fa520c8bb72703cc16205d3d17234e5f6999478c790b7eb2d33"
+        },
+        {
+          "key": "deployment.compose.yaml",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/compose.yaml",
+          "sha256": "d20152c4d3363eb33826a24d9ecd998ba58affa19f27717fdd69c8d11def92fb"
+        },
+        {
+          "key": "deployment.entrypoint.sh",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/entrypoint.sh",
+          "sha256": "f07b5617b56db5a698caf4c3d14d1049f306f37b9b3bb49708db02e6d43c7075"
+        },
+        {
+          "key": "deployment.supervisord.conf",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/supervisord.conf",
+          "sha256": "3f1c5c60723361239efd351b620183121c1a10a0cfe19ff0281fe54d9282e369"
+        },
+        {
+          "key": "deployment.sshd_config",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/sshd_config",
+          "sha256": "bb30f666c3849c3edd7c6260405f09bbcbe8809aa35238e6d109fd1cfb11615f"
+        },
+        {
+          "key": "deployment.profile.sh",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/profile.sh",
+          "sha256": "4bbc93d5bc4f3080fca37b0bb63433e59e7961eec13b9f9140bf6bbf11fcade6"
+        },
+        {
+          "key": "deployment.codex-herdr",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/codex-herdr",
+          "sha256": "757e37d5dda3b5c8c96cbefdc27a21d35dae78971688348624b85decc0d3f06f"
+        },
+        {
+          "key": "deployment.herdr-codex",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/herdr-codex",
+          "sha256": "e2fafdacc1f76416a8ba3aa7d6de09981033446d51b368ea47be257ad70ed3b5"
+        },
+        {
+          "key": "deployment.healthcheck.sh",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/healthcheck.sh",
+          "sha256": "cc3821c4457cb42e3afbe77c24c2c6926bd2b495f045b274fc1795fc395c5fec"
+        },
+        {
+          "key": "deployment.versions.json",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/versions.json",
+          "sha256": "5d589441b69fbe152ca1aa6dd18da0f0e69f35267d945008b3723c5f292e9146"
+        },
+        {
+          "key": "deployment.herdr-runtime.service",
+          "kind": "deployment-source",
+          "path": "/docker/herdr-runtime/deployment/herdr-runtime.service",
+          "sha256": "9c70c85d1d7e2eff76c702812776b85d528096766897207ea5359f7aa9f6f20c"
+        },
+        {
+          "key": "public.palantir-overview",
+          "kind": "primary-public-documentation",
+          "url": "https://www.palantir.com/docs/foundry/ontology/overview/",
+          "retrievedAtUtc": "2026-10-20T03:34:31.962360+00:00",
+          "sha256": "1aeba4763be683a58a1204235c34d13d3f954b462570daa683305b3bd2de6406"
+        },
+        {
+          "key": "public.palantir-system",
+          "kind": "primary-public-documentation",
+          "url": "https://www.palantir.com/docs/foundry/architecture-center/ontology-system/",
+          "retrievedAtUtc": "2026-10-20T03:34:32.025115+00:00",
+          "sha256": "ddc1dc914d5e8a49f52fb73c6c5aad9e6145d8c4f6d1cf4b7ec4d371b7f65a99"
+        },
+        {
+          "key": "public.palantir-action-criteria",
+          "kind": "primary-public-documentation",
+          "url": "https://www.palantir.com/docs/foundry/action-types/submission-criteria/",
+          "retrievedAtUtc": "2026-10-20T03:34:32.160027+00:00",
+          "sha256": "f1f67d357088465777267fb9c9bd488ec9a8c835b3611a14f45ab7601131a2ff"
+        },
+        {
+          "key": "public.palantir-action-permissions",
+          "kind": "primary-public-documentation",
+          "url": "https://www.palantir.com/docs/foundry/action-types/permissions/",
+          "retrievedAtUtc": "2026-10-20T03:34:32.271290+00:00",
+          "sha256": "d1b9273e5fae7be3dd5822a940b29c3a4719ffc2fa573dd52ec9b853a42ed1e5"
+        },
+        {
+          "key": "public.docker-bind",
+          "kind": "primary-public-documentation",
+          "url": "https://docs.docker.com/engine/storage/bind-mounts/",
+          "retrievedAtUtc": "2026-10-20T03:34:32.519774+00:00",
+          "sha256": "76fc1a9a8e6eb95a3f66c631f7ce5092d27c730acef27089651d79a00c19e35c"
+        },
+        {
+          "key": "public.git-worktree",
+          "kind": "primary-public-documentation",
+          "url": "https://git-scm.com/docs/git-worktree",
+          "retrievedAtUtc": "2026-10-20T03:34:32.679864+00:00",
+          "sha256": "5a2982e574d7b64075a93d86eb01fd0f546908d756e34a64457bd6d0b671ace4"
+        }
+      ],
+      "claims": [
+        {
+          "key": "claim.host-control",
+          "status": "observed",
+          "statement": "The observed native Codex and Herdr processes run in the host mount namespace. Existing host root orchestration is an actual execution path.",
+          "evidenceRefs": [
+            "source.observations"
+          ]
+        },
+        {
+          "key": "claim.declared-container-role",
+          "status": "source_declared",
+          "statement": "The deployment README defines a dedicated non-root SSH/Herdr/Codex user runtime and describes a container-centered remote Orchestrator entrypoint.",
+          "evidenceRefs": [
+            "deployment.README.md"
+          ]
+        },
+        {
+          "key": "claim.actual-user-purpose",
+          "status": "user_required",
+          "statement": "The user wants one integrated Orchestrator workflow across Codex, Claude, Grok, Muse, Antigravity and native Hermes TUI, preserving host and container environments with purpose boundaries.",
+          "evidenceRefs": [
+            "source.interview"
+          ]
+        },
+        {
+          "key": "claim.role-gap",
+          "status": "assistant_inference",
+          "statement": "The main problem is an ungoverned gap among declared entrypoint, current host-centered operation, execution placement, workspace provenance and native session ownership; absence of an original design is not established.",
+          "evidenceRefs": [
+            "source.observations",
+            "deployment.README.md",
+            "source.interview"
+          ]
+        },
+        {
+          "key": "claim.same-spelling-different-storage",
+          "status": "observed",
+          "statement": "Host /home/palantirkc and container /home/palantirkc have different backing directories and accounts. The container home binds host /docker/herdr-runtime/home, not host /home/palantirkc.",
+          "evidenceRefs": [
+            "source.observations",
+            "deployment.compose.yaml"
+          ]
+        },
+        {
+          "key": "claim.health-scope",
+          "status": "source_declared",
+          "statement": "Healthy means SSH bootstrap readiness; cold readiness with no Herdr daemon is allowed. Container health alone does not verify agent use, hooks, serving or Goal recovery.",
+          "evidenceRefs": [
+            "deployment.healthcheck.sh",
+            "deployment.README.md",
+            "source.observations"
+          ]
+        },
+        {
+          "key": "claim.launch-context",
+          "status": "observed",
+          "statement": "The infrastructure thread reports inherited HERDR_PANE_ID w3:p1; a previous native pane lookup returned pane_not_found. This is evidence of stale context, not proof that all hooks fail. The container helper explicitly launches codex --no-daemon to retain pane context.",
+          "evidenceRefs": [
+            "source.observations",
+            "deployment.codex-herdr",
+            "deployment.README.md"
+          ]
+        },
+        {
+          "key": "claim.ontology-meaning",
+          "status": "source_declared",
+          "statement": "Palantir describes Ontology as operational integration of data, logic, action and security, including real objects/links, executable behavior and governed state change. A folder taxonomy or ID table alone is insufficient.",
+          "evidenceRefs": [
+            "public.palantir-overview",
+            "public.palantir-system",
+            "public.palantir-action-criteria",
+            "public.palantir-action-permissions"
+          ]
+        },
+        {
+          "key": "claim.local-platform-gap",
+          "status": "not_verified",
+          "statement": "This proposal does not establish that the local common harness implements the full Palantir product or currently enforces every proposed action policy. Existing semantic owners and native executors must be inspected before extension.",
+          "evidenceRefs": [
+            "source.interview"
+          ]
+        },
+        {
+          "key": "claim.image-provenance",
+          "status": "observed",
+          "statement": "The runtime compose_files label includes stdin overlay input and the compose image label differs from the live immutable image ID. Reconcile original deployment receipts before rebuild; these observations alone do not establish corruption or drift.",
+          "evidenceRefs": [
+            "source.observations"
+          ]
+        },
+        {
+          "key": "claim.task-isolation-not-established",
+          "status": "not_verified",
+          "statement": "A shared UID1000 and whole-home RW bind do not establish task-to-task or project-to-project filesystem isolation. Task-bound instructions must not be reported as an OS-enforced per-task sandbox.",
+          "evidenceRefs": [
+            "source.observations",
+            "deployment.compose.yaml",
+            "deployment.README.md"
+          ]
+        }
+      ],
+      "problems": [
+        {
+          "key": "problem.role-placement",
+          "severity": "high",
+          "claimRefs": [
+            "claim.host-control",
+            "claim.declared-container-role",
+            "claim.actual-user-purpose",
+            "claim.role-gap"
+          ],
+          "failureMode": "An agent chooses execution environment from shell inheritance, alias or folder name rather than a Task-bound role and capability contract.",
+          "impact": "Wrong permissions, duplicate setup, unclear handoff and uncertain operational ownership."
+        },
+        {
+          "key": "problem.path-source-identity",
+          "severity": "high",
+          "claimRefs": [
+            "claim.same-spelling-different-storage"
+          ],
+          "failureMode": "Same project/path names are treated as the same repository or current revision.",
+          "impact": "Edits or tests run against an unintended checkout; source consolidation can retire a still-used path."
+        },
+        {
+          "key": "problem.session-context",
+          "severity": "high",
+          "claimRefs": [
+            "claim.launch-context",
+            "claim.health-scope"
+          ],
+          "failureMode": "Pane identity, native thread, Goal and running-server identity are conflated, or inherited daemon context is assumed fresh.",
+          "impact": "Hook/session restore/control may address the wrong pane, or readiness may be mistaken for continued work."
+        },
+        {
+          "key": "problem.ontology-enforcement",
+          "severity": "high",
+          "claimRefs": [
+            "claim.ontology-meaning",
+            "claim.local-platform-gap"
+          ],
+          "failureMode": "Typed IDs/relations are counted as permission enforcement or completed runtime adoption.",
+          "impact": "The recorded architecture and real effects can diverge even when documents validate."
+        },
+        {
+          "key": "problem.lifecycle-provenance",
+          "severity": "medium",
+          "claimRefs": [
+            "claim.image-provenance",
+            "claim.health-scope"
+          ],
+          "failureMode": "One YAML, image tag or healthy status is treated as a complete reproducible execution or recovery contract.",
+          "impact": "Rebuild/restart loses unrecorded overlay or state and creates false recovery expectations."
+        },
+        {
+          "key": "problem.scope-vs-enforcement",
+          "severity": "high",
+          "claimRefs": [
+            "claim.task-isolation-not-established",
+            "claim.local-platform-gap"
+          ],
+          "failureMode": "A Task metadata scope is mistaken for filesystem enforcement, or testing an excluded host path is treated as proof that sibling projects are isolated.",
+          "impact": "Agents with the same user/home can have broader access than a proposed Task action policy describes."
+        }
+      ],
+      "observedEntities": [
+        {
+          "key": "runtime.host",
+          "kind": "RuntimeEnvironment",
+          "state": "observed",
+          "attributes": {
+            "host": "srv1873899",
+            "executionPrincipal": "root",
+            "home": "/root",
+            "mountNamespace": "mnt:[4026531841]"
+          },
+          "evidenceRefs": [
+            "source.observations"
+          ]
+        },
+        {
+          "key": "runtime.herdr-container",
+          "kind": "RuntimeEnvironment",
+          "state": "observed",
+          "attributes": {
+            "name": "herdr-runtime",
+            "executionPrincipal": "palantirkc for SSH worker sessions; root for bootstrap daemons",
+            "home": "/home/palantirkc",
+            "backingHome": "/docker/herdr-runtime/home"
+          },
+          "evidenceRefs": [
+            "source.observations",
+            "deployment.README.md"
+          ]
+        },
+        {
+          "key": "runtime.hermes-container",
+          "kind": "RuntimeEnvironment",
+          "state": "observed",
+          "attributes": {
+            "name": "hermes-agent-2q3y-hermes-serve-1",
+            "nativeOwner": "Hermes runtime/default-profile Lead",
+            "persistentDataHostPath": "/docker/hermes-agent-2q3y/data",
+            "persistentDataContainerPath": "/opt/data"
+          },
+          "evidenceRefs": [
+            "source.observations"
+          ]
+        },
+        {
+          "key": "workspace.host-projects",
+          "kind": "WorkspaceRoot",
+          "state": "observed",
+          "attributes": {
+            "runtimeRef": "runtime.host",
+            "path": "/home/palantirkc/projects"
+          },
+          "evidenceRefs": [
+            "source.observations"
+          ]
+        },
+        {
+          "key": "workspace.container-shared",
+          "kind": "WorkspaceRoot",
+          "state": "observed",
+          "attributes": {
+            "runtimeRef": "runtime.herdr-container",
+            "path": "/home/palantirkc/code/shared",
+            "backingHostPath": "/docker/herdr-runtime/home/code/shared"
+          },
+          "evidenceRefs": [
+            "source.observations"
+          ]
+        },
+        {
+          "key": "service.host-herdr",
+          "kind": "NativeCoordinationService",
+          "state": "observed",
+          "attributes": {
+            "runtimeRef": "runtime.host",
+            "nativeOwner": "Herdr"
+          },
+          "evidenceRefs": [
+            "source.observations"
+          ]
+        },
+        {
+          "key": "owner.common-harness",
+          "kind": "SemanticSourceOwner",
+          "state": "existing-owner-reference",
+          "attributes": {
+            "projectPath": "/home/palantirkc/projects/agent-platform",
+            "rule": "Reuse current common-harness contracts and canonical generators; exact admission remains successor-owned."
+          },
+          "evidenceRefs": []
+        }
+      ],
+      "relationships": [
+        {
+          "key": "relation.host-herdr",
+          "kind": "runsIn",
+          "from": "service.host-herdr",
+          "to": "runtime.host",
+          "status": "observed"
+        },
+        {
+          "key": "relation.host-workspace",
+          "kind": "locatedIn",
+          "from": "workspace.host-projects",
+          "to": "runtime.host",
+          "status": "observed"
+        },
+        {
+          "key": "relation.container-workspace",
+          "kind": "locatedIn",
+          "from": "workspace.container-shared",
+          "to": "runtime.herdr-container",
+          "status": "observed"
+        },
+        {
+          "key": "relation.distinct-workspaces",
+          "kind": "distinctPhysicalWorkspaceFrom",
+          "from": "workspace.host-projects",
+          "to": "workspace.container-shared",
+          "status": "observed"
+        },
+        {
+          "key": "relation.semantic-placement",
+          "kind": "governsPlacementContract",
+          "from": "owner.common-harness",
+          "to": "runtime.herdr-container",
+          "status": "proposed"
+        }
+      ],
+      "decisionSummary": {
+        "userRequired": [
+          "Retain both host and container with clear purposes",
+          "Support integrated native CLI and Hermes development workflows",
+          "Base boundaries on Ontology as Palantir means it",
+          "Include directory and repository consolidation in successor scope"
+        ],
+        "assistantRecommendation": "Keep host-based coordination and infrastructure control; use the existing herdr-runtime as the first governed non-root project execution target; preserve Hermes-native runtime ownership; add further runtimes only for justified dependency/data/authority/lifecycle differences.",
+        "implementationAcceptance": null,
+        "sourceSharingDecision": "deferred; compare both options",
+        "rationale": [
+          "UI/control location and worker execution location are distinct",
+          "A container adds value through an actual dependency/permission/lifecycle boundary, not through duplicating a CLI command",
+          "Formal roles and IDs require real source/runtime consumers and enforcement",
+          "Physical clones can share one canonical logical Repository identity without becoming competing sources of truth"
+        ]
+      },
+      "palantirAlignment": {
+        "interpretation": "Use the operational model of data, logic, actions and security as the design basis, rather than a folder taxonomy or ID inventory.",
+        "productAdoptionClaim": false,
+        "existingOwnersRetained": true,
+        "logicalModelCandidates": [
+          "Domain",
+          "Project",
+          "Repository",
+          "Workspace",
+          "RuntimeEnvironment",
+          "RuntimeInstance",
+          "Actor/Agent",
+          "NativeSession",
+          "Work",
+          "Task",
+          "ActionRequest",
+          "EffectReceipt",
+          "VerificationResult",
+          "AcceptanceDecision"
+        ],
+        "admissionRule": "Reuse existing owner concepts before adding a type; candidate names in this draft are not a parallel Ontology implementation.",
+        "logicRole": "Existing typed policies resolve allowed runtime, required source revision and preconditions; native owners continue to execute loops, tools, sessions and retries.",
+        "enforcementRule": "An Ontology policy record must be bound to actual UID, mount, socket, credential scope, native approval and supported target helper; a relation alone grants no permission.",
+        "transactionLimit": "Git, Docker and native session effects are not one atomic cross-system transaction. Preserve separate native receipts, currentness checks and bounded recovery."
+      },
+      "proposedRoles": [
+        {
+          "key": "role.host-coordination",
+          "runtimeRef": "runtime.host",
+          "purpose": "Primary user-facing Orchestrator and Herdr coordination; infrastructure operations and bounded task dispatch/review.",
+          "allowedEffects": [
+            "Manage native task/pane lifecycle within granted scope",
+            "Read admitted project context through existing source owners",
+            "Perform explicitly authorized host/deployment changes through supported owners/helpers"
+          ],
+          "defaultExecutionPolicy": "Project development should select a governed non-root execution runtime where feasible; host direct execution remains an explicit capability/Task exception, not an undocumented assumption.",
+          "notImplied": [
+            "No transfer of Hermes research ownership",
+            "No new scheduler, model loop, memory store or generic credential bridge"
+          ],
+          "status": "proposed"
+        },
+        {
+          "key": "role.project-execution",
+          "runtimeRef": "runtime.herdr-container",
+          "purpose": "Initial general non-root developer execution environment for selected native CLI workers, project changes and checks.",
+          "allowedEffects": [
+            "Modify the Task-bound workspace/branch",
+            "Run bounded development tools and tests",
+            "Return source revision, artifacts and verification evidence to existing owners"
+          ],
+          "defaultExecutionPolicy": "Run as the admitted user principal (currently declared palantirkc UID1000); expose only required source/data and separately provision native authentication.",
+          "notImplied": [
+            "No host Docker socket",
+            "No host root home or shared credential mount",
+            "No second canonical Orchestrator memory",
+            "No automatic access to Hermes production profile data",
+            "No claim of per-project filesystem isolation from a shared UID/home alone"
+          ],
+          "status": "proposed",
+          "enforcementQualification": "The existing shared developer runtime can serve tasks in the same admitted access/trust group. Task workspace limits are instructional until a specific enforcement mechanism is verified. Stronger inter-task separation requires distinct scoped runtime/home/mount/credential boundaries."
+        },
+        {
+          "key": "role.hermes-native",
+          "runtimeRef": "runtime.hermes-container",
+          "purpose": "Preserve native Hermes lifecycle, profiles, conversations, memory and the existing Hermes default-profile Lead responsibilities.",
+          "allowedEffects": [
+            "Use native Hermes TUI and supported target-scoped lifecycle paths",
+            "Produce source/evidence through existing project owners"
+          ],
+          "defaultExecutionPolicy": "Keep Hermes-native state and role ownership with existing runtime owners; host Orchestrator may coordinate admitted tasks without redefining those owners.",
+          "notImplied": [
+            "Source repository consolidation is not runtime profile deletion",
+            "No duplicated Hermes state in herdr-runtime"
+          ],
+          "status": "preserved-boundary"
+        },
+        {
+          "key": "role.future-project-service",
+          "runtimeRef": null,
+          "purpose": "Create additional application/service/worker runtimes only when dependency, data-access, effect authority or lifecycle boundaries differ materially.",
+          "allowedEffects": [
+            "Only the service-specific admitted actions"
+          ],
+          "defaultExecutionPolicy": "A Domain, Project, CLI or folder does not automatically require its own container.",
+          "notImplied": [
+            "No bulk container creation",
+            "No automatic production deployment"
+          ],
+          "status": "proposed"
+        }
+      ],
+      "proposedActions": [
+        {
+          "key": "action.start-worker",
+          "name": "StartNativeWorker",
+          "targets": [
+            "Task",
+            "Workspace",
+            "RuntimeEnvironment",
+            "NativeSession"
+          ],
+          "actor": "Accountable Orchestrator using the native runtime",
+          "preconditions": [
+            "Task and source revision are admitted",
+            "Target runtime/user/workspace/tool versions are explicit",
+            "Native launch arguments and model/approval ownership are preserved",
+            "Required authentication and hook trust are independently established"
+          ],
+          "executor": "Supported Herdr/native CLI mechanism; no parallel scheduler",
+          "effects": [
+            "Start or attach one explicitly targeted native CLI worker"
+          ],
+          "evidence": [
+            "Actual process/runtime/user identity",
+            "Native thread and server-qualified pane identity",
+            "Accepted source revision and output locator"
+          ],
+          "state": "proposed-not-executed"
+        },
+        {
+          "key": "action.verify-project",
+          "name": "RunProjectVerification",
+          "targets": [
+            "Task",
+            "Workspace",
+            "SourceRevision",
+            "VerificationResult"
+          ],
+          "actor": "Assigned developer worker",
+          "preconditions": [
+            "Scope and test command are admitted",
+            "Only the selected workspace and synthetic fixtures are affected"
+          ],
+          "executor": "Native shell/tools inside the selected runtime",
+          "effects": [
+            "Produce bounded test/build artifacts and verification evidence"
+          ],
+          "evidence": [
+            "Command/version/exit result",
+            "Input revision and output hashes",
+            "Unobserved limits"
+          ],
+          "state": "proposed-not-executed"
+        },
+        {
+          "key": "action.change-infrastructure",
+          "name": "ApplyInfrastructureChange",
+          "targets": [
+            "RuntimeInstance",
+            "DeploymentRevision",
+            "OperationRequest",
+            "EffectReceipt"
+          ],
+          "actor": "Infrastructure owner with explicit bounded authorization",
+          "preconditions": [
+            "Current target incarnation/lock and reviewed source bytes are pinned",
+            "Existing active work/effects are reconciled",
+            "Current authorization covers the exact lifecycle effect"
+          ],
+          "executor": "Existing target-specific helper/native service; Hermes promotion uses its installed helper",
+          "effects": [
+            "Apply only the named infrastructure operation"
+          ],
+          "evidence": [
+            "Actual native receipt",
+            "Post-effect identity/state readback",
+            "Recovery metadata"
+          ],
+          "state": "proposed-not-executed"
+        },
+        {
+          "key": "action.consolidate-repositories",
+          "name": "ConsolidateSourceRepositories",
+          "targets": [
+            "Repository",
+            "Workspace",
+            "NativeProfileSourceMapping",
+            "SourceRevision"
+          ],
+          "actor": "Accountable source/project owners coordinated by successor",
+          "preconditions": [
+            "Canonical repo and relevant histories/remotes/consumers are mapped",
+            "Runtime profiles and operational data are separately identified",
+            "Active writer/worktree/session dependencies are reconciled"
+          ],
+          "executor": "Existing Git/source-owner workflow",
+          "effects": [
+            "Migrate necessary source/history and update references before old-path retirement"
+          ],
+          "evidence": [
+            "Source/history mapping",
+            "Consumer checks and admitted commit/review",
+            "Zero unresolved old-path dependency or explicit retained compatibility"
+          ],
+          "state": "proposed-not-executed"
+        }
+      ],
+      "infrastructureBoundary": {
+        "definition": "An operation is infrastructural when its effects change shared host/runtime lifecycle, access boundaries, shared tooling, mounts/network, deployment or persistent operational state; the folder where a command is typed does not determine its authority.",
+        "examples": [
+          {
+            "operation": "Edit a project function and run its bounded tests",
+            "category": "project-development",
+            "defaultExecutor": "Task-bound non-root worker"
+          },
+          {
+            "operation": "Change Docker mounts, network, image or host SSH settings",
+            "category": "infrastructure-operation",
+            "defaultExecutor": "Authorized infrastructure owner/helper"
+          },
+          {
+            "operation": "Change a shared harness action contract",
+            "category": "source-development-plus-governed-adoption",
+            "defaultExecutor": "Canonical semantic source owner; native activation separately owned"
+          },
+          {
+            "operation": "Open native Hermes TUI",
+            "category": "native-runtime-use",
+            "defaultExecutor": "Existing Hermes runtime/profile owner path"
+          },
+          {
+            "operation": "Pause old Lead Goal after verified successor handoff",
+            "category": "native-goal-lifecycle",
+            "defaultExecutor": "Existing explicit user-authorized native Goal owner/control route"
+          }
+        ]
+      },
+      "containerPartitionRule": {
+        "deriveFrom": [
+          "Required dependencies and tool versions",
+          "Data access and sensitivity",
+          "Effect/operation authority",
+          "Lifecycle and failure domain",
+          "Resource limits",
+          "Native state ownership",
+          "Whether tasks belong to the same or different data/action access trust group"
+        ],
+        "doNotDeriveOnlyFrom": [
+          "Folder name",
+          "CLI brand",
+          "One container per Ontology object",
+          "One container per repository or Domain by default"
+        ],
+        "initialScope": "Use the existing non-root developer runtime for one bounded same-access-group pilot. Create a separate scoped runtime only when stronger inter-task access or independent lifecycle/dependency boundaries are required and authorized."
+      },
+      "storageOptions": [
+        {
+          "key": "storage.separate-git",
+          "status": "recommended-pilot-not-accepted",
+          "model": "Canonical logical Repository identity with runtime-local clones/worktrees and explicit Git revisions/results.",
+          "advantages": [
+            "Preserves filesystem/UID isolation",
+            "Avoids cross-namespace absolute worktree metadata assumptions",
+            "Source movement is visible as commit/branch/review"
+          ],
+          "costs": [
+            "Physical copies remain",
+            "Requires disciplined revision admission and explicit artifact exchange"
+          ],
+          "requiredChecks": [
+            "Same intended repository/remote identity",
+            "Exact source revision and worktree relationship",
+            "Result consumed by existing source owner"
+          ]
+        },
+        {
+          "key": "storage.shared-bind",
+          "status": "comparison-open",
+          "model": "One explicitly scoped physical workspace bind-mounted into both runtimes with a tested path/UID/concurrency contract.",
+          "advantages": [
+            "Immediate access to the same files",
+            "Fewer source copies for the selected workspace"
+          ],
+          "costs": [
+            "Shared write effects and ownership coordination",
+            "Git worktree/absolute path compatibility",
+            "Potential expansion of host file exposure"
+          ],
+          "requiredChecks": [
+            "Minimal mount source and write mode",
+            "UID/GID and safe concurrent writer behavior",
+            "Git common-dir and worktree validity from both namespaces",
+            "No home/credential/socket broad mount"
+          ]
+        }
+      ],
+      "nativeRuntimeContracts": {
+        "commonCliContract": "Use common command names and explicit native capabilities per runtime/user; do not force one absolute /root path into non-root container environments.",
+        "accountsAndAuthentication": "Separate native user settings/session/authentication by runtime and owner; do not copy host credentials as a shortcut.",
+        "herdrControl": "Native Herdr multi-machine/server identities remain distinct. A host-visible remote TUI does not prove hook/socket/resume integration across the boundary.",
+        "codexLaunch": "Review the documented --no-daemon helper versus shared daemon capabilities, remote mode and queue/agents requirements. Choose explicit native semantics; do not assume the generic command inherits helper flags.",
+        "currentSessionContinuity": "Do not move directories, change mounts or restart a runtime underneath an active native session. Use checkpoints and verified source/runtime adoption.",
+        "codeServer": "Retain its separate browser IDE role and privileges; current YAML existence alone does not establish a running service."
+      },
+      "workPackages": [
+        {
+          "key": "work.scope-admission",
+          "formalTaskId": null,
+          "title": "Admit runtime boundary proposal into existing common-harness work",
+          "dependsOn": [],
+          "owner": "Successor Orchestrator and infrastructure semantic owner",
+          "deliverable": "Actual logical IDs, original input/decision bindings and links to existing repo/handoff work",
+          "effects": "Source-owned registration only"
+        },
+        {
+          "key": "work.current-topology",
+          "formalTaskId": null,
+          "title": "Reconcile canonical topology and deployment provenance",
+          "dependsOn": [
+            "work.scope-admission"
+          ],
+          "owner": "Infrastructure owner",
+          "deliverable": "Runtime/account/path/mount/source/image/entrypoint map with observation scope and unresolved provenance",
+          "effects": "Read-only inventory and source-owned records"
+        },
+        {
+          "key": "work.ontology-contract",
+          "formalTaskId": null,
+          "title": "Extend existing operational Ontology contracts for placement and action scope",
+          "dependsOn": [
+            "work.scope-admission",
+            "work.current-topology"
+          ],
+          "owner": "Existing Ontology/common-harness semantic owners",
+          "deliverable": "Reused or deliberately extended types/relations/actions/policies plus actual consumer contract",
+          "effects": "Reviewed source changes; no new independent registry or execution engine"
+        },
+        {
+          "key": "work.developer-pilot",
+          "formalTaskId": null,
+          "title": "Verify one task-bound non-root developer worker end to end",
+          "dependsOn": [
+            "work.current-topology",
+            "work.ontology-contract"
+          ],
+          "owner": "Successor with selected project/native CLI owners",
+          "deliverable": "One real bounded project change/check linked Task→workspace→runtime→session→result",
+          "effects": "Future narrowly authorized pilot; preserve current sessions"
+        },
+        {
+          "key": "work.repo-consolidation",
+          "formalTaskId": null,
+          "title": "Integrate directory and hermes-profile-* repository consolidation",
+          "dependsOn": [
+            "work.current-topology",
+            "work.ontology-contract"
+          ],
+          "owner": "Existing repository/project owners and Hermes source owner",
+          "deliverable": "Canonical repo/history/native-profile source mapping and phased migration plan",
+          "effects": "No direct production profile/data deletion inferred"
+        },
+        {
+          "key": "work.adoption",
+          "formalTaskId": null,
+          "title": "Adopt validated placement across native CLI entrypoints and successor handoff",
+          "dependsOn": [
+            "work.developer-pilot",
+            "work.repo-consolidation"
+          ],
+          "owner": "Accountable native Leads",
+          "deliverable": "Verified command semantics, context/hook/restore behavior, updated entrypoints and remaining exceptions",
+          "effects": "Separately authorized native activation only"
+        }
+      ],
+      "acceptanceCriteria": [
+        {
+          "key": "acceptance.semantic-consumption",
+          "criterion": "A real Task resolves through admitted Repository/Workspace/Runtime/Actor/Action references in the existing common harness; IDs and records are consumed by a native caller.",
+          "requiredEvidence": [
+            "Source-owned registration and reader result",
+            "Exact consumer/runtime binding"
+          ],
+          "currentState": "not-verified"
+        },
+        {
+          "key": "acceptance.host-container-boundary",
+          "criterion": "The worker runs as its admitted non-root principal. Allowed synthetic workspace access and excluded synthetic host-path access are tested separately, and any native SSH/helper path back to host is reconciled without credential disclosure.",
+          "requiredEvidence": [
+            "Actual UID/HOME/runtime and mount metadata",
+            "Synthetic host-boundary positive/negative checks",
+            "Declared and observed host-action access/owner controls"
+          ],
+          "currentState": "not-verified"
+        },
+        {
+          "key": "acceptance.native-context",
+          "criterion": "Native thread and Herdr server-qualified pane identity match the intended worker; hooks report to the correct runtime/server with no stale inherited context.",
+          "requiredEvidence": [
+            "Native context tuple",
+            "Actual hook receipt/session identity",
+            "Documented daemon/no-daemon decision and capability limitations"
+          ],
+          "currentState": "not-verified"
+        },
+        {
+          "key": "acceptance.source-result",
+          "criterion": "The pilot uses the intended source revision and its change/check result is consumed by the canonical source owner.",
+          "requiredEvidence": [
+            "Repository/branch/commit/worktree lineage",
+            "Project checks and result readback"
+          ],
+          "currentState": "not-verified"
+        },
+        {
+          "key": "acceptance.preservation",
+          "criterion": "Existing native sessions, Hermes operational state, host-key checking, Tailscale boundary and code-server role remain preserved through the scoped change.",
+          "requiredEvidence": [
+            "Before/after process incarnation metadata",
+            "Native owner/lifecycle checks for affected targets only"
+          ],
+          "currentState": "not-verified"
+        },
+        {
+          "key": "acceptance.recovery",
+          "criterion": "SSH reconnect, Herdr restart, container recreate and host restart have distinct tested or explicitly untested contracts; dialogue restoration is not reported as uninterrupted Goal continuation.",
+          "requiredEvidence": [
+            "Isolated authorized recovery case results",
+            "Persistent state and owner resumption policy"
+          ],
+          "currentState": "not-verified"
+        },
+        {
+          "key": "acceptance.retirement",
+          "criterion": "Old repository/path retirement occurs only after source/history/consumer mappings and current active dependencies are reconciled.",
+          "requiredEvidence": [
+            "Consumer closure",
+            "Current writer/session/worktree dependency check",
+            "Explicit retained exceptions"
+          ],
+          "currentState": "not-verified"
+        },
+        {
+          "key": "acceptance.task-to-task-boundary",
+          "criterion": "The runtime declares whether sibling projects share an access trust group. If per-task isolation is claimed, a synthetic sibling-project resource is included in positive/negative tests under the actual worker user/runtime. If isolation is not provided, record that limit explicitly instead of reporting a passing sandbox guarantee.",
+          "requiredEvidence": [
+            "Access-trust-group decision",
+            "Actual isolation mechanism or explicit not-provided status",
+            "Synthetic sibling-resource result when isolation is claimed"
+          ],
+          "currentState": "not-verified"
+        }
+      ],
+      "successorHandoff": {
+        "currentLeadThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+        "currentLeadAgent": "orch-main-autonomy",
+        "observedPaneId": "w3:pJ",
+        "successorThreadId": null,
+        "canonicalCheckpointLocator": null,
+        "requirement": "Bind this package and actual user inputs to the existing common-harness Work/Task, connect prior directory/repo/handoff records and preserve source/effect fences. Execute after the native successor ACK/CAS and Goal/plan verification.",
+        "adoptionStatus": "not-confirmed"
+      },
+      "nonGoals": [
+        "No new agent scheduler, memory database, general registry or credential bridge",
+        "No claim of an implemented Foundry/AIP product",
+        "No automatic model evaluations or new spending budget",
+        "No blind hermes-profile source directory or production profile deletion",
+        "No blanket container recreation, Docker prune or code-server privilege change"
+      ],
+      "nextDecision": {
+        "owner": "Successor Orchestrator with existing semantic/infrastructure/native owners",
+        "action": "Review and admit the role/action contract, select the bounded pilot, compare source-sharing options, and provide actual formal IDs before implementation.",
+        "userQuestionPolicy": "Ask only for consequential business constraints or genuinely unresolved effect authorization; do not push infrastructure architecture selection back onto the user."
+      },
+      "boundaryModel": {
+        "semanticActionScope": {
+          "meaning": "Admitted actor/resource/action/current-state policy in existing common-harness source",
+          "enforcement": "Must name the actual native approval/helper/OS mechanism or explicitly state instruction-only"
+        },
+        "hostContainerBoundary": {
+          "meaning": "Actual user/mount/socket/network/effect boundary between host and project runtime",
+          "currentState": "metadata-observed; effective permission tests pending",
+          "exceptionToReconcile": "README describes an independently generated Herdr-to-host SSH identity; absence of Docker socket or copied credentials does not prove absence of host access."
+        },
+        "taskToTaskBoundary": {
+          "meaning": "Access difference between sibling Task/project workspaces",
+          "currentState": "not-established in the current shared UID1000 whole-home mount",
+          "initialPilotPolicy": "Declare a same-access trust group and do not claim per-task filesystem isolation; if stronger separation is required, use a separately admitted scoped runtime and synthetic sibling-resource tests."
+        }
+      },
+      "review": {
+        "kind": "independent-read-only-design-review",
+        "reviewer": "native internal subagent dual_runtime_proposal_review",
+        "result": "One material gap identified and corrected: separate host/container from task/task enforcement evidence.",
+        "correctionRefs": [
+          "claim.task-isolation-not-established",
+          "problem.scope-vs-enforcement",
+          "acceptance.host-container-boundary",
+          "acceptance.task-to-task-boundary"
+        ],
+        "nativeAdoptionVerified": false
+      }
+    },
+    "originalInterview": {
+      "artifactType": "runtime-role-proposal-interview",
+      "artifactVersion": "1.0.0",
+      "capturedAtUtc": "2026-10-20T03:36:21.018106+00:00",
+      "source": "Actual user messages received in this conversation; not a reconstructed historical transcript.",
+      "nativeContextReportedThreadId": "01a1571b-2ee3-7832-8dd6-5894635f40b4",
+      "answers": [
+        {
+          "key": "interview.retain-both",
+          "question": "앞으로 Herdr와 Codex·Claude 같은 작업용 CLI를 주로 어디에서 실행하고 싶으세요?",
+          "verbatimAnswer": "목적별로 둘 다 유지하되 역할을 명확히 분리",
+          "interpretation": "Retain host and container environments with explicit purposes. This does not choose a specific physical placement contract.",
+          "classification": "actual-user-requirement"
+        },
+        {
+          "key": "interview.original-purpose",
+          "question": "현재 herdr-runtime 컨테이너가 꼭 필요한 이유로 생각하시는 것은 무엇인가요?",
+          "verbatimAnswer": "VPS Host의 Orchestrator가 Codex/Claude/Grok/Muse/Antigravity CLI를 필요한 경우 agnostic하게 사용하면서 Hermes-agent-2q3y/ 컨테이너에서 Hermes TUI도 사용하면서 pane별로 TUI를 띄워놓고, 사용자가 원하는 프로젝트들을 개발하도록 하기 위함이었다. 그러나 최근에 VPS Host 실행환경에서 Orchestrator를 사용하면서 역할이 불분명해졌는데(왜냐하면 VPS Host Herdr Orchestrator Session가 pane으로 Codex/Claude/Grok/Muse/Antigravity/Hermes 를 모두 띄울 수 있으니까), 역할정의를 다시 했으면 좋겠는데? 컨테이너의 역할이 헷갈려.",
+          "interpretation": "The integrated multi-CLI and native Hermes development workflow is the intended outcome. Host pane visibility alone does not specify where every worker process must execute.",
+          "classification": "actual-user-purpose-and-problem"
+        },
+        {
+          "key": "interview.ontology-boundary",
+          "question": "두 환경을 유지할 때 역할 경계는 어느 쪽이 좋을까요?",
+          "verbatimAnswer": "1번인데, 인프라의 boundary가 어느정도인지 모르겠는데? 내가 Palantir's AIP/Foundry같은 소프트웨어의 근간이 되는 **\"Palantir에서 의미하는(매우 중요한 형용사) Ontology\"**를 기반으로 컨테이너들을 분리해서 개발 전반에 대한 작업하고싶다.",
+          "interpretation": "The user selected host-infrastructure/container-development direction while explicitly requesting the boundary definition. Palantir-style operational Ontology is a governing design requirement; this is not approval of every implementation detail of a prior option.",
+          "classification": "actual-user-direction-with-requested-clarification"
+        },
+        {
+          "key": "interview.source-sharing-deferred",
+          "question": "호스트와 컨테이너의 프로젝트 파일은 어떻게 다루고 싶으세요?",
+          "verbatimAnswer": "아직 결정하지 않고 제안서에서 비교",
+          "interpretation": "Compare shared bind-mounted workspaces against separate Git workspaces. No storage migration choice is accepted.",
+          "classification": "actual-user-deferred-decision"
+        },
+        {
+          "key": "interview.holistic-judgment",
+          "question": "herdr-runtime은 어떤 역할이 가장 유용할까요?",
+          "verbatimAnswer": "통합적으로 고려해서 너가 제안을 해봐. 내가 Whole-Lens가 아니라서 잘 모르겠어.",
+          "interpretation": "The assistant should synthesize the architecture recommendation rather than require the user to choose infrastructure abstractions. Proposal selection remains distinct from migration authorization.",
+          "classification": "actual-user-delegation-of-design-judgment"
+        },
+        {
+          "key": "input.repo-consolidation",
+          "question": null,
+          "verbatimAnswer": "이와 관련해서도 디렉토리 트리 관련해서 최적화(예를들어, hermes-profile-* 전부 필요없어, 예전에 Git 설정 잘못해서 전부 통합해야하고 repo도 대규모 개편해야하는 이유 중에 하나(다른 이유들도 많음)가 이거야)해야하니까, 새 Orchestrator가 공통하네스에 근거하여 ID 부여하고 작업범위 추가포함하도록 해라.",
+          "interpretation": "Consolidate unnecessary hermes-profile-* source repositories within broader repository reorganization. Historical Git misconfiguration is one stated reason. Runtime Hermes profiles/data are distinct resources whose migration/deletion is not inferred.",
+          "classification": "actual-user-successor-scope"
+        },
+        {
+          "key": "input.proposal-request",
+          "question": null,
+          "verbatimAnswer": "너는 아까 실행환경에서 디렉토리 트리 자세히 출력해서 나에게 설명했던 것을 기반으로 more deep dive 해서, VPS Host 실행환경과 herdr-runtime/ 컨테이너의 역할이 불분명한 것에 대한 문제를 정의하고, 이에 대해서 새 Orchestrator가 작업을 시작할 때 그쪽에 전달할 수 있는 제안서(ID를 새로 또 부여하거나 기존 작업범위를 더 넓혀서 진행할 수 있도록)를 만들자. 이와 관련해서 유저 인터뷰 하면서 적극적으로 너의 의견을 제안해라.",
+          "interpretation": "Produce an evidence-backed proposal and interview record for successor admission through the existing common harness; extend existing scope or allocate IDs using the actual owner contract.",
+          "classification": "actual-user-artifact-and-handoff-request"
+        }
+      ],
+      "proposalStatus": "assistant-recommendation-to-be-reviewed",
+      "acceptedImplementationDecision": null,
+      "supersededAssistantPositions": [
+        {
+          "position": "Host-only primary runtime as a default",
+          "status": "superseded-by-user-retain-both-answer"
+        },
+        {
+          "position": "Host does infrastructure only and cannot coordinate general project development",
+          "status": "rejected-as-overly-narrow-interpretation-of-user-workflow"
+        },
+        {
+          "position": "All CLI processes must run on the host because their panes are visible there",
+          "status": "not-established-by-user; separate UI/control from execution placement"
+        }
+      ],
+      "unresolvedUserChoices": [
+        {
+          "key": "source-sharing",
+          "state": "explicitly-deferred-to-proposal-comparison"
+        }
+      ]
+    },
+    "originalPackageFiles": [
+      {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/received-runtime-role-proposal-20261020/proposal.json",
+        "sha256": "ff55aa7c602f019fb1b3312fadbb53ffe98193660425703e1aa0dcc52889a2ab"
+      },
+      {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/received-runtime-role-proposal-20261020/interview.json",
+        "sha256": "d610db1863e5551f8ad512ba38be519ad267aa4e3e31ed145f918ce68fc28344"
+      },
+      {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/received-runtime-role-proposal-20261020/evidence/observations.json",
+        "sha256": "0b61e576a896a7961c7b4a47b1ac3a71d3cc1b615e808efc28177e08022b5e72"
+      },
+      {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/received-runtime-role-proposal-20261020/evidence/public-sources.json",
+        "sha256": "27456c20ee40fd910b42c534b6066badfa4eb5c4be9d64dbd239187ef7d0ee29"
+      },
+      {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/received-runtime-role-proposal-20261020/validation.json",
+        "sha256": "cb21c420b8e0d90eecafbd1ae03201757ebed3cf6de7fa835be09f80afb9b322"
+      }
+    ],
+    "packageCustody": {
+      "kind": "snapshot",
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/runtime-role-proposal.received-custody.actual.json",
+      "sha256": "a8f22ac898948edcb0df2239153d40bead1ded22e42e68a501a3587d95a78156"
+    },
+    "actualUserReady": {
+      "kind": "snapshot",
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/RUNTIME_ROLE_PROPOSAL_20261020.ready-source.actual.json",
+      "sha256": "8c3c1ffc3e4d20c6efa226d9946df1303f60f3e20ff50bdf5db0b18dbaaabc6d"
+    },
+    "sourceReferenceReview": {
+      "kind": "snapshot",
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/runtime-role-proposal.admission-source-review.actual.json",
+      "sha256": "8aa66685e4408080806be9e73531161459b5c5aadd8c69cbab0625a94d623134"
+    },
+    "freshPublicSourceManifest": {
+      "kind": "snapshot",
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/runtime-role-proposal-source-review/source-extracts.manifest.actual.json",
+      "sha256": "9db2587f97326251698dc4cddc0d12528f6546fa02f965986681dea33139f1b2"
+    },
+    "requiredSourceQualifications": [
+      {
+        "artifactLocalKey": "qualification.launch-context-original-receipt",
+        "proposalPointer": "/claims/6",
+        "issue": "The retained observations source contains inherited HERDR_PANE_ID w3:p1 but no original pane lookup response proving pane_not_found.",
+        "requiredSourceTreatment": "Retain the stale environment value as recorded observation; treat the previous lookup as reported receipt-unavailable until an existing owner supplies its exact original receipt. Do not infer that all hooks fail.",
+        "blocksProposalSourceAdmission": false,
+        "blocksUsingMissingLookupAsVerifiedEvidence": true
+      },
+      {
+        "artifactLocalKey": "qualification.separate-git-isolation",
+        "proposalPointer": "/storageOptions/0/advantages/0",
+        "issue": "The unconditional phrase Preserves filesystem/UID isolation is broader than separate Git clones/worktrees establish.",
+        "requiredSourceTreatment": "Qualify the advantage as preserving already-enforced runtime/user/mount boundaries when those exist. Separate source copies alone do not create OS principals, host isolation or task-to-task access isolation. Keep current boundaryModel not-established and all synthetic checks pending.",
+        "blocksProposalSourceAdmission": false,
+        "blocksClaimOfIsolationOrCompletedAcceptance": true
+      },
+      {
+        "artifactLocalKey": "qualification.historical-successor-binding",
+        "proposalPointer": "/successorHandoff",
+        "issue": "The package currentLead/pane and successor-handoff fields are historical sender context, with successor IDs/checkpoint null.",
+        "requiredSourceTreatment": "Bind admission to the actual current Root and existing topology Task/checkpoint through its owning writer. This package is not ACK/CAS, a command to replace MAIN, or native successor Goal/plan proof. Conditional old Lead self-Pause remains separate and successor Goal continues.",
+        "blocksProposalSourceAdmission": false,
+        "blocksNativeOwnershipOrLifecycleInference": true
+      }
+    ],
+    "relatedExistingSources": [
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-07.json",
+        "sha256": "c337e13b811bdac0dad4c963781f2021b9c34f49d91fe3ce84daf4848a80fa55"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HOST-INTEGRATION.json",
+        "sha256": "60ee217de29475af7a8634922df72133217b0fadc48e7cd24ffe79dfc90c4fee"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HOST-ESTATE-CONTINUATION.json",
+        "sha256": "0848c0079b22082cddcd974124d9cab77ec2642de79b038e67a971be063a2bdf"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY.json",
+        "sha256": "44d5e40ed4c00d27ab74183deebcca79d9fc9edf3d90de4c1c12285bb4e16d9f"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-DIR-TOPOLOGY-20261020.json",
+        "sha256": "e0cc13bfb7130377a59dd42d570fd24220eb66556df0f1c7533eb83255d20ad3"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-DIR-TOPOLOGY-SCOPE-EXPANSION-20261020.json",
+        "sha256": "a41311c3c2117dae8505effdf42bcaec7517d8fa98cc552fe31a553a39fb2664"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-OLD-LEAD-CONDITIONAL-PAUSE-20261020.json",
+        "sha256": "16d9a7edc5954292062385c83712b87aaa0148dcacf3aae092387080303ea934"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "architecture/capability-source-owners.json",
+        "sha256": "a94c7572afb5ef16ef7ebf5a4e224f738abbc78bb491837df47a95e78abf85d4"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "bc940af849698370589beebbf1ed3cb51a8f0718",
+        "path": "architecture/runtime-filesystem-contract.json",
+        "sha256": "227468a6b4091cc54c67340d05ed744db2c6d82c827ca89bbbb5c7895dc6b63a"
+      }
+    ],
+    "authoritySeparation": "Retain BOTH environments, integrated native CLI/Hermes workflow, operational Palantir-style Data/Logic/Action/Security, comparison of source sharing and holistic engineering judgment are user directions. Host-primary coordination/existing non-root developer pilot/additional runtime partition recommendations remain proposed; no implementation or storage migration acceptance is invented. All seven interview answers retain their individual classifications and verbatim wording.",
+    "acceptanceState": "All eight criteria unverified; 37 staging structural checks and 27 independent bounded source/ref/graph checks do not establish runtime enforcement, native use, architecture acceptance or migration.",
+    "wholeScopeFences": "Prior directory observations and hermes-profile-* structural source consolidation remain in same full ODI Work/Task with history/content/evidence/consumer closure before old-path retirement. Preserve default Hermes Lead R&D/Ontology/project measurement and native profiles/data/credentials, serving349, current native controls/trust, SSH hostkey/Tailscale, cumulativeUSD14unknown/no paid judgment, all consumed/fiveuncertain effects, native Goal ownership and oldLead-only conditionalPause/fallback; successor Goal continues."
+  }
+}
