@@ -1,0 +1,45 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 4,
+    "taskId": "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
+  },
+  "title": "Successor-owned directory and repository structural consolidation with topology proof",
+  "nextAction": "SUCCESSOR ONLY. After actual common-harness adoption/finite coverage and exact receiver ACK/CAS sole ownership with genuine successor Goal/plan, read both ODI-USER-DIR-TOPOLOGY-20261020 and ODI-USER-DIR-TOPOLOGY-SCOPE-EXPANSION-20261020, originals/supplement/testimony and related ODI-07/repository-direction/owner records. Establish canonical host/container/user/path/mount and repository destination ownership; distinguish source hermes-profile-* repositories from native runtime profiles. Plan and execute authorized owner-aligned source structural consolidation, retaining necessary content/history/evidence and updating consumers/remotes/worktrees/entrypoints; address other reasons from existing first-party records without inventing them. Verify adoption/reference integrity before retiring obsolete source paths. Preserve whole ODI WHY/owners/fences/USD14unknown, Hermes default Lead R&D/Ontology/measurement and native profiles/user data/credentials/serving349. No current-MAIN migration or blind directory/history/production-profile deletion. Current MAIN registers/links/checkpoints and continues its unchanged Goal/process until safe handoff. Read source-link clarification Input ODI-DIR-TOPOLOGY-SOURCE-LINK-CLARIFICATION-20261020 for exact setup evidence; its matching canonical setup Task remains unknown.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "native-effect",
+  "dependsOn": [
+    {
+      "taskId": "ODI-WORK-METHOD-ADOPTION-20261020",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020",
+    "ODI-DECISION-COMMON-FIRST-20261020",
+    "ODI-DECISION-LONG-AUTONOMY-20261020",
+    "ODI-DECISION-DIR-TOPOLOGY-STRUCTURAL-CONSOLIDATION-20261020",
+    "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": []
+}

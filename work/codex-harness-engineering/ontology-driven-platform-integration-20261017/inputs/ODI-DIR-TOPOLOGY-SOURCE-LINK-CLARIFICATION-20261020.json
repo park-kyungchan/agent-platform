@@ -1,0 +1,45 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-DIR-TOPOLOGY-SOURCE-LINK-CLARIFICATION-20261020",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "Actual Root exact source-link readback; preserve original user Input unchanged"
+  },
+  "content": {
+    "classification": "Source-owner clarification of a stale proposal-derived narrative in the immutable original registration Input. No new user answer or runtime behavior inferred.",
+    "clarifiesInputId": "ODI-USER-DIR-TOPOLOGY-20261020",
+    "clarifiesFragment": "#/content/registrationContext/relatedLinksInterpretation/4",
+    "originalPreservedByteForByte": true,
+    "actualCLISetupSources": {
+      "setupReceipt": {
+        "kind": "snapshot",
+        "path": "/root/.local/share/herdr-setup/20261020T023248Z/receipt.json",
+        "sha256": "7d99a858841c0cda7e0421579ac365d57463e9e2d4610af995491e4709af8d21"
+      },
+      "rootCompletionObservation": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/HERDR_SETUP_20261020_023248.completion.observation.actual.json",
+        "sha256": "d380c305292079923340186e97db26d42fa1ecae5f025aea1a98c19258095120"
+      },
+      "futureSuccessorNativeExecutable": "/root/.local/share/agent-cli/codex/0.163.0/bin/codex",
+      "canonicalSetupTaskId": null,
+      "canonicalSetupSource": null
+    },
+    "meaning": "Original relatedLinksInterpretation CLI entry was inherited from a helper proposal and says no receipt attached. Actual Root pendingSetupCorrelation in that SAME Input already binds setup receipt7d99 and completiond380. Use those exact pinned sources; canonical matching setupTask remains unknown in the bounded search. Receipt hash/user testimony does not imply newly verified runtime behavior or global Task absence.",
+    "sourceReference": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "9facd33916a35138b95b5a5d8d8ef14fdb41fe9e",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-DIR-TOPOLOGY-20261020.json",
+      "sha256": "e0cc13bfb7130377a59dd42d570fd24220eb66556df0f1c7533eb83255d20ad3"
+    },
+    "substantiveTopologyInvestigation": false,
+    "nativePermissionGranted": false
+  }
+}
