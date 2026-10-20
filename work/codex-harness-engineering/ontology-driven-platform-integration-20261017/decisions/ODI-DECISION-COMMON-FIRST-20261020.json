@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-COMMON-FIRST-20261020",
+  "status": "accepted",
+  "answer": "지금 이러한 작업방식이 공통하네스 자체를 개선해야한다. 향후 모든 pane의 subLead와 Hostinger VPS Host의 Orchestrator를 포함한 모든 컨테이너의 에이전트들(subAgents and thread 등등 모두 포함)에게 이 작업방식이 일관성있게 적용되어야한다. 너는 이것이 가장 먼저 적용된 상태에서 모든 작업을 진행하기 위해서 어떻게 해야하는지 final review를 맡기고 최종승인 대기해라. 유저인터뷰가 필요하면 사전에 적극적으로 진행해라.",
+  "meaning": "Implement one common work method and compatible projections; actual finite required-owner admission/receive-use across owned Host/container/native/nested/resume routes before general work. Dormant/new entrants held on wake.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-COMMON-FIRST-20261020.json",
+    "fragment": "#/content/originalText"
+  },
+  "supersedes": []
+}

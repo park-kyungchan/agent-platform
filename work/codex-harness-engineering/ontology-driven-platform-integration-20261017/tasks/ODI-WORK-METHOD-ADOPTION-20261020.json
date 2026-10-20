@@ -1,0 +1,49 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "ODI-WORK-METHOD-ADOPTION-20261020",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 1,
+    "planId": "ODI-PLAN",
+    "planRevision": 4,
+    "taskId": "ODI-WORK-METHOD-ADOPTION-20261020"
+  },
+  "title": "Coordinate actual finite common-method native adoption and receive/use",
+  "nextAction": "After reviewed core/projections, admit exact owner-specific native action Tasks; actual compatible refresh/injection/receive/use on useful bootstrap Tasks and supported lifecycle routes. Close finite coverage predicate before general work. This coordination record grants no native action or fabricated occurrence.",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [
+    {
+      "taskId": "ODI-COMMON-WORK-METHOD-CORE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-WORK-METHOD-COVERAGE-20261020",
+      "milestone": "execution-and-verification"
+    },
+    {
+      "taskId": "ODI-WORK-METHOD-NATIVE-COMPATIBILITY-20261020",
+      "milestone": "execution-and-verification"
+    }
+  ],
+  "decisionIds": [
+    "ODI-DECISION-COMMON-FIRST-20261020",
+    "ODI-DECISION-LONG-AUTONOMY-20261020"
+  ],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

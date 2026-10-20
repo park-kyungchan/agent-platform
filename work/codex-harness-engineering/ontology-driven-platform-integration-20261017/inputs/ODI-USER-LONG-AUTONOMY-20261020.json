@@ -1,0 +1,20 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-USER-LONG-AUTONOMY-20261020",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "current-user",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/actual-user.execution-and-rolling-orchestrator-authority.json#/originalText",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "originalText": "이제 기존 pane을 닫고, 새 Orchestrator에게 인계해서 전체 작업을 진행시키자. 새 Orchestrator가 장시간동안 사용자 개입없이 자율작업을 할 수 있도록 하려면 update_plan and create_goal tools를 가지고 잘 작성해야하는데, 내가 이 두개의 tools를 어떠한 목적으로 사용하기를 원했는지 반복되는 feedback을 확인한다음에 새 Orchestrator에게 이것을 활용해서 장시간 자율작업을 진행할 수 있도록 해라. 장시간 자율작업이므로 공통하네스가 개선된 이후에는 pane을 주기적으로 새로 띄워서 새 Orchestrator가 계속 Orchestration할 수 있는 long-running workFlow를 만들어줄 수 있는 것에 관해서도 update_tool and Goal Prompt에 명시해주어야한다.",
+    "sourceSha256": "2fdbf36ef574671bb32d428ca8e48d5fe2f0b0be99ff6326f6c80c61aea7c817",
+    "nativeAuthorshipIndependentlyAuthenticated": false,
+    "classification": "Exact preserved actual-user text captured by prior MAIN and re-read by actual successor; source capture is not native user authentication"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-LONG-AUTONOMY-20261020",
+  "status": "accepted",
+  "answer": "이제 기존 pane을 닫고, 새 Orchestrator에게 인계해서 전체 작업을 진행시키자. 새 Orchestrator가 장시간동안 사용자 개입없이 자율작업을 할 수 있도록 하려면 update_plan and create_goal tools를 가지고 잘 작성해야하는데, 내가 이 두개의 tools를 어떠한 목적으로 사용하기를 원했는지 반복되는 feedback을 확인한다음에 새 Orchestrator에게 이것을 활용해서 장시간 자율작업을 진행할 수 있도록 해라. 장시간 자율작업이므로 공통하네스가 개선된 이후에는 pane을 주기적으로 새로 띄워서 새 Orchestrator가 계속 Orchestration할 수 있는 long-running workFlow를 만들어줄 수 있는 것에 관해서도 update_tool and Goal Prompt에 명시해주어야한다.",
+  "meaning": "Latest actual user approves full autonomous execution via new actual MAIN/genuine native Goal/plan, retiring old owned idle pane after exact transfer, and recurring safe serial handoffs after common adoption. Old interview/final-approval/pause/no-new-main text superseded. All source/native/domain owners, serving349, model/effort/auth/permissions/trust, sameUSD14 and consumed/five uncertainty fences remain.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-LONG-AUTONOMY-20261020.json",
+    "fragment": "#/content/originalText"
+  },
+  "supersedes": []
+}
