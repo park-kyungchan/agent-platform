@@ -68,6 +68,8 @@ export const platformEntryPoints = {
   "current-work-native-hook.js":
     "packages/native-hermes-adapter/src/platform-current-work/native-hook.ts",
   "read-memory.js": "packages/native-hermes-adapter/src/platform-current-work/read-memory.ts",
+  "read-work-method.js":
+    "packages/native-hermes-adapter/src/platform-current-work/read-work-method.ts",
 } as const;
 export const platformSourcePaths = [
   "package.json",
@@ -93,6 +95,8 @@ export const platformSourcePaths = [
     "context",
     "read-current-work",
     "read-memory",
+    "read-work-method",
+    "work-method",
     "provider",
     "build",
     "hook-context",
@@ -105,12 +109,15 @@ export const platformSourcePaths = [
   ),
   "packages/work-continuity/src/handoff.ts",
   "packages/work-continuity/src/runtime-index.ts",
+  "packages/work-continuity/src/work-method.ts",
   ...["index", "source", "records", "context", "types"].map(
     (name) => "packages/work-continuity/src/git-work/" + name + ".ts",
   ),
   "packages/work-continuity/src/logical-identity.ts",
   "packages/work-continuity/src/operational-state.ts",
-  ...["source", "types"].map((name) => "packages/work-continuity/src/context/" + name + ".ts"),
+  ...["index", "source", "types", "validation", "store", "context", "boundary"].map(
+    (name) => "packages/work-continuity/src/context/" + name + ".ts",
+  ),
   ...["recall-request", "lexical-recall", "qualification"].map(
     (name) => "packages/work-continuity/src/workspace/" + name + ".ts",
   ),
@@ -193,6 +200,7 @@ async function verifyInstalledWorkProjection(
     ],
     ["platform-rearchitecture/work-records.ts", [["handoff", "src/handoff.ts"]]],
     ["platform-rearchitecture/work-continuity.ts", [["handoff", "src/handoff.ts"]]],
+    ["platform-current-work/work-method.ts", [["context", "src/context/index.ts"]]],
     [
       "platform-current-work/read-memory.ts",
       [

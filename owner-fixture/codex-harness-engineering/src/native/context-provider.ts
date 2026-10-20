@@ -14,6 +14,8 @@ export interface ContextProviderProof {
   sourceLocationId?: string;
   /** Present only for the exact fixed Git Work export proven by a v3 registration. */
   gitWorkModulePath?: string;
+  /** Explicit v6 admission only; exposed through the existing context index. */
+  workMethodAvailable?: true;
 }
 export const contextProviderRelativeSources = [
   "project.json",
@@ -38,6 +40,9 @@ export const memoryProviderRelativeSources = [
   "packages/work-continuity/src/workspace/recall-request.ts",
   "packages/work-continuity/src/workspace/lexical-recall.ts",
   "packages/work-continuity/src/workspace/qualification.ts",
+] as const;
+export const workMethodProviderRelativeSources = [
+  "packages/work-continuity/src/work-method.ts",
 ] as const;
 const memoryModuleRelativePath = memoryProviderRelativeSources[0];
 const legacyContextProviderRelativeSources = contextProviderRelativeSources.filter(
@@ -97,13 +102,16 @@ export async function readRegisteredContextProvider(
   if (registration.bytes.byteLength > 2097152 || registration.pin.sha256 !== match[1])
     throw Error("Pinned context provider registration changed");
   const value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(registration.bytes));
-  const version5 = value?.schema === "codex.context-provider-source-closure.v5";
+  const version6 = value?.schema === "codex.context-provider-source-closure.v6";
+  const version5 = version6 || value?.schema === "codex.context-provider-source-closure.v5";
   const version4 = version5 || value?.schema === "codex.context-provider-source-closure.v4";
   const location = version5 ? selectRegisteredProviderLocation(root, value) : undefined;
   const providerRoot = location?.providerRoot ?? value?.providerRoot;
   const version3 = version4 || value?.schema === "codex.context-provider-source-closure.v3";
   const version2 = version3 || value?.schema === "codex.context-provider-source-closure.v2";
-  const requiredSources = version4
+  const requiredSources = version6
+    ? [...contextProviderRelativeSources, ...gitWorkProviderRelativeSources, ...memoryProviderRelativeSources, ...workMethodProviderRelativeSources]
+    : version4
     ? [...contextProviderRelativeSources, ...gitWorkProviderRelativeSources, ...memoryProviderRelativeSources]
     : version3
     ? [...contextProviderRelativeSources, ...gitWorkProviderRelativeSources]
@@ -132,6 +140,7 @@ export async function readRegisteredContextProvider(
       "codex.context-provider-source-closure.v3",
       "codex.context-provider-source-closure.v4",
       "codex.context-provider-source-closure.v5",
+      "codex.context-provider-source-closure.v6",
     ].includes(value.schema) ||
     (!version5 && value.consumerRoot !== root) ||
     providerRoot !== resolve(root, "../agent-platform") ||
@@ -168,7 +177,7 @@ export async function readRegisteredContextProvider(
     pins.push(source.pin);
     sources.set(pin.path, source);
   }
-  validateContextProviderMetadata(sources, value.providerRoot, version4 ? 4 : version3 ? 3 : version2 ? 2 : 1);
+  validateContextProviderMetadata(sources, value.providerRoot, version6 ? 6 : version4 ? 4 : version3 ? 3 : version2 ? 2 : 1);
   const expected = resolve(providerRoot, value.modulePath),
     actual = Bun.resolveSync(packageName + "/context", dirname(module));
   // readSource performs exact canonical containment/type/2MiB checks. Resolution imports no code.
@@ -191,6 +200,7 @@ export async function readRegisteredContextProvider(
     providerRoot,
     ...(location ? { canonicalProviderRoot: location.canonicalProviderRoot, sourceLocationId: location.sourceLocationId } : {}),
     ...(gitWorkModulePath ? { gitWorkModulePath } : {}),
+    ...(version6 ? { workMethodAvailable: true as const } : {}),
   };
 }
 export async function recheckContextProvider(
@@ -206,7 +216,7 @@ export async function recheckContextProvider(
 
 /** Pure semantic validation, also used by dry source composition. It observes no target runtime. */
 export function validateContextProviderMetadata(
-  sources: ReadonlyMap<string, ProviderRead>, canonicalProviderRoot: string, version: 1 | 2 | 3 | 4,
+  sources: ReadonlyMap<string, ProviderRead>, canonicalProviderRoot: string, version: 1 | 2 | 3 | 4 | 6,
 ): void {
   const version2 = version >= 2, version3 = version >= 3, version4 = version >= 4;
   const json = (path: string) =>
@@ -215,6 +225,14 @@ export function validateContextProviderMetadata(
     upper = json("ontology-pin.json"),
     pkg = json("packages/work-continuity/package.json"),
     rootPackage = json("package.json");
+  const indexSource = sources.get("packages/work-continuity/src/context/index.ts");
+  if (!indexSource) throw Error("Context provider index source required");
+  const imports = new Bun.Transpiler({ loader: "ts" }).scanImports(
+    new TextDecoder("utf-8", { fatal: true }).decode(indexSource.bytes),
+  );
+  const importsWorkMethod = imports.some(({ path }) => path === "../work-method" || path === "../work-method.ts");
+  if (version === 6 ? !importsWorkMethod : importsWorkMethod)
+    throw Error(version === 6 ? "Work method provider requires its existing context index export" : "Work method executable requires the v6 source closure");
   if (
     project.kind !== "project" ||
     project.projectId !== "agent-platform" ||
@@ -227,6 +245,7 @@ export function validateContextProviderMetadata(
     upper.releasePin?.sha256 !== sources.get("releases/palantirkc-ontology-0.2.0.tgz")!.pin.sha256 ||
     pkg.name !== packageName ||
     pkg.exports?.["./context"] !== "./src/context/index.ts" ||
+    (version === 6 && !sources.has(workMethodProviderRelativeSources[0])) ||
     (version3 && pkg.exports?.["./git-work"] !== "./src/git-work/index.ts") ||
     (version4 && pkg.exports?.["./memory/recall-request"] !== "./src/workspace/recall-request.ts") ||
     rootPackage.dependencies?.["@palantirkc/ontology"] !==

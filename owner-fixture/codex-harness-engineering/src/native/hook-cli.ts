@@ -46,9 +46,13 @@ function admitsPinnedHostInput(value: unknown, retained: unknown, bindingsPath: 
         typeof value.cwd !== 'string' || typeof value.session_id !== 'string' || !value.session_id ||
         value.session_id.length > 1024 || /[\u0000-\u001f]/.test(value.session_id) ||
         !['SessionStart','UserPromptSubmit'].includes(String(value.hook_event_name)) ||
-        (value.hook_event_name === 'SessionStart' && !['startup','resume','compact','clear'].includes(String(value.source)))) return false;
+        (value.hook_event_name === 'SessionStart' && !['startup','resume','compact','clear','fork'].includes(String(value.source)))) return false;
     const text = (item: unknown) => typeof item === 'string' && item.length > 0 && item.length <= 1024 && !/[\u0000-\u001f]/.test(item);
     const selected = retained.contextSelections[0];
+    // This additive Host route admits only an explicitly selected native child.
+    // A root fork or a parent selection is never a wildcard for its descendants.
+    if (value.hook_event_name === 'SessionStart' && value.source === 'fork' &&
+        (!text(value.agent_id) || !text(selected.nativeAgentId))) return false;
     if (!['projectId','workId','taskId','nativeSessionId'].every(key => text(selected[key])) ||
         !['agent_id','agent_type'].every(key => value[key] === undefined || text(value[key])) ||
         !['nativeAgentId','nativeAgentType'].every(key => selected[key] === undefined || text(selected[key]))) return false;
@@ -65,6 +69,8 @@ export function admitsCurrentHomeContext(input: HookInput, registry: HookBinding
       registry.bindings.length !== 1 || registry.contextSelections?.length !== 1) return false;
   const binding = registry.bindings[0]!, selected = registry.contextSelections[0]!;
   const host = binding.nativeCodexHome !== undefined || Object.hasOwn(registry, 'hostAdmission');
+  if (host && input.hook_event_name === 'SessionStart' && input.source === 'fork' &&
+      (!input.agent_id || !selected.nativeAgentId)) return false;
   if (selected.schema !== "codex.session-git-work-selection.v1" ||
       (host ? !admitsHostDescriptor(registry) :
         binding.projectId !== "codex-harness-engineering" || binding.workId !== "ontology-driven-harness-operation") ||

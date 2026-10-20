@@ -32,12 +32,17 @@ async function observe(){
  }
  const pins=[...ownerSources.map(s=>s.pin),...provider.pins].sort((a,b)=>a.path.localeCompare(b.path));
  for(const pin of pins)if((await readExact(pin.path)).pin.sha256!==pin.sha256)throw Error('Context provider changed during observation');
- return {pins,gitWorkModulePath:provider.gitWorkModulePath,signature:hash(Buffer.from(JSON.stringify(pins)))};
+ return {pins,gitWorkModulePath:provider.gitWorkModulePath,workMethodAvailable:provider.workMethodAvailable,signature:hash(Buffer.from(JSON.stringify(pins)))};
 }
 type IndexApi=typeof import('../continuity/index');
 type SectionsApi=typeof import('../continuity/sections');
 type GitWorkApi=typeof import('@palantirkc/work-continuity/git-work');
-export interface LoadedCodexOwnerContext {index:IndexApi;sections:SectionsApi;gitWork?:GitWorkApi;sourcePins:ProviderPin[];verifyCurrentSourceClosure():Promise<void>}
+// The common index remains the single typed semantic owner. This narrow bridge
+// accepts unknown boundary data; it neither duplicates schemas nor imports an
+// unregistered package subpath before Root publishes the reviewed v6 successor.
+const workMethodFunctions=['validateWorkMethodStanding','validateWorkMethodPacket','validateWorkMethodReceipt','workMethodPacketSha256','workMethodReceiptSha256','workMethodRequiredSources','decideWorkMethodAdmission','evaluateWorkMethodCoverage'] as const;
+export type WorkMethodOwnerApi=Readonly<Record<typeof workMethodFunctions[number],(...args:unknown[])=>unknown>>;
+export interface LoadedCodexOwnerContext {index:IndexApi;sections:SectionsApi;gitWork?:GitWorkApi;workMethod?:WorkMethodOwnerApi;sourcePins:ProviderPin[];verifyCurrentSourceClosure():Promise<void>}
 let loaded:LoadedCodexOwnerContext|undefined,signature:string|undefined,pending:Promise<LoadedCodexOwnerContext>|undefined;
 export async function loadCodexOwnerContext():Promise<LoadedCodexOwnerContext>{
  if(pending){const result=await pending;await result.verifyCurrentSourceClosure();return result;}
@@ -49,9 +54,15 @@ export async function loadCodexOwnerContext():Promise<LoadedCodexOwnerContext>{
   const index:IndexApi=await import(pathToFileURL(ownerPaths[0]!).href),sections:SectionsApi=await import(pathToFileURL(ownerPaths[7]!).href);
   const gitWork:GitWorkApi|undefined=observation.gitWorkModulePath?await import(pathToFileURL(observation.gitWorkModulePath).href):undefined;
   if(gitWork&&['resolveGitWorkSelection','openGitWork','readGitWorkContext'].some(name=>typeof gitWork[name as keyof GitWorkApi]!=='function'))throw Error('Registered Git Work provider API differs');
+  let workMethod:WorkMethodOwnerApi|undefined;
+  if(observation.workMethodAvailable){
+   const exports=index as unknown as Record<string,unknown>;
+   if(workMethodFunctions.some(name=>typeof exports[name]!=='function'))throw Error('Registered Work method provider API differs');
+   workMethod=Object.freeze(Object.fromEntries(workMethodFunctions.map(name=>[name,exports[name]]))) as WorkMethodOwnerApi;
+  }
   if((await observe()).signature!==observation.signature)throw Error('Codex context provider changed during import; use a fresh process');
   signature=observation.signature;
-  loaded={index,sections,...(gitWork?{gitWork}:{}),sourcePins:observation.pins,verifyCurrentSourceClosure:async()=>{if((await observe()).signature!==signature)throw Error('Codex context code successor requires a fresh process');}};
+  loaded={index,sections,...(gitWork?{gitWork}:{}),...(workMethod?{workMethod}:{}),sourcePins:observation.pins,verifyCurrentSourceClosure:async()=>{if((await observe()).signature!==signature)throw Error('Codex context code successor requires a fresh process');}};
   return loaded;
  })();
  try{return await pending;}finally{pending=undefined;}
