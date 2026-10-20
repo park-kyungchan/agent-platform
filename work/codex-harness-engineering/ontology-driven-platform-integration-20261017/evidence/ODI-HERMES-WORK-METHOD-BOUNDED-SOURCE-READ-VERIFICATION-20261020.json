@@ -8,8 +8,8 @@
   "evidenceKind": "verification",
   "source": {
     "kind": "snapshot",
-    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-RESULT-20261020.json",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-RESULT-CORRECTED-20261020.json",
     "fragment": "#/content/verification",
-    "sha256": "558b1494edce0ed6065a49ae5f466b3fddc296761aceb74e639c1162b032eb51"
+    "sha256": "4ac64254072154ce2aff1ace3b77d04421bce928582b76ce54e6676d650094d2"
   }
 }
