@@ -1,0 +1,101 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-USER-DIR-TOPOLOGY-SCOPE-EXPANSION-20261020",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "native-user-message",
+    "locator": "Actual current user scope-expansion message; verbatim source capture /home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/DIR_TOPOLOGY_20261020.scope-expansion.source.actual.json"
+  },
+  "content": {
+    "correlation": "DIR_TOPOLOGY_20261020",
+    "originalText": "User-requested scope expansion for the SAME DIR_TOPOLOGY_20261020 successor task; preserve and update the existing record rather than creating a duplicate if already registered. First-party user feedback (retain verbatim with attribution): \"이와 관련해서도 디렉토리 트리 관련해서 최적화(예를들어, hermes-profile-* 전부 필요없어, 예전에 Git 설정 잘못해서 전부 통합해야하고 repo도 대규모 개편해야하는 이유 중에 하나(다른 이유들도 많음)가 이거야)해야하니까, 새 Orchestrator가 공통하네스에 근거하여 ID 부여하고 작업범위 추가포함하도록 해라.\"\n\nThis expands the requested outcome beyond a read-only directory map into directory/repository structural optimization and consolidation. The user explicitly judges the current hermes-profile-* repositories unnecessary and wants them consolidated; earlier Git configuration mistakes are ONE stated reason for a broader repository reorganization, not an exhaustive explanation. Keep user testimony, observed topology and proposed architecture separate. Do not reduce this to naming cleanup or infer the other unprovided reasons.\n\nUse the existing common-harness Domain/Project/Work/Task contracts to assign/reuse stable IDs, relate this work to the prior directory/runtime topology request, existing repository reorganization, Hermes integration/profile source ownership, VPS operations, CLI runtime separation and orchestrator handoff records where those relations actually exist. Record the first-party scope expansion in the current checkpoint and transfer it as successor-owned work for the new Orchestrator pane after the existing ACK/CAS/native Goal-plan handoff. Preserve the current Goal/process until your natural checkpoint; this is not a Pause or immediate pane replacement request.\n\nThe successor acceptance scope should cover: (1) identifying canonical repositories and destination ownership; (2) relating current hermes-profile-* source directories to actual runtime profiles without conflating them; (3) consolidating necessary content/history/evidence and updating consumers, remotes, worktree relationships and entrypoints under a coherent repository design; (4) addressing other repo-reorganization reasons from existing first-party records; (5) verifying adoption and reference integrity before retiring obsolete paths. Preserve Hermes default-profile Lead ownership of research/ontology/project measurement and runtime-owned user data/credentials. This dispatch requests source-owned planning and subsequent authorized migration by the successor, not immediate blind deletion of directories, Git history or production Hermes profiles by the current infrastructure session.\n\nAt a natural checkpoint, reply DIR_TOPOLOGY_20261020_SCOPE_REPLY with actual assigned/reused logical IDs, related IDs or explicit unknowns, canonical typed checkpoint/entrypoint locator, and confirmation that the successor scope contains structural consolidation. Since the earlier reply was not visible in bounded reads, retain the registration/result in the canonical typed handoff record so the successor and user can recover it. Do not create a second session store or parallel tracking scheme.",
+    "attribution": "Actual current first-party user message",
+    "verbatimFirstPartyFeedback": "이와 관련해서도 디렉토리 트리 관련해서 최적화(예를들어, hermes-profile-* 전부 필요없어, 예전에 Git 설정 잘못해서 전부 통합해야하고 repo도 대규모 개편해야하는 이유 중에 하나(다른 이유들도 많음)가 이거야)해야하니까, 새 Orchestrator가 공통하네스에 근거하여 ID 부여하고 작업범위 추가포함하도록 해라.",
+    "classification": "Actual first-party scope expansion of the SAME successor-owned Task. User testimony, user-provided dated topology observations, existing source facts and future proposed architecture remain distinct. Current MAIN records/links/checkpoints only.",
+    "priorInputId": "ODI-USER-DIR-TOPOLOGY-20261020",
+    "stableTaskId": "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020",
+    "sourceCapture": {
+      "kind": "snapshot",
+      "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/DIR_TOPOLOGY_20261020.scope-expansion.source.actual.json",
+      "sha256": "8d82c330c95653e8f238a3a578395ce4240c2f826a21d5e129682bcd1b3c026e"
+    },
+    "relatedSources": [
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "99ce517c60843992049bd52b9a42b9abdb822503",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-07.json",
+        "sha256": "c337e13b811bdac0dad4c963781f2021b9c34f49d91fe3ce84daf4848a80fa55"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "99ce517c60843992049bd52b9a42b9abdb822503",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY.json",
+        "sha256": "44d5e40ed4c00d27ab74183deebcca79d9fc9edf3d90de4c1c12285bb4e16d9f"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "99ce517c60843992049bd52b9a42b9abdb822503",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-INPUT-COMMON-HARNESS-REPOSITORY-DIRECTION.json",
+        "sha256": "2fac81a66b7ed2d342b8aa8a644210350385be05b55421f344cd33a70a650047"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "99ce517c60843992049bd52b9a42b9abdb822503",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-DIR-TOPOLOGY-20261020.json",
+        "sha256": "e0cc13bfb7130377a59dd42d570fd24220eb66556df0f1c7533eb83255d20ad3"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "99ce517c60843992049bd52b9a42b9abdb822503",
+        "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/decisions/ODI-DECISION-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020.json",
+        "sha256": "d9162524963072b70b6209d6901b21900d872a4160bec10bbf810851832275dd"
+      },
+      {
+        "kind": "git",
+        "repositoryId": "park-kyungchan/agent-platform",
+        "commit": "99ce517c60843992049bd52b9a42b9abdb822503",
+        "path": "architecture/capability-source-owners.json",
+        "sha256": "a94c7572afb5ef16ef7ebf5a4e224f738abbc78bb491837df47a95e78abf85d4"
+      }
+    ],
+    "actualRelatedIds": {
+      "sameWorkRepositoryRearchitectureTask": "ODI-07",
+      "priorRepositoryDirectionDecision": "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY",
+      "priorTopologyDecision": "ODI-DECISION-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020",
+      "commonSourceRepository": "park-kyungchan/agent-platform",
+      "infrastructureDomain": "infrastructure",
+      "infrastructureProject": "vps-operations",
+      "nativeHermesSourceOwner": "hermes-harness-engineering",
+      "HermesProfileSourceTaskIds": null,
+      "profileSourceToRuntimeMappings": null,
+      "successorNativeThreadId": null,
+      "successorHerdrPaneId": null
+    },
+    "successorAcceptance": [
+      "Identify canonical repositories and destination ownership.",
+      "Relate existing hermes-profile-* source directories to actual runtime profiles without conflating either or inferring one-to-one identity.",
+      "Consolidate necessary source content, Git history and evidence; update consumers, remotes, Git worktree relationships and entrypoints under a coherent owner-aligned repository design.",
+      "Find and address additional repository-reorganization reasons in existing first-party records; do not infer reasons the user has not supplied.",
+      "Verify actual adoption and reference integrity before retiring obsolete source paths; preserve completed/uncertain effects, history and recoverability.",
+      "Retain original host/container/account/path/mount map and observed-versus-declared, duplicates/symlinks/worktree distinctions."
+    ],
+    "sourceOwnerBoundary": "Existing capability-source-owners registry and original topology Input remain source-bound. Hermes default-profile Lead owns research/Ontology/project measurement; native runtime owns profiles, user data and credentials. Root successor owns infrastructure orchestration/integration, not those domains.",
+    "migrationAuthority": "After actual common-harness adoption/finite coverage and existing exact sole-successor ACK/CAS/genuine Goal-plan handoff, the successor is authorized to perform source-owned structural planning and subsequent scoped migration/consolidation through existing owners and effect-specific review/merge/application/use guards. This is not immediate blind deletion, history removal or production-profile deletion by current MAIN.",
+    "scopeInterpretation": "Earlier no-migration guard remains a current-session boundary; this latest explicit expansion admits later successor source consolidation. Original dated observations stay testimony until actually re-observed. Earlier Git configuration errors are ONE user-stated reason; unprovided other reasons remain unknown pending existing first-party source records. Not merely naming cleanup.",
+    "currentGoalLifecycleChanged": false,
+    "currentProcessRestartRequested": false,
+    "newTaskCreated": false,
+    "nativePermissionGranted": false,
+    "wholeWorkComplete": false
+  }
+}

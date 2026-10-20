@@ -16,8 +16,8 @@
     "planRevision": 4,
     "taskId": "ODI-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020"
   },
-  "title": "Successor-owned infrastructure topology map and scoped recommendations",
-  "nextAction": "SUCCESSOR ONLY. After actual common-harness adoption/finite coverage release and the existing exact receiver ACK/CAS sole-ownership transfer with genuine successor Goal/plan readiness, read Input ODI-USER-DIR-TOPOLOGY-20261020 original and supplement plus its exact related source records. Then perform only the user's bounded read-only topology investigation and scoped recommendations through existing source/native/domain owners. Distinguish user-provided observations from new current proof, logical IDs from native thread/pane/PID/path, declared from observed runtime, duplicates from symlinks/Git worktrees, and recommendations from later migration decisions. Preserve whole ODI WHY/owners/fences, sameUSD14unknown, current controls and service roles. No migrations, deletions, container recreation, code-server privilege/role changes, credentials/user-data contents or unrelated storage-domain writes. Current MAIN registers/links/checkpoints only and continues its existing Goal until its own safe handoff.",
+  "title": "Successor-owned directory and repository structural consolidation with topology proof",
+  "nextAction": "SUCCESSOR ONLY. After actual common-harness adoption/finite coverage and exact receiver ACK/CAS sole ownership with genuine successor Goal/plan, read both ODI-USER-DIR-TOPOLOGY-20261020 and ODI-USER-DIR-TOPOLOGY-SCOPE-EXPANSION-20261020, originals/supplement/testimony and related ODI-07/repository-direction/owner records. Establish canonical host/container/user/path/mount and repository destination ownership; distinguish source hermes-profile-* repositories from native runtime profiles. Plan and execute authorized owner-aligned source structural consolidation, retaining necessary content/history/evidence and updating consumers/remotes/worktrees/entrypoints; address other reasons from existing first-party records without inventing them. Verify adoption/reference integrity before retiring obsolete source paths. Preserve whole ODI WHY/owners/fences/USD14unknown, Hermes default Lead R&D/Ontology/measurement and native profiles/user data/credentials/serving349. No current-MAIN migration or blind directory/history/production-profile deletion. Current MAIN registers/links/checkpoints and continues its unchanged Goal/process until safe handoff.",
   "state": {
     "execution": "planned",
     "verification": "pending",
@@ -35,7 +35,9 @@
   "decisionIds": [
     "ODI-DECISION-INFRASTRUCTURE-TOPOLOGY-SUCCESSOR-20261020",
     "ODI-DECISION-COMMON-FIRST-20261020",
-    "ODI-DECISION-LONG-AUTONOMY-20261020"
+    "ODI-DECISION-LONG-AUTONOMY-20261020",
+    "ODI-DECISION-DIR-TOPOLOGY-STRUCTURAL-CONSOLIDATION-20261020",
+    "ODI-DECISION-COMMON-HARNESS-REPOSITORY-TOPOLOGY"
   ],
   "effectIds": [],
   "pendingEffectIds": [],
