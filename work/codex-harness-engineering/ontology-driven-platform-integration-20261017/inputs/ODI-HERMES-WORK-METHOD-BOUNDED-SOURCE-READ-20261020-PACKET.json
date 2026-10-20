@@ -1,0 +1,75 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020-PACKET",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "source-owner-capture",
+    "locator": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/bounded-reader-task-registration.authoring.actual.json"
+  },
+  "content": {
+    "classification": "Actual Root source-owner bootstrap assignment and first logical registration; not an actual-user answer, native Task/Run authentication, runtime permission or retroactive qualification of preparation.",
+    "capturedAtUtc": "2026-10-20T04:35:05.910677Z",
+    "logical": {
+      "domainId": "native-harness",
+      "projectId": "codex-harness-engineering",
+      "workId": "ontology-driven-platform-integration-20261017",
+      "issueId": "ODI-ISSUE-20261017",
+      "specId": "ODI-SPEC",
+      "specRevision": 1,
+      "planId": "ODI-PLAN",
+      "planRevision": 4,
+      "taskId": "ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020"
+    },
+    "exactTaskText": "Implement only the bounded guarded Hermes source-read bootstrap in Input ODI-HERMES-WORK-METHOD-BOUNDED-SOURCE-READ-20261020-PACKET; retain exact source, checks and unknown native IDs. No runtime install, activation, paid judgment or general-work release.",
+    "parentActualNativeThreadId": "01a156bc-f195-7f42-b71b-43e786bbb04f",
+    "assignedActualNativeThreadId": "01a156c2-ec90-7e12-9d5f-791e25500b3a",
+    "assignedNativeRole": "/root/native_compatibility",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "nativeEventId": null,
+    "nativeAuthorshipAuthenticated": false,
+    "currentSourcePrecedent": {
+      "kind": "git",
+      "repositoryId": "park-kyungchan/agent-platform",
+      "commit": "0f13c9474b9fdb01eaed733c27995b9131ba95b0",
+      "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/tasks/ODI-HERMES-WORK-METHOD-FIRST-READ-NATIVE-20261020.json"
+    },
+    "actualEngineeringTrigger": {
+      "fullExistingResponseDraftChars": 13911,
+      "unchangedResponseCap": 12000,
+      "investigation": {
+        "kind": "snapshot",
+        "path": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/hermes-work-method-output-fit.investigation.actual.json",
+        "sha256": "f59fd1ecfd2e7685a4e39f1bb6488930a2ff13de0ee8df1fbf795b1dea16d31c"
+      }
+    },
+    "sourceScope": [
+      "Use the existing compiled guarded read-work-method entrypoint with a closed explicit opt-in immutable source-read route. Preserve legacy full response behavior and all existing input/core/output caps.",
+      "Bind source-map path/hash/data base through the trusted source-owner build contract. Request data never chooses executable modules, provider/registration roots or arbitrary filesystem paths. Exact logical Task and actual identity-only native tuple stay scoped.",
+      "Read complete immutable mapped originals and shared fully validated owner documents as contiguous strict UTF-8 chunks, with full-document SHA, exact continuation digest/offset and complete serialized reply length including metadata/escaping. Recheck source/map/file before and after reads; hold unknown IDs, foreign scope, symlinks, escape, drift, malformed boundaries and metadata that alone exceeds the cap.",
+      "Reuse exact existing native/common validation and admission. Delivery establishes neither receipt/use/admission nor native permissions. No paginator state, second runtime/scheduler/ontology/Memory/session store/provider or credentials bridge.",
+      "Use one isolated implementation worktree/branch. Add the minimum maintained module and required provider/source capability/owner-marker pins; Root serializes central source publication/application. Preserve code/native/data/domain owners and generated facade ownership.",
+      "Use meaningful existing focused source/compiled-fixture tests, strict types, quality/source closure checks with zero model calls. Private offline dependency projection repair is private QA only; no shared node_modules/global cache/config/trust/runtime installation or external software changes.",
+      "Capture genuine own source-author metadata under this exact logical Task. Keep unavailable native Task/Run/event IDs null. Preserve exact assignment/source/checks/unknowns; independent review, authenticated publication, required CI/manual expected-head merge and native owner adoption remain separate."
+    ],
+    "implementation": {
+      "worktree": "/home/palantirkc/projects/codex-harness-engineering/.private/orchestrator-long-autonomy-handoff-20261020/worktrees/hermes-source-read",
+      "branch": "work/hermes-work-method-source-read-20261020",
+      "initialSourceBase": "0d41d8f85d552ea373a73125e2fa85c49d729dd6",
+      "preRegistrationPreparationReported": true,
+      "formalTaskCorrelationBeforeThisRecord": "pending; no completed producer Task reused",
+      "currentMainSourceTreeEqualToInitialBase": true
+    },
+    "acceptanceScope": [
+      "Legacy API and caps unchanged; lossless complete-byte chunk reconstruction and hash continuity including multibyte/escaped text.",
+      "Closed owner binding and source/map/file drift, foreign identity/logical Task and symlink/path rejection.",
+      "Actual candidate source/typed checks, independent exact review and normal publication/CI/merge. Native install/receive/use/finite coverage/whole acceptance remain unverified."
+    ],
+    "wholeScopeFences": "All original ODI purpose/WHY/Data-Logic-Action-Security/owners and unfinished estate/Memory/H16-H49/PR17-19/domain/MCP-image-Linux/recovery/distinct acceptance remain. Same successor topology Task/structural consolidation/exactff55 proposal+7inputs+3qualifications and source-sharing comparison. Serving349/current model/effort/auth/permissions/hook trust, sameUSD14unknown,9fences126consumed5uncertain preserved. No paid Jev/provider/evaluation suite/old helper/effect replay/general release/new MAIN/Pause. Conditional old-Lead-only safe-handoff Pause/fallback remains; successor Goal continues."
+  }
+}

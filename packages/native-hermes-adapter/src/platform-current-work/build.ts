@@ -4,6 +4,7 @@ import { isAbsolute, join, resolve, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { currentWorkOutputPolicy } from "./output-policy.ts";
+import type { WorkMethodSourceBinding } from "./work-method-source.ts";
 import {
   observeHermesPlatformSource,
   platformEntryPoints,
@@ -25,6 +26,8 @@ export interface PlatformBuildRequest {
   currentWorkOutputVersion?: "v1" | "v2";
   currentWorkMaxChars?: number;
   currentWorkMetadataEncoding?: "metadata.v1";
+  /** Optional immutable data scope; absence keeps explicit source-read held. */
+  workMethodSourceBinding?: WorkMethodSourceBinding;
 }
 async function compilerPin(path: string) {
   if (resolve(path) !== path || (await realpath(path)) !== path)
@@ -125,6 +128,23 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
     if (!/^[a-f0-9]{64}$/u.test(request.currentWorkBindings.sha256))
       throw Error("EXACT_CURRENT_WORK_BINDINGS_PIN_REQUIRED");
   }
+  if (request.workMethodSourceBinding !== undefined) {
+    const binding = request.workMethodSourceBinding;
+    if (
+      !binding ||
+      typeof binding !== "object" ||
+      Array.isArray(binding) ||
+      Object.keys(binding).sort().join("|") !== "dataBase|mapSha256|runtimeMapPath"
+    )
+      throw Error("EXACT_WORK_METHOD_SOURCE_BINDING_REQUIRED");
+    runtimePath(binding.dataBase);
+    runtimePath(binding.runtimeMapPath);
+    if (
+      !binding.runtimeMapPath.startsWith(binding.dataBase + "/") ||
+      !/^[a-f0-9]{64}$/u.test(binding.mapSha256)
+    )
+      throw Error("EXACT_WORK_METHOD_SOURCE_BINDING_REQUIRED");
+  }
   const source = await observeHermesPlatformSource(request.registrationPath, request),
     before = await compilerPin(request.compiler.path);
   if (before.sha256 !== request.compiler.sha256) throw Error("INSTALLED_COMPILER_PIN_DRIFT");
@@ -191,6 +211,11 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
           JSON.stringify(request.currentWorkOutputVersion ?? "v1"),
         "--define",
         "HERMES_CURRENT_WORK_MAX_CHARS=" + JSON.stringify(outputPolicy.policy.maxChars),
+        "--define",
+        "HERMES_WORK_METHOD_SOURCE_BINDING=" +
+          (request.workMethodSourceBinding
+            ? JSON.stringify(request.workMethodSourceBinding)
+            : "undefined"),
       ];
       if (request.currentWorkMetadataEncoding)
         argv.push(
@@ -297,6 +322,9 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
       currentWorkOutputPolicy: outputPolicy.policy,
       ...(request.currentWorkMetadataEncoding
         ? { currentWorkMetadataEncoding: request.currentWorkMetadataEncoding }
+        : {}),
+      ...(request.workMethodSourceBinding
+        ? { workMethodSourceBinding: request.workMethodSourceBinding }
         : {}),
       authority: "none" as const,
       nativePermissionGranted: false as const,

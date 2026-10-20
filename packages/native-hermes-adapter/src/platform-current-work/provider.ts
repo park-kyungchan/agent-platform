@@ -97,6 +97,7 @@ export const platformSourcePaths = [
     "read-memory",
     "read-work-method",
     "work-method",
+    "work-method-source",
     "provider",
     "build",
     "hook-context",

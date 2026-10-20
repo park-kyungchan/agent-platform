@@ -172,8 +172,29 @@ function held(reason: string, policy: CurrentWorkOutputPolicy): HermesWorkMethod
   };
 }
 
+/** Identity-only native seam shared by the legacy and explicit source-read routes. */
+export function hermesWorkMethodEventIdentity(eventValue: unknown) {
+  const event = row(eventValue);
+  only(event, ["hook_event_name", "profile", "session_id", "cwd", "extra"]);
+  if (event.hook_event_name !== "pre_llm_call") fail("UNSUPPORTED_NATIVE_EVENT");
+  const extra = event.extra === undefined || event.extra === null ? {} : row(event.extra);
+  only(extra, ["agent_id", "project_id", "task_id", "run_id", "turn_id"]);
+  const native: HermesWorkMethodTuple = {
+    runtime: "native-hermes",
+    profileId: id(event.profile),
+    sessionId: id(event.session_id),
+    agentId: optional(extra.agent_id),
+    nativeProjectId: optional(extra.project_id),
+    nativeTaskId: optional(extra.task_id),
+    nativeRunId: optional(extra.run_id),
+    turnId: optional(extra.turn_id),
+  };
+  const actualCwd = cwd(event.cwd);
+  return { native, actualCwd };
+}
+
 /** Additive owner admission only: no generic tool veto, native invocation, fallback or activation. */
-export async function readHermesWorkMethod(
+async function evaluateHermesWorkMethod(
   value: unknown,
   options: HermesWorkMethodOptions,
 ): Promise<HermesWorkMethodResponse> {
@@ -193,22 +214,7 @@ export async function readHermesWorkMethod(
     if (!output.valid) fail("INVALID_OUTPUT_POLICY");
     policy = output.policy;
 
-    const event = row(request.event);
-    only(event, ["hook_event_name", "profile", "session_id", "cwd", "extra"]);
-    if (event.hook_event_name !== "pre_llm_call") fail("UNSUPPORTED_NATIVE_EVENT");
-    const extra = event.extra === undefined || event.extra === null ? {} : row(event.extra);
-    only(extra, ["agent_id", "project_id", "task_id", "run_id", "turn_id"]);
-    const native: HermesWorkMethodTuple = {
-      runtime: "native-hermes",
-      profileId: id(event.profile),
-      sessionId: id(event.session_id),
-      agentId: optional(extra.agent_id),
-      nativeProjectId: optional(extra.project_id),
-      nativeTaskId: optional(extra.task_id),
-      nativeRunId: optional(extra.run_id),
-      turnId: optional(extra.turn_id),
-    };
-    const actualCwd = cwd(event.cwd);
+    const { native, actualCwd } = hermesWorkMethodEventIdentity(request.event);
     const selection = row(request.selection);
     only(selection, ["schema", "cwd", "native", "actorId", "routeId", "packetSha256"]);
     if (selection.schema !== "hermes.work-method-owner-selection.v1")
@@ -276,10 +282,9 @@ export async function readHermesWorkMethod(
       nativePermissionGranted: false,
       executionAuthorityGranted: false,
     };
-    // Cap the complete serialized response, not an unclipped subfield or approximate token count.
-    const withinBound = JSON.stringify(response).length <= policy.maxChars;
+    // Shared evaluation retains complete contracts; each public wire route applies its own cap.
     await options.verifySourceClosure();
-    return withinBound ? response : held("WORK_METHOD_OUTPUT_EXCEEDS_BOUND", policy);
+    return response;
   } catch (error) {
     const reason =
       stage === "source" || stage === "readback"
@@ -289,4 +294,31 @@ export async function readHermesWorkMethod(
           : "INVALID_OWNER_REQUEST";
     return held(reason, policy);
   }
+}
+
+/** Legacy complete response remains lossless and keeps its original whole-response cap. */
+export async function readHermesWorkMethod(value: unknown, options: HermesWorkMethodOptions) {
+  const response = await evaluateHermesWorkMethod(value, options);
+  return JSON.stringify(response).length <= response.policy.maxChars
+    ? response
+    : held("WORK_METHOD_OUTPUT_EXCEEDS_BOUND", response.policy);
+}
+
+/** A source document only; a paginated delivery never establishes native receive/use/admission. */
+export async function readHermesWorkMethodSourceDocument(
+  value: unknown,
+  options: HermesWorkMethodOptions,
+) {
+  const response = await evaluateHermesWorkMethod(value, options);
+  if (!response.projection || !response.native || !response.admission)
+    throw Error("OWNER_DOCUMENT_NOT_SOURCE_QUALIFIED");
+  return {
+    schema: "hermes.work-method-source-document.v1" as const,
+    native: response.native,
+    admission: response.admission,
+    contracts: response.projection,
+    nativeAuthenticationEstablished: false as const,
+    nativePermissionGranted: false as const,
+    executionAuthorityGranted: false as const,
+  };
 }
