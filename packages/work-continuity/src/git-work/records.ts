@@ -18,6 +18,14 @@ import type {
   TaskOperationalState,
   ValidationResult,
   WorkRecord,
+  PinnedGitSource,
+  SelectedExternalArtifactPrerequisite,
+  ArtifactSourceClosure,
+  SelectedArtifactGateDefinition,
+  ArtifactSelectionReceipt,
+  ExternalArtifactMilestoneReceipt,
+  ArtifactCriterionReceipt,
+  ExternalArtifactReceiverUse,
 } from "./types.ts";
 
 const text = (value: unknown): value is string =>
@@ -85,6 +93,7 @@ function completedTaskContract(task: TaskRecord): object {
     title: task.title,
     executionClass: task.executionClass,
     dependsOn: [...task.dependsOn].sort((a, b) => a.taskId.localeCompare(b.taskId)),
+    externalPrerequisites: task.externalPrerequisites,
     decisionIds: [...task.decisionIds].sort(),
     effectIds: [...task.effectIds].sort(),
     pendingEffectIds: [...(task.pendingEffectIds ?? [])].sort(),
@@ -211,7 +220,8 @@ export function assertRecord(value: unknown): GitWorkRecord {
   requireValue(object(value), "INVALID_WORK_RECORD");
   const record = value as unknown as GitWorkRecord;
   requireValue(
-    record.schema === "common.git-work.v1" &&
+    (record.schema === "common.git-work.v1" ||
+      (record.kind === "task" && record.schema === "common.git-work-task.v2")) &&
       [record.id, record.domainId, record.projectId, record.workId].every(text),
     "INVALID_RECORD_IDENTITY",
   );
@@ -319,6 +329,22 @@ export function assertRecord(value: unknown): GitWorkRecord {
           strings(record.verificationEvidenceIds),
         "INVALID_TASK_CONTRACT",
       );
+      if (record.externalPrerequisites !== undefined) {
+        requireValue(
+          Array.isArray(record.externalPrerequisites) && record.externalPrerequisites.length <= 64,
+          "INVALID_EXTERNAL_PREREQUISITES",
+        );
+        requireValue(
+          record.externalPrerequisites.length === 0 || record.schema === "common.git-work-task.v2",
+          "EXTERNAL_PREREQUISITES_REQUIRE_TASK_V2",
+        );
+        record.externalPrerequisites.forEach(assertExternalArtifactPrerequisite);
+        requireValue(
+          new Set(record.externalPrerequisites.map((p) => p.consumerGate.instanceId)).size ===
+            record.externalPrerequisites.length,
+          "DUPLICATE_EXTERNAL_GATE_INSTANCE",
+        );
+      }
       if (record.pendingEffectIds !== undefined)
         requireValue(strings(record.pendingEffectIds), "INVALID_PENDING_EFFECTS");
       if (record.nextAction !== undefined)
@@ -469,7 +495,10 @@ export async function validateRecordSources(
     sources.push(result);
     return result;
   };
-  if (record.kind === "work" && record.continuity) {
+  if (record.kind === "task" && record.externalPrerequisites) {
+    for (const prerequisite of record.externalPrerequisites)
+      for (const reference of externalArtifactSourceReferences(prerequisite)) await read(reference);
+  } else if (record.kind === "work" && record.continuity) {
     for (const reference of record.continuity.purposeSources) {
       const source = await read(reference);
       const original = assertRecord(source.document);
@@ -689,6 +718,7 @@ export async function dependencyFindings(
 export async function validateRecordSet(
   records: Map<string, GitWorkRecord>,
   reader: GitWorkReader,
+  externalTrail: readonly string[] = [],
 ): Promise<ValidationResult> {
   const findings: string[] = [];
   const work = records.get(recordKey({ kind: "work", id: reader.work.workId }));
@@ -788,6 +818,10 @@ export async function validateRecordSet(
         if (record.state.execution === "complete") {
           for (const dependency of record.dependsOn)
             findings.push(...(await dependencyFindings(record, dependency, records, reader)));
+          for (const prerequisite of record.externalPrerequisites ?? [])
+            findings.push(
+              ...(await externalPrerequisiteFindings(record, prerequisite, reader, externalTrail)),
+            );
         }
         if (record.state.verification === "passed") {
           requireValue(
@@ -1078,4 +1112,315 @@ export async function validateGitWorkTransition(
     }
   }
   return outcome(findings);
+}
+
+function pinnedGitSource(value: unknown): asserts value is PinnedGitSource {
+  sourceReference(value);
+  requireValue(
+    object(value) &&
+      value.kind === "git" &&
+      typeof value.sha256 === "string" &&
+      /^[a-f0-9]{64}$/.test(value.sha256),
+    "PINNED_EXTERNAL_GIT_SOURCE_REQUIRED",
+  );
+}
+const milestones = [
+  "execution-and-verification",
+  "shared-audit-delivery",
+  "formal-task-completion",
+  "acceptance",
+];
+export function assertExternalArtifactPrerequisite(
+  value: unknown,
+): asserts value is SelectedExternalArtifactPrerequisite {
+  requireValue(
+    object(value) &&
+      value.schema === "common.git-selected-external-artifact.v1" &&
+      value.grantsNativePermission === false &&
+      object(value.producer) &&
+      object(value.consumerGate) &&
+      object(value.qualification),
+    "INVALID_EXTERNAL_ARTIFACT_PREREQUISITE",
+  );
+  const p = value as unknown as SelectedExternalArtifactPrerequisite,
+    g = p.consumerGate;
+  assertLogicalIdentity(p.producer.logical);
+  assertLogicalIdentity(g.consumer);
+  requireValue(
+    text(p.producer.ownerId) &&
+      milestones.includes(p.producer.milestone) &&
+      text(g.instanceId) &&
+      positive(g.revision) &&
+      text(g.selectedAlternative) &&
+      text(g.selectionOwnerId) &&
+      Array.isArray(g.criterionReceipts) &&
+      g.criterionReceipts.length > 0 &&
+      g.criterionReceipts.length <= 64 &&
+      g.criterionReceipts.every((r) => object(r) && text(r.criterionId)) &&
+      new Set(g.criterionReceipts.map((r) => r.criterionId)).size === g.criterionReceipts.length,
+    "INVALID_EXTERNAL_ARTIFACT_GATE",
+  );
+  requireValue(
+    p.qualification.status === "unresolved"
+      ? p.qualification.receiverUse === null
+      : ["rejected", "owner-qualified"].includes(p.qualification.status) &&
+          object(p.qualification.receiverUse),
+    "INVALID_EXTERNAL_ARTIFACT_QUALIFICATION",
+  );
+  externalArtifactSourceReferences(p).forEach(pinnedGitSource);
+}
+export function externalArtifactSourceReferences(
+  p: SelectedExternalArtifactPrerequisite,
+): PinnedGitSource[] {
+  return [
+    p.producer.record,
+    p.producer.sourceClosure,
+    p.producer.artifact,
+    p.producer.ownerMilestoneReceipt,
+    p.consumerGate.definition,
+    p.consumerGate.consumerSourceClosure,
+    p.consumerGate.ownerSelectionReceipt,
+    ...p.consumerGate.criterionReceipts.map((r) => r.evidence),
+    ...(p.qualification.receiverUse ? [p.qualification.receiverUse] : []),
+  ];
+}
+/** Uses canonical Git object readers and existing milestone checks, without mixing Work record maps.
+ * Owner receipt declarations are source evidence; this function never authenticates a native owner.
+ */
+export async function externalPrerequisiteFindings(
+  task: TaskRecord,
+  prerequisite: SelectedExternalArtifactPrerequisite,
+  reader: GitWorkReader,
+  trail: readonly string[] = [],
+): Promise<string[]> {
+  try {
+    assertExternalArtifactPrerequisite(prerequisite);
+    const p = prerequisite.producer,
+      g = prerequisite.consumerGate;
+    const currentKey = JSON.stringify([
+      reader.selection.repositoryId,
+      reader.commit,
+      task.projectId,
+      task.workId,
+      task.id,
+    ]);
+    requireValue(
+      trail.length < 16 && !trail.includes(currentKey),
+      "EXTERNAL_PREREQUISITE_CYCLE_OR_DEPTH",
+    );
+    requireValue(
+      sameFields(g.consumer, task.logical, identityKeys) &&
+        sameFields(g.consumer, reader.work, ["domainId", "projectId", "workId", "issueId"]) &&
+        g.consumer.specId === reader.work.spec.id &&
+        g.consumer.specRevision === reader.work.spec.revision &&
+        g.consumer.planId === reader.work.plan.id &&
+        g.consumer.planRevision === reader.work.plan.revision,
+      "EXTERNAL_CONSUMER_IDENTITY_OR_REVISION_MISMATCH",
+    );
+    requireValue(
+      p.logical.workId !== task.workId ||
+        p.logical.projectId !== task.projectId ||
+        p.record.repositoryId !== reader.selection.repositoryId,
+      "EXTERNAL_PRODUCER_MUST_BE_FOREIGN_WORK",
+    );
+    const read = async (ref: PinnedGitSource) => {
+      pinnedGitSource(ref);
+      return reader.readSource(ref);
+    };
+    const closure = async (ref: PinnedGitSource, logical: typeof task.logical) => {
+      const value = (await read(ref)).value as unknown as ArtifactSourceClosure;
+      requireValue(
+        value?.schema === "common.git-artifact-source-closure.v1" &&
+          object(value.logical) &&
+          sameFields(value.logical, logical, identityKeys) &&
+          Array.isArray(value.sources) &&
+          value.sources.length > 0 &&
+          value.sources.length <= 128,
+        "EXTERNAL_SOURCE_CLOSURE_MISMATCH",
+      );
+      for (const source of value.sources) await read(source);
+    };
+    await closure(p.sourceClosure, p.logical);
+    await closure(g.consumerSourceClosure, g.consumer);
+    await read(p.artifact);
+    const { openGitWork, gitRecordPath } = await import("./source.ts");
+    requireValue(
+      p.record.path ===
+        gitRecordPath(p.logical.projectId, p.logical.workId, {
+          kind: "task",
+          id: p.logical.taskId,
+        }) &&
+        (p.record.fragment === undefined || p.record.fragment === "#"),
+      "EXTERNAL_PRODUCER_RECORD_ADDRESS_MISMATCH",
+    );
+    const declared = assertRecord((await read(p.record)).value);
+    requireValue(
+      declared.kind === "task" && sameFields(declared.logical, p.logical, identityKeys),
+      "EXTERNAL_PRODUCER_LOGICAL_MISMATCH",
+    );
+    const root =
+      p.record.repositoryId === reader.selection.repositoryId
+        ? reader.selection.repositoryRoot
+        : reader.selection.repositories?.[p.record.repositoryId];
+    requireValue(root, "SOURCE_REPOSITORY_NOT_ADMITTED");
+    const producerReader = await openGitWork({
+      ...reader.selection,
+      repositoryRoot: root,
+      repositoryId: p.record.repositoryId,
+      commit: p.record.commit,
+      projectId: p.logical.projectId,
+      workId: p.logical.workId,
+      repositories: {
+        ...reader.selection.repositories,
+        [reader.selection.repositoryId]: reader.selection.repositoryRoot,
+      },
+    });
+    requireValue(
+      sameFields(producerReader.work, p.logical, ["domainId", "projectId", "workId", "issueId"]) &&
+        producerReader.work.spec.id === p.logical.specId &&
+        producerReader.work.spec.revision === p.logical.specRevision &&
+        producerReader.work.plan.id === p.logical.planId &&
+        producerReader.work.plan.revision === p.logical.planRevision,
+      "EXTERNAL_PRODUCER_ACTIVE_CONTRACT_MISMATCH",
+    );
+    // Read only the selected producer's existing canonical closure, including its local dependencies/fences.
+    const records = new Map<string, GitWorkRecord>();
+    const queue: RecordReference[] = [
+      { kind: "work", id: p.logical.workId },
+      { kind: "task", id: p.logical.taskId },
+    ];
+    while (queue.length) {
+      const ref = queue.shift()!,
+        key = recordKey(ref);
+      if (records.has(key)) continue;
+      requireValue(records.size < (reader.selection.maxRecords ?? 2048), "EXTERNAL_RECORD_LIMIT");
+      const record = await producerReader.readRecord(ref);
+      records.set(key, record);
+      queue.push(...recordDependencies(record));
+    }
+    const validated = await validateRecordSet(records, producerReader, [...trail, currentKey]);
+    requireValue(validated.valid, `EXTERNAL_PRODUCER_INVALID:${validated.findings.join("|")}`);
+    const milestoneFindings = await dependencyFindings(
+      declared,
+      {
+        taskId: declared.id,
+        milestone: p.milestone,
+        receiptEvidenceId: declared.executionEvidenceId,
+      },
+      records,
+      producerReader,
+    );
+    // Validate the producer's own occurrence using v1 checks. Cross-Work artifact use is
+    // qualified below by the exact consumer-specific receipt, independently of runtime equality.
+    requireValue(
+      milestoneFindings.filter(
+        (f) => f !== `ACCEPTANCE_REQUIRES_OWNER_QUALIFICATION:${declared.id}`,
+      ).length === 0,
+      `EXTERNAL_MILESTONE_NOT_SATISFIED:${milestoneFindings.join("|")}`,
+    );
+    const definition = (await read(g.definition))
+      .value as unknown as SelectedArtifactGateDefinition;
+    requireValue(
+      definition?.schema === "common.git-artifact-gate-definition.v1" &&
+        definition.selectionOwnerId === g.selectionOwnerId &&
+        Array.isArray(definition.alternatives) &&
+        definition.alternatives.length > 0 &&
+        definition.alternatives.length <= 64 &&
+        definition.alternatives.every((a) => object(a) && text(a.id)) &&
+        new Set(definition.alternatives.map((a) => a.id)).size === definition.alternatives.length,
+      "EXTERNAL_GATE_DEFINITION_MISMATCH",
+    );
+    const alternative = definition.alternatives.find((a) => a.id === g.selectedAlternative);
+    requireValue(
+      alternative &&
+        sameFields(alternative.producer, p.logical, identityKeys) &&
+        alternative.ownerId === p.ownerId &&
+        isDeepStrictEqual(alternative.sourceClosure, p.sourceClosure) &&
+        alternative.milestone === p.milestone &&
+        isDeepStrictEqual(alternative.artifact, p.artifact) &&
+        strings(alternative.criterionIds) &&
+        alternative.criterionIds.length > 0 &&
+        sameStringSet(
+          alternative.criterionIds,
+          g.criterionReceipts.map((r) => r.criterionId),
+        ),
+      "EXTERNAL_SELECTED_ALTERNATIVE_OR_CRITERIA_MISMATCH",
+    );
+    const { ownerSelectionReceipt: _selection, criterionReceipts: _criteria, ...selection } = g;
+    const { ownerMilestoneReceipt: _milestone, ...producer } = p;
+    const selected = (await read(g.ownerSelectionReceipt))
+      .value as unknown as ArtifactSelectionReceipt;
+    requireValue(
+      selected?.schema === "common.git-artifact-selection-receipt.v1" &&
+        isDeepStrictEqual(selected.gate, selection),
+      "EXTERNAL_OWNER_SELECTION_RECEIPT_MISMATCH",
+    );
+    const milestone = (await read(p.ownerMilestoneReceipt))
+      .value as unknown as ExternalArtifactMilestoneReceipt;
+    requireValue(
+      milestone?.schema === "common.git-external-milestone-receipt.v1" &&
+        milestone.ownerId === p.ownerId &&
+        isDeepStrictEqual(milestone.producer, producer),
+      "EXTERNAL_OWNER_MILESTONE_RECEIPT_MISMATCH",
+    );
+    if (p.milestone === "acceptance") {
+      requireValue(milestone.acceptanceDecision, "EXTERNAL_ACCEPTANCE_OWNER_DECISION_REQUIRED");
+      const accepted = validateArtifact((await read(milestone.acceptanceDecision)).value);
+      requireValue(
+        accepted.valid &&
+          accepted.value?.kind === "decision" &&
+          accepted.value.domainId === p.logical.domainId &&
+          accepted.value.projectId === p.logical.projectId &&
+          accepted.value.payload.status === "accepted" &&
+          accepted.value.payload.authority?.actorId === p.ownerId &&
+          accepted.value.payload.details?.recordClass === "AcceptanceDecision" &&
+          isDeepStrictEqual(accepted.value.payload.details?.logical, p.logical) &&
+          accepted.value.payload.details?.accepted === true &&
+          accepted.value.payload.details?.ownerId === milestone.ownerId,
+        "EXTERNAL_ACCEPTANCE_OWNER_DECISION_MISMATCH",
+      );
+    }
+    for (const row of g.criterionReceipts) {
+      const receipt = (await read(row.evidence)).value as unknown as ArtifactCriterionReceipt;
+      requireValue(
+        receipt?.schema === "common.git-artifact-criterion-receipt.v1" &&
+          receipt.criterionId === row.criterionId &&
+          receipt.status === "pass" &&
+          isDeepStrictEqual(receipt.selection, selection) &&
+          isDeepStrictEqual(receipt.producer, producer) &&
+          Array.isArray(receipt.evidence) &&
+          receipt.evidence.length > 0 &&
+          receipt.evidence.length <= 128,
+        "EXTERNAL_CRITERION_RECEIPT_MISMATCH",
+      );
+      for (const evidence of receipt.evidence) await read(evidence);
+    }
+    requireValue(
+      prerequisite.qualification.status === "owner-qualified" &&
+        prerequisite.qualification.receiverUse,
+      "EXTERNAL_RECEIVER_USE_REQUIRED",
+    );
+    const use = (await read(prerequisite.qualification.receiverUse))
+      .value as unknown as ExternalArtifactReceiverUse;
+    requireValue(
+      use?.schema === "common.git-external-artifact-receiver-use.v1" &&
+        use.status === "used" &&
+        use.receiverOwnerId === g.selectionOwnerId &&
+        isDeepStrictEqual(use.selection, selection) &&
+        isDeepStrictEqual(use.producer, producer) &&
+        isDeepStrictEqual(use.ownerSelectionReceipt, g.ownerSelectionReceipt) &&
+        isDeepStrictEqual(use.ownerMilestoneReceipt, p.ownerMilestoneReceipt) &&
+        isDeepStrictEqual(use.criterionReceipts, g.criterionReceipts) &&
+        Array.isArray(use.evidence) &&
+        use.evidence.length > 0 &&
+        use.evidence.length <= 128,
+      "EXTERNAL_RECEIVER_USE_BINDING_MISMATCH",
+    );
+    for (const evidence of use.evidence) await read(evidence);
+    return [];
+  } catch (error) {
+    return [
+      `${error instanceof Error ? error.message : "EXTERNAL_PREREQUISITE_UNAVAILABLE"}:${task.id}`,
+    ];
+  }
 }

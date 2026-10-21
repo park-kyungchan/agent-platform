@@ -3,6 +3,10 @@ import {
   JEV_MODEL,
   type Json,
   type NativeBinding,
+  type ChildAssignment,
+  type ChildAssignmentReference,
+  type CurrentChildAuthority,
+  type ContractPin,
   type WholeLens,
   type SemanticEvent,
   type PreparedDecision,
@@ -13,6 +17,10 @@ import {
   canonicalJson,
   semanticDigest,
   prepareChildSemanticPacket,
+  prepareLogicalAssignmentSemanticPacket,
+  qualifyChildAssignmentAuthority,
+  validateChildAssignment,
+  validateContractPin,
   prepareSemanticDecision,
   normalizeSemanticReply,
 } from "./policy.ts";
@@ -57,6 +65,8 @@ export type WorkflowInput =
         goal: string;
         packetDigest: string;
         requiredPostconditionIds: string[];
+        /** Required for actual delegation receipts; absent historical advice remains readable. */
+        expectedChild?: ChildAssignment;
       };
       profiles: CompleteProfile[];
     }
@@ -102,6 +112,8 @@ export interface PreparedWorkflowDecision extends PreparedDecision {
   workflowPolicy: WorkflowPolicy;
 }
 export interface CurrentWorkflowBinding {
+  /** Reobserved by the existing native owner, never inferred from an old result. */
+  childAuthority?: CurrentChildAuthority;
   authorized: boolean;
   bindingDigest: string;
   sourceRevision: string;
@@ -192,6 +204,11 @@ function validateWorkflow(workflow: WorkflowInput): void {
         workflow.taskPacket.requiredPostconditionIds.length
     )
       throw Error("WORKFLOW_TASK_PACKET_REQUIRED");
+    if (workflow.taskPacket.expectedChild !== undefined) {
+      validateChildAssignment(workflow.taskPacket.expectedChild);
+      if (workflow.taskPacket.expectedChild.packetDigest !== workflow.taskPacket.packetDigest)
+        throw Error("CHILD_ASSIGNMENT_PACKET_MISMATCH");
+    }
     uniqueIds(workflow.profiles.map((p) => ({ id: p.profileId })));
     for (const profile of workflow.profiles)
       if (
@@ -561,6 +578,7 @@ export function normalizeWorkflowReply(
 }
 
 export interface NativeDelegationObservation {
+  assignment?: ChildAssignmentReference;
   observationId: string;
   taskPacketDigest: string;
   requestedProfile: { profileId: string; model: string; effort: string };
@@ -586,6 +604,9 @@ export function recordNativeDelegationReceipt(input: {
     | "native-postcondition-failed";
   reason: string;
   observation: NativeDelegationObservation;
+  expectedChild: ChildAssignment | null;
+  currentChildAuthority: CurrentChildAuthority | null;
+  continuedEffectsAuthorizedByResult: false;
   executionAuthorityGranted: false;
   taskCompletionGranted: false;
   retryAllowed: false;
@@ -604,6 +625,11 @@ export function recordNativeDelegationReceipt(input: {
     status,
     reason,
     observation: clone(o),
+    expectedChild: clone(
+      p.workflow.kind === "delegation" ? (p.workflow.taskPacket.expectedChild ?? null) : null,
+    ),
+    currentChildAuthority: clone(current.childAuthority ?? null),
+    continuedEffectsAuthorizedByResult: false as const,
     executionAuthorityGranted: false as const,
     taskCompletionGranted: false as const,
     retryAllowed: false as const,
@@ -655,14 +681,47 @@ export function recordNativeDelegationReceipt(input: {
     canonicalJson(o.resolvedProfile) !== canonicalJson(expected)
   )
     return result("held", "native-resolved-profile-mismatch");
-  const parent = p.request.state.binding as unknown as NativeBinding;
+  const assignment = p.workflow.taskPacket.expectedChild;
   try {
-    prepareChildSemanticPacket({
+    validateChildAssignment(assignment!);
+    if (
+      assignment!.sourceRevision !== p.sourceRevision ||
+      assignment!.packetDigest !== o.taskPacketDigest ||
+      canonicalJson(o.assignment) !==
+        canonicalJson({
+          assignmentId: assignment!.assignmentId,
+          revision: assignment!.revision,
+          assignmentDigest: semanticDigest(assignment),
+        }) ||
+      o.childBinding.logical === null ||
+      canonicalJson(o.childBinding.logical) !== canonicalJson(assignment!.logical)
+    )
+      return result("held", "expected-child-logical-assignment-or-source-mismatch");
+  } catch {
+    return result("held", "expected-child-logical-assignment-or-source-mismatch");
+  }
+  if (
+    !current.childAuthority ||
+    qualifyChildAssignmentAuthority(assignment!, current.childAuthority).status === "held"
+  )
+    return result("held", "child-parent-authority-not-current");
+  const parent = p.request.state.binding as unknown as NativeBinding;
+  if (
+    parent.logical !== null &&
+    !["domainId", "projectId", "workId"].every(
+      (key) => parent.logical![key as "workId"] === assignment!.parentAuthority[key as "workId"],
+    )
+  )
+    return result("held", "parent-logical-authority-mismatch");
+  try {
+    const packetInput = {
       parentBinding: parent,
       childBinding: o.childBinding,
       parentLens: p.request.state.requiredContext as unknown as WholeLens,
       childTaskGoal: p.workflow.taskPacket.goal,
-    });
+    };
+    if (assignment!.route.kind === "native-child") prepareChildSemanticPacket(packetInput);
+    else prepareLogicalAssignmentSemanticPacket({ ...packetInput, assignment: assignment! });
   } catch {
     return result("held", "native-child-parent-lineage-mismatch");
   }
@@ -685,4 +744,69 @@ export function recordNativeDelegationReceipt(input: {
     "verified-native-delegation",
     "offered-requested-resolved-profile-and-task-postconditions-observed",
   );
+}
+
+/** Preserve a late artifact even when its assignment can no longer permit further work. */
+export function recordChildArtifactDisposition(input: {
+  assignment: ChildAssignment;
+  result: {
+    assignment: ChildAssignmentReference;
+    logical: NonNullable<NativeBinding["logical"]>;
+    sourceRevision: string;
+    sourceClosure: ContractPin;
+    packetDigest: string;
+    artifact: ContractPin;
+  };
+  /** An authenticated owner decision is still the native owner's responsibility. */
+  readoption: { current: CurrentChildAuthority; ownerDecision: ContractPin } | null;
+}): {
+  schema: "jev.child-artifact-disposition.v1";
+  status: "held" | "historical-evidence-only" | "explicitly-readopted-artifact";
+  assignment: ChildAssignment;
+  result: typeof input.result;
+  readoption: typeof input.readoption;
+  continuedEffectsAuthorizedByResult: false;
+  executionAuthorityGranted: false;
+  permitsReplay: false;
+} {
+  let status: "held" | "historical-evidence-only" | "explicitly-readopted-artifact" = "held";
+  try {
+    validateChildAssignment(input.assignment);
+    validateContractPin(input.result.artifact);
+    const a = input.assignment,
+      r = input.result;
+    if (
+      canonicalJson(r.assignment) ===
+        canonicalJson({
+          assignmentId: a.assignmentId,
+          revision: a.revision,
+          assignmentDigest: semanticDigest(a),
+        }) &&
+      canonicalJson(r.logical) === canonicalJson(a.logical) &&
+      r.sourceRevision === a.sourceRevision &&
+      canonicalJson(r.sourceClosure) === canonicalJson(a.sourceClosure) &&
+      r.packetDigest === a.packetDigest
+    ) {
+      status = "historical-evidence-only";
+      if (
+        input.readoption &&
+        qualifyChildAssignmentAuthority(a, input.readoption.current).status !== "held"
+      ) {
+        validateContractPin(input.readoption.ownerDecision);
+        status = "explicitly-readopted-artifact";
+      }
+    }
+  } catch {
+    /* Artifact and exact original binding remain durable, even when held. */
+  }
+  return {
+    schema: "jev.child-artifact-disposition.v1",
+    status,
+    assignment: clone(input.assignment),
+    result: clone(input.result),
+    readoption: clone(input.readoption),
+    continuedEffectsAuthorizedByResult: false,
+    executionAuthorityGranted: false,
+    permitsReplay: false,
+  };
 }

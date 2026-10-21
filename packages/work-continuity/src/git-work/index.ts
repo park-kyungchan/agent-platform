@@ -12,6 +12,8 @@ export {
   validateGitWorkTransition,
   assertRecord,
   taskVerificationTarget,
+  assertExternalArtifactPrerequisite,
+  externalPrerequisiteFindings,
 } from "./records.ts";
 export {
   readGitWorkContext,

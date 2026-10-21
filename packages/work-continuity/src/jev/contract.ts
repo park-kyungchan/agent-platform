@@ -194,3 +194,60 @@ export interface ReadConsumptionReceipt {
   taskCompletionGranted: false;
   retryAllowed: false;
 }
+
+/** Source-owned pins are declarations; native owners authenticate their receipts. */
+export interface ContractPin {
+  path: string;
+  sha256: string;
+}
+export interface ParentAuthorityRevision {
+  assignmentId: string;
+  revision: number;
+  domainId: string;
+  projectId: string;
+  workId: string;
+  ownerId: string;
+  status: "active" | "revoked" | "retired";
+  authorityReference: ContractPin;
+}
+/** One assignment relation, embedded in the packet; observations reference its digest. */
+export interface ChildAssignment {
+  schema: "jev.child-assignment.v1";
+  assignmentId: string;
+  revision: number;
+  status: "admitted" | "revoked" | "retired";
+  actorId: string;
+  logical: LogicalIdentity;
+  sourceRevision: string;
+  sourceClosure: ContractPin;
+  packetDigest: string;
+  parentAuthority: ParentAuthorityRevision;
+  route:
+    | { kind: "native-child" }
+    | {
+        kind: "logical-assignment";
+        parentBindingDigest: string;
+        childBindingDigest: string;
+        relationEvidenceRefs: string[];
+      };
+}
+export interface ChildAssignmentReference {
+  assignmentId: string;
+  revision: number;
+  assignmentDigest: string;
+}
+export interface CarryForwardReceipt {
+  schema: "jev.child-carry-forward.v1";
+  from: ParentAuthorityRevision;
+  to: ParentAuthorityRevision;
+  childAssignment: ChildAssignmentReference;
+  successorOwnerDecision: ContractPin;
+  pendingAndUnknownEffects: ContractPin[];
+  permitsReplay: false;
+}
+export interface CurrentChildAuthority {
+  parentAuthority: ParentAuthorityRevision;
+  childAssignment: ChildAssignmentReference;
+  childStatus: ChildAssignment["status"];
+  carryForward: CarryForwardReceipt | null;
+}

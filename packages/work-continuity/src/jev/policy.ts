@@ -7,6 +7,10 @@ import {
   semanticPurposes,
   type Json,
   type NativeBinding,
+  type ContractPin,
+  type ParentAuthorityRevision,
+  type ChildAssignment,
+  type CurrentChildAuthority,
   type WholeLens,
   type SemanticEvent,
   type SemanticPurpose,
@@ -488,5 +492,168 @@ export function prepareChildSemanticPacket(input: {
     lens,
     parentTaskGoal: input.parentLens.taskGoal,
     parentSessionId: input.parentBinding.sessionId,
+  };
+}
+
+export function validateContractPin(value: ContractPin): void {
+  if (
+    !value ||
+    !id(value.path) ||
+    typeof value.sha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.sha256)
+  )
+    throw Error("EXACT_CONTRACT_PIN_REQUIRED");
+}
+export function validateParentAuthority(value: ParentAuthorityRevision): void {
+  if (
+    !value ||
+    ![value.assignmentId, value.domainId, value.projectId, value.workId, value.ownerId].every((v) =>
+      id(v),
+    ) ||
+    !Number.isSafeInteger(value.revision) ||
+    value.revision < 1 ||
+    !["active", "revoked", "retired"].includes(value.status)
+  )
+    throw Error("EXACT_PARENT_AUTHORITY_REQUIRED");
+  validateContractPin(value.authorityReference);
+}
+export function validateChildAssignment(value: ChildAssignment): void {
+  if (
+    !value ||
+    value.schema !== "jev.child-assignment.v1" ||
+    !id(value.assignmentId) ||
+    !id(value.actorId) ||
+    !id(value.sourceRevision) ||
+    !Number.isSafeInteger(value.revision) ||
+    value.revision < 1 ||
+    !["admitted", "revoked", "retired"].includes(value.status) ||
+    typeof value.packetDigest !== "string" ||
+    !/^[a-f0-9]{64}$/.test(value.packetDigest)
+  )
+    throw Error("EXACT_CHILD_ASSIGNMENT_REQUIRED");
+  assertLogicalIdentity(value.logical);
+  validateContractPin(value.sourceClosure);
+  validateParentAuthority(value.parentAuthority);
+  if (
+    value.parentAuthority.status !== "active" ||
+    !["domainId", "projectId", "workId"].every(
+      (key) => value.logical[key as "workId"] === value.parentAuthority[key as "workId"],
+    )
+  )
+    throw Error("CHILD_PARENT_WORK_AUTHORITY_MISMATCH");
+  if (value.route?.kind === "logical-assignment") {
+    if (
+      ![value.route.parentBindingDigest, value.route.childBindingDigest].every(
+        (v) => typeof v === "string" && /^[a-f0-9]{64}$/.test(v),
+      ) ||
+      !strings(value.route.relationEvidenceRefs, 1)
+    )
+      throw Error("EXPLICIT_LOGICAL_ASSIGNMENT_BINDING_REQUIRED");
+  } else if (value.route?.kind !== "native-child") throw Error("EXPLICIT_CHILD_ROUTE_REQUIRED");
+  canonicalJson(value);
+}
+/** Pure source qualification only. Existing native owners must reobserve/authenticate before each effect. */
+export function qualifyChildAssignmentAuthority(
+  assignment: ChildAssignment,
+  current: CurrentChildAuthority,
+): {
+  status: "current" | "carried-forward" | "held";
+  reason: string;
+  executionAuthorityGranted: false;
+  permitsReplay: false;
+} {
+  const result = (status: "current" | "carried-forward" | "held", reason: string) => ({
+    status,
+    reason,
+    executionAuthorityGranted: false as const,
+    permitsReplay: false as const,
+  });
+  try {
+    validateChildAssignment(assignment);
+    validateParentAuthority(current?.parentAuthority);
+    const expected = {
+      assignmentId: assignment.assignmentId,
+      revision: assignment.revision,
+      assignmentDigest: semanticDigest(assignment),
+    };
+    if (
+      assignment.status !== "admitted" ||
+      current.childStatus !== "admitted" ||
+      canonicalJson(current.childAssignment) !== canonicalJson(expected) ||
+      current.parentAuthority.status !== "active"
+    )
+      return result("held", "child-or-parent-authority-not-current");
+    if (canonicalJson(assignment.parentAuthority) === canonicalJson(current.parentAuthority)) {
+      if (current.carryForward !== null) return result("held", "unexpected-carry-forward");
+      return result("current", "exact-current-parent-authority");
+    }
+    const carry = current.carryForward;
+    if (
+      !carry ||
+      carry.schema !== "jev.child-carry-forward.v1" ||
+      carry.permitsReplay !== false ||
+      canonicalJson(carry.from) !== canonicalJson(assignment.parentAuthority) ||
+      canonicalJson(carry.to) !== canonicalJson(current.parentAuthority) ||
+      canonicalJson(carry.childAssignment) !== canonicalJson(expected) ||
+      !["domainId", "projectId", "workId"].every(
+        (key) => carry.from[key as "workId"] === carry.to[key as "workId"],
+      ) ||
+      (carry.from.assignmentId === carry.to.assignmentId &&
+        carry.to.revision <= carry.from.revision) ||
+      !Array.isArray(carry.pendingAndUnknownEffects) ||
+      carry.pendingAndUnknownEffects.length > 128
+    )
+      return result("held", "explicit-successor-carry-forward-required");
+    validateContractPin(carry.successorOwnerDecision);
+    carry.pendingAndUnknownEffects.forEach(validateContractPin);
+    return result("carried-forward", "exact-successor-readmission-no-replay");
+  } catch {
+    return result("held", "invalid-child-or-parent-authority");
+  }
+}
+/** Independent native sessions use an explicit assignment relation, never native child ancestry. */
+export function prepareLogicalAssignmentSemanticPacket(input: {
+  parentBinding: NativeBinding;
+  childBinding: NativeBinding;
+  parentLens: WholeLens;
+  childTaskGoal: string;
+  assignment: ChildAssignment;
+}): {
+  binding: NativeBinding;
+  lens: WholeLens;
+  parentTaskGoal: string;
+  logicalParentSessionId: string;
+} {
+  validateNativeBinding(input.parentBinding);
+  validateNativeBinding(input.childBinding);
+  validateWholeLens(input.parentLens);
+  validateChildAssignment(input.assignment);
+  const route = input.assignment.route;
+  if (
+    !text(input.childTaskGoal, 12000) ||
+    input.assignment.status !== "admitted" ||
+    route.kind !== "logical-assignment" ||
+    route.parentBindingDigest !== semanticDigest(input.parentBinding) ||
+    route.childBindingDigest !== semanticDigest(input.childBinding) ||
+    input.parentBinding.sessionId === input.childBinding.sessionId ||
+    (input.parentBinding.logical !== null &&
+      !["domainId", "projectId", "workId"].every(
+        (key) =>
+          input.parentBinding.logical![key as "workId"] ===
+          input.assignment.parentAuthority[key as "workId"],
+      )) ||
+    input.childBinding.logical === null ||
+    canonicalJson(input.childBinding.logical) !== canonicalJson(input.assignment.logical)
+  )
+    throw Error("EXACT_LOGICAL_ASSIGNMENT_REQUIRED");
+  const lens = JSON.parse(
+    canonicalJson({ ...input.parentLens, taskGoal: input.childTaskGoal }),
+  ) as WholeLens;
+  validateWholeLens(lens);
+  return {
+    binding: JSON.parse(canonicalJson(input.childBinding)) as NativeBinding,
+    lens,
+    parentTaskGoal: input.parentLens.taskGoal,
+    logicalParentSessionId: input.parentBinding.sessionId,
   };
 }
