@@ -395,7 +395,7 @@ test("R02-v7 native synthetic migrated owner allocates fresh Task and companion 
       resources: [],
       status: "planned",
     },
-    contracts: [
+    contracts: JSON.parse(canonicalV3([
       {
         id: "fresh-spec",
         kind: "spec",
@@ -412,7 +412,7 @@ test("R02-v7 native synthetic migrated owner allocates fresh Task and companion 
         body: { methodRef: work.contracts.plan, appliesToSpec: { $contractRef: 0 } },
         sourceRefs: [],
       },
-    ],
+    ])) as CreateRequest["contracts"],
   };
   const created = await allocateGitWorkIdentity(
     request,
