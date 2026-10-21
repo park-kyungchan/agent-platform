@@ -343,17 +343,18 @@ test("R02-v7 native synthetic migrated owner allocates fresh Task and companion 
     async withCurrentAuthority(input, operation) {
       return f.owner.withCurrentMigrationAuthority(
         { ...input, request: f.request },
-        async (authority) => operation({
-          ownerId: authority.ownerId,
-          actorId: authority.actorId,
-          scope: { kind: "work", projectId: legacyScope.projectId, workId: legacyScope.workId },
-          kinds: ["task"],
-          revision: authority.revision,
-          authorityRef: authority.authorityRef,
-          expiresAtUtc: authority.expiresAtUtc,
-          membership: authority.membership,
-          gitHookPolicy: authority.gitHookPolicy,
-        }),
+        async (authority) =>
+          operation({
+            ownerId: authority.ownerId,
+            actorId: authority.actorId,
+            scope: { kind: "work", projectId: legacyScope.projectId, workId: legacyScope.workId },
+            kinds: ["task"],
+            revision: authority.revision,
+            authorityRef: authority.authorityRef,
+            expiresAtUtc: authority.expiresAtUtc,
+            membership: authority.membership,
+            gitHookPolicy: authority.gitHookPolicy,
+          }),
       );
     },
     async readGraph(input) {
@@ -370,7 +371,12 @@ test("R02-v7 native synthetic migrated owner allocates fresh Task and companion 
   const spec = migrated.contracts.find((c) => c.digest === work.contracts.spec.digest)!;
   if (spec.kind !== "spec") throw Error("SYNTHETIC_SPEC_REQUIRED");
   const criterion = spec.body.acceptanceCriteria[0]!.id;
-  const taskOwner = { kind: "task", projectId: legacyScope.projectId, workId: legacyScope.workId, taskId: { $allocatedId: true } };
+  const taskOwner = {
+    kind: "task",
+    projectId: legacyScope.projectId,
+    workId: legacyScope.workId,
+    taskId: { $allocatedId: true },
+  };
   const request: CreateRequest = {
     schema: "common.git-work-create.v3",
     ownerId: f.request.ownerId,
@@ -378,46 +384,94 @@ test("R02-v7 native synthetic migrated owner allocates fresh Task and companion 
     kind: "task",
     scope: { kind: "work", projectId: legacyScope.projectId, workId: legacyScope.workId },
     record: {
-      projectId: legacyScope.projectId, workId: legacyScope.workId,
-      taskId: { $allocatedId: true }, title: "Fresh synthetic source Task",
-      assigneeActorId: "synthetic-observed-native-actor", revision: 1,
+      projectId: legacyScope.projectId,
+      workId: legacyScope.workId,
+      taskId: { $allocatedId: true },
+      title: "Fresh synthetic source Task",
+      assigneeActorId: "synthetic-observed-native-actor",
+      revision: 1,
       contractOverrides: { spec: { $contractRef: 0 }, plan: { $contractRef: 1 } },
-      acceptanceCriteria: [criterion], resources: [], status: "planned",
+      acceptanceCriteria: [criterion],
+      resources: [],
+      status: "planned",
     },
     contracts: [
-      { id: "fresh-spec", kind: "spec", owner: taskOwner, revision: 1,
-        body: { refinesSpec: work.contracts.spec, acceptanceCriteria: [{ id: criterion }] }, sourceRefs: [] },
-      { id: "fresh-plan", kind: "plan", owner: taskOwner, revision: 1,
-        body: { methodRef: work.contracts.plan, appliesToSpec: { $contractRef: 0 } }, sourceRefs: [] },
+      {
+        id: "fresh-spec",
+        kind: "spec",
+        owner: taskOwner,
+        revision: 1,
+        body: { refinesSpec: work.contracts.spec, acceptanceCriteria: [{ id: criterion }] },
+        sourceRefs: [],
+      },
+      {
+        id: "fresh-plan",
+        kind: "plan",
+        owner: taskOwner,
+        revision: 1,
+        body: { methodRef: work.contracts.plan, appliesToSpec: { $contractRef: 0 } },
+        sourceRefs: [],
+      },
     ],
   };
-  const created = await allocateGitWorkIdentity(request, { ...f.target, expectedHead: admitted.head }, owner);
+  const created = await allocateGitWorkIdentity(
+    request,
+    { ...f.target, expectedHead: admitted.head },
+    owner,
+  );
   expect(created.status).toBe("created");
   expect(created.id).not.toBe(newTaskId);
   expect(observed[0]!.head).toBe(admitted.head);
   expect(digestV3(observed[0]!.graph)).toBe(observed[0]!.digest);
   validateGitWorkV3Graph(observed[0]!.graph);
   const reopened = await readMigratedGitWorkV3({ ...f.selection, commit: created.head });
-  const target = { projectId: legacyScope.projectId, workId: legacyScope.workId, taskId: created.id };
+  const target = {
+    projectId: legacyScope.projectId,
+    workId: legacyScope.workId,
+    taskId: created.id,
+  };
   const effective = resolveEffectiveContract(reopened, target);
   expect(effective.holdReasons).toEqual([]);
   expect(effective.contracts.spec.id).toBe("fresh-spec");
   expect(reopened.tasks).toHaveLength(migrated.tasks.length + 1);
   expect(reopened.contracts).toHaveLength(migrated.contracts.length + 2);
-  const replay = await allocateGitWorkIdentity(request, { ...f.target, expectedHead: created.head }, owner);
+  const replay = await allocateGitWorkIdentity(
+    request,
+    { ...f.target, expectedHead: created.head },
+    owner,
+  );
   expect(replay.status).toBe("existing");
   expect(replay.id).toBe(created.id);
   expect(replay.head).toBe(created.head);
   expect(git(f.root, "rev-list", "--count", admitted.head + ".." + replay.head)).toBe("1");
   for (const source of f.projection.sources)
-    expect(sourceSha256(git(f.root, "show", replay.head + ":" + source.path) + "\n")).toBe(source.sha256);
+    expect(sourceSha256(git(f.root, "show", replay.head + ":" + source.path) + "\n")).toBe(
+      source.sha256,
+    );
   // General mutation and failed refresh stay closed outside the bounded writer.
   reopened.tasks[0]!.title += " changed";
   expect(() => resolveEffectiveContract(reopened, target)).toThrow("REQUALIFICATION_REQUIRED");
   reopened.tasks[0]!.title = reopened.tasks[0]!.title.slice(0, -8);
-  await expect(readSourceQualifiedGitWorkV3Context({ graph: reopened, task: target, mode: "full", reader: { read: async () => { throw Error("SYNTHETIC_SOURCE_REJECTED"); } } })).rejects.toThrow("SYNTHETIC_SOURCE_REJECTED");
+  await expect(
+    readSourceQualifiedGitWorkV3Context({
+      graph: reopened,
+      task: target,
+      mode: "full",
+      reader: {
+        read: async () => {
+          throw Error("SYNTHETIC_SOURCE_REJECTED");
+        },
+      },
+    }),
+  ).rejects.toThrow("SYNTHETIC_SOURCE_REJECTED");
   const revokedOwner = { ...owner, readGraph: async () => reopened };
-  await expect(allocateGitWorkIdentity({ ...request, createRequestId: "revoked-source-must-not-write" }, { ...f.target, expectedHead: created.head }, revokedOwner)).rejects.toThrow("ACTUAL_SOURCE_QUALIFICATION_REQUIRED");
+  await expect(
+    allocateGitWorkIdentity(
+      { ...request, createRequestId: "revoked-source-must-not-write" },
+      { ...f.target, expectedHead: created.head },
+      revokedOwner,
+    ),
+  ).rejects.toThrow("ACTUAL_SOURCE_QUALIFICATION_REQUIRED");
   expect(git(f.root, "rev-parse", fixtureRef)).toBe(created.head);
 }, 30_000);
 
