@@ -17,6 +17,8 @@ import {
   validateGitWorkTransition,
   type ContextRequest,
   type StartRequest,
+} from "../packages/work-continuity/src/git-work/index.ts";
+import {
   readGitWorkV3Context,
   previewGitWorkV3Allocation,
   allocateGitWorkIdentity,
@@ -30,8 +32,8 @@ import {
   openExactV3SourceReader,
   readSourceQualifiedGitWorkV3Context,
   type GitAllocationTarget,
-} from "../packages/work-continuity/src/git-work/index.ts";
-import type { TaskRef } from "../packages/work-continuity/src/git-work/generated/v3.ts";
+  type TaskRef,
+} from "../packages/work-continuity/src/git-work/v3.ts";
 import {
   readDocumentationRegistry,
   type DocumentationObservations,

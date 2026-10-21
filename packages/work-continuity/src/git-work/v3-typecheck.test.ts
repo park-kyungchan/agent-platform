@@ -5,6 +5,8 @@ import { join } from "node:path";
 test("owned v3 runtime, generator and synthetic consumers satisfy strict TypeScript", () => {
   const root = new URL("../../../../", import.meta.url).pathname;
   const owned = [
+    "packages/work-continuity/src/git-work/v3.ts",
+    "packages/work-continuity/src/git-work/v3-public.test.ts",
     "packages/work-continuity/src/git-work/v3-codec.ts",
     "packages/work-continuity/src/git-work/effective-contract.ts",
     "packages/work-continuity/src/git-work/allocation.ts",

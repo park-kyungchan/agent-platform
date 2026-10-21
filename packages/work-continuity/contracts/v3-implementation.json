@@ -59,7 +59,7 @@
   "activationPerformed": false,
   "acceptanceDecision": null,
   "corrections": {
-    "assignmentRevision": 7,
+    "assignmentRevision": 8,
     "findings": [
       "S01-R01",
       "S01-R02",
@@ -85,5 +85,14 @@
     "isolation": "Actual source documents are cloned before internal graph qualification, and readers receive only TaskRef fields. Neither original nor partially staged proof becomes available during source callbacks.",
     "concurrency": "A private per-graph refresh epoch prevents older completion from overwriting a newer refresh; no IDs, effects or native permissions are allocated.",
     "preservation": "One effective resolver, all scoped holds, supported full merge ancestry, native-qualified hook policy and prior positive/negative/lost-ACK tests remain unchanged."
+  },
+  "publicApi": {
+    "legacySubpath": "@palantirkc/work-continuity/git-work",
+    "legacyEntrypoint": "packages/work-continuity/src/git-work/index.ts",
+    "legacyBoundary": "Historical finite v5/v6 source projections retain 25/26 paths and five legacy Git Work modules; no eager v3 dependency or native guard change.",
+    "versionedSubpath": "@palantirkc/work-continuity/git-work/v3",
+    "versionedEntrypoint": "packages/work-continuity/src/git-work/v3.ts",
+    "implementation": "One versioned facade re-exports the canonical current v3 implementation and legacy interoperability API; no second resolver/schema/allocator.",
+    "nativeAdoption": "An explicit versioned source entrypoint does not extend historical provider registrations, native command permission or first-import trust."
   }
 }

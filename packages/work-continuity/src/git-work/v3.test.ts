@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile, chmod } from "node:fs/promises
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { Graph, Contract, Task, Run } from "./generated/v3.ts";
-import { assertV3, canonicalV3, digestV3, encodeV3, decodeV3 } from "./v3-codec.ts";
+import { assertV3, canonicalV3, digestV3, encodeV3, decodeV3 } from "./v3.ts";
 import {
   resolveEffectiveContract,
   readGitWorkV3Context,
@@ -11,8 +11,8 @@ import {
   validateGitWorkV3Graph,
   v3ContractRef,
   v3ContractDigest,
-} from "./effective-contract.ts";
-import { allocateGitWorkIdentity, previewGitWorkV3Allocation } from "./allocation.ts";
+} from "./v3.ts";
+import { allocateGitWorkIdentity, previewGitWorkV3Allocation } from "./v3.ts";
 import {
   fixtureGraph,
   fixtureTask,

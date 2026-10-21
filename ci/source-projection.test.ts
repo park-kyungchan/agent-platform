@@ -141,6 +141,8 @@ test("current finite source guards prove fictional canonical/physical separation
   expect(proof.valid).toHaveLength(2);
   expect(proof.contextVersion).toBe("v6");
   expect(proof.rejectedCases).toBe(26);
+  expect(proof.eagerV3ExportRegressionRejected).toBe(true);
+  expect(proof.valid.every((value) => value.legacyPublicPackageAvailable && value.v3SourceAbsent)).toBe(true);
   expect(
     proof.valid.every((value) => value.workMethodAvailable === true && value.contextPins === 35),
   ).toBe(true);
@@ -181,6 +183,8 @@ test("legacy v5 projection keeps its own source graph and guard semantics", asyn
     });
     expect(proof.contextVersion).toBe("v5");
     expect(proof.rejectedCases).toBe(22);
+    expect(proof.eagerV3ExportRegressionRejected).toBe(true);
+    expect(proof.valid.every((value) => value.legacyPublicPackageAvailable && value.v3SourceAbsent)).toBe(true);
     expect(
       proof.valid.every((value) => value.workMethodAvailable === false && value.contextPins === 34),
     ).toBe(true);

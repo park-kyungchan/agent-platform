@@ -16,7 +16,7 @@ import type {
   GitWorkSelection,
   SelectedExternalArtifactPrerequisite,
 } from "./types.ts";
-import { canonicalV3, digestV3 } from "./v3-codec.ts";
+import { canonicalV3, digestV3 } from "./v3.ts";
 import { gitRecordPath, openGitWork } from "./source.ts";
 import { validateGitWorkTransition, taskVerificationTarget } from "./records.ts";
 import {
@@ -26,8 +26,8 @@ import {
   recoverLegacyCreateRequest,
   readMigratedGitWorkV3,
   type NativeLegacyMigrationOwner,
-} from "./legacy-bridge.ts";
-import { validateGitWorkAliases, resolveGitWorkAlias } from "./aliases.ts";
+} from "./v3.ts";
+import { validateGitWorkAliases, resolveGitWorkAlias } from "./v3.ts";
 import {
   resolveEffectiveContract,
   readGitWorkV3Context,
@@ -35,18 +35,18 @@ import {
   readSourceQualifiedGitWorkV3Context,
   v3ContractRef,
   validateGitWorkV3Graph,
-} from "./effective-contract.ts";
+} from "./v3.ts";
 import {
   openExactV3SourceReader,
   consumerContractBinding,
   qualifySelectedExternalArtifacts,
   type ExactV3SourceReader,
-} from "./external-artifacts.ts";
+} from "./v3.ts";
 import {
   allocateGitWorkIdentity,
   type GitAllocationTarget,
   type NativeGitIdentityOwner,
-} from "./allocation.ts";
+} from "./v3.ts";
 import { qualifyLegacyGraphBindings } from "./legacy-qualification.ts";
 import { sourceSha256 } from "./git-owner-transaction.ts";
 import {
