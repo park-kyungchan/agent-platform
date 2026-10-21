@@ -8,19 +8,19 @@
   "logicalWork": {
     "domainId": "native-harness",
     "projectId": "codex-harness-engineering",
-    "workId": "8b389507-8863-46b9-b9ca-1ec1974fbf75",
-    "taskId": "ab9a1f21-3d8d-4526-a5e7-d518ea468de2"
+    "workId": "ontology-driven-platform-integration-20261017",
+    "taskId": "18a81525-5cb1-4e22-a235-bf221bf6837b"
   },
-  "sourceBaseSha": "c4a65f9e8169597e5a6dbbfa2808dad051bf20ca",
+  "sourceBaseSha": "5591d0521aca2cd545220599e3bc78a6d8f19cf0",
   "author": {
     "runtime": "native-codex",
-    "threadId": "01a15c16-4285-78e2-8971-621eca83dc03",
+    "threadId": "01a15e93-a450-71f0-bfe4-2352ea19068b",
     "sessionId": null,
     "nativeTaskId": null,
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-21T11:26:13.044Z",
+  "capturedAtUtc": "2026-10-21T15:34:39.418Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
