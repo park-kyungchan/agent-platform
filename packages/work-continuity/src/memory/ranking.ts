@@ -60,7 +60,7 @@ function features(text: string): Map<string, number> {
   const out = new Map<string, number>();
   for (const [name, pattern] of vocabulary) if (pattern.test(positive)) out.set("concept:" + name, 5);
   for (const token of normalized.match(/[\p{L}\p{N}_]+/gu) ?? []) {
-    const word = token.replace(/(?:으로|에서|에는|에게|까지|처럼|보다|하고|하는|하면|했던|했던|은|는|이|가|을|를|의|에|도|과|와)$/u, "");
+    const word = token.replace(/(?:으로|에서|에는|에게|까지|처럼|보다|하고|하는|하면|했던|은|는|이|가|을|를|의|에|도|과|와)$/u, "");
     if (!word || stop.has(word)) continue;
     out.set("word:" + word, 2);
     // Korean agglutination needs partial-word evidence; Latin identifiers remain

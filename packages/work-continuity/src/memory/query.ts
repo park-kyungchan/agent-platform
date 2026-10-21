@@ -21,7 +21,7 @@ export interface MemoryQueryResult {
   governing: Array<Extract<Acquired, { kind: "governing" }>>;
   conflicts: Array<{ claimKey: string; conflictingEvidence: boolean; governingConflict: boolean; selectedGoverningValue: string | null }>;
   taskContext?: ReturnType<typeof readGitWorkV3Context>;
-  counts: { discovered: number; acquired: number; denied: number; statusExcluded: number; timeExcluded: number; scopeExcluded: number; matched: number };
+  counts: { discovered: number; acquired: number; denied: number; statusExcluded: number; timeExcluded: number; scopeExcluded: number; matched: number; governingClosure: number };
   omissions: { sourceLimit: number; hitLimit: number; hitChars: number; governing: number; conflicts: number };
   acquisitionGaps: Array<{ code: string }>;
   sourceCoverage: "complete" | "partial";
@@ -53,7 +53,7 @@ function validateHeader(address: MemoryAddress): void {
     const { claimKey, ...header } = address.header;
     assertMemory("GoverningDocument", { ...header, schema: "common.memory-governing.v1", claim: { key: claimKey, value: "metadata validation" }, text: "metadata validation" });
   }
-  if (!address.source.owner || !address.source.uri || !address.source.revision || !/^[a-f0-9]{64}$/.test(address.source.digest)) throw Error("MEMORY_EXACT_SOURCE_REQUIRED");
+  if (Object.keys(address.source).sort().join(",")!=="digest,owner,revision,uri" || !address.source.owner?.trim() || !address.source.uri?.trim() || !address.source.revision?.trim() || !/^[a-f0-9]{64}$/.test(address.source.digest)) throw Error("MEMORY_EXACT_SOURCE_REQUIRED");
 }
 /** Production query boundary. Native reader authentication/policy is separate
  * from all JSON requests/source flags. No persistent text/result/embedding cache
@@ -83,7 +83,7 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
       taskContext = readGitWorkV3Context({ graph, task: request.task, mode: request.transport ?? "full", ...(request.effectiveDigest ? {expectedDigest:request.effectiveDigest} : {}) });
     }
     const inventory = await lease.discover({ mode: request.mode, purpose: request.purpose, ...(request.scopes ? {scopes:request.scopes} : {}) }); await current();
-    const counts = { discovered: inventory.entries.length, acquired: 0, denied: 0, statusExcluded: 0, timeExcluded: 0, scopeExcluded: 0, matched: 0 };
+    const counts = { discovered: inventory.entries.length, acquired: 0, denied: 0, statusExcluded: 0, timeExcluded: 0, scopeExcluded: 0, matched: 0, governingClosure: 0 };
     const omissions = { sourceLimit: Math.max(0,inventory.entries.length-1000),hitLimit:0,hitChars:0,governing:0,conflicts:0 };
     const gaps: Array<{code:string}> = inventory.gaps.map(gap => ({code:gap.code}));
     if (inventory.truncated) gaps.push({code:"owner-inventory-truncated"});
@@ -96,7 +96,7 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
         const address = structuredClone(original), header = address.header;
         const identity = canonicalMemory([address.source.owner,address.source.uri,address.source.revision]);
         if (seen.has(identity)) throw Error("MEMORY_DUPLICATE_SOURCE_IDENTITY"); seen.add(identity);
-        if (!Object.hasOwn(lease.ownerPolicyGenerations,address.source.owner) || !header.allowedReaders.includes(lease.readerId)) { counts.denied++; continue; }
+        if (![address.source,...header.sourceRefs].every(source=>Object.hasOwn(lease.ownerPolicyGenerations,source.owner)) || !header.allowedReaders.includes(lease.readerId)) { counts.denied++; continue; }
         if (request.scopes && !request.scopes.some(scope => scopeKey(scope)===scopeKey(header.owner) || (address.kind === "memory" && address.header.subjects.some(subject=>scopeKey(subject)===scopeKey(scope))))) { counts.scopeExcluded++; continue; }
         if (request.mode === "current" && (header.status !== "active" || address.currentness !== "current")) { counts.statusExcluded++; continue; }
         const inTime = validAt(header,at);
@@ -153,15 +153,19 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
       // Work affects relevance among matching rows; it never filters permitted scopes.
       const contextWork=request.task??request.work;
       const relevant=(row:Acquired) => contextWork && [row.kind==="memory"?row.document.record.owner:row.document.owner,...(row.kind==="memory"?row.document.record.subjects:[])].some(scope=>"workId" in scope && scope.workId===contextWork.workId && scope.projectId===contextWork.projectId)?1:0;
-      const selected=ranked.indices.slice().sort((a,b)=>{
+      // Lexical recall of a summary must also surface the actual applicable
+      // governing original for that claim, even when its wording differs. This
+      // closes over already permitted/acquired sources, never new body reads.
+      const claimOf=(row:Acquired)=>row.kind==="memory"?row.document.claim?.key:row.document.claim.key;
+      const claimScores=new Map<string,number>();
+      for(const index of ranked.indices){const claim=claimOf(acquired[index]!);if(claim)claimScores.set(claim,Math.max(claimScores.get(claim)??0,ranked.scores.get(index)!));}
+      const candidateScores=new Map(ranked.scores);
+      for(const [index,row] of acquired.entries())if(row.kind==="memory"&&row.use?.decision&&claimScores.has(row.use.decision.claim.key))candidateScores.set(index,claimScores.get(row.use.decision.claim.key)!);
+      counts.governingClosure=candidateScores.size-ranked.indices.length;
+      const selected=[...candidateScores.keys()].sort((a,b)=>{
         const left=acquired[a]!,right=acquired[b]!;
-        // Only an independently qualified actual governing source can precede
-        // contradictory Memory for the same claim. An enum never gives priority.
-        if(left.kind==="memory"&&right.kind==="memory"&&left.document.claim?.key&&left.document.claim.key===right.document.claim?.key){
-          const governs=Number(!!right.use?.decision)-Number(!!left.use?.decision);
-          if(governs)return governs;
-        }
-        return ranked.scores.get(b)!-ranked.scores.get(a)!||relevant(right)-relevant(left)||a-b;
+        const score=(row:Acquired,index:number)=>Math.max(candidateScores.get(index)!,claimScores.get(claimOf(row)??"")??0);
+        return score(right,b)-score(left,a)||Number(right.kind==="memory"&&!!right.use?.decision)-Number(left.kind==="memory"&&!!left.use?.decision)||relevant(right)-relevant(left)||a-b;
       }).map(index=>acquired[index]!);
       const result:MemoryQueryResult={schema:"common.memory-query-result.v1",mode:request.mode,readerId:lease.readerId,policyGeneration:generation,ownerPolicyGenerations:JSON.parse(policy) as Record<string,string>,observedAtUtc:lease.nowUtc,asOf:request.asOf??lease.nowUtc,hits:[],governing:[],conflicts:[],...(taskContext?{taskContext}:{}),counts,omissions,acquisitionGaps:gaps,sourceCoverage:inventory.truncated||gaps.length||omissions.sourceLimit?"partial":"complete",index:{version:retrievalVersion,lifetime:"query",disposed:true,persistentBodies:false,rebuildWatermark:memoryDigest(canonicalMemory([generation,policy,acquired.map(row=>row.source)]))},authority:"none",nativePermissionGranted:false,semanticAcceptanceEstablished:false};
       const budget=request.maxChars??16000, limit=request.limit??10;

@@ -123,3 +123,37 @@ test("historical immutable revision cannot masquerade as current merely because 
  expect((await result(query(),f)).hits).toEqual([]);expect(f.reads.size).toBe(0);
  const history=await result(query({mode:"history"}),f);expect(history.hits[0]!.currentness).toBe("historical");expect(history.hits[0]!.document.record.status).toBe("active");
 });
+
+test("every original owner must be in the current lease before native original/body acquisition",async()=>{
+ const f=nativeFixture([memory("cross-owner","언어",{sourceRefs:[{owner:"absent-original-owner",uri:"fixture://unavailable-owner/one",revision:"1",digest:"a".repeat(64)}]})]);
+ const out=await result(query(),f);expect(out.hits).toEqual([]);expect(out.counts.denied).toBe(1);expect(f.events.some(event=>event.startsWith("original:")||event.startsWith("acquire:"))).toBe(false);
+});
+test("missing or corrupt exact originals reject before derived body even when metadata and labels are plausible",async()=>{
+ const f=nativeFixture([memory("one","언어")]);
+ for(const readOriginal of [undefined,async()=>new TextEncoder().encode("corrupted original")]){
+  const owner:NativeMemoryReader={async withCurrentRead(q,consume){return f.owner.withCurrentRead(q,lease=>consume({...lease,readOriginal:readOriginal!}));}};
+  await expect(withMemoryQuery(query(),owner,value=>value)).rejects.toThrow();expect(f.reads.size).toBe(0);
+ }
+});
+test("current actual governing original closes a recalled summary claim even without matching its wording",async()=>{
+ const summary=memory("summary","API_Z9",{kind:"knowledge",authority:"model-inference"},{key:"language",value:"English"});
+ const adopted=memory("adopted","전혀 다른 한국어 결정",{kind:"decision",authority:"owner-adopted"},{key:"language",value:"Korean"});
+ const actual=governing("actual-source","Korean");
+ // Native owner qualifies actual governing bytes from the already acquired
+ // original. Neither kind nor authority alone supplies this proof.
+ const f=nativeFixture([summary,adopted]);
+ const decision={...actual,sourceRefs:adopted.record.sourceRefs};
+ const owner:NativeMemoryReader={async withCurrentRead(q,consume){return f.owner.withCurrentRead(q,lease=>consume({...lease,qualifyMemoryUse:async(address)=>address.header.id==="adopted"?{kind:"governing-decision",source:adopted.record.sourceRefs[0]!,decision}:null}));}};
+ const out=await withMemoryQuery(query({query:"API_Z9"}),owner,value=>value);
+ expect(out.hits.map(hit=>hit.document.record.id)).toEqual(["adopted","summary"]);expect(out.counts.governingClosure).toBe(1);expect(out.conflicts[0]!.selectedGoverningValue).toBe("Korean");
+ expect(out.hits[0]!.currentInstructionEligible).toBe(true);
+ f.state.governingQualified=false;
+ const unqualified=await withMemoryQuery(query({query:"API_Z9"}),owner,value=>value);expect(unqualified.hits.map(hit=>hit.document.record.id)).toEqual(["summary"]);
+});
+test("current-policy requalification rebuilds views after a denial; closing during acquisition prevents consumer use",async()=>{
+ const f=nativeFixture([memory("one","언어")]);const view=createMemoryQueryView(query(),f.owner);
+ f.denied.add(f.addresses[0]!.source.uri);expect((await view.withCurrent(value=>value)).hits).toHaveLength(0);
+ f.state.generation++;f.denied.clear();expect((await view.withCurrent(value=>value)).hits).toHaveLength(1);
+ f.state.afterAcquire=()=>view.close();let consumed=false;
+ await expect(view.withCurrent(()=>{consumed=true;})).rejects.toThrow("VIEW_CLOSED");expect(consumed).toBe(false);
+});
