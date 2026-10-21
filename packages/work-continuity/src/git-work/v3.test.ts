@@ -160,9 +160,8 @@ describe("durable authenticated Git owner allocation", () => {
     expect(JSON.parse(await new Response(p.stdout).text()).error).toContain("ID_COLLISION"); expect(await p.exited).toBe(1); expect(fixtureGit(root, "rev-parse", fixtureRef)).toBe(target.expectedHead);
   });
   test("uncertain-success CAS is observed once and never replayed", async () => {
-    const { root, target } = await repository(); const bin = join(root, "synthetic-bin"); await mkdir(bin);
-    const shim = join(bin, "git"); await writeFile(shim, '#!/bin/sh\nmutate=no\nfor arg in "$@"; do if [ "$arg" = update-ref ]; then mutate=yes; fi; done\n/usr/bin/git "$@"\ncode=$?\nif [ "$mutate" = yes ] && [ "$code" = 0 ]; then exit 1; fi\nexit "$code"\n'); await chmod(shim, 0o700);
-    const path = join(root, "worker-input.json"); await writeFile(path, JSON.stringify({ request: fixtureTaskRequest(), target })); const p = Bun.spawn([process.execPath, "--no-env-file", "--no-install", new URL("./fixtures/v3-worker.ts", import.meta.url).pathname, path], { stdout: "pipe", stderr: "pipe", env: { ...process.env, PATH: bin + ":" + process.env.PATH } });
+    const { root, target } = await repository();
+    const path = join(root, "worker-input.json"); await writeFile(path, JSON.stringify({ request: fixtureTaskRequest(), target, syntheticLostCasAcknowledgement: true })); const p = Bun.spawn([process.execPath, "--no-env-file", "--no-install", new URL("./fixtures/v3-worker.ts", import.meta.url).pathname, path], { stdout: "pipe", stderr: "pipe" });
     const result = JSON.parse(await new Response(p.stdout).text());
     if (result.status !== "reconciled") console.error("SYNTHETIC_CAS_STATUS_" + String(result.status ?? result.error).toUpperCase().replace(/[^A-Z_]/g, "_"));
     expect(await p.exited).toBe(0); expect(result.status).toBe("reconciled"); expect(fixtureGit(root, "rev-list", "--count", target.expectedHead + ".." + fixtureRef)).toBe("1");
