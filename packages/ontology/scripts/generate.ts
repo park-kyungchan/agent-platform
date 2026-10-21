@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { compile, compileFromFile } from "json-schema-to-typescript";
 import packageManifest from "../package.json" with { type: "json" };
 import Ajv from "ajv";
@@ -41,37 +41,18 @@ async function generateGitWorkV3(): Promise<void> {
   {
     // Bundle only already pinned Ajv helpers. Consumers need no new dependency/pin.
     const standalone = standaloneCode(ajv, exports);
-    const built = await Bun.build({
-      entrypoints: ["git-work-v3-schema"],
-      target: "bun",
-      packages: "bundle",
-      plugins: [
-        {
-          name: "owned-v3-schema",
-          setup(build) {
-            build.onResolve({ filter: /^git-work-v3-schema$/ }, () => ({
-              path: "validators",
-              namespace: "owned-v3-schema",
-            }));
-            build.onLoad({ filter: /.*/, namespace: "owned-v3-schema" }, () => ({
-              contents: standalone,
-              loader: "js",
-              resolveDir: join(root, "packages/ontology"),
-            }));
-            // Bun custom namespaces do not inherit ordinary package resolution.
-            // Resolve only Ajv's pinned standalone helpers from this generator's
-            // declared dependency, then let the bundler include their bytes.
-            build.onResolve(
-              {
-                filter: /^ajv\/dist\/runtime\/(?:ucs2length|equal)(?:\.js)?$/,
-                namespace: "owned-v3-schema",
-              },
-              (args) => ({ path: fileURLToPath(import.meta.resolve(args.path)), namespace: "file" }),
-            );
-          },
-        },
-      ],
-    });
+    // Bun 1.4.3 does not resolve CommonJS helpers from a custom namespace.
+    // An exclusively created, transient normal-file entry uses this package's
+    // already pinned dependency resolver. The stable filename also makes bundle
+    // source labels reproducible. It is never a maintained second source.
+    const entry = fileURLToPath(new URL("./.git-work-v3-standalone.generated.js", import.meta.url));
+    await writeFile(entry, standalone, { flag: "wx" });
+    let built: Awaited<ReturnType<typeof Bun.build>>;
+    try {
+      built = await Bun.build({ entrypoints: [entry], target: "bun", packages: "bundle" });
+    } finally {
+      await rm(entry);
+    }
     if (!built.success) throw Error("V3_VALIDATOR_BUNDLE_FAILED");
     const runtime = banner + "\n" + (await built.outputs[0]!.text());
     const declarations =
