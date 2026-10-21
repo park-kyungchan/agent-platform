@@ -33,7 +33,12 @@ await assert.rejects(()=>v3.allocateGitWorkIdentity(fixtureTaskRequest(),{},unde
 console.log(JSON.stringify({legacyPublicImport:true,explicitV3PackageImport:true,singleCanonicalImplementation:true,contextModes:4,nativePermissionGranted:false}));`;
   const child = Bun.spawn(
     [process.execPath, "--no-env-file", "--no-install", "--no-macros", "--no-addons", "-e", script],
-    { cwd: root, env: { ...process.env, BUN_OPTIONS: "", NODE_OPTIONS: "" }, stdout: "pipe", stderr: "pipe" },
+    {
+      cwd: root,
+      env: { ...process.env, BUN_OPTIONS: "", NODE_OPTIONS: "" },
+      stdout: "pipe",
+      stderr: "pipe",
+    },
   );
   const stdout = await new Response(child.stdout).text();
   const stderr = await new Response(child.stderr).text();
