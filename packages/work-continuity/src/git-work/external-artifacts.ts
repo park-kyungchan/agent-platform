@@ -1,6 +1,6 @@
-import type { Graph, GitSourcePin, SelectedExternalArtifact, ConsumerContractBinding, ProducerContractBinding, Dependency, TaskRef, ContractSet } from "./generated/v3.ts";
+import type { Graph, GitSourcePin, SelectedExternalArtifact, ConsumerContractBinding, ProducerContractBinding, Dependency, TaskRef, ContractSet, TaskContractSourceClosure } from "./generated/v3.ts";
 import type { GitWorkSelection, ResolvedSource } from "./types.ts";
-import { openGitSourceSnapshot, verifiedOriginalBytes } from "./source.ts";
+import { openGitSourceSnapshot, verifiedOriginalBytes, encodedId } from "./source.ts";
 import { assertV3, canonicalV3, digestV3 } from "./v3-codec.ts";
 import { expandGitWorkV3Context, v3TaskKey, v3WorkKey } from "./effective-contract.ts";
 
@@ -34,11 +34,34 @@ function assertProducerBinding(graph: Graph, producer: ProducerContractBinding):
   for (const key of ["task", "workRevision", "taskRevision", "workContracts", "contracts"] as const) if (!same(core[key], producer[key])) throw Error("V3_ARTIFACT_PRODUCER_CONTRACT_MISMATCH");
 }
 
+async function qualifyTaskContractSources(graph: Graph, task: TaskRef, closure: TaskContractSourceClosure, reader: ExactV3SourceReader): Promise<void> {
+  const work = graph.works.find((w) => v3WorkKey(w) === v3WorkKey(task));
+  const selectedTask = graph.tasks.find((t) => v3TaskKey(t) === v3TaskKey(task));
+  if (!work || !selectedTask) throw Error("V3_ARTIFACT_SOURCE_TASK_ENDPOINT_MISSING");
+  const base = `work/${encodedId(task.projectId)}/${encodedId(task.workId)}/v3`;
+  if (closure.work.path !== base + "/work.json" || closure.task.path !== base + `/tasks/${encodedId(task.taskId)}.json` || closure.work.repositoryId !== closure.task.repositoryId || closure.work.commit !== closure.task.commit) throw Error("V3_ARTIFACT_CANONICAL_TASK_SNAPSHOT_REQUIRED");
+  const workSource = await readExactV3Source(reader, closure.work), taskSource = await readExactV3Source(reader, closure.task);
+  assertV3("StoredRecord", workSource.document); assertV3("StoredRecord", taskSource.document);
+  if (workSource.document.kind !== "work" || taskSource.document.kind !== "task" || !same(workSource.document.value, work) || !same(taskSource.document.value, selectedTask)) throw Error("V3_ARTIFACT_CANONICAL_WORK_TASK_SOURCE_MISMATCH");
+  const refs = [...new Map([work.contracts, effectiveTaskRefs(graph,task)].flatMap((set) => Object.values(set)).map((ref) => [canonicalV3(ref),ref])).values()];
+  if (closure.contracts.length !== refs.length) throw Error("V3_ARTIFACT_CONTRACT_SOURCE_CLOSURE_MISMATCH");
+  const seen = new Set<string>();
+  for (const pin of closure.contracts) {
+    if (pin.repositoryId !== closure.work.repositoryId || pin.commit !== closure.work.commit || seen.has(pin.path)) throw Error("V3_ARTIFACT_MIXED_OR_DUPLICATE_CONTRACT_SNAPSHOT");
+    seen.add(pin.path); const source = await readExactV3Source(reader,pin); assertV3("Contract",source.document); const c = source.document;
+    const expectedPath = base + (c.owner.kind === "task" ? `/tasks/${encodedId(c.owner.taskId)}` : "") + `/contracts/${c.kind}/${encodedId(c.id)}@${c.revision}.json`;
+    const expected = graph.contracts.find((row) => same(row,c));
+    if (!expected || pin.path !== expectedPath || !refs.some((ref) => ref.id === c.id && ref.revision === c.revision && ref.kind === c.kind && ref.digest === c.digest && same(ref.owner,c.owner))) throw Error("V3_ARTIFACT_CONTRACT_SOURCE_CLOSURE_MISMATCH");
+  }
+}
+
 /** Reads every source; no serialized/source-provider claim can mint this proof. */
 export async function qualifySelectedExternalArtifacts(graph: Graph, reader: ExactV3SourceReader): Promise<Graph> {
   for (const selected of graph.externalArtifacts ?? []) {
     assertV3("SelectedExternalArtifact", selected);
     assertProducerBinding(graph, selected.producer);
+    await qualifyTaskContractSources(graph,selected.producer.task,selected.producerSources,reader);
+    await qualifyTaskContractSources(graph,selected.selection.consumer.task,selected.consumerSources,reader);
     if (!same(selected.selection.consumer, consumerContractBinding(graph, selected.selection.consumer.task))) throw Error("V3_ARTIFACT_CONSUMER_CONTRACT_MISMATCH");
     const packetSource = await readExactV3Source(reader, selected.producerContext);
     const raw = packetSource.document;
@@ -72,7 +95,7 @@ export async function qualifySelectedExternalArtifacts(graph: Graph, reader: Exa
       for (const evidence of source.document.evidence) await readExactV3Source(reader, evidence);
     }
     const receiver = await readExactV3Source(reader, selected.receiverUse); assertV3("ArtifactReceiverUse", receiver.document);
-    if (receiver.document.status !== "used" || receiver.document.receiverOwnerId !== selected.receiverOwnerId || !same(receiver.document.selection, selected.selection) || !same(receiver.document.producer, selected.producer) || !same(receiver.document.artifact, selected.artifact)) throw Error("V3_ARTIFACT_RECEIVER_QUALIFICATION_MISMATCH");
+    if (!receiver.document.evidence.length || receiver.document.status !== "used" || receiver.document.receiverOwnerId !== selected.receiverOwnerId || !same(receiver.document.selection, selected.selection) || !same(receiver.document.producer, selected.producer) || !same(receiver.document.artifact, selected.artifact)) throw Error("V3_ARTIFACT_RECEIVER_QUALIFICATION_MISMATCH");
     for (const evidence of receiver.document.evidence) await readExactV3Source(reader, evidence);
     // Verified producer milestone is retained as source semantics, not native permission.
     qualified.set(selected, canonicalV3({ selected, milestone: milestone.document.milestone }));

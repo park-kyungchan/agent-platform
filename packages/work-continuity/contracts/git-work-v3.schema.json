@@ -2080,6 +2080,12 @@
         },
         "receiverUse": {
           "$ref": "#/$defs/GitSourcePin"
+        },
+        "producerSources": {
+          "$ref": "#/$defs/TaskContractSourceClosure"
+        },
+        "consumerSources": {
+          "$ref": "#/$defs/TaskContractSourceClosure"
         }
       },
       "required": [
@@ -2093,7 +2099,9 @@
         "selectionReceipt",
         "criteria",
         "receiverOwnerId",
-        "receiverUse"
+        "receiverUse",
+        "producerSources",
+        "consumerSources"
       ],
       "additionalProperties": false
     },
@@ -2388,6 +2396,30 @@
         "revision",
         "producer",
         "body"
+      ],
+      "additionalProperties": false
+    },
+    "TaskContractSourceClosure": {
+      "type": "object",
+      "properties": {
+        "work": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "task": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitSourcePin"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "work",
+        "task",
+        "contracts"
       ],
       "additionalProperties": false
     }

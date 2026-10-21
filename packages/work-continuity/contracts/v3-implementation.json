@@ -4,7 +4,7 @@
   "protocol": "common.git-work.v3",
   "status": "source-candidate-not-activated",
   "canonicalSchema": "packages/work-continuity/contracts/git-work-v3.schema.json",
-  "canonicalSchemaSha256": "4c5c06cb984c67767bd551a4e7db7ed8b0cc0405edcb8a450b428c246e679425",
+  "canonicalSchemaSha256": "918dc3a6e933b50b186d7c72d15f7b21083459530e0ee9e32e42ebc81f6c7a48",
   "generator": "packages/ontology/scripts/generate.ts --git-work-v3",
   "generatedOutputs": [
     "packages/work-continuity/src/git-work/generated/v3.ts",
@@ -67,7 +67,7 @@
       "S01-R04"
     ],
     "legacyBridge": "legacy-bridge.ts: explicit existing-scope admission, immutable inventory, typed locator aliases and prior bootstrap mapping; never random allocation",
-    "artifactQualification": "external-artifacts.ts: actual pinned producer context/artifact/gate/selection/criterion/receiver sources; in-process source proof checked by same resolver",
+    "artifactQualification": "external-artifacts.ts: actual canonical Work/Task/contract source closures plus pinned producer context/artifact/gate/selection/criterion/receiver sources, checked by the single effective resolver",
     "creationReplay": "immutable ledger and Git creation blobs plus bounded same-identity successor lineage/current source graph validation",
     "gitHooks": "native current per-invocation no-Git-hooks policy required before writes, exact head/owner/ref/authority/expiry; per-command Git override only; no Codex /hooks or global config change",
     "qualityBoundary": "New correction sources require Root registry/quality/provider successor pins. No native adoption or publication."

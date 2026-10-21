@@ -123,6 +123,15 @@ async function artifactFixture() {
   plan.body.methodRef = v3ContractRef(workPlan); plan.body.appliesToSpec=v3ContractRef(spec); { const { digest: _,...body }=plan; plan.digest=digestV3(body); }
   producerGraph.tasks[0]!.contractOverrides = { spec: v3ContractRef(spec),plan: v3ContractRef(plan) };
   graph.works.push(...producerGraph.works); graph.tasks.push(...producerGraph.tasks); graph.contracts.push(...producerGraph.contracts);
+  const contractPath = (c: Graph["contracts"][number]) => `work/${encodeURIComponent(c.owner.projectId)}/${encodeURIComponent(c.owner.workId)}/v3` + (c.owner.kind === "task" ? `/tasks/${encodeURIComponent(c.owner.taskId)}` : "") + `/contracts/${c.kind}/${encodeURIComponent(c.id)}@${c.revision}.json`;
+  const sourceHashes = new Map<string,string>();
+  for (const work of graph.works) { const path = `work/${work.projectId}/${work.workId}/v3/work.json`; sourceHashes.set(path,await put(root,path,{ schema: "common.git-work-record.v3",kind: "work",value: work })); }
+  for (const task of graph.tasks) { const path = `work/${task.projectId}/${task.workId}/v3/tasks/${task.taskId}.json`; sourceHashes.set(path,await put(root,path,{ schema: "common.git-work-record.v3",kind: "task",value: task })); }
+  for (const c of graph.contracts) sourceHashes.set(contractPath(c),await put(root,contractPath(c),c));
+  const sourceCommit = commit(root);
+  const sourcePin = (path: string): GitSourcePin => ({ repositoryId: "synthetic-repository",commit: sourceCommit,path,sha256: sourceHashes.get(path)! });
+  const sourceClosure = (selectedGraph: Graph) => ({ work: sourcePin(`work/${selectedGraph.works[0]!.projectId}/${selectedGraph.works[0]!.workId}/v3/work.json`),task: sourcePin(`work/${selectedGraph.tasks[0]!.projectId}/${selectedGraph.tasks[0]!.workId}/v3/tasks/${selectedGraph.tasks[0]!.taskId}.json`),contracts: selectedGraph.contracts.map((c) => sourcePin(contractPath(c))) });
+  const consumerSources = sourceClosure(fixtureGraph()), producerSources = sourceClosure(producerGraph);
   const effective = resolveEffectiveContract(producerGraph,producer);
   const producerBinding = { task: producer,workRevision: effective.workRevision,taskRevision: effective.taskRevision,workContracts: effective.workContracts,contracts: effective.contracts,effectiveDigest: effective.digest };
   const producerContext = await pin(root,"work/artifact-sources/producer-context.json",readGitWorkV3Context({ graph: producerGraph,task: producer,mode: "compact" }));
@@ -136,7 +145,7 @@ async function artifactFixture() {
   const selectionReceipt = await pin(root,"work/artifact-sources/selection.json",{ schema: "common.git-artifact-selection.v3",selection });
   const criterion = await pin(root,"work/artifact-sources/criterion.json",{ schema: "common.git-artifact-criterion.v3",selection,criterionId: "integrates",status: "pass",evidence: [evidence] });
   const receiverUse = await pin(root,"work/artifact-sources/receiver.json",{ schema: "common.git-artifact-receiver-use.v3",selection,producer: producerBinding,artifact,receiverOwnerId: "consumer-native-owner",status: "used",evidence: [evidence] });
-  const selected: SelectedExternalArtifact = { schema: "common.git-selected-external-artifact.v3",producer: producerBinding,producerContext,artifact,artifactSource,producerMilestone,selection,selectionReceipt,criteria: [{ criterionId: "integrates",receipt: criterion }],receiverOwnerId: "consumer-native-owner",receiverUse };
+  const selected: SelectedExternalArtifact = { schema: "common.git-selected-external-artifact.v3",producer: producerBinding,producerContext,producerSources,consumerSources,artifact,artifactSource,producerMilestone,selection,selectionReceipt,criteria: [{ criterionId: "integrates",receipt: criterion }],receiverOwnerId: "consumer-native-owner",receiverUse };
   graph.externalArtifacts = [selected]; graph.dependencies = [{ producer,consumer: fixtureTask,required: "verified",artifact }];
   const sourceSelection: GitWorkSelection = { repositoryRoot: root,repositoryId: "synthetic-repository",commit: git(root,"rev-parse","HEAD"),...fixtureScope };
   return { root,graph,selected,sourceSelection,producer };
@@ -149,13 +158,15 @@ test("R02 actual selected source/producer Task override/consumer gate/evidence/r
   expect(full.effective.externalArtifacts[0]!.producer.contracts.spec.id).toBe("producer-task-spec");
   for (const mode of ["compact","dispatch","resume"] as const) expect(expandGitWorkV3Context(await readSourceQualifiedGitWorkV3Context({ graph: f.graph,task: fixtureTask,mode,expectedDigest: full.effective.digest,reader: await openExactV3SourceReader(f.sourceSelection) })).effective).toEqual(full.effective);
 });
-test.each(["nonexistent","wrong-producer","wrong-receiver","stale-gate","missing-criterion","changed-consumer"])("R02 rejects %s pinned selected artifact", async (fault) => {
+test.each(["nonexistent","wrong-producer","wrong-receiver","stale-gate","missing-criterion","changed-consumer","forged-producer-source","forged-consumer-source"])("R02 rejects %s pinned selected artifact", async (fault) => {
   const f = await artifactFixture();
   if (fault === "nonexistent") f.selected.artifactSource.path += ".missing";
   if (fault === "wrong-producer") f.selected.producer.contracts = f.selected.producer.workContracts;
   if (fault === "wrong-receiver") f.selected.receiverOwnerId = "foreign-native-owner";
   if (fault === "stale-gate") f.selected.selection.revision++;
   if (fault === "missing-criterion") f.selected.criteria=[];
+  if (fault === "forged-producer-source") f.selected.producerSources.task.sha256="0".repeat(64);
+  if (fault === "forged-consumer-source") f.selected.consumerSources.work.sha256="0".repeat(64);
   if (fault === "changed-consumer") f.graph.tasks[0]!.revision++;
   await expect(readSourceQualifiedGitWorkV3Context({ graph: f.graph,task: fixtureTask,mode: "full",reader: await openExactV3SourceReader(f.sourceSelection) })).rejects.toThrow();
 });
