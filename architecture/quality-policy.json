@@ -41,14 +41,18 @@
       "path": "packages/native-codex-adapter",
       "name": "@palantirkc/native-codex-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
+      "allowedWorkspaceDependencies": [
+        "@palantirkc/work-continuity"
+      ]
     },
     {
       "capabilityId": "native-hermes-context",
       "path": "packages/native-hermes-adapter",
       "name": "@palantirkc/native-hermes-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
+      "allowedWorkspaceDependencies": [
+        "@palantirkc/work-continuity"
+      ]
     },
     {
       "capabilityId": "operational-context",
@@ -141,6 +145,18 @@
       "sha256": "0eab394ec6caa0f96ec1f5b7f857e5b04f7ca65c6d3901b86d9995d29396c5ef",
       "capabilityId": "native-hermes-context",
       "reason": "Exact request-schema definition used by the admitted native/jev bridge. Codex retains Jev semantic policy; native Hermes retains credentials/runtime/data custody. Source definition only; no execution permission, activation or new model budget."
+    },
+    {
+      "path": "packages/work-continuity/contracts/git-work-v3.schema.json",
+      "sha256": "85626ea6e2a057dabd00dd2db711fad4b0b9ef5f6e5991b00eb0394850f11553",
+      "capabilityId": "work-continuity",
+      "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
+    },
+    {
+      "path": "packages/work-continuity/contracts/v3-implementation.json",
+      "sha256": "9e6d9303d453309d1b85639df80863bfcd3ea7374dc0d5ae0184b523e9910ffe",
+      "capabilityId": "work-continuity",
+      "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
     }
   ],
   "stagedSources": [

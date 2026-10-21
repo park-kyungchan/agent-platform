@@ -100,7 +100,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/index.ts",
-          "sha256": "6f318ee4bdc33d8b5a446b80f26e4f6cdd21270f88f5757d6ebe24e3b35d86e2",
+          "sha256": "b848dfbba7e328937a60e3502fb5afe08bce7eaa11b662ce784488847abf2cd1",
           "relativePath": "packages/work-continuity/src/git-work/index.ts"
         },
         {
@@ -227,6 +227,46 @@
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/supplements.ts",
           "sha256": "efa1657d840b19f0f1ecb603f1fd4f9a0dc4877927f1ec5751c07e32746ece1f",
           "relativePath": "packages/work-continuity/src/jev/supplements.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/allocation.ts",
+          "sha256": "e83ef2e2de5477914e4cc699c5a4f2cc47416b7338f1c2abb7dd4ee8b940d3a5",
+          "relativePath": "packages/work-continuity/src/git-work/allocation.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/effective-contract.ts",
+          "sha256": "002bff6c81c705f9df41f26d0ef000921f1999acae7def81635ed5315c670918",
+          "relativePath": "packages/work-continuity/src/git-work/effective-contract.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/v3-codec.ts",
+          "sha256": "63697d1d8672e9fd971713acdce6baecaff5a3d29cbf9645678674232fa26f1a",
+          "relativePath": "packages/work-continuity/src/git-work/v3-codec.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/fixtures/v3-owner.ts",
+          "sha256": "79e8a0fc2da23dd67606764093f5fc035cfb7434480ddd9ec76a872c4905f31f",
+          "relativePath": "packages/work-continuity/src/git-work/fixtures/v3-owner.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/fixtures/v3-worker.ts",
+          "sha256": "9494215f3f1bdaddfa4e619807b3b496f55543e6dcb278c76c408a19a2968e31",
+          "relativePath": "packages/work-continuity/src/git-work/fixtures/v3-worker.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/generated/v3.ts",
+          "sha256": "8660b9b1e301e877335cce0f595f82ce46ce7f02a9f4395f3db6443c1ab101e0",
+          "relativePath": "packages/work-continuity/src/git-work/generated/v3.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/generated/v3-validators.js",
+          "sha256": "0db6174819fe7adf5c2a74384812ab80ff66396825f2b959be8728140a12ebee",
+          "relativePath": "packages/work-continuity/src/git-work/generated/v3-validators.js"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/generated/v3-validators.d.ts",
+          "sha256": "5d1084074c72e843213217440364db56522df567a2c9d715cfde256bd215ff38",
+          "relativePath": "packages/work-continuity/src/git-work/generated/v3-validators.d.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
@@ -349,7 +389,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/ontology/scripts/generate.ts",
-          "sha256": "2fca0155844b0f11ad5c7b43d484a113bdd3b4f4bf440d39bf3d5d9fe6c41416",
+          "sha256": "4f4245e3d4da99a664a2a32d4476ccfbff8ca4db69e6fe8cc5562b9ff7c54e45",
           "relativePath": "packages/ontology/scripts/generate.ts"
         }
       ],
