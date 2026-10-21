@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, mkdir, writeFile, readFile, rm, chmod } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import type { Graph, GitSourcePin, LegacyMigrationRequest, SelectedExternalArtifact, Run } from "./generated/v3.ts";
@@ -133,8 +133,8 @@ async function artifactFixture() {
   const selection = { instanceId: "consumer-gate",revision: 4,definition,consumer,selectedAlternative: "selected-A",selectionOwnerId: "consumer-owner" };
   const evidence = await pin(root,"work/artifact-sources/evidence.json",{ synthetic: "bounded independent source observation" });
   const producerMilestone = await pin(root,"work/artifact-sources/milestone.json",{ schema: "common.git-artifact-producer-milestone.v3",producer: producerBinding,artifact,artifactSource,milestone: "verified" });
-  const selectionReceipt = await pin(root,"work/artifact-sources/selection.json",{ schema: "common.git-artifact-selection-receipt.v3",selection });
-  const criterion = await pin(root,"work/artifact-sources/criterion.json",{ schema: "common.git-artifact-criterion-receipt.v3",selection,criterionId: "integrates",status: "pass",evidence: [evidence] });
+  const selectionReceipt = await pin(root,"work/artifact-sources/selection.json",{ schema: "common.git-artifact-selection.v3",selection });
+  const criterion = await pin(root,"work/artifact-sources/criterion.json",{ schema: "common.git-artifact-criterion.v3",selection,criterionId: "integrates",status: "pass",evidence: [evidence] });
   const receiverUse = await pin(root,"work/artifact-sources/receiver.json",{ schema: "common.git-artifact-receiver-use.v3",selection,producer: producerBinding,artifact,receiverOwnerId: "consumer-native-owner",status: "used",evidence: [evidence] });
   const selected: SelectedExternalArtifact = { schema: "common.git-selected-external-artifact.v3",producer: producerBinding,producerContext,artifact,artifactSource,producerMilestone,selection,selectionReceipt,criteria: [{ criterionId: "integrates",receipt: criterion }],receiverOwnerId: "consumer-native-owner",receiverUse };
   graph.externalArtifacts = [selected]; graph.dependencies = [{ producer,consumer: fixtureTask,required: "verified",artifact }];
@@ -181,7 +181,7 @@ test("R03 immutable ledger edits remain conflicts even if restored at current he
 });
 
 test("R04 missing/wrong native hook policy rejects before mutation; qualified invocation leaves Git/native hook configuration intact", async () => {
-  const f=await ownerFixture(); const marker=join(f.root,"synthetic-hook-marker"); const hooks=join(f.root,"synthetic-hooks"); await mkdir(hooks); const hook=join(hooks,"reference-transaction"); await writeFile(hook,`#!/bin/sh\nprintf synthetic >> '${marker}'\n`); await chmod(hook,0o700); git(f.root,"config","core.hooksPath",hooks);
+  const f=await ownerFixture(); const marker=join(f.root,"prepared"); const hooks=join(f.root,"synthetic-hooks"); await mkdir(hooks); const hook=join(hooks,"reference-transaction"); await symlink("/usr/bin/touch",hook); git(f.root,"config","core.hooksPath",hooks);
   const before=git(f.root,"count-objects","-v");
   await expect(allocateGitWorkIdentity(fixtureTaskRequest(),f.target,fixtureOwner(f.root,{ gitHookPolicy: undefined }))).rejects.toThrow("GIT_HOOK_POLICY");
   expect(git(f.root,"rev-parse",fixtureRef)).toBe(f.target.expectedHead); expect(git(f.root,"count-objects","-v")).toBe(before);
@@ -193,5 +193,5 @@ test("R04 missing/wrong native hook policy rejects before mutation; qualified in
   expect(git(f.root,"rev-list","--count",f.target.expectedHead+".."+fixtureRef)).toBe("1");
   expect(git(f.root,"config","--get","core.hooksPath")).toBe(hooks); await expect(readFile(marker)).rejects.toThrow();
   // Prove the harmless fixture hook itself works under an ordinary native Git call.
-  git(f.root,"update-ref","refs/heads/synthetic-hook-positive",receipt.head); expect(await readFile(marker,"utf8")).toContain("synthetic");
+  git(f.root,"update-ref","refs/heads/synthetic-hook-positive",receipt.head); expect(await readFile(marker,"utf8")).toBe("");
 });

@@ -377,7 +377,7 @@ export async function openGitSourceSnapshot(input: GitWorkSelection) {
   }
   return Object.freeze({ selection, commit: input.commit, workPath, maxRecords, readSource: source,
     async listPaths(prefix: string): Promise<string[]> {
-      assertGitPath(prefix);
+      assertGitPath(prefix.endsWith("/") ? prefix.slice(0, -1) : prefix);
       const paths = decode(await git(root, ["ls-tree", "-r", "-z", "--name-only", input.commit, "--", prefix], Math.min(maxRecords * 8192, 16_777_216))).split("\0").filter(Boolean);
       if (paths.length > maxRecords) throw Error("SOURCE_SNAPSHOT_RECORD_COUNT_LIMIT");
       return paths;

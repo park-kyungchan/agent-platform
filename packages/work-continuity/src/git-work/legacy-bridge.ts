@@ -85,7 +85,7 @@ export async function readVersionedLegacyGitWork(selection: GitWorkSelection): P
   if (fence.scope.projectId !== selection.projectId || fence.scope.workId !== selection.workId || fence.legacyReadSnapshot.repositoryId !== selection.repositoryId) throw Error("V3_WRITER_FENCE_SCOPE_MISMATCH");
   for (const pin of fence.sources) { const current = await snapshot.readSource({ kind: "snapshot", path: pin.path }); if (current.sha256 !== pin.sha256) throw Error("V3_RETIRED_LEGACY_WRITER_CHANGED_ORIGINAL"); }
   const old = await readLegacyGitWorkProjection({ ...selection, commit: fence.legacyReadSnapshot.commit });
-  if (old.inventoryDigest !== fence.inventoryDigest) throw Error("V3_WRITER_FENCE_INVENTORY_MISMATCH");
+  if (old.inventoryDigest !== fence.inventoryDigest || !same(old.sources, fence.sources)) throw Error("V3_WRITER_FENCE_INVENTORY_MISMATCH");
   return old;
 }
 export async function assertLegacyGitWriterAllowed(selection: GitWorkSelection): Promise<void> {
@@ -205,6 +205,8 @@ export async function recoverLegacyCreateRequest(input: { selection: GitWorkSele
 export async function readMigratedGitWorkV3(selection: GitWorkSelection): Promise<Graph> {
   const historical = await readVersionedLegacyGitWork(selection); const snapshot = await openGitSourceSnapshot(selection);
   if (!(await snapshot.listPaths(legacyWriterFencePath(selection))).length) throw Error("V3_EXPLICIT_NATIVE_MIGRATION_REQUIRED");
+  const aliases = await snapshot.readSource({ kind: "snapshot", path: gitWorkPath(selection.projectId,selection.workId) + "/v3/aliases.json" });
+  if (!same(aliases.document, historical.aliases)) throw Error("V3_MIGRATED_ALIAS_SOURCE_CHANGED");
   const graph: Graph = { ...historical.graph, works: [], tasks: [], contracts: [] };
   const base = gitWorkPath(selection.projectId,selection.workId) + "/v3/";
   for (const path of await snapshot.listPaths(base)) {
