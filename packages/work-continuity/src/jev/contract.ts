@@ -118,6 +118,8 @@ export type SemanticQuestion = NoulQuestion | ChoiceQuestion;
 export interface SemanticWireRequest {
   schema: "jev.semantic-request.v1" | "jev.semantic-request.v2";
   consumptionPolicy?: "jev.direct-selected-answer.v2";
+  /** Required false for the semantic/workflow v2 text boundary; absent in v1. */
+  imageOptIn?: boolean;
   requestId: string;
   model: typeof JEV_MODEL;
   purpose: "semantic_bundle";

@@ -1,0 +1,18 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "4c80dc5e-0f94-434e-ad10-6d4d194ad0c9",
+  "kind": "spec",
+  "id": "W05-SPEC-INTEGRATION-REPAIR-20261021",
+  "revision": 1,
+  "outcome": "Approved W05 source repair and local publication preparation only; Root owns all external workflow effects and native owners retain activation/Acceptance.",
+  "criteria": [
+    "W05-I01 actual semantic-v2 and fixed-role workflow-v2 producers enter the actual native parser through explicit advice-only metadata; direct-v2/v1 and fixed role/independent questions preserved.",
+    "W05-I03 v2 semantic/workflow normalizers require the full canonical prepared request digest and refuse missing/wrong/same-state-different-question replies.",
+    "W05-I02 actual host request and immutable recovery loaders admit exact caller/helper origins and hashes before transport with source/descriptor/currentness guards preserved.",
+    "Explicit v2 same-owner ledger metadata preserves raw SHA/state/native occurrence and version-correct held/unknown/recovery; missing metadata stays legacy v1 with no-repeat/completed/unknown fences.",
+    "Final complete Python/TypeScript closure, predecessor/current/mixed-version controls and required affected/source checks are measured offline with no provider/native/config effects.",
+    "Fresh actual source-author metadata and independent exact commit/tree/manifest review prepare Root publication; local delivery remains distinct from activation and whole Acceptance."
+  ]
+}

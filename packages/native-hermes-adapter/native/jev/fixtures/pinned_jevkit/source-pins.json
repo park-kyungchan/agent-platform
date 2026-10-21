@@ -1,0 +1,27 @@
+{
+  "schema": "jev.immutable-sdk-test-source.v1",
+  "classification": "Byte-exact externally-owned test-source dependency copies; never a maintained SDK implementation or native delivery target.",
+  "semanticOwner": "Existing pinned jevkit SDK source owner; this assignment grants no upstream edit/activation authority.",
+  "copiedAtUtc": "2026-10-21T09:57:16.235080+00:00",
+  "sourceEvidence": "Original fixed source SHA256 values from retained W03 independent actual SDK closure; explicit W05 verify-sdk-origin command must independently match all originals and copies.",
+  "files": [
+    {
+      "path": "images.py",
+      "sha256": "4a711bb42e9d303a6c65427f4cacf192792afa291ef4cf9ebc73ab17cf563331",
+      "bytes": 5867,
+      "originalSource": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/images.py"
+    },
+    {
+      "path": "keystore.py",
+      "sha256": "a3fdc653a473b4c24cb6cf8b77fcfb24b599e38026650cb4fd28fdc7795d39dc",
+      "bytes": 10563,
+      "originalSource": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/keystore.py"
+    },
+    {
+      "path": "client.py",
+      "sha256": "63915a3925e074b3d314c65bd2eaf4146523c7b3e3692dd0814440c739493f5c",
+      "bytes": 40071,
+      "originalSource": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/client.py"
+    }
+  ]
+}

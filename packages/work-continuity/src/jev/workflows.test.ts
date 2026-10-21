@@ -192,7 +192,9 @@ const reply = (
     p.request.schema === "jev.semantic-request.v2"
       ? "jev.semantic-result.v2"
       : "jev.semantic-result.v1",
-  ...(p.request.consumptionPolicy ? { consumptionPolicy: p.request.consumptionPolicy } : {}),
+  ...(p.request.consumptionPolicy
+    ? { consumptionPolicy: p.request.consumptionPolicy, requestDigest: p.requestDigest }
+    : {}),
   status: "ok",
   requestId: p.request.requestId,
   stateDigest: p.request.stateDigest,

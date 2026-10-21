@@ -1,0 +1,21 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "4c80dc5e-0f94-434e-ad10-6d4d194ad0c9",
+  "kind": "plan",
+  "id": "W05-PLAN-INTEGRATION-REPAIR-20261021",
+  "revision": 1,
+  "specId": "W05-SPEC-INTEGRATION-REPAIR-20261021",
+  "specRevision": 1,
+  "objective": "Repair and independently qualify the exact common/native and Codex host closure.",
+  "clauses": [
+    "Verify authority/workflow/validated findings and freeze interface revision 1 before disjoint native high writers.",
+    "Common/native and host writers repair only their assigned source roots; SubLead serializes integration metadata/local commits.",
+    "Retain exact final counterpart dependency exposure; test actual producer/parser/SDK/host/same-ledger/normalized-consumer closure with offline injection and denied credentials/sockets.",
+    "Run exact affected repository checks and canonical finite source QA without changing active owner registrations.",
+    "Freshly capture source-author metadata against the actual immediate parent and commit final reviewed metadata/Work/source.",
+    "Retain and close completed owned writers, then launch fresh independent high reviewer against exact final two-repository heads/trees and prepare validator-compatible publication payloads.",
+    "Write durable result for Root pull, retain/close reviewer and leave SubLead idle; no Goal, publication, main or native effects."
+  ]
+}

@@ -362,7 +362,6 @@
             },
             {
               "type": "object",
-              "required": ["directBoundary"],
               "properties": {
                 "directBoundary": {
                   "type": "object",
@@ -383,8 +382,50 @@
                       "type": "object"
                     }
                   }
+                },
+                "semanticBoundary": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "schema",
+                    "mode",
+                    "executionAuthorityGranted",
+                    "automaticWrite",
+                    "workerCompletionVerified"
+                  ],
+                  "properties": {
+                    "schema": {
+                      "const": "jev.semantic-boundary.v2"
+                    },
+                    "mode": {
+                      "const": "advice-only"
+                    },
+                    "executionAuthorityGranted": {
+                      "const": false
+                    },
+                    "automaticWrite": {
+                      "const": false
+                    },
+                    "workerCompletionVerified": {
+                      "const": false
+                    }
+                  }
                 }
-              }
+              },
+              "oneOf": [
+                {
+                  "required": ["directBoundary"],
+                  "not": {
+                    "required": ["semanticBoundary"]
+                  }
+                },
+                {
+                  "required": ["semanticBoundary"],
+                  "not": {
+                    "required": ["directBoundary"]
+                  }
+                }
+              ]
             }
           ]
         },
@@ -538,7 +579,39 @@
           }
         }
       },
-      "description": "Structural admission only. Runtime validates exact canonical state digest, represented assets, owner metadata, bytes, expanded limits and presence bindings. Pinned owner client admits a narrower text subset; all assets/Box and multipart hold before transport pending actual decoder/client qualification. No execution permission."
+      "description": "Structural admission only. Exactly one directBoundary or exact advice-only semanticBoundary. Semantic requests are text only with imageOptIn false and no assets/Box. Runtime validates the canonical state digest and existing direct image bindings. Pinned owner client subsets and native permissions remain separate.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "required": ["semanticBoundary"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "imageOptIn": {
+                "const": false
+              },
+              "questions": {
+                "additionalProperties": {
+                  "properties": {
+                    "type": {
+                      "not": {
+                        "const": "box"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "not": {
+              "required": ["assets"]
+            }
+          }
+        }
+      ]
     },
     "content": {
       "type": ["string", "object", "array", "null"]

@@ -1,4 +1,4 @@
-"""Pure native admission for the canonical common direct-v2 contract.
+"""Pure native admission for canonical common semantic and direct v2 contracts.
 
 No transport, credential lookup, decoder, action execution or persistence lives
 here. The existing pinned jevkit client remains the only provider client. Image
@@ -147,6 +147,19 @@ def validate_request(request):
         validate_question(question)
     assets = request.get('assets', {})
     need(isinstance(assets, dict) and ('assets' not in request or bool(assets)), 'v2_assets_nonempty')
+    need(('semanticBoundary' in request['state']) != ('directBoundary' in request['state']),
+         'v2_exactly_one_boundary_required')
+    if 'semanticBoundary' in request['state']:
+        boundary = request['state']['semanticBoundary']
+        expected = {'schema': 'jev.semantic-boundary.v2', 'mode': 'advice-only',
+                    'executionAuthorityGranted': False, 'automaticWrite': False,
+                    'workerCompletionVerified': False}
+        # Canonical equality also rejects numeric 0 in place of boolean false.
+        need(canonical_json(boundary) == canonical_json(expected), 'v2_semantic_boundary_required')
+        need(request['imageOptIn'] is False and 'assets' not in request
+             and all(q['type'] != 'box' for q in request['questions'].values()),
+             'v2_semantic_text_only')
+        return
     boundary = request['state'].get('directBoundary')
     need(isinstance(boundary, dict) and set(boundary) == {
         'opportunity', 'actions', 'boxes', 'imageEvidence'}, 'v2_direct_boundary_required')

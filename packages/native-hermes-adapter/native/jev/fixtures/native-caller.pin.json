@@ -1,0 +1,10 @@
+{
+  "schema": "jev.immutable-native-adapter-test-source.v1",
+  "classification": "Byte-exact externally-owned native adapter test-source copy; never an independent maintained implementation or delivery target.",
+  "originalSource": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/native-caller.py",
+  "fixturePath": "native-caller.py",
+  "sha256": "dd72953016d12fdc730235dece88e635b58573042544b77e890b5d64566af71d",
+  "bytes": 22881,
+  "copiedAtUtc": "2026-10-21T10:01:50.324547+00:00",
+  "scope": "Actual host offline loader test-source closure only; original source unchanged and no native activation."
+}

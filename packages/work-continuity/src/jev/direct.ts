@@ -419,6 +419,7 @@ export function prepareDirectDecision(input: {
     string,
     Json
   >;
+  delete state.semanticBoundary;
   const request: DirectWireRequest = {
     ...base.request,
     schema: "jev.semantic-request.v2",

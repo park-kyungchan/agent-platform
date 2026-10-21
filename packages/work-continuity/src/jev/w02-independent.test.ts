@@ -122,7 +122,7 @@ const nativeReply = (p: PreparedDecision): FixtureReply => ({
       ? "jev.semantic-result.v2"
       : "jev.semantic-result.v1",
   ...(p.request.schema === "jev.semantic-request.v2"
-    ? { consumptionPolicy: p.request.consumptionPolicy }
+    ? { consumptionPolicy: p.request.consumptionPolicy, requestDigest: p.requestDigest }
     : {}),
   requestId: p.request.requestId,
   purpose: "semantic_bundle",

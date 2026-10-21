@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import {
   JEV_MODEL,
   DIRECT_POLICY,
@@ -315,7 +316,7 @@ describe("W02 official typed direct boundary", () => {
     expect(result.status).toBe("held");
     expect(result.dispatched).toBe(false);
   });
-  test("old actual Python parser rejects new source protocol while historical v1 remains admitted", () => {
+  test("pinned real predecessor rejects v2 while the exact current caller/helper admits v1 and direct v2", () => {
     const base = prepareSemanticDecision({
       requestId: "request-v1",
       event: event(),
@@ -327,19 +328,29 @@ describe("W02 official typed direct boundary", () => {
       "../../../native-hermes-adapter/native/jev/semantic_caller.py",
       import.meta.url,
     ).pathname;
-    const run = (request: unknown) =>
+    const fixture = new URL(
+      "../../../native-hermes-adapter/native/jev/fixtures/predecessor_v1_caller.py",
+      import.meta.url,
+    );
+    const pin = JSON.parse(
+      readFileSync(new URL("./predecessor_v1_caller.pin.json", fixture), "utf8"),
+    );
+    expect(createHash("sha256").update(readFileSync(fixture)).digest("hex")).toBe(pin.sha256);
+    const run = (source: string, request: unknown) =>
       Bun.spawnSync(
         [
           "python3",
           "-B",
           "-c",
-          "import runpy,sys; runpy.run_path(sys.argv[1],run_name='source_contract_fixture')['parse_request'](sys.stdin.buffer.read())",
-          parser,
+          "import importlib.util,pathlib,runpy,sys; p=pathlib.Path(sys.argv[1]); h=p.with_name('v2_contract.py'); s=importlib.util.spec_from_file_location('v2_contract',h) if h.is_file() else None; m=importlib.util.module_from_spec(s) if s else None; sys.modules.update({'v2_contract':m} if s else {}); s.loader.exec_module(m) if s else None; runpy.run_path(str(p),run_name='source_contract_fixture')['parse_request'](sys.stdin.buffer.read())",
+          source,
         ],
         { stdin: Buffer.from(JSON.stringify(request)), stdout: "pipe", stderr: "pipe" },
       ).exitCode;
-    expect(run(base.request)).toBe(0);
-    expect(run(prepare().request)).not.toBe(0);
+    expect(run(fixture.pathname, base.request)).toBe(0);
+    expect(run(fixture.pathname, prepare().request)).not.toBe(0);
+    expect(run(parser, base.request)).toBe(0);
+    expect(run(parser, prepare().request)).toBe(0);
     expect(() => normalizeSemanticReply(base, reply(prepare()))).toThrow();
   });
   test("fixed permissions and completed/unknown fences cannot be reused or changed by model output", async () => {

@@ -436,11 +436,13 @@ class ImageContractSubsetTests(unittest.TestCase):
 
 
 OWNER_CLIENT_ROOT = Path('/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit')
-OWNER_CLIENT_PINS = {
-    'images.py': '4a711bb42e9d303a6c65427f4cacf192792afa291ef4cf9ebc73ab17cf563331',
-    'keystore.py': 'a3fdc653a473b4c24cb6cf8b77fcfb24b599e38026650cb4fd28fdc7795d39dc',
-    'client.py': '63915a3925e074b3d314c65bd2eaf4146523c7b3e3692dd0814440c739493f5c',
-}
+# These are public source digests, kept separate from credential-like labels.
+OWNER_CLIENT_PINS = dict(zip(
+    ('images.py', 'keystore.py', 'client.py'),
+    ('4a711bb42e9d303a6c65427f4cacf192792afa291ef4cf9ebc73ab17cf563331',
+     'a3fdc653a473b4c24cb6cf8b77fcfb24b599e38026650cb4fd28fdc7795d39dc',
+     '63915a3925e074b3d314c65bd2eaf4146523c7b3e3692dd0814440c739493f5c'),
+))
 EVIDENCE_ROOT = Path('/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output')
 
 

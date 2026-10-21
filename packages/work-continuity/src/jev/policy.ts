@@ -314,6 +314,17 @@ export function prepareSemanticDecision(input: {
   );
   const state = JSON.parse(
     canonicalJson({
+      ...(input.consumptionPolicy
+        ? {
+            semanticBoundary: {
+              schema: "jev.semantic-boundary.v2",
+              mode: "advice-only",
+              executionAuthorityGranted: false,
+              automaticWrite: false,
+              workerCompletionVerified: false,
+            },
+          }
+        : {}),
       event: {
         kind: event.kind,
         materialRevision: event.materialRevision,
@@ -349,7 +360,9 @@ export function prepareSemanticDecision(input: {
     schema: input.consumptionPolicy
       ? ("jev.semantic-request.v2" as const)
       : ("jev.semantic-request.v1" as const),
-    ...(input.consumptionPolicy ? { consumptionPolicy: input.consumptionPolicy } : {}),
+    ...(input.consumptionPolicy
+      ? { consumptionPolicy: input.consumptionPolicy, imageOptIn: false as const }
+      : {}),
     requestId: input.requestId,
     model: JEV_MODEL,
     purpose: "semantic_bundle" as const,
@@ -409,7 +422,8 @@ export function normalizeSemanticReply(
         : "jev.semantic-result.v1") ||
     (prepared.request.schema === "jev.semantic-request.v2" &&
       (prepared.request.consumptionPolicy !== "jev.direct-selected-answer.v2" ||
-        value.consumptionPolicy !== prepared.request.consumptionPolicy)) ||
+        value.consumptionPolicy !== prepared.request.consumptionPolicy ||
+        value.requestDigest !== prepared.requestDigest)) ||
     value.status !== "ok" ||
     value.requestId !== prepared.request.requestId ||
     value.stateDigest !== prepared.request.stateDigest ||

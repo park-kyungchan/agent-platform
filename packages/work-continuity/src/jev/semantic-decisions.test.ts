@@ -832,6 +832,7 @@ test("direct-v2 consumes an allowed tied selection while explicit legacy v1 stil
   const raw = reply(p);
   raw.schema = "jev.semantic-result.v2";
   raw.consumptionPolicy = "jev.direct-selected-answer.v2";
+  raw.requestDigest = p.requestDigest;
   (raw.answers as Record<string, unknown>)[p.selectionQuestionId!] = {
     type: "choice",
     choice: "read-source",

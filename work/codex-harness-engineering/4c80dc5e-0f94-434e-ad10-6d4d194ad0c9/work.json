@@ -1,0 +1,46 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "4c80dc5e-0f94-434e-ad10-6d4d194ad0c9",
+  "kind": "work",
+  "id": "4c80dc5e-0f94-434e-ad10-6d4d194ad0c9",
+  "repositoryId": "park-kyungchan/agent-platform",
+  "issueId": "W05-ISSUE-INTEGRATION-REPAIR-20261021",
+  "purpose": {
+    "objective": "Repair validated W05 integration findings and prepare exact two-repository local source delivery for the approved Root publication workflow.",
+    "successCriteria": [
+      "W05-I01 actual semantic-v2 and fixed-role workflow-v2 producers enter the actual native parser through explicit advice-only metadata; direct-v2/v1 and fixed role/independent questions preserved.",
+      "W05-I03 v2 semantic/workflow normalizers require the full canonical prepared request digest and refuse missing/wrong/same-state-different-question replies.",
+      "W05-I02 actual host request and immutable recovery loaders admit exact caller/helper origins and hashes before transport with source/descriptor/currentness guards preserved.",
+      "Explicit v2 same-owner ledger metadata preserves raw SHA/state/native occurrence and version-correct held/unknown/recovery; missing metadata stays legacy v1 with no-repeat/completed/unknown fences.",
+      "Final complete Python/TypeScript closure, predecessor/current/mixed-version controls and required affected/source checks are measured offline with no provider/native/config effects.",
+      "Fresh actual source-author metadata and independent exact commit/tree/manifest review prepare Root publication; local delivery remains distinct from activation and whole Acceptance."
+    ],
+    "inScope": [
+      "Assigned common/native Jev source in agent-platform",
+      "Assigned Codex host Jev loader/reserve/recovery source in codex-harness-engineering",
+      "Necessary source-only publication metadata and this single canonical Work bundle",
+      "Independent final closure verification and local commits"
+    ],
+    "outOfScope": [
+      "GitHub/main/handoff/cleanup effects owned by Root",
+      "Provider/native hook/action/restore trials and runtime activation",
+      "Active registrations/descriptors/config/trust/credentials/cache/skills",
+      "External SDK/mounted projection edits, AGY/Argon and exclusive Academy scope",
+      "Whole ODI/Jev/domain/human Acceptance and Goal lifecycle"
+    ]
+  },
+  "spec": {
+    "id": "W05-SPEC-INTEGRATION-REPAIR-20261021",
+    "revision": 1
+  },
+  "plan": {
+    "id": "W05-PLAN-INTEGRATION-REPAIR-20261021",
+    "revision": 1
+  },
+  "governingDecisionIds": [
+    "W05-ACTUAL-FULL-WORKFLOW-AUTHORITY-20261021"
+  ],
+  "historicalFenceIds": []
+}
