@@ -1,0 +1,16 @@
+{
+  "schema": "agent-platform.exact-tree-review-reuse.v1",
+  "originalHead": "210f2e8c588a5de7bfdc0361095f2565a96a3cc1",
+  "successorHead": "4cd6eea995700177159a3d3d42bf63024fb5fc13",
+  "reviewedTreeSha": "eff40f0a35c8fbc25377eab478dd0c01166e0eb3",
+  "reviewedSourceManifestSha256": "466ae530a513004ba6f691474d4200b24a7d3af350f18390713abb36d391be29",
+  "originalNativeReviewSha256": "6b46c83d5ad6b130e99aae9b083083822ee2cfe08263575aa52d754350fe4fa7",
+  "originalNativeReviewRef": "https://github.com/park-kyungchan/agent-platform/blob/a2cee5ed40f16f0fd59dd71963626fb509329969/native-review-results/210f2e8c588a5de7bfdc0361095f2565a96a3cc1.details.json",
+  "currentUnresolvedFindings": 0,
+  "identityProof": "Authenticated GitHub merge commit and actual main equal4cd6eea995700177159a3d3d42bf63024fb5fc13; tree byte identity to reviewed210f; exact checked baseM1784 and parents[M1784,H210f].",
+  "authority": "Repository AGENTS identical-reviewed-tree successor rule; explicit Root expected-head merge PR65 after all5currentCIchecks.",
+  "newNativeReviewInvocation": false,
+  "nativeTaskId": null,
+  "nativeRunId": null,
+  "nativeActivation": false
+}
