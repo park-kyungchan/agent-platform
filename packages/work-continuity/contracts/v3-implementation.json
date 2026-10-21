@@ -59,7 +59,7 @@
   "activationPerformed": false,
   "acceptanceDecision": null,
   "corrections": {
-    "assignmentRevision": 6,
+    "assignmentRevision": 7,
     "findings": [
       "S01-R01",
       "S01-R02",
@@ -78,5 +78,12 @@
     "R03": "Bounded full parent DAG (maximum8192 complete non-shallow commits) finds one actual introducing transaction; merge propagation is distinct from mutation. Every side-parent ledger deletion/rewrite and every relevant successor edge is checked, including removed/foreign/regressed side history restored at head. No ref retry or source history rewriting.",
     "R04": "Preserved resolved exact native-qualified per-invocation hook policy and existing positive/negative/lost-ACK tests.",
     "nativeSourceRequirement": "External artifact native owner must publish an exact canonical semantic graph source projection without embedded external proof rows at work/<project>/<work>/v3/graph.json, pin it alongside actual records, and retain native controls. This source slice performs no publication/adoption or native owner permission issuance."
+  },
+  "refreshQualification": {
+    "boundary": "Every public source refresh (context, legacy and artifact) revokes graph/legacy/artifact proof at entry before schema validation, source reads, aliases or joins. Alias qualification belongs to that same graph transaction; no separate alias authority is inferred.",
+    "publication": "An unexposed detached graph stages all legacy, alias and artifact phases, whole-graph validation and final requested context transport/digest checks. Only a complete unchanged/current refresh transfers proofs synchronously to original objects. All staging proofs are discarded on completion/rejection.",
+    "isolation": "Actual source documents are cloned before internal graph qualification, and readers receive only TaskRef fields. Neither original nor partially staged proof becomes available during source callbacks.",
+    "concurrency": "A private per-graph refresh epoch prevents older completion from overwriting a newer refresh; no IDs, effects or native permissions are allocated.",
+    "preservation": "One effective resolver, all scoped holds, supported full merge ancestry, native-qualified hook policy and prior positive/negative/lost-ACK tests remain unchanged."
   }
 }

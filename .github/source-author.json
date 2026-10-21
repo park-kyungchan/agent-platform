@@ -11,16 +11,16 @@
     "workId": "ontology-driven-platform-integration-20261017",
     "taskId": "18a81525-5cb1-4e22-a235-bf221bf6837b"
   },
-  "sourceBaseSha": "b439001081d7f2ad4f33dd291e43003bf4282e87",
+  "sourceBaseSha": "532b80c56e2dae70ab764b005824abede3cb79cd",
   "author": {
     "runtime": "native-codex",
-    "threadId": "01a15e93-a450-71f0-bfe4-2352ea19068b",
+    "threadId": "01a15f39-8925-73c2-865f-8a4c9c3082ca",
     "sessionId": null,
     "nativeTaskId": null,
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-21T19:39:48.907Z",
+  "capturedAtUtc": "2026-10-21T20:11:12.645Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }

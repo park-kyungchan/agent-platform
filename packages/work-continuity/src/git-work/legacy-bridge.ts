@@ -41,10 +41,9 @@ import {
 import { qualifyLegacyGraphBindings } from "./legacy-qualification.ts";
 import {
   openExactV3SourceReader,
-  qualifySelectedExternalArtifacts,
   readExactV3Source,
 } from "./external-artifacts.ts";
-import { validateGitWorkAliases, qualifyGitWorkAliases } from "./aliases.ts";
+import { validateGitWorkAliases } from "./aliases.ts";
 import {
   validateGitWorkV3Graph,
   readGitWorkV3Context,
@@ -279,7 +278,6 @@ export async function readLegacyGitWorkProjection(
   graph.aliases = aliases;
   const exact = await openExactV3SourceReader(selection);
   await qualifyLegacyGraphBindings(graph, exact);
-  await qualifyGitWorkAliases(aliases, exact);
   validateGitWorkV3Graph(graph);
   const sorted = sources.sort((a, b) => a.path.localeCompare(b.path));
   return { graph, reader, sources: sorted, inventoryDigest: digestV3(sorted), aliases, records };
@@ -728,7 +726,6 @@ export async function readMigratedGitWorkV3(selection: GitWorkSelection): Promis
   }
   const exact = await openExactV3SourceReader(selection);
   await qualifyLegacyGraphBindings(graph, exact);
-  await qualifySelectedExternalArtifacts(graph, exact);
   validateGitWorkV3Graph(graph);
   return graph;
 }

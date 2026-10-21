@@ -18,15 +18,14 @@ import {
   effectiveTaskRefs,
   assertCurrentArtifactGraph,
   selectedArtifactForDependency,
-  qualifySelectedExternalArtifacts,
+  refreshGitWorkV3Qualifications,
   type ExactV3SourceReader,
 } from "./external-artifacts.ts";
 import {
   assertQualifiedLegacyTask,
-  qualifyLegacyGraphBindings,
   legacyDependencyHoldReasons,
 } from "./legacy-qualification.ts";
-import { validateGitWorkAliases, qualifyGitWorkAliases } from "./aliases.ts";
+import { validateGitWorkAliases } from "./aliases.ts";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 
 export const v3WorkKey = (row: { projectId: string; workId: string }): string =>
@@ -430,9 +429,5 @@ export function expandGitWorkV3Context(input: ContextPacket | CompactContextPack
 export async function readSourceQualifiedGitWorkV3Context(
   input: Parameters<typeof readGitWorkV3Context>[0] & { graph: Graph; reader: ExactV3SourceReader },
 ) {
-  assertV3("Graph", input.graph);
-  await qualifyLegacyGraphBindings(input.graph, input.reader);
-  await qualifyGitWorkAliases(input.graph.aliases ?? [], input.reader);
-  await qualifySelectedExternalArtifacts(input.graph, input.reader);
-  return readGitWorkV3Context(input);
+  return refreshGitWorkV3Qualifications(input.graph,input.reader,(staged) => readGitWorkV3Context({ ...input,graph: staged }));
 }
