@@ -50,7 +50,7 @@
       "packageName": "@palantirkc/work-continuity",
       "packageManifest": {
         "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/package.json",
-        "sha256": "8c382dba4a0bd93ff3805e3cdccb95d119130e05ad198ce80f3d669decad12c8"
+        "sha256": "72bb6f1423a019c36b2712c963abfaa7789cc0352072523ab9d2b07ff42d7c84"
       },
       "sourcePins": [
         {
@@ -100,7 +100,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/index.ts",
-          "sha256": "aa94d4bc054164961492a1432e64b8c2e2a916bc6491bdd7601ffda00a3eef90",
+          "sha256": "6f318ee4bdc33d8b5a446b80f26e4f6cdd21270f88f5757d6ebe24e3b35d86e2",
           "relativePath": "packages/work-continuity/src/git-work/index.ts"
         },
         {
@@ -302,6 +302,11 @@
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/record-lineage.ts",
           "sha256": "40b882fe5361e6edb9d22eb1f45eba2163fd907171baabf85d887249bc0ad9a1",
           "relativePath": "packages/work-continuity/src/git-work/record-lineage.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/v3.ts",
+          "sha256": "9cf774c32383b60ba04f42658917658ff02ce750fb9a56be40e6cfd415730a9a",
+          "relativePath": "packages/work-continuity/src/git-work/v3.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
