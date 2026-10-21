@@ -1,4 +1,4 @@
-/** Generated from git-work-v3.schema.json; do not edit. SHA-256: 918dc3a6e933b50b186d7c72d15f7b21083459530e0ee9e32e42ebc81f6c7a48 */
+/** Generated from git-work-v3.schema.json; do not edit. SHA-256: 1f1542021ee00b044bc5d0d7577430aeba58a0d2431aa92fcb7f05c1df7e27e0 */
 export declare const validateGraph: (value: unknown) => boolean;
 export declare const validateWork: (value: unknown) => boolean;
 export declare const validateTask: (value: unknown) => boolean;
