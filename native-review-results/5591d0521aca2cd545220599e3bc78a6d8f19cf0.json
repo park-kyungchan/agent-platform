@@ -1,0 +1,44 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "5591d0521aca2cd545220599e3bc78a6d8f19cf0",
+  "reviewedTreeSha": "e5103b45bbdc0f370555e8455ac25ec30a19d75e",
+  "reviewedSourceManifestSha256": "5959088f830b15368d994982b978e811d8f6eb9002d74f4c541c52a7f15c7b0c",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a15e2f-8adc-73b2-b0f7-6802d5634525",
+    "threadId": "01a15e2f-8adc-73b2-b0f7-6802d5634525",
+    "nativeTaskId": null,
+    "nativeRunId": null
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a15c16-4285-78e2-8971-621eca83dc03",
+    "threadId": "01a15c16-4285-78e2-8971-621eca83dc03",
+    "nativeTaskId": null,
+    "nativeRunId": null
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "reviewScope": "Explicit permitted review reuse for observed mechanical merge 5591d0521aca2cd545220599e3bc78a6d8f19cf0, identical to source c21f66aabafd0d952b0a140f7b81c589809dd0e1. Root verified actual source, parents, metadata and exact retained successful dependency proof. Original native review remains source-c21f66aabafd0d952b0a140f7b81c589809dd0e1-only; no new model call for this merge.",
+  "reviewReuse": {
+    "originalNativeReviewedHead": "c21f66aabafd0d952b0a140f7b81c589809dd0e1",
+    "originalNativeResult": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/custom-skills-sublead-20261021/review-ci-final/native-review-result.actual.json",
+      "bytes": 940,
+      "sha256": "bfc904623f13b01952c9a25031a03f3ad964ff44da75b5be6482ce17667e7990"
+    },
+    "observedMergeBinding": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/custom-skills-sublead-20261021/publication/common.main-final-binding.actual.json",
+      "bytes": 3030,
+      "sha256": "2f8186574c33678894f897958d72b6de08c18c1aa9a9d62a6be464bce682c6a4"
+    },
+    "normalizedByNativeThread": "01a15c16-4285-78e2-8971-621eca83dc03",
+    "newNativeInferenceForMergeHead": false
+  }
+}
