@@ -150,7 +150,7 @@
     },
     {
       "path": "packages/work-continuity/contracts/v3-implementation.json",
-      "sha256": "93aa3d7f38490561bfc8632fdfae5feacd57a0ea58e06a40f21a9676352aec5d",
+      "sha256": "94d8700a32a2059740d664b598d12cffbba7cfe858c393ff23e76f7503dba37e",
       "capabilityId": "work-continuity",
       "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
     }
