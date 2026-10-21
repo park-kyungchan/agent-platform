@@ -50,7 +50,7 @@
       "packageName": "@palantirkc/work-continuity",
       "packageManifest": {
         "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/package.json",
-        "sha256": "8c382dba4a0bd93ff3805e3cdccb95d119130e05ad198ce80f3d669decad12c8"
+        "sha256": "72bb6f1423a019c36b2712c963abfaa7789cc0352072523ab9d2b07ff42d7c84"
       },
       "sourcePins": [
         {
@@ -105,12 +105,12 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/records.ts",
-          "sha256": "af8700fae57dcbb11bece7ad9a7f117896bc6a429bce40ec0adc937d27748c48",
+          "sha256": "efaae0fc311a46d5d859b712f38885fe171563c3fa91eb95434116928a67d93f",
           "relativePath": "packages/work-continuity/src/git-work/records.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/source.ts",
-          "sha256": "9dfc1b8d9a17dcc896bd015f9702b2c4585b01a4477aa3dc9febca3bd18ef8c1",
+          "sha256": "6275eb8cb65a865b92e8027ff7d42ba206d4f873ae59f77172cb67dc4ea5368f",
           "relativePath": "packages/work-continuity/src/git-work/source.ts"
         },
         {
@@ -227,6 +227,86 @@
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/jev/supplements.ts",
           "sha256": "efa1657d840b19f0f1ecb603f1fd4f9a0dc4877927f1ec5751c07e32746ece1f",
           "relativePath": "packages/work-continuity/src/jev/supplements.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/allocation.ts",
+          "sha256": "ec32684cb6f85b85b2030636c62f97fc77869c00899c59f76cc5ddaa4f44b5a7",
+          "relativePath": "packages/work-continuity/src/git-work/allocation.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/effective-contract.ts",
+          "sha256": "2f1450b923925cf0dc07a690f7ba1d0eb083f7e6873c9e43279fde986f1fe71a",
+          "relativePath": "packages/work-continuity/src/git-work/effective-contract.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/v3-codec.ts",
+          "sha256": "b1e5c1940365ff0b8ff1fa32f53645211e4b0a931f50fd2228c41cc9fc9ee7ac",
+          "relativePath": "packages/work-continuity/src/git-work/v3-codec.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/fixtures/v3-owner.ts",
+          "sha256": "f0b17827736bc1e8ee75e729566dcbd0bb0eea5c114e695ca21f31625fbfabc6",
+          "relativePath": "packages/work-continuity/src/git-work/fixtures/v3-owner.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/fixtures/v3-worker.ts",
+          "sha256": "4dbcff6ae677885c75877c3c95429aafa6d810699dffffc3df4e5efc20755a2d",
+          "relativePath": "packages/work-continuity/src/git-work/fixtures/v3-worker.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/generated/v3.ts",
+          "sha256": "3c51e51d1cc24447cd72ec9266237716ddd411de8094368ed83dbfc79dc83406",
+          "relativePath": "packages/work-continuity/src/git-work/generated/v3.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/generated/v3-validators.js",
+          "sha256": "0abe51e2221868ea697705b1b4ab3800b7b75f4e31f797891661c68aabb14cf6",
+          "relativePath": "packages/work-continuity/src/git-work/generated/v3-validators.js"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/generated/v3-validators.d.ts",
+          "sha256": "3c1b384e57ab34f2f41cb76a389495d9a5dab05f7f4ddb4ba5ef365acdaf2cd5",
+          "relativePath": "packages/work-continuity/src/git-work/generated/v3-validators.d.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/aliases.ts",
+          "sha256": "01d6399aeadb84a80b61d3493efc02435c9bf55ef7b9994d93f196d35068a717",
+          "relativePath": "packages/work-continuity/src/git-work/aliases.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/external-artifacts.ts",
+          "sha256": "49bd20c38dfa0adaafac84496306204b6f68bd4b9d1a64824ff978b5bfe39f43",
+          "relativePath": "packages/work-continuity/src/git-work/external-artifacts.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/git-owner-transaction.ts",
+          "sha256": "04d122d39ae2c3a326e3b849af929942778edef3cc47fcaaa877d6e2dd83cb58",
+          "relativePath": "packages/work-continuity/src/git-work/git-owner-transaction.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/legacy-bridge.ts",
+          "sha256": "4dfea8e42960c33c8673ee118e22aed62a9aa5c1a49946ad99dfa57c10bbf7f9",
+          "relativePath": "packages/work-continuity/src/git-work/legacy-bridge.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/legacy-model.ts",
+          "sha256": "17101cf9bf806a14a83fce5f498c7eb82eec0db0e7fe136d3067912ff6aa81e8",
+          "relativePath": "packages/work-continuity/src/git-work/legacy-model.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/legacy-qualification.ts",
+          "sha256": "63771d822b76c964c5f2081b2b56db5649d7a0455d90cfe4096a5040ec26aac8",
+          "relativePath": "packages/work-continuity/src/git-work/legacy-qualification.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/record-lineage.ts",
+          "sha256": "40b882fe5361e6edb9d22eb1f45eba2163fd907171baabf85d887249bc0ad9a1",
+          "relativePath": "packages/work-continuity/src/git-work/record-lineage.ts"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/v3.ts",
+          "sha256": "9cf774c32383b60ba04f42658917658ff02ce750fb9a56be40e6cfd415730a9a",
+          "relativePath": "packages/work-continuity/src/git-work/v3.ts"
         }
       ],
       "authoritativeGenerationRule": "Canonical implementation/source generation follows this package owner boundary; native generated projections and public immutable releases are not independent writers.",
@@ -349,7 +429,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/ontology/scripts/generate.ts",
-          "sha256": "2fca0155844b0f11ad5c7b43d484a113bdd3b4f4bf440d39bf3d5d9fe6c41416",
+          "sha256": "5b5e2ab68eb9caf32a4585214b03cd2a75b2558e18db5d1272ef4d2c588c27e7",
           "relativePath": "packages/ontology/scripts/generate.ts"
         }
       ],

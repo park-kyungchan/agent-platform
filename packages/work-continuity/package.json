@@ -23,7 +23,8 @@
     "./memory": "./src/workspace/memory.ts",
     "./git-work": "./src/git-work/index.ts",
     "./runtime-docs": "./src/runtime-docs/index.ts",
-    "./runtime-index": "./src/runtime-index.ts"
+    "./runtime-index": "./src/runtime-index.ts",
+    "./git-work/v3": "./src/git-work/v3.ts"
   },
   "engines": {
     "bun": ">=1.3.14"

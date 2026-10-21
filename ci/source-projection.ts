@@ -291,8 +291,15 @@ const {readNativeAdapterSourceClosure}=await import(${JSON.stringify(join(root, 
 const native=await readNativeAdapterSourceClosure();await native.verify();
 const {loadCodexOwnerContext}=await import(${JSON.stringify(join(root, "src/native/context-owner.ts"))});
 const context=await loadCodexOwnerContext();await context.verifyCurrentSourceClosure();
+const legacyPath=Bun.resolveSync('@palantirkc/work-continuity/git-work',${JSON.stringify(join(root, "package.json"))});
+if(legacyPath!==${JSON.stringify(resolve(root, "../agent-platform/packages/work-continuity/src/git-work/index.ts"))})throw Error('Legacy public package resolution changed');
+const legacy=await import(legacyPath);
+if(['openGitWork','readCompactGitWorkContext','decodeCompactGitWorkContext','validateGitWorkRecords'].some(name=>typeof legacy[name]!=='function'))throw Error('Legacy public API absent');
+if(['canonicalV3','resolveEffectiveContract','allocateGitWorkIdentity','readMigratedGitWorkV3'].some(name=>name in legacy))throw Error('Versioned v3 API escaped into finite legacy entrypoint');
+const v3Absent=!(await Bun.file(${JSON.stringify(resolve(root, "../agent-platform/packages/work-continuity/src/git-work/v3-codec.ts"))}).exists());
+if(!v3Absent)throw Error('Historical finite source projection was inflated with v3');
 if(${JSON.stringify(contextVersion)}==='v6'&&(!context.workMethod||['validateWorkMethodStanding','validateWorkMethodPacket','validateWorkMethodReceipt','workMethodPacketSha256','workMethodReceiptSha256','workMethodRequiredSources','decideWorkMethodAdmission','evaluateWorkMethodCoverage'].some(name=>typeof context.workMethod[name]!=='function')))throw Error('Versioned work-method owner API absent');
-console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRoot:native.canonicalProviderRoot,sourceLocationId:native.sourceLocationId,contextPins:context.sourcePins.length,nativePins:native.pins.length,workMethodAvailable:!!context.workMethod}));`;
+console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRoot:native.canonicalProviderRoot,sourceLocationId:native.sourceLocationId,contextPins:context.sourcePins.length,nativePins:native.pins.length,workMethodAvailable:!!context.workMethod,legacyPublicPackageAvailable:true,v3SourceAbsent:v3Absent}));`;
       return Bun.spawnSync([process.execPath, "--no-env-file", "-e", script], {
         cwd: base,
         env: {
@@ -326,6 +333,27 @@ console.log(JSON.stringify({providerRoot:native.providerRoot,canonicalProviderRo
         await readFile(join(projected, "architecture", file), "utf8"),
       );
     const original = declarations.get(projected)!;
+    // Reproduce the former eager-export failure with matching source pins. A
+    // first-import guard must still pass before the absent module rejects.
+    const legacyIndexPath = "packages/work-continuity/src/git-work/index.ts";
+    const legacyIndex = await readFile(join(projectedProvider, legacyIndexPath));
+    try {
+      const escaped = Buffer.concat([
+        legacyIndex,
+        Buffer.from("\nexport { canonicalV3 } from './v3-codec.ts';\n"),
+      ]);
+      await writeFile(join(projectedProvider, legacyIndexPath), escaped);
+      const changed = structuredClone(original);
+      const pins = changed.context.sourcePins as { path: string; sha256: string }[];
+      pins.find((pin) => pin.path === legacyIndexPath)!.sha256 = hash(escaped);
+      await publish(projected, changed.context, changed.native);
+      const failedImport = probe(projected);
+      assert.notEqual(failedImport.exitCode, 0);
+      assert.match(failedImport.stderr.toString(), /Cannot find module.*v3-codec\.ts/);
+    } finally {
+      await writeFile(join(projectedProvider, legacyIndexPath), legacyIndex);
+      await publish(projected, original.context, original.native);
+    }
     const mutations: ((value: RecordValue) => void)[] = [
       (value) => {
         value.sourceProjections = [];
@@ -458,6 +486,7 @@ for(const [path,verify] of [[${JSON.stringify(join(projectedProvider, "packages/
       contextVersion,
       valid,
       rejectedCases: rejected,
+      eagerV3ExportRegressionRejected: true,
       canonicalOwnerDistinctFromProjectedPhysicalRoot: canonicalProvider !== projectedProvider,
       identicalSealedRegistrations: true,
       nativePermissionGranted: false,

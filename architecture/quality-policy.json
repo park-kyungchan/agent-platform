@@ -141,6 +141,18 @@
       "sha256": "0eab394ec6caa0f96ec1f5b7f857e5b04f7ca65c6d3901b86d9995d29396c5ef",
       "capabilityId": "native-hermes-context",
       "reason": "Exact request-schema definition used by the admitted native/jev bridge. Codex retains Jev semantic policy; native Hermes retains credentials/runtime/data custody. Source definition only; no execution permission, activation or new model budget."
+    },
+    {
+      "path": "packages/work-continuity/contracts/git-work-v3.schema.json",
+      "sha256": "1f1542021ee00b044bc5d0d7577430aeba58a0d2431aa92fcb7f05c1df7e27e0",
+      "capabilityId": "work-continuity",
+      "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
+    },
+    {
+      "path": "packages/work-continuity/contracts/v3-implementation.json",
+      "sha256": "c41e34c02a2ac6cad4e09afe474a88cc581cea75fb4d5d926f457d40515a3533",
+      "capabilityId": "work-continuity",
+      "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
     }
   ],
   "stagedSources": [

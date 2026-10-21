@@ -1,0 +1,98 @@
+{
+  "schema": "agent-platform.git-work-v3-implementation.v1",
+  "sourceTask": "18a81525-5cb1-4e22-a235-bf221bf6837b",
+  "protocol": "common.git-work.v3",
+  "status": "source-candidate-not-activated",
+  "canonicalSchema": "packages/work-continuity/contracts/git-work-v3.schema.json",
+  "canonicalSchemaSha256": "1f1542021ee00b044bc5d0d7577430aeba58a0d2431aa92fcb7f05c1df7e27e0",
+  "generator": "packages/ontology/scripts/generate.ts --git-work-v3",
+  "generatedOutputs": [
+    "packages/work-continuity/src/git-work/generated/v3.ts",
+    "packages/work-continuity/src/git-work/generated/v3-validators.js",
+    "packages/work-continuity/src/git-work/generated/v3-validators.d.ts"
+  ],
+  "generatorCheck": "packages/ontology/scripts/generate.ts --git-work-v3 --check",
+  "runtimeValidation": "Same schema compiled by pinned Ajv, with pinned runtime helpers bundled into the generated executable; no new dependency or immutable release changes.",
+  "contractDigest": "SHA-256 of bounded canonical JSON including owner, kind, ID, revision, body and source references, excluding only digest. Reference model is normative shape; new version explicitly binds contract identity and revision.",
+  "resolver": "packages/work-continuity/src/git-work/effective-contract.ts#resolveEffectiveContract",
+  "contextPaths": [
+    "full",
+    "compact",
+    "dispatch",
+    "resume"
+  ],
+  "compactTransport": "Lossless bounded deflate/base64 envelope of the exact generated ContextPacket schema; decode revalidates effective digest and complete contract source closure.",
+  "recovery": "Dispatch/resume require an explicit effective digest and an exact owner-provided historical graph. No latest lookup exists in the resolver.",
+  "graphFamilies": {
+    "ownership": "Domain parent, Project primary Domain, Work Project, Task Work",
+    "refinement": "Task parent chain plus typed Issue/Spec/Plan Work refinement",
+    "dependency": "Acyclic execution prerequisites with exact cross-Work artifact revision/digest",
+    "delegation": "Typed source authority references; source graph grants no native permission",
+    "knowledge": "Cyclic relatedTo relations and source-qualified provenance",
+    "nativeCorrelation": "Nullable native observations, separate from logical source identity and authority"
+  },
+  "allocation": {
+    "api": "allocateGitWorkIdentity",
+    "idSource": "node:crypto.randomUUID (opaque UUIDv4; caller cannot select a canonical ID)",
+    "requestKey": "Owner-global ownerId/createRequestId; meaning/kind/scope bound by canonical request digest",
+    "recordRoot": "work/<project>/<work>/v3/ (new side-by-side version; all legacy records/fences remain unchanged)",
+    "requestRoot": "work/.identity-requests/<owner-hash>/<request-hash>.json",
+    "collisionIndex": "work/.identity-ids/<uuid>.json; generated atomic request-binding projection",
+    "transaction": "One existing Git owner ref compare-and-swap publishes mapping, record, companion contracts and collision index. Temporary index/object construction never checks out files.",
+    "ownerBoundary": "NativeGitIdentityOwner.withCurrentAuthority must authenticate full operation, actual owner membership/current authority and hold its native authority lease across the callback/CAS. JSON witnesses are not a CLI credential.",
+    "graphSourceBoundary": "Native owner provides exact selected Domain/Project source semantics. Every v3 Work/Task/contract projection is compared against actual immutable selected Git record bytes before publication.",
+    "checkoutBoundary": "A checked-out owner ref is refused. Native owner must qualify an unoccupied branch/bare Git record transaction; common code does not mutate checkout, trust or configuration.",
+    "retryBoundary": "No ref/commit mutation retry. Known/uncertain CAS outcomes are reconciled once against exact current request mapping and record/contract receipts, otherwise held for owner observation.",
+    "runBoundary": "Initial Run only reserves, binds effective digest/source/authority, uses a distinct next attempt, and has no native bindings/effects. No native execution/adoption is granted.",
+    "templates": "Explicit {$allocatedId:true} and earlier {$contractRef:index} tokens. Derive contract digests after ID rendering; validate all generated records and contract closure before CAS.",
+    "cli": "Existing harness context-v3 and allocate-v3; explicit dry-run performs no allocation/publication. Apply requires a native owner adapter supplied to runHarness by the actual runtime owner. No dynamic module, credential bridge or global native configuration."
+  },
+  "compatibility": {
+    "v1v2Semantics": "Explicit canonical legacy-v3 read/admission/recovery adapter preserves original sources and per-Task historical contracts, unknown Issue text and unsupported v2 holds. One native-qualified CAS sets the v3 authoritative writer fence; legacy transition authoring then rejects. No native adoption performed.",
+    "historicalReleases": "All original 0.1.0/0.2.0 artifacts and consumer pins unchanged.",
+    "unsupportedInputs": "Unknown fields, wrong scoped refs, stale revisions/digests, missing coverage, cycles and unqualified native owners reject.",
+    "noWorkForMemoryQueries": true,
+    "originalDecisionAndEffectStoresRetained": true
+  },
+  "verification": "Meaningful synthetic Graph, codec, Git CAS, process-concurrency/restart/conflict/collision/uncertain-CAS, scoped owner denial and historical preservation tests in v3*.test.ts; execute exclusively in the qualified isolated source runner.",
+  "nativePermissionGranted": false,
+  "activationPerformed": false,
+  "acceptanceDecision": null,
+  "corrections": {
+    "assignmentRevision": 8,
+    "findings": [
+      "S01-R01",
+      "S01-R02",
+      "S01-R03",
+      "S01-R04"
+    ],
+    "legacyBridge": "legacy-bridge.ts: explicit existing-scope admission, immutable inventory, typed locator aliases and prior bootstrap mapping; never random allocation",
+    "artifactQualification": "external-artifacts.ts: actual canonical Work/Task/contract source closures plus pinned producer context/artifact/gate/selection/criterion/receiver sources, checked by the single effective resolver",
+    "creationReplay": "immutable ledger and Git creation blobs plus bounded same-identity successor lineage/current source graph validation",
+    "gitHooks": "native current per-invocation no-Git-hooks policy required before writes, exact head/owner/ref/authority/expiry; per-command Git override only; no Codex /hooks or global config change",
+    "qualityBoundary": "New correction sources require Root registry/quality/provider successor pins. No native adoption or publication."
+  },
+  "residualCorrections": {
+    "R01": "Evaluate exact legacy selected dependencies using canonical records.ts dependencyFindings and original GitWorkReader; carry scoped dynamic holds, prevent removal/change of source edges and preserve separate acceptance qualification. Unrelated ready Tasks are unaffected.",
+    "R02": "Canonical pinned v3/graph.json semantic source projection is checked against actual canonical Work/Task/contract blobs at the same snapshot. The one resolver reconstructs the complete producer effective contract and compares packet/current graph. Proof fingerprints bind the exact graph; any graph mutation requires fresh actual source qualification. Upstream closures without actual proof remain unsupported/held, never accepted from packet self-digests.",
+    "R03": "Bounded full parent DAG (maximum8192 complete non-shallow commits) finds one actual introducing transaction; merge propagation is distinct from mutation. Every side-parent ledger deletion/rewrite and every relevant successor edge is checked, including removed/foreign/regressed side history restored at head. No ref retry or source history rewriting.",
+    "R04": "Preserved resolved exact native-qualified per-invocation hook policy and existing positive/negative/lost-ACK tests.",
+    "nativeSourceRequirement": "External artifact native owner must publish an exact canonical semantic graph source projection without embedded external proof rows at work/<project>/<work>/v3/graph.json, pin it alongside actual records, and retain native controls. This source slice performs no publication/adoption or native owner permission issuance."
+  },
+  "refreshQualification": {
+    "boundary": "Every public source refresh (context, legacy and artifact) revokes graph/legacy/artifact proof at entry before schema validation, source reads, aliases or joins. Alias qualification belongs to that same graph transaction; no separate alias authority is inferred.",
+    "publication": "An unexposed detached graph stages all legacy, alias and artifact phases, whole-graph validation and final requested context transport/digest checks. Only a complete unchanged/current refresh transfers proofs synchronously to original objects. All staging proofs are discarded on completion/rejection.",
+    "isolation": "Actual source documents are cloned before internal graph qualification, and readers receive only TaskRef fields. Neither original nor partially staged proof becomes available during source callbacks.",
+    "concurrency": "A private per-graph refresh epoch prevents older completion from overwriting a newer refresh; no IDs, effects or native permissions are allocated.",
+    "preservation": "One effective resolver, all scoped holds, supported full merge ancestry, native-qualified hook policy and prior positive/negative/lost-ACK tests remain unchanged."
+  },
+  "publicApi": {
+    "legacySubpath": "@palantirkc/work-continuity/git-work",
+    "legacyEntrypoint": "packages/work-continuity/src/git-work/index.ts",
+    "legacyBoundary": "Historical finite v5/v6 source projections retain 25/26 paths and five legacy Git Work modules; no eager v3 dependency or native guard change.",
+    "versionedSubpath": "@palantirkc/work-continuity/git-work/v3",
+    "versionedEntrypoint": "packages/work-continuity/src/git-work/v3.ts",
+    "implementation": "One versioned facade re-exports the canonical current v3 implementation and legacy interoperability API; no second resolver/schema/allocator.",
+    "nativeAdoption": "An explicit versioned source entrypoint does not extend historical provider registrations, native command permission or first-import trust."
+  }
+}

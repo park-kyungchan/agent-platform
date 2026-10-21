@@ -19,6 +19,22 @@ import {
   type StartRequest,
 } from "../packages/work-continuity/src/git-work/index.ts";
 import {
+  readGitWorkV3Context,
+  previewGitWorkV3Allocation,
+  allocateGitWorkIdentity,
+  type NativeGitIdentityOwner,
+  type NativeLegacyMigrationOwner,
+  readVersionedLegacyGitWork,
+  readMigratedGitWorkV3,
+  previewLegacyGitWorkMigration,
+  admitLegacyGitWork,
+  recoverLegacyCreateRequest,
+  openExactV3SourceReader,
+  readSourceQualifiedGitWorkV3Context,
+  type GitAllocationTarget,
+  type TaskRef,
+} from "../packages/work-continuity/src/git-work/v3.ts";
+import {
   readDocumentationRegistry,
   type DocumentationObservations,
 } from "../packages/work-continuity/src/runtime-docs/index.ts";
@@ -77,12 +93,121 @@ export {
   gitReadEnvironment,
   resolveGitWorkSelection,
 } from "../packages/work-continuity/src/git-work/index.ts";
-export async function runHarness(argv: string[]): Promise<unknown> {
+export async function runHarness(
+  argv: string[],
+  nativeOwner?: NativeGitIdentityOwner,
+  nativeMigrationOwner?: NativeLegacyMigrationOwner,
+): Promise<unknown> {
   const [command, path, extra] = argv;
   if (argv.length !== (command === "transition" || command === "source" ? 3 : 2))
     throw Error(usage);
   const request = object(await readRequest(path));
   switch (command) {
+    case "context-v3": {
+      documentationFields(request, ["graph", "task", "mode", "expectedDigest", "snapshot"]);
+      if (request.snapshot !== undefined) {
+        const selection = await resolveGitWorkSelection(request.snapshot);
+        return readSourceQualifiedGitWorkV3Context({
+          ...request,
+          reader: await openExactV3SourceReader(selection),
+        } as unknown as Parameters<typeof readSourceQualifiedGitWorkV3Context>[0]);
+      }
+      return readGitWorkV3Context(
+        request as unknown as {
+          graph: unknown;
+          task: TaskRef;
+          mode: "full" | "compact" | "dispatch" | "resume";
+          expectedDigest?: string;
+        },
+      );
+    }
+    case "legacy-v3": {
+      documentationFields(request, [
+        "mode",
+        "snapshot",
+        "task",
+        "contextMode",
+        "expectedDigest",
+        "request",
+        "target",
+        "recovery",
+      ]);
+      if (request.mode === "read") {
+        const selection = await resolveGitWorkSelection(request.snapshot);
+        const projected = await readVersionedLegacyGitWork(selection);
+        return readGitWorkV3Context({
+          graph: projected.graph,
+          task: request.task as TaskRef,
+          mode: request.contextMode as "full" | "compact" | "dispatch" | "resume",
+          ...(request.expectedDigest === undefined
+            ? {}
+            : { expectedDigest: String(request.expectedDigest) }),
+        });
+      }
+      if (request.mode === "read-migrated") {
+        const selection = await resolveGitWorkSelection(request.snapshot);
+        return readGitWorkV3Context({
+          graph: await readMigratedGitWorkV3(selection),
+          task: request.task as TaskRef,
+          mode: request.contextMode as "full" | "compact" | "dispatch" | "resume",
+          ...(request.expectedDigest === undefined
+            ? {}
+            : { expectedDigest: String(request.expectedDigest) }),
+        });
+      }
+      if (request.mode === "recover") {
+        const recovery = object(request.recovery);
+        documentationFields(recovery, [
+          "ownerId",
+          "legacyOwner",
+          "createRequestId",
+          "kind",
+          "meaningSha256",
+        ]);
+        return recoverLegacyCreateRequest({
+          ...recovery,
+          selection: await resolveGitWorkSelection(request.snapshot),
+        } as unknown as Parameters<typeof recoverLegacyCreateRequest>[0]);
+      }
+      const target = object(request.target);
+      documentationFields(target, [
+        "repositoryRoot",
+        "ownerRef",
+        "expectedHead",
+        "expectedAuthorityRevision",
+      ]);
+      if (request.mode === "dry-run")
+        return previewLegacyGitWorkMigration(request.request, String(target.repositoryRoot));
+      if (request.mode !== "apply") throw Error("V3_EXPLICIT_LEGACY_MIGRATION_MODE_REQUIRED");
+      if (!nativeMigrationOwner) throw Error("V3_CURRENT_NATIVE_MIGRATION_OWNER_REQUIRED");
+      return admitLegacyGitWork(
+        request.request,
+        target as unknown as GitAllocationTarget,
+        nativeMigrationOwner,
+      );
+    }
+    case "allocate-v3": {
+      documentationFields(request, ["mode", "request", "target"]);
+      const target = object(request.target);
+      documentationFields(target, [
+        "repositoryRoot",
+        "ownerRef",
+        "expectedHead",
+        "expectedAuthorityRevision",
+      ]);
+      if (request.mode === "dry-run")
+        return previewGitWorkV3Allocation(
+          request.request,
+          target as unknown as GitAllocationTarget,
+        );
+      if (request.mode !== "apply") throw Error("V3_EXPLICIT_ALLOCATION_MODE_REQUIRED");
+      if (!nativeOwner) throw Error("V3_NATIVE_OWNER_ADAPTER_REQUIRED");
+      return allocateGitWorkIdentity(
+        request.request,
+        target as unknown as GitAllocationTarget,
+        nativeOwner,
+      );
+    }
     case "quality-preflight":
       return preflightQualityImprovement(request);
     case "quality-compare":
