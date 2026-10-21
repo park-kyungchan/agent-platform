@@ -58,6 +58,16 @@ async function generateGitWorkV3(): Promise<void> {
               loader: "js",
               resolveDir: join(root, "packages/ontology"),
             }));
+            // Bun custom namespaces do not inherit ordinary package resolution.
+            // Resolve only Ajv's pinned standalone helpers from this generator's
+            // declared dependency, then let the bundler include their bytes.
+            build.onResolve(
+              {
+                filter: /^ajv\/dist\/runtime\/(?:ucs2length|equal)(?:\.js)?$/,
+                namespace: "owned-v3-schema",
+              },
+              (args) => ({ path: fileURLToPath(import.meta.resolve(args.path)), namespace: "file" }),
+            );
           },
         },
       ],
