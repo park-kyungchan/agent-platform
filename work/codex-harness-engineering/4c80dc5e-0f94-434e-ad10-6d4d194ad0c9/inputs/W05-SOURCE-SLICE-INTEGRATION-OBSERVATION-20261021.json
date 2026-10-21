@@ -74,6 +74,11 @@
         "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/common.closure.actual.json",
         "sha256": "4d97bf9d1ecd2e6e393dd9a0cf3227e7bd751d4c6ad56c45b6085e2907c1126e",
         "bytes": 267
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/root-fixture-contract-delta-004.json",
+        "sha256": "dd3ac2bd1e7f07bfadc7090edc51d1be2a803aad2d589c32fe6752f923b167e1",
+        "bytes": 2463
       }
     ],
     "singleCanonicalWorkBundle": true,
