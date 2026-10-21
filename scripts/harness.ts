@@ -17,7 +17,13 @@ import {
   validateGitWorkTransition,
   type ContextRequest,
   type StartRequest,
+  readGitWorkV3Context,
+  previewGitWorkV3Allocation,
+  allocateGitWorkIdentity,
+  type NativeGitIdentityOwner,
+  type GitAllocationTarget,
 } from "../packages/work-continuity/src/git-work/index.ts";
+import type { TaskRef } from "../packages/work-continuity/src/git-work/generated/v3.ts";
 import {
   readDocumentationRegistry,
   type DocumentationObservations,
@@ -77,12 +83,25 @@ export {
   gitReadEnvironment,
   resolveGitWorkSelection,
 } from "../packages/work-continuity/src/git-work/index.ts";
-export async function runHarness(argv: string[]): Promise<unknown> {
+export async function runHarness(argv: string[], nativeOwner?: NativeGitIdentityOwner): Promise<unknown> {
   const [command, path, extra] = argv;
   if (argv.length !== (command === "transition" || command === "source" ? 3 : 2))
     throw Error(usage);
   const request = object(await readRequest(path));
   switch (command) {
+    case "context-v3": {
+      documentationFields(request, ["graph", "task", "mode", "expectedDigest"]);
+      return readGitWorkV3Context(request as unknown as { graph: unknown; task: TaskRef; mode: "full" | "compact" | "dispatch" | "resume"; expectedDigest?: string });
+    }
+    case "allocate-v3": {
+      documentationFields(request, ["mode", "request", "target"]);
+      const target = object(request.target);
+      documentationFields(target, ["repositoryRoot", "ownerRef", "expectedHead", "expectedAuthorityRevision"]);
+      if (request.mode === "dry-run") return previewGitWorkV3Allocation(request.request, target as unknown as GitAllocationTarget);
+      if (request.mode !== "apply") throw Error("V3_EXPLICIT_ALLOCATION_MODE_REQUIRED");
+      if (!nativeOwner) throw Error("V3_NATIVE_OWNER_ADAPTER_REQUIRED");
+      return allocateGitWorkIdentity(request.request, target as unknown as GitAllocationTarget, nativeOwner);
+    }
     case "quality-preflight":
       return preflightQualityImprovement(request);
     case "quality-compare":

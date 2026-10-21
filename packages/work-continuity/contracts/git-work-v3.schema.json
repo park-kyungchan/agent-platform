@@ -1,0 +1,1444 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-platform.invalid/contracts/git-work-v3.schema.json",
+  "title": "GitWorkV3Graph",
+  "$ref": "#/$defs/Graph",
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!\\s)(?!.*\\s$)[^\\u0000-\\u001f\\u007f]+$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "Revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "Json": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "maxLength": 65536
+        },
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Json"
+          },
+          "maxItems": 10000
+        },
+        {
+          "type": "object",
+          "maxProperties": 10000,
+          "additionalProperties": {
+            "$ref": "#/$defs/Json"
+          }
+        }
+      ]
+    },
+    "WorkRef": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "$ref": "#/$defs/Id"
+        },
+        "workId": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "projectId",
+        "workId"
+      ],
+      "additionalProperties": false
+    },
+    "TaskRef": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "$ref": "#/$defs/Id"
+        },
+        "workId": {
+          "$ref": "#/$defs/Id"
+        },
+        "taskId": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "projectId",
+        "workId",
+        "taskId"
+      ],
+      "additionalProperties": false
+    },
+    "Scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "user"
+            },
+            "userId": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "userId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "domain"
+            },
+            "domainId": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "domainId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "project"
+            },
+            "projectId": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "projectId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "work"
+            },
+            "projectId": {
+              "$ref": "#/$defs/Id"
+            },
+            "workId": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "projectId",
+            "workId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "task"
+            },
+            "projectId": {
+              "$ref": "#/$defs/Id"
+            },
+            "workId": {
+              "$ref": "#/$defs/Id"
+            },
+            "taskId": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "projectId",
+            "workId",
+            "taskId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ContractOwner": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "work"
+            },
+            "projectId": {
+              "$ref": "#/$defs/Id"
+            },
+            "workId": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "projectId",
+            "workId"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "task"
+            },
+            "projectId": {
+              "$ref": "#/$defs/Id"
+            },
+            "workId": {
+              "$ref": "#/$defs/Id"
+            },
+            "taskId": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "projectId",
+            "workId",
+            "taskId"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ContractRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "owner": {
+          "$ref": "#/$defs/ContractOwner"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "kind": {
+          "enum": [
+            "issue",
+            "spec",
+            "plan"
+          ]
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "owner",
+        "revision",
+        "kind",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "ContractSet": {
+      "type": "object",
+      "properties": {
+        "issue": {
+          "$ref": "#/$defs/ContractRef"
+        },
+        "spec": {
+          "$ref": "#/$defs/ContractRef"
+        },
+        "plan": {
+          "$ref": "#/$defs/ContractRef"
+        }
+      },
+      "required": [
+        "issue",
+        "spec",
+        "plan"
+      ],
+      "additionalProperties": false
+    },
+    "ContractOverrides": {
+      "type": "object",
+      "properties": {
+        "issue": {
+          "$ref": "#/$defs/ContractRef"
+        },
+        "spec": {
+          "$ref": "#/$defs/ContractRef"
+        },
+        "plan": {
+          "$ref": "#/$defs/ContractRef"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "SourceRef": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "$ref": "#/$defs/Id"
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "revision": {
+          "$ref": "#/$defs/Id"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "owner",
+        "uri",
+        "revision",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "AcceptanceCriterion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "covers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2000
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": {
+        "$ref": "#/$defs/Json"
+      }
+    },
+    "SpecBody": {
+      "type": "object",
+      "properties": {
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AcceptanceCriterion"
+          },
+          "maxItems": 2000
+        },
+        "refinesSpec": {
+          "$ref": "#/$defs/ContractRef"
+        }
+      },
+      "required": [
+        "acceptanceCriteria"
+      ],
+      "additionalProperties": {
+        "$ref": "#/$defs/Json"
+      }
+    },
+    "IssueBody": {
+      "type": "object",
+      "properties": {
+        "parentIssue": {
+          "$ref": "#/$defs/ContractRef"
+        }
+      },
+      "required": [],
+      "additionalProperties": {
+        "$ref": "#/$defs/Json"
+      }
+    },
+    "PlanBody": {
+      "type": "object",
+      "properties": {
+        "appliesToSpec": {
+          "$ref": "#/$defs/ContractRef"
+        },
+        "methodRef": {
+          "$ref": "#/$defs/ContractRef"
+        }
+      },
+      "required": [
+        "appliesToSpec"
+      ],
+      "additionalProperties": {
+        "$ref": "#/$defs/Json"
+      }
+    },
+    "Contract": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "owner": {
+              "$ref": "#/$defs/ContractOwner"
+            },
+            "revision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "kind": {
+              "const": "issue"
+            },
+            "digest": {
+              "$ref": "#/$defs/Digest"
+            },
+            "sourceRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SourceRef"
+              },
+              "maxItems": 2000
+            },
+            "body": {
+              "$ref": "#/$defs/IssueBody"
+            }
+          },
+          "required": [
+            "id",
+            "owner",
+            "revision",
+            "kind",
+            "digest",
+            "sourceRefs",
+            "body"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "owner": {
+              "$ref": "#/$defs/ContractOwner"
+            },
+            "revision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "kind": {
+              "const": "spec"
+            },
+            "digest": {
+              "$ref": "#/$defs/Digest"
+            },
+            "sourceRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SourceRef"
+              },
+              "maxItems": 2000
+            },
+            "body": {
+              "$ref": "#/$defs/SpecBody"
+            }
+          },
+          "required": [
+            "id",
+            "owner",
+            "revision",
+            "kind",
+            "digest",
+            "sourceRefs",
+            "body"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/Id"
+            },
+            "owner": {
+              "$ref": "#/$defs/ContractOwner"
+            },
+            "revision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "kind": {
+              "const": "plan"
+            },
+            "digest": {
+              "$ref": "#/$defs/Digest"
+            },
+            "sourceRefs": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/SourceRef"
+              },
+              "maxItems": 2000
+            },
+            "body": {
+              "$ref": "#/$defs/PlanBody"
+            }
+          },
+          "required": [
+            "id",
+            "owner",
+            "revision",
+            "kind",
+            "digest",
+            "sourceRefs",
+            "body"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Domain": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "$ref": "#/$defs/Id"
+        },
+        "parentDomainId": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "Project": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "$ref": "#/$defs/Id"
+        },
+        "primaryDomainId": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "primaryDomainId"
+      ],
+      "additionalProperties": false
+    },
+    "Work": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "$ref": "#/$defs/Id"
+        },
+        "workId": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "$ref": "#/$defs/Id"
+        },
+        "leadActorId": {
+          "$ref": "#/$defs/Id"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "contracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "status": {
+          "enum": [
+            "proposed",
+            "admitted",
+            "active",
+            "verified",
+            "accepted",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "projectId",
+        "workId",
+        "title",
+        "leadActorId",
+        "revision",
+        "contracts",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "ResourceClaim": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/$defs/Id"
+        },
+        "mode": {
+          "enum": [
+            "read",
+            "write"
+          ]
+        }
+      },
+      "required": [
+        "resource",
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "Task": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "$ref": "#/$defs/Id"
+        },
+        "workId": {
+          "$ref": "#/$defs/Id"
+        },
+        "taskId": {
+          "$ref": "#/$defs/Id"
+        },
+        "title": {
+          "$ref": "#/$defs/Id"
+        },
+        "parentTaskId": {
+          "$ref": "#/$defs/Id"
+        },
+        "assigneeActorId": {
+          "$ref": "#/$defs/Id"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "contractOverrides": {
+          "$ref": "#/$defs/ContractOverrides"
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2000
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceClaim"
+          },
+          "maxItems": 2000
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "ready",
+            "running",
+            "blocked",
+            "verified",
+            "accepted",
+            "cancelled"
+          ]
+        }
+      },
+      "required": [
+        "projectId",
+        "workId",
+        "taskId",
+        "title",
+        "assigneeActorId",
+        "revision",
+        "contractOverrides",
+        "acceptanceCriteria",
+        "resources",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "Dependency": {
+      "type": "object",
+      "properties": {
+        "producer": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "consumer": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "required": {
+          "enum": [
+            "verified",
+            "accepted"
+          ]
+        },
+        "artifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        }
+      },
+      "required": [
+        "producer",
+        "consumer",
+        "required"
+      ],
+      "additionalProperties": false
+    },
+    "Related": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "relatedTo"
+        },
+        "from": {
+          "$ref": "#/$defs/Scope"
+        },
+        "to": {
+          "$ref": "#/$defs/Scope"
+        }
+      },
+      "required": [
+        "kind",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "Delegation": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "$ref": "#/$defs/Scope"
+        },
+        "to": {
+          "$ref": "#/$defs/Scope"
+        },
+        "authorityRef": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "from",
+        "to",
+        "authorityRef"
+      ],
+      "additionalProperties": false
+    },
+    "Provenance": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/Scope"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceRef"
+        }
+      },
+      "required": [
+        "subject",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "NativeBinding": {
+      "type": "object",
+      "properties": {
+        "runtimeId": {
+          "$ref": "#/$defs/Id"
+        },
+        "nativeSessionId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nativeTaskId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nativeRunId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "paneId": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "runtimeId",
+        "nativeSessionId",
+        "nativeTaskId",
+        "nativeRunId",
+        "paneId"
+      ],
+      "additionalProperties": false
+    },
+    "NativeCorrelation": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "binding": {
+          "$ref": "#/$defs/NativeBinding"
+        }
+      },
+      "required": [
+        "task",
+        "binding"
+      ],
+      "additionalProperties": false
+    },
+    "Graph": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-work.v3"
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Domain"
+          },
+          "maxItems": 2000
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Project"
+          },
+          "maxItems": 2000
+        },
+        "works": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Work"
+          },
+          "maxItems": 2000
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Task"
+          },
+          "maxItems": 2000
+        },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Contract"
+          },
+          "maxItems": 10000
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Dependency"
+          },
+          "maxItems": 10000
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Related"
+          },
+          "maxItems": 10000
+        },
+        "delegations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Delegation"
+          },
+          "maxItems": 10000
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Provenance"
+          },
+          "maxItems": 10000
+        },
+        "nativeCorrelations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NativeCorrelation"
+          },
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "schema",
+        "domains",
+        "projects",
+        "works",
+        "tasks",
+        "contracts",
+        "dependencies",
+        "relations",
+        "delegations",
+        "provenance",
+        "nativeCorrelations"
+      ],
+      "additionalProperties": false
+    },
+    "Ancestor": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "contracts": {
+          "$ref": "#/$defs/ContractSet"
+        }
+      },
+      "required": [
+        "task",
+        "revision",
+        "contracts"
+      ],
+      "additionalProperties": false
+    },
+    "DependencyTask": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "contracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceClaim"
+          },
+          "maxItems": 2000
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2000
+        }
+      },
+      "required": [
+        "task",
+        "revision",
+        "contracts",
+        "resources",
+        "acceptanceCriteria"
+      ],
+      "additionalProperties": false
+    },
+    "EffectiveContract": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-work-effective.v3"
+        },
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "taskRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "workContracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "taskOverrides": {
+          "$ref": "#/$defs/ContractOverrides"
+        },
+        "contracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "parentTaskChain": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Ancestor"
+          },
+          "maxItems": 2000
+        },
+        "taskResources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceClaim"
+          },
+          "maxItems": 2000
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2000
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Dependency"
+          },
+          "maxItems": 10000
+        },
+        "dependencyTasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DependencyTask"
+          },
+          "maxItems": 2000
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "schema",
+        "task",
+        "workRevision",
+        "taskRevision",
+        "workContracts",
+        "taskOverrides",
+        "contracts",
+        "parentTaskChain",
+        "taskResources",
+        "acceptanceCriteria",
+        "dependencies",
+        "dependencyTasks",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "Run": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "$ref": "#/$defs/Id"
+        },
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "attempt": {
+          "$ref": "#/$defs/Revision"
+        },
+        "status": {
+          "enum": [
+            "reserved",
+            "started",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "uncertain"
+          ]
+        },
+        "effectiveContractDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "sourceSnapshotId": {
+          "$ref": "#/$defs/Id"
+        },
+        "parentAuthorityRef": {
+          "$ref": "#/$defs/Id"
+        },
+        "nativeBindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NativeBinding"
+          },
+          "maxItems": 2000
+        },
+        "effectRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2000
+        }
+      },
+      "required": [
+        "runId",
+        "task",
+        "attempt",
+        "status",
+        "effectiveContractDigest",
+        "sourceSnapshotId",
+        "parentAuthorityRef",
+        "nativeBindings",
+        "effectRefs"
+      ],
+      "additionalProperties": false
+    },
+    "CreateRequest": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-work-create.v3"
+        },
+        "ownerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "createRequestId": {
+          "$ref": "#/$defs/Id"
+        },
+        "kind": {
+          "enum": [
+            "work",
+            "task",
+            "run"
+          ]
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "record": {
+          "$ref": "#/$defs/Json"
+        },
+        "contracts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Json"
+          },
+          "maxItems": 100
+        }
+      },
+      "required": [
+        "schema",
+        "ownerId",
+        "createRequestId",
+        "kind",
+        "scope",
+        "record",
+        "contracts"
+      ],
+      "additionalProperties": false
+    },
+    "AllocationBinding": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-work-allocation.v3"
+        },
+        "ownerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "createRequestId": {
+          "$ref": "#/$defs/Id"
+        },
+        "requestDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "kind": {
+          "enum": [
+            "work",
+            "task",
+            "run"
+          ]
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$"
+        },
+        "recordPath": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "recordSha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "contracts": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "sha256": {
+                "$ref": "#/$defs/Digest"
+              }
+            },
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "authority": {
+          "type": "object",
+          "properties": {
+            "actorId": {
+              "$ref": "#/$defs/Id"
+            },
+            "revision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "authorityRef": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "actorId",
+            "revision",
+            "authorityRef"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema",
+        "ownerId",
+        "createRequestId",
+        "requestDigest",
+        "kind",
+        "scope",
+        "id",
+        "recordPath",
+        "recordSha256",
+        "contracts",
+        "authority"
+      ],
+      "additionalProperties": false
+    },
+    "StoredRecord": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "const": "common.git-work-record.v3"
+            },
+            "kind": {
+              "const": "work"
+            },
+            "value": {
+              "$ref": "#/$defs/Work"
+            }
+          },
+          "required": [
+            "schema",
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "const": "common.git-work-record.v3"
+            },
+            "kind": {
+              "const": "task"
+            },
+            "value": {
+              "$ref": "#/$defs/Task"
+            }
+          },
+          "required": [
+            "schema",
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schema": {
+              "const": "common.git-work-record.v3"
+            },
+            "kind": {
+              "const": "run"
+            },
+            "value": {
+              "$ref": "#/$defs/Run"
+            }
+          },
+          "required": [
+            "schema",
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ContextPacket": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-work-context.v3"
+        },
+        "mode": {
+          "enum": [
+            "full",
+            "compact",
+            "dispatch",
+            "resume"
+          ]
+        },
+        "effective": {
+          "$ref": "#/$defs/EffectiveContract"
+        },
+        "contractSources": {
+          "type": "array",
+          "maxItems": 10000,
+          "items": {
+            "$ref": "#/$defs/Contract"
+          }
+        },
+        "authority": {
+          "const": "none"
+        },
+        "nativePermissionGranted": {
+          "const": false
+        },
+        "semanticAcceptanceEstablished": {
+          "const": false
+        }
+      },
+      "required": [
+        "schema",
+        "mode",
+        "effective",
+        "contractSources",
+        "authority",
+        "nativePermissionGranted",
+        "semanticAcceptanceEstablished"
+      ],
+      "additionalProperties": false
+    },
+    "CompactContextPacket": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-work-context.compact.v3"
+        },
+        "encoding": {
+          "const": "deflate-raw+base64.v1"
+        },
+        "effectiveDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "decodedBytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4194304
+        },
+        "payload": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8388608
+        },
+        "authority": {
+          "const": "none"
+        },
+        "nativePermissionGranted": {
+          "const": false
+        },
+        "semanticAcceptanceEstablished": {
+          "const": false
+        }
+      },
+      "required": [
+        "schema",
+        "encoding",
+        "effectiveDigest",
+        "decodedBytes",
+        "payload",
+        "authority",
+        "nativePermissionGranted",
+        "semanticAcceptanceEstablished"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
