@@ -39,10 +39,7 @@ import {
   legacyTaskProjection,
 } from "./legacy-model.ts";
 import { qualifyLegacyGraphBindings } from "./legacy-qualification.ts";
-import {
-  openExactV3SourceReader,
-  readExactV3Source,
-} from "./external-artifacts.ts";
+import { openExactV3SourceReader, readExactV3Source } from "./external-artifacts.ts";
 import { validateGitWorkAliases } from "./aliases.ts";
 import {
   validateGitWorkV3Graph,

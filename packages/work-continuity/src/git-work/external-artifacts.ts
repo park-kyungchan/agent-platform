@@ -9,7 +9,11 @@ import type {
   ContractSet,
   TaskContractSourceClosure,
 } from "./generated/v3.ts";
-import { stageLegacyGraphBindings, revokeLegacyGraphProofs, prepareLegacyProofPublication } from "./legacy-qualification.ts";
+import {
+  stageLegacyGraphBindings,
+  revokeLegacyGraphProofs,
+  prepareLegacyProofPublication,
+} from "./legacy-qualification.ts";
 import type { GitWorkSelection, ResolvedSource, GitWorkReader } from "./types.ts";
 import { openGitSourceSnapshot, openGitWork, verifiedOriginalBytes, encodedId } from "./source.ts";
 import { qualifyGitWorkAliases } from "./aliases.ts";
@@ -445,66 +449,102 @@ async function stageSelectedExternalArtifacts(
   }
   for (const [selected, proof] of completed) qualified.set(selected, proof);
   qualifiedGraphs.set(graph, graphDigest);
-  graphArtifacts.set(graph,new Set(completed.map(([selected]) => selected)));
+  graphArtifacts.set(graph, new Set(completed.map(([selected]) => selected)));
   return graph;
 }
 /** Revoke the complete remembered set before schema, reads or joins may fail. */
 function revokeArtifactGraphProofs(graph: object): void {
-  qualifiedGraphs.set(graph,null);
-  for (const selected of graphArtifacts.get(graph) ?? []) qualified.set(selected,{ valid: false });
+  qualifiedGraphs.set(graph, null);
+  for (const selected of graphArtifacts.get(graph) ?? []) qualified.set(selected, { valid: false });
   graphArtifacts.delete(graph);
   try {
-    const rows = Object.getOwnPropertyDescriptor(graph,"externalArtifacts")?.value;
-    if (Array.isArray(rows)) for (const [key,descriptor] of Object.entries(Object.getOwnPropertyDescriptors(rows))) {
-      const selected = descriptor.value;
-      if (/^[0-9]+$/.test(key) && selected && typeof selected === "object") qualified.set(selected,{ valid: false });
-    }
-  } catch { /* Malformed accessors/proxies cannot retain remembered qualifications. */ }
+    const rows = Object.getOwnPropertyDescriptor(graph, "externalArtifacts")?.value;
+    if (Array.isArray(rows))
+      for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(rows))) {
+        const selected = descriptor.value;
+        if (/^[0-9]+$/.test(key) && selected && typeof selected === "object")
+          qualified.set(selected, { valid: false });
+      }
+  } catch {
+    /* Malformed accessors/proxies cannot retain remembered qualifications. */
+  }
 }
 function prepareArtifactProofPublication(target: Graph, staged: Graph): () => void {
-  const pairs: [object,Extract<ArtifactSourceProof,{ valid: true }>] [] = [];
+  const pairs: [object, Extract<ArtifactSourceProof, { valid: true }>][] = [];
   for (let index = 0; index < (target.externalArtifacts ?? []).length; index++) {
-    const selected = target.externalArtifacts![index]!, stagedSelected = staged.externalArtifacts?.[index];
+    const selected = target.externalArtifacts![index]!,
+      stagedSelected = staged.externalArtifacts?.[index];
     const proof = stagedSelected && qualified.get(stagedSelected);
-    if (!proof || !proof.valid || !same(selected,stagedSelected) || proof.graphDigest !== digestV3(staged)) throw Error("V3_COMPLETE_ARTIFACT_REFRESH_REQUIRED");
-    pairs.push([selected,proof]);
+    if (
+      !proof ||
+      !proof.valid ||
+      !same(selected, stagedSelected) ||
+      proof.graphDigest !== digestV3(staged)
+    )
+      throw Error("V3_COMPLETE_ARTIFACT_REFRESH_REQUIRED");
+    pairs.push([selected, proof]);
   }
-  return () => { for (const [selected,proof] of pairs) qualified.set(selected,proof); graphArtifacts.set(target,new Set(pairs.map(([selected]) => selected))); };
+  return () => {
+    for (const [selected, proof] of pairs) qualified.set(selected, proof);
+    graphArtifacts.set(target, new Set(pairs.map(([selected]) => selected)));
+  };
 }
 /** All public source refreshes use one transaction. The detached working graph
  * is never passed to readers; no old or partial proof is visible on rejection.
  * finish runs the existing resolver/context serialization before publication. */
-export function refreshGitWorkV3Qualifications(graph: Graph, reader: ExactV3SourceReader): Promise<void>;
-export function refreshGitWorkV3Qualifications<T>(graph: Graph, reader: ExactV3SourceReader, finish: (staged: Graph) => T): Promise<T>;
+export function refreshGitWorkV3Qualifications(
+  graph: Graph,
+  reader: ExactV3SourceReader,
+): Promise<void>;
+export function refreshGitWorkV3Qualifications<T>(
+  graph: Graph,
+  reader: ExactV3SourceReader,
+  finish: (staged: Graph) => T,
+): Promise<T>;
 export async function refreshGitWorkV3Qualifications<T = void>(
-  graph: Graph, reader: ExactV3SourceReader, finish?: (staged: Graph) => T,
+  graph: Graph,
+  reader: ExactV3SourceReader,
+  finish?: (staged: Graph) => T,
 ): Promise<T | void> {
   const epoch = {};
-  refreshEpochs.set(graph,epoch);
+  refreshEpochs.set(graph, epoch);
   revokeArtifactGraphProofs(graph);
   revokeLegacyGraphProofs(graph);
   let staged: Graph | undefined;
   try {
-    assertV3("Graph",graph);
+    assertV3("Graph", graph);
     const expected = digestV3(graph);
     staged = structuredClone(graph);
-    await stageLegacyGraphBindings(staged,reader);
-    await qualifyGitWorkAliases(staged.aliases ?? [],reader);
-    await stageSelectedExternalArtifacts(staged,reader);
+    await stageLegacyGraphBindings(staged, reader);
+    await qualifyGitWorkAliases(staged.aliases ?? [], reader);
+    await stageSelectedExternalArtifacts(staged, reader);
     validateGitWorkV3Graph(staged);
     const result = finish?.(staged);
-    if (refreshEpochs.get(graph) !== epoch || digestV3(graph) !== expected || digestV3(staged) !== expected) throw Error("V3_SOURCE_REFRESH_SUPERSEDED_OR_GRAPH_CHANGED");
-    const legacy = prepareLegacyProofPublication(graph,staged);
-    const artifacts = prepareArtifactProofPublication(graph,staged);
+    if (
+      refreshEpochs.get(graph) !== epoch ||
+      digestV3(graph) !== expected ||
+      digestV3(staged) !== expected
+    )
+      throw Error("V3_SOURCE_REFRESH_SUPERSEDED_OR_GRAPH_CHANGED");
+    const legacy = prepareLegacyProofPublication(graph, staged);
+    const artifacts = prepareArtifactProofPublication(graph, staged);
     // Synchronous, non-throwing WeakMap writes after every validation/read/join.
-    legacy(); artifacts(); qualifiedGraphs.set(graph,expected);
+    legacy();
+    artifacts();
+    qualifiedGraphs.set(graph, expected);
     return result;
   } finally {
-    if (staged) { revokeArtifactGraphProofs(staged); revokeLegacyGraphProofs(staged); }
+    if (staged) {
+      revokeArtifactGraphProofs(staged);
+      revokeLegacyGraphProofs(staged);
+    }
   }
 }
-export async function qualifySelectedExternalArtifacts(graph: Graph, reader: ExactV3SourceReader): Promise<Graph> {
-  await refreshGitWorkV3Qualifications(graph,reader);
+export async function qualifySelectedExternalArtifacts(
+  graph: Graph,
+  reader: ExactV3SourceReader,
+): Promise<Graph> {
+  await refreshGitWorkV3Qualifications(graph, reader);
   return graph;
 }
 

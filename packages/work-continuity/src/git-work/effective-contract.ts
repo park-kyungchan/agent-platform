@@ -21,10 +21,7 @@ import {
   refreshGitWorkV3Qualifications,
   type ExactV3SourceReader,
 } from "./external-artifacts.ts";
-import {
-  assertQualifiedLegacyTask,
-  legacyDependencyHoldReasons,
-} from "./legacy-qualification.ts";
+import { assertQualifiedLegacyTask, legacyDependencyHoldReasons } from "./legacy-qualification.ts";
 import { validateGitWorkAliases } from "./aliases.ts";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 
@@ -429,5 +426,7 @@ export function expandGitWorkV3Context(input: ContextPacket | CompactContextPack
 export async function readSourceQualifiedGitWorkV3Context(
   input: Parameters<typeof readGitWorkV3Context>[0] & { graph: Graph; reader: ExactV3SourceReader },
 ) {
-  return refreshGitWorkV3Qualifications(input.graph,input.reader,(staged) => readGitWorkV3Context({ ...input,graph: staged }));
+  return refreshGitWorkV3Qualifications(input.graph, input.reader, (staged) =>
+    readGitWorkV3Context({ ...input, graph: staged }),
+  );
 }

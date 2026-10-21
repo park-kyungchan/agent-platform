@@ -7,7 +7,11 @@ import {
   legacyPlanContract,
   legacyTaskBinding,
 } from "./legacy-model.ts";
-import { refreshGitWorkV3Qualifications, readExactV3Source, type ExactV3SourceReader } from "./external-artifacts.ts";
+import {
+  refreshGitWorkV3Qualifications,
+  readExactV3Source,
+  type ExactV3SourceReader,
+} from "./external-artifacts.ts";
 
 type LegacySourceProof = { fingerprint: string; edges: Graph["dependencies"]; holds: string[] };
 const qualified = new WeakMap<object, LegacySourceProof>();
@@ -133,7 +137,11 @@ export async function stageLegacyGraphBindings(
         snapshots.set(
           key,
           (async () => {
-            const legacy = await reader.openLegacyWork!(binding.source, { projectId: task.projectId, workId: task.workId, taskId: task.taskId });
+            const legacy = await reader.openLegacyWork!(binding.source, {
+              projectId: task.projectId,
+              workId: task.workId,
+              taskId: task.taskId,
+            });
             return { reader: legacy, loaded: await loadRecords(legacy) };
           })(),
         );
@@ -162,8 +170,8 @@ export async function stageLegacyGraphBindings(
       holds: [...new Set(holds)].sort(),
     });
   }
-  for (const [binding,proof] of completed) qualified.set(binding,proof);
-  graphBindings.set(graph,new Set(completed.keys()));
+  for (const [binding, proof] of completed) qualified.set(binding, proof);
+  graphBindings.set(graph, new Set(completed.keys()));
   return graph;
 }
 /** Internal refresh support. Revocation never evaluates graph accessors. */
@@ -171,29 +179,42 @@ export function revokeLegacyGraphProofs(graph: object): void {
   for (const binding of graphBindings.get(graph) ?? []) qualified.delete(binding);
   graphBindings.delete(graph);
   try {
-    const tasks = Object.getOwnPropertyDescriptor(graph,"tasks")?.value;
-    if (Array.isArray(tasks)) for (const [key,descriptor] of Object.entries(Object.getOwnPropertyDescriptors(tasks))) {
-      const task = descriptor.value;
-      if (/^[0-9]+$/.test(key) && task && typeof task === "object") { const binding = Object.getOwnPropertyDescriptor(task,"legacyBinding")?.value; if (binding && typeof binding === "object") qualified.delete(binding); }
-    }
-  } catch { /* Full validation still rejects malformed source data after revocation. */ }
+    const tasks = Object.getOwnPropertyDescriptor(graph, "tasks")?.value;
+    if (Array.isArray(tasks))
+      for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(tasks))) {
+        const task = descriptor.value;
+        if (/^[0-9]+$/.test(key) && task && typeof task === "object") {
+          const binding = Object.getOwnPropertyDescriptor(task, "legacyBinding")?.value;
+          if (binding && typeof binding === "object") qualified.delete(binding);
+        }
+      }
+  } catch {
+    /* Full validation still rejects malformed source data after revocation. */
+  }
 }
 /** Prepare all writes before committing any staged proof to caller-owned data. */
 export function prepareLegacyProofPublication(target: Graph, staged: Graph): () => void {
-  const pairs: [object,LegacySourceProof][] = [];
+  const pairs: [object, LegacySourceProof][] = [];
   for (let index = 0; index < target.tasks.length; index++) {
     const binding = target.tasks[index]!.legacyBinding;
     if (!binding) continue;
     const stagedBinding = staged.tasks[index]?.legacyBinding;
     const proof = stagedBinding && qualified.get(stagedBinding);
-    if (!proof || !same(binding,stagedBinding) || proof.fingerprint !== canonicalV3(binding)) throw Error("V3_COMPLETE_LEGACY_REFRESH_REQUIRED");
-    pairs.push([binding,proof]);
+    if (!proof || !same(binding, stagedBinding) || proof.fingerprint !== canonicalV3(binding))
+      throw Error("V3_COMPLETE_LEGACY_REFRESH_REQUIRED");
+    pairs.push([binding, proof]);
   }
-  return () => { for (const [binding,proof] of pairs) qualified.set(binding,proof); graphBindings.set(target,new Set(pairs.map(([binding]) => binding))); };
+  return () => {
+    for (const [binding, proof] of pairs) qualified.set(binding, proof);
+    graphBindings.set(target, new Set(pairs.map(([binding]) => binding)));
+  };
 }
 /** Public legacy qualification shares the complete fail-closed refresh boundary. */
-export async function qualifyLegacyGraphBindings(graph: Graph, reader: ExactV3SourceReader): Promise<Graph> {
-  await refreshGitWorkV3Qualifications(graph,reader);
+export async function qualifyLegacyGraphBindings(
+  graph: Graph,
+  reader: ExactV3SourceReader,
+): Promise<Graph> {
+  await refreshGitWorkV3Qualifications(graph, reader);
   return graph;
 }
 

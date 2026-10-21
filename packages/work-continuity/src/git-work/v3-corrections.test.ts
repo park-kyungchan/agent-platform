@@ -35,7 +35,12 @@ import {
   v3ContractRef,
   validateGitWorkV3Graph,
 } from "./effective-contract.ts";
-import { openExactV3SourceReader, consumerContractBinding, qualifySelectedExternalArtifacts, type ExactV3SourceReader } from "./external-artifacts.ts";
+import {
+  openExactV3SourceReader,
+  consumerContractBinding,
+  qualifySelectedExternalArtifacts,
+  type ExactV3SourceReader,
+} from "./external-artifacts.ts";
 import {
   allocateGitWorkIdentity,
   type GitAllocationTarget,
@@ -497,7 +502,10 @@ test("R01 missing inventory, omitted bootstrap, wrong meaning and competing writ
   expect(git(f.root, "rev-parse", fixtureRef)).toBe(applied.head);
 });
 
-async function artifactFixture(forge?: "resources" | "criteria" | "ancestry" | "dependency", supplement?: Graph) {
+async function artifactFixture(
+  forge?: "resources" | "criteria" | "ancestry" | "dependency",
+  supplement?: Graph,
+) {
   const root = await directory();
   git(root, "init", "--initial-branch=work/synthetic-v3");
   git(root, "config", "user.name", "Synthetic artifact owner");
@@ -591,11 +599,17 @@ async function artifactFixture(forge?: "resources" | "criteria" | "ancestry" | "
   graph.tasks.push(...producerGraph.tasks);
   graph.contracts.push(...producerGraph.contracts);
   if (supplement) {
-    graph.domains.push(...supplement.domains); graph.projects.push(...supplement.projects);
-    graph.works.push(...supplement.works); graph.tasks.push(...supplement.tasks); graph.contracts.push(...supplement.contracts);
-    graph.dependencies.push(...supplement.dependencies); graph.relations.push(...supplement.relations);
-    graph.delegations.push(...supplement.delegations); graph.provenance.push(...supplement.provenance);
-    graph.nativeCorrelations.push(...supplement.nativeCorrelations); graph.aliases = [...(supplement.aliases ?? [])];
+    graph.domains.push(...supplement.domains);
+    graph.projects.push(...supplement.projects);
+    graph.works.push(...supplement.works);
+    graph.tasks.push(...supplement.tasks);
+    graph.contracts.push(...supplement.contracts);
+    graph.dependencies.push(...supplement.dependencies);
+    graph.relations.push(...supplement.relations);
+    graph.delegations.push(...supplement.delegations);
+    graph.provenance.push(...supplement.provenance);
+    graph.nativeCorrelations.push(...supplement.nativeCorrelations);
+    graph.aliases = [...(supplement.aliases ?? [])];
   }
   const contractPath = (c: Graph["contracts"][number]) =>
     `work/${encodeURIComponent(c.owner.projectId)}/${encodeURIComponent(c.owner.workId)}/v3` +
@@ -1434,115 +1448,245 @@ test("R03-v6 migration/bootstrap recover and replay across merge; merged bootstr
   ).rejects.toThrow();
 }, 30_000);
 
-function assertRefreshRequired(graph: Graph, task: { projectId: string; workId: string; taskId: string }, digest: string) {
+function assertRefreshRequired(
+  graph: Graph,
+  task: { projectId: string; workId: string; taskId: string },
+  digest: string,
+) {
   // Reused rows in another Graph must not retain old per-binding/artifact proof.
-  const borrowed = { ...graph,tasks: [...graph.tasks],...(graph.externalArtifacts ? { externalArtifacts: [...graph.externalArtifacts] } : {}) };
-  for (const input of [graph,borrowed]) {
-    expect(() => validateGitWorkV3Graph(input)).toThrow(/REQUALIFICATION_REQUIRED|ACTUAL_SOURCE_QUALIFICATION_REQUIRED/);
-    expect(() => resolveEffectiveContract(input,task)).toThrow(/REQUALIFICATION_REQUIRED|ACTUAL_SOURCE_QUALIFICATION_REQUIRED/);
-    for (const mode of ["full","compact","dispatch","resume"] as const) expect(() => readGitWorkV3Context({ graph: input,task,mode,expectedDigest: digest })).toThrow(/REQUALIFICATION_REQUIRED|ACTUAL_SOURCE_QUALIFICATION_REQUIRED/);
+  const borrowed = {
+    ...graph,
+    tasks: [...graph.tasks],
+    ...(graph.externalArtifacts ? { externalArtifacts: [...graph.externalArtifacts] } : {}),
+  };
+  for (const input of [graph, borrowed]) {
+    expect(() => validateGitWorkV3Graph(input)).toThrow(
+      /REQUALIFICATION_REQUIRED|ACTUAL_SOURCE_QUALIFICATION_REQUIRED/,
+    );
+    expect(() => resolveEffectiveContract(input, task)).toThrow(
+      /REQUALIFICATION_REQUIRED|ACTUAL_SOURCE_QUALIFICATION_REQUIRED/,
+    );
+    for (const mode of ["full", "compact", "dispatch", "resume"] as const)
+      expect(() =>
+        readGitWorkV3Context({ graph: input, task, mode, expectedDigest: digest }),
+      ).toThrow(/REQUALIFICATION_REQUIRED|ACTUAL_SOURCE_QUALIFICATION_REQUIRED/);
   }
 }
-async function refreshPacket(graph: Graph, task: { projectId: string; workId: string; taskId: string }, reader: ExactV3SourceReader) {
-  return expandGitWorkV3Context(await readSourceQualifiedGitWorkV3Context({ graph,task,mode: "full",reader }));
+async function refreshPacket(
+  graph: Graph,
+  task: { projectId: string; workId: string; taskId: string },
+  reader: ExactV3SourceReader,
+) {
+  return expandGitWorkV3Context(
+    await readSourceQualifiedGitWorkV3Context({ graph, task, mode: "full", reader }),
+  );
 }
 async function graphWithEarlyRefreshSources(selectedArtifact: boolean) {
   const legacy = await legacyPrerequisiteFixture(true);
   // Distinct actual source occurrence makes this pin unique to the alias phase.
   const alias = legacy.projection.graph.aliases![0]!;
-  await put(legacy.root,"work/synthetic-alias-occurrence.json",{ synthetic: "alias source occurrence" });
-  const aliasCommit = commit(legacy.root); alias.provenance = { ...alias.provenance,commit: aliasCommit };
+  await put(legacy.root, "work/synthetic-alias-occurrence.json", {
+    synthetic: "alias source occurrence",
+  });
+  const aliasCommit = commit(legacy.root);
+  alias.provenance = { ...alias.provenance, commit: aliasCommit };
   const legacyReader = await openExactV3SourceReader(legacy.selection);
-  const legacyTaskRef = { projectId: legacyScope.projectId,workId: legacyScope.workId,taskId: publicationId };
-  if (!selectedArtifact) return { graph: legacy.projection.graph,task: legacyTaskRef,reader: legacyReader,aliasPin: alias.provenance,legacyTaskRef };
-  const artifact = await artifactFixture(undefined,legacy.projection.graph);
-  const artifactReader = await openExactV3SourceReader(artifact.sourceSelection);
-  const legacyCommits = new Set([...legacy.projection.sources.map((pin) => pin.commit),aliasCommit]);
-  const route = (identity: { commit: string }) => legacyCommits.has(identity.commit) ? legacyReader : artifactReader;
-  const reader: ExactV3SourceReader = {
-    read(pin) { return route(pin).read(pin); },
-    readAt(identity,path) { return route(identity).readAt!(identity,path); },
-    openLegacyWork(pin,task) { return route(pin).openLegacyWork!(pin,task); },
+  const legacyTaskRef = {
+    projectId: legacyScope.projectId,
+    workId: legacyScope.workId,
+    taskId: publicationId,
   };
-  return { graph: artifact.graph,task: fixtureTask,reader,aliasPin: alias.provenance,legacyTaskRef };
-}
-test.each([
-  { artifact: false,fault: "missing-reader" },{ artifact: false,fault: "rejecting-reader" },
-  { artifact: false,fault: "alias" },{ artifact: false,fault: "later-legacy" },
-  { artifact: true,fault: "missing-reader" },{ artifact: true,fault: "alias" },{ artifact: true,fault: "later-legacy" },
-])("R02-v7 complete refresh revokes before early failure and recovers atomically: %j", async ({ artifact,fault }) => {
-  const f = await graphWithEarlyRefreshSources(artifact);
-  const initial = await refreshPacket(f.graph,f.task,f.reader);
-  expect(initial.status).toBe("source-qualified");
-  const before = digestV3(f.graph);
-  const legacyDigest = resolveEffectiveContract(f.graph,f.legacyTaskRef).digest;
-  const bindings = f.graph.tasks.flatMap((task) => task.legacyBinding ? [task.legacyBinding] : []);
-  const last = bindings.at(-1)!.source;
-  let failureReached = false, priorLegacyPassed = false;
-  const broken: ExactV3SourceReader = {
-    ...f.reader,
-    async read(pin) {
-      if (fault === "alias" && canonicalV3(pin) === canonicalV3(f.aliasPin) || fault === "later-legacy" && canonicalV3(pin) === canonicalV3(last)) {
-        failureReached=true;
-        expect(priorLegacyPassed).toBe(true);
-        assertRefreshRequired(f.graph,f.task,initial.effective.digest);
-        throw Error("SYNTHETIC_EARLY_REFRESH_READ_REJECTED");
-      }
-      const result = await f.reader.read(pin);
-      if (canonicalV3(pin) === canonicalV3(bindings[0]!.source)) priorLegacyPassed=true;
-      return result;
+  if (!selectedArtifact)
+    return {
+      graph: legacy.projection.graph,
+      task: legacyTaskRef,
+      reader: legacyReader,
+      aliasPin: alias.provenance,
+      legacyTaskRef,
+    };
+  const artifact = await artifactFixture(undefined, legacy.projection.graph);
+  const artifactReader = await openExactV3SourceReader(artifact.sourceSelection);
+  const legacyCommits = new Set([
+    ...legacy.projection.sources.map((pin) => pin.commit),
+    aliasCommit,
+  ]);
+  const route = (identity: { commit: string }) =>
+    legacyCommits.has(identity.commit) ? legacyReader : artifactReader;
+  const reader: ExactV3SourceReader = {
+    read(pin) {
+      return route(pin).read(pin);
+    },
+    readAt(identity, path) {
+      return route(identity).readAt!(identity, path);
+    },
+    openLegacyWork(pin, task) {
+      return route(pin).openLegacyWork!(pin, task);
     },
   };
-  if (fault === "missing-reader") delete broken.openLegacyWork;
-  if (fault === "rejecting-reader") broken.openLegacyWork = async () => { failureReached=true; throw Error("SYNTHETIC_LEGACY_OPEN_REJECTED"); };
-  await expect(refreshPacket(f.graph,f.task,broken)).rejects.toThrow();
-  if (fault !== "missing-reader") expect(failureReached).toBe(true);
-  expect(digestV3(f.graph)).toBe(before);
-  assertRefreshRequired(f.graph,f.task,initial.effective.digest);
-  assertRefreshRequired(f.graph,f.legacyTaskRef,legacyDigest);
-  const recovered = await refreshPacket(f.graph,f.task,f.reader);
-  expect(recovered.effective).toEqual(initial.effective);
-  expect(recovered.status).toBe("source-qualified");
-  expect(resolveEffectiveContract(f.graph,f.legacyTaskRef).digest).toBe(legacyDigest);
-  expect(resolveEffectiveContract(f.graph,{ ...f.legacyTaskRef,taskId: newTaskId }).holdReasons).toEqual([]);
-  for (const mode of ["full","compact","dispatch","resume"] as const) expect(expandGitWorkV3Context(readGitWorkV3Context({ graph: f.graph,task: f.task,mode,expectedDigest: recovered.effective.digest })).effective).toEqual(recovered.effective);
-},30_000);
+  return {
+    graph: artifact.graph,
+    task: fixtureTask,
+    reader,
+    aliasPin: alias.provenance,
+    legacyTaskRef,
+  };
+}
+test.each([
+  { artifact: false, fault: "missing-reader" },
+  { artifact: false, fault: "rejecting-reader" },
+  { artifact: false, fault: "alias" },
+  { artifact: false, fault: "later-legacy" },
+  { artifact: true, fault: "missing-reader" },
+  { artifact: true, fault: "alias" },
+  { artifact: true, fault: "later-legacy" },
+])(
+  "R02-v7 complete refresh revokes before early failure and recovers atomically: %j",
+  async ({ artifact, fault }) => {
+    const f = await graphWithEarlyRefreshSources(artifact);
+    const initial = await refreshPacket(f.graph, f.task, f.reader);
+    expect(initial.status).toBe("source-qualified");
+    const before = digestV3(f.graph);
+    const legacyDigest = resolveEffectiveContract(f.graph, f.legacyTaskRef).digest;
+    const bindings = f.graph.tasks.flatMap((task) =>
+      task.legacyBinding ? [task.legacyBinding] : [],
+    );
+    const last = bindings.at(-1)!.source;
+    let failureReached = false,
+      priorLegacyPassed = false;
+    const broken: ExactV3SourceReader = {
+      ...f.reader,
+      async read(pin) {
+        if (
+          (fault === "alias" && canonicalV3(pin) === canonicalV3(f.aliasPin)) ||
+          (fault === "later-legacy" && canonicalV3(pin) === canonicalV3(last))
+        ) {
+          failureReached = true;
+          expect(priorLegacyPassed).toBe(true);
+          assertRefreshRequired(f.graph, f.task, initial.effective.digest);
+          throw Error("SYNTHETIC_EARLY_REFRESH_READ_REJECTED");
+        }
+        const result = await f.reader.read(pin);
+        if (canonicalV3(pin) === canonicalV3(bindings[0]!.source)) priorLegacyPassed = true;
+        return result;
+      },
+    };
+    if (fault === "missing-reader") delete broken.openLegacyWork;
+    if (fault === "rejecting-reader")
+      broken.openLegacyWork = async () => {
+        failureReached = true;
+        throw Error("SYNTHETIC_LEGACY_OPEN_REJECTED");
+      };
+    await expect(refreshPacket(f.graph, f.task, broken)).rejects.toThrow();
+    if (fault !== "missing-reader") expect(failureReached).toBe(true);
+    expect(digestV3(f.graph)).toBe(before);
+    assertRefreshRequired(f.graph, f.task, initial.effective.digest);
+    assertRefreshRequired(f.graph, f.legacyTaskRef, legacyDigest);
+    const recovered = await refreshPacket(f.graph, f.task, f.reader);
+    expect(recovered.effective).toEqual(initial.effective);
+    expect(recovered.status).toBe("source-qualified");
+    expect(resolveEffectiveContract(f.graph, f.legacyTaskRef).digest).toBe(legacyDigest);
+    expect(
+      resolveEffectiveContract(f.graph, { ...f.legacyTaskRef, taskId: newTaskId }).holdReasons,
+    ).toEqual([]);
+    for (const mode of ["full", "compact", "dispatch", "resume"] as const)
+      expect(
+        expandGitWorkV3Context(
+          readGitWorkV3Context({
+            graph: f.graph,
+            task: f.task,
+            mode,
+            expectedDigest: recovered.effective.digest,
+          }),
+        ).effective,
+      ).toEqual(recovered.effective);
+  },
+  30_000,
+);
 
-test.each([false,true])("R02-v7 schema rejection revokes remembered rows even when current arrays are missing; artifact=%s", async (artifact) => {
-  const f = await graphWithEarlyRefreshSources(artifact), initial = await refreshPacket(f.graph,f.task,f.reader);
-  const tasks = f.graph.tasks, artifacts = f.graph.externalArtifacts;
-  const invalid = f.graph as unknown as Record<string,unknown>; invalid.tasks=null; if (artifact) invalid.externalArtifacts=null;
-  await expect(refreshPacket(f.graph,f.task,f.reader)).rejects.toThrow("INVALID_V3");
-  f.graph.tasks=tasks; if (artifact) f.graph.externalArtifacts=artifacts;
-  assertRefreshRequired(f.graph,f.task,initial.effective.digest);
-  expect((await refreshPacket(f.graph,f.task,f.reader)).effective).toEqual(initial.effective);
-},30_000);
-test.each([false,true])("R02-v7 final context failure publishes no legacy/artifact/alias replacements; artifact=%s", async (artifact) => {
-  const f = await graphWithEarlyRefreshSources(artifact), initial = await refreshPacket(f.graph,f.task,f.reader);
-  await expect(readSourceQualifiedGitWorkV3Context({ graph: f.graph,task: f.task,mode: "resume",expectedDigest: "0".repeat(64),reader: f.reader })).rejects.toThrow("STALE_EFFECTIVE");
-  assertRefreshRequired(f.graph,f.task,initial.effective.digest);
-  expect((await refreshPacket(f.graph,f.task,f.reader)).effective).toEqual(initial.effective);
-},30_000);
-test.each(["legacy","artifact"])("R02-v7 standalone public %s qualifier shares early revocation and complete refresh", async (entry) => {
-  const f = await graphWithEarlyRefreshSources(entry === "artifact"), initial = await refreshPacket(f.graph,f.task,f.reader);
-  const missing = { ...f.reader }; delete missing.openLegacyWork;
-  const refresh = entry === "legacy" ? qualifyLegacyGraphBindings : qualifySelectedExternalArtifacts;
-  await expect(refresh(f.graph,missing)).rejects.toThrow("DEPENDENCY_SOURCE_READER_REQUIRED");
-  assertRefreshRequired(f.graph,f.task,initial.effective.digest);
-  await refresh(f.graph,f.reader);
-  expect(resolveEffectiveContract(f.graph,f.task)).toEqual(initial.effective);
-},30_000);
+test.each([false, true])(
+  "R02-v7 schema rejection revokes remembered rows even when current arrays are missing; artifact=%s",
+  async (artifact) => {
+    const f = await graphWithEarlyRefreshSources(artifact),
+      initial = await refreshPacket(f.graph, f.task, f.reader);
+    const tasks = f.graph.tasks,
+      artifacts = f.graph.externalArtifacts;
+    const invalid = f.graph as unknown as Record<string, unknown>;
+    invalid.tasks = null;
+    if (artifact) invalid.externalArtifacts = null;
+    await expect(refreshPacket(f.graph, f.task, f.reader)).rejects.toThrow("INVALID_V3");
+    f.graph.tasks = tasks;
+    if (artifact) f.graph.externalArtifacts = artifacts;
+    assertRefreshRequired(f.graph, f.task, initial.effective.digest);
+    expect((await refreshPacket(f.graph, f.task, f.reader)).effective).toEqual(initial.effective);
+  },
+  30_000,
+);
+test.each([false, true])(
+  "R02-v7 final context failure publishes no legacy/artifact/alias replacements; artifact=%s",
+  async (artifact) => {
+    const f = await graphWithEarlyRefreshSources(artifact),
+      initial = await refreshPacket(f.graph, f.task, f.reader);
+    await expect(
+      readSourceQualifiedGitWorkV3Context({
+        graph: f.graph,
+        task: f.task,
+        mode: "resume",
+        expectedDigest: "0".repeat(64),
+        reader: f.reader,
+      }),
+    ).rejects.toThrow("STALE_EFFECTIVE");
+    assertRefreshRequired(f.graph, f.task, initial.effective.digest);
+    expect((await refreshPacket(f.graph, f.task, f.reader)).effective).toEqual(initial.effective);
+  },
+  30_000,
+);
+test.each(["legacy", "artifact"])(
+  "R02-v7 standalone public %s qualifier shares early revocation and complete refresh",
+  async (entry) => {
+    const f = await graphWithEarlyRefreshSources(entry === "artifact"),
+      initial = await refreshPacket(f.graph, f.task, f.reader);
+    const missing = { ...f.reader };
+    delete missing.openLegacyWork;
+    const refresh =
+      entry === "legacy" ? qualifyLegacyGraphBindings : qualifySelectedExternalArtifacts;
+    await expect(refresh(f.graph, missing)).rejects.toThrow("DEPENDENCY_SOURCE_READER_REQUIRED");
+    assertRefreshRequired(f.graph, f.task, initial.effective.digest);
+    await refresh(f.graph, f.reader);
+    expect(resolveEffectiveContract(f.graph, f.task)).toEqual(initial.effective);
+  },
+  30_000,
+);
 test("R02-v7 in-flight refresh is private and an older completion cannot overwrite a newer complete qualification", async () => {
-  const f = await graphWithEarlyRefreshSources(true), initial = await refreshPacket(f.graph,f.task,f.reader);
+  const f = await graphWithEarlyRefreshSources(true),
+    initial = await refreshPacket(f.graph, f.task, f.reader);
   let unblock!: () => void, entered!: () => void;
-  const blocked = new Promise<void>((resolve) => { unblock=resolve; }), started = new Promise<void>((resolve) => { entered=resolve; });
+  const blocked = new Promise<void>((resolve) => {
+      unblock = resolve;
+    }),
+    started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
   let first = true;
-  const slow: ExactV3SourceReader = { ...f.reader,async read(pin) { if (first) { first=false; entered(); await blocked; } return f.reader.read(pin); } };
-  const old = refreshPacket(f.graph,f.task,slow);
-  const observed = old.then(() => "unexpected-success",(error: unknown) => error instanceof Error ? error.message : "unknown");
+  const slow: ExactV3SourceReader = {
+    ...f.reader,
+    async read(pin) {
+      if (first) {
+        first = false;
+        entered();
+        await blocked;
+      }
+      return f.reader.read(pin);
+    },
+  };
+  const old = refreshPacket(f.graph, f.task, slow);
+  const observed = old.then(
+    () => "unexpected-success",
+    (error: unknown) => (error instanceof Error ? error.message : "unknown"),
+  );
   await started;
-  assertRefreshRequired(f.graph,f.task,initial.effective.digest);
-  expect((await refreshPacket(f.graph,f.task,f.reader)).effective).toEqual(initial.effective);
-  unblock(); expect(await observed).toContain("REFRESH_SUPERSEDED");
-  expect(resolveEffectiveContract(f.graph,f.task)).toEqual(initial.effective);
-},30_000);
+  assertRefreshRequired(f.graph, f.task, initial.effective.digest);
+  expect((await refreshPacket(f.graph, f.task, f.reader)).effective).toEqual(initial.effective);
+  unblock();
+  expect(await observed).toContain("REFRESH_SUPERSEDED");
+  expect(resolveEffectiveContract(f.graph, f.task)).toEqual(initial.effective);
+}, 30_000);
