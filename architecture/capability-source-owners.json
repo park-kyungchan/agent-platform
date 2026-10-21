@@ -389,7 +389,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/ontology/scripts/generate.ts",
-          "sha256": "4f4245e3d4da99a664a2a32d4476ccfbff8ca4db69e6fe8cc5562b9ff7c54e45",
+          "sha256": "b8c84da592f354355b52164f6e5ff8765a7357fc08b09dddb7319ae5daced11d",
           "relativePath": "packages/ontology/scripts/generate.ts"
         }
       ],
