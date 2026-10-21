@@ -1,4 +1,4 @@
-/** Generated from git-work-v3.schema.json; do not edit. SHA-256: 4c5c06cb984c67767bd551a4e7db7ed8b0cc0405edcb8a450b428c246e679425 */
+/** Generated from git-work-v3.schema.json; do not edit. SHA-256: 918dc3a6e933b50b186d7c72d15f7b21083459530e0ee9e32e42ebc81f6c7a48 */
 
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -468,6 +468,8 @@ export interface SelectedExternalArtifact {
   }[];
   receiverOwnerId: Id;
   receiverUse: GitSourcePin;
+  producerSources: TaskContractSourceClosure;
+  consumerSources: TaskContractSourceClosure;
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -507,6 +509,18 @@ export interface ConsumerContractBinding {
    * @maxItems 2048
    */
   acceptanceCriteria: Id[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "TaskContractSourceClosure".
+ */
+export interface TaskContractSourceClosure {
+  work: GitSourcePin;
+  task: GitSourcePin;
+  /**
+   * @maxItems 2048
+   */
+  contracts: GitSourcePin[];
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
