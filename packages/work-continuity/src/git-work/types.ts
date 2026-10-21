@@ -105,7 +105,9 @@ export interface TaskDependency {
   receiptEvidenceId?: string;
   receiverEvidenceId?: string;
 }
-export interface TaskRecord extends RecordBase {
+export interface TaskRecord extends Omit<RecordBase, "schema"> {
+  /** Task-only protocol: old v1 readers must reject external-prerequisite Tasks. */
+  schema: "common.git-work.v1" | "common.git-work-task.v2";
   kind: "task";
   logical: LogicalIdentity;
   title: string;
@@ -114,6 +116,8 @@ export interface TaskRecord extends RecordBase {
   state: TaskOperationalState;
   executionClass: "source-only" | "native-effect";
   dependsOn: TaskDependency[];
+  /** Versioned external artifact route; v1 dependsOn remains strictly Work-local. */
+  externalPrerequisites?: SelectedExternalArtifactPrerequisite[];
   decisionIds: string[];
   effectIds: string[];
   verificationEvidenceIds: string[];
@@ -525,3 +529,89 @@ export type StartRequest =
       current: RecordIdentity;
       branch: string;
     };
+
+/** Every external address pins both Git snapshot and complete blob bytes. */
+export interface PinnedGitSource extends ExternalGitSource {
+  sha256: string;
+}
+export interface ArtifactSourceClosure {
+  schema: "common.git-artifact-source-closure.v1";
+  logical: LogicalIdentity;
+  sources: PinnedGitSource[];
+}
+export interface SelectedArtifactAlternative {
+  id: string;
+  producer: LogicalIdentity;
+  ownerId: string;
+  sourceClosure: PinnedGitSource;
+  milestone: DependencyMilestone;
+  artifact: PinnedGitSource;
+  criterionIds: string[];
+}
+export interface SelectedArtifactGateDefinition {
+  schema: "common.git-artifact-gate-definition.v1";
+  selectionOwnerId: string;
+  alternatives: SelectedArtifactAlternative[];
+}
+export interface SelectedExternalArtifactPrerequisite {
+  schema: "common.git-selected-external-artifact.v1";
+  producer: {
+    logical: LogicalIdentity;
+    ownerId: string;
+    /** Exact canonical Task record in the producer Work, never inserted into the consumer map. */
+    record: PinnedGitSource;
+    sourceClosure: PinnedGitSource;
+    milestone: DependencyMilestone;
+    artifact: PinnedGitSource;
+    ownerMilestoneReceipt: PinnedGitSource;
+  };
+  consumerGate: {
+    instanceId: string;
+    revision: number;
+    definition: PinnedGitSource;
+    consumer: LogicalIdentity;
+    consumerSourceClosure: PinnedGitSource;
+    selectedAlternative: string;
+    selectionOwnerId: string;
+    ownerSelectionReceipt: PinnedGitSource;
+    criterionReceipts: { criterionId: string; evidence: PinnedGitSource }[];
+  };
+  qualification:
+    | { status: "unresolved"; receiverUse: null }
+    | { status: "rejected" | "owner-qualified"; receiverUse: PinnedGitSource };
+  grantsNativePermission: false;
+}
+/** All receipt schemas bind the entire consumer-specific gate, not a shared mutable gate status. */
+export interface ArtifactSelectionReceipt {
+  schema: "common.git-artifact-selection-receipt.v1";
+  gate: Omit<
+    SelectedExternalArtifactPrerequisite["consumerGate"],
+    "ownerSelectionReceipt" | "criterionReceipts"
+  >;
+}
+export interface ExternalArtifactMilestoneReceipt {
+  schema: "common.git-external-milestone-receipt.v1";
+  ownerId: string;
+  producer: Omit<SelectedExternalArtifactPrerequisite["producer"], "ownerMilestoneReceipt">;
+  /** Required only for acceptance; a separate owner AcceptanceDecision, never inferred from checks. */
+  acceptanceDecision?: PinnedGitSource;
+}
+export interface ArtifactCriterionReceipt {
+  schema: "common.git-artifact-criterion-receipt.v1";
+  selection: ArtifactSelectionReceipt["gate"];
+  producer: ExternalArtifactMilestoneReceipt["producer"];
+  criterionId: string;
+  status: "pass" | "fail" | "unknown";
+  evidence: PinnedGitSource[];
+}
+export interface ExternalArtifactReceiverUse {
+  schema: "common.git-external-artifact-receiver-use.v1";
+  selection: ArtifactSelectionReceipt["gate"];
+  producer: ExternalArtifactMilestoneReceipt["producer"];
+  ownerSelectionReceipt: PinnedGitSource;
+  ownerMilestoneReceipt: PinnedGitSource;
+  criterionReceipts: SelectedExternalArtifactPrerequisite["consumerGate"]["criterionReceipts"];
+  status: "used" | "rejected";
+  receiverOwnerId: string;
+  evidence: PinnedGitSource[];
+}

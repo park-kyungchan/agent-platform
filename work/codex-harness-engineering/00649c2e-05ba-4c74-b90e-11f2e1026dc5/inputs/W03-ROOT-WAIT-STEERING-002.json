@@ -1,0 +1,22 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+  "kind": "input",
+  "id": "W03-ROOT-WAIT-STEERING-002",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/root-context-delta-002.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w03.root-orchestration-wait-policy.v1",
+    "atUtc": "2026-10-21T08:29:02.822187+00:00",
+    "actualUserInstruction": "timeout 5\ubc30\ub85c \ub298\ub824\ub77c, tool call \ube44\uc6a9 \uc544\ub07c\uae30 \uc704\ud568\uc774\ub2e4.",
+    "statusWaitTimeoutMs": 225000,
+    "previousStatusWaitTimeoutMs": 45000,
+    "instruction": "Use 225000ms for supported Herdr status/completion waits and reuse the same pending wait/process instead of starting repeated 45000ms waits. Keep host/API execution yielded so actual user input can still be handled. This does not change provider timeouts/retries, source/effect admission, model policy or stopping boundaries. Pull durable results on completion or material phase change, not repeated status prompts."
+  }
+}

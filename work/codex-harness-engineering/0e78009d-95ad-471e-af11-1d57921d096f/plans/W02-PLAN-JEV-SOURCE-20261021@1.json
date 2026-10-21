@@ -1,0 +1,19 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "kind": "plan",
+  "id": "W02-PLAN-JEV-SOURCE-20261021",
+  "revision": 1,
+  "specId": "W02-SPEC-JEV-SOURCE-20261021",
+  "specRevision": 1,
+  "objective": "Deliver F02/F04/F08/S04 in the canonical common Jev boundary.",
+  "clauses": [
+    "Pin authority, source and typed child packets; read selected official contracts before wire changes.",
+    "One implementation writer and one docs/independent verification high child share only this tab; serialize shared writes.",
+    "Implement typed currentness failure, fixed-role singleton routing, v2 direct typed primitives/actions and monotonic supplementation.",
+    "Freeze bytes, independently test imported consumers, run required affected/source-provider checks.",
+    "Scoped local commit/tree and typed results for Root pull; remain idle."
+  ]
+}

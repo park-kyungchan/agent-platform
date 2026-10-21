@@ -1,0 +1,127 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "kind": "input",
+  "id": "W02-SOURCE-VERIFICATION-ARTIFACT-20261021",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering:W02-SubLead",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/verification.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schemaVersion": "1.0.0",
+    "kind": "verification",
+    "id": "codex-harness-engineering:verification:w02-jev-source-20261021",
+    "projectId": "codex-harness-engineering",
+    "domainId": "native-harness",
+    "createdAt": "2026-10-21T07:54:32.904112+00:00",
+    "payload": {
+      "targetRefs": [
+        "common-harness:task:da448aeb14092ae8b52418f2ee5d9c72fed5df9f2765850bf6d74e0f0d533cc3"
+      ],
+      "criteria": [
+        {
+          "id": "F02",
+          "status": "pass",
+          "message": "One dispatched read retains typed unknown/no-retry and bounded original outcome through currentness/serialization/persistence failures.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:w02-source-check-results-20261021"
+          ]
+        },
+        {
+          "id": "S04-F08-role",
+          "status": "pass",
+          "message": "Fixed role/capability qualification precedes preparation; zero holds, singleton omits only profile Choice, independent questions and fresh permission remain.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:w02-source-check-results-20261021"
+          ]
+        },
+        {
+          "id": "F04",
+          "status": "pass",
+          "message": "Versioned direct Choice/Noul/Score/assets/Box and fixed typed actions pass positive/negative imported-source tests; native v1 holds unsupported v2.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:w02-source-check-results-20261021"
+          ]
+        },
+        {
+          "id": "F08-continuity",
+          "status": "pass",
+          "message": "Stable-item max-two counters, terminal results and completed/unknown fences survive synthetic handoff/restore without store or Goal.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:w02-source-check-results-20261021"
+          ]
+        },
+        {
+          "id": "required-checks",
+          "status": "pass",
+          "message": "Independent65-case exact-byte verification,158 source tests,28 legacy native tests, strict types/style and27-command source-owner CI including handoff/import/provider closure pass.",
+          "evidenceRefs": [
+            "codex-harness-engineering:evidence:w02-source-check-results-20261021"
+          ]
+        }
+      ],
+      "inputHashes": [
+        {
+          "path": "packages/work-continuity/src/jev/consume.ts",
+          "sha256": "0ac380ceea19cf338c3f6695d85b4458ed70da0f51bb1a58e085ac1e123ee569"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/contract.ts",
+          "sha256": "2bf6e88b4cf7ed353874aaaf1ffd754045aab307499a56666c2960656b31c305"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/direct.test.ts",
+          "sha256": "49c6f223d76062cbe0c6e08c11624da64bd5d34bd96d45836c85c1d681c285e6"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/direct.ts",
+          "sha256": "ab54251cae5ed7d452a73bd8c4413f4654195a2b9ec9c3a7a962b3db3366fe6b"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/index.ts",
+          "sha256": "1671d48b6c7137a57815a4445a7ee1897dd5513b9d6af3585d26a82814ee0333"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/policy.ts",
+          "sha256": "d5ff66931165b6e7f3e736718f3d22b98be5e48f72e2e478b183b062eaf3a3a4"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/semantic-decisions.test.ts",
+          "sha256": "1baa7d8b924984065e0e18475621ea7142a73e7a0f362ccd405373d6271a8c69"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/supplements.test.ts",
+          "sha256": "47251dbbe834bcf09744e255ee64990ac647ae958b1ea8eb10246ced97aea5bd"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/supplements.ts",
+          "sha256": "efa1657d840b19f0f1ecb603f1fd4f9a0dc4877927f1ec5751c07e32746ece1f"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/w02-independent.test.ts",
+          "sha256": "34d40e7af757c8194f6945f9d3ce259230aca89f224d71d194ae93f33452217d"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/workflows.test.ts",
+          "sha256": "803280ff16e31f2970632b304de8eb9fe333878e45e9355fe0c413a6499731d7"
+        },
+        {
+          "path": "packages/work-continuity/src/jev/workflows.ts",
+          "sha256": "c6be81899aaf5a01b446b7861e0243031912c86eee02be7ed4b23bc6f65fab25"
+        },
+        {
+          "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/verification.actual.json",
+          "sha256": "1824046c20830ede06e8e451c9b79aa291c0a38f4c0101e0ad6e004280b641bd"
+        }
+      ],
+      "runtime": {
+        "name": "Bun source-only verification",
+        "version": "1.4.3"
+      }
+    }
+  }
+}

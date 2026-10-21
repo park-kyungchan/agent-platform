@@ -1,10 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { JEV_MODEL, type SemanticEvent, type WholeLens, type NativeBinding } from "./contract.ts";
-import { canonicalJson } from "./policy.ts";
+import {
+  JEV_MODEL,
+  type SemanticEvent,
+  type WholeLens,
+  type NativeBinding,
+  type ChildAssignment,
+} from "./contract.ts";
+import { canonicalJson, semanticDigest, qualifyChildAssignmentAuthority } from "./policy.ts";
 import {
   prepareWorkflowDecision,
   normalizeWorkflowReply,
   recordNativeDelegationReceipt,
+  recordChildArtifactDisposition,
   type WorkflowInput,
   type WorkflowEvidence,
   type PreparedWorkflowDecision,
@@ -12,6 +19,49 @@ import {
   type NativeDelegationObservation,
 } from "./workflows.ts";
 
+const childAssignment = (): ChildAssignment => ({
+  schema: "jev.child-assignment.v1",
+  assignmentId: "child-assignment",
+  revision: 1,
+  status: "admitted",
+  actorId: "child-actor",
+  logical: {
+    domainId: "native-harness",
+    projectId: "project",
+    workId: "work",
+    issueId: "issue",
+    specId: "spec",
+    specRevision: 1,
+    planId: "plan",
+    planRevision: 1,
+    taskId: "child-task",
+  },
+  sourceRevision: "source-v1",
+  sourceClosure: { path: "closure.json", sha256: "a".repeat(64) },
+  packetDigest: "b".repeat(64),
+  parentAuthority: {
+    assignmentId: "parent-assignment",
+    revision: 1,
+    status: "active",
+    ownerId: "lead",
+    domainId: "native-harness",
+    projectId: "project",
+    workId: "work",
+    authorityReference: { path: "authority.json", sha256: "a".repeat(64) },
+  },
+  route: { kind: "native-child" },
+});
+const assignmentReference = (a = childAssignment()) => ({
+  assignmentId: a.assignmentId,
+  revision: a.revision,
+  assignmentDigest: semanticDigest(a),
+});
+const childAuthority = (a = childAssignment()) => ({
+  parentAuthority: structuredClone(a.parentAuthority),
+  childAssignment: assignmentReference(a),
+  childStatus: a.status,
+  carryForward: null,
+});
 const binding = (): NativeBinding => ({
   runtime: "native-codex",
   sessionId: "root",
@@ -76,6 +126,7 @@ const delegation = (): Extract<WorkflowInput, { kind: "delegation" }> => ({
     goal: "Review exact owned source.",
     packetDigest: "b".repeat(64),
     requiredPostconditionIds: ["exact-source-reviewed"],
+    expectedChild: childAssignment(),
   },
   profiles: [
     {
@@ -123,6 +174,9 @@ const prepare = (workflow: WorkflowInput): PreparedWorkflowDecision => {
 };
 const current = (p: PreparedWorkflowDecision): CurrentWorkflowBinding => ({
   authorized: true,
+  childAuthority: childAuthority(
+    p.workflow.kind === "delegation" ? p.workflow.taskPacket.expectedChild : undefined,
+  ),
   bindingDigest: p.bindingDigest,
   sourceRevision: p.sourceRevision,
   workflowDigest: p.workflowDigest,
@@ -134,7 +188,13 @@ const reply = (
   selected = "sol-low",
   confidence = 0.95,
 ): Record<string, unknown> => ({
-  schema: "jev.semantic-result.v1",
+  schema:
+    p.request.schema === "jev.semantic-request.v2"
+      ? "jev.semantic-result.v2"
+      : "jev.semantic-result.v1",
+  ...(p.request.consumptionPolicy
+    ? { consumptionPolicy: p.request.consumptionPolicy, requestDigest: p.requestDigest }
+    : {}),
   status: "ok",
   requestId: p.request.requestId,
   stateDigest: p.request.stateDigest,
@@ -167,6 +227,7 @@ const reply = (
 });
 const observation = (): NativeDelegationObservation => ({
   observationId: "native:dispatch-observation",
+  assignment: assignmentReference(),
   taskPacketDigest: delegation().taskPacket.packetDigest,
   requestedProfile: { profileId: "sol-low", model: "gpt-6.1-sol", effort: "low" },
   resolvedProfile: { profileId: "sol-low", model: "gpt-6.1-sol", effort: "low" },
@@ -176,6 +237,7 @@ const observation = (): NativeDelegationObservation => ({
     parentSessionId: "root",
     lineageSessionIds: ["root", "child"],
     admissionRef: "owner:child",
+    logical: childAssignment().logical,
   },
   status: "observed",
   postconditions: [
@@ -198,6 +260,7 @@ describe("ongoing parent-owned complete-profile recommendation", () => {
     ).toEqual(["sol-low", "sol-ultra", "__abstain"]);
     const changed = delegation();
     changed.taskPacket.packetDigest = "d".repeat(64);
+    changed.taskPacket.expectedChild!.packetDigest = changed.taskPacket.packetDigest;
     expect(prepare(changed).reuseKey).not.toBe(p.reuseKey);
     const advice = normalizeWorkflowReply(p, reply(p), current(p));
     expect(advice.selectedProfile?.effort).toBe("low");
@@ -594,4 +657,284 @@ describe("deterministic local-first retrieval and source-owned continuity", () =
     w.criteria[0]!.evidenceIds = ["source-0"];
     expect(() => prepare(w)).toThrow("WORKFLOW_MANDATORY_CONTEXT_BOUND");
   });
+});
+
+describe("exact child and parent authority revisions", () => {
+  const run = (o = observation(), modify?: (c: CurrentWorkflowBinding) => void) => {
+    const p = prepare(delegation()),
+      c = current(p);
+    modify?.(c);
+    return recordNativeDelegationReceipt({
+      prepared: p,
+      advice: normalizeWorkflowReply(p, reply(p), current(p)),
+      current: c,
+      observation: o,
+    });
+  };
+  test.each(["domainId", "projectId", "workId", "issueId", "specId", "planId", "taskId"] as const)(
+    "foreign child %s cannot verify",
+    (key) => {
+      const o = observation();
+      o.childBinding!.logical![key] = "foreign";
+      expect(run(o).status).toBe("held");
+    },
+  );
+  test.each(["specRevision", "planRevision"] as const)("stale child %s cannot verify", (key) => {
+    const o = observation();
+    o.childBinding!.logical![key]++;
+    expect(run(o).status).toBe("held");
+  });
+  test("null child logical, foreign assignment and stale assignment digest hold", () => {
+    const o = observation();
+    o.childBinding!.logical = null;
+    expect(run(o).status).toBe("held");
+    expect(
+      run({ ...observation(), assignment: { ...assignmentReference(), revision: 2 } }).status,
+    ).toBe("held");
+    expect(
+      run({
+        ...observation(),
+        assignment: { ...assignmentReference(), assignmentDigest: "0".repeat(64) },
+      }).status,
+    ).toBe("held");
+  });
+  test("historical unbound advice cannot produce a verified receipt", () => {
+    const w = delegation();
+    delete w.taskPacket.expectedChild;
+    const p = prepare(w),
+      c = current(p);
+    expect(
+      recordNativeDelegationReceipt({
+        prepared: p,
+        advice: normalizeWorkflowReply(p, reply(p), c),
+        current: c,
+        observation: observation(),
+      }).status,
+    ).toBe("held");
+  });
+  test("retired/revoked child or parent and stale parent revision cannot continue", () => {
+    for (const status of ["revoked", "retired"] as const) {
+      expect(
+        run(observation(), (c) => {
+          c.childAuthority!.parentAuthority.status = status;
+        }).status,
+      ).toBe("held");
+      expect(
+        run(observation(), (c) => {
+          c.childAuthority!.childStatus = status;
+        }).status,
+      ).toBe("held");
+    }
+    expect(
+      run(observation(), (c) => {
+        c.childAuthority!.parentAuthority.revision++;
+      }).status,
+    ).toBe("held");
+  });
+  test("explicit exact successor carries forward without result permission or replay", () => {
+    const a = childAssignment();
+    const c: NonNullable<CurrentWorkflowBinding["childAuthority"]> = childAuthority(a);
+    c.parentAuthority = { ...a.parentAuthority, revision: 2, ownerId: "successor" };
+    c.carryForward = {
+      schema: "jev.child-carry-forward.v1",
+      from: a.parentAuthority,
+      to: c.parentAuthority,
+      childAssignment: assignmentReference(a),
+      successorOwnerDecision: { path: "successor.json", sha256: "c".repeat(64) },
+      pendingAndUnknownEffects: [{ path: "unknown-effects.json", sha256: "d".repeat(64) }],
+      permitsReplay: false,
+    };
+    expect(qualifyChildAssignmentAuthority(a, c).status).toBe("carried-forward");
+    expect(
+      run(observation(), (current) => {
+        current.childAuthority = c;
+      }).status,
+    ).toBe("verified-native-delegation");
+    c.carryForward.childAssignment.revision++;
+    expect(qualifyChildAssignmentAuthority(a, c).status).toBe("held");
+  });
+  test("late result remains historical evidence under changed authority", () => {
+    const a = childAssignment(),
+      result = {
+        assignment: assignmentReference(a),
+        logical: a.logical,
+        sourceRevision: a.sourceRevision,
+        sourceClosure: a.sourceClosure,
+        packetDigest: a.packetDigest,
+        artifact: { path: "late-result.json", sha256: "e".repeat(64) },
+      };
+    const historical = recordChildArtifactDisposition({ assignment: a, result, readoption: null });
+    expect(historical.status).toBe("historical-evidence-only");
+    expect(historical.result).toEqual(result);
+    const c = childAuthority(a);
+    c.parentAuthority.status = "retired";
+    expect(
+      recordChildArtifactDisposition({
+        assignment: a,
+        result,
+        readoption: { current: c, ownerDecision: a.sourceClosure },
+      }).status,
+    ).toBe("historical-evidence-only");
+    expect(
+      recordChildArtifactDisposition({
+        assignment: a,
+        result,
+        readoption: { current: childAuthority(a), ownerDecision: a.sourceClosure },
+      }).status,
+    ).toBe("explicitly-readopted-artifact");
+    expect(historical.continuedEffectsAuthorizedByResult).toBe(false);
+    expect(historical.permitsReplay).toBe(false);
+  });
+  test("independent sessions use explicit observed assignment without fabricated ancestry", () => {
+    const o = observation(),
+      parent = event();
+    o.childBinding = {
+      ...binding(),
+      runtime: "native-hermes",
+      sessionId: "independent",
+      logical: childAssignment().logical,
+      rootSessionId: null,
+      parentSessionId: null,
+      lineageSessionIds: [],
+    };
+    const w = delegation(),
+      a = w.taskPacket.expectedChild!;
+    a.route = {
+      kind: "logical-assignment",
+      parentBindingDigest: semanticDigest(parent.binding),
+      childBindingDigest: semanticDigest(o.childBinding),
+      relationEvidenceRefs: ["native:observed-assignment"],
+    };
+    o.assignment = assignmentReference(a);
+    const p = prepare(w),
+      c = current(p),
+      advice = normalizeWorkflowReply(p, reply(p), c);
+    expect(
+      recordNativeDelegationReceipt({ prepared: p, advice, current: c, observation: o }).status,
+    ).toBe("verified-native-delegation");
+    expect(o.childBinding.parentSessionId).toBeNull();
+    o.childBinding.sessionId = "replacement";
+    expect(
+      recordNativeDelegationReceipt({ prepared: p, advice, current: c, observation: o }).status,
+    ).toBe("held");
+  });
+});
+
+describe("W02 fixed-role qualification before semantic preparation", () => {
+  const fixed = (): Extract<WorkflowInput, { kind: "delegation" }> => {
+    const workflow = delegation();
+    workflow.rolePolicy = {
+      schema: "jev.fixed-role-policy.v1",
+      role: "ordinary-child",
+      allowedTuples: [{ model: "gpt-6.1-sol", effort: "high" }],
+      authorizationRef: "user:fixed-child",
+      sourceRevision: "source-v1",
+      capabilityEvidenceRefs: ["native:fixed-capability"],
+    };
+    workflow.profiles = [{ ...workflow.profiles[0]!, profileId: "sol-high", effort: "high" }];
+    return workflow;
+  };
+  test("qualified singleton omits profile selection and keeps all independent semantic purposes", () => {
+    const p = prepare(fixed());
+    expect(p.selectionQuestionId).toBeNull();
+    expect(Object.values(p.questionMeanings)).toEqual([
+      "task_scope_satisfaction",
+      "worker_supervision",
+      "engineering_coverage",
+    ]);
+    const fresh = { ...current(p), rolePolicyDigest: semanticDigest(fixed().rolePolicy) };
+    const advice = normalizeWorkflowReply(p, reply(p), fresh);
+    expect(advice.status).toBe("advice");
+    expect(advice.selectedProfile?.effort).toBe("high");
+    expect(advice.deterministic).toBe(true);
+    expect(normalizeWorkflowReply(p, reply(p), current(p)).status).toBe("held");
+    const o = observation();
+    o.requestedProfile = o.resolvedProfile = {
+      profileId: "sol-high",
+      model: "gpt-6.1-sol",
+      effort: "high",
+    };
+    expect(
+      recordNativeDelegationReceipt({ prepared: p, advice, current: fresh, observation: o }).status,
+    ).toBe("verified-native-delegation");
+    o.resolvedProfile = { ...o.requestedProfile, effort: "low" };
+    expect(
+      recordNativeDelegationReceipt({ prepared: p, advice, current: fresh, observation: o }).status,
+    ).toBe("held");
+  });
+  test("zero tuples hold before semantic event preparation and off-policy profiles cannot enter routing", () => {
+    for (const profiles of [
+      [],
+      delegation().profiles,
+      [{ ...fixed().profiles[0]!, availability: "unknown" as const }],
+    ]) {
+      const workflow = { ...fixed(), profiles };
+      // Even malformed semantic facts are never reached once the fixed capability set is empty.
+      expect(
+        prepareWorkflowDecision({
+          requestId: "zero",
+          event: { ...event(), facts: undefined as never },
+          lens: lens(),
+          workflow,
+        }),
+      ).toEqual({ status: "held", reason: "no-authorized-available-native-profile" });
+    }
+    const workflow = fixed();
+    workflow.profiles.push({
+      ...workflow.profiles[0]!,
+      profileId: "reviewer-exception",
+      model: "gpt-6-astra",
+      effort: "xhigh",
+    });
+    expect(prepare(workflow).selectionQuestionId).toBeNull();
+    workflow.rolePolicy!.allowedTuples = [{ model: "gpt-6-astra", effort: "xhigh" }];
+    expect(() => prepare(workflow)).toThrow("WORKFLOW_FIXED_ROLE_POLICY_REQUIRED");
+  });
+  test("explicit future multi-candidate role routing retains its question", () => {
+    const workflow = fixed();
+    workflow.rolePolicy!.role = "explicit-routing";
+    workflow.rolePolicy!.allowedTuples.push({ model: "gpt-6.1-sol", effort: "low" });
+    workflow.profiles.push(delegation().profiles[0]!);
+    expect(prepare(workflow).selectionQuestionId).not.toBeNull();
+  });
+});
+test("direct-v2 delegation requires typed role policy before any semantic question preparation", () => {
+  expect(
+    prepareWorkflowDecision({
+      requestId: "v2-no-policy",
+      event: { ...event(), facts: undefined as never },
+      lens: lens(),
+      workflow: delegation(),
+      consumptionPolicy: "jev.direct-selected-answer.v2",
+    }),
+  ).toEqual({ status: "held", reason: "direct-delegation-fixed-role-policy-required" });
+});
+test("explicit direct-v2 multi-profile policy consumes the selected allowed low-confidence tie without a second judge", () => {
+  const workflow = delegation();
+  workflow.rolePolicy = {
+    schema: "jev.fixed-role-policy.v1",
+    role: "explicit-routing",
+    allowedTuples: [
+      { model: "gpt-6.1-sol", effort: "low" },
+      { model: "gpt-6.1-sol", effort: "ultra" },
+    ],
+    authorizationRef: "user:explicit-future-routing",
+    sourceRevision: "source-v1",
+    capabilityEvidenceRefs: ["native:qualified-capability"],
+  };
+  const p = prepare(workflow),
+    raw = reply(p, {}, "sol-low", 0);
+  (raw.answers as Record<string, unknown>)[p.selectionQuestionId!] = {
+    type: "choice",
+    choice: "sol-low",
+    confidence: 0,
+    probabilities: { "sol-low": 0.5, "sol-ultra": 0.5, __abstain: 0 },
+  };
+  const advice = normalizeWorkflowReply(p, raw, {
+    ...current(p),
+    rolePolicyDigest: semanticDigest(workflow.rolePolicy),
+  });
+  expect(advice.status).toBe("advice");
+  expect(advice.selectedProfile?.profileId).toBe("sol-low");
+  expect(advice.deterministic).toBe(false);
 });

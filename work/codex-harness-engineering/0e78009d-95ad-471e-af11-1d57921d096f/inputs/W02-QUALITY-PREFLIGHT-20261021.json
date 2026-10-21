@@ -1,0 +1,176 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "kind": "input",
+  "id": "W02-QUALITY-PREFLIGHT-20261021",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality.preflight.request.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "protocol": {
+      "schema": "common.quality-improvement.v1",
+      "work": {
+        "projectId": "codex-harness-engineering",
+        "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+        "workRef": {
+          "ref": "/home/palantirkc/worktrees/jev-w02-common-source-20261021/work/codex-harness-engineering/0e78009d-95ad-471e-af11-1d57921d096f/work.json",
+          "version": "1",
+          "sha256": "312308a0ddc430c6f36cda3a086c3ca7acb85a649cd29b06e9335405dae69f1f"
+        },
+        "specRef": {
+          "ref": "/home/palantirkc/worktrees/jev-w02-common-source-20261021/work/codex-harness-engineering/0e78009d-95ad-471e-af11-1d57921d096f/specs/W02-SPEC-JEV-SOURCE-20261021@1.json",
+          "version": "1",
+          "sha256": "fe9aab8a0af711664db092d0c658c7820bd4516033c32b4d0f73bea1bb3a4468"
+        },
+        "planRef": {
+          "ref": "/home/palantirkc/worktrees/jev-w02-common-source-20261021/work/codex-harness-engineering/0e78009d-95ad-471e-af11-1d57921d096f/plans/W02-PLAN-JEV-SOURCE-20261021@1.json",
+          "version": "1",
+          "sha256": "e14056a82b2690fdc9c15518f75fb8d3c9271496b82875f509b11b2ad1f7301e"
+        }
+      },
+      "target": {
+        "baseline": {
+          "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality.baseline-target.json",
+          "version": "fbc3a8a0e674b0dc0a1c31ed7c5e1c366fe6be4b",
+          "sha256": "cc4e60db3ca4bf519f2491e3777503667ce6896dc4d2d85c7620c50ce7c4a380"
+        },
+        "candidate": {
+          "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality.candidate-target.json",
+          "version": "w02-source-treatment@1",
+          "sha256": "eb71654abc56bde799a49ea691b1fcdf430db2081379bdf31e4a088b4b0014a7"
+        }
+      },
+      "goal": "Preserve one dispatched read and original outcome through malformed/absent post-read currentness; fresh successful reads remain verified.",
+      "validation": {
+        "dataset": {
+          "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality.dataset.json",
+          "version": "1",
+          "sha256": "c176d15a6a7f193e8e7df66129be8f4692918fb6d798dc954ddc7319874e0c2d"
+        },
+        "expectedBehavior": {
+          "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality.dataset.json",
+          "version": "1",
+          "sha256": "c176d15a6a7f193e8e7df66129be8f4692918fb6d798dc954ddc7319874e0c2d"
+        },
+        "independenceEvidence": {
+          "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality.independence.json",
+          "version": "1",
+          "sha256": "c68a8780eb893e687871abf53d57502e390de7dd08fb1f74376c54343d6dda24"
+        },
+        "inputSha256": "c176d15a6a7f193e8e7df66129be8f4692918fb6d798dc954ddc7319874e0c2d",
+        "contextSha256": "25b8064b762e90480ffc39f4229bf5428ef6feadf654e3eac2168ed82bf4bf4f",
+        "environmentSha256": "18983dc9da8d9c9cdcded68a97ee9aa3a06df0543472bb591e6ac726e362b0ea",
+        "consumers": [
+          {
+            "id": "consumeReadonlySelection",
+            "version": "source-api-v1"
+          }
+        ],
+        "iterations": 1,
+        "criteria": [
+          {
+            "id": "null-post-currentness",
+            "caseId": "null-post-currentness",
+            "evaluator": {
+              "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality-evaluator.ts",
+              "version": "1",
+              "sha256": "cbd16e30be0a5123a444565a62db73b1bddd1d9f19cc7ab424c1ca22aa7c71bc"
+            },
+            "objectiveVersion": "F02@dispatch-1",
+            "thresholdVersion": "exact-receipt@1",
+            "verificationClass": "deterministic-verified",
+            "kind": "behavior"
+          },
+          {
+            "id": "undefined-post-currentness",
+            "caseId": "undefined-post-currentness",
+            "evaluator": {
+              "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality-evaluator.ts",
+              "version": "1",
+              "sha256": "cbd16e30be0a5123a444565a62db73b1bddd1d9f19cc7ab424c1ca22aa7c71bc"
+            },
+            "objectiveVersion": "F02@dispatch-1",
+            "thresholdVersion": "exact-receipt@1",
+            "verificationClass": "deterministic-verified",
+            "kind": "behavior"
+          },
+          {
+            "id": "malformed-post-currentness",
+            "caseId": "malformed-post-currentness",
+            "evaluator": {
+              "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality-evaluator.ts",
+              "version": "1",
+              "sha256": "cbd16e30be0a5123a444565a62db73b1bddd1d9f19cc7ab424c1ca22aa7c71bc"
+            },
+            "objectiveVersion": "F02@dispatch-1",
+            "thresholdVersion": "exact-receipt@1",
+            "verificationClass": "deterministic-verified",
+            "kind": "behavior"
+          },
+          {
+            "id": "throw-post-currentness",
+            "caseId": "throw-post-currentness",
+            "evaluator": {
+              "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality-evaluator.ts",
+              "version": "1",
+              "sha256": "cbd16e30be0a5123a444565a62db73b1bddd1d9f19cc7ab424c1ca22aa7c71bc"
+            },
+            "objectiveVersion": "F02@dispatch-1",
+            "thresholdVersion": "exact-receipt@1",
+            "verificationClass": "deterministic-verified",
+            "kind": "control"
+          },
+          {
+            "id": "fresh-post-currentness",
+            "caseId": "fresh-post-currentness",
+            "evaluator": {
+              "ref": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality-evaluator.ts",
+              "version": "1",
+              "sha256": "cbd16e30be0a5123a444565a62db73b1bddd1d9f19cc7ab424c1ca22aa7c71bc"
+            },
+            "objectiveVersion": "F02@dispatch-1",
+            "thresholdVersion": "exact-receipt@1",
+            "verificationClass": "deterministic-verified",
+            "kind": "control"
+          }
+        ]
+      },
+      "allowedChanges": [
+        "packages/work-continuity/src/jev/",
+        "work/codex-harness-engineering/0e78009d-95ad-471e-af11-1d57921d096f/"
+      ],
+      "limits": {
+        "maxCaseResults": 10,
+        "maxDurationMs": 120000,
+        "maxTotalTokens": 0
+      },
+      "decision": {
+        "ownerId": "codex-harness-engineering:RootLead",
+        "reviewRequired": true
+      }
+    },
+    "preflight": {
+      "status": "ready-for-comparison",
+      "outcome": "insufficient",
+      "findings": [],
+      "evidenceRefs": [],
+      "transitions": [],
+      "authority": "none",
+      "nativePermissionGranted": false,
+      "sourceAuthenticityVerified": false,
+      "actualExposureAuthenticated": false,
+      "acceptanceEstablished": false
+    },
+    "baselineObservation": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/quality.baseline.observation.actual.json",
+      "sha256": "ac88795a15cc7d13ae9bad9b12099eee1a8538cf39688bab6b20d43122183b5a"
+    },
+    "candidateObservation": null,
+    "scope": "Only F02 source behavior; monetary/latency effects unknown. Other repairs use scoped source verification without measured gain claims."
+  }
+}

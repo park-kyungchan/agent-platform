@@ -1,0 +1,35 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "1bd226cb-234b-4579-ac2f-dce2045e3d1d",
+  "kind": "task",
+  "id": "c2750f2a-1821-4801-94e8-edbe7275bfe6",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "1bd226cb-234b-4579-ac2f-dce2045e3d1d",
+    "issueId": "W01-ISSUE-SOURCE-CONTRACTS-20261021",
+    "specId": "W01-SPEC-SOURCE-CONTRACTS-20261021",
+    "specRevision": 1,
+    "planId": "W01-PLAN-SOURCE-CONTRACTS-20261021",
+    "planRevision": 1,
+    "taskId": "c2750f2a-1821-4801-94e8-edbe7275bfe6"
+  },
+  "title": "NEW-ACTOR-PLACEMENT",
+  "nextAction": "Root verifies the exact source/tree and required reviewed successor pins. Native adoption, canonical registration and Work Acceptance remain held.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [],
+  "effectIds": [],
+  "verificationEvidenceIds": [
+    "W01-SOURCE-VERIFICATION-20261021"
+  ]
+}

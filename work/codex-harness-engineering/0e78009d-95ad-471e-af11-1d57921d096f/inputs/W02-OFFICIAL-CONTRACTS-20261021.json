@@ -1,0 +1,30 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "kind": "input",
+  "id": "W02-OFFICIAL-CONTRACTS-20261021",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/official-contracts.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w02.official-contract-pins.v1",
+    "evidence": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/official-contracts.actual.json",
+      "sha256": "7b1951af106eedda7a7282c5cc7046fca6f2e0ddaf194a42160b4d94fc690f6e"
+    },
+    "modelPin": "jev-1.14.0",
+    "sourceCount": 10,
+    "retrievalMethod": "Selected Scrapling retrieval with TLS verification; no fallback; bounded JSON extracts.",
+    "consumerMapping": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/consumer-mapping.actual.json",
+      "sha256": "54f110efee6a5153757bb9e52c4f0697383c5fac8a9b1951e7f08bedfeeeba1c"
+    },
+    "protocol": "Explicit common v2 for direct Choice/Noul/Score/assets/Box and actions; native v1 parser holds unsupported v2.",
+    "nativeAdoptionEstablished": false
+  }
+}

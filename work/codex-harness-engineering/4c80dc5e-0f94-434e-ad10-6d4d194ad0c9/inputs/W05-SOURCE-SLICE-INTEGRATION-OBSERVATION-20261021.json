@@ -1,0 +1,307 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "4c80dc5e-0f94-434e-ad10-6d4d194ad0c9",
+  "kind": "input",
+  "id": "W05-SOURCE-SLICE-INTEGRATION-OBSERVATION-20261021",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering:W05-SubLead",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/progress.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w05.source-slice-integration-observation.v1",
+    "recordedAtUtc": "2026-10-21T10:15:54.270339+00:00",
+    "evidence": [
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/root-publication-context-001.json",
+        "sha256": "4a4a63660c007216e00d0130f2770935bfbe751b754df06fe7431f34081521ae",
+        "bytes": 2821
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/root-closure-delta-002.json",
+        "sha256": "3fad787ea1d0baefded31c69dd6e2ce45908c67eadb670b6c4e4da629e5d3cc0",
+        "bytes": 1393
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/root-test-fixture-delta-003.json",
+        "sha256": "60262176bf1b61a74a37f34e8e22259f8c478cfda4cd9e10cdfbcbe669eb0da3",
+        "bytes": 1722
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/common.result.json",
+        "sha256": "ba907a3d157f8ef61964e41d1d4131d31d5ed0f21e585de41007079b5dffcce7",
+        "bytes": 23688
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/common.dependencies.integration-final.json",
+        "sha256": "2d0dfa47d3bd9c4f6288d3eefb737c7137a33be416e62149daa8d073373d7850",
+        "bytes": 14658
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/common.integration-successor.actual.json",
+        "sha256": "afef7309f9bc012438eaf6453a786a733627dd3ebf1413c5c7160ecc31cb693a",
+        "bytes": 1236
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/sublead.final-cross-language-checks.actual.json",
+        "sha256": "f9cb73fc6186af9511f412a634fc3e0058f519bf50c52b1d8feaf3ec619ba7ef",
+        "bytes": 3664
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/common-quality.final.json",
+        "sha256": "86dbbaa495bd6bbda79ccffbe7cf0e6ba197ddf63e6246c2a070fe28aaac63c5",
+        "bytes": 250954
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/generated-owner-qa-readback.actual.json",
+        "sha256": "5f2c9fe27dc1c54d59e47179792ae82331acbbdc2cf1a6a55bb2d5a0d86189d0",
+        "bytes": 798
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/finite-codex-owner-source-readback.actual.json",
+        "sha256": "b9c18b50d2006bba012c477dd613df7c82f51244b0847738064714f3a6105935",
+        "bytes": 2955
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/native-identities.actual.json",
+        "sha256": "a685241976b56f6186cb12af5315b046414547a0c9b620c4075a23cdbe61899d",
+        "bytes": 1388
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/common.closure.actual.json",
+        "sha256": "4d97bf9d1ecd2e6e393dd9a0cf3227e7bd751d4c6ad56c45b6085e2907c1126e",
+        "bytes": 267
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/root-fixture-contract-delta-004.json",
+        "sha256": "dd3ac2bd1e7f07bfadc7090edc51d1be2a803aad2d589c32fe6752f923b167e1",
+        "bytes": 2463
+      }
+    ],
+    "singleCanonicalWorkBundle": true,
+    "counterpartRepository": {
+      "repository": "park-kyungchan/codex-harness-engineering",
+      "branch": "work/jev-w05-integration-repair-20261021",
+      "baseCommit": "e1d6a8ae9c723679604fc88a599509bd8ff9e53f",
+      "sourceComponents": [
+        {
+          "repository": "park-kyungchan/codex-harness-engineering",
+          "path": "src/native/jev-hook.ts",
+          "sha256": "634b2672b11c36e9cfffa35705c6f0fd98957443c549758b0f522f9e7ed026e6",
+          "observation": "Source component observation; final independent two-repository commit/tree binding is retained outside this self-referential source commit."
+        },
+        {
+          "repository": "park-kyungchan/codex-harness-engineering",
+          "path": "src/native/jev-cli.ts",
+          "sha256": "6796b5b20f99e45445e312450b328761fe4212b0d05b95be1f5abd913146a395",
+          "observation": "Source component observation; final independent two-repository commit/tree binding is retained outside this self-referential source commit."
+        },
+        {
+          "repository": "park-kyungchan/codex-harness-engineering",
+          "path": "src/native/jev-consumer-cli.ts",
+          "sha256": "56ff641eeabbd39c362dec11d9b9800e24d03349b3ad09827a74c8d27de5f43e",
+          "observation": "Source component observation; final independent two-repository commit/tree binding is retained outside this self-referential source commit."
+        }
+      ],
+      "workRecords": "This Work bundle is the one owning record store; host branch does not duplicate it."
+    },
+    "commonSourceArtifacts": [
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "bun.lock",
+        "sha256": "423ea4c01100bf11d34eedb3357dc19d15d2b0e2806937120ebc843404a139f0"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "package.json",
+        "sha256": "a2d83cc9464156a83b3f6536517923fceb6b20bd7d36d29b214fcfc81dfa11e5"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/contract.schema.json",
+        "sha256": "0eab394ec6caa0f96ec1f5b7f857e5b04f7ca65c6d3901b86d9995d29396c5ef"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/fixtures/native-caller.pin.json",
+        "sha256": "c9038593d3c89902b369fb8f0c9c8d6ef26605e12525bf071965226eff1141e9"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/fixtures/native-caller.py",
+        "sha256": "dd72953016d12fdc730235dece88e635b58573042544b77e890b5d64566af71d"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/fixtures/pinned_jevkit/client.py",
+        "sha256": "63915a3925e074b3d314c65bd2eaf4146523c7b3e3692dd0814440c739493f5c"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/fixtures/pinned_jevkit/images.py",
+        "sha256": "4a711bb42e9d303a6c65427f4cacf192792afa291ef4cf9ebc73ab17cf563331"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/fixtures/pinned_jevkit/keystore.py",
+        "sha256": "a3fdc653a473b4c24cb6cf8b77fcfb24b599e38026650cb4fd28fdc7795d39dc"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/fixtures/pinned_jevkit/source-pins.json",
+        "sha256": "2a6fa411dd97af1c027e19938eacb76cd05d95f2ff85890d7c450d2f8a82c883"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/fixtures/predecessor_v1_caller.pin.json",
+        "sha256": "6805174087b0e3cbf2638a8e383f2092e027c2776b1412616aafb5bb8134838b"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/fixtures/predecessor_v1_caller.py",
+        "sha256": "d4dd5c91598869f436009a4ba50de67d430b7be04b584da29a8f86d44e2dcca5"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/semantic_caller.py",
+        "sha256": "317d81524528bf8ef019272cef8a125ee26bcd6de1a276cc9b2dfd36cacb1aca"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/shared_accounting.py",
+        "sha256": "e7990104dfdabacd34be4fa100a44fae19f08578981f246b3da4258c9891cdbd"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/test_independent_v2.py",
+        "sha256": "3c2573c22fb157281db38b2ba42b6c70f32b30e3387970d089a0ac8f547ebd85"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/test_result_receipts.py",
+        "sha256": "dcb27cb001917ea3cb58f77d1382658d654e2b811619bc5f5d1cd5c8e8850b05"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/test_semantic_caller.py",
+        "sha256": "49a42047a1d11543d8390416dac5a78afeb11c879097a7c3e1526f4b44f98b7b"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/test_shared_accounting.py",
+        "sha256": "5bfba979d3ce60ac780969ec55abab1b2d96e2d5000d764333af576d0c3f453e"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/test_v2_contract.py",
+        "sha256": "858c9b339a4139bf3f1217f7f351b39689b575efd4d24cf7e370ae81ee584a16"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/test_w05_common_integration.py",
+        "sha256": "ff252e6be0ec49e476c6fb7865d64c416faeb6c0a88cc500a3c128f99eaefc52"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/native-hermes-adapter/native/jev/v2_contract.py",
+        "sha256": "816ddcf8d9003817a09be7b0573680bcdfcdcf5586e549443646569f4235aeae"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/consume.ts",
+        "sha256": "0ac380ceea19cf338c3f6695d85b4458ed70da0f51bb1a58e085ac1e123ee569"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/contract.ts",
+        "sha256": "a3b9030ada9fec0a0c04687bd3b7dbc4fdba2a8b36dd3de5a8eddd89310a2539"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/direct.test.ts",
+        "sha256": "b594bfa36883257015975c5699b496ab36c4827812e75a2569797647c377369d"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/direct.ts",
+        "sha256": "1559b7f25b27f762b8fcd4afc2a79bc1f8d70dfed3676ba77efc92f08f6e3ead"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/index.ts",
+        "sha256": "1671d48b6c7137a57815a4445a7ee1897dd5513b9d6af3585d26a82814ee0333"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/policy.ts",
+        "sha256": "67b4c16c57ea2df09af6d518daeabe607c8ddd7e7c7f7b3ab3add6a77c8775eb"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/semantic-decisions.test.ts",
+        "sha256": "5f547ac72a7952bf1400335ec1d9feed102f8715cdfca4df987b0cb6aa2e34ae"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/supplements.test.ts",
+        "sha256": "47251dbbe834bcf09744e255ee64990ac647ae958b1ea8eb10246ced97aea5bd"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/supplements.ts",
+        "sha256": "efa1657d840b19f0f1ecb603f1fd4f9a0dc4877927f1ec5751c07e32746ece1f"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/w02-independent.test.ts",
+        "sha256": "c22c5714538af4bbb2f6f7f6b355398a825f8474323484f32e0a073d41716910"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/w05-integration.test.ts",
+        "sha256": "fc0c5a5b189f0e7d806f7a8c3db7805d4901c7b579e90f5848b34486add9c74e"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/workflows.test.ts",
+        "sha256": "57ac5b9689dff4b44cd78bb4f520c95d12ebb37a0020090231d807c756c9a6ff"
+      },
+      {
+        "repository": "park-kyungchan/agent-platform",
+        "path": "packages/work-continuity/src/jev/workflows.ts",
+        "sha256": "c6be81899aaf5a01b446b7861e0243031912c86eee02be7ed4b23bc6f65fab25"
+      }
+    ],
+    "sourceOnlyResult": "W05-I01/I03 and compatibility controls implemented. Common final source passes87 unique Python tests,15 focused final integration/direct tests,161 full Jev tests and39 handoff tests; all14 quality gates pass on final closure. Exact full source QA and fresh independent head/tree review are separate publication gates.",
+    "publicationState": "Root owns all publication/status/PR/explicit merge/main/handoff/cleanup effects. Exact final two-repository source heads, trees and independent reviewer outputs live in the separately retained execution output/result.json and publication evidence; this source commit does not self-authenticate future review.",
+    "nativeSourceAuthorRole": {
+      "runtime": "native-codex",
+      "threadId": "01a15dd8-a97e-7671-be07-f9df08a5ad62",
+      "model": "gpt-6.1-sol",
+      "effort": "ultra",
+      "role": "SubLead integration author; actual high child source provenance retained in common.result and host.result; no actor/model/source substitution",
+      "nativeTaskId": null,
+      "nativeRunId": null
+    },
+    "logicalTaskState": "The continuing CI-SUCCESSOR-ADOPTION Task retains running/pending overall state: broader shared publication/adoption and native owner qualification are not established by a local source slice. No formal completion or AcceptanceDecision is created.",
+    "remainingOwnerGates": [
+      "Actual native child logical/current-authority join and its eligible positive host delegation receipt",
+      "Images/Box and documented client subset qualification",
+      "Actual native hook/action/restore and other CLI use",
+      "Source/descriptor/helper distribution, each native owner readback and explicit activation",
+      "Original residual leaves, preserved unknown USD14 effects and whole/domain/human Acceptance"
+    ],
+    "effects": {
+      "providerRequests": 0,
+      "nativeActivation": false,
+      "activeRegistrationChanges": false,
+      "credentialsRead": false,
+      "realLedgerRead": false,
+      "gitHubOrMainEffects": false,
+      "GoalLifecycle": 0
+    }
+  }
+}

@@ -714,3 +714,186 @@ test("partial native ancestry never qualifies as a fully verified inherited chil
     prepare({ event: { ...event(), binding: { ...binding(), lineageSessionIds: [] } } }),
   ).toThrow("INVALID_NATIVE_SEMANTIC_BINDING");
 });
+
+describe("W02 F02 post-dispatch failure boundary", () => {
+  for (const after of [null, undefined, {}, { authorized: true }, { evidenceRefs: 7 }])
+    test(`missing or malformed post-read owner state preserves a single dispatch: ${JSON.stringify(after)}`, async () => {
+      const p = prepare(),
+        decision = normalizeSemanticReply(p, reply(p));
+      let reads = 0,
+        observations = 0;
+      const original = {
+        status: "observed" as const,
+        observationId: "read:completed",
+        evidenceRefs: ["read:source"],
+        postconditionSatisfied: true,
+      };
+      const result = await consumeReadonlySelection({
+        prepared: p,
+        decision,
+        handlers: new Map([
+          [
+            "native.read-source",
+            async () => {
+              reads++;
+              return original;
+            },
+          ],
+        ]),
+        observeCurrent: async () =>
+          (++observations === 1 ? current(p) : after) as CurrentReadBinding,
+      });
+      expect(result.status).toBe("read-unknown");
+      expect(result.dispatched).toBe(true);
+      expect(result.retryAllowed).toBe(false);
+      expect(result.observation).toEqual(original);
+      expect(reads).toBe(1);
+      expect(() => JSON.stringify(result)).not.toThrow();
+    });
+  test("candidate digest failure after execution and receipt serialization failure are typed unknown", async () => {
+    for (const failure of ["digest", "serialization"] as const) {
+      const p = prepare(),
+        decision = normalizeSemanticReply(p, reply(p));
+      const observation = {
+        status: "observed" as const,
+        observationId: "read:done",
+        evidenceRefs: ["source:done"],
+        postconditionSatisfied: true,
+      };
+      const result = await consumeReadonlySelection({
+        prepared: p,
+        decision,
+        handlers: new Map([
+          [
+            "native.read-source",
+            async () => {
+              if (failure === "digest")
+                (p.candidates[0]!.parameters as Record<string, unknown>).invalid = BigInt(1);
+              else Object.assign(observation, { invalid: BigInt(1) });
+              return observation;
+            },
+          ],
+        ]),
+        observeCurrent: async () => current(p),
+      });
+      expect(result.status).toBe("read-unknown");
+      expect(result.dispatched).toBe(true);
+      expect(result.retryAllowed).toBe(false);
+      expect(result.failure?.boundary).toBe(
+        failure === "digest" ? "post-read" : "receipt-serialization",
+      );
+      expect(() => JSON.stringify(result)).not.toThrow();
+    }
+  });
+  test("existing owner persistence failure preserves original outcome without a second write", async () => {
+    const { persistReadConsumptionReceipt } = await import("./index.ts");
+    const p = prepare(),
+      decision = normalizeSemanticReply(p, reply(p));
+    const original = await consumeReadonlySelection({
+      prepared: p,
+      decision,
+      handlers: new Map([
+        [
+          "native.read-source",
+          async () => ({
+            status: "observed",
+            observationId: "read:done",
+            evidenceRefs: ["source:done"],
+            postconditionSatisfied: true,
+          }),
+        ],
+      ]),
+      observeCurrent: async () => current(p),
+    });
+    let writes = 0;
+    const result = await persistReadConsumptionReceipt(original, async () => {
+      writes++;
+      throw Error("owner write ambiguous");
+    });
+    expect(result.status).toBe("storage-unknown");
+    expect(result.receipt.dispatched).toBe(true);
+    expect(result.receipt.failure?.originalStatus).toBe("verified-read");
+    expect(result.receipt.failure?.originalObservationId).toBe("read:done");
+    expect(writes).toBe(1);
+    expect(result.retryAllowed).toBe(false);
+    expect(() => JSON.stringify(result)).not.toThrow();
+    Object.assign(original, { invalid: BigInt(1) });
+    const serialization = await persistReadConsumptionReceipt(original, async () => {
+      writes++;
+    });
+    expect(serialization.receipt.failure?.boundary).toBe("receipt-serialization");
+    expect(serialization.receipt.dispatched).toBe(true);
+    expect(writes).toBe(1);
+  });
+});
+
+test("direct-v2 consumes an allowed tied selection while explicit legacy v1 still abstains", async () => {
+  const p = prepare({ consumptionPolicy: "jev.direct-selected-answer.v2" });
+  const raw = reply(p);
+  raw.schema = "jev.semantic-result.v2";
+  raw.consumptionPolicy = "jev.direct-selected-answer.v2";
+  raw.requestDigest = p.requestDigest;
+  (raw.answers as Record<string, unknown>)[p.selectionQuestionId!] = {
+    type: "choice",
+    choice: "read-source",
+    confidence: 0,
+    probabilities: { "read-source": 0.5, [ABSTAIN_ID]: 0.5 },
+  };
+  const selected = normalizeSemanticReply(p, raw);
+  expect(selected.selectedCandidateId).toBe("read-source");
+  expect(selected.nativeChoiceConfidence).toBe(0);
+  expect(
+    (
+      await consumeReadonlySelection({
+        prepared: p,
+        decision: selected,
+        handlers: new Map([
+          [
+            "native.read-source",
+            async () => ({
+              status: "observed",
+              observationId: "source:direct-read",
+              evidenceRefs: ["source:checked"],
+              postconditionSatisfied: true,
+            }),
+          ],
+        ]),
+        observeCurrent: async () => current(p),
+      })
+    ).status,
+  ).toBe("verified-read");
+  expect(() => normalizeSemanticReply(p, { ...raw, schema: "jev.semantic-result.v1" })).toThrow();
+  const legacy = prepare();
+  expect(() => normalizeSemanticReply(legacy, raw)).toThrow();
+});
+
+test("reused mutable native current binding cannot rewrite the original pre-read authorization or source", async () => {
+  const p = prepare(),
+    reused = current(p);
+  let observes = 0;
+  const result = await consumeReadonlySelection({
+    prepared: p,
+    decision: normalizeSemanticReply(p, reply(p)),
+    handlers: new Map([
+      [
+        "native.read-source",
+        async () => ({
+          status: "observed",
+          observationId: "read:original",
+          evidenceRefs: ["source:one"],
+          postconditionSatisfied: true,
+        }),
+      ],
+    ]),
+    observeCurrent: async () => {
+      if (++observes > 1) {
+        reused.sourceRevision = "changed";
+        reused.authorizationRef = "changed-permission";
+      }
+      return reused;
+    },
+  });
+  expect(result.status).toBe("read-unknown");
+  expect(result.dispatched).toBe(true);
+  expect(result.retryAllowed).toBe(false);
+});

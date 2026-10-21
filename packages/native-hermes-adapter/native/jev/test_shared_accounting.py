@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from shared_accounting import AccountingHeld, ExistingLedger, MODEL, OWNER
+from shared_accounting import AccountingHeld, DIRECT_POLICY, ExistingLedger, MODEL, OWNER
 
 PRICING = {'model': MODEL, 'inputUsdPerToken': 0.000000042,
            'outputUsdPerToken': 0, 'evidenceSha256': 'a' * 64}
@@ -29,6 +29,18 @@ def response(index=1, count=1):
             'submittedRequestSha256': f'{index:064x}', 'stateDigest': 'b' * 64,
             'requestedModel': MODEL, 'returnedModel': MODEL, 'status': 'ok',
             'sourcePostconditionVerified': True, 'transportInvocations': count}
+
+
+def v2_contract(**updates):
+    return {'requestSchema': 'jev.semantic-request.v2', 'resultSchema': 'jev.semantic-result.v2',
+            'consumptionPolicy': DIRECT_POLICY, 'requestDigest': 'c' * 64, **updates}
+
+
+def v2_response(index=1, count=1, **updates):
+    return {**response(index, count), 'schema': 'jev.semantic-result.v2',
+            'consumptionPolicy': DIRECT_POLICY, 'requestDigest': 'c' * 64,
+            'purpose': 'semantic_bundle', 'connectionLeases': count,
+            'executionAuthorityGranted': False, 'automaticWrite': False, **updates}
 
 
 def concurrent_reserve(path, index, barrier, output):
@@ -213,6 +225,119 @@ class AccountingTests(unittest.TestCase):
         self.assertEqual(current['calls'][:10], self.legacy)
         self.assertEqual(current['inferenceRequestsDispatched'], 14)
         self.assertEqual(current['unreconciledReserveUsd'], 1.04)
+
+    def test_v1_admission_and_historical_rows_do_not_gain_v2_metadata(self):
+        admitted = self.owner.reserve(**arguments())
+        self.assertNotIn('semanticContract', admitted['admission'])
+        self.owner.reconcile(request_id='synthetic-1', request_sha256=f'{1:064x}', result=response())
+        ledger = self.ledger()
+        self.assertEqual(ledger['calls'][:10], self.legacy)
+        self.assertNotIn('semanticContract', ledger['calls'][-1])
+
+    def test_v2_explicit_reservation_metadata_pending_and_idempotent_result(self):
+        admission = self.owner.reserve(**arguments(semantic_contract=v2_contract()))
+        self.assertEqual(admission['admission']['semanticContract'], v2_contract())
+        self.assertEqual(self.owner.pending()['pending'][0]['semanticContract'], v2_contract())
+        args = {'request_id': 'synthetic-1', 'request_sha256': f'{1:064x}', 'result': v2_response()}
+        self.owner.reconcile(**args)
+        after = self.path.read_bytes()
+        self.assertTrue(self.owner.reconcile(**args)['alreadyReconciled'])
+        self.assertEqual(self.path.read_bytes(), after)
+        self.assertEqual(self.ledger()['calls'][:10], self.legacy)
+        self.assertEqual(self.ledger()['inferenceRequestsDispatched'], 11)
+        self.assertEqual(self.ledger()['unreconciledReserveUsd'], 1.01)
+        self.assertFalse(self.owner.reserve(**arguments(semantic_contract=v2_contract()))['admitted'])
+
+    def test_v2_bad_or_incomplete_reservation_metadata_never_writes(self):
+        original = self.path.read_bytes()
+        invalid = [{}, {'requestSchema': 'jev.semantic-request.v2'},
+                   v2_contract(requestSchema='jev.semantic-request.v1'),
+                   v2_contract(resultSchema='jev.semantic-result.v1'),
+                   v2_contract(consumptionPolicy='other'), v2_contract(requestDigest='not-a-hash'),
+                   {**v2_contract(), 'unowned': True}]
+        for metadata in invalid:
+            with self.subTest(metadata=metadata), self.assertRaises(AccountingHeld):
+                self.owner.reserve(**arguments(semantic_contract=metadata))
+            self.assertEqual(self.path.read_bytes(), original)
+
+    def test_v2_result_never_upgrades_legacy_admission_or_downgrades_v2(self):
+        self.owner.reserve(**arguments())
+        self.owner.reserve(**arguments(2, semantic_contract=v2_contract()))
+        original = self.path.read_bytes()
+        for index, result in [(1, v2_response()), (2, response(2))]:
+            with self.subTest(index=index), self.assertRaisesRegex(AccountingHeld, 'response_contract_binding_mismatch'):
+                self.owner.reconcile(request_id=f'synthetic-{index}', request_sha256=f'{index:064x}', result=result)
+            self.assertEqual(self.path.read_bytes(), original)
+
+    def test_v2_correlation_policy_and_canonical_digest_mismatch_preserve_reservation(self):
+        self.owner.reserve(**arguments(semantic_contract=v2_contract()))
+        original = self.path.read_bytes()
+        for update in ({'consumptionPolicy': 'other'}, {'requestDigest': 'd' * 64},
+                       {'submittedRequestSha256': 'd' * 64}, {'stateDigest': 'd' * 64},
+                       {'purpose': 'other'}, {'requestId': 'other'}, {'requestDigest': None}):
+            with self.subTest(update=update), self.assertRaises(AccountingHeld):
+                self.owner.reconcile(request_id='synthetic-1', request_sha256=f'{1:064x}',
+                                     result=v2_response(**update))
+            self.assertEqual(self.path.read_bytes(), original)
+
+    def test_v2_transport_count_authority_and_success_proofs_cannot_refund(self):
+        self.owner.reserve(**arguments(semantic_contract=v2_contract()))
+        original = self.path.read_bytes()
+        for update in ({'transportInvocations': True}, {'connectionLeases': True},
+                       {'transportInvocations': 0, 'connectionLeases': 0},
+                       {'connectionLeases': 0}, {'status': 'held'},
+                       {'executionAuthorityGranted': True}, {'automaticWrite': True},
+                       {'sourcePostconditionVerified': False}, {'returnedModel': 'jev-latest'}):
+            with self.subTest(update=update), self.assertRaises(AccountingHeld):
+                self.owner.reconcile(request_id='synthetic-1', request_sha256=f'{1:064x}',
+                                     result=v2_response(**update))
+            self.assertEqual(self.path.read_bytes(), original)
+
+    def test_v2_zero_http_and_unknown_original_effects_stay_no_repeat(self):
+        for index in (1, 2):
+            self.owner.reserve(**arguments(index, semantic_contract=v2_contract()))
+        self.owner.mark_unknown(request_id='synthetic-2', request_sha256=f'{2:064x}')
+        self.assertEqual(self.ledger()['unreconciledReserveUsd'], 1.02)
+        self.assertFalse(self.owner.reserve(**arguments(2, semantic_contract=v2_contract()))['admitted'])
+        zero = v2_response(count=0, status='held', returnedModel=None, sourcePostconditionVerified=False)
+        self.owner.reconcile(request_id='synthetic-1', request_sha256=f'{1:064x}', result=zero)
+        self.assertEqual(self.ledger()['unreconciledReserveUsd'], 1.01)
+        unknown = v2_response(2, status='error', returnedModel=None, sourcePostconditionVerified=False)
+        self.owner.reconcile(request_id='synthetic-2', request_sha256=f'{2:064x}', result=unknown)
+        self.assertEqual(self.ledger()['unreconciledReserveUsd'], 1.01)
+        self.assertEqual(self.ledger()['inferenceRequestsDispatched'], 11)
+        after = self.path.read_bytes()
+        self.assertTrue(self.owner.reconcile(request_id='synthetic-2', request_sha256=f'{2:064x}',
+                                            result=unknown)['alreadyReconciled'])
+        self.assertFalse(self.owner.reserve(**arguments(2, semantic_contract=v2_contract()))['admitted'])
+        self.assertEqual(self.path.read_bytes(), after)
+
+    def test_contract_rebinding_and_cross_version_equivalence_cannot_reopen_effect(self):
+        self.owner.reserve(**arguments(decision_digest='e' * 64))
+        self.owner.mark_unknown(request_id='synthetic-1', request_sha256=f'{1:064x}')
+        original = self.path.read_bytes()
+        with self.assertRaisesRegex(AccountingHeld, 'request_contract_rebound_do_not_retry'):
+            self.owner.reserve(**arguments(semantic_contract=v2_contract()))
+        held = self.owner.reserve(**arguments(2, decision_digest='e' * 64, semantic_contract=v2_contract()))
+        self.assertFalse(held['admitted'])
+        self.assertNotIn('semanticContract', held['existing'])
+        self.assertEqual(self.path.read_bytes(), original)
+
+    def test_v2_actual_imported_caller_result_reconciles_same_existing_owner(self):
+        from test_v2_contract import OfflineOwner, request, raw
+        from v2_contract import digest
+        r = request()
+        request_sha = hashlib.sha256(raw(r)).hexdigest()
+        metadata = v2_contract(requestDigest=digest(r))
+        self.owner.reserve(**arguments(request_id=r['requestId'], request_sha256=request_sha,
+            state_digest=r['stateDigest'], scope=r['scope'], semantic_contract=metadata))
+        with tempfile.TemporaryDirectory() as folder:
+            result = OfflineOwner(Path(folder), r).run()
+        self.assertEqual(result['status'], 'ok')
+        outcome = self.owner.reconcile(request_id=r['requestId'], request_sha256=request_sha, result=result)
+        self.assertEqual(outcome['inferenceRequestsDispatched'], 11)
+        self.assertEqual(self.ledger()['calls'][-1]['semanticContract'], metadata)
+        self.assertEqual(self.ledger()['calls'][:10], self.legacy)
 
 
 if __name__ == '__main__':

@@ -3,6 +3,10 @@ import {
   JEV_MODEL,
   type Json,
   type NativeBinding,
+  type ChildAssignment,
+  type ChildAssignmentReference,
+  type CurrentChildAuthority,
+  type ContractPin,
   type WholeLens,
   type SemanticEvent,
   type PreparedDecision,
@@ -13,10 +17,22 @@ import {
   canonicalJson,
   semanticDigest,
   prepareChildSemanticPacket,
+  prepareLogicalAssignmentSemanticPacket,
+  qualifyChildAssignmentAuthority,
+  validateChildAssignment,
+  validateContractPin,
   prepareSemanticDecision,
   normalizeSemanticReply,
 } from "./policy.ts";
 
+export interface FixedRolePolicy {
+  schema: "jev.fixed-role-policy.v1";
+  role: "ordinary-child" | "explicit-routing";
+  allowedTuples: { model: string; effort: string }[];
+  authorizationRef: string;
+  sourceRevision: string;
+  capabilityEvidenceRefs: string[];
+}
 /** These are native-owner observations, never a model-generated profile catalog. */
 export interface CompleteProfile {
   profileId: string;
@@ -52,11 +68,14 @@ export interface ContinuityNomination {
 export type WorkflowInput =
   | {
       kind: "delegation";
+      rolePolicy?: FixedRolePolicy;
       taskPacket: {
         id: string;
         goal: string;
         packetDigest: string;
         requiredPostconditionIds: string[];
+        /** Required for actual delegation receipts; absent historical advice remains readable. */
+        expectedChild?: ChildAssignment;
       };
       profiles: CompleteProfile[];
     }
@@ -102,6 +121,10 @@ export interface PreparedWorkflowDecision extends PreparedDecision {
   workflowPolicy: WorkflowPolicy;
 }
 export interface CurrentWorkflowBinding {
+  /** Reobserved by the existing native owner, never inferred from an old result. */
+  childAuthority?: CurrentChildAuthority;
+  /** Required fresh native-owner attestation when a role policy is used. */
+  rolePolicyDigest?: string;
   authorized: boolean;
   bindingDigest: string;
   sourceRevision: string;
@@ -182,7 +205,9 @@ function validateWorkflow(workflow: WorkflowInput): void {
         throw Error("WORKFLOW_EVIDENCE_REQUIRED");
   };
   if (workflow.kind === "delegation") {
-    bounded(workflow.profiles, 16);
+    if (!Array.isArray(workflow.profiles) || workflow.profiles.length > 16)
+      throw Error("WORKFLOW_ITEMS_BOUND");
+    if (workflow.rolePolicy) validateRolePolicy(workflow.rolePolicy);
     if (
       !identifier(workflow.taskPacket.id) ||
       !text(workflow.taskPacket.goal) ||
@@ -192,6 +217,11 @@ function validateWorkflow(workflow: WorkflowInput): void {
         workflow.taskPacket.requiredPostconditionIds.length
     )
       throw Error("WORKFLOW_TASK_PACKET_REQUIRED");
+    if (workflow.taskPacket.expectedChild !== undefined) {
+      validateChildAssignment(workflow.taskPacket.expectedChild);
+      if (workflow.taskPacket.expectedChild.packetDigest !== workflow.taskPacket.packetDigest)
+        throw Error("CHILD_ASSIGNMENT_PACKET_MISMATCH");
+    }
     uniqueIds(workflow.profiles.map((p) => ({ id: p.profileId })));
     for (const profile of workflow.profiles)
       if (
@@ -249,6 +279,37 @@ function validateWorkflow(workflow: WorkflowInput): void {
     }
   } else throw Error("UNKNOWN_JEV_WORKFLOW");
 }
+function validateRolePolicy(policy: FixedRolePolicy): void {
+  if (
+    policy.schema !== "jev.fixed-role-policy.v1" ||
+    !["ordinary-child", "explicit-routing"].includes(policy.role) ||
+    !identifier(policy.authorizationRef) ||
+    !identifier(policy.sourceRevision) ||
+    !refs(policy.capabilityEvidenceRefs) ||
+    !Array.isArray(policy.allowedTuples) ||
+    !policy.allowedTuples.length ||
+    policy.allowedTuples.length > 16 ||
+    policy.allowedTuples.some((tuple) => !identifier(tuple.model) || !identifier(tuple.effort)) ||
+    (policy.role === "ordinary-child" &&
+      (policy.allowedTuples.length !== 1 ||
+        policy.allowedTuples[0]!.model !== "gpt-6.1-sol" ||
+        policy.allowedTuples[0]!.effort !== "high"))
+  )
+    throw Error("WORKFLOW_FIXED_ROLE_POLICY_REQUIRED");
+}
+function eligibleProfiles(
+  workflow: Extract<WorkflowInput, { kind: "delegation" }>,
+): CompleteProfile[] {
+  return workflow.profiles.filter(
+    (profile) =>
+      profile.availability === "available" &&
+      profile.applicability === "applicable" &&
+      (!workflow.rolePolicy ||
+        workflow.rolePolicy.allowedTuples.some(
+          (tuple) => tuple.model === profile.model && tuple.effort === profile.effort,
+        )),
+  );
+}
 function validatePolicy(policy: WorkflowPolicy): void {
   if (
     ![policy.minimumSupport, policy.maximumConflict, policy.minimumChoiceConfidence].every(
@@ -288,6 +349,9 @@ function baseAdvice(p: PreparedWorkflowDecision): WorkflowAdvice {
 }
 function preparedIntact(p: PreparedWorkflowDecision): boolean {
   return (
+    (p.workflow.kind !== "delegation" ||
+      ((p.request.schema !== "jev.semantic-request.v2" || !!p.workflow.rolePolicy) &&
+        (!p.workflow.rolePolicy || p.request.schema === "jev.semantic-request.v2"))) &&
     semanticDigest(p.request) === p.requestDigest &&
     semanticDigest(p.request.state) === p.request.stateDigest &&
     semanticDigest(p.request.state.binding) === p.bindingDigest &&
@@ -303,7 +367,10 @@ function currentMatches(p: PreparedWorkflowDecision, current: CurrentWorkflowBin
     current.bindingDigest === p.bindingDigest &&
     current.sourceRevision === p.sourceRevision &&
     current.workflowDigest === p.workflowDigest &&
-    refs(current.evidenceRefs)
+    refs(current.evidenceRefs) &&
+    (p.workflow.kind !== "delegation" ||
+      !p.workflow.rolePolicy ||
+      current.rolePolicyDigest === semanticDigest(p.workflow.rolePolicy))
   );
 }
 
@@ -315,15 +382,33 @@ export function prepareWorkflowDecision(input: {
   workflow: WorkflowInput;
   policy?: WorkflowPolicy;
   previousConsumedReuseKey?: string;
+  consumptionPolicy?: "jev.direct-selected-answer.v2";
 }): WorkflowPrepareResult {
   validateWorkflow(input.workflow);
   const policy = clone(input.policy ?? DEFAULT_WORKFLOW_POLICY);
   validatePolicy(policy);
+  // Policy/capability qualification precedes even the independent question preparation.
+  if (input.workflow.kind === "delegation") {
+    if (input.consumptionPolicy === "jev.direct-selected-answer.v2" && !input.workflow.rolePolicy)
+      return { status: "held", reason: "direct-delegation-fixed-role-policy-required" };
+    if (
+      input.workflow.rolePolicy &&
+      input.workflow.rolePolicy.sourceRevision !== input.event.sourceRevision
+    )
+      return { status: "held", reason: "role-policy-source-mismatch" };
+    if (!eligibleProfiles(input.workflow).length)
+      return { status: "held", reason: "no-authorized-available-native-profile" };
+  }
   const base = prepareSemanticDecision({
     requestId: input.requestId,
     event: input.event,
     lens: input.lens,
     candidates: [],
+    consumptionPolicy:
+      input.consumptionPolicy ??
+      (input.workflow.kind === "delegation" && input.workflow.rolePolicy
+        ? "jev.direct-selected-answer.v2"
+        : undefined),
   });
   if (base.status !== "prepared") return base;
   if (input.lens.dependencies.some((dependency) => dependency.currentness !== "current"))
@@ -339,26 +424,25 @@ export function prepareWorkflowDecision(input: {
   };
   let selectionQuestionId: string | null = null;
   if (workflow.kind === "delegation") {
-    const available = workflow.profiles.filter(
-      (profile) => profile.availability === "available" && profile.applicability === "applicable",
-    );
+    const available = eligibleProfiles(workflow);
     if (!available.length)
       return { status: "held", reason: "no-authorized-available-native-profile" };
-    selectionQuestionId = add("workflow:profile", {
-      type: "choice",
-      instructions: {
-        question:
-          "Which offered complete native profile best fits workflow.taskPacket and requiredContext at this actual delegation?",
-        rules: [
-          "Choose a complete offered profile only. Preserve Lead model/effort and native ownership.",
-          "Abstain when evidence, authorized availability or suitability is unknown. This recommends, never dispatches or changes settings.",
-        ],
-      },
-      criteria: Object.fromEntries([
-        ...available.map((profile) => [profile.profileId, canonicalJson(profile)]),
-        [ABSTAIN_ID, "No supported authorized profile recommendation."],
-      ]),
-    });
+    if (!workflow.rolePolicy || available.length > 1)
+      selectionQuestionId = add("workflow:profile", {
+        type: "choice",
+        instructions: {
+          question:
+            "Which offered complete native profile best fits workflow.taskPacket and requiredContext at this actual delegation?",
+          rules: [
+            "Choose a complete offered profile only. Preserve Lead model/effort and native ownership.",
+            "Abstain when evidence, authorized availability or suitability is unknown. This recommends, never dispatches or changes settings.",
+          ],
+        },
+        criteria: Object.fromEntries([
+          ...available.map((profile) => [profile.profileId, canonicalJson(profile)]),
+          [ABSTAIN_ID, "No supported authorized profile recommendation."],
+        ]),
+      });
   } else if (workflow.kind === "retrieval") {
     for (const item of workflow.candidates) {
       add(`evidence:${item.id}:support`, {
@@ -415,7 +499,7 @@ export function prepareWorkflowDecision(input: {
     throw Error("WORKFLOW_MANDATORY_CONTEXT_BOUND");
   const reuseKey = semanticDigest({
     model: JEV_MODEL,
-    policyVersion: "jev.workflows.v1",
+    policyVersion: base.request.consumptionPolicy ?? "jev.workflows.v1",
     stateDigest: request.stateDigest,
     questions,
   });
@@ -473,16 +557,17 @@ export function normalizeWorkflowReply(
   const workflow = prepared.workflow,
     policy = prepared.workflowPolicy;
   if (workflow.kind === "delegation") {
-    const profile = workflow.profiles.find(
-      (item) =>
-        item.profileId === decision.selectedCandidateId &&
-        item.availability === "available" &&
-        item.applicability === "applicable",
-    );
+    const eligible = eligibleProfiles(workflow);
+    const singleton = !!workflow.rolePolicy && eligible.length === 1;
+    const profile = singleton
+      ? eligible[0]
+      : eligible.find((item) => item.profileId === decision.selectedCandidateId);
     if (
       !profile ||
-      decision.nativeChoiceConfidence === null ||
-      decision.nativeChoiceConfidence < policy.minimumChoiceConfidence
+      (!singleton &&
+        prepared.request.schema === "jev.semantic-request.v1" &&
+        (decision.nativeChoiceConfidence === null ||
+          decision.nativeChoiceConfidence < policy.minimumChoiceConfidence))
     )
       return { ...advice, reason: "profile-abstention-tie-or-insufficient-confidence" };
     return {
@@ -491,6 +576,7 @@ export function normalizeWorkflowReply(
       disposition: "recommend-profile",
       reason: "complete-offered-profile-recommended-native-dispatch-required",
       selectedProfile: clone(profile),
+      deterministic: singleton,
     };
   }
   if (workflow.kind === "retrieval") {
@@ -561,6 +647,7 @@ export function normalizeWorkflowReply(
 }
 
 export interface NativeDelegationObservation {
+  assignment?: ChildAssignmentReference;
   observationId: string;
   taskPacketDigest: string;
   requestedProfile: { profileId: string; model: string; effort: string };
@@ -586,6 +673,9 @@ export function recordNativeDelegationReceipt(input: {
     | "native-postcondition-failed";
   reason: string;
   observation: NativeDelegationObservation;
+  expectedChild: ChildAssignment | null;
+  currentChildAuthority: CurrentChildAuthority | null;
+  continuedEffectsAuthorizedByResult: false;
   executionAuthorityGranted: false;
   taskCompletionGranted: false;
   retryAllowed: false;
@@ -604,6 +694,11 @@ export function recordNativeDelegationReceipt(input: {
     status,
     reason,
     observation: clone(o),
+    expectedChild: clone(
+      p.workflow.kind === "delegation" ? (p.workflow.taskPacket.expectedChild ?? null) : null,
+    ),
+    currentChildAuthority: clone(current.childAuthority ?? null),
+    continuedEffectsAuthorizedByResult: false as const,
     executionAuthorityGranted: false as const,
     taskCompletionGranted: false as const,
     retryAllowed: false as const,
@@ -628,7 +723,7 @@ export function recordNativeDelegationReceipt(input: {
     !a.selectedProfile ||
     a.selectedProfile.availability !== "available" ||
     a.selectedProfile.applicability !== "applicable" ||
-    !p.workflow.profiles.some(
+    !eligibleProfiles(p.workflow).some(
       (profile) => canonicalJson(profile) === canonicalJson(a.selectedProfile),
     )
   )
@@ -655,14 +750,47 @@ export function recordNativeDelegationReceipt(input: {
     canonicalJson(o.resolvedProfile) !== canonicalJson(expected)
   )
     return result("held", "native-resolved-profile-mismatch");
-  const parent = p.request.state.binding as unknown as NativeBinding;
+  const assignment = p.workflow.taskPacket.expectedChild;
   try {
-    prepareChildSemanticPacket({
+    validateChildAssignment(assignment!);
+    if (
+      assignment!.sourceRevision !== p.sourceRevision ||
+      assignment!.packetDigest !== o.taskPacketDigest ||
+      canonicalJson(o.assignment) !==
+        canonicalJson({
+          assignmentId: assignment!.assignmentId,
+          revision: assignment!.revision,
+          assignmentDigest: semanticDigest(assignment),
+        }) ||
+      o.childBinding.logical === null ||
+      canonicalJson(o.childBinding.logical) !== canonicalJson(assignment!.logical)
+    )
+      return result("held", "expected-child-logical-assignment-or-source-mismatch");
+  } catch {
+    return result("held", "expected-child-logical-assignment-or-source-mismatch");
+  }
+  if (
+    !current.childAuthority ||
+    qualifyChildAssignmentAuthority(assignment!, current.childAuthority).status === "held"
+  )
+    return result("held", "child-parent-authority-not-current");
+  const parent = p.request.state.binding as unknown as NativeBinding;
+  if (
+    parent.logical !== null &&
+    !["domainId", "projectId", "workId"].every(
+      (key) => parent.logical![key as "workId"] === assignment!.parentAuthority[key as "workId"],
+    )
+  )
+    return result("held", "parent-logical-authority-mismatch");
+  try {
+    const packetInput = {
       parentBinding: parent,
       childBinding: o.childBinding,
       parentLens: p.request.state.requiredContext as unknown as WholeLens,
       childTaskGoal: p.workflow.taskPacket.goal,
-    });
+    };
+    if (assignment!.route.kind === "native-child") prepareChildSemanticPacket(packetInput);
+    else prepareLogicalAssignmentSemanticPacket({ ...packetInput, assignment: assignment! });
   } catch {
     return result("held", "native-child-parent-lineage-mismatch");
   }
@@ -685,4 +813,69 @@ export function recordNativeDelegationReceipt(input: {
     "verified-native-delegation",
     "offered-requested-resolved-profile-and-task-postconditions-observed",
   );
+}
+
+/** Preserve a late artifact even when its assignment can no longer permit further work. */
+export function recordChildArtifactDisposition(input: {
+  assignment: ChildAssignment;
+  result: {
+    assignment: ChildAssignmentReference;
+    logical: NonNullable<NativeBinding["logical"]>;
+    sourceRevision: string;
+    sourceClosure: ContractPin;
+    packetDigest: string;
+    artifact: ContractPin;
+  };
+  /** An authenticated owner decision is still the native owner's responsibility. */
+  readoption: { current: CurrentChildAuthority; ownerDecision: ContractPin } | null;
+}): {
+  schema: "jev.child-artifact-disposition.v1";
+  status: "held" | "historical-evidence-only" | "explicitly-readopted-artifact";
+  assignment: ChildAssignment;
+  result: typeof input.result;
+  readoption: typeof input.readoption;
+  continuedEffectsAuthorizedByResult: false;
+  executionAuthorityGranted: false;
+  permitsReplay: false;
+} {
+  let status: "held" | "historical-evidence-only" | "explicitly-readopted-artifact" = "held";
+  try {
+    validateChildAssignment(input.assignment);
+    validateContractPin(input.result.artifact);
+    const a = input.assignment,
+      r = input.result;
+    if (
+      canonicalJson(r.assignment) ===
+        canonicalJson({
+          assignmentId: a.assignmentId,
+          revision: a.revision,
+          assignmentDigest: semanticDigest(a),
+        }) &&
+      canonicalJson(r.logical) === canonicalJson(a.logical) &&
+      r.sourceRevision === a.sourceRevision &&
+      canonicalJson(r.sourceClosure) === canonicalJson(a.sourceClosure) &&
+      r.packetDigest === a.packetDigest
+    ) {
+      status = "historical-evidence-only";
+      if (
+        input.readoption &&
+        qualifyChildAssignmentAuthority(a, input.readoption.current).status !== "held"
+      ) {
+        validateContractPin(input.readoption.ownerDecision);
+        status = "explicitly-readopted-artifact";
+      }
+    }
+  } catch {
+    /* Artifact and exact original binding remain durable, even when held. */
+  }
+  return {
+    schema: "jev.child-artifact-disposition.v1",
+    status,
+    assignment: clone(input.assignment),
+    result: clone(input.result),
+    readoption: clone(input.readoption),
+    continuedEffectsAuthorizedByResult: false,
+    executionAuthorityGranted: false,
+    permitsReplay: false,
+  };
 }

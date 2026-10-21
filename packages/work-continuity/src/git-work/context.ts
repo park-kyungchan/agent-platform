@@ -3,6 +3,7 @@ import { assertLogicalIdentity } from "../logical-identity.ts";
 import { validateTaskOperationalState } from "../operational-state.ts";
 import {
   dependencyFindings,
+  externalPrerequisiteFindings,
   effectInventory,
   loadRecords,
   outcome,
@@ -143,6 +144,8 @@ async function buildGitWorkContext(
         holdReasons.push(`SELECTED_TASK_NEXT_ACTION_REQUIRED:${selected.id}`);
       for (const dependency of selected.dependsOn)
         holdReasons.push(...(await dependencyFindings(selected, dependency, records, reader)));
+      for (const prerequisite of selected.externalPrerequisites ?? [])
+        holdReasons.push(...(await externalPrerequisiteFindings(selected, prerequisite, reader)));
     }
   }
   if (request.latestRelevant !== "current")
@@ -238,6 +241,9 @@ async function buildGitWorkContext(
           logical: json(record.logical),
           state: json(record.state),
           dependsOn: json(record.dependsOn),
+          ...(record.externalPrerequisites === undefined
+            ? {}
+            : { externalPrerequisites: json(record.externalPrerequisites) }),
           effectIds: record.effectIds,
           ...(record.artifact?.kind === "task"
             ? { acceptanceCriteria: record.artifact.payload.acceptanceCriteria }
@@ -610,6 +616,10 @@ function encodeCompactGitWorkContext(
     const indices = (value: unknown): number[] => texts(value).map(stringIndex);
     const records = new Map<string, ContextRecordProjection>();
     for (const record of context.records) {
+      compactAssert(
+        !Array.isArray(record.externalPrerequisites) || record.externalPrerequisites.length === 0,
+        "EXTERNAL_PREREQUISITES_REQUIRE_FULL_CONTEXT",
+      );
       if (record.kind === "spec" || record.kind === "plan")
         compactAssert(
           Number.isSafeInteger(record.revision) && Number(record.revision) > 0,

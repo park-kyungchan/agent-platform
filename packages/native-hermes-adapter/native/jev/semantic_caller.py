@@ -22,6 +22,10 @@ import sys
 import time
 
 sys.dont_write_bytecode = True
+
+from v2_contract import (CLIENT_SHA, POLICY, ContractHeld as Held, admit_existing_client,
+                         digest as common_digest, validate_answers, validate_request as validate_v2_request)
+
 ROOT = Path('/opt/data/runtime/harness/jev-1.14')
 CALLER_SHA = 'dd72953016d12fdc730235dece88e635b58573042544b77e890b5d64566af71d'
 MANIFEST_SHA = '72294eb10b15de0e64d5551da668a15173cfe66ba7314b9c5356d92703a2d39f'
@@ -34,7 +38,8 @@ RESULT_FIELDS = {'schema', 'requestId', 'purpose', 'stateDigest', 'submittedRequ
                  'transportInvocations', 'connectionLeases', 'callerLatencyMs',
                  'sourcePostconditionVerified', 'descriptorSourceBefore', 'descriptorSourceAfter',
                  'sourcePins', 'wire', 'executionAuthorityGranted', 'automaticWrite',
-                 'workerCompletionVerified'}
+                 'workerCompletionVerified', 'consumptionPolicy', 'requestDigest'}
+RESULT_SCHEMAS = {'jev.semantic-result.v1', 'jev.semantic-result.v2'}
 
 
 class NativeResultReceipts:
@@ -117,7 +122,7 @@ class NativeResultReceipts:
                  after.st_mtime_ns, after.st_ctime_ns), 'native_receipt_changed_during_read')
             result = json.loads(body, object_pairs_hook=strict_pairs,
                                 parse_constant=lambda _: (_ for _ in ()).throw(Held('nonfinite_receipt')))
-            need(isinstance(result, dict) and result.get('schema') == 'jev.semantic-result.v1'
+            need(isinstance(result, dict) and result.get('schema') in RESULT_SCHEMAS
                  and result.get('requestId') == request_id and set(result) <= RESULT_FIELDS,
                  'native_receipt_shape')
             return result
@@ -144,7 +149,7 @@ class NativeResultReceipts:
 
     def publish(self, result):
         need(isinstance(result, dict) and set(result) <= RESULT_FIELDS
-             and result.get('schema') == 'jev.semantic-result.v1', 'technical_result_only')
+             and result.get('schema') in RESULT_SCHEMAS, 'technical_result_only')
         request_id = result['requestId']
         raw = (json.dumps(result, sort_keys=True, ensure_ascii=False, allow_nan=False,
                           separators=(',', ':')) + '\n').encode()
@@ -182,10 +187,6 @@ class NativeResultReceipts:
             return observed
 
 
-class Held(Exception):
-    pass
-
-
 def need(condition, code):
     if not condition:
         raise Held(code)
@@ -208,9 +209,14 @@ def parse_request(raw):
     request = json.loads(raw, object_pairs_hook=strict_pairs,
                          parse_constant=lambda _: (_ for _ in ()).throw(Held('nonfinite_json')))
     json.dumps(request, allow_nan=False)
-    need(isinstance(request, dict) and set(request) == {
-        'schema', 'requestId', 'model', 'purpose', 'stateDigest', 'state', 'questions', 'scope'}, 'request_fields')
-    need(request['schema'] == 'jev.semantic-request.v1' and request['model'] == MODEL, 'request_model_or_schema')
+    need(isinstance(request, dict), 'request_fields')
+    version2 = request.get('schema') == 'jev.semantic-request.v2'
+    fields = {'schema', 'requestId', 'model', 'purpose', 'stateDigest', 'state', 'questions', 'scope'}
+    if version2:
+        fields |= {'consumptionPolicy', 'imageOptIn'}
+    need(set(request) - ({'assets'} if version2 else set()) == fields, 'request_fields')
+    need(request['schema'] in ('jev.semantic-request.v1', 'jev.semantic-request.v2')
+         and request['model'] == MODEL, 'request_model_or_schema')
     need(isinstance(request['requestId'], str) and LABEL.fullmatch(request['requestId']), 'request_id')
     need(request['purpose'] == 'semantic_bundle', 'purpose')
     need(isinstance(request['stateDigest'], str) and HEX.fullmatch(request['stateDigest']), 'state_digest')
@@ -234,11 +240,16 @@ def parse_request(raw):
     questions = request['questions']
     need(isinstance(questions, dict) and 1 <= len(questions) <= 24, 'question_count')
     for name, question in questions.items():
-        need(isinstance(name, str) and LABEL.fullmatch(name) and isinstance(question, dict), 'question_shape')
+        need(isinstance(name, str) and (version2 or LABEL.fullmatch(name))
+             and isinstance(question, dict), 'question_shape')
+        if version2:
+            continue
         need(question.get('type') in ('noul', 'choice'), 'question_type')
         if question['type'] == 'choice':
             need(isinstance(question.get('criteria'), dict) and 2 <= len(question['criteria']) <= 32,
                  'candidate_count')
+    if version2:
+        validate_v2_request(request)
     return request
 
 
@@ -247,6 +258,7 @@ def run(raw, *, descriptor_verify=None):
     request, transports, leases = None, 0, 0
     adapter = manifest = origins = getter = pool = None
     answers, usage, wire = {}, {}, {}
+    provider_payload = None
     status, error, source_verified = 'held', None, False
     returned_model = None
     descriptor_before = descriptor_after = None
@@ -266,6 +278,10 @@ def run(raw, *, descriptor_verify=None):
         receipt_owner.ready()
         existing = receipt_owner.read(request['requestId'], sha(raw), request['stateDigest'])
         if existing is not None:
+            need(existing.get('schema') == request['schema'].replace('request', 'result')
+                 and (request['schema'] != 'jev.semantic-request.v2'
+                      or existing.get('consumptionPolicy') == POLICY
+                      and existing.get('requestDigest') == common_digest(request)), 'native_receipt_version_conflict')
             fresh = descriptor_verify()
             need(isinstance(fresh, dict) and fresh.get('status') == 'successor-source-verified'
                  and fresh.get('callerSha256') == CALLER_SHA and fresh.get('manifestSha256') == MANIFEST_SHA,
@@ -273,6 +289,8 @@ def run(raw, *, descriptor_verify=None):
             # This is the original exact result, including its original count and
             # usage. It reconciles the original admission, never a fresh model call.
             return existing
+        if request['schema'] == 'jev.semantic-request.v2':
+            admit_existing_client(request)
         manifest_raw = (ROOT / 'application-manifest.json').read_bytes()
         need(sha(manifest_raw) == MANIFEST_SHA and sha((ROOT / 'native-caller.py').read_bytes()) == CALLER_SHA,
              'native_source_preflight')
@@ -282,6 +300,9 @@ def run(raw, *, descriptor_verify=None):
         manifest = json.loads(manifest_raw)
         need(manifest.get('deploymentRoot') == str(ROOT), 'native_deployment_root')
         adapter.verify_sources(manifest)
+        if request['schema'] == 'jev.semantic-request.v2':
+            need(sha((ROOT / 'upstream/jevkit/client.py').read_bytes()) == CLIENT_SHA,
+                 'v2_client_source_pin_mismatch')
         sys.path.insert(0, str(ROOT / 'upstream'))
         from jevkit import client, privacy, rerank  # noqa: F401: required origin closure
         adapter.verify_loaded_origins(manifest)
@@ -307,9 +328,15 @@ def run(raw, *, descriptor_verify=None):
         client._POOL = pool
 
         def transport(body, headers, timeout):
-            nonlocal transports, returned_model, usage
+            nonlocal transports, returned_model, usage, provider_payload
             need(transports == 0, 'http_budget_exhausted')
             need(len(body) <= MAX_WIRE_BYTES, 'serialized_wire_budget_exceeded')
+            if request['schema'] == 'jev.semantic-request.v2':
+                submitted = json.loads(body, object_pairs_hook=strict_pairs,
+                                       parse_constant=lambda _: (_ for _ in ()).throw(Held('nonfinite_wire')))
+                need(common_digest(submitted) == common_digest({
+                    'model': MODEL, 'state': state, 'questions': request['questions']}),
+                    'v2_client_wire_projection_changed')
             transports += 1
             wire.update(startedMonotonicNs=time.monotonic_ns(), nativeProcessId=os.getpid(),
                         requestBodySha256=sha(body))
@@ -318,7 +345,13 @@ def run(raw, *, descriptor_verify=None):
             finally:
                 wire['completedMonotonicNs'] = time.monotonic_ns()
             wire['responseBodySha256'] = sha(reply)
-            payload = json.loads(reply)
+            if request['schema'] == 'jev.semantic-request.v2':
+                payload = json.loads(reply, object_pairs_hook=strict_pairs,
+                                     parse_constant=lambda _: (_ for _ in ()).throw(Held('nonfinite_reply')))
+                need(isinstance(payload, dict), 'provider_reply_object')
+            else:
+                payload = json.loads(reply)
+            provider_payload = payload
             returned_model = payload.get('model')
             usage = adapter.usage_only(payload.get('usage'))
             return reply
@@ -327,7 +360,11 @@ def run(raw, *, descriptor_verify=None):
                            provider='typesafe', transport=transport)
         need(returned_model in (MODEL, 'jev-1.14.0'), 'returned_model_mismatch')
         need(transports == 1 and pool.leases == 1, 'http_count_unverified')
-        answers, status = reply['answers'], 'ok'
+        # The pinned client's Score parser supplies defaults and transforms
+        # legends/keys. v2 retains only the validated actual provider fields.
+        answers = (validate_answers(request, provider_payload.get('answers'))
+                   if request['schema'] == 'jev.semantic-request.v2' else reply['answers'])
+        status = 'ok'
     except Exception as exception:
         # Never print upstream exception details: they may include source/tool
         # state or credential transport context. Known codes only are retained.
@@ -341,6 +378,9 @@ def run(raw, *, descriptor_verify=None):
     if adapter is not None and manifest is not None and origins is not None:
         try:
             adapter.verify_sources(manifest)
+            if request is not None and request['schema'] == 'jev.semantic-request.v2':
+                need(sha((ROOT / 'upstream/jevkit/client.py').read_bytes()) == CLIENT_SHA,
+                     'v2_client_source_pin_mismatch')
             need(adapter.verify_loaded_origins(manifest, getter) == origins, 'loaded_origins_changed')
             need(sha((ROOT / 'application-manifest.json').read_bytes()) == MANIFEST_SHA, 'manifest_changed')
             source_verified = True
@@ -373,6 +413,10 @@ def run(raw, *, descriptor_verify=None):
             'descriptorSourceAfter': descriptor_after,
             'sourcePins': {'callerSha256': CALLER_SHA, 'manifestSha256': MANIFEST_SHA}, 'wire': wire,
             'executionAuthorityGranted': False, 'automaticWrite': False, 'workerCompletionVerified': False}
+    if request is not None and request['schema'] == 'jev.semantic-request.v2':
+        result.update(schema='jev.semantic-result.v2', consumptionPolicy=POLICY,
+                      requestDigest=common_digest(request))
+        result['sourcePins']['clientSha256'] = CLIENT_SHA
     if receipt_owner is not None and request is not None:
         try:
             return receipt_owner.publish(result)

@@ -132,7 +132,7 @@
     },
     {
       "path": "packages/native-hermes-adapter/native/jev/contract.schema.json",
-      "sha256": "559ee9ced57197c5d902dbf3222c27438144084c8cb20011d07f05806f7e8d8e",
+      "sha256": "0eab394ec6caa0f96ec1f5b7f857e5b04f7ca65c6d3901b86d9995d29396c5ef",
       "capabilityId": "native-hermes-context",
       "reason": "Exact request-schema definition used by the admitted native/jev bridge. Codex retains Jev semantic policy; native Hermes retains credentials/runtime/data custody. Source definition only; no execution permission, activation or new model budget."
     }

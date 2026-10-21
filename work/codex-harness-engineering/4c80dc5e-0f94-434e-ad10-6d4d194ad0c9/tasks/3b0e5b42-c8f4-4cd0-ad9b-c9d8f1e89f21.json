@@ -1,0 +1,33 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "4c80dc5e-0f94-434e-ad10-6d4d194ad0c9",
+  "kind": "task",
+  "id": "3b0e5b42-c8f4-4cd0-ad9b-c9d8f1e89f21",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "4c80dc5e-0f94-434e-ad10-6d4d194ad0c9",
+    "issueId": "W05-ISSUE-INTEGRATION-REPAIR-20261021",
+    "specId": "W05-SPEC-INTEGRATION-REPAIR-20261021",
+    "specRevision": 1,
+    "planId": "W05-PLAN-INTEGRATION-REPAIR-20261021",
+    "planRevision": 1,
+    "taskId": "3b0e5b42-c8f4-4cd0-ad9b-c9d8f1e89f21"
+  },
+  "title": "CI-SUCCESSOR-ADOPTION: bounded W05 source integration repair",
+  "nextAction": "Finish exact offline source checks and independent review; Root publishes/merges the exact reviewed heads in qualified order and retains all native adoption and whole outcome gates.",
+  "state": {
+    "execution": "running",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [],
+  "effectIds": [],
+  "verificationEvidenceIds": []
+}

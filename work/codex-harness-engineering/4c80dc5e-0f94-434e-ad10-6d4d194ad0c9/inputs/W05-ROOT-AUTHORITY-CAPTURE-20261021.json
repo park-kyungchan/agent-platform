@@ -1,0 +1,56 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "4c80dc5e-0f94-434e-ad10-6d4d194ad0c9",
+  "kind": "input",
+  "id": "W05-ROOT-AUTHORITY-CAPTURE-20261021",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering:Root",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/authority.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "authority": {
+      "schema": "jev.w05.full-integration-workflow-authority.v1",
+      "recordedAtUtc": "2026-10-21T09:43:22.915759+00:00",
+      "actualUserInstruction": "\uad8c\uace0\ub300\ub85c \uc9c4\ud589\ud558\uc790.",
+      "acceptedRecommendation": "Repair and verify W05-I01/I02/I03; commit, push, publish exact native review/status, create PRs, explicitly merge the reviewed expected heads in compatibility-qualified order, synchronize both mains, hand off to a fresh main-based Lead session, then clean unnecessary owned branches/worktrees/panes after receiving proof.",
+      "sourceRepairProposal": {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair.proposed.json",
+        "sha256": "86f1b08dd56009e6807a2edeb8c48c9a5cb38ce17210b17924f13d9bd714671e"
+      },
+      "approvedRepositories": [
+        "park-kyungchan/agent-platform",
+        "park-kyungchan/codex-harness-engineering"
+      ],
+      "sourceAndRequiredMetadataSuccessorsApproved": true,
+      "sourceCommitPushReviewStatusPRExplicitMergeApproved": true,
+      "mainSynchronizationFreshLeadHandoffAndBoundedCleanupApproved": true,
+      "supersedes": "The prior source-only proposal exclusions for named GitHub publication, main synchronization, fresh Lead and bounded cleanup are superseded by this actual user approval.",
+      "retainedExclusions": [
+        "No paid Jev/provider trials or actual native hook/action/restore tests",
+        "No runtime model/effort/config/approval/trust/credential/cache changes or Hermes/native activation",
+        "No active source/descriptor/registration updates inferred merely from a main merge; use source/readback observations truthfully and retain actual owner permission gates",
+        "No external SDK/image source or mounted projection edits, AGY/Argon probes, exclusive Academy scope access, data/role/code-server changes",
+        "No Goal creation/resume/lifecycle, unknown/completed effect replay, automatic merge or new Markdown"
+      ],
+      "rootOnlyUserCommunication": true,
+      "subLead": {
+        "model": "gpt-6.1-sol",
+        "effort": "ultra"
+      },
+      "ordinaryChildren": {
+        "model": "gpt-6.1-sol",
+        "effort": "high"
+      },
+      "sessionOnlyNativeLaunch": "Preserve previously explicitly selected --dangerously-bypass-approvals-and-sandbox, no persistent runtime changes.",
+      "statusWaitTimeoutMs": 225000,
+      "expectedTimeout": "Preserve exact native receipt and treat only recognized timeout as pending/wrapper0.",
+      "publicationOwner": "Root Lead alone; source SubLead/children do not publish, merge, change main or create the successor Lead."
+    },
+    "sha256": "4532071a1e23f1ec87ddc42846661f20bf82a143fbce625f447e1fa626eefa76",
+    "custody": "Exact Root-provided authority capture; original actual user/native message is not fabricated by this source record."
+  }
+}

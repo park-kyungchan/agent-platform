@@ -1,0 +1,95 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+  "kind": "input",
+  "id": "W03-OWNER-CLIENT-SOURCE",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/owner-client.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w03.owner-client-source.v1",
+    "recordedAtUtc": "2026-10-21T08:20:52.127739+00:00",
+    "evidenceClass": "static-host-mounted-owner-source-trace",
+    "owner": "Existing Hermes native/default-profile Lead",
+    "hostRoot": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14",
+    "nativeRoot": "/opt/data/runtime/harness/jev-1.14",
+    "sourcePins": [
+      {
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/application-manifest.json",
+        "relativePath": "application-manifest.json",
+        "sha256": "72294eb10b15de0e64d5551da668a15173cfe66ba7314b9c5356d92703a2d39f",
+        "bytes": 22355
+      },
+      {
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/native-caller.py",
+        "relativePath": "native-caller.py",
+        "sha256": "dd72953016d12fdc730235dece88e635b58573042544b77e890b5d64566af71d",
+        "bytes": 22881
+      },
+      {
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/client.py",
+        "relativePath": "upstream/jevkit/client.py",
+        "sha256": "63915a3925e074b3d314c65bd2eaf4146523c7b3e3692dd0814440c739493f5c",
+        "bytes": 40071
+      },
+      {
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/images.py",
+        "relativePath": "upstream/jevkit/images.py",
+        "sha256": "4a711bb42e9d303a6c65427f4cacf192792afa291ef4cf9ebc73ab17cf563331",
+        "bytes": 5867
+      },
+      {
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/privacy.py",
+        "relativePath": "upstream/jevkit/privacy.py",
+        "sha256": "6bab2fd480ab369be731310b3106a2a19ec34545ecb37b0cbba878605db3f153",
+        "bytes": 6251
+      },
+      {
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/rerank.py",
+        "relativePath": "upstream/jevkit/rerank.py",
+        "sha256": "4e94b96dddf6db62f5f96cbf6c1cd8583d566b4c7743e1b2c4af8e2a40d3def1",
+        "bytes": 41811
+      },
+      {
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/keystore.py",
+        "relativePath": "upstream/jevkit/keystore.py",
+        "sha256": "a3fdc653a473b4c24cb6cf8b77fcfb24b599e38026650cb4fd28fdc7795d39dc",
+        "bytes": 10563
+      }
+    ],
+    "upstreamCommit": "b8f69fe68b0efaa006f9baede46c3849aaf789f6",
+    "capabilities": {
+      "questionTypes": ["choice", "noul", "score", "box"],
+      "ask": "ask(state,questions,timeout=20,retries=0,model=MODEL,provider=typesafe,transport=existing_wrapper,assets=optional)",
+      "transport": "Existing client._http_transport and native SingleRequestPool; one lease/request only",
+      "choice": "2..255; structured criteria passed; selected key/probabilities/max validation; low confidence and ties admitted",
+      "noul": "Optional true/false nonempty structured criteria; typed numeric probability",
+      "score": "2..10 nonempty structured levels. _check_answer converts probability keys to ints, adds spread_reported, defaults confidence to1 and filters legend to string values. Preserve submitted raw reply in v2 wrapper rather than fabricate fields from parsed default.",
+      "box": "Question supported; _check_answer requires numeric confidence (null raises), strictly increasing normalized edges",
+      "assets": "ask accepts assets; _checked_assets supports JSON base64 only, never checks actual base64/decode/dimensions. Auto opt-in header. No multipart path.",
+      "images": "images.check header-only; not full decode; older min side256 conflicts selected official280. Still PNG/JPEG, header animation and EXIF checks only."
+    },
+    "limitationsAndExtension": [
+      {
+        "owner": "Hermes native upstream/source publisher",
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/client.py",
+        "behavior": "API one-level Choice/Score, nullable/empty content, nullable Box confidence and lossless structured Score legend need owner reviewed client successor; no source guard bypass or pinned client writes in W03."
+      },
+      {
+        "owner": "Existing native image decoder/client owner",
+        "path": "/docker/hermes-agent-2q3y/data/runtime/harness/jev-1.14/upstream/jevkit/images.py",
+        "behavior": "Full still-image decoder/type/size280..1568/processed+expanded32MiB checks and exact multipart framing missing. Existing64KiB incoming/48KiB wire budgets also remain; explicitly hold image path until qualified decoder available."
+      }
+    ],
+    "nativeInstalledConfigurationVerified": false,
+    "liveProviderTrials": 0,
+    "nativeImportsOrActions": 0,
+    "credentialRead": false,
+    "outsideScopeWrites": 0
+  }
+}

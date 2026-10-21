@@ -1,0 +1,42 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "1bd226cb-234b-4579-ac2f-dce2045e3d1d",
+  "kind": "work",
+  "id": "1bd226cb-234b-4579-ac2f-dce2045e3d1d",
+  "repositoryId": "park-kyungchan/agent-platform",
+  "issueId": "W01-ISSUE-SOURCE-CONTRACTS-20261021",
+  "purpose": {
+    "objective": "Autonomously deliver the approved W01 common-source slice: versioned selected external-artifact prerequisites; exact expected child logical/assignment/packet binding; parent authority revision, revocation and explicit successor carry-forward semantics. Preserve v1 behavior and native ownership.",
+    "successCriteria": [
+      "External prerequisites bind an exact selected producer and consumer through existing source readers without foreign v1 records.",
+      "Delegation receipts reject foreign, missing or stale logical child/source/assignment/packet bindings.",
+      "Current parent authority and explicit successor carry-forward gate effects while late artifacts remain evidence.",
+      "Existing local v1 dependencies, string IDs, native lineage and all owner/effect fences are preserved."
+    ],
+    "inScope": [
+      "packages/work-continuity/src/git-work/",
+      "packages/work-continuity/src/jev/contract.ts",
+      "packages/work-continuity/src/jev/policy.ts",
+      "packages/work-continuity/src/jev/workflows.ts"
+    ],
+    "outOfScope": [
+      "Canonical main checkout",
+      "Other worktrees, owners, live registrations/config/native stores",
+      "package.json, bun.lock, project.json, capability registry or generated source pins without root-approved concrete scope extension",
+      "Hermes/Academy/private original content or other services",
+      "Canonical ID registration, native lifecycle activation and Work Acceptance"
+    ]
+  },
+  "spec": {
+    "id": "W01-SPEC-SOURCE-CONTRACTS-20261021",
+    "revision": 1
+  },
+  "plan": {
+    "id": "W01-PLAN-SOURCE-CONTRACTS-20261021",
+    "revision": 1
+  },
+  "governingDecisionIds": [],
+  "historicalFenceIds": []
+}

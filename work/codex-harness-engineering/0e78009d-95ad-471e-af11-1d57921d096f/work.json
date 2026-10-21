@@ -1,0 +1,41 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "kind": "work",
+  "id": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "repositoryId": "park-kyungchan/agent-platform",
+  "issueId": "W02-ISSUE-JEV-SOURCE-20261021",
+  "purpose": {
+    "objective": "Deliver approved W02 common Jev source slice with offline independent verification and exact local delivery.",
+    "successCriteria": [
+      "F02 preserves typed dispatched unknown/no-retry receipts on malformed post-read currentness and serialization failures.",
+      "S04/F08 validates role policy/capability before preparation, deterministically selects qualified singleton, holds zero and keeps independent questions.",
+      "F04 versions direct selected allowed answers with Choice/Noul/Score/assets/Box and bound actions; no confidence/tie/premium override.",
+      "F08 monotonic per-item two supplements and terminal persistence use existing owners, without store/Goal/native restore.",
+      "W01/v1, identity/currentness/permission/source boundaries survive; unsupported old adapters explicitly hold."
+    ],
+    "inScope": [
+      "packages/work-continuity/src/jev/",
+      "Focused related TS tests and this Work records"
+    ],
+    "outOfScope": [
+      "Native adapter edits",
+      "Provider inference trials",
+      "Publication/activation/canonical registration",
+      "Other common modules, manifests, locks or generated pins",
+      "Native loops/auth/tools/sessions/credentials and original data"
+    ]
+  },
+  "spec": {
+    "id": "W02-SPEC-JEV-SOURCE-20261021",
+    "revision": 1
+  },
+  "plan": {
+    "id": "W02-PLAN-JEV-SOURCE-20261021",
+    "revision": 1
+  },
+  "governingDecisionIds": [],
+  "historicalFenceIds": []
+}
