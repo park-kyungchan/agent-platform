@@ -1,0 +1,35 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "kind": "task",
+  "id": "aae3e0ab-3071-40e8-81a3-c797a60119a5",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+    "issueId": "W02-ISSUE-JEV-SOURCE-20261021",
+    "specId": "W02-SPEC-JEV-SOURCE-20261021",
+    "specRevision": 1,
+    "planId": "W02-PLAN-JEV-SOURCE-20261021",
+    "planRevision": 1,
+    "taskId": "aae3e0ab-3071-40e8-81a3-c797a60119a5"
+  },
+  "title": "NEW-JEV-EVENT-CONSUMPTION",
+  "nextAction": "Root qualifies exact local source commit/tree and owner-reviewed registration/adapter successors; native activation, canonical registration and Work Acceptance remain pending.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [],
+  "effectIds": [],
+  "verificationEvidenceIds": [
+    "W02-SOURCE-VERIFICATION-20261021"
+  ]
+}

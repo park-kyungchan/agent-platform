@@ -1,0 +1,40 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "kind": "input",
+  "id": "W02-SOURCE-CHECK-RESULTS-20261021",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering:W02-SubLead",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/verification.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w02.source-check-results.v1",
+    "verification": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/verification.actual.json",
+      "sha256": "1824046c20830ede06e8e451c9b79aa291c0a38f4c0101e0ad6e004280b641bd"
+    },
+    "requiredChecks": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/required-checks.actual.json",
+      "sha256": "9477c1ab2cf446a20ddff73ca4d91670244a6b9d3289a16edbc5058956526022"
+    },
+    "implementation": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/implementation.result.json",
+      "sha256": "d1342eb11bf97139a9a2e7885d83474a8ab0bae830c32182ab034e2043640a7e"
+    },
+    "independent": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/independent.result.json",
+      "sha256": "4453a4cd8bcaa2198467b97b4a6075e0a67928bd3b0485436b896a07e2bdc2ca"
+    },
+    "sourceTests": 158,
+    "independentCases": 65,
+    "nativeLegacyTests": 28,
+    "sourceCICommands": 27,
+    "unresolvedSourceFindings": [],
+    "qualityComparison": "defer: original elapsed usage missing; no performance claim",
+    "acceptanceDecision": null
+  }
+}

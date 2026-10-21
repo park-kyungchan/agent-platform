@@ -226,8 +226,14 @@ export function prepareSemanticDecision(input: {
   /** Optional extra feature questions for a native result that spans several semantic groups. */
   purposes?: readonly SemanticPurpose[];
   previousConsumedReuseKey?: string;
+  consumptionPolicy?: "jev.direct-selected-answer.v2";
 }): PrepareResult {
   const { event, lens } = input;
+  if (
+    input.consumptionPolicy !== undefined &&
+    input.consumptionPolicy !== "jev.direct-selected-answer.v2"
+  )
+    throw Error("UNSUPPORTED_SEMANTIC_CONSUMPTION_POLICY");
   if (
     !id(input.requestId) ||
     !id(event.eventId) ||
@@ -332,7 +338,7 @@ export function prepareSemanticDecision(input: {
   const stateDigest = semanticDigest(state);
   const reuseKey = semanticDigest({
     model: JEV_MODEL,
-    policyVersion: "jev.semantic-policy.v1",
+    policyVersion: input.consumptionPolicy ?? "jev.semantic-policy.v1",
     stateDigest,
     questions,
     candidateDigests,
@@ -340,7 +346,10 @@ export function prepareSemanticDecision(input: {
   if (input.previousConsumedReuseKey === reuseKey)
     return { status: "skipped", reason: "unchanged", reuseKey };
   const request = {
-    schema: "jev.semantic-request.v1" as const,
+    schema: input.consumptionPolicy
+      ? ("jev.semantic-request.v2" as const)
+      : ("jev.semantic-request.v1" as const),
+    ...(input.consumptionPolicy ? { consumptionPolicy: input.consumptionPolicy } : {}),
     requestId: input.requestId,
     model: JEV_MODEL,
     purpose: "semantic_bundle" as const,
@@ -384,8 +393,23 @@ export function normalizeSemanticReply(
   if (semanticDigest(prepared.request) !== prepared.requestDigest)
     throw Error("PREPARED_SEMANTIC_REQUEST_DRIFT");
   if (
+    (prepared.request.schema !== "jev.semantic-request.v1" &&
+      prepared.request.schema !== "jev.semantic-request.v2") ||
+    (prepared.request.schema === "jev.semantic-request.v1" &&
+      prepared.request.consumptionPolicy !== undefined) ||
+    (prepared.request.schema === "jev.semantic-request.v2" &&
+      prepared.request.consumptionPolicy !== "jev.direct-selected-answer.v2")
+  )
+    throw Error("SEMANTIC_PROTOCOL_OR_POLICY_HELD");
+  if (
     !record(value) ||
-    value.schema !== "jev.semantic-result.v1" ||
+    value.schema !==
+      (prepared.request.schema === "jev.semantic-request.v2"
+        ? "jev.semantic-result.v2"
+        : "jev.semantic-result.v1") ||
+    (prepared.request.schema === "jev.semantic-request.v2" &&
+      (prepared.request.consumptionPolicy !== "jev.direct-selected-answer.v2" ||
+        value.consumptionPolicy !== prepared.request.consumptionPolicy)) ||
     value.status !== "ok" ||
     value.requestId !== prepared.request.requestId ||
     value.stateDigest !== prepared.request.stateDigest ||
@@ -438,8 +462,9 @@ export function normalizeSemanticReply(
         throw Error("SEMANTIC_CHOICE_DISTRIBUTION");
       const maximum = Math.max(...probabilities);
       const tied = probabilities.filter((value) => value === maximum).length > 1;
-      selectedCandidateId = tied ? ABSTAIN_ID : answer.choice;
-      selectionReason = tied
+      const vetoTie = tied && prepared.request.schema === "jev.semantic-request.v1";
+      selectedCandidateId = vetoTie ? ABSTAIN_ID : answer.choice;
+      selectionReason = vetoTie
         ? "tied-distribution"
         : answer.choice === ABSTAIN_ID
           ? "model-abstained"
@@ -450,6 +475,9 @@ export function normalizeSemanticReply(
   }
   return {
     status: "decision",
+    ...(prepared.request.consumptionPolicy
+      ? { consumptionPolicy: prepared.request.consumptionPolicy }
+      : {}),
     requestId: prepared.request.requestId,
     stateDigest: prepared.request.stateDigest,
     reuseKey: prepared.reuseKey,

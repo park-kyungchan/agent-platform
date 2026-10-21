@@ -1,0 +1,53 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "0e78009d-95ad-471e-af11-1d57921d096f",
+  "kind": "input",
+  "id": "W02-CHILD-DISPATCH-RECEIPTS-20261021",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/children.actual.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w02.child-dispatch-binding.v1",
+    "sublead": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/sublead-runtime.actual.json",
+      "sha256": "9457f2ec254d8cb3e9502fc8e81c14679f905febb9016d347b78d80d7e321f8b"
+    },
+    "children": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/children.actual.json",
+      "sha256": "2f3d1f72f012c8de9ed478d824a7a7f77d7a073f0abb830690bc081b51af3ae2"
+    },
+    "packets": [
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/packets/implementation.json",
+        "sha256": "c7b5e89eb6957edbc8066d9ff01f30123ca5a962e419fcd531bf477cc656ead8"
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/packets/verification.json",
+        "sha256": "19166ade9d52f87d439b34815a126f501b628e76a4ace362c747453e594db275"
+      },
+      {
+        "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/packets/verification@2.json",
+        "sha256": "1d80ce6d8d7886b62047d6bc651ce8c934b5f8e23796553424d7134da1d9ddff"
+      }
+    ],
+    "rootContextDelta": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/root-context-delta-001.json",
+      "sha256": "95ac8037310cd4f844aa89a3ea65742031beddc5a251525bb9bd4d48ab42bc4a"
+    },
+    "sameTab": "w9:t3",
+    "actualModelsVerified": true,
+    "nativeParentInferred": false,
+    "relation": "Explicit logical assignment; no claimed native ancestry or canonical ID registration.",
+    "implementationSourceFrozen": true,
+    "implementationResult": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w02-jev-common-source-20261021/output/implementation.result.json",
+      "sha256": "d1342eb11bf97139a9a2e7885d83474a8ab0bae830c32182ab034e2043640a7e"
+    },
+    "independentFinalAcceptance": "pending"
+  }
+}

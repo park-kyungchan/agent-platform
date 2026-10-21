@@ -188,7 +188,11 @@ const reply = (
   selected = "sol-low",
   confidence = 0.95,
 ): Record<string, unknown> => ({
-  schema: "jev.semantic-result.v1",
+  schema:
+    p.request.schema === "jev.semantic-request.v2"
+      ? "jev.semantic-result.v2"
+      : "jev.semantic-result.v1",
+  ...(p.request.consumptionPolicy ? { consumptionPolicy: p.request.consumptionPolicy } : {}),
   status: "ok",
   requestId: p.request.requestId,
   stateDigest: p.request.stateDigest,
@@ -812,4 +816,123 @@ describe("exact child and parent authority revisions", () => {
       recordNativeDelegationReceipt({ prepared: p, advice, current: c, observation: o }).status,
     ).toBe("held");
   });
+});
+
+describe("W02 fixed-role qualification before semantic preparation", () => {
+  const fixed = (): Extract<WorkflowInput, { kind: "delegation" }> => {
+    const workflow = delegation();
+    workflow.rolePolicy = {
+      schema: "jev.fixed-role-policy.v1",
+      role: "ordinary-child",
+      allowedTuples: [{ model: "gpt-6.1-sol", effort: "high" }],
+      authorizationRef: "user:fixed-child",
+      sourceRevision: "source-v1",
+      capabilityEvidenceRefs: ["native:fixed-capability"],
+    };
+    workflow.profiles = [{ ...workflow.profiles[0]!, profileId: "sol-high", effort: "high" }];
+    return workflow;
+  };
+  test("qualified singleton omits profile selection and keeps all independent semantic purposes", () => {
+    const p = prepare(fixed());
+    expect(p.selectionQuestionId).toBeNull();
+    expect(Object.values(p.questionMeanings)).toEqual([
+      "task_scope_satisfaction",
+      "worker_supervision",
+      "engineering_coverage",
+    ]);
+    const fresh = { ...current(p), rolePolicyDigest: semanticDigest(fixed().rolePolicy) };
+    const advice = normalizeWorkflowReply(p, reply(p), fresh);
+    expect(advice.status).toBe("advice");
+    expect(advice.selectedProfile?.effort).toBe("high");
+    expect(advice.deterministic).toBe(true);
+    expect(normalizeWorkflowReply(p, reply(p), current(p)).status).toBe("held");
+    const o = observation();
+    o.requestedProfile = o.resolvedProfile = {
+      profileId: "sol-high",
+      model: "gpt-6.1-sol",
+      effort: "high",
+    };
+    expect(
+      recordNativeDelegationReceipt({ prepared: p, advice, current: fresh, observation: o }).status,
+    ).toBe("verified-native-delegation");
+    o.resolvedProfile = { ...o.requestedProfile, effort: "low" };
+    expect(
+      recordNativeDelegationReceipt({ prepared: p, advice, current: fresh, observation: o }).status,
+    ).toBe("held");
+  });
+  test("zero tuples hold before semantic event preparation and off-policy profiles cannot enter routing", () => {
+    for (const profiles of [
+      [],
+      delegation().profiles,
+      [{ ...fixed().profiles[0]!, availability: "unknown" as const }],
+    ]) {
+      const workflow = { ...fixed(), profiles };
+      // Even malformed semantic facts are never reached once the fixed capability set is empty.
+      expect(
+        prepareWorkflowDecision({
+          requestId: "zero",
+          event: { ...event(), facts: undefined as never },
+          lens: lens(),
+          workflow,
+        }),
+      ).toEqual({ status: "held", reason: "no-authorized-available-native-profile" });
+    }
+    const workflow = fixed();
+    workflow.profiles.push({
+      ...workflow.profiles[0]!,
+      profileId: "reviewer-exception",
+      model: "gpt-6-astra",
+      effort: "xhigh",
+    });
+    expect(prepare(workflow).selectionQuestionId).toBeNull();
+    workflow.rolePolicy!.allowedTuples = [{ model: "gpt-6-astra", effort: "xhigh" }];
+    expect(() => prepare(workflow)).toThrow("WORKFLOW_FIXED_ROLE_POLICY_REQUIRED");
+  });
+  test("explicit future multi-candidate role routing retains its question", () => {
+    const workflow = fixed();
+    workflow.rolePolicy!.role = "explicit-routing";
+    workflow.rolePolicy!.allowedTuples.push({ model: "gpt-6.1-sol", effort: "low" });
+    workflow.profiles.push(delegation().profiles[0]!);
+    expect(prepare(workflow).selectionQuestionId).not.toBeNull();
+  });
+});
+test("direct-v2 delegation requires typed role policy before any semantic question preparation", () => {
+  expect(
+    prepareWorkflowDecision({
+      requestId: "v2-no-policy",
+      event: { ...event(), facts: undefined as never },
+      lens: lens(),
+      workflow: delegation(),
+      consumptionPolicy: "jev.direct-selected-answer.v2",
+    }),
+  ).toEqual({ status: "held", reason: "direct-delegation-fixed-role-policy-required" });
+});
+test("explicit direct-v2 multi-profile policy consumes the selected allowed low-confidence tie without a second judge", () => {
+  const workflow = delegation();
+  workflow.rolePolicy = {
+    schema: "jev.fixed-role-policy.v1",
+    role: "explicit-routing",
+    allowedTuples: [
+      { model: "gpt-6.1-sol", effort: "low" },
+      { model: "gpt-6.1-sol", effort: "ultra" },
+    ],
+    authorizationRef: "user:explicit-future-routing",
+    sourceRevision: "source-v1",
+    capabilityEvidenceRefs: ["native:qualified-capability"],
+  };
+  const p = prepare(workflow),
+    raw = reply(p, {}, "sol-low", 0);
+  (raw.answers as Record<string, unknown>)[p.selectionQuestionId!] = {
+    type: "choice",
+    choice: "sol-low",
+    confidence: 0,
+    probabilities: { "sol-low": 0.5, "sol-ultra": 0.5, __abstain: 0 },
+  };
+  const advice = normalizeWorkflowReply(p, raw, {
+    ...current(p),
+    rolePolicyDigest: semanticDigest(workflow.rolePolicy),
+  });
+  expect(advice.status).toBe("advice");
+  expect(advice.selectedProfile?.profileId).toBe("sol-low");
+  expect(advice.deterministic).toBe(false);
 });

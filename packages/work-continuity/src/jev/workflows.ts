@@ -25,6 +25,14 @@ import {
   normalizeSemanticReply,
 } from "./policy.ts";
 
+export interface FixedRolePolicy {
+  schema: "jev.fixed-role-policy.v1";
+  role: "ordinary-child" | "explicit-routing";
+  allowedTuples: { model: string; effort: string }[];
+  authorizationRef: string;
+  sourceRevision: string;
+  capabilityEvidenceRefs: string[];
+}
 /** These are native-owner observations, never a model-generated profile catalog. */
 export interface CompleteProfile {
   profileId: string;
@@ -60,6 +68,7 @@ export interface ContinuityNomination {
 export type WorkflowInput =
   | {
       kind: "delegation";
+      rolePolicy?: FixedRolePolicy;
       taskPacket: {
         id: string;
         goal: string;
@@ -114,6 +123,8 @@ export interface PreparedWorkflowDecision extends PreparedDecision {
 export interface CurrentWorkflowBinding {
   /** Reobserved by the existing native owner, never inferred from an old result. */
   childAuthority?: CurrentChildAuthority;
+  /** Required fresh native-owner attestation when a role policy is used. */
+  rolePolicyDigest?: string;
   authorized: boolean;
   bindingDigest: string;
   sourceRevision: string;
@@ -194,7 +205,9 @@ function validateWorkflow(workflow: WorkflowInput): void {
         throw Error("WORKFLOW_EVIDENCE_REQUIRED");
   };
   if (workflow.kind === "delegation") {
-    bounded(workflow.profiles, 16);
+    if (!Array.isArray(workflow.profiles) || workflow.profiles.length > 16)
+      throw Error("WORKFLOW_ITEMS_BOUND");
+    if (workflow.rolePolicy) validateRolePolicy(workflow.rolePolicy);
     if (
       !identifier(workflow.taskPacket.id) ||
       !text(workflow.taskPacket.goal) ||
@@ -266,6 +279,37 @@ function validateWorkflow(workflow: WorkflowInput): void {
     }
   } else throw Error("UNKNOWN_JEV_WORKFLOW");
 }
+function validateRolePolicy(policy: FixedRolePolicy): void {
+  if (
+    policy.schema !== "jev.fixed-role-policy.v1" ||
+    !["ordinary-child", "explicit-routing"].includes(policy.role) ||
+    !identifier(policy.authorizationRef) ||
+    !identifier(policy.sourceRevision) ||
+    !refs(policy.capabilityEvidenceRefs) ||
+    !Array.isArray(policy.allowedTuples) ||
+    !policy.allowedTuples.length ||
+    policy.allowedTuples.length > 16 ||
+    policy.allowedTuples.some((tuple) => !identifier(tuple.model) || !identifier(tuple.effort)) ||
+    (policy.role === "ordinary-child" &&
+      (policy.allowedTuples.length !== 1 ||
+        policy.allowedTuples[0]!.model !== "gpt-6.1-sol" ||
+        policy.allowedTuples[0]!.effort !== "high"))
+  )
+    throw Error("WORKFLOW_FIXED_ROLE_POLICY_REQUIRED");
+}
+function eligibleProfiles(
+  workflow: Extract<WorkflowInput, { kind: "delegation" }>,
+): CompleteProfile[] {
+  return workflow.profiles.filter(
+    (profile) =>
+      profile.availability === "available" &&
+      profile.applicability === "applicable" &&
+      (!workflow.rolePolicy ||
+        workflow.rolePolicy.allowedTuples.some(
+          (tuple) => tuple.model === profile.model && tuple.effort === profile.effort,
+        )),
+  );
+}
 function validatePolicy(policy: WorkflowPolicy): void {
   if (
     ![policy.minimumSupport, policy.maximumConflict, policy.minimumChoiceConfidence].every(
@@ -305,6 +349,9 @@ function baseAdvice(p: PreparedWorkflowDecision): WorkflowAdvice {
 }
 function preparedIntact(p: PreparedWorkflowDecision): boolean {
   return (
+    (p.workflow.kind !== "delegation" ||
+      ((p.request.schema !== "jev.semantic-request.v2" || !!p.workflow.rolePolicy) &&
+        (!p.workflow.rolePolicy || p.request.schema === "jev.semantic-request.v2"))) &&
     semanticDigest(p.request) === p.requestDigest &&
     semanticDigest(p.request.state) === p.request.stateDigest &&
     semanticDigest(p.request.state.binding) === p.bindingDigest &&
@@ -320,7 +367,10 @@ function currentMatches(p: PreparedWorkflowDecision, current: CurrentWorkflowBin
     current.bindingDigest === p.bindingDigest &&
     current.sourceRevision === p.sourceRevision &&
     current.workflowDigest === p.workflowDigest &&
-    refs(current.evidenceRefs)
+    refs(current.evidenceRefs) &&
+    (p.workflow.kind !== "delegation" ||
+      !p.workflow.rolePolicy ||
+      current.rolePolicyDigest === semanticDigest(p.workflow.rolePolicy))
   );
 }
 
@@ -332,15 +382,33 @@ export function prepareWorkflowDecision(input: {
   workflow: WorkflowInput;
   policy?: WorkflowPolicy;
   previousConsumedReuseKey?: string;
+  consumptionPolicy?: "jev.direct-selected-answer.v2";
 }): WorkflowPrepareResult {
   validateWorkflow(input.workflow);
   const policy = clone(input.policy ?? DEFAULT_WORKFLOW_POLICY);
   validatePolicy(policy);
+  // Policy/capability qualification precedes even the independent question preparation.
+  if (input.workflow.kind === "delegation") {
+    if (input.consumptionPolicy === "jev.direct-selected-answer.v2" && !input.workflow.rolePolicy)
+      return { status: "held", reason: "direct-delegation-fixed-role-policy-required" };
+    if (
+      input.workflow.rolePolicy &&
+      input.workflow.rolePolicy.sourceRevision !== input.event.sourceRevision
+    )
+      return { status: "held", reason: "role-policy-source-mismatch" };
+    if (!eligibleProfiles(input.workflow).length)
+      return { status: "held", reason: "no-authorized-available-native-profile" };
+  }
   const base = prepareSemanticDecision({
     requestId: input.requestId,
     event: input.event,
     lens: input.lens,
     candidates: [],
+    consumptionPolicy:
+      input.consumptionPolicy ??
+      (input.workflow.kind === "delegation" && input.workflow.rolePolicy
+        ? "jev.direct-selected-answer.v2"
+        : undefined),
   });
   if (base.status !== "prepared") return base;
   if (input.lens.dependencies.some((dependency) => dependency.currentness !== "current"))
@@ -356,26 +424,25 @@ export function prepareWorkflowDecision(input: {
   };
   let selectionQuestionId: string | null = null;
   if (workflow.kind === "delegation") {
-    const available = workflow.profiles.filter(
-      (profile) => profile.availability === "available" && profile.applicability === "applicable",
-    );
+    const available = eligibleProfiles(workflow);
     if (!available.length)
       return { status: "held", reason: "no-authorized-available-native-profile" };
-    selectionQuestionId = add("workflow:profile", {
-      type: "choice",
-      instructions: {
-        question:
-          "Which offered complete native profile best fits workflow.taskPacket and requiredContext at this actual delegation?",
-        rules: [
-          "Choose a complete offered profile only. Preserve Lead model/effort and native ownership.",
-          "Abstain when evidence, authorized availability or suitability is unknown. This recommends, never dispatches or changes settings.",
-        ],
-      },
-      criteria: Object.fromEntries([
-        ...available.map((profile) => [profile.profileId, canonicalJson(profile)]),
-        [ABSTAIN_ID, "No supported authorized profile recommendation."],
-      ]),
-    });
+    if (!workflow.rolePolicy || available.length > 1)
+      selectionQuestionId = add("workflow:profile", {
+        type: "choice",
+        instructions: {
+          question:
+            "Which offered complete native profile best fits workflow.taskPacket and requiredContext at this actual delegation?",
+          rules: [
+            "Choose a complete offered profile only. Preserve Lead model/effort and native ownership.",
+            "Abstain when evidence, authorized availability or suitability is unknown. This recommends, never dispatches or changes settings.",
+          ],
+        },
+        criteria: Object.fromEntries([
+          ...available.map((profile) => [profile.profileId, canonicalJson(profile)]),
+          [ABSTAIN_ID, "No supported authorized profile recommendation."],
+        ]),
+      });
   } else if (workflow.kind === "retrieval") {
     for (const item of workflow.candidates) {
       add(`evidence:${item.id}:support`, {
@@ -432,7 +499,7 @@ export function prepareWorkflowDecision(input: {
     throw Error("WORKFLOW_MANDATORY_CONTEXT_BOUND");
   const reuseKey = semanticDigest({
     model: JEV_MODEL,
-    policyVersion: "jev.workflows.v1",
+    policyVersion: base.request.consumptionPolicy ?? "jev.workflows.v1",
     stateDigest: request.stateDigest,
     questions,
   });
@@ -490,16 +557,17 @@ export function normalizeWorkflowReply(
   const workflow = prepared.workflow,
     policy = prepared.workflowPolicy;
   if (workflow.kind === "delegation") {
-    const profile = workflow.profiles.find(
-      (item) =>
-        item.profileId === decision.selectedCandidateId &&
-        item.availability === "available" &&
-        item.applicability === "applicable",
-    );
+    const eligible = eligibleProfiles(workflow);
+    const singleton = !!workflow.rolePolicy && eligible.length === 1;
+    const profile = singleton
+      ? eligible[0]
+      : eligible.find((item) => item.profileId === decision.selectedCandidateId);
     if (
       !profile ||
-      decision.nativeChoiceConfidence === null ||
-      decision.nativeChoiceConfidence < policy.minimumChoiceConfidence
+      (!singleton &&
+        prepared.request.schema === "jev.semantic-request.v1" &&
+        (decision.nativeChoiceConfidence === null ||
+          decision.nativeChoiceConfidence < policy.minimumChoiceConfidence))
     )
       return { ...advice, reason: "profile-abstention-tie-or-insufficient-confidence" };
     return {
@@ -508,6 +576,7 @@ export function normalizeWorkflowReply(
       disposition: "recommend-profile",
       reason: "complete-offered-profile-recommended-native-dispatch-required",
       selectedProfile: clone(profile),
+      deterministic: singleton,
     };
   }
   if (workflow.kind === "retrieval") {
@@ -654,7 +723,7 @@ export function recordNativeDelegationReceipt(input: {
     !a.selectedProfile ||
     a.selectedProfile.availability !== "available" ||
     a.selectedProfile.applicability !== "applicable" ||
-    !p.workflow.profiles.some(
+    !eligibleProfiles(p.workflow).some(
       (profile) => canonicalJson(profile) === canonicalJson(a.selectedProfile),
     )
   )

@@ -116,7 +116,8 @@ export interface ChoiceQuestion {
 }
 export type SemanticQuestion = NoulQuestion | ChoiceQuestion;
 export interface SemanticWireRequest {
-  schema: "jev.semantic-request.v1";
+  schema: "jev.semantic-request.v1" | "jev.semantic-request.v2";
+  consumptionPolicy?: "jev.direct-selected-answer.v2";
   requestId: string;
   model: typeof JEV_MODEL;
   purpose: "semantic_bundle";
@@ -153,6 +154,7 @@ export type PrepareResult =
       reuseKey: string | null;
     };
 export interface SemanticDecision {
+  consumptionPolicy?: "jev.direct-selected-answer.v2";
   status: "decision";
   requestId: string;
   stateDigest: string;
@@ -182,6 +184,13 @@ export interface CurrentReadBinding {
 }
 export type ReadonlyHandler = (candidate: ReadonlyCandidate) => Promise<ReadObservation>;
 export interface ReadConsumptionReceipt {
+  /** Safe boundary metadata for an already dispatched or storage-unknown result. */
+  failure?: {
+    schema: "jev.read-failure.v1";
+    boundary: "post-read" | "receipt-serialization" | "owner-persistence";
+    originalStatus: string | null;
+    originalObservationId: string | null;
+  };
   requestId: string;
   selectedCandidateId: string;
   status:
