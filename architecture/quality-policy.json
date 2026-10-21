@@ -41,14 +41,18 @@
       "path": "packages/native-codex-adapter",
       "name": "@palantirkc/native-codex-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
+      "allowedWorkspaceDependencies": [
+        "@palantirkc/work-continuity"
+      ]
     },
     {
       "capabilityId": "native-hermes-context",
       "path": "packages/native-hermes-adapter",
       "name": "@palantirkc/native-hermes-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
+      "allowedWorkspaceDependencies": [
+        "@palantirkc/work-continuity"
+      ]
     },
     {
       "capabilityId": "operational-context",
@@ -144,13 +148,13 @@
     },
     {
       "path": "packages/work-continuity/contracts/git-work-v3.schema.json",
-      "sha256": "918dc3a6e933b50b186d7c72d15f7b21083459530e0ee9e32e42ebc81f6c7a48",
+      "sha256": "1f1542021ee00b044bc5d0d7577430aeba58a0d2431aa92fcb7f05c1df7e27e0",
       "capabilityId": "work-continuity",
       "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
     },
     {
       "path": "packages/work-continuity/contracts/v3-implementation.json",
-      "sha256": "dab01f50e22ddd31d30007e7b75b76a80d756b696e187c303bb93a06ce85aa53",
+      "sha256": "93aa3d7f38490561bfc8632fdfae5feacd57a0ea58e06a40f21a9676352aec5d",
       "capabilityId": "work-continuity",
       "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
     }
