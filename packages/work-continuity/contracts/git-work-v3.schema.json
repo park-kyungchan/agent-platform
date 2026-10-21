@@ -2414,12 +2414,16 @@
             "$ref": "#/$defs/GitSourcePin"
           },
           "maxItems": 2048
+        },
+        "graph": {
+          "$ref": "#/$defs/GitSourcePin"
         }
       },
       "required": [
         "work",
         "task",
-        "contracts"
+        "contracts",
+        "graph"
       ],
       "additionalProperties": false
     }

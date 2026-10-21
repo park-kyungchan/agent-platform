@@ -16,11 +16,12 @@ import type {
 import { assertV3, canonicalV3, digestV3, encodeV3, decodeV3 } from "./v3-codec.ts";
 import {
   effectiveTaskRefs,
+  assertCurrentArtifactGraph,
   selectedArtifactForDependency,
   qualifySelectedExternalArtifacts,
   type ExactV3SourceReader,
 } from "./external-artifacts.ts";
-import { assertQualifiedLegacyTask, qualifyLegacyGraphBindings } from "./legacy-qualification.ts";
+import { assertQualifiedLegacyTask, qualifyLegacyGraphBindings, legacyDependencyHoldReasons } from "./legacy-qualification.ts";
 import { validateGitWorkAliases, qualifyGitWorkAliases } from "./aliases.ts";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 
@@ -90,9 +91,10 @@ export interface ValidatedV3Graph {
   contracts: Map<string, Contract>;
 }
 
-export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
+function validateStructure(input: unknown): ValidatedV3Graph {
   assertV3("Graph", input);
   const g = input;
+  assertCurrentArtifactGraph(g);
   validateGitWorkAliases(g.aliases ?? []);
   const domains = unique(g.domains, (x) => x.id, "DOMAIN");
   const projects = unique(g.projects, (x) => x.id, "PROJECT");
@@ -146,7 +148,7 @@ export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
   for (const t of g.tasks) {
     const w = works.get(v3WorkKey(t));
     if (!w) throw Error("V3_MISSING_TASK_WORK");
-    assertQualifiedLegacyTask(t);
+    assertQualifiedLegacyTask(t,g);
     if (t.assigneeActorId === null && !t.legacyBinding)
       throw Error("V3_TASK_NATIVE_ACTOR_OR_LEGACY_SOURCE_REQUIRED");
     const owner: Scope = { kind: "task", ...taskRef(t) };
@@ -219,7 +221,6 @@ export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
     g.dependencies.map((d) => [v3TaskKey(d.producer), v3TaskKey(d.consumer)]),
     "DEPENDENCY",
   );
-  for (const d of g.dependencies) selectedArtifactForDependency(g, d);
   for (const r of g.relations)
     if (!scopeExists(r.from) || !scopeExists(r.to)) throw Error("V3_RELATED_SCOPE_MISSING");
   for (const d of g.delegations)
@@ -236,9 +237,15 @@ export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
   return { works, tasks, contracts };
 }
 
+export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
+  const validated = validateStructure(input); const graph = input as Graph;
+  for (const dependency of graph.dependencies) selectedArtifactForDependency(graph,dependency);
+  return validated;
+}
+
 /** A single resolver for full, compact, dispatch and immutable recovery source paths. */
 export function resolveEffectiveContract(input: unknown, target: TaskRef): EffectiveContract {
-  const { works, tasks } = validateGitWorkV3Graph(input);
+  const { works, tasks } = validateStructure(input);
   const g = input as Graph;
   const t = tasks.get(v3TaskKey(target));
   if (!t) throw Error("V3_UNKNOWN_TASK");
@@ -291,7 +298,7 @@ export function resolveEffectiveContract(input: unknown, target: TaskRef): Effec
     contracts: effectiveTaskRefs(g, t) as ContractSet,
     ...(t.legacyBinding ? { legacyBinding: t.legacyBinding } : {}),
     holdReasons: [
-      ...new Set([...selected].flatMap((key) => tasks.get(key)!.legacyBinding?.holdReasons ?? [])),
+      ...new Set([...selected].flatMap((key) => { const row = tasks.get(key)!; return [...(row.legacyBinding?.holdReasons ?? []), ...legacyDependencyHoldReasons(g,row)]; })),
     ].sort(),
     externalArtifacts: sorted(
       dependencies.flatMap((d) => {
@@ -410,6 +417,7 @@ export function expandGitWorkV3Context(input: ContextPacket | CompactContextPack
 export async function readSourceQualifiedGitWorkV3Context(
   input: Parameters<typeof readGitWorkV3Context>[0] & { graph: Graph; reader: ExactV3SourceReader },
 ) {
+  assertV3("Graph",input.graph);
   await qualifyLegacyGraphBindings(input.graph, input.reader);
   await qualifyGitWorkAliases(input.graph.aliases ?? [], input.reader);
   await qualifySelectedExternalArtifacts(input.graph, input.reader);

@@ -37,7 +37,8 @@ export const sourceSha256 = (bytes: string): string =>
 /** Read-only commands retain repository configuration and execute no ref hooks. */
 export async function gitOwnerRead(root: string, args: string[]): Promise<string> {
   if (
-    !["rev-parse", "ls-tree", "cat-file", "show", "log", "merge-base", "worktree"].includes(
+    !["rev-parse", "ls-tree", "cat-file", "show", "log", "merge-base",
+      "rev-list", "worktree"].includes(
       args[0] ?? "",
     )
   )
@@ -208,23 +209,33 @@ export async function publishGitOwnerFiles(
     await rm(temporary, { recursive: true, force: true });
   }
 }
-/** Mapping/index receipts are append-only; source records may evolve separately. */
+/** Exact full ancestry, including side parents. Bounds reject incomplete histories. */
+export interface GitOwnerAncestryNode { commit: string; parents: string[] }
+export async function gitOwnerAncestry(root: string, head: string): Promise<GitOwnerAncestryNode[]> {
+  if (!oid(head)) throw Error("V3_EXACT_ANCESTRY_HEAD_REQUIRED");
+  if ((await gitOwnerRead(root,["rev-parse","--is-shallow-repository"])).trim() !== "false") throw Error("V3_COMPLETE_OWNER_ANCESTRY_REQUIRED");
+  const lines = (await gitOwnerRead(root, ["rev-list", "--topo-order", "--parents", "--max-count=8193", head])).trim().split("\n").filter(Boolean);
+  if (lines.length > 8192) throw Error("V3_COMPLETE_OWNER_ANCESTRY_BOUND");
+  const nodes = lines.map((line) => { const [commit, ...parents] = line.split(" "); if (!commit || ![commit,...parents].every(oid)) throw Error("V3_INVALID_OWNER_ANCESTRY"); return { commit, parents }; });
+  const ids = new Set(nodes.map((node) => node.commit));
+  if (!ids.has(head) || nodes.some((node) => node.parents.some((parent) => !ids.has(parent)))) throw Error("V3_INCOMPLETE_OWNER_ANCESTRY");
+  return nodes.reverse();
+}
+/** Mapping/index receipts have one introduction. A merge propagates the existing
+ * transaction; every parent path still participates in rewrite/deletion checks. */
 export async function immutableGitLedgerCreation(
-  root: string,
-  head: string,
-  path: string,
-  expectedBytes: string,
+  root: string, head: string, path: string, expectedBytes: string,
 ): Promise<string> {
-  const commits = (
-    await gitOwnerRead(root, ["log", "--first-parent", "--format=%H", "-n", "2", head, "--", path])
-  )
-    .trim()
-    .split("\n")
-    .filter(Boolean);
-  if (
-    commits.length !== 1 ||
-    (await readOptionalGitRecord(root, commits[0]!, path)) !== expectedBytes
-  )
-    throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REWRITTEN");
-  return commits[0]!;
+  const nodes = await gitOwnerAncestry(root, head);
+  const values = new Map<string,string | null>(); const introductions: string[] = [];
+  for (const node of nodes) {
+    const value = await readOptionalGitRecord(root,node.commit,path);
+    if (value !== null && value !== expectedBytes) throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REWRITTEN");
+    const propagated = node.parents.some((parent) => values.get(parent) === expectedBytes);
+    if (value === null && propagated) throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REMOVED");
+    if (value === expectedBytes && !propagated) introductions.push(node.commit);
+    values.set(node.commit,value);
+  }
+  if (values.get(head) !== expectedBytes || introductions.length !== 1) throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REWRITTEN");
+  return introductions[0]!;
 }

@@ -1,6 +1,6 @@
 import type { Graph, GitSourcePin, Contract, Task } from "./generated/v3.ts";
-import { assertRecord } from "./records.ts";
-import { canonicalV3 } from "./v3-codec.ts";
+import { assertRecord, dependencyFindings, loadRecords } from "./records.ts";
+import { canonicalV3, digestV3 } from "./v3-codec.ts";
 import {
   legacyIssueContract,
   legacySpecContract,
@@ -9,13 +9,16 @@ import {
 } from "./legacy-model.ts";
 import { readExactV3Source, type ExactV3SourceReader } from "./external-artifacts.ts";
 
-const qualified = new WeakMap<object, string>();
+const qualified = new WeakMap<object, { fingerprint: string; edges: Graph["dependencies"]; holds: string[] }>();
+const supportedEdges = (task: import("./types.ts").TaskRecord): Graph["dependencies"] => task.dependsOn.filter((d) => ["execution-and-verification", "acceptance"].includes(d.milestone)).map((d) => ({ producer: { projectId: task.projectId, workId: task.workId, taskId: d.taskId }, consumer: { projectId: task.projectId, workId: task.workId, taskId: task.id }, required: d.milestone === "acceptance" ? "accepted" : "verified" }));
+const sorted = <T>(rows: T[]): T[] => [...rows].sort((a,b) => canonicalV3(a).localeCompare(canonicalV3(b)));
 const same = (a: unknown, b: unknown): boolean => canonicalV3(a) === canonicalV3(b);
 /** Revalidate the original typed legacy records; do not trust a compatibility flag. */
 export async function qualifyLegacyGraphBindings(
   graph: Graph,
   reader: ExactV3SourceReader,
 ): Promise<Graph> {
+  const snapshots = new Map<string, Promise<{ reader: import("./types.ts").GitWorkReader; loaded: Awaited<ReturnType<typeof loadRecords>> }>>();
   for (const task of graph.tasks.filter((t) => t.legacyBinding !== undefined)) {
     const binding = task.legacyBinding!;
     const source = await readExactV3Source(reader, binding.source);
@@ -100,11 +103,29 @@ export async function qualifyLegacyGraphBindings(
       )
     )
       throw Error("V3_LEGACY_TASK_CRITERIA_FALSELY_NARROWED");
-    qualified.set(binding, canonicalV3(binding));
+    const holds: string[] = [];
+    if (original.dependsOn.length) {
+      if (!reader.openLegacyWork) throw Error("V3_LEGACY_DEPENDENCY_SOURCE_READER_REQUIRED");
+      const key = canonicalV3([binding.source.repositoryId,binding.source.commit,task.projectId,task.workId]);
+      if (!snapshots.has(key)) snapshots.set(key,(async () => { const legacy = await reader.openLegacyWork!(binding.source,task); return { reader: legacy, loaded: await loadRecords(legacy) }; })());
+      const snapshot = await snapshots.get(key)!;
+      if (snapshot.loaded.findings.length) throw Error("V3_LEGACY_DEPENDENCY_SNAPSHOT_RECORDS_INVALID");
+      for (const dependency of original.dependsOn) {
+        const findings = await dependencyFindings(original,dependency,snapshot.loaded.records,snapshot.reader);
+        for (const finding of findings) holds.push("LEGACY_" + finding.split(":")[0] + ":" + digestV3([task.projectId,task.workId,task.taskId,dependency]).slice(0,16));
+      }
+    }
+    qualified.set(binding,{ fingerprint: canonicalV3(binding), edges: supportedEdges(original), holds: [...new Set(holds)].sort() });
   }
   return graph;
 }
-export function assertQualifiedLegacyTask(task: Task): void {
-  if (task.legacyBinding && qualified.get(task.legacyBinding) !== canonicalV3(task.legacyBinding))
-    throw Error("V3_LEGACY_ACTUAL_SOURCE_QUALIFICATION_REQUIRED");
+export function assertQualifiedLegacyTask(task: Task, graph?: Graph): void {
+  if (!task.legacyBinding) return;
+  const proof = qualified.get(task.legacyBinding);
+  if (!proof || proof.fingerprint !== canonicalV3(task.legacyBinding)) throw Error("V3_LEGACY_ACTUAL_SOURCE_QUALIFICATION_REQUIRED");
+  if (graph && !same(sorted(graph.dependencies.filter((d) => same(d.consumer,{ projectId: task.projectId,workId: task.workId,taskId: task.taskId }))),sorted(proof.edges))) throw Error("V3_LEGACY_DEPENDENCY_SOURCE_CLOSURE_CHANGED");
+}
+export function legacyDependencyHoldReasons(graph: Graph, task: Task): string[] {
+  assertQualifiedLegacyTask(task,graph);
+  return task.legacyBinding ? [...qualified.get(task.legacyBinding)!.holds] : [];
 }

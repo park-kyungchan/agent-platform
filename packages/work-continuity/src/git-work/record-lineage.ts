@@ -1,11 +1,9 @@
 import type { StoredRecord } from "./generated/v3.ts";
 import { assertV3, canonicalV3 } from "./v3-codec.ts";
-import { gitOwnerRead, readOptionalGitRecord } from "./git-owner-transaction.ts";
+import { gitOwnerRead, gitOwnerAncestry, readOptionalGitRecord } from "./git-owner-transaction.ts";
 
 function checkSuccessor(before: StoredRecord, after: StoredRecord): void {
   if (before.kind !== after.kind) throw Error("V3_RECORD_SUCCESSOR_KIND_MISMATCH");
-  const a = before.value,
-    b = after.value;
   if (before.kind === "run" && after.kind === "run") {
     const x = before.value,
       y = after.value;
@@ -70,8 +68,6 @@ function checkSuccessor(before: StoredRecord, after: StoredRecord): void {
     if (y.revision === x.revision && canonicalV3(oldBody) !== canonicalV3(newBody))
       throw Error("V3_TASK_CHANGE_REQUIRES_REVISION");
   } else throw Error("V3_RECORD_SUCCESSOR_KIND_MISMATCH");
-  void a;
-  void b;
 }
 
 /** Exact bounded owner-branch ancestry, distinct from native authorship/permission. */
@@ -85,35 +81,24 @@ export async function verifyRecordSuccessorLineage(
   await gitOwnerRead(root, ["merge-base", "--is-ancestor", creationCommit, head]);
   const initial = JSON.parse(creationBytes) as unknown;
   assertV3("StoredRecord", initial);
-  let prior = initial;
-  const commits = (
-    await gitOwnerRead(root, [
-      "log",
-      "--first-parent",
-      "--reverse",
-      "--format=%H",
-      "-n",
-      "257",
-      `${creationCommit}..${head}`,
-      "--",
-      path,
-    ])
-  )
-    .trim()
-    .split("\n")
-    .filter(Boolean);
-  if (commits.length > 256) throw Error("V3_RECORD_SUCCESSOR_LINEAGE_BOUND");
-  for (const commit of commits) {
-    const bytes = await readOptionalGitRecord(root, commit, path);
+  const nodes = await gitOwnerAncestry(root,head);
+  const descendants = new Set<string>(); const records = new Map<string, StoredRecord>();
+  for (const node of nodes) {
+    const inherits = node.commit === creationCommit || node.parents.some((parent) => descendants.has(parent));
+    const bytes = await readOptionalGitRecord(root,node.commit,path);
+    if (!inherits) {
+      if (bytes !== null) throw Error("V3_RECORD_OUTSIDE_INTRODUCING_TRANSACTION_LINEAGE");
+      continue;
+    }
+    descendants.add(node.commit);
     if (bytes === null) throw Error("V3_ALLOCATED_RECORD_REMOVED");
-    const current: unknown = JSON.parse(bytes);
-    assertV3("StoredRecord", current);
-    checkSuccessor(prior, current);
-    prior = current;
+    const current: unknown = JSON.parse(bytes); assertV3("StoredRecord",current);
+    if (node.commit === creationCommit && bytes !== creationBytes) throw Error("V3_RECORD_CREATION_BYTES_MISMATCH");
+    for (const parent of node.parents) {
+      const prior = records.get(parent);
+      if (prior) checkSuccessor(prior,current);
+    }
+    records.set(node.commit,current);
   }
-  const bytes = await readOptionalGitRecord(root, head, path);
-  if (bytes === null) throw Error("V3_ALLOCATED_RECORD_REMOVED");
-  const current: unknown = JSON.parse(bytes);
-  assertV3("StoredRecord", current);
-  checkSuccessor(prior, current);
+  if (!descendants.has(head)) throw Error("V3_RECORD_CREATION_NOT_IN_OWNER_ANCESTRY");
 }

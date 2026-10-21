@@ -4,7 +4,7 @@
   "protocol": "common.git-work.v3",
   "status": "source-candidate-not-activated",
   "canonicalSchema": "packages/work-continuity/contracts/git-work-v3.schema.json",
-  "canonicalSchemaSha256": "918dc3a6e933b50b186d7c72d15f7b21083459530e0ee9e32e42ebc81f6c7a48",
+  "canonicalSchemaSha256": "1f1542021ee00b044bc5d0d7577430aeba58a0d2431aa92fcb7f05c1df7e27e0",
   "generator": "packages/ontology/scripts/generate.ts --git-work-v3",
   "generatedOutputs": [
     "packages/work-continuity/src/git-work/generated/v3.ts",
@@ -59,7 +59,7 @@
   "activationPerformed": false,
   "acceptanceDecision": null,
   "corrections": {
-    "assignmentRevision": 5,
+    "assignmentRevision": 6,
     "findings": [
       "S01-R01",
       "S01-R02",
@@ -71,5 +71,12 @@
     "creationReplay": "immutable ledger and Git creation blobs plus bounded same-identity successor lineage/current source graph validation",
     "gitHooks": "native current per-invocation no-Git-hooks policy required before writes, exact head/owner/ref/authority/expiry; per-command Git override only; no Codex /hooks or global config change",
     "qualityBoundary": "New correction sources require Root registry/quality/provider successor pins. No native adoption or publication."
+  },
+  "residualCorrections": {
+    "R01": "Evaluate exact legacy selected dependencies using canonical records.ts dependencyFindings and original GitWorkReader; carry scoped dynamic holds, prevent removal/change of source edges and preserve separate acceptance qualification. Unrelated ready Tasks are unaffected.",
+    "R02": "Canonical pinned v3/graph.json semantic source projection is checked against actual canonical Work/Task/contract blobs at the same snapshot. The one resolver reconstructs the complete producer effective contract and compares packet/current graph. Proof fingerprints bind the exact graph; any graph mutation requires fresh actual source qualification. Upstream closures without actual proof remain unsupported/held, never accepted from packet self-digests.",
+    "R03": "Bounded full parent DAG (maximum8192 complete non-shallow commits) finds one actual introducing transaction; merge propagation is distinct from mutation. Every side-parent ledger deletion/rewrite and every relevant successor edge is checked, including removed/foreign/regressed side history restored at head. No ref retry or source history rewriting.",
+    "R04": "Preserved resolved exact native-qualified per-invocation hook policy and existing positive/negative/lost-ACK tests.",
+    "nativeSourceRequirement": "External artifact native owner must publish an exact canonical semantic graph source projection without embedded external proof rows at work/<project>/<work>/v3/graph.json, pin it alongside actual records, and retain native controls. This source slice performs no publication/adoption or native owner permission issuance."
   }
 }
