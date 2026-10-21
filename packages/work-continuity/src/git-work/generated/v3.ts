@@ -1,4 +1,4 @@
-/** Generated from git-work-v3.schema.json; do not edit. SHA-256: 85626ea6e2a057dabd00dd2db711fad4b0b9ef5f6e5991b00eb0394850f11553 */
+/** Generated from git-work-v3.schema.json; do not edit. SHA-256: 4c5c06cb984c67767bd551a4e7db7ed8b0cc0405edcb8a450b428c246e679425 */
 
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -176,6 +176,14 @@ export interface GitWorkV3Graph {
    * @maxItems 10000
    */
   nativeCorrelations: NativeCorrelation[];
+  /**
+   * @maxItems 2048
+   */
+  aliases?: GitWorkAlias[];
+  /**
+   * @maxItems 2048
+   */
+  externalArtifacts?: SelectedExternalArtifact[];
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -203,10 +211,11 @@ export interface Work {
   projectId: Id;
   workId: Id;
   title: Id;
-  leadActorId: Id;
+  leadActorId: Id | null;
   revision: Revision;
   contracts: ContractSet;
   status: "proposed" | "admitted" | "active" | "verified" | "accepted" | "cancelled";
+  legacySource?: GitSourcePin;
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -230,6 +239,16 @@ export interface ContractRef {
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "GitSourcePin".
+ */
+export interface GitSourcePin {
+  repositoryId: Id;
+  commit: string;
+  path: string;
+  sha256: Digest;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
  * via the `definition` "Task".
  */
 export interface Task {
@@ -238,7 +257,7 @@ export interface Task {
   taskId: Id;
   title: Id;
   parentTaskId?: Id;
-  assigneeActorId: Id;
+  assigneeActorId: Id | null;
   revision: Revision;
   contractOverrides: ContractOverrides;
   /**
@@ -250,6 +269,7 @@ export interface Task {
    */
   resources: ResourceClaim[];
   status: "planned" | "ready" | "running" | "blocked" | "verified" | "accepted" | "cancelled";
+  legacyBinding?: LegacyTaskBinding;
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -267,6 +287,19 @@ export interface ContractOverrides {
 export interface ResourceClaim {
   resource: Id;
   mode: "read" | "write";
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "LegacyTaskBinding".
+ */
+export interface LegacyTaskBinding {
+  protocol: "common.git-work.v1" | "common.git-work-task.v2";
+  source: GitSourcePin;
+  contracts: ContractSet;
+  /**
+   * @maxItems 2048
+   */
+  holdReasons: Id[];
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -394,6 +427,89 @@ export interface NativeBinding {
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "GitWorkAlias".
+ */
+export interface GitWorkAlias {
+  namespace: Id;
+  from: TypedLegacyAddress;
+  to: TypedLegacyAddress;
+  revision: Revision;
+  provenance: GitSourcePin;
+  reason: string;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "TypedLegacyAddress".
+ */
+export interface TypedLegacyAddress {
+  kind: "work" | "task" | "run" | "issue" | "spec" | "plan";
+  scope: Scope;
+  key: string;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "SelectedExternalArtifact".
+ */
+export interface SelectedExternalArtifact {
+  schema: "common.git-selected-external-artifact.v3";
+  producer: ProducerContractBinding;
+  producerContext: GitSourcePin;
+  artifact: ArtifactRef;
+  artifactSource: GitSourcePin;
+  producerMilestone: GitSourcePin;
+  selection: ArtifactGateSelection;
+  selectionReceipt: GitSourcePin;
+  /**
+   * @maxItems 2048
+   */
+  criteria: {
+    criterionId: Id;
+    receipt: GitSourcePin;
+  }[];
+  receiverOwnerId: Id;
+  receiverUse: GitSourcePin;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ProducerContractBinding".
+ */
+export interface ProducerContractBinding {
+  task: TaskRef;
+  workRevision: Revision;
+  taskRevision: Revision;
+  workContracts: ContractSet;
+  contracts: ContractSet;
+  effectiveDigest: Digest;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ArtifactGateSelection".
+ */
+export interface ArtifactGateSelection {
+  instanceId: Id;
+  revision: Revision;
+  definition: GitSourcePin;
+  consumer: ConsumerContractBinding;
+  selectedAlternative: Id;
+  selectionOwnerId: Id;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ConsumerContractBinding".
+ */
+export interface ConsumerContractBinding {
+  task: TaskRef;
+  workRevision: Revision;
+  taskRevision: Revision;
+  workContracts: ContractSet;
+  contracts: ContractSet;
+  /**
+   * @maxItems 2048
+   */
+  acceptanceCriteria: Id[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
  * via the `definition` "WorkRef".
  */
 export interface WorkRef {
@@ -446,6 +562,14 @@ export interface Graph {
    * @maxItems 10000
    */
   nativeCorrelations: NativeCorrelation[];
+  /**
+   * @maxItems 2048
+   */
+  aliases?: GitWorkAlias[];
+  /**
+   * @maxItems 2048
+   */
+  externalArtifacts?: SelectedExternalArtifact[];
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -506,6 +630,15 @@ export interface EffectiveContract {
    */
   dependencyTasks: DependencyTask[];
   digest: Digest;
+  legacyBinding?: LegacyTaskBinding;
+  /**
+   * @maxItems 2048
+   */
+  holdReasons: Id[];
+  /**
+   * @maxItems 2048
+   */
+  externalArtifacts: SelectedExternalArtifact[];
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -569,6 +702,18 @@ export interface AllocationBinding {
     actorId: Id;
     revision: Revision;
     authorityRef: Id;
+    gitHookPolicyRef: Id;
+  };
+  creation: {
+    recordBlobOid: string;
+    /**
+     * @maxItems 100
+     */
+    contractBlobs: {
+      path: string;
+      blobOid: string;
+      sha256: Digest;
+    }[];
   };
 }
 /**
@@ -586,6 +731,11 @@ export interface ContextPacket {
   authority: "none";
   nativePermissionGranted: false;
   semanticAcceptanceEstablished: false;
+  status: "source-qualified" | "held";
+  /**
+   * @maxItems 2048
+   */
+  holdReasons: Id[];
 }
 /**
  * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
@@ -600,4 +750,212 @@ export interface CompactContextPacket {
   authority: "none";
   nativePermissionGranted: false;
   semanticAcceptanceEstablished: false;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "SnapshotIdentity".
+ */
+export interface SnapshotIdentity {
+  repositoryId: Id;
+  commit: string;
+  projectId: Id;
+  workId: Id;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ArtifactAlternative".
+ */
+export interface ArtifactAlternative {
+  id: Id;
+  producer: ProducerContractBinding;
+  artifact: ArtifactRef;
+  /**
+   * @maxItems 2048
+   */
+  criterionIds: Id[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "SelectedArtifactGate".
+ */
+export interface SelectedArtifactGate {
+  schema: "common.git-artifact-gate.v3";
+  instanceId: Id;
+  revision: Revision;
+  consumer: ConsumerContractBinding;
+  selectionOwnerId: Id;
+  /**
+   * @maxItems 2048
+   */
+  alternatives: ArtifactAlternative[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ArtifactSelectionReceipt".
+ */
+export interface ArtifactSelectionReceipt {
+  schema: "common.git-artifact-selection.v3";
+  selection: ArtifactGateSelection;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ArtifactCriterionReceipt".
+ */
+export interface ArtifactCriterionReceipt {
+  schema: "common.git-artifact-criterion.v3";
+  selection: ArtifactGateSelection;
+  criterionId: Id;
+  status: "pass" | "fail" | "unknown";
+  /**
+   * @maxItems 2048
+   */
+  evidence: GitSourcePin[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ArtifactProducerMilestone".
+ */
+export interface ArtifactProducerMilestone {
+  schema: "common.git-artifact-producer-milestone.v3";
+  producer: ProducerContractBinding;
+  artifact: ArtifactRef;
+  artifactSource: GitSourcePin;
+  milestone: "verified" | "accepted";
+  acceptanceDecision?: GitSourcePin;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ArtifactAcceptanceDecision".
+ */
+export interface ArtifactAcceptanceDecision {
+  schema: "common.git-artifact-acceptance.v3";
+  producer: ProducerContractBinding;
+  artifact: ArtifactRef;
+  ownerId: Id;
+  decision: "accepted";
+  /**
+   * @maxItems 2048
+   */
+  evidence: GitSourcePin[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "ArtifactReceiverUse".
+ */
+export interface ArtifactReceiverUse {
+  schema: "common.git-artifact-receiver-use.v3";
+  selection: ArtifactGateSelection;
+  producer: ProducerContractBinding;
+  artifact: ArtifactRef;
+  receiverOwnerId: Id;
+  status: "used" | "rejected";
+  /**
+   * @maxItems 2048
+   */
+  evidence: GitSourcePin[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "LegacyCreateRequestBinding".
+ */
+export interface LegacyCreateRequestBinding {
+  schema: "common.git-legacy-create-binding.v3";
+  ownerId: Id;
+  legacyOwner: {
+    repositoryId: Id;
+    projectId: Id;
+    workId: Id;
+  };
+  createRequestId: Id;
+  kind: "task";
+  id: Id;
+  meaningSha256: Digest;
+  source: GitSourcePin;
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "LegacyMigrationRequest".
+ */
+export interface LegacyMigrationRequest {
+  schema: "common.git-legacy-migration-request.v3";
+  ownerId: Id;
+  createRequestId: Id;
+  snapshot: SnapshotIdentity;
+  expectedInventoryDigest: Digest;
+  /**
+   * @maxItems 2048
+   */
+  bootstrapRequests: GitSourcePin[];
+  /**
+   * @maxItems 2048
+   */
+  aliases: GitWorkAlias[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "LegacyWriterFence".
+ */
+export interface LegacyWriterFence {
+  schema: "common.git-work-writer-fence.v3";
+  ownerId: Id;
+  scope: WorkRef;
+  authoritativeProtocol: "v3";
+  legacyReadSnapshot: SnapshotIdentity;
+  inventoryDigest: Digest;
+  migrationRequestDigest: Digest;
+  /**
+   * @maxItems 10000
+   */
+  sources: GitSourcePin[];
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "LegacyMigrationReceipt".
+ */
+export interface LegacyMigrationReceipt {
+  schema: "common.git-legacy-migration-receipt.v3";
+  ownerId: Id;
+  createRequestId: Id;
+  requestDigest: Digest;
+  scope: WorkRef;
+  legacySnapshot: SnapshotIdentity;
+  inventoryDigest: Digest;
+  /**
+   * @maxItems 10000
+   */
+  preservedSources: GitSourcePin[];
+  /**
+   * @maxItems 10000
+   */
+  projectedFiles: {
+    path: string;
+    blobOid: string;
+    sha256: Digest;
+  }[];
+  writerFencePath: string;
+  /**
+   * @maxItems 2048
+   */
+  legacyRequestPaths: string[];
+  /**
+   * @maxItems 2048
+   */
+  aliases: GitWorkAlias[];
+  authority: {
+    actorId: Id;
+    revision: Revision;
+    authorityRef: Id;
+    gitHookPolicyRef: Id;
+  };
+}
+/**
+ * This interface was referenced by `GitWorkV3Graph`'s JSON-Schema
+ * via the `definition` "SelectedArtifactDocument".
+ */
+export interface SelectedArtifactDocument {
+  schema: "common.git-artifact.v3";
+  id: Id;
+  revision: Revision;
+  producer: ProducerContractBinding;
+  body: Json;
 }

@@ -1,4 +1,4 @@
-/** Generated from git-work-v3.schema.json; do not edit. SHA-256: 85626ea6e2a057dabd00dd2db711fad4b0b9ef5f6e5991b00eb0394850f11553 */
+/** Generated from git-work-v3.schema.json; do not edit. SHA-256: 4c5c06cb984c67767bd551a4e7db7ed8b0cc0405edcb8a450b428c246e679425 */
 export declare const validateGraph: (value: unknown) => boolean;
 export declare const validateWork: (value: unknown) => boolean;
 export declare const validateTask: (value: unknown) => boolean;
@@ -10,3 +10,20 @@ export declare const validateAllocationBinding: (value: unknown) => boolean;
 export declare const validateStoredRecord: (value: unknown) => boolean;
 export declare const validateContextPacket: (value: unknown) => boolean;
 export declare const validateCompactContextPacket: (value: unknown) => boolean;
+export declare const validateGitSourcePin: (value: unknown) => boolean;
+export declare const validateLegacyTaskBinding: (value: unknown) => boolean;
+export declare const validateGitWorkAlias: (value: unknown) => boolean;
+export declare const validateConsumerContractBinding: (value: unknown) => boolean;
+export declare const validateProducerContractBinding: (value: unknown) => boolean;
+export declare const validateSelectedArtifactGate: (value: unknown) => boolean;
+export declare const validateSelectedArtifactDocument: (value: unknown) => boolean;
+export declare const validateArtifactSelectionReceipt: (value: unknown) => boolean;
+export declare const validateArtifactCriterionReceipt: (value: unknown) => boolean;
+export declare const validateArtifactProducerMilestone: (value: unknown) => boolean;
+export declare const validateArtifactAcceptanceDecision: (value: unknown) => boolean;
+export declare const validateArtifactReceiverUse: (value: unknown) => boolean;
+export declare const validateSelectedExternalArtifact: (value: unknown) => boolean;
+export declare const validateLegacyCreateRequestBinding: (value: unknown) => boolean;
+export declare const validateLegacyMigrationRequest: (value: unknown) => boolean;
+export declare const validateLegacyWriterFence: (value: unknown) => boolean;
+export declare const validateLegacyMigrationReceipt: (value: unknown) => boolean;
