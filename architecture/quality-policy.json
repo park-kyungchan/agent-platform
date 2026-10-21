@@ -114,9 +114,15 @@
     },
     {
       "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/standing-user-decision.json",
-      "sha256": "40c5e87f935697962f205ba7c1c3612e2fcfb2a6293099e6842d380b356c4137",
+      "sha256": "a61c3e3300373ccbbe8762e705f350a812c3975fd22aa63a45a5497cc2c3ffc8",
       "capabilityId": "native-codex-source",
       "reason": "Exact common-owned Herdr long-work skill reference; source definition and captured standing user decision only, without native permission, runtime activation or acceptance."
+    },
+    {
+      "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/sublead-workflow.json",
+      "sha256": "bec318448e0160f65b08f2b7eb5d55dc71e0d68e268b6baad134b26a454cc0d6",
+      "capabilityId": "native-codex-source",
+      "reason": "Exact common-owned conditional SubLead instruction reference; defines scoped delegation guidance without runtime scheduling, native permission or Acceptance."
     },
     {
       "path": "packages/native-codex-adapter/skills/herdr-codex-long-work/references/standing-typed-engineering-decision.json",
