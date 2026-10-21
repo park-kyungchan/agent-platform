@@ -1,0 +1,38 @@
+{
+  "schema": "native-independent-review.v2",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "1784b2f6d604bd148a540710e6283aba770daa7b",
+  "reviewedTreeSha": "7159687f23b95ccdc71265d260864bf5179a7915",
+  "reviewedSourceManifestSha256": "ea39923eb3c99674f9f72263746486a17ab02bcc3cc7948a05ccf09a208f68c8",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a15f1b-a0f4-7cc1-b407-039084108ad9"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a15e93-a450-71f0-bfe4-2352ea19068b"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "reviewReuse": {
+    "schema": "agent-platform.exact-tree-review-reuse.v1",
+    "originalHead": "60419180044df931af34c856e3574f7d3882f5bd",
+    "successorHead": "1784b2f6d604bd148a540710e6283aba770daa7b",
+    "reviewedTreeSha": "7159687f23b95ccdc71265d260864bf5179a7915",
+    "originalNativeReviewSha256": "96208ec94f15355fc4f1b79c813f8170a6cfdd24527fbbeaeb7453a1514590b3",
+    "currentUnresolvedFindings": 0,
+    "identityProof": "GitHub merge commit tree exactly equals independently reviewed source tree; strict checked base remained5591d0521aca2cd545220599e3bc78a6d8f19cf0",
+    "authority": "Repository AGENTS.md identical-reviewed-tree successor rule; explicit Root expected-head merge64",
+    "newNativeReviewInvocation": false,
+    "nativeActivation": false
+  },
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/b33f83164778e44e688b6d70f0bf1b1a46088ab0/native-review-results/1784b2f6d604bd148a540710e6283aba770daa7b.json",
+    "sha256": "5f079d3b9d5dcb305b1070840935f31f7ce8bcc4e5f4e1807b0d1c279b53f519"
+  }
+}
