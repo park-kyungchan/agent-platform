@@ -108,42 +108,87 @@ async function generateMemoryV1(): Promise<void> {
   const schemaPath = join(root, "packages/work-continuity/contracts/memory-v1.schema.json");
   const workPath = join(root, "packages/work-continuity/contracts/git-work-v3.schema.json");
   const output = join(root, "packages/work-continuity/src/memory/generated");
-  const input = await readFile(schemaPath), workInput = await readFile(workPath);
+  const input = await readFile(schemaPath),
+    workInput = await readFile(workPath);
   const schemaSha256 = createHash("sha256").update(input).digest("hex");
   const sharedSchemaSha256 = createHash("sha256").update(workInput).digest("hex");
   const banner = `/** Generated from memory-v1.schema.json; do not edit. SHA-256: ${schemaSha256}; S01: ${sharedSchemaSha256} */`;
   // Materialize only the referenced shared definition closure from its canonical
   // S01 schema. This transient compiler input is not another maintained schema.
-  const schema = JSON.parse(input.toString()) as Parameters<typeof compile>[0] & { $defs: Record<string, unknown> };
+  const schema = JSON.parse(input.toString()) as Parameters<typeof compile>[0] & {
+    $defs: Record<string, unknown>;
+  };
   const shared = JSON.parse(workInput.toString()) as { $defs: Record<string, unknown> };
-  for (const name of ["Scope", "SourceRef", "TaskRef", "WorkRef", "Id", "Digest", "Revision", "Json"])
+  for (const name of [
+    "Scope",
+    "SourceRef",
+    "TaskRef",
+    "WorkRef",
+    "Id",
+    "Digest",
+    "Revision",
+    "Json",
+  ])
     schema.$defs[name] = structuredClone(shared.$defs[name]);
   const types = await compile(schema, "MemoryV1", {
-    bannerComment: banner, unreachableDefinitions: true, unknownAny: true, format: true,
+    bannerComment: banner,
+    unreachableDefinitions: true,
+    unknownAny: true,
+    format: true,
   });
-  const names = ["MemoryRecord", "MemoryDocument", "MemoryQuery", "GoverningDocument", "LegacyBinding"];
-  const ajv = new Ajv({ strict: true, allErrors: false, inlineRefs: false, code: { source: true, esm: true } });
+  const names = [
+    "MemoryRecord",
+    "MemoryDocument",
+    "MemoryQuery",
+    "GoverningDocument",
+    "LegacyBinding",
+  ];
+  const ajv = new Ajv({
+    strict: true,
+    allErrors: false,
+    inlineRefs: false,
+    code: { source: true, esm: true },
+  });
   ajv.addSchema(schema as Parameters<Ajv["addSchema"]>[0], "memory");
-  const standalone = standaloneCode(ajv, Object.fromEntries(names.map(name => ["validate" + name, "memory#/$defs/" + name])));
+  const standalone = standaloneCode(
+    ajv,
+    Object.fromEntries(names.map((name) => ["validate" + name, "memory#/$defs/" + name])),
+  );
   const entry = fileURLToPath(new URL("./.memory-v1-standalone.generated.js", import.meta.url));
   await writeFile(entry, standalone, { flag: "wx" });
   let built: Awaited<ReturnType<typeof Bun.build>>;
-  try { built = await Bun.build({ entrypoints: [entry], target: "bun", packages: "bundle" }); }
-  finally { await rm(entry); }
+  try {
+    built = await Bun.build({ entrypoints: [entry], target: "bun", packages: "bundle" });
+  } finally {
+    await rm(entry);
+  }
   if (!built.success) throw Error("MEMORY_VALIDATOR_BUNDLE_FAILED");
   const artifacts = {
     "memory-v1.ts": types,
-    "memory-v1-validators.js": banner + "\n" + await built.outputs[0]!.text(),
-    "memory-v1-validators.d.ts": banner + "\n" + names.map(name => `export declare const validate${name}: (value: unknown) => boolean;`).join("\n") + "\n",
+    "memory-v1-validators.js": banner + "\n" + (await built.outputs[0]!.text()),
+    "memory-v1-validators.d.ts":
+      banner +
+      "\n" +
+      names
+        .map((name) => `export declare const validate${name}: (value: unknown) => boolean;`)
+        .join("\n") +
+      "\n",
   };
   if (!process.argv.includes("--check")) await mkdir(output, { recursive: true });
   for (const [name, bytes] of Object.entries(artifacts)) {
     const path = join(output, name);
     if (process.argv.includes("--check")) {
-      if (await readFile(path, "utf8") !== bytes) throw Error("STALE_MEMORY_GENERATED_SOURCE");
+      if ((await readFile(path, "utf8")) !== bytes) throw Error("STALE_MEMORY_GENERATED_SOURCE");
     } else await writeFile(path, bytes);
   }
-  console.log(JSON.stringify({status: "pass",schemaSha256,sharedSchemaSha256,outputs:Object.keys(artifacts)}));
+  console.log(
+    JSON.stringify({
+      status: "pass",
+      schemaSha256,
+      sharedSchemaSha256,
+      outputs: Object.keys(artifacts),
+    }),
+  );
 }
 
 if (process.argv.includes("--memory-v1")) {

@@ -153,7 +153,16 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
       // Work affects relevance among matching rows; it never filters permitted scopes.
       const contextWork=request.task??request.work;
       const relevant=(row:Acquired) => contextWork && [row.kind==="memory"?row.document.record.owner:row.document.owner,...(row.kind==="memory"?row.document.record.subjects:[])].some(scope=>"workId" in scope && scope.workId===contextWork.workId && scope.projectId===contextWork.projectId)?1:0;
-      const selected=ranked.indices.map(index=>acquired[index]!).sort((a,b)=>relevant(b)-relevant(a));
+      const selected=ranked.indices.slice().sort((a,b)=>{
+        const left=acquired[a]!,right=acquired[b]!;
+        // Only an independently qualified actual governing source can precede
+        // contradictory Memory for the same claim. An enum never gives priority.
+        if(left.kind==="memory"&&right.kind==="memory"&&left.document.claim?.key&&left.document.claim.key===right.document.claim?.key){
+          const governs=Number(!!right.use?.decision)-Number(!!left.use?.decision);
+          if(governs)return governs;
+        }
+        return ranked.scores.get(b)!-ranked.scores.get(a)!||relevant(right)-relevant(left)||a-b;
+      }).map(index=>acquired[index]!);
       const result:MemoryQueryResult={schema:"common.memory-query-result.v1",mode:request.mode,readerId:lease.readerId,policyGeneration:generation,ownerPolicyGenerations:JSON.parse(policy) as Record<string,string>,observedAtUtc:lease.nowUtc,asOf:request.asOf??lease.nowUtc,hits:[],governing:[],conflicts:[],...(taskContext?{taskContext}:{}),counts,omissions,acquisitionGaps:gaps,sourceCoverage:inventory.truncated||gaps.length||omissions.sourceLimit?"partial":"complete",index:{version:retrievalVersion,lifetime:"query",disposed:true,persistentBodies:false,rebuildWatermark:memoryDigest(canonicalMemory([generation,policy,acquired.map(row=>row.source)]))},authority:"none",nativePermissionGranted:false,semanticAcceptanceEstablished:false};
       const budget=request.maxChars??16000, limit=request.limit??10;
       const fits=()=>JSON.stringify(result).length<=budget;

@@ -108,7 +108,7 @@ export async function runHarness(
     case "memory-query": {
       if (!nativeMemoryReader) throw Error("MEMORY_CURRENT_NATIVE_READER_REQUIRED");
       const { withMemoryQuery } = await import("../packages/work-continuity/src/memory/v1.ts");
-      return withMemoryQuery(request, nativeMemoryReader, result => result);
+      return withMemoryQuery(request, nativeMemoryReader, (result) => result);
     }
     case "context-v3": {
       documentationFields(request, ["graph", "task", "mode", "expectedDigest", "snapshot"]);
