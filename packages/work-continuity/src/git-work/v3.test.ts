@@ -282,7 +282,11 @@ describe("v3 generated schema and immutable contract semantics", () => {
         required: "accepted",
       },
     ];
-    graph.dependencies[1]!.artifact = { id: "immutable-artifact", revision: 1, digest: "1".repeat(64) };
+    graph.dependencies[1]!.artifact = {
+      id: "immutable-artifact",
+      revision: 1,
+      digest: "1".repeat(64),
+    };
     expect(() => resolveEffectiveContract(graph, fixtureTask)).toThrow("EXACT_SELECTED_ARTIFACT");
     delete graph.dependencies[1]!.artifact;
     const initial = resolveEffectiveContract(graph, fixtureTask);

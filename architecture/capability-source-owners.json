@@ -270,37 +270,37 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/aliases.ts",
-          "sha256": "64a82b45932b54842420a06ca3d9bf1328d9e8086a01948cf3c08dc9335e383f",
+          "sha256": "01d6399aeadb84a80b61d3493efc02435c9bf55ef7b9994d93f196d35068a717",
           "relativePath": "packages/work-continuity/src/git-work/aliases.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/external-artifacts.ts",
-          "sha256": "590d6710f5fc88dcaf76d2addd719b41862b70bf50df1847d70362e87bf9216d",
+          "sha256": "501e6dc716e1aafb2a55457fc22a7ec1a1b151b3e88a43241fa461b4d177ec96",
           "relativePath": "packages/work-continuity/src/git-work/external-artifacts.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/git-owner-transaction.ts",
-          "sha256": "97c1d23e0413f5d940b4eb814754c25d81fb95b65143473dee4170c5458097e7",
+          "sha256": "6e365c3e6f70401f94d6e27a9afb027574a16c454433cd0ff416f5e26797fd7b",
           "relativePath": "packages/work-continuity/src/git-work/git-owner-transaction.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/legacy-bridge.ts",
-          "sha256": "81bca1db7f6327e4e273c04ac5c7722bdeff5f48e3a491732b9ec55b48523629",
+          "sha256": "7bbdc51a7c67a47d12f02836e4d3c6ec08b2b2c9a62cff4688cdd5ca42ebc2a5",
           "relativePath": "packages/work-continuity/src/git-work/legacy-bridge.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/legacy-model.ts",
-          "sha256": "6a09c8016168fbac625c31ecc06520283b76cc3ffdee132f831194c82e41c25a",
+          "sha256": "17101cf9bf806a14a83fce5f498c7eb82eec0db0e7fe136d3067912ff6aa81e8",
           "relativePath": "packages/work-continuity/src/git-work/legacy-model.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/legacy-qualification.ts",
-          "sha256": "84283a594c478c4bd7776c0b382cea33066d44b0f480f36305a8a76446245990",
+          "sha256": "454db45e79b80ada5a62bdca68576d7e0a4874889e2b35fefc253dc74ad91ec5",
           "relativePath": "packages/work-continuity/src/git-work/legacy-qualification.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/record-lineage.ts",
-          "sha256": "a972fbd3fbb40e39dc65a98cb9649079504e2ea52a5a412e8ac29c77b68dd0eb",
+          "sha256": "674f31042aab926d5974948844213eeec4105a22d3ec9b7a5ef1372882f62941",
           "relativePath": "packages/work-continuity/src/git-work/record-lineage.ts"
         }
       ],
