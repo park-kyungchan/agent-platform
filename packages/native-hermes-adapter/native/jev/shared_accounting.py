@@ -24,6 +24,7 @@ import time
 
 DEFAULT_LEDGER = Path('/home/palantirkc/orchestrator/.recovery-20261019/jev-accounting.actual.json')
 MODEL = 'typesafe-ai/jev-1.14.0'
+DIRECT_POLICY = 'jev.direct-selected-answer.v2'
 HEX = re.compile(r'[0-9a-f]{64}\Z')
 LABEL = re.compile(r'[A-Za-z0-9_.:-]{1,160}\Z')
 ACTIVE = {'admitted-semantic-dispatch-pending', 'dispatch-outcome-unknown-do-not-retry'}
@@ -45,6 +46,26 @@ def sha(body):
 
 def utc():
     return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def contract_metadata(value):
+    """Explicit v2 admission only; absent metadata always means legacy v1.
+
+    These technical binding fields are supplied by the existing native host
+    owner before dispatch. No schema, policy or canonical request digest is
+    inferred from an old ledger row or a later provider result.
+    """
+    if value is None:
+        return None
+    need(isinstance(value, dict) and set(value) == {
+        'requestSchema', 'resultSchema', 'consumptionPolicy', 'requestDigest'},
+        'v2_reservation_metadata_required')
+    need(value['requestSchema'] == 'jev.semantic-request.v2'
+         and value['resultSchema'] == 'jev.semantic-result.v2'
+         and value['consumptionPolicy'] == DIRECT_POLICY
+         and isinstance(value['requestDigest'], str) and HEX.fullmatch(value['requestDigest']),
+         'v2_reservation_metadata_invalid')
+    return dict(value)
 
 
 def numeric(value):
@@ -114,6 +135,10 @@ class ExistingLedger:
              'existing_call_records_required')
         need(all(str(row.get('state', '')).startswith('reconciled-') or
                  row.get('state') in ACTIVE for row in ledger['calls']), 'legacy_call_requires_reconciliation')
+        for row in ledger['calls']:
+            if 'semanticContract' in row:
+                need(row['semanticContract'] is not None, 'v2_reservation_metadata_required')
+                contract_metadata(row['semanticContract'])
 
     def _persist(self, descriptor, previous, ledger):
         current = self.path.lstat()
@@ -164,7 +189,8 @@ class ExistingLedger:
         return {key: scope.get(key) for key in ('sessionId', 'agentId', 'agentType')}
 
     def reserve(self, *, request_id, request_sha256, state_digest, purpose, scope, receipt_ref,
-                pricing, reserve_usd=0.01, max_input_bytes=49152, decision_digest=None):
+                pricing, reserve_usd=0.01, max_input_bytes=49152, decision_digest=None,
+                semantic_contract=None):
         need(isinstance(request_id, str) and LABEL.fullmatch(request_id), 'request_id')
         need(isinstance(request_sha256, str) and HEX.fullmatch(request_sha256), 'request_digest')
         need(isinstance(state_digest, str) and HEX.fullmatch(state_digest), 'state_digest')
@@ -185,16 +211,21 @@ class ExistingLedger:
         need(reserve_usd >= minimum, 'reserve_below_pricing_byte_bound')
         need(decision_digest is None or isinstance(decision_digest, str) and HEX.fullmatch(decision_digest),
              'decision_digest')
+        semantic_contract = contract_metadata(semantic_contract)
         binding = self._binding(scope)
         with self._locked() as (descriptor, previous, ledger):
             for row in ledger['calls']:
                 if row.get('localCorrelationId') == request_id:
                     need(row.get('requestSha256') == request_sha256, 'request_id_rebound_do_not_retry')
+                    need(row.get('semanticContract') == semantic_contract, 'request_contract_rebound_do_not_retry')
                     return {'admitted': False, 'reason': 'existing_request_do_not_dispatch',
                             'existing': row, 'ledgerSha256': sha(previous)}
                 if (decision_digest is not None and row.get('decisionDigest') == decision_digest
                         and row.get('purpose') == purpose and row.get('stateDigest') == state_digest
                         and row.get('nativeBinding') == binding):
+                    # A schema successor cannot reopen an equivalent completed
+                    # or unknown effect. Returning the original row does not
+                    # upgrade its version or infer missing admission metadata.
                     return {'admitted': False, 'reason': 'equivalent_state_do_not_dispatch',
                             'existing': row, 'ledgerSha256': sha(previous)}
             need(sum(row.get('state') in ACTIVE for row in ledger['calls']) < self.max_in_flight,
@@ -209,6 +240,8 @@ class ExistingLedger:
                      'receipt': receipt_ref, 'admittedAtUtc': utc(), 'accountedTransportCount': 0,
                      'pricingEvidenceSha256': pricing['evidenceSha256'],
                      'minimumByteBoundReserveUsd': minimum, 'maximumWireInputBytes': max_input_bytes}
+            if semantic_contract is not None:
+                entry['semanticContract'] = semantic_contract
             if ledger.get('admissionOwner') != OWNER:
                 ledger.setdefault('accountingOwnerHistory', []).append({
                     'admissionOwner': ledger.get('admissionOwner'),
@@ -239,7 +272,9 @@ class ExistingLedger:
                     'pending': [{'requestId': row['localCorrelationId'],
                                  'requestSha256': row['requestSha256'],
                                  'stateDigest': row['stateDigest'], 'state': row['state'],
-                                 'receipt': row['receipt'], 'nativeBinding': row['nativeBinding']}
+                                 'receipt': row['receipt'], 'nativeBinding': row['nativeBinding'],
+                                 **({'semanticContract': dict(row['semanticContract'])}
+                                    if 'semanticContract' in row else {})}
                                 for row in rows]}
 
     @staticmethod
@@ -249,13 +284,24 @@ class ExistingLedger:
         return matches[0]
 
     def reconcile(self, *, request_id, request_sha256, result, estimate_usd=None):
-        need(isinstance(result, dict) and result.get('schema') == 'jev.semantic-result.v1', 'response_schema')
+        need(isinstance(result, dict) and result.get('schema') in (
+            'jev.semantic-result.v1', 'jev.semantic-result.v2'), 'response_schema')
         need(result.get('requestId') == request_id and result.get('submittedRequestSha256') == request_sha256,
              'response_correlation_unknown')
         count = result.get('transportInvocations')
         need(type(count) is int and count in (0, 1), 'transport_count_unknown')
         need(result.get('status') in ('ok', 'error', 'held'), 'response_status')
         need(result.get('requestedModel') == MODEL, 'requested_model_mismatch')
+        if result['schema'] == 'jev.semantic-result.v2':
+            need(result.get('consumptionPolicy') == DIRECT_POLICY
+                 and isinstance(result.get('requestDigest'), str) and HEX.fullmatch(result['requestDigest'])
+                 and result.get('purpose') == 'semantic_bundle', 'v2_response_contract_invalid')
+            leases = result.get('connectionLeases')
+            need(type(leases) is int and 0 <= leases <= count, 'v2_connection_count_unknown')
+            need(result.get('executionAuthorityGranted') is False and result.get('automaticWrite') is False,
+                 'v2_response_authority_invalid')
+            need(result['status'] != 'held' or count == 0, 'v2_held_transport_count')
+            need(result['status'] != 'ok' or count == leases == 1, 'v2_success_transport_count')
         if result['status'] == 'ok':
             need(result.get('returnedModel') in (MODEL, 'jev-1.14.0')
                  and result.get('sourcePostconditionVerified') is True, 'successful_response_unverified')
@@ -264,6 +310,14 @@ class ExistingLedger:
         with self._locked() as (descriptor, previous, ledger):
             row = self._find(ledger, request_id, request_sha256)
             need(result.get('stateDigest') == row.get('stateDigest'), 'state_binding_mismatch')
+            contract = row.get('semanticContract')
+            if contract is None:
+                need(result['schema'] == 'jev.semantic-result.v1', 'response_contract_binding_mismatch')
+            else:
+                need(result['schema'] == contract['resultSchema']
+                     and result.get('consumptionPolicy') == contract['consumptionPolicy']
+                     and result.get('requestDigest') == contract['requestDigest']
+                     and result.get('purpose') == row['purpose'], 'response_contract_binding_mismatch')
             if str(row.get('state', '')).startswith('reconciled-'):
                 need(row.get('semanticResponseSha256') == response_sha, 'original_response_changed')
                 return {'state': row['state'], 'alreadyReconciled': True, 'ledgerSha256': sha(previous)}

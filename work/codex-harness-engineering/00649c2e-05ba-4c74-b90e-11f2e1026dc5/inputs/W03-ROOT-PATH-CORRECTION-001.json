@@ -1,0 +1,28 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+  "kind": "input",
+  "id": "W03-ROOT-PATH-CORRECTION-001",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/root-context-delta-001.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w03.root-assignment-delta.v1",
+    "atUtc": "2026-10-21T08:23:06.549370+00:00",
+    "assignmentId": "W03-NATIVE-V2-SOURCE-SUBLEAD-20261021",
+    "assignmentRevision": 1,
+    "type": "canonical-own-record-path-correction",
+    "authority": "The actual user already approved own W03 TS/JSON Work records. Root corrects its overly narrow slug-path projection to the canonical UUID path; no broader source/runtime authority.",
+    "background": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/work-path-extension.proposed.json",
+    "oldRecordDirectory": "work/codex-harness-engineering/jev-w03-native-v2-source-20261021/",
+    "approvedCanonicalRecordDirectory": "work/codex-harness-engineering/00649c2e-05ba-4c74-b90e-11f2e1026dc5/",
+    "logicalWorkIdUnchanged": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+    "instruction": "Use the existing canonical gitWorkPath reader/layout. Move only your own newly authored uncommitted slug-path records to the canonical UUID directory if needed; preserve any inherited records. No alias feature or logical ID substitution is requested. Validate/consume own Work through the actual canonical reader. All other source/native/provider/Goal/owner boundaries remain. Complete this correction within the approved source slice without another user approval.",
+    "rootMistake": "Initial packet prescribed a slug directory incompatible with the existing UUID reader. Correct the packet path rather than creating a second reader or gate."
+  }
+}

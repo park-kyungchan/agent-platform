@@ -1,0 +1,36 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+  "kind": "input",
+  "id": "W03-QUALITY-PREDECLARATION",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/request.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w03.source-work-record.v1",
+    "assignmentId": "W03-NATIVE-V2-SOURCE-SUBLEAD-20261021",
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+    "recordCustody": "Approved named W03 path; not a canonical ID registration or native authorship proof.",
+    "kind": "bounded-source-validation-plan",
+    "actualConsumer": "Native Hermes semantic caller -> exact pinned jevkit.client.check_questions/ask -> existing pool/transport -> immutable existing receipts.",
+    "usefulGoal": "Admit qualified v2 typed answers without fabricated metadata or a second client; preserve v1 and effect fences.",
+    "independentValidation": "Separate high child imports actual source, reviews consumer joins and exercises adversarial fixtures.",
+    "treatment": "Only approved native caller/schema/helpers/tests; no dependency, native configuration or provider effects.",
+    "limits": {
+      "runtimeOwners": "Native loops/session/auth/tools/permissions/config and existing provider client/receipts stay native-owner controlled. Hermes default Lead retains R&D/Ontology/Wiki/internal measurement; Root infra role only. code-server stays separate browser IDE.",
+      "forbidden": "No source writes outside allowlist, live installed caller/config/source pins/registrations/skills/caches/credentials; no push/PR/merge/release/deploy/activation; no canonical UUID registration; no provider/native lifecycle/action/restore tests; no Goal; no scheduler/runtime/session replica; no effect replay.",
+      "exclusiveAcademy": "ACX-BOUNDARY-001 two Academy scopes, branches, worktrees and owners remain exclusive. Do not inspect private content, write, dispatch competing workers, merge, activate, relocate or expand. See pinned coordination-boundaries if a real overlap arises.",
+      "AGYArgon": "Hold remains. No executable/help/provider probes.",
+      "formats": "Author English TS/JSON only outside required native Python runtime source/tests. No new Markdown."
+    },
+    "baseline": "Reuse exact W02 results; missing original baseline usage remains unknown. No repeated inference/evals.",
+    "nextDecision": "Root evaluates local delivery and explicit owner extensions; publication/native qualification/Acceptance remain separate."
+  }
+}

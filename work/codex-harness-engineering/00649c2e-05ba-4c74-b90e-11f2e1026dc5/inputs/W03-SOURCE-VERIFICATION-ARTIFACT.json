@@ -1,0 +1,126 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+  "kind": "input",
+  "id": "W03-SOURCE-VERIFICATION-ARTIFACT",
+  "inputKind": "source-owner-record",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "locator": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/independent.result.json",
+    "kind": "source-owner-capture"
+  },
+  "content": {
+    "schema": "jev.w03.source-verification-artifact.v1",
+    "scope": "Approved source/offline slice only; no native integration or Acceptance.",
+    "sourceBase": "0a36719fab1de97114e22c1c31a7542cfc768a61",
+    "reviewedSourcePins": [
+      {
+        "path": "packages/native-hermes-adapter/native/jev/semantic_caller.py",
+        "sha256": "317d81524528bf8ef019272cef8a125ee26bcd6de1a276cc9b2dfd36cacb1aca"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/jev/v2_contract.py",
+        "sha256": "1cf741cce4f40afd52998df4e6ae4fa075895f8ad34901f2a0c9d39d710a07c8"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/jev/test_v2_contract.py",
+        "sha256": "858c9b339a4139bf3f1217f7f351b39689b575efd4d24cf7e370ae81ee584a16"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/jev/contract.schema.json",
+        "sha256": "f40084d14543693c1f77653a02df6cd0b626c4ec6eaf875719e3377ac1999e2f"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/jev/shared_accounting.py",
+        "sha256": "e7990104dfdabacd34be4fa100a44fae19f08578981f246b3da4258c9891cdbd"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/jev/test_shared_accounting.py",
+        "sha256": "5bfba979d3ce60ac780969ec55abab1b2d96e2d5000d764333af576d0c3f453e"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/jev/test_independent_v2.py",
+        "sha256": "bfb8562195b91f2a2fba579663cfa2ef31026658e5e793743321f7fe38495349"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/jev/test_semantic_caller.py",
+        "sha256": "49a42047a1d11543d8390416dac5a78afeb11c879097a7c3e1526f4b44f98b7b"
+      },
+      {
+        "path": "packages/native-hermes-adapter/native/jev/test_result_receipts.py",
+        "sha256": "dcb27cb001917ea3cb58f77d1382658d654e2b811619bc5f5d1cd5c8e8850b05"
+      }
+    ],
+    "independentResult": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/independent.result.json",
+      "sha256": "feb798ae2e55e6a59756eef430d0e8b56007dfd02d6e7ae2b2519233c279d473"
+    },
+    "requiredChecks": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/required-checks.actual.json",
+      "sha256": "9194814158ca4f310678a5481aa1c524c16c1d2ddb832b88fd22a5261be7b34f"
+    },
+    "requiredCheckClasses": {
+      "context-provider-proof": "exact-unchanged-source-qa",
+      "python-syntax": "actual-w03-source-syntax",
+      "handoff": "exact-unchanged-source-qa",
+      "imports": "exact-unchanged-source-qa",
+      "source-owner-closure": "exact-unchanged-source-qa",
+      "native-python": "actual-imported-w03-source-offline-injection",
+      "strict-types": "exact-unchanged-source-qa",
+      "native-hermes-package": "exact-unchanged-source-qa",
+      "whitespace": "source-whitespace",
+      "format": "actual-w03-json-format"
+    },
+    "actualFinalImportedPythonTests": 87,
+    "independentCases": 36,
+    "typeScriptByteIdenticalQaFiles": 268,
+    "nativeHermesPackage": {
+      "passed": 192,
+      "skipped": 1,
+      "failed": 0,
+      "assertions": 1758
+    },
+    "findings": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/independent.findings.final.json",
+      "sha256": "ac1156cbb5f546548b18cb39f629863f68e4e2f979b454151199860494cd59d8"
+    },
+    "unresolvedInScopeFindings": [],
+    "consumerMatrix": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/consumer-matrix.actual.json",
+      "sha256": "224cfd0fee5b1a11e8eb4ab3d29a84a152c00ce803ee08e88c66974845818919"
+    },
+    "extensions": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/implementation.extensions.json",
+      "sha256": "018cb56de17a5fccff4760e63cb34c76f223af349d16747eaf1cbbe836f84bda"
+    },
+    "childResults": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/child-results-retained.actual.json",
+      "sha256": "927e1c5bb66df021bbf8a36beac2e3c097a48b59318c2a72235939595cc1d5a9"
+    },
+    "childrenClosure": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/children-closure.actual.json",
+      "sha256": "eabcdd2def35818d8b3daf28a3577b479701221e8063987f073ed7145871e554"
+    },
+    "measurement": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w03-native-v2-source-20261021/output/measurement-limits.actual.json",
+      "sha256": "c01eb4cda201664e2d2eca66bc6210be788e513201eddfd7b05f1a18cdd8917b"
+    },
+    "nativeInstalledConfiguration": "unverified",
+    "liveProviderNativeE2E": "not-authorized-not-run",
+    "publication": "pending-not-authorized",
+    "activation": "pending-not-authorized",
+    "canonicalRegistration": "not-performed",
+    "WorkAcceptance": false,
+    "effects": {
+      "provider": 0,
+      "nativeActions": 0,
+      "realLedgerAccess": false,
+      "configuration": 0,
+      "publication": 0,
+      "activation": 0,
+      "Goal": 0
+    }
+  }
+}

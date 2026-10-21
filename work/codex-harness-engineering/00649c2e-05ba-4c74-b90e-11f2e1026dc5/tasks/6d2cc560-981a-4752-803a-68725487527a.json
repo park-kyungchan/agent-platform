@@ -1,0 +1,33 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+  "kind": "task",
+  "id": "6d2cc560-981a-4752-803a-68725487527a",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "00649c2e-05ba-4c74-b90e-11f2e1026dc5",
+    "issueId": "W03-NATIVE-V2-SOURCE-ISSUE",
+    "specId": "W03-NATIVE-V2-SOURCE-SPEC",
+    "specRevision": 1,
+    "planId": "W03-NATIVE-V2-SOURCE-PLAN",
+    "planRevision": 1,
+    "taskId": "6d2cc560-981a-4752-803a-68725487527a"
+  },
+  "title": "CLI-hermes-tui: Named parser/client source slice; not whole Hermes runtime acceptance",
+  "nextAction": "Root consumes exact local source delivery. Actual host metadata/pins, environment-specific native joins, image/client owner extensions, publication review, activation and whole Task/Work Acceptance remain separate.",
+  "state": {
+    "execution": "complete",
+    "verification": "passed",
+    "localAudit": "result-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "audit-synchronization-pending"
+  },
+  "executionClass": "source-only",
+  "dependsOn": [],
+  "decisionIds": [],
+  "effectIds": [],
+  "verificationEvidenceIds": ["W03-SOURCE-VERIFICATION"]
+}
