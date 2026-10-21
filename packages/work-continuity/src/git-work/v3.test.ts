@@ -28,9 +28,10 @@ function override(g: Graph, edit: (body: Record<string, unknown>) => void = () =
 
 describe("v3 generated schema and immutable contract semantics", () => {
   test("schema codecs retain scoped legacy slugs and reject ambiguous JSON", () => {
+    class SyntheticArraySubclass extends Array<number> {}
     const graph = fixtureGraph(); expect(decodeV3("Graph", encodeV3("Graph", graph))).toEqual(graph);
     expect(() => decodeV3("Graph", JSON.stringify(graph))).toThrow("CANONICAL_TRANSPORT");
-    for (const value of [NaN, Infinity, -0, 1.5, undefined, { x: undefined }, new Date(), [, 1], Object.defineProperty({}, "x", { get() { throw Error("accessor executed"); }, enumerable: true })]) expect(() => canonicalV3(value)).toThrow();
+    for (const value of [NaN, Infinity, -0, 1.5, undefined, { x: undefined }, new Date(), SyntheticArraySubclass.of(1), [, 1], Object.defineProperty({}, "x", { get() { throw Error("accessor executed"); }, enumerable: true })]) expect(() => canonicalV3(value)).toThrow();
     expect(() => canonicalV3({ x: "x".repeat(4_194_305) })).toThrow("BOUND");
     const cycle: { self?: unknown } = {}; cycle.self = cycle; expect(() => canonicalV3(cycle)).toThrow("CYCLE");
   });

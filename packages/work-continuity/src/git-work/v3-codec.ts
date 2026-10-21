@@ -16,7 +16,8 @@ export function canonicalV3(value: unknown): string {
     if (typeof input === "number" && Number.isSafeInteger(input) && !Object.is(input, -0)) return String(input);
     if (typeof input !== "object" || input === null) throw Error("V3_PLAIN_JSON_REQUIRED");
     if (parents.has(input)) throw Error("V3_JSON_CYCLE");
-    if (!Array.isArray(input) && ![Object.prototype, null].includes(Object.getPrototypeOf(input))) throw Error("V3_PLAIN_JSON_REQUIRED");
+    const prototype = Object.getPrototypeOf(input);
+    if (Array.isArray(input) ? prototype !== Array.prototype : ![Object.prototype, null].includes(prototype)) throw Error("V3_PLAIN_JSON_REQUIRED");
     if (Reflect.ownKeys(input).some((key) => typeof key !== "string")) throw Error("V3_PLAIN_JSON_REQUIRED");
     const descriptors = Object.getOwnPropertyDescriptors(input);
     if (Object.entries(descriptors).some(([key, d]) => !Object.hasOwn(d, "value") || (!d.enumerable && !(Array.isArray(input) && key === "length")))) throw Error("V3_PLAIN_JSON_REQUIRED");
