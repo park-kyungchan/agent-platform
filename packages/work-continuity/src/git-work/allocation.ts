@@ -416,7 +416,9 @@ export async function allocateGitWorkIdentity(
         if (!["planned", "ready"].includes(task.status))
           throw Error("V3_OWNER_TASK_NOT_RESERVABLE");
         if (task.assigneeActorId === null) throw Error("V3_RUN_NATIVE_ASSIGNEE_UNOBSERVED");
-        if (run.effectiveContractDigest !== resolveEffectiveContract(graph, run.task).digest)
+        const effectiveContract = resolveEffectiveContract(graph, run.task);
+        if (effectiveContract.holdReasons.length) throw Error("V3_RUN_EFFECTIVE_CONTRACT_HELD");
+        if (run.effectiveContractDigest !== effectiveContract.digest)
           throw Error("V3_RUN_EFFECTIVE_CONTRACT_MISMATCH");
         let lastAttempt = 0;
         for (const path of allPaths.filter(

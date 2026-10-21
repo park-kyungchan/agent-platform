@@ -11,7 +11,7 @@ import { readLegacyGitWorkProjection, readVersionedLegacyGitWork, admitLegacyGit
 import { validateGitWorkAliases, resolveGitWorkAlias } from "./aliases.ts";
 import { resolveEffectiveContract, readGitWorkV3Context, expandGitWorkV3Context, readSourceQualifiedGitWorkV3Context, v3ContractRef } from "./effective-contract.ts";
 import { openExactV3SourceReader, consumerContractBinding } from "./external-artifacts.ts";
-import { allocateGitWorkIdentity, type GitAllocationTarget } from "./allocation.ts";
+import { allocateGitWorkIdentity, type GitAllocationTarget, type NativeGitIdentityOwner } from "./allocation.ts";
 import { sourceSha256 } from "./git-owner-transaction.ts";
 import { fixtureGit as git, fixtureScope, fixtureTask, fixtureRef, fixtureGraph, fixtureOwner, fixtureTaskRequest, fixtureWorkRequest, fixtureContract, seedFixture } from "./fixtures/v3-owner.ts";
 
@@ -206,3 +206,22 @@ test("R04 missing/wrong native hook policy rejects before mutation; qualified in
   // Prove the harmless fixture hook itself works under an ordinary native Git call.
   git(f.root,"update-ref","refs/heads/synthetic-hook-positive",receipt.head); expect(await readFile(marker,"utf8")).toBe("");
 });
+
+
+test("R01 unsupported v2 prerequisites remain held after explicit actor binding and cannot reserve a new Run", async () => {
+  const f = await legacyFixture();
+  const admitted = await admitLegacyGitWork(f.request,f.target,f.owner);
+  const path = `work/${legacyScope.projectId}/${legacyScope.workId}/v3/tasks/external-v2.json`;
+  const head = await evolve(f.root,admitted.head,path,(row) => { row.value.assigneeActorId = "synthetic-observed-assignee"; row.value.revision = 2; });
+  const selection = { ...f.selection,commit: head }, task = { projectId: legacyScope.projectId,workId: legacyScope.workId,taskId: "external-v2" };
+  const effective = resolveEffectiveContract(await readMigratedGitWorkV3(selection),task);
+  const native: NativeGitIdentityOwner = {
+    async readGraph(input) { return readMigratedGitWorkV3({ ...selection,commit: input.head }); },
+    async withCurrentAuthority(input,operation) {
+      return f.owner.withCurrentMigrationAuthority({ ...input,request: f.request },(authority) => operation({ ownerId: authority.ownerId,actorId: authority.actorId,scope: { kind: "work",projectId: task.projectId,workId: task.workId },kinds: ["run"],revision: authority.revision,authorityRef: authority.authorityRef,expiresAtUtc: authority.expiresAtUtc,membership: true,gitHookPolicy: authority.gitHookPolicy }));
+    },
+  };
+  const request = { schema: "common.git-work-create.v3",ownerId: f.request.ownerId,createRequestId: "held-v2-run-request",kind: "run",scope: { kind: "task",...task },contracts: [],record: { runId: { $allocatedId: true },task,attempt: 1,status: "reserved",effectiveContractDigest: effective.digest,sourceSnapshotId: "synthetic-bound-source",parentAuthorityRef: "synthetic-current-admission",nativeBindings: [],effectRefs: [] } };
+  await expect(allocateGitWorkIdentity(request,{ ...f.target,expectedHead: head },native)).rejects.toThrow("EFFECTIVE_CONTRACT_HELD");
+  expect(git(f.root,"rev-parse",fixtureRef)).toBe(head);
+},30_000);
