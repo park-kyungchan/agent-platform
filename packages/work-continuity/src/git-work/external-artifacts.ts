@@ -13,6 +13,7 @@ import {
   stageLegacyGraphBindings,
   revokeLegacyGraphProofs,
   prepareLegacyProofPublication,
+  assertQualifiedLegacyTask,
 } from "./legacy-qualification.ts";
 import type { GitWorkSelection, ResolvedSource, GitWorkReader } from "./types.ts";
 import { openGitSourceSnapshot, openGitWork, verifiedOriginalBytes, encodedId } from "./source.ts";
@@ -100,8 +101,13 @@ const qualifiedGraphs = new WeakMap<object, string | null>();
 const graphArtifacts = new WeakMap<object, Set<object>>();
 const refreshEpochs = new WeakMap<object, object>();
 export function assertCurrentArtifactGraph(graph: Graph): void {
-  if (qualifiedGraphs.has(graph) && qualifiedGraphs.get(graph) !== digestV3(graph))
+  if (qualifiedGraphs.has(graph) && qualifiedGraphs.get(graph) !== digestV3(graph)) {
+    // Retain the precise supported-dependency diagnostic for a changed legacy
+    // projection. A revoked/in-progress refresh still rejects unconditionally.
+    if (qualifiedGraphs.get(graph) !== null)
+      for (const task of graph.tasks) assertQualifiedLegacyTask(task, graph);
     throw Error("V3_ARTIFACT_QUALIFIED_GRAPH_CHANGED_REQUALIFICATION_REQUIRED");
+  }
   for (const selected of graph.externalArtifacts ?? []) {
     const proof = qualified.get(selected);
     if (

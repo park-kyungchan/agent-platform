@@ -584,6 +584,12 @@ export async function admitLegacyGitWork(
         );
       for (const contract of projection.graph.contracts)
         files.set(contractPath(contract), bytes(contract));
+      // The owner-qualified actor/status transition changes the projection.
+      // Refresh its complete source closure before consuming the new graph.
+      await qualifyLegacyGraphBindings(
+        projection.graph,
+        await openExactV3SourceReader(selectionFor(request, target.repositoryRoot)),
+      );
       validateGitWorkV3Graph(projection.graph);
       const fence: LegacyWriterFence = {
         schema: "common.git-work-writer-fence.v3",
