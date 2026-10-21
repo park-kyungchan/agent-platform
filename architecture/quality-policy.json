@@ -41,18 +41,14 @@
       "path": "packages/native-codex-adapter",
       "name": "@palantirkc/native-codex-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": [
-        "@palantirkc/work-continuity"
-      ]
+      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
     },
     {
       "capabilityId": "native-hermes-context",
       "path": "packages/native-hermes-adapter",
       "name": "@palantirkc/native-hermes-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": [
-        "@palantirkc/work-continuity"
-      ]
+      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
     },
     {
       "capabilityId": "operational-context",

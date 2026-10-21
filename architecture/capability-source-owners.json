@@ -230,27 +230,27 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/allocation.ts",
-          "sha256": "e83ef2e2de5477914e4cc699c5a4f2cc47416b7338f1c2abb7dd4ee8b940d3a5",
+          "sha256": "b229e89693b02edadab94e110a540052383c545cc02c7dc2e4e8fd7ccb7032dd",
           "relativePath": "packages/work-continuity/src/git-work/allocation.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/effective-contract.ts",
-          "sha256": "002bff6c81c705f9df41f26d0ef000921f1999acae7def81635ed5315c670918",
+          "sha256": "4a7ad63308f5ef0dd0e3f913c239397b0126b8be0821ab17903944d238650421",
           "relativePath": "packages/work-continuity/src/git-work/effective-contract.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/v3-codec.ts",
-          "sha256": "63697d1d8672e9fd971713acdce6baecaff5a3d29cbf9645678674232fa26f1a",
+          "sha256": "f136cc3ddb3e5fd766894ce3ec765fc78d6667ffdf68cb0e4e33971cbdbf3652",
           "relativePath": "packages/work-continuity/src/git-work/v3-codec.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/fixtures/v3-owner.ts",
-          "sha256": "79e8a0fc2da23dd67606764093f5fc035cfb7434480ddd9ec76a872c4905f31f",
+          "sha256": "031b08719e91ce38cd0f4151a89006d0c514b37517b0fd2c3f914ae160acef8f",
           "relativePath": "packages/work-continuity/src/git-work/fixtures/v3-owner.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/fixtures/v3-worker.ts",
-          "sha256": "9494215f3f1bdaddfa4e619807b3b496f55543e6dcb278c76c408a19a2968e31",
+          "sha256": "4dbcff6ae677885c75877c3c95429aafa6d810699dffffc3df4e5efc20755a2d",
           "relativePath": "packages/work-continuity/src/git-work/fixtures/v3-worker.ts"
         },
         {
