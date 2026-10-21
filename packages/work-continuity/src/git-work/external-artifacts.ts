@@ -80,21 +80,14 @@ export async function readExactV3Source(
     throw Error("V3_PINNED_SOURCE_RECEIPT_MISMATCH");
   return source;
 }
-const qualified = new WeakMap<
-  object,
-  {
-    selected: string;
-    graphDigest: string;
-    producerDigest: string;
-    milestone: "verified" | "accepted";
-  }
->();
+type ArtifactSourceProof = { valid: false } | { valid: true; selected: string; graphDigest: string; producerDigest: string; milestone: "verified" | "accepted" };
+const qualified = new WeakMap<object, ArtifactSourceProof>();
 export function assertCurrentArtifactGraph(graph: Graph): void {
   for (const selected of graph.externalArtifacts ?? []) {
     const proof = qualified.get(selected);
     if (
       proof &&
-      (proof.graphDigest !== digestV3(graph) || proof.selected !== canonicalV3(selected))
+      (!proof.valid || proof.graphDigest !== digestV3(graph) || proof.selected !== canonicalV3(selected))
     )
       throw Error("V3_ARTIFACT_QUALIFIED_GRAPH_CHANGED_REQUALIFICATION_REQUIRED");
   }
@@ -256,7 +249,8 @@ export async function qualifySelectedExternalArtifacts(
   reader: ExactV3SourceReader,
 ): Promise<Graph> {
   assertV3("Graph", graph);
-  for (const selected of graph.externalArtifacts ?? []) qualified.delete(selected);
+  for (const selected of graph.externalArtifacts ?? []) qualified.set(selected,{ valid: false });
+  const completed: [SelectedExternalArtifact, Extract<ArtifactSourceProof,{ valid: true }>] [] = [];
   const graphDigest = digestV3(graph);
   for (const selected of graph.externalArtifacts ?? []) {
     assertV3("SelectedExternalArtifact", selected);
@@ -300,7 +294,7 @@ export async function qualifySelectedExternalArtifacts(
     const canonicalEffective = resolveEffectiveContract(producerGraph, selected.producer.task);
     if (
       !same(canonicalEffective, effective) ||
-      !same(resolveEffectiveContract(graph, selected.producer.task), canonicalEffective)
+      !same(resolveEffectiveContract({ ...graph,externalArtifacts: [] }, selected.producer.task), canonicalEffective)
     )
       throw Error("V3_ARTIFACT_COMPLETE_PRODUCER_EFFECTIVE_MISMATCH");
     const semanticGraph = (input: Graph) => {
@@ -417,13 +411,15 @@ export async function qualifySelectedExternalArtifacts(
     // Verified producer milestone is retained as source semantics, not native permission.
     if (digestV3(graph) !== graphDigest)
       throw Error("V3_ARTIFACT_GRAPH_MUTATED_DURING_QUALIFICATION");
-    qualified.set(selected, {
+    completed.push([selected, {
+      valid: true,
       selected: canonicalV3(selected),
       graphDigest,
       producerDigest: canonicalEffective.digest,
       milestone: milestone.document.milestone,
-    });
+    }]);
   }
+  for (const [selected,proof] of completed) qualified.set(selected,proof);
   return graph;
 }
 export function selectedArtifactForDependency(
@@ -440,7 +436,7 @@ export function selectedArtifactForDependency(
   if (candidates.length !== 1) throw Error("V3_EXACT_SELECTED_ARTIFACT_REQUIRED");
   const selected = candidates[0]!;
   const proof = qualified.get(selected);
-  if (!proof) throw Error("V3_ARTIFACT_ACTUAL_SOURCE_QUALIFICATION_REQUIRED");
+  if (!proof || !proof.valid) throw Error("V3_ARTIFACT_ACTUAL_SOURCE_QUALIFICATION_REQUIRED");
   if (proof.selected !== canonicalV3(selected) || proof.graphDigest !== digestV3(graph))
     throw Error("V3_ARTIFACT_QUALIFIED_GRAPH_CHANGED_REQUALIFICATION_REQUIRED");
   if (

@@ -1083,14 +1083,14 @@ async function legacyPrerequisiteFixture(
         content: {
           schemaVersion: "1.0.0",
           kind: "verification",
-          id: "synthetic:adoption-verification",
+          id: `${legacyScope.projectId}:verification:adoption`,
           projectId: legacyScope.projectId,
           domainId: legacyScope.domainId,
           createdAt: "2026-10-21T00:00:00Z",
           payload: {
             targetRefs: [
               evidence === "wrong-target"
-                ? "synthetic:foreign-task"
+                ? `${legacyScope.projectId}:task:foreign`
                 : taskVerificationTarget(adoption),
             ],
             criteria: [
@@ -1098,7 +1098,7 @@ async function legacyPrerequisiteFixture(
                 id: "source-proof",
                 status: "pass",
                 message: "Synthetic source verification",
-                evidenceRefs: ["synthetic:evidence"],
+                evidenceRefs: [`${legacyScope.projectId}:evidence:observation`],
               },
             ],
             inputHashes: [{ path: "synthetic.json", sha256: "1".repeat(64) }],
@@ -1283,6 +1283,7 @@ test.each(["producer-resource", "consumer-resource", "producer-ancestry", "consu
         reader: await openExactV3SourceReader(f.sourceSelection),
       }),
     ).rejects.toThrow();
+    expect(() => resolveEffectiveContract(f.graph, f.producer)).toThrow("REQUALIFICATION_REQUIRED");
   },
 );
 
