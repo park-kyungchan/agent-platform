@@ -1,0 +1,55 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "4d017552b33848744808a3ef2c1fcced88f29017",
+  "reviewedTreeSha": "570594c60f8a38acd63181ae4212c366fa4706dc",
+  "reviewedSourceManifestSha256": "90013c9130de93c4a8eacf459198a9b4faece4321ae59862d01c52961b08eacd",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "native-codex-thread:01a15e01-b0df-7951-b4c0-bf51e4b14913"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "native-codex-thread:01a15dd8-a97e-7671-be07-f9df08a5ad62"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "nativeReviewProvenance": {
+    "emittedAtUtc": "2026-10-21T10:40:48.121117+00:00",
+    "nativeThreadId": "01a15e01-b0df-7951-b4c0-bf51e4b14913",
+    "sourceReviewTurnId": "01a15e01-bdd1-79b2-bcd9-4c989d695e87",
+    "finalProofValidationAndEmissionTurnId": "01a15e09-dca8-7670-8b3e-ff7c65583187",
+    "model": "gpt-6.1-sol",
+    "effort": "high",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "observedTurns": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/independent.native-turns.final.actual.json",
+      "sha256": "e74b118544bfe3b220c14ba4bb33b2ed9dd029c49c7beb5204457bcc59832f3b"
+    },
+    "legacyTaskIdSemantics": "Reviewer/author taskId fields are owner identity references to actual observed native threads, not exposed native Task/Run or logical Work/Task IDs.",
+    "independentSourceAuthorThreadId": "01a15dd8-a97e-7671-be07-f9df08a5ad62"
+  },
+  "reviewScope": "Explicit permitted review reuse for observed mechanical merge 4d017552b33848744808a3ef2c1fcced88f29017, identical to source 013ae3e93e6c9fae7483053929b778956adb26ee. Root verified actual source, parents, metadata and exact retained successful dependency proof. Original native review remains source-013ae3e93e6c9fae7483053929b778956adb26ee-only; no new model call for this merge.",
+  "sameTreeReviewReuse": "Permitted only for a later actually observed clean ordered mechanical two-parent merge with identical reviewed tree, explicit observed successor binding, fresh metadata/immediate-authoring-parent and ancestry checks, retained exact required proof and current zero unresolved findings. New tree or unknown source requires fresh review. No raw is issued for an unobserved merge head.",
+  "reviewReuse": {
+    "originalNativeReviewedHead": "013ae3e93e6c9fae7483053929b778956adb26ee",
+    "originalNativeResult": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/output/independent.common-review-result.json",
+      "bytes": 2487,
+      "sha256": "d1f6caaceb182582c42e9a9b708fc61ae9d13d9d7818a036e05bc3aa5de0876d"
+    },
+    "observedMergeBinding": {
+      "path": "/home/palantirkc/jev-1.14-interview-20261021/execution/w05-integration-repair-20261021/publication/common.main-final-binding.actual.json",
+      "bytes": 3030,
+      "sha256": "c62b9d30c2d6d90fcbe1f5bf1e6dadfeb64736eda8a493551763744be6a65b1a"
+    },
+    "normalizedByNativeThread": "01a15c16-4285-78e2-8971-621eca83dc03",
+    "newNativeInferenceForMergeHead": false
+  }
+}
