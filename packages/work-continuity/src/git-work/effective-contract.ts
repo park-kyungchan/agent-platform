@@ -21,7 +21,11 @@ import {
   qualifySelectedExternalArtifacts,
   type ExactV3SourceReader,
 } from "./external-artifacts.ts";
-import { assertQualifiedLegacyTask, qualifyLegacyGraphBindings, legacyDependencyHoldReasons } from "./legacy-qualification.ts";
+import {
+  assertQualifiedLegacyTask,
+  qualifyLegacyGraphBindings,
+  legacyDependencyHoldReasons,
+} from "./legacy-qualification.ts";
 import { validateGitWorkAliases, qualifyGitWorkAliases } from "./aliases.ts";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 
@@ -148,7 +152,7 @@ function validateStructure(input: unknown): ValidatedV3Graph {
   for (const t of g.tasks) {
     const w = works.get(v3WorkKey(t));
     if (!w) throw Error("V3_MISSING_TASK_WORK");
-    assertQualifiedLegacyTask(t,g);
+    assertQualifiedLegacyTask(t, g);
     if (t.assigneeActorId === null && !t.legacyBinding)
       throw Error("V3_TASK_NATIVE_ACTOR_OR_LEGACY_SOURCE_REQUIRED");
     const owner: Scope = { kind: "task", ...taskRef(t) };
@@ -238,8 +242,9 @@ function validateStructure(input: unknown): ValidatedV3Graph {
 }
 
 export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
-  const validated = validateStructure(input); const graph = input as Graph;
-  for (const dependency of graph.dependencies) selectedArtifactForDependency(graph,dependency);
+  const validated = validateStructure(input);
+  const graph = input as Graph;
+  for (const dependency of graph.dependencies) selectedArtifactForDependency(graph, dependency);
   return validated;
 }
 
@@ -298,7 +303,15 @@ export function resolveEffectiveContract(input: unknown, target: TaskRef): Effec
     contracts: effectiveTaskRefs(g, t) as ContractSet,
     ...(t.legacyBinding ? { legacyBinding: t.legacyBinding } : {}),
     holdReasons: [
-      ...new Set([...selected].flatMap((key) => { const row = tasks.get(key)!; return [...(row.legacyBinding?.holdReasons ?? []), ...legacyDependencyHoldReasons(g,row)]; })),
+      ...new Set(
+        [...selected].flatMap((key) => {
+          const row = tasks.get(key)!;
+          return [
+            ...(row.legacyBinding?.holdReasons ?? []),
+            ...legacyDependencyHoldReasons(g, row),
+          ];
+        }),
+      ),
     ].sort(),
     externalArtifacts: sorted(
       dependencies.flatMap((d) => {
@@ -417,7 +430,7 @@ export function expandGitWorkV3Context(input: ContextPacket | CompactContextPack
 export async function readSourceQualifiedGitWorkV3Context(
   input: Parameters<typeof readGitWorkV3Context>[0] & { graph: Graph; reader: ExactV3SourceReader },
 ) {
-  assertV3("Graph",input.graph);
+  assertV3("Graph", input.graph);
   await qualifyLegacyGraphBindings(input.graph, input.reader);
   await qualifyGitWorkAliases(input.graph.aliases ?? [], input.reader);
   await qualifySelectedExternalArtifacts(input.graph, input.reader);

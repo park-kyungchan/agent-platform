@@ -13,11 +13,19 @@ import { qualifyLegacyGraphBindings } from "./legacy-qualification.ts";
 import type { GitWorkSelection, ResolvedSource, GitWorkReader } from "./types.ts";
 import { openGitSourceSnapshot, openGitWork, verifiedOriginalBytes, encodedId } from "./source.ts";
 import { assertV3, canonicalV3, digestV3 } from "./v3-codec.ts";
-import { expandGitWorkV3Context, resolveEffectiveContract, v3TaskKey, v3WorkKey } from "./effective-contract.ts";
+import {
+  expandGitWorkV3Context,
+  resolveEffectiveContract,
+  v3TaskKey,
+  v3WorkKey,
+} from "./effective-contract.ts";
 
 export interface ExactV3SourceReader {
   read(pin: GitSourcePin): Promise<ResolvedSource>;
-  readAt?(identity: Pick<GitSourcePin, "repositoryId" | "commit">, path: string): Promise<ResolvedSource>;
+  readAt?(
+    identity: Pick<GitSourcePin, "repositoryId" | "commit">,
+    path: string,
+  ): Promise<ResolvedSource>;
   openLegacyWork?(pin: GitSourcePin, task: TaskRef): Promise<GitWorkReader>;
 }
 export async function openExactV3SourceReader(
@@ -25,11 +33,28 @@ export async function openExactV3SourceReader(
 ): Promise<ExactV3SourceReader> {
   const snapshot = await openGitSourceSnapshot(selection);
   return {
-    async readAt(identity, path) { return snapshot.readSource({ kind: "git", ...identity, path }); },
+    async readAt(identity, path) {
+      return snapshot.readSource({
+        kind: "git",
+        repositoryId: identity.repositoryId,
+        commit: identity.commit,
+        path,
+      });
+    },
     async openLegacyWork(pin, task) {
-      const root = pin.repositoryId === selection.repositoryId ? selection.repositoryRoot : selection.repositories?.[pin.repositoryId];
+      const root =
+        pin.repositoryId === selection.repositoryId
+          ? selection.repositoryRoot
+          : selection.repositories?.[pin.repositoryId];
       if (!root) throw Error("V3_EXPLICIT_LEGACY_REPOSITORY_REQUIRED");
-      return openGitWork({ ...selection, repositoryRoot: root, repositoryId: pin.repositoryId, commit: pin.commit, projectId: task.projectId, workId: task.workId });
+      return openGitWork({
+        ...selection,
+        repositoryRoot: root,
+        repositoryId: pin.repositoryId,
+        commit: pin.commit,
+        projectId: task.projectId,
+        workId: task.workId,
+      });
     },
     async read(pin) {
       assertV3("GitSourcePin", pin);
@@ -55,11 +80,23 @@ export async function readExactV3Source(
     throw Error("V3_PINNED_SOURCE_RECEIPT_MISMATCH");
   return source;
 }
-const qualified = new WeakMap<object, { selected: string; graphDigest: string; producerDigest: string; milestone: "verified" | "accepted" }>();
+const qualified = new WeakMap<
+  object,
+  {
+    selected: string;
+    graphDigest: string;
+    producerDigest: string;
+    milestone: "verified" | "accepted";
+  }
+>();
 export function assertCurrentArtifactGraph(graph: Graph): void {
   for (const selected of graph.externalArtifacts ?? []) {
     const proof = qualified.get(selected);
-    if (proof && (proof.graphDigest !== digestV3(graph) || proof.selected !== canonicalV3(selected))) throw Error("V3_ARTIFACT_QUALIFIED_GRAPH_CHANGED_REQUALIFICATION_REQUIRED");
+    if (
+      proof &&
+      (proof.graphDigest !== digestV3(graph) || proof.selected !== canonicalV3(selected))
+    )
+      throw Error("V3_ARTIFACT_QUALIFIED_GRAPH_CHANGED_REQUALIFICATION_REQUIRED");
   }
 }
 const same = (a: unknown, b: unknown): boolean => canonicalV3(a) === canonicalV3(b);
@@ -103,7 +140,9 @@ async function qualifyTaskContractSources(
     closure.task.path !== base + `/tasks/${encodedId(task.taskId)}.json` ||
     closure.work.repositoryId !== closure.task.repositoryId ||
     closure.work.commit !== closure.task.commit ||
-    closure.graph.repositoryId !== closure.work.repositoryId || closure.graph.commit !== closure.work.commit || closure.graph.path !== base + "/graph.json"
+    closure.graph.repositoryId !== closure.work.repositoryId ||
+    closure.graph.commit !== closure.work.commit ||
+    closure.graph.path !== base + "/graph.json"
   )
     throw Error("V3_ARTIFACT_CANONICAL_TASK_SNAPSHOT_REQUIRED");
   const workSource = await readExactV3Source(reader, closure.work),
@@ -157,29 +196,58 @@ async function qualifyTaskContractSources(
     )
       throw Error("V3_ARTIFACT_CONTRACT_SOURCE_CLOSURE_MISMATCH");
   }
-  const graphSource = await readExactV3Source(reader,closure.graph); assertV3("Graph",graphSource.document);
+  const graphSource = await readExactV3Source(reader, closure.graph);
+  assertV3("Graph", graphSource.document);
   const canonical = graphSource.document;
-  if (canonical.externalArtifacts?.length || !reader.readAt) throw Error("V3_ARTIFACT_CANONICAL_GRAPH_SOURCE_READER_REQUIRED");
+  if (canonical.externalArtifacts?.length || !reader.readAt)
+    throw Error("V3_ARTIFACT_CANONICAL_GRAPH_SOURCE_READER_REQUIRED");
   const readRow = async (path: string, expected: unknown) => {
-    const source = await reader.readAt!(closure.graph,path); verifiedOriginalBytes(source);
-    if (source.repositoryId !== closure.graph.repositoryId || source.commit !== closure.graph.commit || source.path !== path || source.reference.fragment !== undefined || !same(source.document,expected) || !same(source.value,source.document)) throw Error("V3_ARTIFACT_CANONICAL_GRAPH_RECORD_MISMATCH");
+    const source = await reader.readAt!(closure.graph, path);
+    verifiedOriginalBytes(source);
+    if (
+      source.repositoryId !== closure.graph.repositoryId ||
+      source.commit !== closure.graph.commit ||
+      source.path !== path ||
+      source.reference.fragment !== undefined ||
+      !same(source.document, expected) ||
+      !same(source.value, source.document)
+    )
+      throw Error("V3_ARTIFACT_CANONICAL_GRAPH_RECORD_MISMATCH");
   };
   for (const row of canonical.works) {
-    await readRow(`work/${encodedId(row.projectId)}/${encodedId(row.workId)}/v3/work.json`,{ schema: "common.git-work-record.v3",kind: "work",value: row });
-    if (!graph.works.some((current) => same(current,row))) throw Error("V3_ARTIFACT_CANONICAL_GRAPH_WORK_CHANGED");
+    await readRow(`work/${encodedId(row.projectId)}/${encodedId(row.workId)}/v3/work.json`, {
+      schema: "common.git-work-record.v3",
+      kind: "work",
+      value: row,
+    });
+    if (!graph.works.some((current) => same(current, row)))
+      throw Error("V3_ARTIFACT_CANONICAL_GRAPH_WORK_CHANGED");
   }
   for (const row of canonical.tasks) {
-    await readRow(`work/${encodedId(row.projectId)}/${encodedId(row.workId)}/v3/tasks/${encodedId(row.taskId)}.json`,{ schema: "common.git-work-record.v3",kind: "task",value: row });
-    if (!graph.tasks.some((current) => same(current,row))) throw Error("V3_ARTIFACT_CANONICAL_GRAPH_TASK_CHANGED");
+    await readRow(
+      `work/${encodedId(row.projectId)}/${encodedId(row.workId)}/v3/tasks/${encodedId(row.taskId)}.json`,
+      { schema: "common.git-work-record.v3", kind: "task", value: row },
+    );
+    if (!graph.tasks.some((current) => same(current, row)))
+      throw Error("V3_ARTIFACT_CANONICAL_GRAPH_TASK_CHANGED");
   }
   for (const row of canonical.contracts) {
-    await readRow(`work/${encodedId(row.owner.projectId)}/${encodedId(row.owner.workId)}/v3` + (row.owner.kind === "task" ? `/tasks/${encodedId(row.owner.taskId)}` : "") + `/contracts/${row.kind}/${encodedId(row.id)}@${row.revision}.json`,row);
-    if (!graph.contracts.some((current) => same(current,row))) throw Error("V3_ARTIFACT_CANONICAL_GRAPH_CONTRACT_CHANGED");
+    await readRow(
+      `work/${encodedId(row.owner.projectId)}/${encodedId(row.owner.workId)}/v3` +
+        (row.owner.kind === "task" ? `/tasks/${encodedId(row.owner.taskId)}` : "") +
+        `/contracts/${row.kind}/${encodedId(row.id)}@${row.revision}.json`,
+      row,
+    );
+    if (!graph.contracts.some((current) => same(current, row)))
+      throw Error("V3_ARTIFACT_CANONICAL_GRAPH_CONTRACT_CHANGED");
   }
-  if (!canonical.tasks.some((row) => same(row,selectedTask)) || !canonical.works.some((row) => same(row,work))) throw Error("V3_ARTIFACT_CANONICAL_GRAPH_SELECTED_SCOPE_MISSING");
-  await qualifyLegacyGraphBindings(canonical,reader);
+  if (
+    !canonical.tasks.some((row) => same(row, selectedTask)) ||
+    !canonical.works.some((row) => same(row, work))
+  )
+    throw Error("V3_ARTIFACT_CANONICAL_GRAPH_SELECTED_SCOPE_MISSING");
+  await qualifyLegacyGraphBindings(canonical, reader);
   return canonical;
-
 }
 
 /** Reads every source; no serialized/source-provider claim can mint this proof. */
@@ -187,7 +255,7 @@ export async function qualifySelectedExternalArtifacts(
   graph: Graph,
   reader: ExactV3SourceReader,
 ): Promise<Graph> {
-  assertV3("Graph",graph);
+  assertV3("Graph", graph);
   for (const selected of graph.externalArtifacts ?? []) qualified.delete(selected);
   const graphDigest = digestV3(graph);
   for (const selected of graph.externalArtifacts ?? []) {
@@ -229,10 +297,18 @@ export async function qualifySelectedExternalArtifacts(
     const effective = packet.effective;
     // The same canonical resolver is used for actual stored records, current
     // dispatch input and transport. Unsupported/unproved upstream closures fail.
-    const canonicalEffective = resolveEffectiveContract(producerGraph,selected.producer.task);
-    if (!same(canonicalEffective,effective) || !same(resolveEffectiveContract(graph,selected.producer.task),canonicalEffective)) throw Error("V3_ARTIFACT_COMPLETE_PRODUCER_EFFECTIVE_MISMATCH");
-    const semanticGraph = (input: Graph) => { const { externalArtifacts: _, ...core } = input; return core; };
-    if (!same(semanticGraph(graph),semanticGraph(consumerGraph))) throw Error("V3_ARTIFACT_COMPLETE_CONSUMER_GRAPH_MISMATCH");
+    const canonicalEffective = resolveEffectiveContract(producerGraph, selected.producer.task);
+    if (
+      !same(canonicalEffective, effective) ||
+      !same(resolveEffectiveContract(graph, selected.producer.task), canonicalEffective)
+    )
+      throw Error("V3_ARTIFACT_COMPLETE_PRODUCER_EFFECTIVE_MISMATCH");
+    const semanticGraph = (input: Graph) => {
+      const { externalArtifacts: _, ...core } = input;
+      return core;
+    };
+    if (!same(semanticGraph(graph), semanticGraph(consumerGraph)))
+      throw Error("V3_ARTIFACT_COMPLETE_CONSUMER_GRAPH_MISMATCH");
 
     if (
       packet.status !== "source-qualified" ||
@@ -339,8 +415,14 @@ export async function qualifySelectedExternalArtifacts(
       throw Error("V3_ARTIFACT_RECEIVER_QUALIFICATION_MISMATCH");
     for (const evidence of receiver.document.evidence) await readExactV3Source(reader, evidence);
     // Verified producer milestone is retained as source semantics, not native permission.
-    if (digestV3(graph) !== graphDigest) throw Error("V3_ARTIFACT_GRAPH_MUTATED_DURING_QUALIFICATION");
-    qualified.set(selected, { selected: canonicalV3(selected), graphDigest, producerDigest: canonicalEffective.digest, milestone: milestone.document.milestone });
+    if (digestV3(graph) !== graphDigest)
+      throw Error("V3_ARTIFACT_GRAPH_MUTATED_DURING_QUALIFICATION");
+    qualified.set(selected, {
+      selected: canonicalV3(selected),
+      graphDigest,
+      producerDigest: canonicalEffective.digest,
+      milestone: milestone.document.milestone,
+    });
   }
   return graph;
 }
@@ -359,9 +441,15 @@ export function selectedArtifactForDependency(
   const selected = candidates[0]!;
   const proof = qualified.get(selected);
   if (!proof) throw Error("V3_ARTIFACT_ACTUAL_SOURCE_QUALIFICATION_REQUIRED");
-  if (proof.selected !== canonicalV3(selected) || proof.graphDigest !== digestV3(graph)) throw Error("V3_ARTIFACT_QUALIFIED_GRAPH_CHANGED_REQUALIFICATION_REQUIRED");
-  if (proof.milestone !== dependency.required && !(dependency.required === "verified" && proof.milestone === "accepted")) throw Error("V3_ARTIFACT_PROOF_CHANGED_OR_MILESTONE_MISMATCH");
-  if (resolveEffectiveContract(graph,selected.producer.task).digest !== proof.producerDigest) throw Error("V3_ARTIFACT_COMPLETE_PRODUCER_EFFECTIVE_MISMATCH");
+  if (proof.selected !== canonicalV3(selected) || proof.graphDigest !== digestV3(graph))
+    throw Error("V3_ARTIFACT_QUALIFIED_GRAPH_CHANGED_REQUALIFICATION_REQUIRED");
+  if (
+    proof.milestone !== dependency.required &&
+    !(dependency.required === "verified" && proof.milestone === "accepted")
+  )
+    throw Error("V3_ARTIFACT_PROOF_CHANGED_OR_MILESTONE_MISMATCH");
+  if (resolveEffectiveContract(graph, selected.producer.task).digest !== proof.producerDigest)
+    throw Error("V3_ARTIFACT_COMPLETE_PRODUCER_EFFECTIVE_MISMATCH");
   assertProducerBinding(graph, selected.producer);
   if (!same(selected.selection.consumer, consumerContractBinding(graph, dependency.consumer)))
     throw Error("V3_ARTIFACT_CONSUMER_CONTRACT_MISMATCH");

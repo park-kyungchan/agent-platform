@@ -566,11 +566,24 @@ async function artifactFixture(forge?: "resources" | "criteria" | "ancestry" | "
     spec: v3ContractRef(spec),
     plan: v3ContractRef(plan),
   };
-  const parent = { ...structuredClone(producerGraph.tasks[0]!),taskId: "producer-parent",contractOverrides: {},acceptanceCriteria: ["AC-1"] };
-  const upstream = { ...structuredClone(parent),taskId: "producer-upstream",resources: [{ resource: "artifact/upstream",mode: "read" as const }] };
+  const parent = {
+    ...structuredClone(producerGraph.tasks[0]!),
+    taskId: "producer-parent",
+    contractOverrides: {},
+    acceptanceCriteria: ["AC-1"],
+  };
+  const upstream = {
+    ...structuredClone(parent),
+    taskId: "producer-upstream",
+    resources: [{ resource: "artifact/upstream", mode: "read" as const }],
+  };
   producerGraph.tasks[0]!.parentTaskId = parent.taskId;
-  producerGraph.tasks.push(parent,upstream);
-  producerGraph.dependencies.push({ producer: { ...producer,taskId: upstream.taskId },consumer: producer,required: "verified" });
+  producerGraph.tasks.push(parent, upstream);
+  producerGraph.dependencies.push({
+    producer: { ...producer, taskId: upstream.taskId },
+    consumer: producer,
+    required: "verified",
+  });
   graph.dependencies.push(...producerGraph.dependencies);
   graph.works.push(...producerGraph.works);
   graph.tasks.push(...producerGraph.tasks);
@@ -597,7 +610,7 @@ async function artifactFixture(forge?: "resources" | "criteria" | "ancestry" | "
   for (const c of graph.contracts)
     sourceHashes.set(contractPath(c), await put(root, contractPath(c), c));
   const producerGraphPath = `work/${producer.projectId}/${producer.workId}/v3/graph.json`;
-  sourceHashes.set(producerGraphPath,await put(root,producerGraphPath,producerGraph));
+  sourceHashes.set(producerGraphPath, await put(root, producerGraphPath, producerGraph));
   const sourceCommit = commit(root);
   const sourcePin = (path: string): GitSourcePin => ({
     repositoryId: "synthetic-repository",
@@ -606,7 +619,9 @@ async function artifactFixture(forge?: "resources" | "criteria" | "ancestry" | "
     sha256: sourceHashes.get(path)!,
   });
   const sourceClosure = (selectedGraph: Graph) => ({
-    graph: sourcePin(`work/${selectedGraph.works[0]!.projectId}/${selectedGraph.works[0]!.workId}/v3/graph.json`),
+    graph: sourcePin(
+      `work/${selectedGraph.works[0]!.projectId}/${selectedGraph.works[0]!.workId}/v3/graph.json`,
+    ),
     work: sourcePin(
       `work/${selectedGraph.works[0]!.projectId}/${selectedGraph.works[0]!.workId}/v3/work.json`,
     ),
@@ -617,12 +632,21 @@ async function artifactFixture(forge?: "resources" | "criteria" | "ancestry" | "
   });
   let consumerSources = sourceClosure(fixtureGraph());
   const producerSources = sourceClosure(producerGraph);
-  const packet = expandGitWorkV3Context(readGitWorkV3Context({ graph: producerGraph,task: producer,mode: "full" }));
-  if (forge === "resources") packet.effective.taskResources = [{ resource: "forged/resource",mode: "read" }];
+  const packet = expandGitWorkV3Context(
+    readGitWorkV3Context({ graph: producerGraph, task: producer, mode: "full" }),
+  );
+  if (forge === "resources")
+    packet.effective.taskResources = [{ resource: "forged/resource", mode: "read" }];
   if (forge === "criteria") packet.effective.acceptanceCriteria = ["AC-2"];
   if (forge === "ancestry") packet.effective.parentTaskChain = [];
-  if (forge === "dependency") { packet.effective.dependencies = []; packet.effective.dependencyTasks = []; }
-  if (forge) { const { digest: _,...body } = packet.effective; packet.effective.digest = digestV3(body); }
+  if (forge === "dependency") {
+    packet.effective.dependencies = [];
+    packet.effective.dependencyTasks = [];
+  }
+  if (forge) {
+    const { digest: _, ...body } = packet.effective;
+    packet.effective.digest = digestV3(body);
+  }
   const effective = packet.effective;
   const producerBinding = {
     task: producer,
@@ -632,11 +656,7 @@ async function artifactFixture(forge?: "resources" | "criteria" | "ancestry" | "
     contracts: effective.contracts,
     effectiveDigest: effective.digest,
   };
-  const producerContext = await pin(
-    root,
-    "work/artifact-sources/producer-context.json",
-    packet,
-  );
+  const producerContext = await pin(root, "work/artifact-sources/producer-context.json", packet);
   const artifactSource = await pin(root, "work/artifact-sources/artifact.json", {
     schema: "common.git-artifact.v3",
     id: "selected-artifact",
@@ -696,8 +716,19 @@ async function artifactFixture(forge?: "resources" | "criteria" | "ancestry" | "
   });
   graph.dependencies.push({ producer, consumer: fixtureTask, required: "verified", artifact });
   const consumerGraphPath = `work/${fixtureTask.projectId}/${fixtureTask.workId}/v3/graph.json`;
-  const consumerGraphSha = await put(root,consumerGraphPath,graph); const consumerCommit = commit(root);
-  consumerSources = { graph: { repositoryId: "synthetic-repository",commit: consumerCommit,path: consumerGraphPath,sha256: consumerGraphSha },work: { ...consumerSources.work,commit: consumerCommit },task: { ...consumerSources.task,commit: consumerCommit },contracts: consumerSources.contracts.map((pin) => ({ ...pin,commit: consumerCommit })) };
+  const consumerGraphSha = await put(root, consumerGraphPath, graph);
+  const consumerCommit = commit(root);
+  consumerSources = {
+    graph: {
+      repositoryId: "synthetic-repository",
+      commit: consumerCommit,
+      path: consumerGraphPath,
+      sha256: consumerGraphSha,
+    },
+    work: { ...consumerSources.work, commit: consumerCommit },
+    task: { ...consumerSources.task, commit: consumerCommit },
+    contracts: consumerSources.contracts.map((pin) => ({ ...pin, commit: consumerCommit })),
+  };
   const selected: SelectedExternalArtifact = {
     schema: "common.git-selected-external-artifact.v3",
     producer: producerBinding,
@@ -735,7 +766,10 @@ test("R02 actual selected source/producer Task override/consumer gate/evidence/r
       reader: await openExactV3SourceReader(f.sourceSelection),
     }),
   );
-  expect(full.effective.dependencyTasks.find((row) => row.task.taskId === "producer-task")!.contracts.spec.id).toBe("producer-task-spec");
+  expect(
+    full.effective.dependencyTasks.find((row) => row.task.taskId === "producer-task")!.contracts
+      .spec.id,
+  ).toBe("producer-task-spec");
   expect(full.effective.externalArtifacts[0]!.producer.contracts.spec.id).toBe(
     "producer-task-spec",
   );
@@ -1012,109 +1046,380 @@ test("R01 unsupported v2 prerequisites remain held after explicit actor binding 
   expect(git(f.root, "rev-parse", fixtureRef)).toBe(head);
 }, 30_000);
 
-const publicationId = "ODI-CI-PUBLICATION-ORDER-20261020", adoptionId = "ODI-WORK-METHOD-ADOPTION-20261020";
-async function legacyPrerequisiteFixture(ready = false, evidence: "pass" | "missing" | "wrong-target" = "pass", acceptance = false) {
+const publicationId = "ODI-CI-PUBLICATION-ORDER-20261020",
+  adoptionId = "ODI-WORK-METHOD-ADOPTION-20261020";
+async function legacyPrerequisiteFixture(
+  ready = false,
+  evidence: "pass" | "missing" | "wrong-target" = "pass",
+  acceptance = false,
+) {
   return legacyFixture((rows) => {
-    const adoption = legacyTask(adoptionId,1,4), publication = legacyTask(publicationId,1,4);
-    publication.dependsOn = [{ taskId: adoptionId,milestone: acceptance ? "acceptance" : "execution-and-verification" }];
-    if (ready) adoption.state = { execution: "complete",verification: "passed",localAudit: "result-durable",sharedAudit: "delivery-confirmed",formalCompletion: "complete" };
+    const adoption = legacyTask(adoptionId, 1, 4),
+      publication = legacyTask(publicationId, 1, 4);
+    publication.dependsOn = [
+      { taskId: adoptionId, milestone: acceptance ? "acceptance" : "execution-and-verification" },
+    ];
+    if (ready)
+      adoption.state = {
+        execution: "complete",
+        verification: "passed",
+        localAudit: "result-durable",
+        sharedAudit: "delivery-confirmed",
+        formalCompletion: "complete",
+      };
     if (evidence !== "missing") {
       adoption.verificationEvidenceIds = ["adoption-proof"];
-      const inputId = "adoption-proof-input", inputPath = gitRecordPath(legacyScope.projectId,legacyScope.workId,{ kind: "input",id: inputId });
-      rows.push({ ...legacyBase,kind: "input",id: inputId,inputKind: "source-owner-record",origin: { ownerId: "synthetic",locator: "synthetic:proof",kind: "source-owner-capture" },content: { schemaVersion: "1.0.0",kind: "verification",id: "synthetic:adoption-verification",projectId: legacyScope.projectId,domainId: legacyScope.domainId,createdAt: "2026-10-21T00:00:00Z",payload: { targetRefs: [evidence === "wrong-target" ? "synthetic:foreign-task" : taskVerificationTarget(adoption)],criteria: [{ id: "source-proof",status: "pass",message: "Synthetic source verification",evidenceRefs: ["synthetic:evidence"] }],inputHashes: [{ path: "synthetic.json",sha256: "1".repeat(64) }],runtime: { name: "synthetic",version: "1" } } } });
-      rows.push({ ...legacyBase,kind: "evidence",id: "adoption-proof",evidenceKind: "verification",source: { kind: "snapshot",path: inputPath,fragment: "#/content" } });
+      const inputId = "adoption-proof-input",
+        inputPath = gitRecordPath(legacyScope.projectId, legacyScope.workId, {
+          kind: "input",
+          id: inputId,
+        });
+      rows.push({
+        ...legacyBase,
+        kind: "input",
+        id: inputId,
+        inputKind: "source-owner-record",
+        origin: { ownerId: "synthetic", locator: "synthetic:proof", kind: "source-owner-capture" },
+        content: {
+          schemaVersion: "1.0.0",
+          kind: "verification",
+          id: "synthetic:adoption-verification",
+          projectId: legacyScope.projectId,
+          domainId: legacyScope.domainId,
+          createdAt: "2026-10-21T00:00:00Z",
+          payload: {
+            targetRefs: [
+              evidence === "wrong-target"
+                ? "synthetic:foreign-task"
+                : taskVerificationTarget(adoption),
+            ],
+            criteria: [
+              {
+                id: "source-proof",
+                status: "pass",
+                message: "Synthetic source verification",
+                evidenceRefs: ["synthetic:evidence"],
+              },
+            ],
+            inputHashes: [{ path: "synthetic.json", sha256: "1".repeat(64) }],
+            runtime: { name: "synthetic", version: "1" },
+          },
+        },
+      });
+      rows.push({
+        ...legacyBase,
+        kind: "evidence",
+        id: "adoption-proof",
+        evidenceKind: "verification",
+        source: { kind: "snapshot", path: inputPath, fragment: "#/content" },
+      });
     }
-    rows.push(adoption,publication);
+    rows.push(adoption, publication);
   });
 }
-test.each([{ ready: false,evidence: "pass" as const },{ ready: true,evidence: "missing" as const },{ ready: true,evidence: "wrong-target" as const }])("R01-v6 exact-shaped supported source prerequisite remains held: %j", async ({ ready,evidence }) => {
-  const f = await legacyPrerequisiteFixture(ready,evidence);
-  const task = { projectId: legacyScope.projectId,workId: legacyScope.workId,taskId: publicationId };
-  const effective = resolveEffectiveContract(f.projection.graph,task);
-  expect(effective.holdReasons.length).toBeGreaterThan(0);
-  for (const mode of ["full","compact","dispatch","resume"] as const) expect(expandGitWorkV3Context(readGitWorkV3Context({ graph: f.projection.graph,task,mode,expectedDigest: effective.digest })).status).toBe("held");
-  expect(resolveEffectiveContract(f.projection.graph,{ ...task,taskId: newTaskId }).holdReasons).toEqual([]);
-  const admitted = await admitLegacyGitWork(f.request,f.target,f.owner);
-  const head = await evolve(f.root,admitted.head,`work/${task.projectId}/${task.workId}/v3/tasks/${publicationId}.json`,(row) => { row.value.assigneeActorId="synthetic-observed"; row.value.revision=2; });
-  const native: NativeGitIdentityOwner = { async readGraph(input) { return readMigratedGitWorkV3({ ...f.selection,commit: input.head }); },async withCurrentAuthority(input,operation) { return f.owner.withCurrentMigrationAuthority({ ...input,request: f.request },(a) => operation({ ownerId: a.ownerId,actorId: a.actorId,scope: { kind: "work",projectId: task.projectId,workId: task.workId },kinds: ["run"],revision: a.revision,authorityRef: a.authorityRef,expiresAtUtc: a.expiresAtUtc,membership: true,gitHookPolicy: a.gitHookPolicy })); } };
-  const digest = resolveEffectiveContract(await native.readGraph({ repositoryRoot: f.root,ownerRef: fixtureRef,head }),task).digest;
-  await expect(allocateGitWorkIdentity({ schema: "common.git-work-create.v3",ownerId: f.request.ownerId,createRequestId: "source-prerequisite-held-run",kind: "run",scope: { kind: "task",...task },contracts: [],record: { runId: { $allocatedId: true },task,attempt: 1,status: "reserved",effectiveContractDigest: digest,sourceSnapshotId: "synthetic-exact-source",parentAuthorityRef: "synthetic-current-admission",nativeBindings: [],effectRefs: [] } },{ ...f.target,expectedHead: head },native)).rejects.toThrow("EFFECTIVE_CONTRACT_HELD");
-  expect(git(f.root,"rev-parse",fixtureRef)).toBe(head);
-},30_000);
+test.each([
+  { ready: false, evidence: "pass" as const },
+  { ready: true, evidence: "missing" as const },
+  { ready: true, evidence: "wrong-target" as const },
+])(
+  "R01-v6 exact-shaped supported source prerequisite remains held: %j",
+  async ({ ready, evidence }) => {
+    const f = await legacyPrerequisiteFixture(ready, evidence);
+    const task = {
+      projectId: legacyScope.projectId,
+      workId: legacyScope.workId,
+      taskId: publicationId,
+    };
+    const effective = resolveEffectiveContract(f.projection.graph, task);
+    expect(effective.holdReasons.length).toBeGreaterThan(0);
+    for (const mode of ["full", "compact", "dispatch", "resume"] as const)
+      expect(
+        expandGitWorkV3Context(
+          readGitWorkV3Context({
+            graph: f.projection.graph,
+            task,
+            mode,
+            expectedDigest: effective.digest,
+          }),
+        ).status,
+      ).toBe("held");
+    expect(
+      resolveEffectiveContract(f.projection.graph, { ...task, taskId: newTaskId }).holdReasons,
+    ).toEqual([]);
+    const admitted = await admitLegacyGitWork(f.request, f.target, f.owner);
+    const head = await evolve(
+      f.root,
+      admitted.head,
+      `work/${task.projectId}/${task.workId}/v3/tasks/${publicationId}.json`,
+      (row) => {
+        row.value.assigneeActorId = "synthetic-observed";
+        row.value.revision = 2;
+      },
+    );
+    const native: NativeGitIdentityOwner = {
+      async readGraph(input) {
+        return readMigratedGitWorkV3({ ...f.selection, commit: input.head });
+      },
+      async withCurrentAuthority(input, operation) {
+        return f.owner.withCurrentMigrationAuthority({ ...input, request: f.request }, (a) =>
+          operation({
+            ownerId: a.ownerId,
+            actorId: a.actorId,
+            scope: { kind: "work", projectId: task.projectId, workId: task.workId },
+            kinds: ["run"],
+            revision: a.revision,
+            authorityRef: a.authorityRef,
+            expiresAtUtc: a.expiresAtUtc,
+            membership: true,
+            gitHookPolicy: a.gitHookPolicy,
+          }),
+        );
+      },
+    };
+    const digest = resolveEffectiveContract(
+      await native.readGraph({ repositoryRoot: f.root, ownerRef: fixtureRef, head }),
+      task,
+    ).digest;
+    await expect(
+      allocateGitWorkIdentity(
+        {
+          schema: "common.git-work-create.v3",
+          ownerId: f.request.ownerId,
+          createRequestId: "source-prerequisite-held-run",
+          kind: "run",
+          scope: { kind: "task", ...task },
+          contracts: [],
+          record: {
+            runId: { $allocatedId: true },
+            task,
+            attempt: 1,
+            status: "reserved",
+            effectiveContractDigest: digest,
+            sourceSnapshotId: "synthetic-exact-source",
+            parentAuthorityRef: "synthetic-current-admission",
+            nativeBindings: [],
+            effectRefs: [],
+          },
+        },
+        { ...f.target, expectedHead: head },
+        native,
+      ),
+    ).rejects.toThrow("EFFECTIVE_CONTRACT_HELD");
+    expect(git(f.root, "rev-parse", fixtureRef)).toBe(head);
+  },
+  30_000,
+);
 test("R01-v6 valid canonical completion+verification evidence clears only its supported gate; acceptance remains separately held", async () => {
   const ready = await legacyPrerequisiteFixture(true);
-  const task = { projectId: legacyScope.projectId,workId: legacyScope.workId,taskId: publicationId };
-  expect(resolveEffectiveContract(ready.projection.graph,task).holdReasons).toEqual([]);
-  const accepted = await legacyPrerequisiteFixture(true,"pass",true);
-  expect(resolveEffectiveContract(accepted.projection.graph,task).holdReasons.some((reason) => reason.startsWith("LEGACY_ACCEPTANCE_REQUIRES_OWNER_QUALIFICATION"))).toBe(true);
-  const modified = ready.projection.graph; modified.dependencies = [];
-  expect(() => resolveEffectiveContract(modified,task)).toThrow("DEPENDENCY_SOURCE_CLOSURE_CHANGED");
+  const task = {
+    projectId: legacyScope.projectId,
+    workId: legacyScope.workId,
+    taskId: publicationId,
+  };
+  expect(resolveEffectiveContract(ready.projection.graph, task).holdReasons).toEqual([]);
+  const accepted = await legacyPrerequisiteFixture(true, "pass", true);
+  expect(
+    resolveEffectiveContract(accepted.projection.graph, task).holdReasons.some((reason) =>
+      reason.startsWith("LEGACY_ACCEPTANCE_REQUIRES_OWNER_QUALIFICATION"),
+    ),
+  ).toBe(true);
+  const modified = ready.projection.graph;
+  modified.dependencies = [];
+  expect(() => resolveEffectiveContract(modified, task)).toThrow(
+    "DEPENDENCY_SOURCE_CLOSURE_CHANGED",
+  );
 });
 
-test.each(["resources","criteria","ancestry","dependency"] as const)("R02-v6 rejects self-consistent forged producer packet %s with unchanged actual canonical records and consistently joined receipts", async (forge) => {
-  const f = await artifactFixture(forge);
-  await expect(readSourceQualifiedGitWorkV3Context({ graph: f.graph,task: fixtureTask,mode: "full",reader: await openExactV3SourceReader(f.sourceSelection) })).rejects.toThrow("COMPLETE_PRODUCER_EFFECTIVE_MISMATCH");
-});
-test.each(["producer-resource","consumer-resource","producer-ancestry","consumer-criterion"])("R02-v6 every public context/resolver rejects mutation after proof: %s", async (mutation) => {
-  const f = await artifactFixture();
-  const packet = expandGitWorkV3Context(await readSourceQualifiedGitWorkV3Context({ graph: f.graph,task: fixtureTask,mode: "full",reader: await openExactV3SourceReader(f.sourceSelection) }));
-  if (mutation === "producer-resource") f.graph.tasks[1]!.resources.push({ resource: "changed/source",mode: "read" });
-  if (mutation === "consumer-resource") f.graph.tasks[0]!.resources.push({ resource: "changed/source",mode: "read" });
-  if (mutation === "producer-ancestry") f.graph.tasks[1]!.parentTaskId="producer-upstream";
-  if (mutation === "consumer-criterion") f.graph.tasks[0]!.acceptanceCriteria=["AC-2"];
-  expect(() => resolveEffectiveContract(f.graph,fixtureTask)).toThrow("REQUALIFICATION_REQUIRED");
-  expect(() => resolveEffectiveContract(f.graph,f.producer)).toThrow("REQUALIFICATION_REQUIRED");
-  for (const mode of ["full","compact","dispatch","resume"] as const) expect(() => readGitWorkV3Context({ graph: f.graph,task: fixtureTask,mode,expectedDigest: packet.effective.digest })).toThrow("REQUALIFICATION_REQUIRED");
-  await expect(readSourceQualifiedGitWorkV3Context({ graph: f.graph,task: fixtureTask,mode: "full",reader: await openExactV3SourceReader(f.sourceSelection) })).rejects.toThrow();
-});
+test.each(["resources", "criteria", "ancestry", "dependency"] as const)(
+  "R02-v6 rejects self-consistent forged producer packet %s with unchanged actual canonical records and consistently joined receipts",
+  async (forge) => {
+    const f = await artifactFixture(forge);
+    await expect(
+      readSourceQualifiedGitWorkV3Context({
+        graph: f.graph,
+        task: fixtureTask,
+        mode: "full",
+        reader: await openExactV3SourceReader(f.sourceSelection),
+      }),
+    ).rejects.toThrow("COMPLETE_PRODUCER_EFFECTIVE_MISMATCH");
+  },
+);
+test.each(["producer-resource", "consumer-resource", "producer-ancestry", "consumer-criterion"])(
+  "R02-v6 every public context/resolver rejects mutation after proof: %s",
+  async (mutation) => {
+    const f = await artifactFixture();
+    const packet = expandGitWorkV3Context(
+      await readSourceQualifiedGitWorkV3Context({
+        graph: f.graph,
+        task: fixtureTask,
+        mode: "full",
+        reader: await openExactV3SourceReader(f.sourceSelection),
+      }),
+    );
+    if (mutation === "producer-resource")
+      f.graph.tasks[1]!.resources.push({ resource: "changed/source", mode: "read" });
+    if (mutation === "consumer-resource")
+      f.graph.tasks[0]!.resources.push({ resource: "changed/source", mode: "read" });
+    if (mutation === "producer-ancestry") f.graph.tasks[1]!.parentTaskId = "producer-upstream";
+    if (mutation === "consumer-criterion") f.graph.tasks[0]!.acceptanceCriteria = ["AC-2"];
+    expect(() => resolveEffectiveContract(f.graph, fixtureTask)).toThrow(
+      "REQUALIFICATION_REQUIRED",
+    );
+    expect(() => resolveEffectiveContract(f.graph, f.producer)).toThrow("REQUALIFICATION_REQUIRED");
+    for (const mode of ["full", "compact", "dispatch", "resume"] as const)
+      expect(() =>
+        readGitWorkV3Context({
+          graph: f.graph,
+          task: fixtureTask,
+          mode,
+          expectedDigest: packet.effective.digest,
+        }),
+      ).toThrow("REQUALIFICATION_REQUIRED");
+    await expect(
+      readSourceQualifiedGitWorkV3Context({
+        graph: f.graph,
+        task: fixtureTask,
+        mode: "full",
+        reader: await openExactV3SourceReader(f.sourceSelection),
+      }),
+    ).rejects.toThrow();
+  },
+);
 
 async function mergeAndSynchronize(root: string, mainBase: string, ownerTip: string) {
-  const oldOwner = git(root,"rev-parse",fixtureRef);
-  git(root,"checkout","--detach",mainBase); await put(root,"work/synthetic-main-integration.json",{ synthetic: "independent main successor",ownerTip }); commit(root);
-  git(root,"merge","--no-ff","--no-edit",ownerTip);
-  const merged = git(root,"rev-parse","HEAD"); expect(git(root,"rev-parse",merged+"^2")).toBe(ownerTip);
-  git(root,"update-ref",fixtureRef,merged,oldOwner); return merged;
+  const oldOwner = git(root, "rev-parse", fixtureRef);
+  git(root, "checkout", "--detach", mainBase);
+  await put(root, "work/synthetic-main-integration.json", {
+    synthetic: "independent main successor",
+    ownerTip,
+  });
+  commit(root);
+  git(root, "merge", "--no-ff", "--no-edit", ownerTip);
+  const merged = git(root, "rev-parse", "HEAD");
+  expect(git(root, "rev-parse", merged + "^2")).toBe(ownerTip);
+  git(root, "update-ref", fixtureRef, merged, oldOwner);
+  return merged;
 }
-test.each(["work","task","run"] as const)("R03-v6 %s replay crosses legitimate evolution, second-parent integration and owner fast-forward with no write", async (kind) => {
-  const f = await ownerFixture();
-  const request = kind === "work" ? fixtureWorkRequest("merged-work") : kind === "task" ? fixtureTaskRequest("merged-task") : { ...fixtureTaskRequest("merged-run"),kind: "run" as const,scope: { kind: "task" as const,...fixtureTask },record: { runId: { $allocatedId: true },task: fixtureTask,attempt: 1,status: "reserved",effectiveContractDigest: resolveEffectiveContract(fixtureGraph(),fixtureTask).digest,sourceSnapshotId: "synthetic-source",parentAuthorityRef: "synthetic-authority",nativeBindings: [],effectRefs: [] } };
-  const created = await allocateGitWorkIdentity(request,f.target,fixtureOwner(f.root));
-  const path = kind === "work" ? `work/${fixtureScope.projectId}/${created.id}/v3/work.json` : `work/${fixtureScope.projectId}/${fixtureScope.workId}/v3/${kind === "task" ? "tasks" : "runs"}/${created.id}.json`;
-  const evolved = await evolve(f.root,created.head,path,(row) => { row.value.status = kind === "work" ? "active" : kind === "task" ? "ready" : "started"; if (kind !== "run") { row.value.revision=2; row.value.title="Legitimate merged revision"; } });
-  const merged = await mergeAndSynchronize(f.root,f.target.expectedHead,evolved);
-  const replay = await allocateGitWorkIdentity(request,{ ...f.target,expectedHead: merged },fixtureOwner(f.root));
-  expect(replay.id).toBe(created.id); expect(replay.status).toBe("existing"); expect(git(f.root,"rev-parse",fixtureRef)).toBe(merged);
-});
-test.each(["ledger-restored","foreign-restored","removed-restored","regression-restored"])("R03-v6 detects merged side-history %s even when current bytes are restored", async (fault) => {
-  const f = await ownerFixture(), request = fixtureTaskRequest("merged-tamper"); const created = await allocateGitWorkIdentity(request,f.target,fixtureOwner(f.root));
-  const recordPath = `work/${fixtureScope.projectId}/${fixtureScope.workId}/v3/tasks/${created.id}.json`;
-  const original = JSON.parse(git(f.root,"show",created.head+":"+recordPath));
-  const ledger = `work/.identity-requests/${sourceSha256(request.ownerId)}/${sourceSha256(request.createRequestId)}.json`;
-  const path = fault === "ledger-restored" ? ledger : recordPath;
-  let good = JSON.parse(git(f.root,"show",created.head+":"+path));
-  git(f.root,"checkout","--detach",created.head);
-  if (fault === "regression-restored") { good.value.status="verified"; await put(f.root,path,good); commit(f.root); }
-  const bad = structuredClone(good);
-  if (fault === "ledger-restored") bad.requestDigest="0".repeat(64);
-  if (fault === "foreign-restored") bad.value.taskId="foreign";
-  if (fault === "regression-restored") bad.value.status="planned";
-  if (fault === "removed-restored") await rm(join(f.root,path)); else await put(f.root,path,bad);
-  commit(f.root); await put(f.root,path,good); const sideTip = commit(f.root);
-  const merged = await mergeAndSynchronize(f.root,f.target.expectedHead,sideTip);
-  await expect(allocateGitWorkIdentity(request,{ ...f.target,expectedHead: merged },fixtureOwner(f.root))).rejects.toThrow();
-  expect(git(f.root,"rev-parse",fixtureRef)).toBe(merged); void original;
-});
+test.each(["work", "task", "run"] as const)(
+  "R03-v6 %s replay crosses legitimate evolution, second-parent integration and owner fast-forward with no write",
+  async (kind) => {
+    const f = await ownerFixture();
+    const request =
+      kind === "work"
+        ? fixtureWorkRequest("merged-work")
+        : kind === "task"
+          ? fixtureTaskRequest("merged-task")
+          : {
+              ...fixtureTaskRequest("merged-run"),
+              kind: "run" as const,
+              scope: { kind: "task" as const, ...fixtureTask },
+              record: {
+                runId: { $allocatedId: true },
+                task: fixtureTask,
+                attempt: 1,
+                status: "reserved",
+                effectiveContractDigest: resolveEffectiveContract(fixtureGraph(), fixtureTask)
+                  .digest,
+                sourceSnapshotId: "synthetic-source",
+                parentAuthorityRef: "synthetic-authority",
+                nativeBindings: [],
+                effectRefs: [],
+              },
+            };
+    const created = await allocateGitWorkIdentity(request, f.target, fixtureOwner(f.root));
+    const path =
+      kind === "work"
+        ? `work/${fixtureScope.projectId}/${created.id}/v3/work.json`
+        : `work/${fixtureScope.projectId}/${fixtureScope.workId}/v3/${kind === "task" ? "tasks" : "runs"}/${created.id}.json`;
+    const evolved = await evolve(f.root, created.head, path, (row) => {
+      row.value.status = kind === "work" ? "active" : kind === "task" ? "ready" : "started";
+      if (kind !== "run") {
+        row.value.revision = 2;
+        row.value.title = "Legitimate merged revision";
+      }
+    });
+    const merged = await mergeAndSynchronize(f.root, f.target.expectedHead, evolved);
+    const replay = await allocateGitWorkIdentity(
+      request,
+      { ...f.target, expectedHead: merged },
+      fixtureOwner(f.root),
+    );
+    expect(replay.id).toBe(created.id);
+    expect(replay.status).toBe("existing");
+    expect(git(f.root, "rev-parse", fixtureRef)).toBe(merged);
+  },
+);
+test.each(["ledger-restored", "foreign-restored", "removed-restored", "regression-restored"])(
+  "R03-v6 detects merged side-history %s even when current bytes are restored",
+  async (fault) => {
+    const f = await ownerFixture(),
+      request = fixtureTaskRequest("merged-tamper");
+    const created = await allocateGitWorkIdentity(request, f.target, fixtureOwner(f.root));
+    const recordPath = `work/${fixtureScope.projectId}/${fixtureScope.workId}/v3/tasks/${created.id}.json`;
+    const original = JSON.parse(git(f.root, "show", created.head + ":" + recordPath));
+    const ledger = `work/.identity-requests/${sourceSha256(request.ownerId)}/${sourceSha256(request.createRequestId)}.json`;
+    const path = fault === "ledger-restored" ? ledger : recordPath;
+    let good = JSON.parse(git(f.root, "show", created.head + ":" + path));
+    git(f.root, "checkout", "--detach", created.head);
+    if (fault === "regression-restored") {
+      good.value.status = "verified";
+      await put(f.root, path, good);
+      commit(f.root);
+    }
+    const bad = structuredClone(good);
+    if (fault === "ledger-restored") bad.requestDigest = "0".repeat(64);
+    if (fault === "foreign-restored") bad.value.taskId = "foreign";
+    if (fault === "regression-restored") bad.value.status = "planned";
+    if (fault === "removed-restored") await rm(join(f.root, path));
+    else await put(f.root, path, bad);
+    commit(f.root);
+    await put(f.root, path, good);
+    const sideTip = commit(f.root);
+    const merged = await mergeAndSynchronize(f.root, f.target.expectedHead, sideTip);
+    await expect(
+      allocateGitWorkIdentity(request, { ...f.target, expectedHead: merged }, fixtureOwner(f.root)),
+    ).rejects.toThrow();
+    expect(git(f.root, "rev-parse", fixtureRef)).toBe(merged);
+    void original;
+  },
+);
 test("R03-v6 migration/bootstrap recover and replay across merge; merged bootstrap rewrite/restore rejects", async () => {
-  const f = await legacyFixture(); const admitted = await admitLegacyGitWork(f.request,f.target,f.owner);
+  const f = await legacyFixture();
+  const admitted = await admitLegacyGitWork(f.request, f.target, f.owner);
   const path = `work/${legacyScope.projectId}/${legacyScope.workId}/v3/tasks/${newTaskId}.json`;
-  const evolved = await evolve(f.root,admitted.head,path,(row) => { row.value.title="Legitimate migration successor"; row.value.revision=2; });
-  const merged = await mergeAndSynchronize(f.root,f.selection.commit,evolved);
-  expect((await admitLegacyGitWork(f.request,{ ...f.target,expectedHead: merged },f.owner)).status).toBe("existing");
-  const recovery = { selection: { ...f.selection,commit: merged },ownerId: f.request.ownerId,legacyOwner: { repositoryId: f.selection.repositoryId,projectId: legacyScope.projectId,workId: legacyScope.workId },createRequestId: "a69cd343-7ac5-4190-9bb9-7a021c41c16b",kind: "task" as const,meaningSha256: f.meaningSha256 };
+  const evolved = await evolve(f.root, admitted.head, path, (row) => {
+    row.value.title = "Legitimate migration successor";
+    row.value.revision = 2;
+  });
+  const merged = await mergeAndSynchronize(f.root, f.selection.commit, evolved);
+  expect(
+    (await admitLegacyGitWork(f.request, { ...f.target, expectedHead: merged }, f.owner)).status,
+  ).toBe("existing");
+  const recovery = {
+    selection: { ...f.selection, commit: merged },
+    ownerId: f.request.ownerId,
+    legacyOwner: {
+      repositoryId: f.selection.repositoryId,
+      projectId: legacyScope.projectId,
+      workId: legacyScope.workId,
+    },
+    createRequestId: "a69cd343-7ac5-4190-9bb9-7a021c41c16b",
+    kind: "task" as const,
+    meaningSha256: f.meaningSha256,
+  };
   expect((await recoverLegacyCreateRequest(recovery)).id).toBe(newTaskId);
-  const ledger = `work/.identity-legacy-requests/${sourceSha256(f.request.ownerId)}/${sourceSha256(recovery.createRequestId)}.json`, good = JSON.parse(git(f.root,"show",merged+":"+ledger));
-  git(f.root,"checkout","--detach",merged); await put(f.root,ledger,{ ...good,meaningSha256: "0".repeat(64) }); commit(f.root); await put(f.root,ledger,good); const side = commit(f.root);
-  const badMerge = await mergeAndSynchronize(f.root,merged,side);
-  await expect(recoverLegacyCreateRequest({ ...recovery,selection: { ...f.selection,commit: badMerge } })).rejects.toThrow("LEDGER_REWRITTEN");
-  await expect(admitLegacyGitWork(f.request,{ ...f.target,expectedHead: badMerge },f.owner)).rejects.toThrow();
-},30_000);
+  const ledger = `work/.identity-legacy-requests/${sourceSha256(f.request.ownerId)}/${sourceSha256(recovery.createRequestId)}.json`,
+    good = JSON.parse(git(f.root, "show", merged + ":" + ledger));
+  git(f.root, "checkout", "--detach", merged);
+  await put(f.root, ledger, { ...good, meaningSha256: "0".repeat(64) });
+  commit(f.root);
+  await put(f.root, ledger, good);
+  const side = commit(f.root);
+  const badMerge = await mergeAndSynchronize(f.root, merged, side);
+  await expect(
+    recoverLegacyCreateRequest({ ...recovery, selection: { ...f.selection, commit: badMerge } }),
+  ).rejects.toThrow("LEDGER_REWRITTEN");
+  await expect(
+    admitLegacyGitWork(f.request, { ...f.target, expectedHead: badMerge }, f.owner),
+  ).rejects.toThrow();
+}, 30_000);

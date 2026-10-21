@@ -37,10 +37,16 @@ export const sourceSha256 = (bytes: string): string =>
 /** Read-only commands retain repository configuration and execute no ref hooks. */
 export async function gitOwnerRead(root: string, args: string[]): Promise<string> {
   if (
-    !["rev-parse", "ls-tree", "cat-file", "show", "log", "merge-base",
-      "rev-list", "worktree"].includes(
-      args[0] ?? "",
-    )
+    ![
+      "rev-parse",
+      "ls-tree",
+      "cat-file",
+      "show",
+      "log",
+      "merge-base",
+      "rev-list",
+      "worktree",
+    ].includes(args[0] ?? "")
   )
     throw Error("V3_READ_ONLY_GIT_COMMAND_REQUIRED");
   return run(root, args);
@@ -210,55 +216,101 @@ export async function publishGitOwnerFiles(
   }
 }
 /** Exact full ancestry, including side parents. Bounds reject incomplete histories. */
-export interface GitOwnerAncestryNode { commit: string; parents: string[] }
-export async function gitOwnerAncestry(root: string, head: string): Promise<GitOwnerAncestryNode[]> {
+export interface GitOwnerAncestryNode {
+  commit: string;
+  parents: string[];
+}
+export async function gitOwnerAncestry(
+  root: string,
+  head: string,
+): Promise<GitOwnerAncestryNode[]> {
   if (!oid(head)) throw Error("V3_EXACT_ANCESTRY_HEAD_REQUIRED");
-  if ((await gitOwnerRead(root,["rev-parse","--is-shallow-repository"])).trim() !== "false") throw Error("V3_COMPLETE_OWNER_ANCESTRY_REQUIRED");
-  const lines = (await gitOwnerRead(root, ["rev-list", "--topo-order", "--parents", "--max-count=8193", head])).trim().split("\n").filter(Boolean);
+  if ((await gitOwnerRead(root, ["rev-parse", "--is-shallow-repository"])).trim() !== "false")
+    throw Error("V3_COMPLETE_OWNER_ANCESTRY_REQUIRED");
+  const lines = (
+    await gitOwnerRead(root, ["rev-list", "--topo-order", "--parents", "--max-count=8193", head])
+  )
+    .trim()
+    .split("\n")
+    .filter(Boolean);
   if (lines.length > 8192) throw Error("V3_COMPLETE_OWNER_ANCESTRY_BOUND");
-  const nodes = lines.map((line) => { const [commit, ...parents] = line.split(" "); if (!commit || ![commit,...parents].every(oid)) throw Error("V3_INVALID_OWNER_ANCESTRY"); return { commit, parents }; });
+  const nodes = lines.map((line) => {
+    const [commit, ...parents] = line.split(" ");
+    if (!commit || ![commit, ...parents].every(oid)) throw Error("V3_INVALID_OWNER_ANCESTRY");
+    return { commit, parents };
+  });
   const ids = new Set(nodes.map((node) => node.commit));
-  if (!ids.has(head) || nodes.some((node) => node.parents.some((parent) => !ids.has(parent)))) throw Error("V3_INCOMPLETE_OWNER_ANCESTRY");
+  if (!ids.has(head) || nodes.some((node) => node.parents.some((parent) => !ids.has(parent))))
+    throw Error("V3_INCOMPLETE_OWNER_ANCESTRY");
   return nodes.reverse();
 }
 /** Batch immutable object metadata avoids one Git process per commit/record.
  * Full-parent traversal and regular-file history remain independently checked. */
 export async function gitOwnerPathHistory(root: string, head: string, path: string) {
-  assertGitPath(path); const nodes = await gitOwnerAncestry(root,head);
-  if (nodes.length * (path.length + 96) > 4_000_000) throw Error("V3_OWNER_PATH_HISTORY_TRANSPORT_BOUND");
+  assertGitPath(path);
+  const nodes = await gitOwnerAncestry(root, head);
+  if (nodes.length * (path.length + 96) > 4_000_000)
+    throw Error("V3_OWNER_PATH_HISTORY_TRANSPORT_BOUND");
   const expressions = nodes.map((node) => node.commit + ":" + path);
-  const output = await run(root,["cat-file","--batch-check=%(objectname) %(objecttype) %(objectsize)"],expressions.join("\n") + "\n");
+  const output = await run(
+    root,
+    ["cat-file", "--batch-check=%(objectname) %(objecttype) %(objectsize)"],
+    expressions.join("\n") + "\n",
+  );
   const lines = output.trimEnd().split("\n");
   if (lines.length !== nodes.length) throw Error("V3_OWNER_PATH_HISTORY_INCOMPLETE");
-  const blobs = new Map<string,string | null>();
+  const blobs = new Map<string, string | null>();
   for (let index = 0; index < nodes.length; index++) {
     const row = lines[index]!;
-    if (row === expressions[index] + " missing") blobs.set(nodes[index]!.commit,null);
-    else { const match = /^([a-f0-9]{40}) blob ([0-9]+)$/.exec(row); if (!match || Number(match[2]) > 4_194_304) throw Error("V3_OWNER_PATH_HISTORY_BLOB_REQUIRED"); blobs.set(nodes[index]!.commit,match[1]!); }
+    if (row === expressions[index] + " missing") blobs.set(nodes[index]!.commit, null);
+    else {
+      const match = /^([a-f0-9]{40}) blob ([0-9]+)$/.exec(row);
+      if (!match || Number(match[2]) > 4_194_304)
+        throw Error("V3_OWNER_PATH_HISTORY_BLOB_REQUIRED");
+      blobs.set(nodes[index]!.commit, match[1]!);
+    }
   }
-  const modes = await gitOwnerRead(root,["log","--full-history","-m","--raw","--no-abbrev","--no-renames","--format=",head,"--",path]);
+  const modes = await gitOwnerRead(root, [
+    "log",
+    "--full-history",
+    "-m",
+    "--raw",
+    "--no-abbrev",
+    "--no-renames",
+    "--format=",
+    head,
+    "--",
+    path,
+  ]);
   for (const line of modes.split("\n").filter(Boolean)) {
     const match = /^:([0-9]{6}) ([0-9]{6}) /.exec(line);
-    if (!match || ![match[1],match[2]].every((mode) => ["000000","100644"].includes(mode!))) throw Error("V3_REGULAR_GIT_RECORD_HISTORY_REQUIRED");
+    if (!match || ![match[1], match[2]].every((mode) => ["000000", "100644"].includes(mode!)))
+      throw Error("V3_REGULAR_GIT_RECORD_HISTORY_REQUIRED");
   }
-  return { nodes,blobs };
+  return { nodes, blobs };
 }
 /** Mapping/index receipts have one introduction. A merge propagates the existing
  * transaction; every parent path still participates in rewrite/deletion checks. */
 export async function immutableGitLedgerCreation(
-  root: string, head: string, path: string, expectedBytes: string,
+  root: string,
+  head: string,
+  path: string,
+  expectedBytes: string,
 ): Promise<string> {
-  const { nodes,blobs } = await gitOwnerPathHistory(root,head,path);
+  const { nodes, blobs } = await gitOwnerPathHistory(root, head, path);
   const expectedBlob = sourceBlobOid(expectedBytes);
-  const values = new Map<string,string | null>(); const introductions: string[] = [];
+  const values = new Map<string, string | null>();
+  const introductions: string[] = [];
   for (const node of nodes) {
     const value = blobs.get(node.commit)!;
-    if (value !== null && value !== expectedBlob) throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REWRITTEN");
+    if (value !== null && value !== expectedBlob)
+      throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REWRITTEN");
     const propagated = node.parents.some((parent) => values.get(parent) === expectedBlob);
     if (value === null && propagated) throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REMOVED");
     if (value === expectedBlob && !propagated) introductions.push(node.commit);
-    values.set(node.commit,value);
+    values.set(node.commit, value);
   }
-  if (values.get(head) !== expectedBlob || introductions.length !== 1) throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REWRITTEN");
+  if (values.get(head) !== expectedBlob || introductions.length !== 1)
+    throw Error("V3_IMMUTABLE_IDENTITY_LEDGER_REWRITTEN");
   return introductions[0]!;
 }

@@ -81,11 +81,13 @@ export async function verifyRecordSuccessorLineage(
   await gitOwnerRead(root, ["merge-base", "--is-ancestor", creationCommit, head]);
   const initial = JSON.parse(creationBytes) as unknown;
   assertV3("StoredRecord", initial);
-  const { nodes,blobs } = await gitOwnerPathHistory(root,head,path);
-  const decoded = new Map<string,StoredRecord>();
-  const descendants = new Set<string>(); const records = new Map<string, StoredRecord>();
+  const { nodes, blobs } = await gitOwnerPathHistory(root, head, path);
+  const decoded = new Map<string, StoredRecord>();
+  const descendants = new Set<string>();
+  const records = new Map<string, StoredRecord>();
   for (const node of nodes) {
-    const inherits = node.commit === creationCommit || node.parents.some((parent) => descendants.has(parent));
+    const inherits =
+      node.commit === creationCommit || node.parents.some((parent) => descendants.has(parent));
     const blob = blobs.get(node.commit)!;
     if (!inherits) {
       if (blob !== null) throw Error("V3_RECORD_OUTSIDE_INTRODUCING_TRANSACTION_LINEAGE");
@@ -93,14 +95,21 @@ export async function verifyRecordSuccessorLineage(
     }
     descendants.add(node.commit);
     if (blob === null) throw Error("V3_ALLOCATED_RECORD_REMOVED");
-    if (!decoded.has(blob)) { const bytes = await gitOwnerRead(root,["cat-file","blob",blob]); if (sourceBlobOid(bytes) !== blob) throw Error("V3_RECORD_HISTORY_BLOB_MISMATCH"); const row: unknown = JSON.parse(bytes); assertV3("StoredRecord",row); decoded.set(blob,row); }
+    if (!decoded.has(blob)) {
+      const bytes = await gitOwnerRead(root, ["cat-file", "blob", blob]);
+      if (sourceBlobOid(bytes) !== blob) throw Error("V3_RECORD_HISTORY_BLOB_MISMATCH");
+      const row: unknown = JSON.parse(bytes);
+      assertV3("StoredRecord", row);
+      decoded.set(blob, row);
+    }
     const current = decoded.get(blob)!;
-    if (node.commit === creationCommit && blob !== sourceBlobOid(creationBytes)) throw Error("V3_RECORD_CREATION_BYTES_MISMATCH");
+    if (node.commit === creationCommit && blob !== sourceBlobOid(creationBytes))
+      throw Error("V3_RECORD_CREATION_BYTES_MISMATCH");
     for (const parent of node.parents) {
       const prior = records.get(parent);
-      if (prior) checkSuccessor(prior,current);
+      if (prior) checkSuccessor(prior, current);
     }
-    records.set(node.commit,current);
+    records.set(node.commit, current);
   }
   if (!descendants.has(head)) throw Error("V3_RECORD_CREATION_NOT_IN_OWNER_ANCESTRY");
 }
