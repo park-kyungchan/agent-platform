@@ -27,9 +27,7 @@
   },
   "executionClass": "source-only",
   "dependsOn": [],
-  "decisionIds": [
-    "W05-ACTUAL-FULL-WORKFLOW-AUTHORITY-20261021"
-  ],
+  "decisionIds": [],
   "effectIds": [],
   "verificationEvidenceIds": []
 }

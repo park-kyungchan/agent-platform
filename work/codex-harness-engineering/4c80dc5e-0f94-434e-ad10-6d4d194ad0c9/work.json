@@ -39,8 +39,6 @@
     "id": "W05-PLAN-INTEGRATION-REPAIR-20261021",
     "revision": 1
   },
-  "governingDecisionIds": [
-    "W05-ACTUAL-FULL-WORKFLOW-AUTHORITY-20261021"
-  ],
+  "governingDecisionIds": [],
   "historicalFenceIds": []
 }
