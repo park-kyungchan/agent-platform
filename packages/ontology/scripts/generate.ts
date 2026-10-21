@@ -112,13 +112,18 @@ async function generateMemoryV1(): Promise<void> {
   const schemaSha256 = createHash("sha256").update(input).digest("hex");
   const sharedSchemaSha256 = createHash("sha256").update(workInput).digest("hex");
   const banner = `/** Generated from memory-v1.schema.json; do not edit. SHA-256: ${schemaSha256}; S01: ${sharedSchemaSha256} */`;
-  const types = await compileFromFile(schemaPath, {
+  // Materialize only the referenced shared definition closure from its canonical
+  // S01 schema. This transient compiler input is not another maintained schema.
+  const schema = JSON.parse(input.toString()) as Parameters<typeof compile>[0] & { $defs: Record<string, unknown> };
+  const shared = JSON.parse(workInput.toString()) as { $defs: Record<string, unknown> };
+  for (const name of ["Scope", "SourceRef", "TaskRef", "WorkRef", "Id", "Digest", "Revision", "Json"])
+    schema.$defs[name] = structuredClone(shared.$defs[name]);
+  const types = await compile(schema, "MemoryV1", {
     bannerComment: banner, unreachableDefinitions: true, unknownAny: true, format: true,
   });
   const names = ["MemoryRecord", "MemoryDocument", "MemoryQuery", "GoverningDocument", "LegacyBinding"];
   const ajv = new Ajv({ strict: true, allErrors: false, inlineRefs: false, code: { source: true, esm: true } });
-  ajv.addSchema(JSON.parse(workInput.toString()) as Parameters<Ajv["addSchema"]>[0]);
-  ajv.addSchema(JSON.parse(input.toString()) as Parameters<Ajv["addSchema"]>[0], "memory");
+  ajv.addSchema(schema as Parameters<Ajv["addSchema"]>[0], "memory");
   const standalone = standaloneCode(ajv, Object.fromEntries(names.map(name => ["validate" + name, "memory#/$defs/" + name])));
   const entry = fileURLToPath(new URL("./.memory-v1-standalone.generated.js", import.meta.url));
   await writeFile(entry, standalone, { flag: "wx" });
