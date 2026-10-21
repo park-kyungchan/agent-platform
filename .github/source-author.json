@@ -11,7 +11,7 @@
     "workId": "8b389507-8863-46b9-b9ca-1ec1974fbf75",
     "taskId": "ab9a1f21-3d8d-4526-a5e7-d518ea468de2"
   },
-  "sourceBaseSha": "618a5b2c288d2277109344f63d7aed3bfbc477aa",
+  "sourceBaseSha": "467091f461b87ea073ec58c3d1b7be1079e8e149",
   "author": {
     "runtime": "native-codex",
     "threadId": "01a15c16-4285-78e2-8971-621eca83dc03",
@@ -20,7 +20,7 @@
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-21T11:17:56.946Z",
+  "capturedAtUtc": "2026-10-21T11:20:04.991Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
