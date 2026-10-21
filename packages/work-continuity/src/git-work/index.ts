@@ -47,7 +47,20 @@ export {
   type GitAllocationTarget,
 } from "./allocation.ts";
 
-export { readLegacyGitWorkProjection, readVersionedLegacyGitWork, previewLegacyGitWorkMigration, admitLegacyGitWork, recoverLegacyCreateRequest, assertLegacyGitWriterAllowed, readMigratedGitWorkV3, type NativeLegacyMigrationOwner } from "./legacy-bridge.ts";
+export {
+  readLegacyGitWorkProjection,
+  readVersionedLegacyGitWork,
+  previewLegacyGitWorkMigration,
+  admitLegacyGitWork,
+  recoverLegacyCreateRequest,
+  assertLegacyGitWriterAllowed,
+  readMigratedGitWorkV3,
+  type NativeLegacyMigrationOwner,
+} from "./legacy-bridge.ts";
 export { validateGitWorkAliases, resolveGitWorkAlias } from "./aliases.ts";
-export { openExactV3SourceReader, qualifySelectedExternalArtifacts, consumerContractBinding } from "./external-artifacts.ts";
+export {
+  openExactV3SourceReader,
+  qualifySelectedExternalArtifacts,
+  consumerContractBinding,
+} from "./external-artifacts.ts";
 export type { NativeSourceGitHookPolicy } from "./git-owner-transaction.ts";

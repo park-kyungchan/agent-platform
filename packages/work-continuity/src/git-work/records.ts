@@ -986,7 +986,14 @@ export async function validateGitWorkTransition(
 ): Promise<ValidationResult> {
   for (const reader of [before, after]) {
     const snapshot = await openGitSourceSnapshot(reader.selection);
-    if ((await snapshot.listPaths(gitWorkPath(reader.work.projectId, reader.work.workId) + "/v3/writer.json")).length) return outcome(["LEGACY_AUTHORITATIVE_WRITER_RETIRED_USE_VERSIONED_MIGRATION_READER"]);
+    if (
+      (
+        await snapshot.listPaths(
+          gitWorkPath(reader.work.projectId, reader.work.workId) + "/v3/writer.json",
+        )
+      ).length
+    )
+      return outcome(["LEGACY_AUTHORITATIVE_WRITER_RETIRED_USE_VERSIONED_MIGRATION_READER"]);
   }
   const findings: string[] = [];
   if (

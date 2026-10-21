@@ -188,7 +188,17 @@ export function fixtureOwner(
         authorityRef: "fixture-current-authority",
         expiresAtUtc: new Date(Date.now() + 60_000).toISOString(),
         membership: true,
-        gitHookPolicy: { mode: "native-qualified-no-git-hooks", repositoryRoot: root, ownerRef: input.ownerRef, head: input.head, ownerId: "fixture-owner", authorityRevision: 1, qualificationRef: "synthetic-current-source-hook-policy", expiresAtUtc: new Date(Date.now() + 60_000).toISOString(), requiredNativeControlsSatisfied: true },
+        gitHookPolicy: {
+          mode: "native-qualified-no-git-hooks",
+          repositoryRoot: root,
+          ownerRef: input.ownerRef,
+          head: input.head,
+          ownerId: "fixture-owner",
+          authorityRevision: 1,
+          qualificationRef: "synthetic-current-source-hook-policy",
+          expiresAtUtc: new Date(Date.now() + 60_000).toISOString(),
+          requiredNativeControlsSatisfied: true,
+        },
         ...overrides,
       });
     },

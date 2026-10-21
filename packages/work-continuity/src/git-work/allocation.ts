@@ -19,7 +19,16 @@ import {
   v3WorkKey,
 } from "./effective-contract.ts";
 import { encodedId } from "./source.ts";
-import { gitOwnerRead as git, readOptionalGitRecord as readOptional, checkedGitOwnerTarget as checkedTarget, qualifySourceGitTransaction, publishGitOwnerFiles, sourceBlobOid, immutableGitLedgerCreation, type NativeSourceGitHookPolicy } from "./git-owner-transaction.ts";
+import {
+  gitOwnerRead as git,
+  readOptionalGitRecord as readOptional,
+  checkedGitOwnerTarget as checkedTarget,
+  qualifySourceGitTransaction,
+  publishGitOwnerFiles,
+  sourceBlobOid,
+  immutableGitLedgerCreation,
+  type NativeSourceGitHookPolicy,
+} from "./git-owner-transaction.ts";
 import type { GitAllocationTarget } from "./git-owner-transaction.ts";
 export type { GitAllocationTarget, NativeSourceGitHookPolicy } from "./git-owner-transaction.ts";
 import { verifyRecordSuccessorLineage } from "./record-lineage.ts";
@@ -119,7 +128,8 @@ export function prepareV3Allocation(input: unknown, allocatedId: string): Prepar
   let path: string;
   if (input.kind === "work") {
     assertV3("Work", record);
-    if (record.legacySource || record.leadActorId === null) throw Error("V3_NEW_ALLOCATION_CANNOT_IMPORT_LEGACY_WORK");
+    if (record.legacySource || record.leadActorId === null)
+      throw Error("V3_NEW_ALLOCATION_CANNOT_IMPORT_LEGACY_WORK");
     if (
       scope.kind !== "project" ||
       record.projectId !== scope.projectId ||
@@ -131,7 +141,8 @@ export function prepareV3Allocation(input: unknown, allocatedId: string): Prepar
     path = workPath(record) + "/work.json";
   } else if (input.kind === "task") {
     assertV3("Task", record);
-    if (record.legacyBinding || record.assigneeActorId === null) throw Error("V3_NEW_ALLOCATION_CANNOT_IMPORT_LEGACY_TASK");
+    if (record.legacyBinding || record.assigneeActorId === null)
+      throw Error("V3_NEW_ALLOCATION_CANNOT_IMPORT_LEGACY_TASK");
     if (
       scope.kind !== "work" ||
       record.projectId !== scope.projectId ||
@@ -207,7 +218,8 @@ async function existingBinding(
   if (!uuid(b.id)) throw Error("V3_INVALID_ALLOCATION_BINDING");
   const prepared = prepareV3Allocation(request, b.id);
   const creationCommit = await immutableGitLedgerCreation(root, head, requestPath(request), bytes);
-  if (await immutableGitLedgerCreation(root, head, identityPath(b.id), bytes) !== creationCommit) throw Error("V3_IDENTITY_INDEX_CREATION_MISMATCH");
+  if ((await immutableGitLedgerCreation(root, head, identityPath(b.id), bytes)) !== creationCommit)
+    throw Error("V3_IDENTITY_INDEX_CREATION_MISMATCH");
   const record = await git(root, ["cat-file", "blob", b.creation.recordBlobOid]);
   const wrapped = {
     schema: "common.git-work-record.v3",
@@ -219,7 +231,7 @@ async function existingBinding(
     record !== fileBytes(wrapped) ||
     hash(record) !== b.recordSha256 ||
     sourceBlobOid(record) !== b.creation.recordBlobOid ||
-    await readOptional(root, creationCommit, prepared.recordPath) !== record ||
+    (await readOptional(root, creationCommit, prepared.recordPath)) !== record ||
     (await readOptional(root, head, identityPath(b.id))) !== bytes ||
     b.contracts.length !== prepared.contractPaths.length ||
     b.creation.contractBlobs.length !== prepared.contractPaths.length
@@ -235,7 +247,7 @@ async function existingBinding(
       b.creation.contractBlobs[i]?.path !== path ||
       b.creation.contractBlobs[i]?.blobOid !== sourceBlobOid(content) ||
       b.creation.contractBlobs[i]?.sha256 !== hash(content) ||
-      await readOptional(root, creationCommit, path) !== content
+      (await readOptional(root, creationCommit, path)) !== content
     )
       throw Error("V3_ALLOCATION_CONTRACT_MISMATCH");
   }
@@ -243,34 +255,43 @@ async function existingBinding(
   return b;
 }
 
-async function readVerifiedOwnerGraph(owner: NativeGitIdentityOwner, target: GitAllocationTarget, head: string): Promise<Graph> {
+async function readVerifiedOwnerGraph(
+  owner: NativeGitIdentityOwner,
+  target: GitAllocationTarget,
+  head: string,
+): Promise<Graph> {
   const observedGraph = await owner.readGraph({
-          repositoryRoot: target.repositoryRoot,
-          ownerRef: target.ownerRef,
-          head,
-        });
-  const graph = { ...observedGraph, works: [...observedGraph.works], tasks: [...observedGraph.tasks], contracts: [...observedGraph.contracts] };
+    repositoryRoot: target.repositoryRoot,
+    ownerRef: target.ownerRef,
+    head,
+  });
+  const graph = {
+    ...observedGraph,
+    works: [...observedGraph.works],
+    tasks: [...observedGraph.tasks],
+    contracts: [...observedGraph.contracts],
+  };
   validateGitWorkV3Graph(graph);
-      // Native metadata still owns Domain/Project semantics. Every projected v3
-      // Work/Task/contract must be backed by exactly the selected Git bytes.
-      for (const w of graph.works)
-        if (
-          (await readOptional(target.repositoryRoot, head, workPath(w) + "/work.json")) !==
-          fileBytes({ schema: "common.git-work-record.v3", kind: "work", value: w })
-        )
-          throw Error("V3_OWNER_GRAPH_WORK_MISMATCH");
-      for (const t of graph.tasks)
-        if (
-          (await readOptional(
-            target.repositoryRoot,
-            head,
-            workPath(t) + "/tasks/" + encodedId(t.taskId) + ".json",
-          )) !== fileBytes({ schema: "common.git-work-record.v3", kind: "task", value: t })
-        )
-          throw Error("V3_OWNER_GRAPH_TASK_MISMATCH");
-      for (const c of graph.contracts)
-        if ((await readOptional(target.repositoryRoot, head, contractPath(c))) !== fileBytes(c))
-          throw Error("V3_OWNER_GRAPH_CONTRACT_MISMATCH");
+  // Native metadata still owns Domain/Project semantics. Every projected v3
+  // Work/Task/contract must be backed by exactly the selected Git bytes.
+  for (const w of graph.works)
+    if (
+      (await readOptional(target.repositoryRoot, head, workPath(w) + "/work.json")) !==
+      fileBytes({ schema: "common.git-work-record.v3", kind: "work", value: w })
+    )
+      throw Error("V3_OWNER_GRAPH_WORK_MISMATCH");
+  for (const t of graph.tasks)
+    if (
+      (await readOptional(
+        target.repositoryRoot,
+        head,
+        workPath(t) + "/tasks/" + encodedId(t.taskId) + ".json",
+      )) !== fileBytes({ schema: "common.git-work-record.v3", kind: "task", value: t })
+    )
+      throw Error("V3_OWNER_GRAPH_TASK_MISMATCH");
+  for (const c of graph.contracts)
+    if ((await readOptional(target.repositoryRoot, head, contractPath(c))) !== fileBytes(c))
+      throw Error("V3_OWNER_GRAPH_CONTRACT_MISMATCH");
   return graph;
 }
 
@@ -326,8 +347,20 @@ export async function allocateGitWorkIdentity(
         !scopeContains(authority.scope, request.scope)
       )
         throw Error("V3_CURRENT_OWNER_AUTHORITY_REQUIRED");
-      const transaction = qualifySourceGitTransaction(target, head, request.ownerId, authority.gitHookPolicy);
-      if (await readOptional(target.repositoryRoot, head, `work/.identity-legacy-requests/${hash(request.ownerId)}/${hash(request.createRequestId)}.json`) !== null) throw Error("V3_LEGACY_REQUEST_REQUIRES_VERSIONED_RECOVERY");
+      const transaction = qualifySourceGitTransaction(
+        target,
+        head,
+        request.ownerId,
+        authority.gitHookPolicy,
+      );
+      if (
+        (await readOptional(
+          target.repositoryRoot,
+          head,
+          `work/.identity-legacy-requests/${hash(request.ownerId)}/${hash(request.createRequestId)}.json`,
+        )) !== null
+      )
+        throw Error("V3_LEGACY_REQUEST_REQUIRES_VERSIONED_RECOVERY");
       const verifiedGraph = await readVerifiedOwnerGraph(owner, target, head);
       const prior = await existingBinding(target.repositoryRoot, head, request);
       if (prior)
@@ -424,7 +457,14 @@ export async function allocateGitWorkIdentity(
         id,
         recordPath: prepared.recordPath,
         recordSha256: hash(recordBytes),
-        creation: { recordBlobOid: sourceBlobOid(recordBytes), contractBlobs: prepared.contracts.map((c, i) => ({ path: prepared.contractPaths[i]!, blobOid: sourceBlobOid(fileBytes(c)), sha256: hash(fileBytes(c)) })) },
+        creation: {
+          recordBlobOid: sourceBlobOid(recordBytes),
+          contractBlobs: prepared.contracts.map((c, i) => ({
+            path: prepared.contractPaths[i]!,
+            blobOid: sourceBlobOid(fileBytes(c)),
+            sha256: hash(fileBytes(c)),
+          })),
+        },
         contracts: prepared.contracts.map((c, i) => ({
           path: prepared.contractPaths[i]!,
           sha256: hash(fileBytes(c)),
@@ -447,11 +487,24 @@ export async function allocateGitWorkIdentity(
       for (const path of files.keys())
         if ((await readOptional(target.repositoryRoot, head, path)) !== null)
           throw Error("V3_ALLOCATION_TARGET_EXISTS");
-      const publication = await publishGitOwnerFiles(target, head, files, "Allocate source identity " + digestV3(request), transaction);
+      const publication = await publishGitOwnerFiles(
+        target,
+        head,
+        files,
+        "Allocate source identity " + digestV3(request),
+        transaction,
+      );
       if (publication.cas === "observe") {
         const observed = await checkedTarget(target);
         const reconciled = await existingBinding(target.repositoryRoot, observed, request);
-        if (reconciled) return { id: reconciled.id, head: observed, status: "reconciled" as const, requestDigest: reconciled.requestDigest, nativePermissionGranted: false as const };
+        if (reconciled)
+          return {
+            id: reconciled.id,
+            head: observed,
+            status: "reconciled" as const,
+            requestDigest: reconciled.requestDigest,
+            nativePermissionGranted: false as const,
+          };
         throw Error("V3_OWNER_CAS_NOT_APPLIED_OR_UNCERTAIN_OBSERVE_BEFORE_NEW_ATTEMPT");
       }
       const observed = await checkedTarget(target);
