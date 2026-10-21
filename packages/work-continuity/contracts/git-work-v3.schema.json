@@ -573,7 +573,14 @@
           "$ref": "#/$defs/Id"
         },
         "leadActorId": {
-          "$ref": "#/$defs/Id"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "revision": {
           "$ref": "#/$defs/Revision"
@@ -590,6 +597,9 @@
             "accepted",
             "cancelled"
           ]
+        },
+        "legacySource": {
+          "$ref": "#/$defs/GitSourcePin"
         }
       },
       "required": [
@@ -641,7 +651,14 @@
           "$ref": "#/$defs/Id"
         },
         "assigneeActorId": {
-          "$ref": "#/$defs/Id"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "revision": {
           "$ref": "#/$defs/Revision"
@@ -673,6 +690,9 @@
             "accepted",
             "cancelled"
           ]
+        },
+        "legacyBinding": {
+          "$ref": "#/$defs/LegacyTaskBinding"
         }
       },
       "required": [
@@ -938,6 +958,20 @@
             "$ref": "#/$defs/NativeCorrelation"
           },
           "maxItems": 10000
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitWorkAlias"
+          },
+          "maxItems": 2048
+        },
+        "externalArtifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SelectedExternalArtifact"
+          },
+          "maxItems": 2048
         }
       },
       "required": [
@@ -1072,6 +1106,23 @@
         },
         "digest": {
           "$ref": "#/$defs/Digest"
+        },
+        "legacyBinding": {
+          "$ref": "#/$defs/LegacyTaskBinding"
+        },
+        "holdReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2048
+        },
+        "externalArtifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SelectedExternalArtifact"
+          },
+          "maxItems": 2048
         }
       },
       "required": [
@@ -1087,7 +1138,9 @@
         "acceptanceCriteria",
         "dependencies",
         "dependencyTasks",
-        "digest"
+        "digest",
+        "holdReasons",
+        "externalArtifacts"
       ],
       "additionalProperties": false
     },
@@ -1262,12 +1315,56 @@
             },
             "authorityRef": {
               "$ref": "#/$defs/Id"
+            },
+            "gitHookPolicyRef": {
+              "$ref": "#/$defs/Id"
             }
           },
           "required": [
             "actorId",
             "revision",
-            "authorityRef"
+            "authorityRef",
+            "gitHookPolicyRef"
+          ],
+          "additionalProperties": false
+        },
+        "creation": {
+          "type": "object",
+          "properties": {
+            "recordBlobOid": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{40}$"
+            },
+            "contractBlobs": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "maxLength": 4096
+                  },
+                  "blobOid": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{40}$"
+                  },
+                  "sha256": {
+                    "$ref": "#/$defs/Digest"
+                  }
+                },
+                "required": [
+                  "path",
+                  "blobOid",
+                  "sha256"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "recordBlobOid",
+            "contractBlobs"
           ],
           "additionalProperties": false
         }
@@ -1283,7 +1380,8 @@
         "recordPath",
         "recordSha256",
         "contracts",
-        "authority"
+        "authority",
+        "creation"
       ],
       "additionalProperties": false
     },
@@ -1383,6 +1481,19 @@
         },
         "semanticAcceptanceEstablished": {
           "const": false
+        },
+        "status": {
+          "enum": [
+            "source-qualified",
+            "held"
+          ]
+        },
+        "holdReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2048
         }
       },
       "required": [
@@ -1392,7 +1503,9 @@
         "contractSources",
         "authority",
         "nativePermissionGranted",
-        "semanticAcceptanceEstablished"
+        "semanticAcceptanceEstablished",
+        "status",
+        "holdReasons"
       ],
       "additionalProperties": false
     },
@@ -1437,6 +1550,844 @@
         "authority",
         "nativePermissionGranted",
         "semanticAcceptanceEstablished"
+      ],
+      "additionalProperties": false
+    },
+    "GitSourcePin": {
+      "type": "object",
+      "properties": {
+        "repositoryId": {
+          "$ref": "#/$defs/Id"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "repositoryId",
+        "commit",
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "SnapshotIdentity": {
+      "type": "object",
+      "properties": {
+        "repositoryId": {
+          "$ref": "#/$defs/Id"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "projectId": {
+          "$ref": "#/$defs/Id"
+        },
+        "workId": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "repositoryId",
+        "commit",
+        "projectId",
+        "workId"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyTaskBinding": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "enum": [
+            "common.git-work.v1",
+            "common.git-work-task.v2"
+          ]
+        },
+        "source": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "contracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "holdReasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "protocol",
+        "source",
+        "contracts",
+        "holdReasons"
+      ],
+      "additionalProperties": false
+    },
+    "TypedLegacyAddress": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "work",
+            "task",
+            "run",
+            "issue",
+            "spec",
+            "plan"
+          ]
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope"
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "kind",
+        "scope",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "GitWorkAlias": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/Id"
+        },
+        "from": {
+          "$ref": "#/$defs/TypedLegacyAddress"
+        },
+        "to": {
+          "$ref": "#/$defs/TypedLegacyAddress"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "provenance": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "namespace",
+        "from",
+        "to",
+        "revision",
+        "provenance",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "ConsumerContractBinding": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "taskRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "workContracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "contracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "task",
+        "workRevision",
+        "taskRevision",
+        "workContracts",
+        "contracts",
+        "acceptanceCriteria"
+      ],
+      "additionalProperties": false
+    },
+    "ProducerContractBinding": {
+      "type": "object",
+      "properties": {
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "workRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "taskRevision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "workContracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "contracts": {
+          "$ref": "#/$defs/ContractSet"
+        },
+        "effectiveDigest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "task",
+        "workRevision",
+        "taskRevision",
+        "workContracts",
+        "contracts",
+        "effectiveDigest"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactAlternative": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "producer": {
+          "$ref": "#/$defs/ProducerContractBinding"
+        },
+        "artifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "criterionIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "id",
+        "producer",
+        "artifact",
+        "criterionIds"
+      ],
+      "additionalProperties": false
+    },
+    "SelectedArtifactGate": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-artifact-gate.v3"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/Id"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "consumer": {
+          "$ref": "#/$defs/ConsumerContractBinding"
+        },
+        "selectionOwnerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ArtifactAlternative"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "schema",
+        "instanceId",
+        "revision",
+        "consumer",
+        "selectionOwnerId",
+        "alternatives"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactGateSelection": {
+      "type": "object",
+      "properties": {
+        "instanceId": {
+          "$ref": "#/$defs/Id"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "definition": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "consumer": {
+          "$ref": "#/$defs/ConsumerContractBinding"
+        },
+        "selectedAlternative": {
+          "$ref": "#/$defs/Id"
+        },
+        "selectionOwnerId": {
+          "$ref": "#/$defs/Id"
+        }
+      },
+      "required": [
+        "instanceId",
+        "revision",
+        "definition",
+        "consumer",
+        "selectedAlternative",
+        "selectionOwnerId"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactSelectionReceipt": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-artifact-selection.v3"
+        },
+        "selection": {
+          "$ref": "#/$defs/ArtifactGateSelection"
+        }
+      },
+      "required": [
+        "schema",
+        "selection"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactCriterionReceipt": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-artifact-criterion.v3"
+        },
+        "selection": {
+          "$ref": "#/$defs/ArtifactGateSelection"
+        },
+        "criterionId": {
+          "$ref": "#/$defs/Id"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitSourcePin"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "schema",
+        "selection",
+        "criterionId",
+        "status",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactProducerMilestone": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-artifact-producer-milestone.v3"
+        },
+        "producer": {
+          "$ref": "#/$defs/ProducerContractBinding"
+        },
+        "artifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "artifactSource": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "milestone": {
+          "enum": [
+            "verified",
+            "accepted"
+          ]
+        },
+        "acceptanceDecision": {
+          "$ref": "#/$defs/GitSourcePin"
+        }
+      },
+      "required": [
+        "schema",
+        "producer",
+        "artifact",
+        "artifactSource",
+        "milestone"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactAcceptanceDecision": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-artifact-acceptance.v3"
+        },
+        "producer": {
+          "$ref": "#/$defs/ProducerContractBinding"
+        },
+        "artifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "ownerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "decision": {
+          "const": "accepted"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitSourcePin"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "schema",
+        "producer",
+        "artifact",
+        "ownerId",
+        "decision",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "ArtifactReceiverUse": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-artifact-receiver-use.v3"
+        },
+        "selection": {
+          "$ref": "#/$defs/ArtifactGateSelection"
+        },
+        "producer": {
+          "$ref": "#/$defs/ProducerContractBinding"
+        },
+        "artifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "receiverOwnerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "status": {
+          "enum": [
+            "used",
+            "rejected"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitSourcePin"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "schema",
+        "selection",
+        "producer",
+        "artifact",
+        "receiverOwnerId",
+        "status",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "SelectedExternalArtifact": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-selected-external-artifact.v3"
+        },
+        "producer": {
+          "$ref": "#/$defs/ProducerContractBinding"
+        },
+        "producerContext": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "artifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "artifactSource": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "producerMilestone": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "selection": {
+          "$ref": "#/$defs/ArtifactGateSelection"
+        },
+        "selectionReceipt": {
+          "$ref": "#/$defs/GitSourcePin"
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterionId": {
+                "$ref": "#/$defs/Id"
+              },
+              "receipt": {
+                "$ref": "#/$defs/GitSourcePin"
+              }
+            },
+            "required": [
+              "criterionId",
+              "receipt"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 2048
+        },
+        "receiverOwnerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "receiverUse": {
+          "$ref": "#/$defs/GitSourcePin"
+        }
+      },
+      "required": [
+        "schema",
+        "producer",
+        "producerContext",
+        "artifact",
+        "artifactSource",
+        "producerMilestone",
+        "selection",
+        "selectionReceipt",
+        "criteria",
+        "receiverOwnerId",
+        "receiverUse"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyCreateRequestBinding": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-legacy-create-binding.v3"
+        },
+        "ownerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "legacyOwner": {
+          "type": "object",
+          "properties": {
+            "repositoryId": {
+              "$ref": "#/$defs/Id"
+            },
+            "projectId": {
+              "$ref": "#/$defs/Id"
+            },
+            "workId": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "repositoryId",
+            "projectId",
+            "workId"
+          ],
+          "additionalProperties": false
+        },
+        "createRequestId": {
+          "$ref": "#/$defs/Id"
+        },
+        "kind": {
+          "const": "task"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "meaningSha256": {
+          "$ref": "#/$defs/Digest"
+        },
+        "source": {
+          "$ref": "#/$defs/GitSourcePin"
+        }
+      },
+      "required": [
+        "schema",
+        "ownerId",
+        "legacyOwner",
+        "createRequestId",
+        "kind",
+        "id",
+        "meaningSha256",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyMigrationRequest": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-legacy-migration-request.v3"
+        },
+        "ownerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "createRequestId": {
+          "$ref": "#/$defs/Id"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/SnapshotIdentity"
+        },
+        "expectedInventoryDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "bootstrapRequests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitSourcePin"
+          },
+          "maxItems": 2048
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitWorkAlias"
+          },
+          "maxItems": 2048
+        }
+      },
+      "required": [
+        "schema",
+        "ownerId",
+        "createRequestId",
+        "snapshot",
+        "expectedInventoryDigest",
+        "bootstrapRequests",
+        "aliases"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyWriterFence": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-work-writer-fence.v3"
+        },
+        "ownerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "scope": {
+          "$ref": "#/$defs/WorkRef"
+        },
+        "authoritativeProtocol": {
+          "const": "v3"
+        },
+        "legacyReadSnapshot": {
+          "$ref": "#/$defs/SnapshotIdentity"
+        },
+        "inventoryDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "migrationRequestDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitSourcePin"
+          },
+          "maxItems": 10000
+        }
+      },
+      "required": [
+        "schema",
+        "ownerId",
+        "scope",
+        "authoritativeProtocol",
+        "legacyReadSnapshot",
+        "inventoryDigest",
+        "migrationRequestDigest",
+        "sources"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyMigrationReceipt": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-legacy-migration-receipt.v3"
+        },
+        "ownerId": {
+          "$ref": "#/$defs/Id"
+        },
+        "createRequestId": {
+          "$ref": "#/$defs/Id"
+        },
+        "requestDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "scope": {
+          "$ref": "#/$defs/WorkRef"
+        },
+        "legacySnapshot": {
+          "$ref": "#/$defs/SnapshotIdentity"
+        },
+        "inventoryDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "preservedSources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitSourcePin"
+          },
+          "maxItems": 10000
+        },
+        "projectedFiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "blobOid": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{40}$"
+              },
+              "sha256": {
+                "$ref": "#/$defs/Digest"
+              }
+            },
+            "required": [
+              "path",
+              "blobOid",
+              "sha256"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 10000
+        },
+        "writerFencePath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "legacyRequestPaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "maxItems": 2048
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GitWorkAlias"
+          },
+          "maxItems": 2048
+        },
+        "authority": {
+          "type": "object",
+          "properties": {
+            "actorId": {
+              "$ref": "#/$defs/Id"
+            },
+            "revision": {
+              "$ref": "#/$defs/Revision"
+            },
+            "authorityRef": {
+              "$ref": "#/$defs/Id"
+            },
+            "gitHookPolicyRef": {
+              "$ref": "#/$defs/Id"
+            }
+          },
+          "required": [
+            "actorId",
+            "revision",
+            "authorityRef",
+            "gitHookPolicyRef"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schema",
+        "ownerId",
+        "createRequestId",
+        "requestDigest",
+        "scope",
+        "legacySnapshot",
+        "inventoryDigest",
+        "preservedSources",
+        "projectedFiles",
+        "writerFencePath",
+        "legacyRequestPaths",
+        "aliases",
+        "authority"
+      ],
+      "additionalProperties": false
+    },
+    "SelectedArtifactDocument": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.git-artifact.v3"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "producer": {
+          "$ref": "#/$defs/ProducerContractBinding"
+        },
+        "body": {
+          "$ref": "#/$defs/Json"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "revision",
+        "producer",
+        "body"
       ],
       "additionalProperties": false
     }

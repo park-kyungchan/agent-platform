@@ -251,7 +251,7 @@ export async function resolveGitWorkSelection(value: unknown): Promise<GitWorkSe
   return { ...request, commit } as unknown as GitWorkSelection;
 }
 
-export async function openGitWork(input: GitWorkSelection): Promise<GitWorkReader> {
+export async function openGitSourceSnapshot(input: GitWorkSelection) {
   input = freeze(structuredClone(input));
   assertCommit(input.commit);
   encodedId(input.repositoryId);
@@ -375,6 +375,21 @@ export async function openGitWork(input: GitWorkSelection): Promise<GitWorkReade
       cached.bytes,
     );
   }
+  return Object.freeze({ selection, commit: input.commit, workPath, maxRecords, readSource: source,
+    async listPaths(prefix: string): Promise<string[]> {
+      assertGitPath(prefix);
+      const paths = decode(await git(root, ["ls-tree", "-r", "-z", "--name-only", input.commit, "--", prefix], Math.min(maxRecords * 8192, 16_777_216))).split("\0").filter(Boolean);
+      if (paths.length > maxRecords) throw Error("SOURCE_SNAPSHOT_RECORD_COUNT_LIMIT");
+      return paths;
+    },
+  });
+}
+
+export async function openGitWork(input: GitWorkSelection): Promise<GitWorkReader> {
+  const snapshot = await openGitSourceSnapshot(input);
+  const { selection, workPath, maxRecords, readSource: source } = snapshot;
+  input = selection;
+  const root = input.repositoryRoot;
   async function readRecord(reference: RecordReference): Promise<GitWorkRecord> {
     reference = freeze(structuredClone(reference));
     const resolved = await source({

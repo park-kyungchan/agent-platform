@@ -9,6 +9,7 @@ test("owned v3 runtime, generator and synthetic consumers satisfy strict TypeScr
     "packages/work-continuity/src/git-work/effective-contract.ts",
     "packages/work-continuity/src/git-work/allocation.ts",
     "packages/work-continuity/src/git-work/v3.test.ts",
+    "packages/work-continuity/src/git-work/v3-corrections.test.ts",
     "packages/work-continuity/src/git-work/v3-generated.test.ts",
     "packages/work-continuity/src/git-work/fixtures/v3-owner.ts",
     "packages/work-continuity/src/git-work/fixtures/v3-worker.ts",

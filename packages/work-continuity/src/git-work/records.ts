@@ -1,3 +1,4 @@
+import { openGitSourceSnapshot, gitWorkPath } from "./source.ts";
 import { validateArtifact } from "@palantirkc/ontology";
 import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
@@ -983,6 +984,10 @@ export async function validateGitWorkTransition(
   before: GitWorkReader,
   after: GitWorkReader,
 ): Promise<ValidationResult> {
+  for (const reader of [before, after]) {
+    const snapshot = await openGitSourceSnapshot(reader.selection);
+    if ((await snapshot.listPaths(gitWorkPath(reader.work.projectId, reader.work.workId) + "/v3/writer.json")).length) return outcome(["LEGACY_AUTHORITATIVE_WRITER_RETIRED_USE_VERSIONED_MIGRATION_READER"]);
+  }
   const findings: string[] = [];
   if (
     before.selection.repositoryId !== after.selection.repositoryId ||

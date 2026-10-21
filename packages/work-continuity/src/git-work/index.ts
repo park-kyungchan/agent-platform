@@ -1,6 +1,7 @@
 export type * from "./types.ts";
 export {
   openGitWork,
+  openGitSourceSnapshot,
   resolveGitWorkSelection,
   gitReadEnvironment,
   gitWorkPath,
@@ -30,6 +31,7 @@ export {
   validateGitWorkV3Graph,
   resolveEffectiveContract,
   readGitWorkV3Context,
+  readSourceQualifiedGitWorkV3Context,
   expandGitWorkV3Context,
   v3ContractRef,
   v3ContractDigest,
@@ -44,3 +46,8 @@ export {
   type CurrentAllocationAuthority,
   type GitAllocationTarget,
 } from "./allocation.ts";
+
+export { readLegacyGitWorkProjection, readVersionedLegacyGitWork, previewLegacyGitWorkMigration, admitLegacyGitWork, recoverLegacyCreateRequest, assertLegacyGitWriterAllowed, readMigratedGitWorkV3, type NativeLegacyMigrationOwner } from "./legacy-bridge.ts";
+export { validateGitWorkAliases, resolveGitWorkAlias } from "./aliases.ts";
+export { openExactV3SourceReader, qualifySelectedExternalArtifacts, consumerContractBinding } from "./external-artifacts.ts";
+export type { NativeSourceGitHookPolicy } from "./git-owner-transaction.ts";

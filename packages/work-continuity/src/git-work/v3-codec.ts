@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import * as validators from "./generated/v3-validators.js";
+import type * as V3 from "./generated/v3.ts";
 import type {
   Graph,
   Work,
@@ -26,6 +27,23 @@ export type V3Types = {
   StoredRecord: StoredRecord;
   ContextPacket: ContextPacket;
   CompactContextPacket: CompactContextPacket;
+  GitSourcePin: V3.GitSourcePin;
+  LegacyTaskBinding: V3.LegacyTaskBinding;
+  GitWorkAlias: V3.GitWorkAlias;
+  ConsumerContractBinding: V3.ConsumerContractBinding;
+  ProducerContractBinding: V3.ProducerContractBinding;
+  SelectedArtifactGate: V3.SelectedArtifactGate;
+  SelectedArtifactDocument: V3.SelectedArtifactDocument;
+  ArtifactSelectionReceipt: V3.ArtifactSelectionReceipt;
+  ArtifactCriterionReceipt: V3.ArtifactCriterionReceipt;
+  ArtifactProducerMilestone: V3.ArtifactProducerMilestone;
+  ArtifactAcceptanceDecision: V3.ArtifactAcceptanceDecision;
+  ArtifactReceiverUse: V3.ArtifactReceiverUse;
+  SelectedExternalArtifact: V3.SelectedExternalArtifact;
+  LegacyCreateRequestBinding: V3.LegacyCreateRequestBinding;
+  LegacyMigrationRequest: V3.LegacyMigrationRequest;
+  LegacyWriterFence: V3.LegacyWriterFence;
+  LegacyMigrationReceipt: V3.LegacyMigrationReceipt;
 };
 export type V3Type = keyof V3Types;
 const maximumBytes = 4_194_304;

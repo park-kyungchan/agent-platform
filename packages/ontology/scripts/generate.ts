@@ -35,8 +35,11 @@ async function generateGitWorkV3(): Promise<void> {
     "StoredRecord",
     "ContextPacket",
     "CompactContextPacket",
+    "GitSourcePin", "LegacyTaskBinding", "GitWorkAlias", "ConsumerContractBinding", "ProducerContractBinding",
+    "SelectedArtifactGate", "SelectedArtifactDocument", "ArtifactSelectionReceipt", "ArtifactCriterionReceipt", "ArtifactProducerMilestone", "ArtifactAcceptanceDecision", "ArtifactReceiverUse", "SelectedExternalArtifact",
+    "LegacyCreateRequestBinding", "LegacyMigrationRequest", "LegacyWriterFence", "LegacyMigrationReceipt",
   ];
-  const ajv = new Ajv({ strict: true, allErrors: false, code: { source: true, esm: true } });
+  const ajv = new Ajv({ strict: true, allErrors: false, inlineRefs: false, code: { source: true, esm: true } });
   ajv.addSchema(schema, "v3");
   const exports = Object.fromEntries(names.map((name) => ["validate" + name, "v3#/$defs/" + name]));
   {

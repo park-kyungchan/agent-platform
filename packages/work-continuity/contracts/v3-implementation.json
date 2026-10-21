@@ -4,7 +4,7 @@
   "protocol": "common.git-work.v3",
   "status": "source-candidate-not-activated",
   "canonicalSchema": "packages/work-continuity/contracts/git-work-v3.schema.json",
-  "canonicalSchemaSha256": "85626ea6e2a057dabd00dd2db711fad4b0b9ef5f6e5991b00eb0394850f11553",
+  "canonicalSchemaSha256": "4c5c06cb984c67767bd551a4e7db7ed8b0cc0405edcb8a450b428c246e679425",
   "generator": "packages/ontology/scripts/generate.ts --git-work-v3",
   "generatedOutputs": [
     "packages/work-continuity/src/git-work/generated/v3.ts",
@@ -48,7 +48,7 @@
     "cli": "Existing harness context-v3 and allocate-v3; explicit dry-run performs no allocation/publication. Apply requires a native owner adapter supplied to runHarness by the actual runtime owner. No dynamic module, credential bridge or global native configuration."
   },
   "compatibility": {
-    "v1v2Semantics": "Existing records/readers/codecs unchanged; additive exports require Root-owned exact provider closure successor before native activation.",
+    "v1v2Semantics": "Explicit canonical legacy-v3 read/admission/recovery adapter preserves original sources and per-Task historical contracts, unknown Issue text and unsupported v2 holds. One native-qualified CAS sets the v3 authoritative writer fence; legacy transition authoring then rejects. No native adoption performed.",
     "historicalReleases": "All original 0.1.0/0.2.0 artifacts and consumer pins unchanged.",
     "unsupportedInputs": "Unknown fields, wrong scoped refs, stale revisions/digests, missing coverage, cycles and unqualified native owners reject.",
     "noWorkForMemoryQueries": true,
@@ -57,5 +57,19 @@
   "verification": "Meaningful synthetic Graph, codec, Git CAS, process-concurrency/restart/conflict/collision/uncertain-CAS, scoped owner denial and historical preservation tests in v3*.test.ts; execute exclusively in the qualified isolated source runner.",
   "nativePermissionGranted": false,
   "activationPerformed": false,
-  "acceptanceDecision": null
+  "acceptanceDecision": null,
+  "corrections": {
+    "assignmentRevision": 5,
+    "findings": [
+      "S01-R01",
+      "S01-R02",
+      "S01-R03",
+      "S01-R04"
+    ],
+    "legacyBridge": "legacy-bridge.ts: explicit existing-scope admission, immutable inventory, typed locator aliases and prior bootstrap mapping; never random allocation",
+    "artifactQualification": "external-artifacts.ts: actual pinned producer context/artifact/gate/selection/criterion/receiver sources; in-process source proof checked by same resolver",
+    "creationReplay": "immutable ledger and Git creation blobs plus bounded same-identity successor lineage/current source graph validation",
+    "gitHooks": "native current per-invocation no-Git-hooks policy required before writes, exact head/owner/ref/authority/expiry; per-command Git override only; no Codex /hooks or global config change",
+    "qualityBoundary": "New correction sources require Root registry/quality/provider successor pins. No native adoption or publication."
+  }
 }

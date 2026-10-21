@@ -14,6 +14,9 @@ import type {
   CompactContextPacket,
 } from "./generated/v3.ts";
 import { assertV3, canonicalV3, digestV3, encodeV3, decodeV3 } from "./v3-codec.ts";
+import { effectiveTaskRefs, selectedArtifactForDependency, qualifySelectedExternalArtifacts, type ExactV3SourceReader } from "./external-artifacts.ts";
+import { assertQualifiedLegacyTask, qualifyLegacyGraphBindings } from "./legacy-qualification.ts";
+import { validateGitWorkAliases, qualifyGitWorkAliases } from "./aliases.ts";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 
 export const v3WorkKey = (row: { projectId: string; workId: string }): string =>
@@ -85,6 +88,7 @@ export interface ValidatedV3Graph {
 export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
   assertV3("Graph", input);
   const g = input;
+  validateGitWorkAliases(g.aliases ?? []);
   const domains = unique(g.domains, (x) => x.id, "DOMAIN");
   const projects = unique(g.projects, (x) => x.id, "PROJECT");
   const works = unique(g.works, v3WorkKey, "WORK");
@@ -125,6 +129,7 @@ export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
     return unique(c.body.acceptanceCriteria, (row) => row.id, "CRITERION");
   };
   for (const w of g.works) {
+    if (w.leadActorId === null && !w.legacySource) throw Error("V3_WORK_NATIVE_ACTOR_OR_LEGACY_SOURCE_REQUIRED");
     const owner: Scope = { kind: "work", projectId: w.projectId, workId: w.workId };
     for (const k of kinds) resolve(w.contracts[k], k, owner);
     const plan = contracts.get(referenceKey(w.contracts.plan))!;
@@ -135,7 +140,13 @@ export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
   for (const t of g.tasks) {
     const w = works.get(v3WorkKey(t));
     if (!w) throw Error("V3_MISSING_TASK_WORK");
+    assertQualifiedLegacyTask(t);
+    if (t.assigneeActorId === null && !t.legacyBinding) throw Error("V3_TASK_NATIVE_ACTOR_OR_LEGACY_SOURCE_REQUIRED");
     const owner: Scope = { kind: "task", ...taskRef(t) };
+    if (t.legacyBinding) {
+      if (Object.keys(t.contractOverrides).length) throw Error("V3_LEGACY_TASK_CANNOT_FORGE_OVERRIDE");
+      for (const kind of kinds) resolve(t.legacyBinding.contracts[kind], kind, { kind: "work", projectId: t.projectId, workId: t.workId });
+    }
     for (const k of kinds)
       if (t.contractOverrides[k]) {
         const c = resolve(t.contractOverrides[k]!, k, owner);
@@ -147,7 +158,7 @@ export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
               : c.body.methodRef;
         if (!parent || !equal(parent, w.contracts[k])) throw Error("V3_TYPED_CONTRACT_REFINEMENT");
       }
-    const refs = { ...w.contracts, ...t.contractOverrides };
+    const refs = effectiveTaskRefs(g, t);
     const plan = contracts.get(referenceKey(refs.plan))!;
     if (plan.kind !== "plan" || !equal(plan.body.appliesToSpec, refs.spec))
       throw Error("V3_EFFECTIVE_PLAN_SPEC_BINDING");
@@ -195,6 +206,7 @@ export function validateGitWorkV3Graph(input: unknown): ValidatedV3Graph {
     g.dependencies.map((d) => [v3TaskKey(d.producer), v3TaskKey(d.consumer)]),
     "DEPENDENCY",
   );
+  for (const d of g.dependencies) selectedArtifactForDependency(g, d);
   for (const r of g.relations)
     if (!scopeExists(r.from) || !scopeExists(r.to)) throw Error("V3_RELATED_SCOPE_MISSING");
   for (const d of g.delegations)
@@ -225,7 +237,7 @@ export function resolveEffectiveContract(input: unknown, target: TaskRef): Effec
     parentTaskChain.unshift({
       task: taskRef(p),
       revision: p.revision,
-      contracts: { ...w.contracts, ...p.contractOverrides },
+      contracts: effectiveTaskRefs(g, p),
     });
     child = p;
   }
@@ -250,10 +262,7 @@ export function resolveEffectiveContract(input: unknown, target: TaskRef): Effec
         return {
           task: taskRef(producer),
           revision: producer.revision,
-          contracts: {
-            ...works.get(v3WorkKey(producer))!.contracts,
-            ...producer.contractOverrides,
-          },
+          contracts: effectiveTaskRefs(g, producer),
           resources: sorted(producer.resources),
           acceptanceCriteria: [...producer.acceptanceCriteria].sort(),
         };
@@ -266,7 +275,10 @@ export function resolveEffectiveContract(input: unknown, target: TaskRef): Effec
     taskRevision: t.revision,
     workContracts: w.contracts,
     taskOverrides: t.contractOverrides,
-    contracts: { ...w.contracts, ...t.contractOverrides } as ContractSet,
+    contracts: effectiveTaskRefs(g, t) as ContractSet,
+    ...(t.legacyBinding ? { legacyBinding: t.legacyBinding } : {}),
+    holdReasons: [...new Set([...selected].flatMap((key) => tasks.get(key)!.legacyBinding?.holdReasons ?? []))].sort(),
+    externalArtifacts: sorted(dependencies.flatMap((d) => { const artifact = selectedArtifactForDependency(g, d); return artifact ? [artifact] : []; })),
     parentTaskChain,
     taskResources: sorted(t.resources),
     acceptanceCriteria: [...t.acceptanceCriteria].sort(),
@@ -304,6 +316,8 @@ export function readGitWorkV3Context(input: {
     schema: "common.git-work-context.v3" as const,
     mode: input.mode,
     effective,
+    status: effective.holdReasons.length ? "held" as const : "source-qualified" as const,
+    holdReasons: effective.holdReasons,
     contractSources: sorted(g.contracts.filter((c) => refs.has(referenceKey(c)))),
     authority: "none" as const,
     nativePermissionGranted: false as const,
@@ -346,6 +360,7 @@ export function expandGitWorkV3Context(input: ContextPacket | CompactContextPack
     assertV3("ContextPacket", input);
     packet = structuredClone(input);
   }
+  if (!equal(packet.holdReasons, packet.effective.holdReasons) || packet.status !== (packet.holdReasons.length ? "held" : "source-qualified")) throw Error("V3_CONTEXT_HOLD_STATUS_MISMATCH");
   const { digest, ...effective } = packet.effective;
   if (digestV3(effective) !== digest) throw Error("V3_EFFECTIVE_PACKET_DIGEST_MISMATCH");
   const sources = unique(packet.contractSources, referenceKey, "CONTRACT_SOURCE");
@@ -365,4 +380,12 @@ export function expandGitWorkV3Context(input: ContextPacket | CompactContextPack
   if (required.size !== provided.size || [...required].some((key) => !provided.has(key)))
     throw Error("V3_CONTEXT_CONTRACT_SOURCE_CLOSURE");
   return packet;
+}
+
+/** Source qualifications are minted from actual immutable Git bytes on every reopen. */
+export async function readSourceQualifiedGitWorkV3Context(input: Parameters<typeof readGitWorkV3Context>[0] & { graph: Graph; reader: ExactV3SourceReader }) {
+  await qualifyLegacyGraphBindings(input.graph, input.reader);
+  await qualifyGitWorkAliases(input.graph.aliases ?? [], input.reader);
+  await qualifySelectedExternalArtifacts(input.graph, input.reader);
+  return readGitWorkV3Context(input);
 }
