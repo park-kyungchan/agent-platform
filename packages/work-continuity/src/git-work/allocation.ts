@@ -189,8 +189,9 @@ export async function allocateGitWorkIdentity(input: unknown, target: GitAllocat
     for (const t of graph.tasks) if (await readOptional(target.repositoryRoot, head, workPath(t) + "/tasks/" + encodedId(t.taskId) + ".json") !== fileBytes({ schema: "common.git-work-record.v3", kind: "task", value: t })) throw Error("V3_OWNER_GRAPH_TASK_MISMATCH");
     for (const c of graph.contracts) if (await readOptional(target.repositoryRoot, head, contractPath(c)) !== fileBytes(c)) throw Error("V3_OWNER_GRAPH_CONTRACT_MISMATCH");
     // Prove selected parent membership against actual owner bytes, not graph-only claims.
-    if (request.scope.kind === "work" || request.scope.kind === "task") {
-      const work = graph.works.find((w) => v3WorkKey(w) === v3WorkKey(request.scope as Task));
+    const selectedScope = request.scope;
+    if (selectedScope.kind === "work" || selectedScope.kind === "task") {
+      const work = graph.works.find((w) => v3WorkKey(w) === v3WorkKey(selectedScope));
       if (!work || await readOptional(target.repositoryRoot, head, workPath(work) + "/work.json") !== fileBytes({ schema: "common.git-work-record.v3", kind: "work", value: work })) throw Error("V3_OWNER_WORK_MEMBERSHIP_MISMATCH");
       if (!["admitted", "active"].includes(work.status)) throw Error("V3_OWNER_WORK_NOT_ACTIVE");
     }

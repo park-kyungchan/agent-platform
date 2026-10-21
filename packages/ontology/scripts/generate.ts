@@ -14,7 +14,7 @@ async function generateGitWorkV3(): Promise<void> {
   const output = join(root, "packages/work-continuity/src/git-work/generated");
   const input = await readFile(schemaPath);
   const schemaSha256 = createHash("sha256").update(input).digest("hex");
-  const schema = JSON.parse(input.toString()) as Parameters<Ajv["addSchema"]>[0];
+  const schema = JSON.parse(input.toString()) as Parameters<typeof compile>[0];
   const banner = `/** Generated from git-work-v3.schema.json; do not edit. SHA-256: ${schemaSha256} */`;
   const types = await compile(schema, "GitWorkV3Graph", {
     bannerComment: banner,

@@ -26,7 +26,7 @@ export function fixtureGraph(): Graph {
   return { schema: "common.git-work.v3", domains: [{ id: "fixture-domain", title: "Synthetic Domain" }], projects: [{ id: fixtureScope.projectId, title: "Synthetic Project", primaryDomainId: "fixture-domain" }], works: [work], tasks: [task], contracts: [issue, spec, plan], dependencies: [], relations: [], delegations: [], provenance: [], nativeCorrelations: [] };
 }
 export function fixtureTaskRequest(key = "synthetic-create"): CreateRequest {
-  return { schema: "common.git-work-create.v3", ownerId: "fixture-owner", createRequestId: key, kind: "task", scope: { kind: "work", ...fixtureScope }, record: { ...fixtureGraph().tasks[0]!, taskId: { $allocatedId: true } }, contracts: [] };
+  return { schema: "common.git-work-create.v3", ownerId: "fixture-owner", createRequestId: key, kind: "task", scope: { kind: "work", ...fixtureScope }, record: JSON.parse(canonicalV3({ ...fixtureGraph().tasks[0]!, taskId: { $allocatedId: true } })) as CreateRequest["record"], contracts: [] };
 }
 export function fixtureWorkRequest(key = "synthetic-work"): CreateRequest {
   const owner = { kind: "work", projectId: fixtureScope.projectId, workId: { $allocatedId: true } };

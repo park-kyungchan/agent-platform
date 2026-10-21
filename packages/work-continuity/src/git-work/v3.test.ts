@@ -71,7 +71,7 @@ describe("v3 generated schema and immutable contract semantics", () => {
     const graph = fixtureGraph(); const task = override(graph); delete task.contractOverrides.plan;
     expect(() => validateGitWorkV3Graph(graph)).toThrow("PLAN_SPEC");
   });
-  test.each([undefined, [], ["missing"], ["AC-1", "AC-1"]])("Task-local criteria require exact nonduplicate Work coverage: %j", (covers) => {
+  test.each([undefined, [], ["missing"], ["AC-1", "AC-1"]].map((covers) => ({ covers })))("Task-local criteria require exact nonduplicate Work coverage: %j", ({ covers }) => {
     const graph = fixtureGraph(); override(graph, (body) => { body.acceptanceCriteria = [{ id: "TASK-1", ...(covers === undefined ? {} : { covers }) }]; });
     expect(() => validateGitWorkV3Graph(graph)).toThrow("COVERAGE");
   });
@@ -163,7 +163,9 @@ describe("durable authenticated Git owner allocation", () => {
     const { root, target } = await repository(); const bin = join(root, "synthetic-bin"); await mkdir(bin);
     const shim = join(bin, "git"); await writeFile(shim, '#!/bin/sh\nmutate=no\nfor arg in "$@"; do if [ "$arg" = update-ref ]; then mutate=yes; fi; done\n/usr/bin/git "$@"\ncode=$?\nif [ "$mutate" = yes ] && [ "$code" = 0 ]; then exit 1; fi\nexit "$code"\n'); await chmod(shim, 0o700);
     const path = join(root, "worker-input.json"); await writeFile(path, JSON.stringify({ request: fixtureTaskRequest(), target })); const p = Bun.spawn([process.execPath, "--no-env-file", "--no-install", new URL("./fixtures/v3-worker.ts", import.meta.url).pathname, path], { stdout: "pipe", stderr: "pipe", env: { ...process.env, PATH: bin + ":" + process.env.PATH } });
-    const result = JSON.parse(await new Response(p.stdout).text()); expect(await p.exited).toBe(0); expect(result.status).toBe("reconciled"); expect(fixtureGit(root, "rev-list", "--count", target.expectedHead + ".." + fixtureRef)).toBe("1");
+    const result = JSON.parse(await new Response(p.stdout).text());
+    if (result.status !== "reconciled") console.error("SYNTHETIC_CAS_STATUS_" + String(result.status ?? result.error).toUpperCase().replace(/[^A-Z_]/g, "_"));
+    expect(await p.exited).toBe(0); expect(result.status).toBe("reconciled"); expect(fixtureGit(root, "rev-list", "--count", target.expectedHead + ".." + fixtureRef)).toBe("1");
   });
   test("Run binds the pinned effective packet and independent attempt; reserve invents no native IDs", async () => {
     const { root, target } = await repository(); const row: Run = { runId: "placeholder", task: fixtureTask, attempt: 1, status: "reserved", effectiveContractDigest: resolveEffectiveContract(fixtureGraph(), fixtureTask).digest, sourceSnapshotId: "fixture-exact-source", parentAuthorityRef: "fixture-current-authority", nativeBindings: [], effectRefs: [] };
