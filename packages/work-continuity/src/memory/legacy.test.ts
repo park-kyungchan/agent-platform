@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { projectQualifiedLegacyMemory, memoryDigest } from "./v1.ts";
+import { projectQualifiedLegacyMemory, memoryDigest, canonicalMemory } from "./v1.ts";
 import { episodeFingerprint, sourceKey, type DerivedMemory, type Episode, type MemoryPolicy, type RecallContext, type DerivationReceipt } from "../workspace/qualification.ts";
 function fixture(){
  const original={repositoryId:"synthetic-repo",revision:"r1",relativePath:"notes/source.md",sha256:memoryDigest("synthetic-original"),byteLength:18};
@@ -12,7 +12,7 @@ function fixture(){
 }
 test("versioned legacy bridge retains old identity/generation/claim and full original lineage without granting adoption",()=>{
  const f=fixture(),projected=projectQualifiedLegacyMemory(f);
- expect(projected.record.id).toBe(f.memory.id);expect(projected.legacy!.metadata).toEqual(f.memory);expect(projected.legacy!.generationId).toBe(f.memory.generationId);expect(projected.claim).toEqual(f.memory.claim);expect(projected.record.status).toBe("candidate");expect(projected.record.authority).toBe("model-inference");expect(projected.record.sourceRefs).toEqual([f.source,f.sourceBindings[0]!.source]);expect("episodeId" in projected.record).toBe(false);
+ expect(projected.record.id).toBe(f.memory.id);expect(canonicalMemory(projected.legacy!.metadata)).toBe(canonicalMemory(f.memory));expect(projected.legacy!.generationId).toBe(f.memory.generationId);expect(projected.claim).toEqual(f.memory.claim);expect(projected.record.status).toBe("candidate");expect(projected.record.authority).toBe("model-inference");expect(projected.record.sourceRefs).toEqual([f.source,f.sourceBindings[0]!.source]);expect("episodeId" in projected.record).toBe(false);
 });
 test("legacy exclusion/current generation/receipt and complete source binding failures remain effective",()=>{
  const excluded=fixture();excluded.policy.excludedFragmentIds=["fragment-old"];expect(()=>projectQualifiedLegacyMemory(excluded)).toThrow("QUALIFICATION_REQUIRED");
