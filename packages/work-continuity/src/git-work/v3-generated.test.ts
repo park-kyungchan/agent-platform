@@ -30,3 +30,23 @@ test("committed v3 types and bundled Ajv validators reproduce from the single sc
   expect(await child.exited, stderr).toBe(0);
   expect(JSON.parse(stdout).schemaSha256).toBe(digest);
 }, 30_000);
+
+test("the existing Ontology generator still reproduces its original three schema projections", async () => {
+  const directory = new URL("../../../ontology/", import.meta.url).pathname;
+  const child = Bun.spawn(
+    [
+      process.execPath,
+      "--no-env-file",
+      "--no-install",
+      "--no-macros",
+      "--no-addons",
+      "scripts/generate.ts",
+      "--check",
+    ],
+    { cwd: directory, stdout: "pipe", stderr: "pipe" },
+  );
+  const stdout = await new Response(child.stdout).text();
+  const stderr = await new Response(child.stderr).text();
+  expect(await child.exited, stderr).toBe(0);
+  expect(stdout.trim().split("\n").length).toBe(3);
+}, 30_000);
