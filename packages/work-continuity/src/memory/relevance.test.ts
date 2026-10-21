@@ -29,7 +29,7 @@ test("fixed independent public Korean corpus measures the declared equivalent le
   const ids=[...new Set(result.hits.map(hit=>f.sourceId(hit.source)))];
   const gold=new Set(item.expected.relevanceTiers.filter(tier=>tier.grade>=2).flatMap(tier=>tier.sourceIds));
   const relevant=ids.filter(id=>gold.has(id)).length;
-  if(item.expected.top1AnyOf.length&&item.expected.top1AnyOf.includes(ids[0]??""))top1++;
+  if(item.expected.top1AnyOf.length&&(item.expected.top1AnyOf as readonly string[]).includes(ids[0]??""))top1++;
   if(gold.size){recallSum+=relevant/gold.size;recallDenominator++;}
   relevantReturned+=relevant;totalReturned+=ids.length;
   if(item.expected.expectedNoResult&&ids.length===0)noResultCorrect++;

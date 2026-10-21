@@ -13,7 +13,9 @@ export function publicCorpusReader(q:PublicQueryInput,initialGeneration=8){
  const state={generation:initialGeneration};const trace:Array<{phase:string;sourceId:string;generation:number}>=[];
  const bodies=new Map<string,Uint8Array>(),originals=new Map<string,Uint8Array>(),byUri=new Map<string,PublicRow>();
  const addresses:MemoryAddress[]=rows.map(row=>{
-  const record=row.memory as MemoryDocument["record"];
+  const candidate:unknown=row.memory;
+  assertMemory("MemoryRecord",candidate);
+  const record=candidate;
   const semantics=row.fixtureSemantics as {claimKey?:string};
   const doc:MemoryDocument={schema:"common.memory-document.v1",record,...(semantics.claimKey?{claim:{key:semantics.claimKey,value:record.text}}:{})};
   assertMemory("MemoryDocument",doc);
