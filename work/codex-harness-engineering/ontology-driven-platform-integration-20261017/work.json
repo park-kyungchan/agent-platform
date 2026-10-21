@@ -34,11 +34,11 @@
   },
   "spec": {
     "id": "ODI-SPEC",
-    "revision": 1
+    "revision": 2
   },
   "plan": {
     "id": "ODI-PLAN",
-    "revision": 4
+    "revision": 5
   },
   "governingDecisionIds": [
     "ODI-DECISION-FINAL-APPROVAL",
@@ -69,7 +69,9 @@
     "ODI-DECISION-COMMON-FIRST-20261020",
     "ODI-DECISION-LONG-AUTONOMY-20261020",
     "ODI-DECISION-CI-WORKFLOW-APPROVED-20261020",
-    "ODI-DECISION-ARGON-HIGH-INDEPENDENT-REVIEW-20261020"
+    "ODI-DECISION-ARGON-HIGH-INDEPENDENT-REVIEW-20261020",
+    "ODI-DECISION-COMMON-HARNESS-EXECUTION-20261021",
+    "ODI-DECISION-REVIEWER-SELECTION-20261021"
   ],
   "historicalFenceIds": [
     "ODI-PREDECESSOR-EFFECTS",

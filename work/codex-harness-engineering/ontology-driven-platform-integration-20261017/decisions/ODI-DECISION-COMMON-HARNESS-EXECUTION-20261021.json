@@ -1,0 +1,17 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "decision",
+  "id": "ODI-DECISION-COMMON-HARNESS-EXECUTION-20261021",
+  "status": "accepted",
+  "answer": "compacted. 아래 내용에 대해 승인한다, 유저는 더이상 개입하지 않으므로, 모든 작업 완료할 때까지 장시간 자율작업하기위해서 인터뷰가 필요하면 진행해라. 없으면 $herdr-codex-long-work 을 이번 최종 실행계획에 맞게 적용해서 장시간 자율작업 진행하면 된다. gpt-6-astra 모델은 더이상 사용하지않는다.",
+  "meaning": "Actual reviewed-v2 implementation approval and autonomous full-outcome execution; no further Astra or unrequested Goal. Exact native/domain/custody/source review and effect fences remain; the separate source child does not release the old native parent.",
+  "answerSource": {
+    "kind": "snapshot",
+    "path": "work/codex-harness-engineering/ontology-driven-platform-integration-20261017/inputs/ODI-USER-COMMON-HARNESS-EXECUTION-APPROVAL-20261021.json",
+    "fragment": "#/content/originalKoreanText"
+  },
+  "supersedes": []
+}

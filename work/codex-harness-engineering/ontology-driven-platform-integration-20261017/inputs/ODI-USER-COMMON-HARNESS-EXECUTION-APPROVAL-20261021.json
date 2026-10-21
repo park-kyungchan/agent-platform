@@ -1,0 +1,51 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "input",
+  "id": "ODI-USER-COMMON-HARNESS-EXECUTION-APPROVAL-20261021",
+  "inputKind": "actual-user-answer",
+  "origin": {
+    "ownerId": "codex-harness-engineering",
+    "kind": "native-user-message",
+    "locator": "Current conversation first-party execution approval after compact; native message ID unexposed"
+  },
+  "content": {
+    "schema": "local.actual-user-execution-authority.v1",
+    "recordedAtUtc": "2026-10-21T15:29:05.510754+00:00",
+    "source": "Actual latest first-party user message in this conversation; native message ID not exposed",
+    "originalKoreanText": "compacted. 아래 내용에 대해 승인한다, 유저는 더이상 개입하지 않으므로, 모든 작업 완료할 때까지 장시간 자율작업하기위해서 인터뷰가 필요하면 진행해라. 없으면 $herdr-codex-long-work 을 이번 최종 실행계획에 맞게 적용해서 장시간 자율작업 진행하면 된다. gpt-6-astra 모델은 더이상 사용하지않는다.",
+    "approvedPlan": {
+      "manifest": "/home/palantirkc/common-harness-reorganization-20261021/execution-preparation-v2/MANIFEST.json",
+      "sha256": "f343952f9a249a2dfd35779729ce01f45e8b6e4ed4fd237406cb9bd42068f282",
+      "review": "/home/palantirkc/common-harness-reorganization-20261021/final-review-astra-xhigh-v2/review.final.json",
+      "reviewSha256": "0bb232ef57c47c577a26203ea6edd9928a1be7dd0ea099542b3a74ebe8859265",
+      "ownerDesignVerification": "/home/palantirkc/common-harness-reorganization-20261021/execution-preparation-v2.owner-design-verification.json",
+      "ownerDesignVerificationSha256": "3f3826df06e3b7131e512838c22a7c9c840ae9dcee29c7af51ad11eb3524f1d4"
+    },
+    "meaning": {
+      "actualImplementationApproval": true,
+      "autonomousExecutionUntilVerifiedDelivery": true,
+      "preserveFullOutcomeAndOwnerGates": true,
+      "repeatGeneralPermissionRequired": false,
+      "noFurtherGpt6AstraUse": true,
+      "goalRequested": false,
+      "futureHumanDomainAcceptanceInvented": false
+    },
+    "authorizedNow": [
+      "P0-P1 current owner/source/branch reconciliation and distinct source-only Task admission",
+      "P2 bounded isolated runner qualification and necessary owned no-focus Work topology",
+      "Reviewed S01-S05 source authoring, isolated verification, independent native review, authenticated publication and explicit expected-head integration",
+      "Exact reviewed one-shot Git Work allocator owner adoption within the approved plan",
+      "Continue full planned native and consumer outcome at exact current native capability/custody/effect gates using existing and current authority; do not reduce unattended intent to source preparation"
+    ],
+    "retainedConstraints": [
+      "No Astra invocation or reuse; prior immutable review evidence remains valid historical evidence",
+      "Native owners retain loops, auth, profiles, sessions, trust and actual effect controls",
+      "No credential/native-store transplant, unrelated services, new paid evaluation, Goal or uncertain/completed effect replay",
+      "Actual human/domain judgments remain unknown until genuinely supplied; no fabricated acceptance or destructive target inference"
+    ],
+    "interviewDisposition": "No unresolved interview question currently prevents P0/source execution. Resolve observed consequential uncertainty from sources first; ask only if current authority and capability cannot decide."
+  }
+}

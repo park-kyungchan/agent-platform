@@ -1,0 +1,37 @@
+{
+  "schema": "common.git-work.v1",
+  "domainId": "native-harness",
+  "projectId": "codex-harness-engineering",
+  "workId": "ontology-driven-platform-integration-20261017",
+  "kind": "task",
+  "id": "18a81525-5cb1-4e22-a235-bf221bf6837b",
+  "logical": {
+    "domainId": "native-harness",
+    "projectId": "codex-harness-engineering",
+    "workId": "ontology-driven-platform-integration-20261017",
+    "issueId": "ODI-ISSUE-20261017",
+    "specId": "ODI-SPEC",
+    "specRevision": 2,
+    "planId": "ODI-PLAN",
+    "planRevision": 5,
+    "taskId": "18a81525-5cb1-4e22-a235-bf221bf6837b"
+  },
+  "title": "Implement reviewed common-harness source contracts and durable owner ID allocation",
+  "nextAction": "After current owner admission, exact native receiver readback and P2 runner qualification, implement approved S01 in its source-only lane. Preserve original native parent/adoption holds. Candidate code executes only in the qualified runner.",
+  "executionClass": "source-only",
+  "state": {
+    "execution": "planned",
+    "verification": "pending",
+    "localAudit": "intent-durable",
+    "sharedAudit": "pending",
+    "formalCompletion": "pending"
+  },
+  "dependsOn": [],
+  "decisionIds": [
+    "ODI-DECISION-COMMON-HARNESS-EXECUTION-20261021",
+    "ODI-DECISION-REVIEWER-SELECTION-20261021"
+  ],
+  "effectIds": [],
+  "pendingEffectIds": [],
+  "verificationEvidenceIds": []
+}
