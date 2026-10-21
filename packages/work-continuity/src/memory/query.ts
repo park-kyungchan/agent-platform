@@ -3,10 +3,10 @@ import { readGitWorkV3Context } from "../git-work/effective-contract.ts";
 import type { MemoryQuery, MemoryDocument, GoverningDocument } from "./generated/memory-v1.ts";
 import { assertMemory, canonicalMemory, decodeMemory, memoryDigest } from "./codec.ts";
 import { rankMemory, retrievalVersion } from "./ranking.ts";
-import { MemoryAcquisitionGap, type MemoryAddress, type NativeMemoryReader, type NativeMemoryReadLease } from "./reader.ts";
+import { MemoryAcquisitionGap, type MemoryAddress, type NativeMemoryReader, type NativeMemoryReadLease, type NativeMemoryUse } from "./reader.ts";
 
-type Acquired = { key: string; source: SourceRef } & (
-  | { kind: "memory"; document: MemoryDocument }
+type Acquired = { key: string; source: SourceRef; currentness: MemoryAddress["currentness"] } & (
+  | { kind: "memory"; document: MemoryDocument; use?: NativeMemoryUse }
   | { kind: "governing"; document: GoverningDocument; governs: boolean }
 );
 export interface MemoryQueryResult {
@@ -17,7 +17,7 @@ export interface MemoryQueryResult {
   ownerPolicyGenerations: Record<string, string>;
   observedAtUtc: string;
   asOf: string;
-  hits: Array<Extract<Acquired, { kind: "memory" }> & { usage: "advisory-evidence"; timeCoverage: "known" | "unknown" }>;
+  hits: Array<Omit<Extract<Acquired, { kind: "memory" }>, "use"> & { usage: "advisory-evidence"; currentInstructionEligible: boolean; adoptionSource?: SourceRef; timeCoverage: "known" | "unknown"; temporalStatus: string }>;
   governing: Array<Extract<Acquired, { kind: "governing" }>>;
   conflicts: Array<{ claimKey: string; conflictingEvidence: boolean; governingConflict: boolean; selectedGoverningValue: string | null }>;
   taskContext?: ReturnType<typeof readGitWorkV3Context>;
@@ -46,7 +46,7 @@ function validAt(header: { validFrom?: string; validUntil?: string }, at: number
   return from <= at && at < until;
 }
 function validateHeader(address: MemoryAddress): void {
-  if (!address || !["memory", "governing"].includes(address.kind) || !address.source || Object.hasOwn(address.header, "text")) throw Error("MEMORY_BODY_IN_DISCOVERY_METADATA");
+  if (!address || !["current","historical","unknown"].includes(address.currentness) || !["memory", "governing"].includes(address.kind) || !address.source || Object.hasOwn(address.header, "text")) throw Error("MEMORY_BODY_IN_DISCOVERY_METADATA");
   if (address.kind === "memory") assertMemory("MemoryRecord", { ...address.header, text: "metadata validation" });
   else {
     if (Object.hasOwn(address.header,"claim") || Object.hasOwn(address.header,"schema")) throw Error("MEMORY_BODY_IN_DISCOVERY_METADATA");
@@ -98,13 +98,20 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
         if (seen.has(identity)) throw Error("MEMORY_DUPLICATE_SOURCE_IDENTITY"); seen.add(identity);
         if (!Object.hasOwn(lease.ownerPolicyGenerations,address.source.owner) || !header.allowedReaders.includes(lease.readerId)) { counts.denied++; continue; }
         if (request.scopes && !request.scopes.some(scope => scopeKey(scope)===scopeKey(header.owner) || (address.kind === "memory" && address.header.subjects.some(subject=>scopeKey(subject)===scopeKey(scope))))) { counts.scopeExcluded++; continue; }
-        if (request.mode === "current" && header.status !== "active") { counts.statusExcluded++; continue; }
+        if (request.mode === "current" && (header.status !== "active" || address.currentness !== "current")) { counts.statusExcluded++; continue; }
         const inTime = validAt(header,at);
-        if ((request.mode === "current" || request.asOf !== undefined) && !inTime) { counts.timeExcluded++; continue; }
+        if (request.mode === "current" && !inTime) { counts.timeExcluded++; continue; }
         const permit = await lease.authorize(address,{mode:request.mode,purpose:request.purpose}); await current();
         if (!permit || typeof permit !== "object") {counts.denied++;continue;}
         let bytes: Uint8Array;
-        try { bytes=await lease.acquire(address,permit); }
+        try {
+          if(typeof lease.readOriginal!=="function")throw Error("MEMORY_EXACT_ORIGINAL_READER_REQUIRED");
+          for(const source of address.header.sourceRefs){
+            const originalBytes=await lease.readOriginal(source,permit);await current();
+            if(originalBytes.byteLength>16_777_216||memoryDigest(originalBytes)!==source.digest)throw Error("MEMORY_ORIGINAL_SOURCE_HASH_MISMATCH");
+          }
+          bytes=await lease.acquire(address,permit);
+        }
         catch(error) { await current(); if (!(error instanceof MemoryAcquisitionGap)) throw error; gaps.push({code:error.code});continue; }
         await current();
         if (bytes.byteLength>1_048_576 || memoryDigest(bytes)!==address.source.digest) throw Error("MEMORY_SOURCE_BYTES_MISMATCH");
@@ -115,15 +122,29 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
           if (canonicalMemory(actual)!==canonicalMemory(address.header) || (document.claim?.key ?? undefined)!==address.claimKey) throw Error("MEMORY_AUTHENTICATED_METADATA_MISMATCH");
           textBytes+=Buffer.byteLength(text);
           if (textBytes>2_097_152) {omissions.sourceLimit++;continue;}
-          acquired.push({kind:"memory",source:address.source,key,document});
+          let use:NativeMemoryUse|null=null;
+          if(address.currentness==="current"&&document.record.status==="active"&&document.record.authority==="owner-adopted"&&validAt(document.record,now)&&lease.qualifyMemoryUse){
+            use=await lease.qualifyMemoryUse(address,document,permit);await current();
+            if(use){
+              if(!document.record.sourceRefs.some(source=>canonicalMemory(source)===canonicalMemory(use!.source)))throw Error("MEMORY_ADOPTION_SOURCE_NOT_ACQUIRED");
+              if(use.kind==="governing-decision"){
+                if(document.record.kind!=="decision"||!use.decision||!lease.qualifyGoverning)throw Error("MEMORY_ACTUAL_GOVERNING_DECISION_REQUIRED");
+                assertMemory("GoverningDocument",use.decision);
+                if(canonicalMemory(use.decision.owner)!==canonicalMemory(document.record.owner)||!use.decision.sourceRefs.every(source=>document.record.sourceRefs.some(acquiredSource=>canonicalMemory(source)===canonicalMemory(acquiredSource)))||(document.claim&&document.claim.key!==use.decision.claim.key))throw Error("MEMORY_ACTUAL_GOVERNING_SOURCE_SCOPE_MISMATCH");
+                if(use.decision.status!=="active"||!validAt(use.decision,now)||!await lease.qualifyGoverning(address,use.decision,permit))use=null;
+              }else if(!["preference","procedure","knowledge"].includes(document.record.kind)||!((use.kind==="standing-preference"&&document.record.kind==="preference")||use.kind==="standing-procedure"))throw Error("MEMORY_ADOPTION_CLASS_MISMATCH");
+              await current();
+            }
+          }
+          acquired.push({kind:"memory",source:address.source,currentness:address.currentness,key,document,...(use?{use}: {})});
         } else {
           const document=decodeMemory("GoverningDocument",bytes), {schema:_,text,claim,...actual}=document;
           const {claimKey,...expected}=address.header;
           if (canonicalMemory(actual)!==canonicalMemory(expected) || claim.key!==claimKey) throw Error("MEMORY_AUTHENTICATED_METADATA_MISMATCH");
           textBytes+=Buffer.byteLength(text)+Buffer.byteLength(claim.value);
           if (textBytes>2_097_152) {omissions.sourceLimit++;continue;}
-          const governs=document.status==="active" && validAt(document,now) && !!lease.qualifyGoverning && await lease.qualifyGoverning(address,document,permit);
-          await current(); acquired.push({kind:"governing",source:address.source,key,document,governs});
+          const governs=address.currentness==="current" && document.status==="active" && validAt(document,now) && !!lease.qualifyGoverning && await lease.qualifyGoverning(address,document,permit);
+          await current(); acquired.push({kind:"governing",source:address.source,currentness:address.currentness,key,document,governs});
         }
       }
       await current();
@@ -137,19 +158,22 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
       const budget=request.maxChars??16000, limit=request.limit??10;
       const fits=()=>JSON.stringify(result).length<=budget;
       if(!fits())throw Error("MEMORY_METADATA_BUDGET_EXCEEDED");
-      const matchedClaims=new Set(selected.flatMap(row=>row.kind==="memory"?(row.document.claim?[row.document.claim.key]:[]):[row.document.claim.key]));
-      for(const row of acquired) if(row.kind==="governing" && matchedClaims.has(row.document.claim.key)) {
+      const governingRows:Array<Extract<Acquired,{kind:"governing"}>>=acquired.flatMap(row=>row.kind==="governing"?[row]:row.use?.decision?[{kind:"governing" as const,source:row.use.source,currentness:row.currentness,key:row.key+"/actual-governing",document:row.use.decision,governs:true}]:[]);
+      const matchedClaims=new Set(selected.flatMap(row=>row.kind==="memory"?[...(row.document.claim?[row.document.claim.key]:[]),...(row.use?.decision?[row.use.decision.claim.key]:[])]:[row.document.claim.key]));
+      for(const row of governingRows) if(matchedClaims.has(row.document.claim.key)) {
         result.governing.push(row);
         if(result.governing.length>20||!fits()){result.governing.pop();omissions.governing++;}
       }
       for(const row of selected) if(row.kind==="memory") {
         if(result.hits.length>=limit){omissions.hitLimit++;continue;}
-        result.hits.push({...row,usage:"advisory-evidence",timeCoverage:row.document.record.validFrom||row.document.record.validUntil?"known":"unknown"});
+        const {use,...visibleRow}=row;
+        const decisionValues=use?.decision?[...new Set(governingRows.filter(g=>g.governs&&g.document.claim.key===use.decision!.claim.key).map(g=>g.document.claim.value))]:[];
+        result.hits.push({...visibleRow,usage:"advisory-evidence",currentInstructionEligible:!!use&&(!use.decision||(decisionValues.length===1&&result.governing.some(g=>g.key===row.key+"/actual-governing"))),...(use?{adoptionSource:use.source}:{}),timeCoverage:row.document.record.validFrom||row.document.record.validUntil?"known":"unknown",temporalStatus:row.document.record.status==="candidate"?"candidate":row.document.record.status==="superseded"?"historical-superseded":row.document.record.status==="revoked"?"historical-revoked":row.document.record.validUntil&&instant(row.document.record.validUntil)<=at?"historical-expired":row.document.record.validFrom&&instant(row.document.record.validFrom)>at?"future":row.currentness!=="current"?"historical-revision":"current"});
         if(!fits()){result.hits.pop();omissions.hitChars++;}
       }
       for(const claimKey of matchedClaims) {
         const values=acquired.flatMap(row=>row.kind==="memory"?(row.document.claim?.key===claimKey?[row.document.claim.value]:[]):row.document.claim.key===claimKey?[row.document.claim.value]:[]);
-        const authoritative=acquired.filter((row):row is Extract<Acquired,{kind:"governing"}>=>row.kind==="governing"&&row.governs&&row.document.claim.key===claimKey);
+        const authoritative=governingRows.filter(row=>row.governs&&row.document.claim.key===claimKey);
         const activeValues=[...new Set(authoritative.map(row=>row.document.claim.value))];
         const visible=authoritative.every(row=>result.governing.some(shown=>shown.key===row.key));
         result.conflicts.push({claimKey,conflictingEvidence:new Set(values).size>1,governingConflict:activeValues.length>1,selectedGoverningValue:activeValues.length===1&&visible?activeValues[0]!:null});

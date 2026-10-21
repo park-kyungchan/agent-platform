@@ -1,9 +1,9 @@
 import type { Graph, TaskRef, Scope, SourceRef } from "../git-work/generated/v3.ts";
-import type { MemoryRecord, MemoryQuery, GoverningDocument } from "./generated/memory-v1.ts";
+import type { MemoryRecord, MemoryQuery, GoverningDocument, MemoryDocument } from "./generated/memory-v1.ts";
 
 export type MemoryHeader = Omit<MemoryRecord, "text">;
 export type GoverningHeader = Omit<GoverningDocument, "schema" | "text" | "claim"> & { claimKey: string };
-export type MemoryAddress = { source: SourceRef; claimKey?: string } & (
+export type MemoryAddress = { source: SourceRef; currentness: "current" | "historical" | "unknown"; claimKey?: string } & (
   | { kind: "memory"; header: MemoryHeader }
   | { kind: "governing"; header: GoverningHeader }
 );
@@ -14,8 +14,14 @@ export interface MemoryInventory {
   gaps: Array<{ code: "missing" | "unreachable" | "unqualified-owner"; scope?: Scope }>;
   truncated: boolean;
 }
+export interface NativeMemoryUse {
+  kind: "standing-preference" | "standing-procedure" | "governing-decision";
+  source: SourceRef;
+  /** Actual governing record supplied/verified by its owner, never a Memory enum. */
+  decision?: GoverningDocument;
+}
 /** The existing native owner authenticates the current caller and retains every
- * selected owner's read/policy lease until the callback and consumer finish.
+ * selected owner's read/policy and current-source-head lease until the callback and consumer finish.
  * authorize MUST cover originals and all source/derived exclusions before read.
  * acquire MUST independently enforce its opaque permit and immutable revision.
  * Implementations may aggregate owners; common code creates no store or client.
@@ -29,7 +35,11 @@ export interface NativeMemoryReadLease {
   assertCurrent(): void | Promise<void>;
   discover(input: Pick<MemoryQuery, "scopes" | "mode" | "purpose">): Promise<MemoryInventory>;
   authorize(address: MemoryAddress, input: Pick<MemoryQuery, "mode" | "purpose">): Promise<NativeMemoryPermit | null>;
+  /** Return the exact permitted immutable original bytes, not a summary/cache claim. */
+  readOriginal(source: SourceRef, permit: NativeMemoryPermit): Promise<Uint8Array>;
   acquire(address: MemoryAddress, permit: NativeMemoryPermit): Promise<Uint8Array>;
+  /** Authenticate adoption evidence/applicability from already acquired originals. */
+  qualifyMemoryUse?(address: MemoryAddress, document: MemoryDocument, permit: NativeMemoryPermit): Promise<NativeMemoryUse | null>;
   /** Actual governing Decision/Spec verification and applicability, not a Memory label. */
   qualifyGoverning?(address: MemoryAddress, document: GoverningDocument, permit: NativeMemoryPermit): Promise<boolean>;
   /** Exact current/historical source-qualified graph, never an inferred latest graph. */

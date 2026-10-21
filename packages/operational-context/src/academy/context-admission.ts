@@ -24,7 +24,7 @@ export function assessAcademyMemoryAdmission(controls: AcademyContextControls) {
   if(!controls.authenticatedReaderId?.trim()||!controls.policyGeneration?.trim()||!controls.current)holds.push("CURRENT_AUTHENTICATED_READER_POLICY_REQUIRED");
   if(controls.unauthorizedBodyObserved||controls.quarantinedDerivedArtifacts)holds.push("INTERRUPT_QUARANTINE_AND_FRESH_CONVERSATION_REQUIRED");
   if(!controls.originalCustodyQualified)holds.push("ORIGINAL_SOURCE_CUSTODY_REQUIRED");
-  for(const name of academyChannels){const channel=controls.channels?.[name];if(!channel||channel.state==="unverified"||channel.policyGeneration!==controls.policyGeneration||!channel.sourceDigest||!/^[a-f0-9]{64}$/.test(channel.sourceDigest))holds.push("CHANNEL_CONTROL_REQUIRED:"+name);}
+  for(const name of academyChannels){const channel=controls.channels?.[name];if(!channel||!["current-permission-enforced","disabled"].includes(channel.state)||channel.policyGeneration!==controls.policyGeneration||!channel.sourceDigest||!/^[a-f0-9]{64}$/.test(channel.sourceDigest))holds.push("CHANNEL_CONTROL_REQUIRED:"+name);}
   return {...academyMemoryPolicy,status:holds.length?"held" as const:"ready-for-separate-native-validation" as const,holds,policyGeneration:controls.policyGeneration,currentHistoryModesSeparate:true,sourceAcquisition:"native-permit-before-body" as const,standingDecisionSource:"actual-governing-decision" as const,humanAcceptance:false as const};
 }
 export interface NativeAcademyContextOwner {
@@ -33,5 +33,5 @@ export interface NativeAcademyContextOwner {
 /** JSON/query flags alone cannot supply current native controls. */
 export async function withAcademyMemoryAdmission<T>(purpose:string,owner:NativeAcademyContextOwner,consume:(assessment:ReturnType<typeof assessAcademyMemoryAdmission>)=>T|Promise<T>):Promise<T>{
   if(!purpose?.trim()||!owner||typeof owner.withCurrentControls!=="function")throw Error("ACADEMY_CURRENT_NATIVE_OWNER_REQUIRED");
-  return owner.withCurrentControls(purpose,async controls=>{const assessment=assessAcademyMemoryAdmission(controls);if(assessment.status==="held")throw Error("ACADEMY_CONTEXT_ADMISSION_HELD");return consume(assessment);});
+  return owner.withCurrentControls(purpose,async controls=>{const assessment=assessAcademyMemoryAdmission(controls);if(assessment.status==="held")throw Error("ACADEMY_CONTEXT_ADMISSION_HELD");const result=await consume(assessment);if(controls.policyGeneration!==assessment.policyGeneration||assessAcademyMemoryAdmission(controls).status==="held")throw Error("ACADEMY_CONTEXT_POLICY_CHANGED");return result;});
 }
