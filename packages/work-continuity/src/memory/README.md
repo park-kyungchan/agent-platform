@@ -45,6 +45,26 @@ originals and their conflicts are built before lexical selection: a search miss
 does not remove a current obligation or select a policy winner. Advisory Memory
 recall still requires relevance; this closure does not promote unrelated Memory.
 
+`NativeMemoryUse` is a disjoint native callback contract. Standing preference or
+procedure uses contain only `kind` and acquired adoption `source`; any attached
+`decision`, including an undefined or historical/foreign/inapplicable one, refuses
+at runtime. A `governing-decision` requires the actual Decision document and the
+complete schema, original/source, exact owner/local-key (when the summary has a
+claim), reader, current status/time and independent governing-qualification joins.
+Only that admitted use can produce an adopted governing row or actual claim.
+Native results are copied into private query snapshots. Qualification callbacks
+receive detached documents and cannot mutate the exact document being admitted.
+Normal standing preferences/procedures remain eligible without Decision authority.
+
+`conflictingEvidence` includes values from both admitted summary claims and actual
+governing documents, grouped by the same exact owner-qualified claim identity.
+An optional absent summary claim stays absent; actual Decision values still count.
+A summary/original mismatch remains visible while only the actual current
+qualified original can govern. Authorized historical originals remain evidence
+without becoming a current `governingConflict` or standing instruction. Supplying
+the same actual Decisions directly or through valid adoption preserves their
+conflict meaning and original-source references.
+
 Claims use the exact canonical tuple `(owner Scope, local key)`, consistently for
 recall closure, conflict output, unique resolution and standing eligibility.
 `claimKey` and every legacy key retain their original bytes; conflict output adds

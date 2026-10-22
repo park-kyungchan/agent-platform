@@ -9,6 +9,7 @@ import {
   type MemoryAddress,
   type NativeMemoryReader,
   type NativeMemoryUse,
+  type NativeMemoryPermit,
 } from "./reader.ts";
 
 type Acquired = { key: string; source: SourceRef; currentness: MemoryAddress["currentness"] } & (
@@ -118,6 +119,21 @@ function validAt(header: { validFrom?: string; validUntil?: string }, at: number
   if (from >= until) throw Error("MEMORY_INVALID_VALIDITY_INTERVAL");
   return from <= at && at < until;
 }
+/** Snapshot a plain bounded native result before retaining it or awaiting more
+ * callbacks. No optional/extra Decision on a standing proof can reach consumers. */
+function snapshotMemoryUse(input: unknown): NativeMemoryUse {
+  canonicalMemory(input);
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    throw Error("MEMORY_NATIVE_USE_SHAPE_MISMATCH");
+  const kind = (input as { kind?: unknown }).kind;
+  const expected = kind === "governing-decision" ? "decision,kind,source" :
+    kind === "standing-preference" || kind === "standing-procedure" ? "kind,source" : null;
+  if (!expected || Object.keys(input).sort().join(",") !== expected)
+    throw Error("MEMORY_NATIVE_USE_SHAPE_MISMATCH");
+  // Exact source and actual governing schema/semantic joins are checked by the
+  // ingestion producer below before this private snapshot becomes an admitted use.
+  return structuredClone(input) as NativeMemoryUse;
+}
 function validateHeader(address: MemoryAddress): void {
   if (
     !address ||
@@ -206,6 +222,16 @@ export async function withMemoryQuery<T>(
         throw Error("MEMORY_POLICY_CHANGED_OR_EXPIRED");
     };
     await current();
+    const qualifyGoverning = async (address: MemoryAddress, document: GoverningDocument,
+      permit: NativeMemoryPermit): Promise<boolean> => {
+      if (!lease.qualifyGoverning) return false;
+      const candidate = structuredClone(document), expected = canonicalMemory(document);
+      const verdict = await lease.qualifyGoverning(structuredClone(address), candidate, permit);
+      await current();
+      if (canonicalMemory(candidate) !== expected)
+        throw Error("MEMORY_GOVERNING_QUALIFICATION_MUTATED_DOCUMENT");
+      return verdict === true;
+    };
     let taskContext: ReturnType<typeof readGitWorkV3Context> | undefined;
     if (request.task) {
       if (!lease.readTaskGraph) throw Error("MEMORY_EXACT_TASK_GRAPH_READER_REQUIRED");
@@ -427,45 +453,52 @@ export async function withMemoryQuery<T>(
             validAt(document.record, now) &&
             lease.qualifyMemoryUse
           ) {
-            use = await lease.qualifyMemoryUse(address, document, permit);
+            const qualifiedDocument = structuredClone(document);
+            const proposed = await lease.qualifyMemoryUse(structuredClone(address), qualifiedDocument, permit);
             await current();
-            if (use) {
+            if (canonicalMemory(qualifiedDocument) !== canonicalMemory(document))
+              throw Error("MEMORY_ADOPTION_QUALIFICATION_MUTATED_DOCUMENT");
+            if (proposed !== null) {
+              const candidate = snapshotMemoryUse(proposed);
               if (
                 !document.record.sourceRefs.some(
-                  (source) => canonicalMemory(source) === canonicalMemory(use!.source),
+                  (source) => canonicalMemory(source) === canonicalMemory(candidate.source),
                 )
               )
                 throw Error("MEMORY_ADOPTION_SOURCE_NOT_ACQUIRED");
-              if (use.kind === "governing-decision") {
-                if (document.record.kind !== "decision" || !use.decision || !lease.qualifyGoverning)
+              if (candidate.kind === "governing-decision") {
+                if (document.record.kind !== "decision" || !lease.qualifyGoverning)
                   throw Error("MEMORY_ACTUAL_GOVERNING_DECISION_REQUIRED");
-                assertMemory("GoverningDocument", use.decision);
+                assertMemory("GoverningDocument", candidate.decision);
                 if (
-                  canonicalMemory(use.decision.owner) !== canonicalMemory(document.record.owner) ||
-                  !use.decision.sourceRefs.every((source) =>
+                  candidate.decision.recordClass !== "decision" ||
+                  canonicalMemory(candidate.decision.owner) !== canonicalMemory(document.record.owner) ||
+                  !candidate.decision.sourceRefs.every((source) =>
                     document.record.sourceRefs.some(
                       (acquiredSource) =>
                         canonicalMemory(source) === canonicalMemory(acquiredSource),
                     ),
                   ) ||
-                  (document.claim && document.claim.key !== use.decision.claim.key)
+                  (document.claim && document.claim.key !== candidate.decision.claim.key)
                 )
                   throw Error("MEMORY_ACTUAL_GOVERNING_SOURCE_SCOPE_MISMATCH");
                 if (
-                  !use.decision.allowedReaders.includes(lease.readerId) ||
-                  use.decision.status !== "active" ||
-                  !validAt(use.decision, now) ||
-                  !(await lease.qualifyGoverning(address, use.decision, permit))
+                  candidate.decision.allowedReaders.includes(lease.readerId) &&
+                  candidate.decision.status === "active" &&
+                  validAt(candidate.decision, now) &&
+                  (await qualifyGoverning(address, candidate.decision, permit))
+                ) use = candidate;
+              } else {
+                if (
+                  !["preference", "procedure", "knowledge"].includes(document.record.kind) ||
+                  !(
+                    (candidate.kind === "standing-preference" && document.record.kind === "preference") ||
+                    candidate.kind === "standing-procedure"
+                  )
                 )
-                  use = null;
-              } else if (
-                !["preference", "procedure", "knowledge"].includes(document.record.kind) ||
-                !(
-                  (use.kind === "standing-preference" && document.record.kind === "preference") ||
-                  use.kind === "standing-procedure"
-                )
-              )
-                throw Error("MEMORY_ADOPTION_CLASS_MISMATCH");
+                  throw Error("MEMORY_ADOPTION_CLASS_MISMATCH");
+                use = candidate;
+              }
               await current();
             }
           }
@@ -488,7 +521,7 @@ export async function withMemoryQuery<T>(
             document.status === "active" &&
             validAt(document, now) &&
             !!lease.qualifyGoverning &&
-            (await lease.qualifyGoverning(address, document, permit));
+            (await qualifyGoverning(address, document, permit));
           await current();
           acquired.push({
             kind: "governing",
@@ -507,7 +540,7 @@ export async function withMemoryQuery<T>(
         (row) =>
           row.kind === "governing"
             ? [row]
-            : row.use?.decision
+            : row.use?.kind === "governing-decision"
               ? [
                   {
                     kind: "governing" as const,
@@ -527,7 +560,7 @@ export async function withMemoryQuery<T>(
             : undefined
           : claimKey(row.document.owner, row.document.claim.key);
       const actualClaimOf = (row: Extract<Acquired, { kind: "memory" }>) =>
-        row.use?.decision
+        row.use?.kind === "governing-decision"
           ? claimKey(row.use.decision.owner, row.use.decision.claim.key)
           : undefined;
       const currentAuthority = new Map<string, Array<Extract<Acquired, { kind: "governing" }>>>();
@@ -584,8 +617,8 @@ export async function withMemoryQuery<T>(
             Math.max(candidateScores.get(index)!, claimScores.get(claimOf(row) ?? "") ?? 0);
           return (
             score(right, b) - score(left, a) ||
-            Number(right.kind === "memory" && !!right.use?.decision) -
-              Number(left.kind === "memory" && !!left.use?.decision) ||
+            Number(right.kind === "memory" && right.use?.kind === "governing-decision") -
+              Number(left.kind === "memory" && left.use?.kind === "governing-decision") ||
             relevant(right) - relevant(left) ||
             a - b
           );
@@ -632,7 +665,7 @@ export async function withMemoryQuery<T>(
           row.kind === "memory"
             ? [
                 ...(row.document.claim ? [claimOf(row)!] : []),
-                ...(row.use?.decision ? [actualClaimOf(row)!] : []),
+                ...(row.use?.kind === "governing-decision" ? [actualClaimOf(row)!] : []),
               ]
             : [claimOf(row)!],
         ),
@@ -659,11 +692,14 @@ export async function withMemoryQuery<T>(
         }
       // Authority warnings precede discretionary hits in the bounded envelope.
       for (const key of matchedClaims) {
-        const values = acquired.flatMap((row) =>
-          claimOf(row) === key
-            ? [row.kind === "memory" ? row.document.claim!.value : row.document.claim.value]
-            : [],
-        );
+        // Evidence includes each admitted summary claim AND every exact actual
+        // governing document, whether directly acquired or derived from a fully
+        // qualified governing-decision use. Optional absent summaries stay absent.
+        const values = [
+          ...acquired.flatMap((row) => row.kind === "memory" && claimOf(row) === key
+            ? [row.document.claim!.value] : []),
+          ...governingRows.filter((row) => claimOf(row) === key).map((row) => row.document.claim.value),
+        ];
         const authoritative = currentAuthority.get(key) ?? [];
         const activeValues = [...new Set(authoritative.map((row) => row.document.claim.value))];
         const incompleteSources = [
@@ -717,7 +753,7 @@ export async function withMemoryQuery<T>(
               !!use &&
               claimReady &&
               !omissions.conflicts &&
-              (!use.decision ||
+              (use.kind !== "governing-decision" ||
                 (resolution?.resolution === "resolved" &&
                   result.governing.some((g) => g.key === row.key + "/actual-governing"))),
             ...(use ? { adoptionSource: use.source } : {}),

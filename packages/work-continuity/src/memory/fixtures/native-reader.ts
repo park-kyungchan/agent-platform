@@ -61,7 +61,8 @@ export function governing(
     ...overrides,
   };
 }
-export function nativeFixture(documents: Array<MemoryDocument | GoverningDocument>, graph?: Graph) {
+export function nativeFixture(documents: Array<MemoryDocument | GoverningDocument>, graph?: Graph,
+  originals?: ReadonlyMap<string, Uint8Array>) {
   const events: string[] = [],
     reads = new Map<string, number>(),
     denied = new Set<string>();
@@ -150,6 +151,11 @@ export function nativeFixture(documents: Array<MemoryDocument | GoverningDocumen
           if (!allowed || allowed.generation !== state.generation)
             throw Error("SYNTHETIC_BAD_PERMIT");
           events.push("original:" + source.uri);
+          if (originals) {
+            const bytes = originals.get(source.uri);
+            if (!bytes) throw Error("SYNTHETIC_EXACT_ORIGINAL_ABSENT");
+            return bytes.slice();
+          }
           const id = source.uri.split("/").at(-1)!;
           return new TextEncoder().encode("original:" + id);
         },

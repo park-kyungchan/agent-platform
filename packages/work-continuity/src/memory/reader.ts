@@ -28,12 +28,20 @@ export interface MemoryInventory {
   gaps: Array<{ code: "missing" | "unreachable" | "unqualified-owner"; scope?: Scope }>;
   truncated: boolean;
 }
-export interface NativeMemoryUse {
-  kind: "standing-preference" | "standing-procedure" | "governing-decision";
-  source: SourceRef;
-  /** Actual governing record supplied/verified by its owner, never a Memory enum. */
-  decision?: GoverningDocument;
-}
+/** Standing adoption and actual Decision authority are disjoint. The runtime
+ * also checks exact shapes; TypeScript alone cannot qualify native input. */
+export type NativeMemoryUse =
+  | {
+      kind: "standing-preference" | "standing-procedure";
+      source: SourceRef;
+      decision?: never;
+    }
+  | {
+      kind: "governing-decision";
+      source: SourceRef;
+      /** Required actual record, separately qualified from acquired originals. */
+      decision: GoverningDocument;
+    };
 /** The existing native owner authenticates the current caller and retains every
  * selected owner's read/policy and current-source-head lease until the callback and consumer finish.
  * authorize MUST cover originals and all source/derived exclusions before read.
