@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { readFile } from "node:fs/promises";
 import { scratch, write, hash, bytes, canonical, git, commit, capture } from "./support";
 const now = "2026-10-20T12:00:00Z";
@@ -329,6 +330,72 @@ export async function memoryScenario(sourceRoot: string, id: string): Promise<un
         path: "work/p/w/inputs/inventory.json",
         fragment: "#/content",
       };
+      // Observe an actual independent Input before claiming a source-only pass.
+      // This same full Input is in the Work purpose closure; no native execution is inferred.
+      const purposeInputBytes = bytes(input("purpose", purpose));
+      await write(root, purposeRef.path, purposeInputBytes);
+      const observedPurposeBytes = await readFile(join(root, purposeRef.path));
+      const purposeMatched = observedPurposeBytes.equals(Buffer.from(purposeInputBytes));
+      if (!purposeMatched) throw Error("FICTIONAL_RECEIPT_SOURCE_OBSERVATION_MISMATCH");
+      const purposeSha256 = hash(observedPurposeBytes);
+      const observedAt = new Date().toISOString();
+      const receiptTask: import("../../../../packages/work-continuity/src/git-work/types").TaskRecord = {
+        ...identity,
+        kind: "task",
+        id: "receipt",
+        logical: {
+          domainId: "d", projectId: "p", workId: "w", taskId: "receipt",
+          issueId: "issue", specId: "spec", specRevision: 1, planId: "plan", planRevision: 1,
+        },
+        title: "Fictional source-only prerequisite",
+        executionClass: "source-only",
+        dependsOn: [], decisionIds: [], effectIds: [], verificationEvidenceIds: ["verification"],
+        state: {
+          execution: "complete", verification: "passed", localAudit: "result-durable",
+          sharedAudit: "pending", formalCompletion: "pending",
+        },
+      };
+      const recordApi = (await import(
+        join(sourceRoot, "packages/work-continuity/src/git-work/records.ts")
+      )) as typeof import("../../../../packages/work-continuity/src/git-work/records");
+      const receiptTarget = recordApi.taskVerificationTarget(receiptTask);
+      const observedSourceId = "p:evidence:receipt-source";
+      const observedSource = {
+        schemaVersion: "1.0.0", kind: "evidence", id: observedSourceId,
+        projectId: "p", domainId: "d", createdAt: observedAt,
+        payload: {
+          claim: "The fictional prerequisite observed its exact same-Work purpose Input bytes.",
+          method: "Read the stored Input with readFile, compare the full bytes and compute SHA-256.",
+          sourceUrl: pathToFileURL(join(root, purposeRef.path)).href,
+          fetchedAt: observedAt,
+          result: {
+            outcome: "success", processExitCode: null, contentMatched: purposeMatched,
+            details: { path: purposeRef.path, sha256: purposeSha256, byteLength: observedPurposeBytes.length },
+          },
+          attempts: [{ attempt: 1, outcome: "success", details: { operation: "readFile-and-byte-comparison" } }],
+          limitations: ["Synthetic private source fixture only.", "No native execution, permission, receipt authenticity or Acceptance is established."],
+          details: { syntheticFixture: true, nativePermissionGranted: false, taskTarget: receiptTarget,
+            observer: { name: "bun", version: Bun.version } },
+        },
+      };
+      const observedSourcePath = "work/p/w/inputs/receipt-observation.json";
+      const observedSourceInput = input("receipt-observation", observedSource);
+      const observedSourceRef = {
+        kind: "snapshot" as const, path: observedSourcePath, fragment: "#/content",
+        sha256: hash(bytes(observedSourceInput)),
+      };
+      const verification = {
+        schemaVersion: "1.0.0", kind: "verification", id: "p:verification:receipt",
+        projectId: "p", domainId: "d", createdAt: observedAt,
+        payload: {
+          targetRefs: [receiptTarget],
+          criteria: [{ id: "safe", status: "pass", message: "The exact fictional source Input bytes were observed.", evidenceRefs: [observedSourceId] }],
+          inputHashes: [{ path: purposeRef.path, sha256: purposeSha256 }],
+          runtime: { name: "bun", version: Bun.version },
+          details: { syntheticFixture: true, nativePermissionGranted: false, observedEvidence: observedSourceRef },
+        },
+      };
+      const verificationInput = input("verification", verification);
       const records: [string, unknown][] = [
         [
           "work/p/w/work.json",
@@ -345,7 +412,7 @@ export async function memoryScenario(sourceRoot: string, id: string): Promise<un
             historicalFenceIds: [],
             continuity: {
               schema: "common.git-work-continuity.v1",
-              purposeSources: [purposeRef],
+              purposeSources: [{ ...purposeRef, sha256: purposeSha256 }],
               effectInventorySources: [inventoryRef],
             },
           },
@@ -392,7 +459,8 @@ export async function memoryScenario(sourceRoot: string, id: string): Promise<un
             },
             title: "Fixture task",
             executionClass: "source-only",
-            dependsOn: [{ taskId: "receipt", milestone: "execution-and-verification" }],
+            // Include the observed source Evidence record in the actual prerequisite closure.
+            dependsOn: [{ taskId: "receipt", milestone: "execution-and-verification", receiptEvidenceId: "receipt-source" }],
             decisionIds: [],
             effectIds: [],
             verificationEvidenceIds: [],
@@ -405,37 +473,20 @@ export async function memoryScenario(sourceRoot: string, id: string): Promise<un
             },
           },
         ],
+        ["work/p/w/tasks/receipt.json", receiptTask],
         [
-          "work/p/w/tasks/receipt.json",
-          {
-            ...identity, kind: "task", id: "receipt",
-            logical: { domainId: "d", projectId: "p", workId: "w", taskId: "receipt",
-              issueId: "issue", specId: "spec", specRevision: 1, planId: "plan", planRevision: 1 },
-            title: "Fictional source-only prerequisite", executionClass: "source-only",
-            dependsOn: [], decisionIds: [], effectIds: [], verificationEvidenceIds: ["verification"],
-            state: { execution: "complete", verification: "passed", localAudit: "result-durable",
-              sharedAudit: "pending", formalCompletion: "pending" },
-          },
+          "work/p/w/evidence/receipt-source.json",
+          { ...identity, kind: "evidence", id: "receipt-source", evidenceKind: "observation",
+            source: observedSourceRef, artifact: observedSource },
         ],
+        [observedSourcePath, observedSourceInput],
         [
           "work/p/w/evidence/verification.json",
           { ...identity, kind: "evidence", id: "verification", evidenceKind: "verification",
-            source: { kind: "snapshot", path: "work/p/w/inputs/verification.json", fragment: "#/content" } },
+            source: { kind: "snapshot", path: "work/p/w/inputs/verification.json", fragment: "#/content",
+              sha256: hash(bytes(verificationInput)) } },
         ],
-        [
-          "work/p/w/inputs/verification.json",
-          input("verification", {
-            schemaVersion: "1.0.0", kind: "verification", id: "fixture:verification:receipt",
-            projectId: "p", domainId: "d", createdAt: "2026-10-20T12:00:00Z",
-            payload: {
-              targetRefs: ["common-harness:task:" + hash(JSON.stringify(["d", "p", "w", "receipt"]))],
-              criteria: [{ id: "safe", status: "pass", message: "Fictional source-only observation", evidenceRefs: [] }],
-              inputHashes: [], runtime: { name: "fictional-source-owner", version: "1" },
-              details: { syntheticFixture: true, nativePermissionGranted: false },
-            },
-          }),
-        ],
-        [purposeRef.path, input("purpose", purpose)],
+        ["work/p/w/inputs/verification.json", verificationInput],
         [inventoryRef.path, input("inventory", { completedEffectIds: [], uncertainEffectIds: [] })],
       ];
       for (const [path, value] of records) await write(root, path, bytes(value));
