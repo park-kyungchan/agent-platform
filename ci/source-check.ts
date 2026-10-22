@@ -263,6 +263,21 @@ async function prepareQaTree() {
     join(resolve(process.env.RUNNER_TEMP ?? tmpdir()), "agent-platform-source-"),
   );
   const common = join(qaBase, "projects/agent-platform");
+  // Fresh token-free metadata retains the actual committed source and tracked paths.
+  // Copy current source data below; never copy native Git configuration or hooks.
+  await mkdir(dirname(common), { recursive: true });
+  await run(qaBase, [
+    "git",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "clone",
+    "--no-hardlinks",
+    "--no-checkout",
+    "--",
+    sourceRoot,
+    common,
+  ]);
+  await run(common, ["git", "-c", "core.hooksPath=/dev/null", "read-tree", "HEAD"]);
   await cp(sourceRoot, common, {
     recursive: true,
     dereference: false,
