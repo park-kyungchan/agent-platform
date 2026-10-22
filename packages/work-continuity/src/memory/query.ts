@@ -126,8 +126,12 @@ function snapshotMemoryUse(input: unknown): NativeMemoryUse {
   if (!input || typeof input !== "object" || Array.isArray(input))
     throw Error("MEMORY_NATIVE_USE_SHAPE_MISMATCH");
   const kind = (input as { kind?: unknown }).kind;
-  const expected = kind === "governing-decision" ? "decision,kind,source" :
-    kind === "standing-preference" || kind === "standing-procedure" ? "kind,source" : null;
+  const expected =
+    kind === "governing-decision"
+      ? "decision,kind,source"
+      : kind === "standing-preference" || kind === "standing-procedure"
+        ? "kind,source"
+        : null;
   if (!expected || Object.keys(input).sort().join(",") !== expected)
     throw Error("MEMORY_NATIVE_USE_SHAPE_MISMATCH");
   // Exact source and actual governing schema/semantic joins are checked by the
@@ -222,10 +226,14 @@ export async function withMemoryQuery<T>(
         throw Error("MEMORY_POLICY_CHANGED_OR_EXPIRED");
     };
     await current();
-    const qualifyGoverning = async (address: MemoryAddress, document: GoverningDocument,
-      permit: NativeMemoryPermit): Promise<boolean> => {
+    const qualifyGoverning = async (
+      address: MemoryAddress,
+      document: GoverningDocument,
+      permit: NativeMemoryPermit,
+    ): Promise<boolean> => {
       if (!lease.qualifyGoverning) return false;
-      const candidate = structuredClone(document), expected = canonicalMemory(document);
+      const candidate = structuredClone(document),
+        expected = canonicalMemory(document);
       const verdict = await lease.qualifyGoverning(structuredClone(address), candidate, permit);
       await current();
       if (canonicalMemory(candidate) !== expected)
@@ -454,7 +462,11 @@ export async function withMemoryQuery<T>(
             lease.qualifyMemoryUse
           ) {
             const qualifiedDocument = structuredClone(document);
-            const proposed = await lease.qualifyMemoryUse(structuredClone(address), qualifiedDocument, permit);
+            const proposed = await lease.qualifyMemoryUse(
+              structuredClone(address),
+              qualifiedDocument,
+              permit,
+            );
             await current();
             if (canonicalMemory(qualifiedDocument) !== canonicalMemory(document))
               throw Error("MEMORY_ADOPTION_QUALIFICATION_MUTATED_DOCUMENT");
@@ -472,7 +484,8 @@ export async function withMemoryQuery<T>(
                 assertMemory("GoverningDocument", candidate.decision);
                 if (
                   candidate.decision.recordClass !== "decision" ||
-                  canonicalMemory(candidate.decision.owner) !== canonicalMemory(document.record.owner) ||
+                  canonicalMemory(candidate.decision.owner) !==
+                    canonicalMemory(document.record.owner) ||
                   !candidate.decision.sourceRefs.every((source) =>
                     document.record.sourceRefs.some(
                       (acquiredSource) =>
@@ -487,12 +500,14 @@ export async function withMemoryQuery<T>(
                   candidate.decision.status === "active" &&
                   validAt(candidate.decision, now) &&
                   (await qualifyGoverning(address, candidate.decision, permit))
-                ) use = candidate;
+                )
+                  use = candidate;
               } else {
                 if (
                   !["preference", "procedure", "knowledge"].includes(document.record.kind) ||
                   !(
-                    (candidate.kind === "standing-preference" && document.record.kind === "preference") ||
+                    (candidate.kind === "standing-preference" &&
+                      document.record.kind === "preference") ||
                     candidate.kind === "standing-procedure"
                   )
                 )
@@ -696,9 +711,12 @@ export async function withMemoryQuery<T>(
         // governing document, whether directly acquired or derived from a fully
         // qualified governing-decision use. Optional absent summaries stay absent.
         const values = [
-          ...acquired.flatMap((row) => row.kind === "memory" && claimOf(row) === key
-            ? [row.document.claim!.value] : []),
-          ...governingRows.filter((row) => claimOf(row) === key).map((row) => row.document.claim.value),
+          ...acquired.flatMap((row) =>
+            row.kind === "memory" && claimOf(row) === key ? [row.document.claim!.value] : [],
+          ),
+          ...governingRows
+            .filter((row) => claimOf(row) === key)
+            .map((row) => row.document.claim.value),
         ];
         const authoritative = currentAuthority.get(key) ?? [];
         const activeValues = [...new Set(authoritative.map((row) => row.document.claim.value))];

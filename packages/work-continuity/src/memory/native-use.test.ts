@@ -1,8 +1,16 @@
 import { test, expect } from "bun:test";
 import {
-  withMemoryQuery, canonicalMemory, memoryDigest, type MemoryQuery,
-  type MemoryDocument, type MemoryRecord, type GoverningDocument, type SourceRef,
-  type NativeMemoryUse, type NativeMemoryReader, type Scope,
+  withMemoryQuery,
+  canonicalMemory,
+  memoryDigest,
+  type MemoryQuery,
+  type MemoryDocument,
+  type MemoryRecord,
+  type GoverningDocument,
+  type SourceRef,
+  type NativeMemoryUse,
+  type NativeMemoryReader,
+  type Scope,
 } from "@palantirkc/work-continuity/memory/v1";
 import { memory, nativeFixture, syntheticReaderId } from "./fixtures/native-reader.ts";
 
@@ -10,106 +18,177 @@ const ownerA: Scope = { kind: "work", projectId: "synthetic-use", workId: "curre
 const ownerB: Scope = { kind: "work", projectId: "synthetic-other", workId: "current" };
 const localKey = "presentation";
 const request = (extra: Partial<MemoryQuery> = {}): MemoryQuery => ({
-  schema: "common.memory-query.v1", purpose: "generic native-use public contract regression",
-  query: "합성 방침", mode: "current", maxChars: 64000, limit: 20, ...extra,
+  schema: "common.memory-query.v1",
+  purpose: "generic native-use public contract regression",
+  query: "합성 방침",
+  mode: "current",
+  maxChars: 64000,
+  limit: 20,
+  ...extra,
 });
-function row(id: string, options: {
-  kind?: MemoryRecord["kind"];
-  useKind?: NativeMemoryUse["kind"];
-  owner?: Scope;
-  summaryClaim?: { key: string; value: string };
-  actual?: { value: string; overrides?: Partial<Omit<GoverningDocument, "sourceRefs">> };
-}) {
-  const owner = options.owner ?? ownerA, useKind = options.useKind ?? "governing-decision";
-  const originalDecision: Omit<GoverningDocument, "sourceRefs"> | undefined = options.actual ? {
-    schema: "common.memory-governing.v1", id: "original-decision-" + id, revision: 1,
-    owner, recordClass: "decision", status: "active", allowedReaders: [syntheticReaderId],
-    claim: { key: localKey, value: options.actual.value }, text: "합성 방침 원문 " + id,
-    ...options.actual.overrides,
-  } : undefined;
+function row(
+  id: string,
+  options: {
+    kind?: MemoryRecord["kind"];
+    useKind?: NativeMemoryUse["kind"];
+    owner?: Scope;
+    summaryClaim?: { key: string; value: string };
+    actual?: { value: string; overrides?: Partial<Omit<GoverningDocument, "sourceRefs">> };
+  },
+) {
+  const owner = options.owner ?? ownerA,
+    useKind = options.useKind ?? "governing-decision";
+  const originalDecision: Omit<GoverningDocument, "sourceRefs"> | undefined = options.actual
+    ? {
+        schema: "common.memory-governing.v1",
+        id: "original-decision-" + id,
+        revision: 1,
+        owner,
+        recordClass: "decision",
+        status: "active",
+        allowedReaders: [syntheticReaderId],
+        claim: { key: localKey, value: options.actual.value },
+        text: "합성 방침 원문 " + id,
+        ...options.actual.overrides,
+      }
+    : undefined;
   // Native original bytes carry adoption and actual Decision fields independently
   // of the Memory summary. No expected value comes from a candidate result.
-  const original = { adoption: { id, owner, useKind },
-    ...(originalDecision ? { decision: originalDecision } : {}) };
+  const original = {
+    adoption: { id, owner, useKind },
+    ...(originalDecision ? { decision: originalDecision } : {}),
+  };
   const bytes = new TextEncoder().encode(canonicalMemory(original));
-  const source: SourceRef = { owner: "synthetic-owner", uri: "fixture://exact-native-original/" + id,
-    revision: "native-original1", digest: memoryDigest(bytes) };
-  const actual: GoverningDocument | undefined = originalDecision ? { ...originalDecision, sourceRefs: [source] } : undefined;
-  const document = memory(id, "합성 방침 요약 " + id, { owner,
-    kind: options.kind ?? "decision", authority: "owner-adopted", sourceRefs: [source] }, options.summaryClaim);
+  const source: SourceRef = {
+    owner: "synthetic-owner",
+    uri: "fixture://exact-native-original/" + id,
+    revision: "native-original1",
+    digest: memoryDigest(bytes),
+  };
+  const actual: GoverningDocument | undefined = originalDecision
+    ? { ...originalDecision, sourceRefs: [source] }
+    : undefined;
+  const document = memory(
+    id,
+    "합성 방침 요약 " + id,
+    { owner, kind: options.kind ?? "decision", authority: "owner-adopted", sourceRefs: [source] },
+    options.summaryClaim,
+  );
   const proposed: unknown = { kind: useKind, source, ...(actual ? { decision: actual } : {}) };
   return { document, actual, proposed, source, bytes, useKind };
 }
 type Row = ReturnType<typeof row>;
-function fixture(rows: Row[], options: {
-  representation?: "memory" | "direct";
-  governing?: "qualified" | "missing" | "false";
-  mutateGoverning?: boolean;
-  beforeAdoption?: (index: number, document: MemoryDocument) => void;
-} = {}) {
+function fixture(
+  rows: Row[],
+  options: {
+    representation?: "memory" | "direct";
+    governing?: "qualified" | "missing" | "false";
+    mutateGoverning?: boolean;
+    beforeAdoption?: (index: number, document: MemoryDocument) => void;
+  } = {},
+) {
   const originals = new Map(rows.map((r) => [r.source.uri, r.bytes]));
-  const documents = options.representation === "direct" ? rows.map((r) => r.actual!) : rows.map((r) => r.document);
-  const f = nativeFixture(documents, undefined, originals), state = { governingCalls: 0, adoptionCalls: 0 };
+  const documents =
+    options.representation === "direct" ? rows.map((r) => r.actual!) : rows.map((r) => r.document);
+  const f = nativeFixture(documents, undefined, originals),
+    state = { governingCalls: 0, adoptionCalls: 0 };
   const owner: NativeMemoryReader = {
     async withCurrentRead(q, consume) {
-      return f.owner.withCurrentRead(q, (lease) => consume({
-        ...lease,
-        async qualifyMemoryUse(address, document) {
-          const index = rows.findIndex((r) => r.document.record.id === document.record.id);
-          const selected = rows[index]!;
-          expect(canonicalMemory(document)).toBe(canonicalMemory(selected.document));
-          expect(f.events).toContain("original:" + selected.source.uri);
-          expect(f.reads.get(address.source.uri)).toBe(1);
-          const original = JSON.parse(new TextDecoder().decode(originals.get(selected.source.uri)!)) as {
-            adoption: { id: string; owner: Scope; useKind: NativeMemoryUse["kind"] };
-          };
-          expect(original.adoption).toEqual({ id: document.record.id, owner: document.record.owner, useKind: selected.useKind });
-          state.adoptionCalls++;
-          options.beforeAdoption?.(index, document);
-          // Deliberately includes runtime-invalid native adapter shapes in negative
-          // cases. The public producer must enforce the disjoint contract itself.
-          return selected.proposed as NativeMemoryUse;
-        },
-        qualifyGoverning: options.governing === "missing" ? undefined : async (_address, document) => {
-          state.governingCalls++;
-          const selected = rows.find((r) => r.actual?.id === document.id)!;
-          expect(f.events).toContain("original:" + selected.source.uri);
-          const original = JSON.parse(new TextDecoder().decode(originals.get(selected.source.uri)!)) as {
-            decision: Omit<GoverningDocument, "sourceRefs">;
-          };
-          // Actual governing qualification joins the acquired original, not a
-          // Memory kind/authority label or a mirrored summary claim.
-          expect(canonicalMemory(document)).toBe(canonicalMemory({ ...original.decision, sourceRefs: [selected.source] }));
-          if (options.mutateGoverning) document.allowedReaders = ["unrelated-reader"];
-          return options.governing !== "false";
-        },
-      }));
+      return f.owner.withCurrentRead(q, (lease) =>
+        consume({
+          ...lease,
+          async qualifyMemoryUse(address, document) {
+            const index = rows.findIndex((r) => r.document.record.id === document.record.id);
+            const selected = rows[index]!;
+            expect(canonicalMemory(document)).toBe(canonicalMemory(selected.document));
+            expect(f.events).toContain("original:" + selected.source.uri);
+            expect(f.reads.get(address.source.uri)).toBe(1);
+            const original = JSON.parse(
+              new TextDecoder().decode(originals.get(selected.source.uri)!),
+            ) as {
+              adoption: { id: string; owner: Scope; useKind: NativeMemoryUse["kind"] };
+            };
+            expect(original.adoption).toEqual({
+              id: document.record.id,
+              owner: document.record.owner,
+              useKind: selected.useKind,
+            });
+            state.adoptionCalls++;
+            options.beforeAdoption?.(index, document);
+            // Deliberately includes runtime-invalid native adapter shapes in negative
+            // cases. The public producer must enforce the disjoint contract itself.
+            return selected.proposed as NativeMemoryUse;
+          },
+          qualifyGoverning:
+            options.governing === "missing"
+              ? undefined
+              : async (_address, document) => {
+                  state.governingCalls++;
+                  const selected = rows.find((r) => r.actual?.id === document.id)!;
+                  expect(f.events).toContain("original:" + selected.source.uri);
+                  const original = JSON.parse(
+                    new TextDecoder().decode(originals.get(selected.source.uri)!),
+                  ) as {
+                    decision: Omit<GoverningDocument, "sourceRefs">;
+                  };
+                  // Actual governing qualification joins the acquired original, not a
+                  // Memory kind/authority label or a mirrored summary claim.
+                  expect(canonicalMemory(document)).toBe(
+                    canonicalMemory({ ...original.decision, sourceRefs: [selected.source] }),
+                  );
+                  if (options.mutateGoverning) document.allowedReaders = ["unrelated-reader"];
+                  return options.governing !== "false";
+                },
+        }),
+      );
     },
   };
   return { ...f, owner, nativeState: state };
 }
 
-const standingCases = ([
-  ["preference", "standing-preference"], ["procedure", "standing-procedure"],
-] as const).flatMap(([kind, useKind]) => (["historical", "foreign", "inapplicable"] as const)
-  .flatMap((variant) => (["missing", "false"] as const).map((governing) => ({ kind, useKind, variant, governing }))));
-test.each(standingCases)("standing $kind cannot promote attached $variant Decision with $governing governing callback", async (spec) => {
-  const overrides: Partial<GoverningDocument> = spec.variant === "historical" ? { status: "superseded" } :
-    spec.variant === "foreign" ? { owner: ownerB } : {};
-  const selected = row("standing-attachment", { kind: spec.kind, useKind: spec.useKind,
-    actual: { value: "unadmitted", overrides } });
-  const f = fixture([selected], { governing: spec.governing });
-  let consumed = false;
-  await expect(withMemoryQuery(request(), f.owner, () => { consumed = true; })).rejects.toThrow("NATIVE_USE_SHAPE_MISMATCH");
-  expect(consumed).toBe(false);
-  expect(f.nativeState.governingCalls).toBe(0);
-  expect(f.nativeState.adoptionCalls).toBe(1);
-  expect(f.reads.size).toBe(1);
-  expect(f.events).toContain("original:" + selected.source.uri);
-});
+const standingCases = (
+  [
+    ["preference", "standing-preference"],
+    ["procedure", "standing-procedure"],
+  ] as const
+).flatMap(([kind, useKind]) =>
+  (["historical", "foreign", "inapplicable"] as const).flatMap((variant) =>
+    (["missing", "false"] as const).map((governing) => ({ kind, useKind, variant, governing })),
+  ),
+);
+test.each(standingCases)(
+  "standing $kind cannot promote attached $variant Decision with $governing governing callback",
+  async (spec) => {
+    const overrides: Partial<GoverningDocument> =
+      spec.variant === "historical"
+        ? { status: "superseded" }
+        : spec.variant === "foreign"
+          ? { owner: ownerB }
+          : {};
+    const selected = row("standing-attachment", {
+      kind: spec.kind,
+      useKind: spec.useKind,
+      actual: { value: "unadmitted", overrides },
+    });
+    const f = fixture([selected], { governing: spec.governing });
+    let consumed = false;
+    await expect(
+      withMemoryQuery(request(), f.owner, () => {
+        consumed = true;
+      }),
+    ).rejects.toThrow("NATIVE_USE_SHAPE_MISMATCH");
+    expect(consumed).toBe(false);
+    expect(f.nativeState.governingCalls).toBe(0);
+    expect(f.nativeState.adoptionCalls).toBe(1);
+    expect(f.reads.size).toBe(1);
+    expect(f.events).toContain("original:" + selected.source.uri);
+  },
+);
 
 test.each([
-  ["preference", "standing-preference"], ["procedure", "standing-procedure"], ["knowledge", "standing-procedure"],
+  ["preference", "standing-preference"],
+  ["procedure", "standing-procedure"],
+  ["knowledge", "standing-procedure"],
 ] as const)("legitimate %s/%s standing adoption needs no Decision", async (kind, useKind) => {
   const selected = row("legitimate-standing", { kind, useKind });
   const f = fixture([selected], { governing: "missing" });
@@ -124,15 +203,20 @@ test.each([
 });
 
 test("fully qualified claim-less actual Decision uses original fields and remains eligible", async () => {
-  const selected = row("genuine", { actual: { value: "original-value" } }), f = fixture([selected]);
+  const selected = row("genuine", { actual: { value: "original-value" } }),
+    f = fixture([selected]);
   expect(Object.hasOwn(selected.document, "claim")).toBe(false);
   const out = await withMemoryQuery(request(), f.owner, (r) => r);
   expect(out.governing).toHaveLength(1);
   expect(out.governing[0]!.document).toEqual(selected.actual!);
   expect(out.governing[0]!.source).toEqual(selected.source);
   expect(out.governing[0]!.governs).toBe(true);
-  expect(out.conflicts[0]).toMatchObject({ conflictingEvidence: false, governingConflict: false,
-    resolution: "resolved", selectedGoverningValue: "original-value" });
+  expect(out.conflicts[0]).toMatchObject({
+    conflictingEvidence: false,
+    governingConflict: false,
+    resolution: "resolved",
+    selectedGoverningValue: "original-value",
+  });
   expect(out.hits[0]!.currentInstructionEligible).toBe(true);
   expect(Object.hasOwn(out.hits[0]!.document, "claim")).toBe(false);
   expect(f.nativeState.governingCalls).toBe(1);
@@ -140,9 +224,12 @@ test("fully qualified claim-less actual Decision uses original fields and remain
 
 test("missing or false governing qualification never becomes actual Decision authority", async () => {
   for (const governing of ["missing", "false"] as const) {
-    const selected = row("unqualified", { actual: { value: "value" } }), f = fixture([selected], { governing });
+    const selected = row("unqualified", { actual: { value: "value" } }),
+      f = fixture([selected], { governing });
     if (governing === "missing") {
-      await expect(withMemoryQuery(request(), f.owner, (r) => r)).rejects.toThrow("ACTUAL_GOVERNING_DECISION_REQUIRED");
+      await expect(withMemoryQuery(request(), f.owner, (r) => r)).rejects.toThrow(
+        "ACTUAL_GOVERNING_DECISION_REQUIRED",
+      );
     } else {
       const out = await withMemoryQuery(request(), f.owner, (r) => r);
       expect(out.governing).toEqual([]);
@@ -168,38 +255,62 @@ test("required Decision and extra standing properties are also checked for untyp
 });
 
 test("two claim-less summaries report the same actual conflicts as direct governing documents", async () => {
-  const rows = [row("one", { actual: { value: "alpha" } }), row("two", { actual: { value: "beta" } })];
-  const adopted = fixture(rows), direct = fixture(rows, { representation: "direct" });
+  const rows = [
+    row("one", { actual: { value: "alpha" } }),
+    row("two", { actual: { value: "beta" } }),
+  ];
+  const adopted = fixture(rows),
+    direct = fixture(rows, { representation: "direct" });
   const out = await withMemoryQuery(request(), adopted.owner, (r) => r);
   const equivalent = await withMemoryQuery(request(), direct.owner, (r) => r);
   expect(rows.every((r) => !Object.hasOwn(r.document, "claim"))).toBe(true);
   expect(out.governing.map((g) => g.document)).toEqual(rows.map((r) => r.actual));
   expect(out.governing.map((g) => g.document)).toEqual(equivalent.governing.map((g) => g.document));
   expect(out.conflicts).toEqual(equivalent.conflicts);
-  expect(out.conflicts[0]).toMatchObject({ claimIdentity: { owner: ownerA, key: localKey },
-    conflictingEvidence: true, governingConflict: true, resolution: "conflict", selectedGoverningValue: null });
+  expect(out.conflicts[0]).toMatchObject({
+    claimIdentity: { owner: ownerA, key: localKey },
+    conflictingEvidence: true,
+    governingConflict: true,
+    resolution: "conflict",
+    selectedGoverningValue: null,
+  });
   expect(out.hits).toHaveLength(2);
-  expect(out.hits.every((h) => !h.currentInstructionEligible && !Object.hasOwn(h.document, "claim"))).toBe(true);
+  expect(
+    out.hits.every((h) => !h.currentInstructionEligible && !Object.hasOwn(h.document, "claim")),
+  ).toBe(true);
 });
 
 test("summary-versus-actual contradiction remains evidence while only the actual Decision governs", async () => {
-  const selected = row("mismatch", { summaryClaim: { key: localKey, value: "summary-value" }, actual: { value: "original-value" } });
-  const f = fixture([selected]), out = await withMemoryQuery(request(), f.owner, (r) => r);
-  expect(out.conflicts[0]).toMatchObject({ conflictingEvidence: true, governingConflict: false,
-    resolution: "resolved", selectedGoverningValue: "original-value" });
+  const selected = row("mismatch", {
+    summaryClaim: { key: localKey, value: "summary-value" },
+    actual: { value: "original-value" },
+  });
+  const f = fixture([selected]),
+    out = await withMemoryQuery(request(), f.owner, (r) => r);
+  expect(out.conflicts[0]).toMatchObject({
+    conflictingEvidence: true,
+    governingConflict: false,
+    resolution: "resolved",
+    selectedGoverningValue: "original-value",
+  });
   expect(out.hits[0]!.document.claim!.value).toBe("summary-value");
   expect(out.hits[0]!.currentInstructionEligible).toBe(false);
   expect(out.governing[0]!.document.claim.value).toBe("original-value");
 });
 
 test("historical-only disagreement remains evidence without a current governing conflict", async () => {
-  const rows = [row("current", { actual: { value: "alpha" } }),
-    row("historical", { actual: { value: "beta", overrides: { status: "superseded" } } })];
+  const rows = [
+    row("current", { actual: { value: "alpha" } }),
+    row("historical", { actual: { value: "beta", overrides: { status: "superseded" } } }),
+  ];
   const f = fixture(rows, { representation: "direct" });
   f.addresses[1]!.currentness = "historical";
   const out = await withMemoryQuery(request({ mode: "history" }), f.owner, (r) => r);
-  expect(out.conflicts[0]).toMatchObject({ conflictingEvidence: true, governingConflict: false,
-    selectedGoverningValue: "alpha" });
+  expect(out.conflicts[0]).toMatchObject({
+    conflictingEvidence: true,
+    governingConflict: false,
+    selectedGoverningValue: "alpha",
+  });
   expect(out.governing.map((g) => g.governs)).toEqual([true, false]);
   expect(out.governing[1]!.document.status).toBe("superseded");
   const current = await withMemoryQuery(request(), f.owner, (r) => r);
@@ -208,20 +319,35 @@ test("historical-only disagreement remains evidence without a current governing 
 });
 
 test("claim-less actual Decisions still preserve distinct owner scopes", async () => {
-  const rows = [row("scope-one", { actual: { value: "alpha" } }),
-    row("scope-two", { owner: ownerB, actual: { value: "beta" } })];
-  const f = fixture(rows), out = await withMemoryQuery(request(), f.owner, (r) => r);
+  const rows = [
+    row("scope-one", { actual: { value: "alpha" } }),
+    row("scope-two", { owner: ownerB, actual: { value: "beta" } }),
+  ];
+  const f = fixture(rows),
+    out = await withMemoryQuery(request(), f.owner, (r) => r);
   expect(out.conflicts).toHaveLength(2);
-  expect(out.conflicts.every((c) => !c.conflictingEvidence && !c.governingConflict && c.resolution === "resolved")).toBe(true);
+  expect(
+    out.conflicts.every(
+      (c) => !c.conflictingEvidence && !c.governingConflict && c.resolution === "resolved",
+    ),
+  ).toBe(true);
   expect(out.hits.every((h) => h.currentInstructionEligible)).toBe(true);
 });
 
 test("native callback aliases cannot change an already validated actual Decision", async () => {
-  const rows = [row("one", { actual: { value: "alpha" } }), row("two", { actual: { value: "alpha" } })];
+  const rows = [
+    row("one", { actual: { value: "alpha" } }),
+    row("two", { actual: { value: "alpha" } }),
+  ];
   const original = structuredClone(rows[0]!.actual!);
-  const f = fixture(rows, { beforeAdoption(index) {
-    if (index === 1) (rows[0]!.proposed as Extract<NativeMemoryUse, { kind: "governing-decision" }>).decision.owner = ownerB;
-  } });
+  const f = fixture(rows, {
+    beforeAdoption(index) {
+      if (index === 1)
+        (
+          rows[0]!.proposed as Extract<NativeMemoryUse, { kind: "governing-decision" }>
+        ).decision.owner = ownerB;
+    },
+  });
   const out = await withMemoryQuery(request(), f.owner, (r) => r);
   expect(out.governing[0]!.document).toEqual(original);
   expect(out.conflicts).toHaveLength(1);
@@ -232,6 +358,10 @@ test("native qualification cannot mutate the document whose exact source it qual
   const selected = row("mutation", { actual: { value: "alpha" } });
   const f = fixture([selected], { mutateGoverning: true });
   let consumed = false;
-  await expect(withMemoryQuery(request(), f.owner, () => { consumed = true; })).rejects.toThrow("GOVERNING_QUALIFICATION_MUTATED_DOCUMENT");
+  await expect(
+    withMemoryQuery(request(), f.owner, () => {
+      consumed = true;
+    }),
+  ).rejects.toThrow("GOVERNING_QUALIFICATION_MUTATED_DOCUMENT");
   expect(consumed).toBe(false);
 });

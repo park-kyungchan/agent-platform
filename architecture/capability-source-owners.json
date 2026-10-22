@@ -257,7 +257,7 @@
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/fixtures/native-reader.ts",
           "relativePath": "packages/work-continuity/src/memory/fixtures/native-reader.ts",
-          "sha256": "3eb19b59022c9c3e90f5216d49ec9694ab0c2a453b7051db760aa35c5139bd78"
+          "sha256": "aefa6af2e3da926b110367f49bee0aa70e2eb3df7056fff2674e5eed15cb29c7"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/fixtures/public-reader.ts",
@@ -287,7 +287,7 @@
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/query.ts",
           "relativePath": "packages/work-continuity/src/memory/query.ts",
-          "sha256": "5d613a96c1d224ccfcf0159d259366d2360a0077b145eb536bf93b0567af61d7"
+          "sha256": "d8576907f7c0728b538157a3da54abc03620c33e5b14928df5703aaaf1dd9c3b"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/ranking.ts",
