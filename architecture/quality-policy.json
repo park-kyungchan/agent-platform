@@ -41,14 +41,18 @@
       "path": "packages/native-codex-adapter",
       "name": "@palantirkc/native-codex-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
+      "allowedWorkspaceDependencies": [
+        "@palantirkc/work-continuity"
+      ]
     },
     {
       "capabilityId": "native-hermes-context",
       "path": "packages/native-hermes-adapter",
       "name": "@palantirkc/native-hermes-adapter",
       "layer": 2,
-      "allowedWorkspaceDependencies": ["@palantirkc/work-continuity"]
+      "allowedWorkspaceDependencies": [
+        "@palantirkc/work-continuity"
+      ]
     },
     {
       "capabilityId": "operational-context",
@@ -153,6 +157,12 @@
       "sha256": "c41e34c02a2ac6cad4e09afe474a88cc581cea75fb4d5d926f457d40515a3533",
       "capabilityId": "work-continuity",
       "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
+    },
+    {
+      "path": "packages/work-continuity/contracts/memory-v1.schema.json",
+      "sha256": "00b51da4a7b20abdf3ca73a927b79c53bf669b023fc9717c11d01cadef965281",
+      "capabilityId": "work-continuity",
+      "reason": "Canonical generated normative B2 Memory/query definition; native User Memory transactional custody and source/authority/permission boundaries retained. Source only, no native permission or adoption."
     }
   ],
   "stagedSources": [
