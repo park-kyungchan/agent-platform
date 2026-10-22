@@ -1,5 +1,6 @@
 import { test, expect } from "bun:test";
-import { writeFile, readFile } from "node:fs/promises";
+import { writeFile, readFile, mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import queries from "./fixtures/public/corpus.public.queries.json" with { type: "json" };
 import manifest from "./fixtures/public/corpus.public.json" with { type: "json" };
@@ -223,22 +224,19 @@ test("fixed independent public Korean corpus measures the declared equivalent le
     nativePermissionGranted: false,
     AcceptanceDecision: null,
     limitations: [
-      "Public fixed source corpus only; withheld split untouched, generalization unknown.",
+      "Public fixed source corpus only; independent validation is separate. No untouched blind-generalization claim from this report.",
       "Query-only index/view created; no persistent snippets/embedding cache exists. Prior native copies remain their actual owner's custody.",
       "Lexical optional-Work adapter comparison is algorithm-only, not historical native B2 adoption.",
     ],
   };
-  // Bounded source-data artifact for qualified format+check collection only. The
-  // native/Host reader never executes this file or replaces expected results.
+  // Observations are disposable execution evidence, outside canonical source inputs.
+  const outputRoot = await mkdtemp(join(tmpdir(), "memory-public-observation-"));
   await writeFile(
-    join(
-      root,
-      "packages/work-continuity/src/memory/fixtures/public.measurement." +
-        retrievalVersion +
-        ".json",
-    ),
+    join(outputRoot, "public.measurement." + retrievalVersion + ".json"),
     JSON.stringify(report, null, 2) + "\n",
   );
+  // The qualified runner retains this public synthetic report outside the source tree.
+  console.log(JSON.stringify({ schema: "local.s02-public-relevance-transport.v1", observation: report }));
   expect(queries.queries).toHaveLength(23);
   expect(forbidden).toBe(0);
   expect(exposureMismatches).toBe(0);
