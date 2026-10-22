@@ -1,3 +1,5 @@
+import { stageFrozenFixtureDependencies } from "./scenarios/dependencies";
+import { prepareProbeEnvironment } from "./probe-environment";
 import { expect, test } from "bun:test";
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -24,6 +26,7 @@ async function run(c: SemanticCase, root: string) {
     ],
     {
       cwd: "/tmp",
+      env: await prepareProbeEnvironment(),
       stdin: Buffer.from(JSON.stringify(semanticRequest(c))),
       timeoutMs: 120000,
       maxBytes: 128000,
@@ -63,16 +66,9 @@ async function disposable(use: (root: string) => Promise<void>) {
             .some((part) => ["node_modules", ".git", "tests", "fixtures"].includes(part)) &&
           !/\.(test|spec)\.ts$/.test(path),
       });
-    // Independent dependency bytes, including Ontology, so the existing generator can qualify
-    // within this temporary root. Workspace aliases resolve to the disposable public packages.
-    await cp(join(source, "node_modules"), join(root, "node_modules"), {
-      recursive: true,
-      dereference: true,
-      filter: (path) =>
-        !/node_modules\/@palantirkc\/(?:work-continuity|native-codex-adapter|native-hermes-adapter)(?:\/|$)/.test(
-          path,
-        ),
-    });
+    // Materialize every actual runtime dependency/peer from its immutable importer,
+    // preserving its bytes without relying on the source installation's nested aliases.
+    await stageFrozenFixtureDependencies(source, root);
     await mkdir(join(root, "node_modules/@palantirkc"), { recursive: true });
     for (const name of ["work-continuity", "native-codex-adapter", "native-hermes-adapter"])
       await symlink(join(root, "packages", name), join(root, "node_modules/@palantirkc", name));
@@ -87,11 +83,11 @@ async function mutate(root: string, path: string, before: string, after: string)
   if (text.split(before).length !== 2) throw Error("EXACT_REVIEWED_SOURCE_MUTATION_REQUIRED");
   await writeFile(file, text.replace(before, after));
 }
-async function positive(id: string) {
+async function positive(id: string, root = source) {
   const c = selected(id);
   await superviseSemanticCase(
     c,
-    () => run(c, source),
+    () => run(c, root),
     () => {},
   );
 }
@@ -124,6 +120,7 @@ test("PF01 real public governing/history/composition branches are externally com
   ] as const) {
     await positive(id);
     await disposable(async (root) => {
+      await positive(id, root);
       await mutate(root, "packages/work-continuity/src/memory/query.ts", before!, after!);
       await rejectedBehavior(id!, root);
     });
@@ -148,6 +145,7 @@ test("PF02 genuine fixed predecessor contracts reject real simultaneous canonica
   ] as const) {
     await positive(id!);
     await disposable(async (root) => {
+      await positive(id, root);
       await mutate(root, path!, before!, after!);
       const value = await rejectedBehavior(id!, root);
       const pair = id === "owner-fixed-context" ? value : value.publicExports[0];

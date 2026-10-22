@@ -1,3 +1,4 @@
+import { prepareProbeEnvironment } from "./probe-environment";
 import { expect, test } from "bun:test";
 import { join, resolve } from "node:path";
 import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
@@ -18,6 +19,7 @@ async function run(c: SemanticCase, root = source) {
     ],
     {
       cwd: "/tmp",
+      env: await prepareProbeEnvironment(),
       stdin: Buffer.from(JSON.stringify(semanticRequest(c))),
       timeoutMs: 120000,
       maxBytes: 128000,

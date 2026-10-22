@@ -3,7 +3,7 @@
   "claim": "bounded-p-semantic-v1",
   "fullS04Completion": false,
   "fullCanonicalAssertionCompletion": "unknown",
-  "readiness": "Revision5 source extensions PF01/PF02 and bounded PF03 payload correction are authored, not executed. All original155 cases and whole legacy workload remain required. Root must qualify exact composed production, fixed predecessor namespace metadata and all real negative source mutations. Full canonical internal completion remains unknown.",
+  "readiness": "Revision6 source-only fixture/caller repairs from actual650 public181 diagnostic (166 matches,15 mismatches), seven explicit missing coverage rows and real-negative dependency topology correction. Every181 case/expected/comparator and all prior rows retained. Root must execute the exact successor; native pin-count14 expectation has a separate static contract finding requiring independent disposition. SourceReady/formal/native false.",
   "caseCount": 181,
   "caseFamilies": {
     "effective-contract": [
@@ -31,7 +31,10 @@
       "run-allocation-reject-caller-id",
       "run-allocation-reject-started"
     ],
-    "effect-preservation": ["effect-inventory-positive", "effect-inventory-overlap"],
+    "effect-preservation": [
+      "effect-inventory-positive",
+      "effect-inventory-overlap"
+    ],
     "milestones": [
       "formal-completion-positive",
       "formal-completion-reject-unsynced",
@@ -86,8 +89,15 @@
       "evidence-changed-source-stale",
       "evidence-expired-stale"
     ],
-    "quality-evidence": ["quality-stop-authority-breach", "quality-stop-effects-breach"],
-    "source-path": ["relative-source-path", "parent-source-escape", "absolute-source-escape"],
+    "quality-evidence": [
+      "quality-stop-authority-breach",
+      "quality-stop-effects-breach"
+    ],
+    "source-path": [
+      "relative-source-path",
+      "parent-source-escape",
+      "absolute-source-escape"
+    ],
     "g01-source": [
       "scenario-git-source-positive",
       "scenario-git-source-hash",
@@ -130,8 +140,13 @@
       "scenario-owner-first-memory",
       "scenario-owner-first-work-method"
     ],
-    "g02-exports": ["scenario-owner-public-exports"],
-    "g02-native-source": ["scenario-owner-native-positive", "scenario-owner-native-after-drift"],
+    "g02-exports": [
+      "scenario-owner-public-exports"
+    ],
+    "g02-native-source": [
+      "scenario-owner-native-positive",
+      "scenario-owner-native-after-drift"
+    ],
     "g02-hermes": [
       "scenario-owner-hermes-positive",
       "scenario-owner-hermes-first-import",
@@ -204,7 +219,10 @@
       "scenario-operational-context-positive",
       "scenario-operational-context-forbidden-effect"
     ],
-    "g04-wiki": ["scenario-operational-wiki-positive", "scenario-operational-wiki-forged-quote"],
+    "g04-wiki": [
+      "scenario-operational-wiki-positive",
+      "scenario-operational-wiki-forged-quote"
+    ],
     "g04-inception": [
       "scenario-operational-inception-positive",
       "scenario-operational-inception-effect-negative",
@@ -239,7 +257,10 @@
       "scenario-memory-history-current",
       "scenario-memory-history-denied"
     ],
-    "pf01-memory-breadth": ["scenario-memory-breadth-unscoped", "scenario-memory-breadth-work"],
+    "pf01-memory-breadth": [
+      "scenario-memory-breadth-unscoped",
+      "scenario-memory-breadth-work"
+    ],
     "pf01-memory-transport": [
       "scenario-memory-transport-full",
       "scenario-memory-transport-compact",
@@ -250,7 +271,10 @@
       "scenario-memory-transport-missing-pin",
       "scenario-memory-transport-currentness"
     ],
-    "pf02-fixed-exports": ["scenario-owner-fixed-context", "scenario-owner-fixed-hermes"]
+    "pf02-fixed-exports": [
+      "scenario-owner-fixed-context",
+      "scenario-owner-fixed-hermes"
+    ]
   },
   "interfaceSources": [
     {
@@ -3235,6 +3259,114 @@
       "path": "ci/quality/trusted/token-policy.test.ts",
       "semanticCases": [],
       "limitation": "Pure P token payload request/response fixture, no candidate or live App token. Actual native qualification remains Root-owned."
+    },
+    {
+      "path": "packages/work-continuity/src/coordination/source-adapters.test.ts",
+      "semanticCases": [
+        "scenario-owner-native-positive",
+        "scenario-owner-native-after-drift",
+        "scenario-owner-hermes-first-import",
+        "scenario-owner-fixed-context",
+        "scenario-owner-fixed-hermes"
+      ],
+      "limitation": "Native adapter API preservation, first import/source drift and exact facade denominator are externally checked through the actual historical owner guard/generator. These are related invariants; the new source/v1 withCodexSource/withHermesSource pairing itself is not directly called by this fixed181 catalogue. The complete retained P/candidate union still includes this test, and its shared-process internal assertions remain unauthenticated.",
+      "sourceHead": "650ab6e2f285130c71b064422ed75feecb424d0b",
+      "sha256": "95a2e1778959b70e0e3373c7df63bc79fe29bd3a22767a919aedc660d5436357",
+      "mappingClass": "explicit-related-invariants-only"
+    },
+    {
+      "path": "packages/work-continuity/src/coordination/source-closure.test.ts",
+      "semanticCases": [
+        "scenario-git-source-hash",
+        "scenario-git-source-missing",
+        "scenario-owner-dependency-drift",
+        "scenario-owner-after-read-drift"
+      ],
+      "limitation": "Exact original byte/hash/missing closure and owner post-read/dependency drift have real external comparisons. No direct external predicate in fixed181 authenticates every new source/v1 content/installed inventory, omitted-file or dependency projection branch. The complete retained P/candidate union still includes this test, and its shared-process internal assertions remain unauthenticated.",
+      "sourceHead": "650ab6e2f285130c71b064422ed75feecb424d0b",
+      "sha256": "f58ff8b5cd0abd6b4e6001519607227a5d26328bbcde1348da2b4e59d4f15d53",
+      "mappingClass": "explicit-related-invariants-only"
+    },
+    {
+      "path": "packages/work-continuity/src/coordination/source-history.test.ts",
+      "semanticCases": [
+        "scenario-git-source-currentness",
+        "scenario-git-legacy-migration",
+        "scenario-git-legacy-migration-conflict",
+        "scenario-owner-first-git"
+      ],
+      "limitation": "Actual immutable old/new Git observations, original legacy migration/idempotency/conflict and prior-import refusal are related external invariants. New source/v1 explicit history-only location and proposed source successor/adoption transitions retain their own full tests; their internal completion remains unknown. The complete retained P/candidate union still includes this test, and its shared-process internal assertions remain unauthenticated.",
+      "sourceHead": "650ab6e2f285130c71b064422ed75feecb424d0b",
+      "sha256": "f1d04fdb52c3dfd35d7995ec1c1a7f2697db125489d1df0a7057e3597961cefe",
+      "mappingClass": "explicit-related-invariants-only"
+    },
+    {
+      "path": "packages/work-continuity/src/coordination/source-output.test.ts",
+      "semanticCases": [
+        "scenario-handoff-source-symlink",
+        "scenario-handoff-partial-publication",
+        "scenario-handoff-stale-writer"
+      ],
+      "limitation": "Physical symlink refusal, partial-publication uncertainty and writer CAS are related actual filesystem outcomes. Fixed181 does not directly call compileSourceBootstrap, output-parent replacement, no-clobber directory custody or every bootstrap publication race. The complete retained P/candidate union still includes this test, and its shared-process internal assertions remain unauthenticated.",
+      "sourceHead": "650ab6e2f285130c71b064422ed75feecb424d0b",
+      "sha256": "a5698c128af3b2ac32af85f6e569e8c16324559f8be89fc4ff4d6b93bb792134",
+      "mappingClass": "explicit-related-invariants-only"
+    },
+    {
+      "path": "packages/work-continuity/src/coordination/source-tooling.test.ts",
+      "semanticCases": [
+        "scenario-owner-tool-drift",
+        "scenario-owner-dependency-drift",
+        "scenario-owner-native-after-drift"
+      ],
+      "limitation": "Actual tool/dependency/source closure drift comparisons retain the same fail-closed invariant. They do not directly certify the new source/v1 compiler/build dependency or generated bootstrap tool closure; exact retained source-tooling workload and independent Root qualification remain necessary. The complete retained P/candidate union still includes this test, and its shared-process internal assertions remain unauthenticated.",
+      "sourceHead": "650ab6e2f285130c71b064422ed75feecb424d0b",
+      "sha256": "32c957daed6f6157b24e18b9c5bd605b321b7a998e9bc9030c34b3928bc6f1e7",
+      "mappingClass": "explicit-related-invariants-only"
+    },
+    {
+      "path": "packages/work-continuity/src/coordination/source.test.ts",
+      "semanticCases": [
+        "scenario-git-source-positive",
+        "scenario-git-source-hash",
+        "scenario-git-source-foreign",
+        "scenario-projection-native-positive",
+        "scenario-projection-foreign-root"
+      ],
+      "limitation": "Actual public source original/hash/foreign scope and pure source-provider projection agreement/refusal are externally compared. New source/v1 content/location/registration normalization, current owner reader and source distribution APIs are not directly covered by these related cases. The complete retained P/candidate union still includes this test, and its shared-process internal assertions remain unauthenticated.",
+      "sourceHead": "650ab6e2f285130c71b064422ed75feecb424d0b",
+      "sha256": "f1fa5ecd1c4f80100b18cf353b36def5536452bb38d8d6bce237285ef9ed876e",
+      "mappingClass": "explicit-related-invariants-only"
+    },
+    {
+      "path": "packages/work-continuity/src/memory/native-use.test.ts",
+      "semanticCases": [
+        "scenario-memory-authority-standing",
+        "scenario-memory-authority-inference",
+        "scenario-memory-authority-no-adoption",
+        "scenario-memory-authority-governing",
+        "scenario-memory-authority-governing-false",
+        "scenario-memory-authority-governing-absent",
+        "scenario-memory-authority-decision",
+        "scenario-memory-authority-decision-false",
+        "scenario-memory-conflict-standing",
+        "scenario-memory-conflict-owner-isolation",
+        "scenario-memory-history-denied",
+        "scenario-memory-transport-currentness"
+      ],
+      "limitation": "Direct public Memory/v1 native callback families check acquired originals, actual governing versus standing/inference, absent/false qualification, same-owner conflict/isolation, present denial and lease drift with external fixed predicates. This association is not proof that every internal native-use assertion completed; no live native authority or caller adoption is established. The complete retained P/candidate union still includes this test, and its shared-process internal assertions remain unauthenticated.",
+      "sourceHead": "650ab6e2f285130c71b064422ed75feecb424d0b",
+      "sha256": "4900c87da7b222ca4117ad20795d4b3d6b9bbad608bc319e80b7ebc969405de1",
+      "mappingClass": "direct-public-Memory-family"
+    },
+    {
+      "path": "ci/quality/trusted/release.test.ts",
+      "semanticCases": [
+        "scenario-owner-fixed-context",
+        "scenario-git-source-hash",
+        "scenario-owner-dependency-drift"
+      ],
+      "limitation": "This P-owned bootstrap test directly invokes readPolicyMinimum and buildPolicy against the full exact current committed source, then removes exactly one newly admitted coverage row in a clean private clone while retaining all tests/source selection. Both guards must refuse. The associated external cases are related source/denominator invariants only; this metadata test grants no native permission or authenticated completion of internal legacy assertions."
     }
   ],
   "canonicalWorkload": [
@@ -3287,7 +3419,10 @@
         "sourceCheck QA creation and frozen install",
         "prepare network manifest-only closure"
       ],
-      "files": ["ci/source-check.ts", "ci/quality/trusted/driver.ts"],
+      "files": [
+        "ci/source-check.ts",
+        "ci/quality/trusted/driver.ts"
+      ],
       "nextPatch": "Root first reconciles original failed occurrence exact missing nested QA lock inputs/cache entries; no blind retry. Extract an exact data-only nested-QA manifest/lock recipe from canonical source-check as a pinned Root-owned proposal, then prefetch that exact closure in the existing credential-free preparation worker with ignore-scripts and no candidate source/config. Keep network-none QA and real audit. This is provisioning evidence, never a source assertion verdict.",
       "cases": [
         "current failed cache miss remains failed/no source verdict",
@@ -3375,7 +3510,10 @@
         "readNativeAdapterSourceClosure",
         "observeHermesContextProvider"
       ],
-      "files": ["ci/source-check.ts", "ci/source-projection.ts"],
+      "files": [
+        "ci/source-check.ts",
+        "ci/source-projection.ts"
+      ],
       "nextPatch": "Add a fixed owner-source fixture scenario adapter to existing probe worker with the exact canonical owner-fixture and P-generated disposable registration graph. Return source bytes/observed error per named call, not P assertion verdicts. Host compares v1-v6 pin sets, drift-before/after and fresh-process first-import refusals. Keep original first-import guards and caches.",
       "cases": [
         "v1-v6 context registrations",
@@ -3476,7 +3614,10 @@
         "sourceCheck QA creation and frozen install",
         "prepare network manifest-only closure"
       ],
-      "files": ["ci/source-check.ts", "ci/quality/trusted/driver.ts"],
+      "files": [
+        "ci/source-check.ts",
+        "ci/quality/trusted/driver.ts"
+      ],
       "nextPatch": "Root first reconciles original failed occurrence exact missing nested QA lock inputs/cache entries; no blind retry. Extract an exact data-only nested-QA manifest/lock recipe from canonical source-check as a pinned Root-owned proposal, then prefetch that exact closure in the existing credential-free preparation worker with ignore-scripts and no candidate source/config. Keep network-none QA and real audit. This is provisioning evidence, never a source assertion verdict.",
       "cases": [
         "current failed cache miss remains failed/no source verdict",
@@ -3743,7 +3884,10 @@
       "scenario-operational-context-positive",
       "scenario-operational-context-forbidden-effect"
     ],
-    "g04-wiki": ["scenario-operational-wiki-positive", "scenario-operational-wiki-forged-quote"],
+    "g04-wiki": [
+      "scenario-operational-wiki-positive",
+      "scenario-operational-wiki-forged-quote"
+    ],
     "g04-inception": [
       "scenario-operational-inception-positive",
       "scenario-operational-inception-effect-negative",
@@ -3786,7 +3930,10 @@
         "scenario-memory-history-current",
         "scenario-memory-history-denied"
       ],
-      "pf01-memory-breadth": ["scenario-memory-breadth-unscoped", "scenario-memory-breadth-work"],
+      "pf01-memory-breadth": [
+        "scenario-memory-breadth-unscoped",
+        "scenario-memory-breadth-work"
+      ],
       "pf01-memory-transport": [
         "scenario-memory-transport-full",
         "scenario-memory-transport-compact",
@@ -3797,7 +3944,10 @@
         "scenario-memory-transport-missing-pin",
         "scenario-memory-transport-currentness"
       ],
-      "pf02-fixed-exports": ["scenario-owner-fixed-context", "scenario-owner-fixed-hermes"]
+      "pf02-fixed-exports": [
+        "scenario-owner-fixed-context",
+        "scenario-owner-fixed-hermes"
+      ]
     },
     "authority": "None. The native callbacks are honest fictional lease/permit/original IO, not source-granted permission or actual native activation.",
     "coverageMeaning": "Required external finite semantic comparisons only. Legacy row associations preserve caller mapping, not authentication of every internal test. No private S02 data, score or oracle is used.",
@@ -3899,5 +4049,38 @@
     },
     "actualExecution": "unknown; source-only author did not execute any candidate/test/formatter/build",
     "rootMetadataRequest": "execution/S04-sublead/correction-v4/root-metadata-request.json"
+  },
+  "revision6Correction": {
+    "baseHead": "650ab6e2f285130c71b064422ed75feecb424d0b",
+    "baseTree": "576304901cd490573e181c08c05da0e3b63bd031",
+    "preservedCaseDefinitions": 181,
+    "preservedCoverageRows": 85,
+    "addedCoverageRows": [
+      "packages/work-continuity/src/coordination/source-adapters.test.ts",
+      "packages/work-continuity/src/coordination/source-closure.test.ts",
+      "packages/work-continuity/src/coordination/source-history.test.ts",
+      "packages/work-continuity/src/coordination/source-output.test.ts",
+      "packages/work-continuity/src/coordination/source-tooling.test.ts",
+      "packages/work-continuity/src/coordination/source.test.ts",
+      "packages/work-continuity/src/memory/native-use.test.ts"
+    ],
+    "sourceFixtureFixes": [
+      "Legacy migration submits the actual canonical projection aliases; original Git bytes and immutable migration assertions unchanged.",
+      "Native source owner gets its own actual offline local-only lock and physical frozen runtime dependency graph, never a copied unrelated lock.",
+      "Git Recall has a real same-Work completed/verified source-only receipt dependency and independent Verification original, retaining distinct generation/head/hash negative inputs.",
+      "Pure projection validation uses exact admitted canonical declarations as data before mutating only the foreign provider root; no canonical path is dereferenced.",
+      "P behavior children explicitly receive private /job HOME/cache locations; the generator/tree/first-import/provenance guards are unchanged.",
+      "Disposable mutation sources receive all actual importer-resolved immutable runtime dependency bytes, including dependencies/peers, with exact source/copy hash joins and explicit conflict limits."
+    ],
+    "predecessorApiQualification": {
+      "path": "execution/S04-sublead/correction-v4/predecessor-namespace.root-receipt.json",
+      "sha256": "475439627de7565cee81dab800d9917f29a157a820e886c8711882094163bd52",
+      "fixedApiSha256": "3e3cbb5965a5dc260e0b760e50cd572ccb3e120c4be3203ee549f89e2cc9fde3",
+      "result": "Root-observed exact4cd context19+Hermes37 canonical/facade match; no native authority or current650 fixture qualification inferred."
+    },
+    "sourceReady": false,
+    "actualSuccessorExecution": "not performed by author",
+    "nativeEffects": false,
+    "actualPolicyBootstrap": "Prepared release.test.ts exercises actual current P minimum/buildPolicy positive and exact missing-row negative, with complete unchanged source/test selection in a private clone. Unexecuted by source author."
   }
 }

@@ -1,4 +1,7 @@
-import { cp, mkdir, readFile, writeFile, symlink, readdir, rm } from "node:fs/promises";
+import { stageFrozenFixtureDependencies } from "./dependencies";
+import { prepareProbeEnvironment } from "../probe-environment";
+import { fixedProcess } from "../process";
+import { cp, mkdir, readFile, writeFile, symlink, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { contextProjectionPaths } from "../../../source-projection";
 import { scratch, hash, write, capture } from "./support";
@@ -16,7 +19,7 @@ const nativePaths = [
     (n) => `packages/native-codex-adapter/src/native/${n}.ts`,
   ),
 ];
-export async function ownerFixture(source: string, root: string) {
+export async function ownerFixture(source: string, root: string, nativeLock = false) {
   const common = join(root, "projects/agent-platform"),
     owner = join(root, "projects/codex-harness-engineering");
   await mkdir(common, { recursive: true });
@@ -36,31 +39,16 @@ export async function ownerFixture(source: string, root: string) {
         !p.split("/").some((x) => ["node_modules", ".git", "tests", "fixtures"].includes(x)) &&
         !/\.(test|spec)\.ts$/.test(p),
     });
-  // Fictional aliases only; no installation/network/configuration of an actual native owner.
-  await mkdir(join(common, "node_modules"), { recursive: true });
-  for (const entry of await readdir(join(source, "node_modules"), { withFileTypes: true })) {
-    if (entry.name === "@palantirkc") continue;
-    await symlink(
-      join(source, "node_modules", entry.name),
-      join(common, "node_modules", entry.name),
-    );
-  }
-  await mkdir(join(common, "node_modules/@palantirkc"), { recursive: true });
+  // Private physical runtime closure: no external dependency alias or package manager fallback.
+  const dependencies = await stageFrozenFixtureDependencies(source, common);
   for (const name of ["work-continuity", "native-codex-adapter", "native-hermes-adapter"])
     await symlink(join(common, "packages", name), join(common, "node_modules/@palantirkc", name));
-  await symlink(
-    join(source, "node_modules/@palantirkc/ontology"),
-    join(common, "node_modules/@palantirkc/ontology"),
-  );
   // P selects the admitted owner guard bytes; H/M supplies only the observed common source.
   await cp(
     join(resolve(import.meta.dir, "../../../.."), "owner-fixture/codex-harness-engineering/src"),
     join(owner, "src"),
     { recursive: true },
   );
-  await mkdir(join(owner, "node_modules/@palantirkc"), { recursive: true });
-  for (const name of ["work-continuity", "native-codex-adapter"])
-    await symlink(join(common, "packages", name), join(owner, "node_modules/@palantirkc", name));
   const project = JSON.parse(await readFile(join(common, "project.json"), "utf8"));
   project.payload.details.sourceOwnerRoot = common;
   await write(common, "project.json", JSON.stringify(project) + "\n");
@@ -71,12 +59,27 @@ export async function ownerFixture(source: string, root: string) {
       name: "fictional-owner",
       private: true,
       type: "module",
+      overrides: Object.fromEntries(dependencies.packages.map(({ name }) => [
+        name, "file:../agent-platform/node_modules/" + name,
+      ])),
       dependencies: {
         "@palantirkc/work-continuity": "file:../agent-platform/packages/work-continuity",
         "@palantirkc/native-codex-adapter": "file:../agent-platform/packages/native-codex-adapter",
       },
     }) + "\n",
   );
+  if (nativeLock) {
+    // Real lock for this exact fictional package/local dependency graph, never a copied foreign lock.
+    const generated = await fixedProcess([
+      process.execPath, "--no-env-file", "--no-install", "install", "--offline",
+      "--ignore-scripts", "--lockfile-only",
+    ], { cwd: owner, env: await prepareProbeEnvironment(), timeoutMs: 120000, maxBytes: 128000 });
+    if (generated.code !== 0 || generated.timedOut) throw Error("FICTIONAL_OWNER_FROZEN_LOCAL_LOCK_REQUIRED");
+    await readFile(join(owner, "bun.lock"));
+  }
+  await mkdir(join(owner, "node_modules/@palantirkc"), { recursive: true });
+  for (const name of ["work-continuity", "native-codex-adapter"])
+    await symlink(join(common, "packages", name), join(owner, "node_modules/@palantirkc", name));
   const policy = JSON.parse(
     await readFile(join(source, "architecture/runtime-filesystem-contract.json"), "utf8"),
   );
@@ -218,7 +221,7 @@ export async function ownerScenario(source: string, id: string): Promise<unknown
     }
   }
   return scratch("owner", async (root) => {
-    const f = await ownerFixture(source, root);
+    const f = await ownerFixture(source, root, ["owner-native-positive", "owner-native-after-drift"].includes(id));
     const guard = (await import(join(f.owner, "src/native/context-provider.ts"))) as {
       readRegisteredContextProvider: (
         root: string,

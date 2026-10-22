@@ -1,3 +1,4 @@
+import { prepareProbeEnvironment } from "./probe-environment";
 import { expect, test } from "bun:test";
 import { resolve, join } from "node:path";
 import { scenarioModule } from "./scenario-adapters";
@@ -26,6 +27,7 @@ async function execute(c: SemanticCase, path = join(root, c.module)) {
     ],
     {
       cwd: "/tmp",
+      env: await prepareProbeEnvironment(),
       stdin: Buffer.from(JSON.stringify(semanticRequest(c))),
       timeoutMs: c.module === scenarioModule ? 120000 : 15000,
       maxBytes: 128000,

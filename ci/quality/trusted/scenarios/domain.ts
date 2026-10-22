@@ -142,16 +142,25 @@ export async function domainScenario(source: string, id: string): Promise<unknow
       const policy = JSON.parse(
         await readFile(join(source, "architecture/runtime-filesystem-contract.json"), "utf8"),
       );
-      policy.sourceProviderProjections = f.registration.sourceProjections;
+      // The pure validator requires admitted canonical addresses, not relocated physical roots.
+      // These declarations are data only; no path below is opened or activated.
+      const projection = policy.sourceProviderProjections[0];
+      const context = { ...f.registration,
+        consumerRoot: projection.canonicalConsumerRoot,
+        providerRoot: projection.canonicalProviderRoot,
+        sourceProjections: policy.sourceProviderProjections,
+      };
       const native = JSON.parse(
         await readFile(join(f.owner, "architecture/native-codex-provider.json"), "utf8"),
       );
+      Object.assign(native, { consumerRoot: projection.canonicalConsumerRoot,
+        providerRoot: projection.canonicalProviderRoot, sourceProjections: policy.sourceProviderProjections });
       if (id === "projection-foreign-root") native.providerRoot = join(root, "foreign");
       else if (id !== "projection-native-positive")
         throw Error("TRUSTED_CI_UNKNOWN_PROJECTION_SCENARIO");
       return {
         observed: await capture(() =>
-          api.assertSourceProjectionAgreement(policy, f.registration, native),
+          api.assertSourceProjectionAgreement(policy, context, native),
         ),
         contextAuthority: f.registration.authority,
         nativePermission: native.nativePermissionGranted,

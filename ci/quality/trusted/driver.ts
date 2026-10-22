@@ -1,3 +1,4 @@
+import { prepareProbeEnvironment } from "./probe-environment";
 import { loadBehaviorModule } from "./scenario-adapters";
 import { callBehavior } from "./semantic";
 import { cp, mkdir, readFile, writeFile, readdir, lstat } from "node:fs/promises";
@@ -111,6 +112,7 @@ async function main(): Promise<void> {
     return;
   }
   if (id === "probe") {
+    Object.assign(process.env, await prepareProbeEnvironment());
     const probe = await input();
     insist(
       typeof probe.module === "string" && typeof probe.exportName === "string",

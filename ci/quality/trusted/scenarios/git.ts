@@ -312,7 +312,7 @@ export async function gitScenario(source: string, id: string): Promise<unknown> 
           snapshot: { repositoryId: "fixture", projectId: "p", workId: "w", commit: initial },
           expectedInventoryDigest: projection.inventoryDigest,
           bootstrapRequests: [],
-          aliases: [],
+          aliases: structuredClone(projection.aliases),
         };
         const owner = {
           async withCurrentMigrationAuthority<T>(
