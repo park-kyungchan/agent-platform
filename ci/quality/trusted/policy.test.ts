@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { fixture } from "./fixtures/execution-report";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import {
+  baseImage,
   command,
   qualifyTrustedExecution,
   sha256,
@@ -10,7 +13,9 @@ import {
 } from "./policy";
 import { readReportArchive } from "./artifact";
 import { verifyRun, verifyPolicyRef, type ProviderReader } from "./provider";
-import { validateWorkerInspect, type WorkerSpec } from "./worker";
+import { WorkerController, validateWorkerInspect, type WorkerSpec } from "./worker";
+import { type ProcessResult, outputMetadata } from "./process";
+import { driverFailureLimit, encodeDriverFailure, parseDriverFailure } from "./driver-failure";
 
 const h = (s: string) => s.repeat(64),
   oid = (s: string) => s.repeat(40);
@@ -443,4 +448,238 @@ test("live main/head/prospective merge drift invalidates the exact native target
   head = e.target.authored.commit;
   merge = oid("9");
   await expect(verifyCurrentTarget(reader, e.target)).rejects.toThrow("HEAD_BASE_OR_MERGE_DRIFT");
+});
+
+// Exercise the real build state machine with inert Docker/journal boundaries only.
+class RegistrationWorker extends WorkerController {
+  calls: { args: string[]; maxBytes: number }[] = [];
+  records: Record<string, unknown>[] = [];
+  order: string[] = [];
+  registration: ProcessResult | Error = {
+    code: 0,
+    timedOut: false,
+    stdout: Buffer.from("registered\n"),
+    stderr: Buffer.alloc(0),
+  };
+  inspectCode = 0;
+  baseMetadata = { Os: "linux", Architecture: "amd64", RepoDigests: [baseImage] };
+  builtMetadata = { Id: "sha256:" + h("f"), Os: "linux", Architecture: "amd64" };
+  override async record(value: unknown): Promise<void> {
+    const row = value as Record<string, unknown>;
+    this.records.push(row);
+    this.order.push(String(row.phase));
+  }
+  override async docker(args: string[], maxBytes = 4_000_000): Promise<ProcessResult> {
+    this.calls.push({ args, maxBytes });
+    this.order.push("docker:" + args[0]);
+    if (args[0] === "pull") {
+      if (this.registration instanceof Error) throw this.registration;
+      return this.registration;
+    }
+    if (args[0] === "build")
+      return {
+        code: 0,
+        timedOut: false,
+        stdout: Buffer.from(this.builtMetadata.Id + "\n"),
+        stderr: Buffer.alloc(0),
+      };
+    if (args[0] === "image" && args[1] === "inspect")
+      return {
+        code: this.inspectCode,
+        timedOut: false,
+        stdout: Buffer.from(
+          JSON.stringify([args[2] === baseImage ? this.baseMetadata : this.builtMetadata]),
+        ),
+        stderr: Buffer.alloc(0),
+      };
+    throw Error("Unexpected fixture Docker request");
+  }
+}
+async function registrationWorker(): Promise<RegistrationWorker> {
+  const { p } = fixture(),
+    root = resolve(import.meta.dir, "../../..");
+  p.workerRecipeSha256 = sha256(await readFile(root + "/ci/quality/trusted/worker.Dockerfile"));
+  return new RegistrationWorker(p, root, "unused-inert-fixture-journal");
+}
+
+test("exact official base registration settles before build or Engine inspection", async () => {
+  const w = await registrationWorker();
+  expect(await w.build()).toBe(w.builtMetadata.Id);
+  expect(w.calls.map(({ args }) => args[0])).toEqual(["pull", "build", "image", "image"]);
+  expect(w.calls[0]).toEqual({
+    args: ["pull", "--platform=linux/amd64", baseImage],
+    maxBytes: 128000,
+  });
+  expect(w.order.slice(0, 5)).toEqual([
+    "base-registration-intent",
+    "docker:pull",
+    "base-registration-result",
+    "image-build-intent",
+    "docker:build",
+  ]);
+  expect(w.calls[2]!.args).toEqual(["image", "inspect", baseImage]);
+  expect(w.records[1]!.transport).toEqual(outputMetadata(w.registration as ProcessResult));
+  expect(w.records[1]!.retryAllowed).toBe(false);
+});
+
+test("failed, timed-out or unknown base registration journals once and never builds or retries", async () => {
+  for (const outcome of [
+    {
+      code: 17,
+      timedOut: false,
+      stdout: Buffer.alloc(0),
+      stderr: Buffer.from("fixture-private-output"),
+    },
+    { code: 0, timedOut: true, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) },
+    new Error("fixture-private-transport-error"),
+  ]) {
+    const w = await registrationWorker();
+    w.registration = outcome;
+    await expect(w.build()).rejects.toThrow(
+      outcome instanceof Error ? outcome.message : "BASE_REGISTRATION_UNKNOWN_RECONCILE_REQUIRED",
+    );
+    expect(w.calls).toHaveLength(1);
+    expect(w.order).toEqual([
+      "base-registration-intent",
+      "docker:pull",
+      "base-registration-result",
+    ]);
+    expect(w.records[1]!.retryAllowed).toBe(false);
+    expect(JSON.stringify(w.records)).not.toContain("fixture-private");
+    if (outcome instanceof Error) {
+      expect(w.records[1]!.transport).toBeNull();
+      expect(w.records[1]!.errorSha256).toBe(sha256(outcome.message));
+    } else expect(w.records[1]!.transport).toEqual(outputMetadata(outcome));
+  }
+});
+
+test("registration does not replace official base metadata or swallow inspect failure", async () => {
+  for (const invalid of ["inspect", "digest", "os", "arch"] as const) {
+    const w = await registrationWorker();
+    if (invalid === "inspect") w.inspectCode = 1;
+    if (invalid === "digest") w.baseMetadata.RepoDigests = ["node@sha256:" + h("a")];
+    if (invalid === "os") w.baseMetadata.Os = "other";
+    if (invalid === "arch") w.builtMetadata.Architecture = "arm64";
+    await expect(w.build()).rejects.toThrow(
+      invalid === "inspect"
+        ? "IMAGE_METADATA_REQUIRED"
+        : "ACTUAL_OFFICIAL_BASE_AND_LOCAL_IMAGE_REQUIRED",
+    );
+    expect(w.calls.filter(({ args }) => args[0] === "pull")).toHaveLength(1);
+    expect(w.records.some((row) => row.phase === "image-observed")).toBe(false);
+  }
+});
+
+test("driver failure preserves finite OS/guard/phase data without raw failure contents", () => {
+  const error = Object.assign(new TypeError("fixture-private-path-and-content"), {
+    code: "EACCES",
+    errno: -13,
+  });
+  let reads = 0;
+  Object.defineProperty(error, "stack", {
+    get: () => {
+      reads++;
+      return "fixture-private-stack";
+    },
+  });
+  Object.defineProperty(error, "path", {
+    get: () => {
+      reads++;
+      return "fixture-private-path";
+    },
+  });
+  const encoded = encodeDriverFailure(error, "prepare", "copy-git");
+  expect(Buffer.byteLength(encoded)).toBeLessThanOrEqual(driverFailureLimit);
+  expect(encoded).not.toContain("fixture-private");
+  expect(reads).toBe(0);
+  const parsed = parseDriverFailure(Buffer.from(encoded), "prepare", [
+    "/usr/local/bin/bun",
+    "--no-env-file",
+    "--no-install",
+    "/policy/ci/quality/trusted/driver.ts",
+    "prepare",
+  ]);
+  expect(parsed).toEqual({
+    schema: "agent-platform.trusted-driver-failure.v1",
+    driver: "prepare",
+    phase: "copy-git",
+    code: "TRUSTED_CI_DRIVER_FAILED",
+    errorType: "TypeError",
+    osCode: "EACCES",
+    errno: -13,
+  });
+  expect(
+    JSON.parse(
+      encodeDriverFailure(
+        new Error("TRUSTED_CI_FROZEN_INSTALL_FAILED"),
+        "prepare",
+        "frozen-install",
+      ),
+    ).code,
+  ).toBe("TRUSTED_CI_FROZEN_INSTALL_FAILED");
+  expect(
+    JSON.parse(
+      encodeDriverFailure(new Error("TRUSTED_CI_NOT_DECLARED"), "prepare", "frozen-install"),
+    ).code,
+  ).toBe("TRUSTED_CI_DRIVER_FAILED");
+  const large = encodeDriverFailure(
+    new Error("fixture-private".repeat(10000)),
+    "prepare",
+    "copy-git",
+  );
+  expect(Buffer.byteLength(large)).toBeLessThanOrEqual(driverFailureLimit);
+  expect(large).not.toContain("fixture-private");
+  const accessorError = {};
+  for (const field of ["message", "code", "errno"])
+    Object.defineProperty(accessorError, field, {
+      get: () => {
+        reads++;
+        return "fixture-private-getter";
+      },
+    });
+  expect(encodeDriverFailure(accessorError, "prepare", "copy-git")).not.toContain(
+    "fixture-private",
+  );
+  expect(reads).toBe(0);
+});
+
+test("driver diagnostic parser rejects mixed, truncated, forged and wrong-boundary data", () => {
+  const argv = [
+    "/usr/local/bin/bun",
+    "--no-env-file",
+    "--no-install",
+    "/policy/ci/quality/trusted/driver.ts",
+    "prepare",
+  ];
+  const encoded = encodeDriverFailure(
+    new Error("TRUSTED_CI_FROZEN_INSTALL_FAILED"),
+    "prepare",
+    "frozen-install",
+  );
+  const valid = JSON.parse(encoded) as Record<string, unknown>;
+  for (const value of [
+    { ...valid, schema: "other" },
+    { ...valid, phase: "audit" },
+    { ...valid, driver: "audit" },
+    { ...valid, code: "TRUSTED_CI_NOT_DECLARED" },
+    { ...valid, osCode: "fixture-private-os-data" },
+    { ...valid, errno: 4096 },
+    { ...valid, errorType: "fixture-private-type" },
+    { ...valid, success: true },
+  ])
+    expect(
+      parseDriverFailure(Buffer.from(JSON.stringify(value) + "\n"), "prepare", argv),
+    ).toBeNull();
+  for (const bytes of [
+    Buffer.from("unrelated-stderr\n" + encoded),
+    Buffer.from(encoded + encoded),
+    Buffer.from(encoded.slice(0, -3)),
+    Buffer.from(" ".repeat(driverFailureLimit + 1)),
+    Buffer.from(encoded.replace('{"schema":', '{"schema":"duplicate","schema":')),
+    Buffer.concat([Buffer.from(encoded), Buffer.from([255])]),
+    Buffer.concat([Buffer.from([239, 187, 191]), Buffer.from(encoded)]),
+  ])
+    expect(parseDriverFailure(bytes, "prepare", argv)).toBeNull();
+  expect(parseDriverFailure(Buffer.from(encoded), "audit", argv)).toBeNull();
+  expect(parseDriverFailure(Buffer.from(encoded), "prepare", ["untrusted-command"])).toBeNull();
 });

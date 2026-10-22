@@ -9,9 +9,11 @@ import { runTrustedSourceChecks } from "../../source-check";
 import { verifyRuntimeLayout } from "../../verify-runtime-layout";
 import { fixedProcess } from "./process";
 import { insist, object, safePath, sha256, trustedDigest } from "./policy";
+import { encodeDriverFailure, type DriverFailurePhase } from "./driver-failure";
 
 const source = "/prepared/source",
   policy = "/policy";
+let phase: DriverFailurePhase = "startup";
 async function input(): Promise<Record<string, unknown>> {
   const bytes = await Bun.stdin.bytes();
   insist(bytes.length <= 128000, "WORKER_INPUT_LIMIT");
@@ -38,9 +40,11 @@ async function copyData(from: string, to: string, installInputsOnly: boolean): P
   }
 }
 async function install(): Promise<void> {
+  phase = "copy-install-inputs";
   await mkdir(source, { recursive: true });
   await copyData("/input", source, true);
   // The network phase has manifests/locks/local archives only: no bunfig, .npmrc, preload or source.
+  phase = "frozen-install";
   await writeFile(source + "/.npmrc", "registry=https://registry.npmjs.org/\n");
   const r = await fixedProcess(
     [process.execPath, "--no-env-file", "install", "--frozen-lockfile", "--ignore-scripts"],
@@ -51,10 +55,14 @@ async function install(): Promise<void> {
     },
   );
   insist(r.code === 0 && !r.timedOut, "FROZEN_INSTALL_FAILED");
+  phase = "install-tools";
   for (const pin of await readToolPins(policy)) await installPinnedTool(pin, "/prepared/tools");
+  phase = "copy-full-source";
   await copyData("/input", source, false);
   // Git metadata is a fresh token-free P-created full-history checkout, never user native state.
+  phase = "copy-git";
   await cp("/input/.git", source + "/.git", { recursive: true });
+  phase = "prepare-result";
   console.log(
     JSON.stringify({
       status: "pass",
@@ -86,11 +94,13 @@ async function main(): Promise<void> {
   const id = process.argv[2];
   if (id === "prepare") return install();
   if (id === "audit") {
+    phase = "audit-inputs";
     const root = "/job/audit";
     await mkdir(root);
     await copyData(source, root, true);
     await writeFile(root + "/.npmrc", "registry=https://registry.npmjs.org/\n");
     // Required real network-dependent Bun audit, with P-selected flags and credential-free config.
+    phase = "audit";
     const r = await fixedProcess(
       [process.execPath, "--no-env-file", "audit", "--json", "--audit-level=high"],
       {
@@ -105,6 +115,7 @@ async function main(): Promise<void> {
     return;
   }
   if (id === "static-quality") {
+    phase = "static-quality";
     // P parser/config/checker/tool code reads candidate bytes. It never imports candidate code/config.
     const result = await runTrustedStaticQuality(source, policy, "/prepared/tools");
     insist(result.status === "pass", "TRUSTED_STATIC_CHECK_FAILED");
@@ -112,6 +123,7 @@ async function main(): Promise<void> {
     return;
   }
   if (id === "probe") {
+    phase = "probe";
     Object.assign(process.env, await prepareProbeEnvironment());
     const probe = await input();
     insist(
@@ -125,17 +137,23 @@ async function main(): Promise<void> {
     process.stdout.write(JSON.stringify(frame) + "\n");
     return;
   }
+  phase = "materialize";
   const root = await materialize();
   process.chdir(root);
   // This executes useful legacy workload, not an authenticated P assertion adapter.
   // Its assertions remain unauthenticated; the host certifies only its finite semantic catalogue.
-  if (id === "source") return runTrustedSourceChecks(root, policy);
+  if (id === "source") {
+    phase = "source";
+    return runTrustedSourceChecks(root, policy);
+  }
   if (id === "runtime-layout") {
+    phase = "runtime-layout";
     const result = await verifyRuntimeLayout(root);
     console.log(JSON.stringify(result));
     return;
   }
   if (id === "candidate-quality") {
+    phase = "candidate-quality";
     const audit = object((await input()).audit);
     insist(
       audit.dependencyInputsSha256 &&
@@ -170,7 +188,7 @@ async function main(): Promise<void> {
   throw Error("TRUSTED_CI_UNKNOWN_DRIVER");
 }
 if (import.meta.main)
-  main().catch(() => {
-    console.error("TRUSTED_CI_DRIVER_FAILED");
+  main().catch((error: unknown) => {
+    process.stderr.write(encodeDriverFailure(error, process.argv[2], phase));
     process.exitCode = 1;
   });
