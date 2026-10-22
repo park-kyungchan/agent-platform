@@ -82,6 +82,7 @@ jobs:
         run: bun run check:quality
         working-directory: /job/source
         env:
+          QUALITY_REPORT_OUTPUT: summary
           QUALITY_REPORT_PATH: ${{ runner.temp }}/agent-platform-quality.json
           TMPDIR: /job/tmp
       - name: Preserve bounded source quality evidence
@@ -130,6 +131,7 @@ jobs:
         run: bun run check:quality
         working-directory: /job/source
         env:
+          QUALITY_REPORT_OUTPUT: summary
           QUALITY_REPORT_PATH: ${{ runner.temp }}/agent-platform-merge-quality.json
           TMPDIR: /job/tmp
       - name: Preserve bounded prospective merge quality evidence

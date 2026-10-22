@@ -1,4 +1,9 @@
+import { parseDriverDiagnostic } from "./trusted/driver-failure";
+import { command } from "./trusted/policy";
 import { expect, test } from "bun:test";
+import { runSourceCommand } from "../source-check";
+import { sourceTestFailureDiagnostics } from "./native-tools";
+import { ProcessOutputLimitError } from "./trusted/process";
 import { metadataOnlyCommandOutput, sourceTestFailureLocations } from "./run";
 import { readQualityScope } from "./scope";
 import { resolve } from "node:path";
@@ -81,4 +86,50 @@ test("Hermes source integration stays admitted to the required package QA lane",
   const path = "packages/native-hermes-adapter/src/source-provider/harness-quality.test.ts";
   expect(scope.testFiles).toContain(path);
   expect(scope.exclusions.stagedTests.some((row) => row.path === path)).toBe(false);
+});
+
+
+test("location omission and input refusal remain explicit incomplete diagnostics", () => {
+  const input=Array.from({length:30},(_,i)=>`at /source/ci/check.test.ts:${i+1}:1`).join("\n");
+  expect(sourceTestFailureDiagnostics(input,"/source",["ci/check.test.ts"])).toMatchObject({total:30,omitted:14,diagnosticComplete:false});
+  expect(sourceTestFailureDiagnostics("x".repeat(1_048_577),"/source",["ci/check.test.ts"])).toEqual({locations:[],total:null,omitted:null,diagnosticComplete:false});
+});
+test("actual source child exports finite allowlisted failure evidence before throwing", async () => {
+  const rows:Record<string,unknown>[]=[];
+  let thrown=false;
+  try {
+    await runSourceCommand("/tmp",[process.execPath,"-e",`import {writeSync} from 'node:fs';writeSync(2,'PRIVATE-SOURCE-SENTINEL\\nat /tmp/ci/check.test.ts:42:7\\n');process.exit(17);`],{
+      knownTestFiles:["ci/check.test.ts"],observe:async(row)=>{expect(thrown).toBe(false);rows.push(row);},
+    });
+  } catch { thrown=true; }
+  expect(thrown).toBe(true);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({status:"fail",failureKind:"nonzero",exitCode:17,timedOut:false,failureLocations:[{path:"ci/check.test.ts",line:42,column:7}]});
+  expect(JSON.stringify(rows)).not.toContain("PRIVATE-SOURCE-SENTINEL");
+  expect(Buffer.byteLength(JSON.stringify(rows[0])+"\n")).toBeLessThanOrEqual(2048);
+});
+test("actual source child preserves cap/spawn/timeout failures and bounded positive evidence", async () => {
+  const rows:Record<string,unknown>[]=[];
+  const observe=async(row:Record<string,unknown>)=>{rows.push(row);};
+  await runSourceCommand("/tmp",[process.execPath,"-e","process.stdout.write('ok')"],{maxBytes:2,observe});
+  expect(rows.at(-1)).toMatchObject({status:"pass",exitCode:0,transport:{stdoutBytes:2,captureComplete:true}});
+  await expect(runSourceCommand("/tmp",[process.execPath,"-e","process.stdout.write('PRIVATE-SOURCE-SENTINEL')"],{maxBytes:2,observe})).rejects.toBeInstanceOf(ProcessOutputLimitError);
+  expect(rows.at(-1)).toMatchObject({status:"fail",failureKind:"output-limit",diagnosticComplete:false,transport:{retainedBytes:2,captureComplete:false,retryAllowed:false}});
+  await expect(runSourceCommand("/tmp",["/missing-source-fixture"],{observe})).rejects.toThrow();
+  expect(rows.at(-1)).toMatchObject({status:"fail",failureKind:"spawn-or-transport",diagnosticComplete:false});
+  await expect(runSourceCommand("/tmp",[process.execPath,"-e","setTimeout(()=>{},5000)"],{timeoutMs:50,observe})).rejects.toThrow("SOURCE_COMMAND_TIMEOUT");
+  expect(rows.at(-1)).toMatchObject({status:"fail",failureKind:"timeout",timedOut:true});
+  expect(JSON.stringify(rows)).not.toContain("PRIVATE-SOURCE-SENTINEL");
+});
+
+
+test("source failure diagnostics survive later parallel success metadata without becoming completion", async () => {
+  const rows:Record<string,unknown>[]=[];
+  await expect(runSourceCommand("/tmp",[process.execPath,"-e","process.exit(17)"],{knownTestFiles:["ci/check.test.ts"],observe:async(row)=>{rows.push(row);}})).rejects.toThrow("SOURCE_COMMAND_NONZERO");
+  const failure=rows[0]!;
+  const stdout=Buffer.from(JSON.stringify({recordClass:"source-only-prior-metadata"})+"\n"+JSON.stringify(failure)+"\n"+JSON.stringify({...failure,status:"pass",failureKind:null,exitCode:0})+"\n");
+  expect(parseDriverDiagnostic(stdout,"candidate",command("source"),["ci/check.test.ts"])).toEqual(failure);
+  expect(parseDriverDiagnostic(Buffer.from(JSON.stringify({...failure,status:"pass"})+"\n"),"candidate",command("source"),[])).toBeNull();
+  expect(parseDriverDiagnostic(Buffer.from(JSON.stringify({...failure,transport:{private:"PRIVATE-SOURCE-SENTINEL"}})+"\n"),"candidate",command("source"),[])).toBeNull();
+  await expect(runSourceCommand("/tmp",[process.execPath,"-e","process.exit(17)"],{observe:async()=>{throw Error("fixture journal unavailable");}})).rejects.toThrow("SOURCE_COMMAND_NONZERO");
 });

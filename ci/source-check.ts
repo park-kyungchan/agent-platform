@@ -1,3 +1,5 @@
+import { runNativeCommand, sourceTestFailureDiagnostics } from "./quality/native-tools";
+import { processFailureMetadata } from "./quality/trusted/process";
 import { operationalTimeouts } from "./quality/operational-timeouts";
 import {
   validateReceiptWithEvidence,
@@ -36,32 +38,95 @@ const writeJson = async (path: string, value: unknown) => {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(value, null, 2) + "\n");
 };
-const commandEvidence: {
-  command: string[];
-  startedAt: string;
-  finishedAt: string;
-  durationMs: number;
-  exitCode: number;
-}[] = [];
-async function run(cwd: string, argv: string[]): Promise<void> {
-  const started = performance.now();
+const commandEvidence: Record<string, unknown>[] = [];
+let commandSequence = 0;
+let diagnosticRoot: string | null = null;
+let diagnosticPaths: string[] = [];
+
+/** The real source child boundary: bounded metadata is emitted before its failure escapes. */
+export async function runSourceCommand(
+  cwd: string,
+  argv: string[],
+  options: {
+    maxBytes?: number;
+    timeoutMs?: number;
+    knownTestFiles?: readonly string[];
+    observe?: (diagnostic: Record<string, unknown>) => Promise<void>;
+  } = {},
+): Promise<void> {
+  const ordinal = ++commandSequence;
   const startedAt = new Date().toISOString();
-  const child = Bun.spawn(argv, {
-    cwd,
-    stdout: "inherit",
-    stderr: "inherit",
-    env: { ...process.env, CI: "true" },
-  });
-  const exitCode = await child.exited;
+  const started = performance.now();
+  let result: Awaited<ReturnType<typeof runNativeCommand>> | undefined;
+  let failure: unknown;
+  let failed = false;
+  try {
+    result = await runNativeCommand(
+      "source-command", argv, cwd,
+      options.timeoutMs ?? operationalTimeouts.workerMs,
+      {}, { maxBytes: options.maxBytes },
+    );
+    if (result.exitCode !== 0 || result.timedOut) {
+      failed = true;
+      failure = Error(result.timedOut ? "SOURCE_COMMAND_TIMEOUT" : "SOURCE_COMMAND_NONZERO");
+    }
+  } catch (error) {
+    failed = true;
+    failure = error;
+  }
+  const transport = result?.rawOutput ?? processFailureMetadata(failure);
+  const locations = sourceTestFailureDiagnostics(
+    result?.stderr ?? "",
+    options.knownTestFiles ? cwd : diagnosticRoot ?? cwd,
+    options.knownTestFiles ?? diagnosticPaths,
+  );
+  if (!result || result.timedOut || (failed && !(options.knownTestFiles ?? diagnosticPaths).length)) {
+    locations.total = null;
+    locations.omitted = null;
+    locations.diagnosticComplete = false;
+  }
+  const diagnostic = {
+    schema: "agent-platform.source-command-diagnostic.v1",
+    commandOrdinal: ordinal,
+    label: "source-command",
+    status: failed ? "fail" : "pass",
+    failureKind: result ? result.timedOut ? "timeout" : result.exitCode !== 0 ? "nonzero" : null
+      : processFailureMetadata(failure).failureKind,
+    exitCode: result?.exitCode ?? ("exitCode" in transport ? transport.exitCode : null),
+    timedOut: result?.timedOut ?? ("timedOut" in transport && transport.timedOut === true),
+    transport,
+    failureLocations: locations.locations,
+    locationTotal: locations.total,
+    locationOmitted: locations.omitted,
+    diagnosticComplete: locations.diagnosticComplete,
+  };
+  while (Buffer.byteLength(JSON.stringify(diagnostic) + "\n") > 2048 && diagnostic.failureLocations.length) {
+    diagnostic.failureLocations.pop();
+    diagnostic.diagnosticComplete = false;
+    if (diagnostic.locationTotal !== null)
+      diagnostic.locationOmitted = diagnostic.locationTotal - diagnostic.failureLocations.length;
+  }
   commandEvidence.push({
-    command: argv.slice(1),
+    ...diagnostic,
+    commandSha256: sha(JSON.stringify(argv)),
     startedAt,
     finishedAt: new Date().toISOString(),
     durationMs: Math.round(performance.now() - started),
-    exitCode,
   });
-  if (exitCode !== 0) throw Error("Source check failed: " + argv.join(" ").slice(0, 300));
+  try {
+    if (Buffer.byteLength(JSON.stringify(diagnostic) + "\n") > 2048)
+      throw Error("SOURCE_COMMAND_DIAGNOSTIC_BUDGET");
+    if (options.observe) await options.observe(diagnostic);
+    else await new Promise<void>((done, reject) => {
+      process.stdout.write(JSON.stringify(diagnostic) + "\n", (error) => error ? reject(error) : done());
+    });
+  } catch (error) {
+    if (!failed) throw error;
+    // A diagnostic write failure does not replace the original command failure or permit replay.
+  }
+  if (failed) throw failure;
 }
+const run = runSourceCommand;
 async function files(root: string): Promise<string[]> {
   const result: string[] = [];
   for (const entry of await readdir(root, { withFileTypes: true })) {
@@ -506,6 +571,8 @@ async function sourceChecks() {
     }>;
   };
   const scope = await readQualityScope(common, undefined, await readTrackedMarkdown(sourceRoot));
+  diagnosticRoot = common;
+  diagnosticPaths = [...scope.testFiles];
   if (trustedControllerRoot) {
     const required = await readQualityScope(trustedControllerRoot);
     scope.testFiles = [...new Set([...required.testFiles, ...scope.testFiles])].sort();
@@ -589,6 +656,7 @@ async function sourceChecks() {
       "Elapsed package phase wall time; overlapping command durations are not summed.",
   };
   const qualityTests = scope.lintFiles.filter((path) => path.startsWith("ci/") && testFile(path));
+  diagnosticPaths = [...new Set([...scope.testFiles, ...qualityTests])];
   if (qualityTests.length)
     await run(common, [
       process.execPath,
@@ -808,6 +876,8 @@ export async function runTrustedSourceChecks(
   try {
     await sourceChecks();
   } finally {
+    diagnosticRoot = null;
+    diagnosticPaths = [];
     sourceRoot = prior;
     trustedControllerRoot = null;
     trustedSourceRunning = false;
