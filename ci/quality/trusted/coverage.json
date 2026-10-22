@@ -31,10 +31,7 @@
       "run-allocation-reject-caller-id",
       "run-allocation-reject-started"
     ],
-    "effect-preservation": [
-      "effect-inventory-positive",
-      "effect-inventory-overlap"
-    ],
+    "effect-preservation": ["effect-inventory-positive", "effect-inventory-overlap"],
     "milestones": [
       "formal-completion-positive",
       "formal-completion-reject-unsynced",
@@ -89,15 +86,8 @@
       "evidence-changed-source-stale",
       "evidence-expired-stale"
     ],
-    "quality-evidence": [
-      "quality-stop-authority-breach",
-      "quality-stop-effects-breach"
-    ],
-    "source-path": [
-      "relative-source-path",
-      "parent-source-escape",
-      "absolute-source-escape"
-    ],
+    "quality-evidence": ["quality-stop-authority-breach", "quality-stop-effects-breach"],
+    "source-path": ["relative-source-path", "parent-source-escape", "absolute-source-escape"],
     "g01-source": [
       "scenario-git-source-positive",
       "scenario-git-source-hash",
@@ -140,13 +130,8 @@
       "scenario-owner-first-memory",
       "scenario-owner-first-work-method"
     ],
-    "g02-exports": [
-      "scenario-owner-public-exports"
-    ],
-    "g02-native-source": [
-      "scenario-owner-native-positive",
-      "scenario-owner-native-after-drift"
-    ],
+    "g02-exports": ["scenario-owner-public-exports"],
+    "g02-native-source": ["scenario-owner-native-positive", "scenario-owner-native-after-drift"],
     "g02-hermes": [
       "scenario-owner-hermes-positive",
       "scenario-owner-hermes-first-import",
@@ -219,10 +204,7 @@
       "scenario-operational-context-positive",
       "scenario-operational-context-forbidden-effect"
     ],
-    "g04-wiki": [
-      "scenario-operational-wiki-positive",
-      "scenario-operational-wiki-forged-quote"
-    ],
+    "g04-wiki": ["scenario-operational-wiki-positive", "scenario-operational-wiki-forged-quote"],
     "g04-inception": [
       "scenario-operational-inception-positive",
       "scenario-operational-inception-effect-negative",
@@ -257,10 +239,7 @@
       "scenario-memory-history-current",
       "scenario-memory-history-denied"
     ],
-    "pf01-memory-breadth": [
-      "scenario-memory-breadth-unscoped",
-      "scenario-memory-breadth-work"
-    ],
+    "pf01-memory-breadth": ["scenario-memory-breadth-unscoped", "scenario-memory-breadth-work"],
     "pf01-memory-transport": [
       "scenario-memory-transport-full",
       "scenario-memory-transport-compact",
@@ -271,10 +250,7 @@
       "scenario-memory-transport-missing-pin",
       "scenario-memory-transport-currentness"
     ],
-    "pf02-fixed-exports": [
-      "scenario-owner-fixed-context",
-      "scenario-owner-fixed-hermes"
-    ]
+    "pf02-fixed-exports": ["scenario-owner-fixed-context", "scenario-owner-fixed-hermes"]
   },
   "interfaceSources": [
     {
@@ -3311,10 +3287,7 @@
         "sourceCheck QA creation and frozen install",
         "prepare network manifest-only closure"
       ],
-      "files": [
-        "ci/source-check.ts",
-        "ci/quality/trusted/driver.ts"
-      ],
+      "files": ["ci/source-check.ts", "ci/quality/trusted/driver.ts"],
       "nextPatch": "Root first reconciles original failed occurrence exact missing nested QA lock inputs/cache entries; no blind retry. Extract an exact data-only nested-QA manifest/lock recipe from canonical source-check as a pinned Root-owned proposal, then prefetch that exact closure in the existing credential-free preparation worker with ignore-scripts and no candidate source/config. Keep network-none QA and real audit. This is provisioning evidence, never a source assertion verdict.",
       "cases": [
         "current failed cache miss remains failed/no source verdict",
@@ -3402,10 +3375,7 @@
         "readNativeAdapterSourceClosure",
         "observeHermesContextProvider"
       ],
-      "files": [
-        "ci/source-check.ts",
-        "ci/source-projection.ts"
-      ],
+      "files": ["ci/source-check.ts", "ci/source-projection.ts"],
       "nextPatch": "Add a fixed owner-source fixture scenario adapter to existing probe worker with the exact canonical owner-fixture and P-generated disposable registration graph. Return source bytes/observed error per named call, not P assertion verdicts. Host compares v1-v6 pin sets, drift-before/after and fresh-process first-import refusals. Keep original first-import guards and caches.",
       "cases": [
         "v1-v6 context registrations",
@@ -3506,10 +3476,7 @@
         "sourceCheck QA creation and frozen install",
         "prepare network manifest-only closure"
       ],
-      "files": [
-        "ci/source-check.ts",
-        "ci/quality/trusted/driver.ts"
-      ],
+      "files": ["ci/source-check.ts", "ci/quality/trusted/driver.ts"],
       "nextPatch": "Root first reconciles original failed occurrence exact missing nested QA lock inputs/cache entries; no blind retry. Extract an exact data-only nested-QA manifest/lock recipe from canonical source-check as a pinned Root-owned proposal, then prefetch that exact closure in the existing credential-free preparation worker with ignore-scripts and no candidate source/config. Keep network-none QA and real audit. This is provisioning evidence, never a source assertion verdict.",
       "cases": [
         "current failed cache miss remains failed/no source verdict",
@@ -3776,10 +3743,7 @@
       "scenario-operational-context-positive",
       "scenario-operational-context-forbidden-effect"
     ],
-    "g04-wiki": [
-      "scenario-operational-wiki-positive",
-      "scenario-operational-wiki-forged-quote"
-    ],
+    "g04-wiki": ["scenario-operational-wiki-positive", "scenario-operational-wiki-forged-quote"],
     "g04-inception": [
       "scenario-operational-inception-positive",
       "scenario-operational-inception-effect-negative",
@@ -3822,10 +3786,7 @@
         "scenario-memory-history-current",
         "scenario-memory-history-denied"
       ],
-      "pf01-memory-breadth": [
-        "scenario-memory-breadth-unscoped",
-        "scenario-memory-breadth-work"
-      ],
+      "pf01-memory-breadth": ["scenario-memory-breadth-unscoped", "scenario-memory-breadth-work"],
       "pf01-memory-transport": [
         "scenario-memory-transport-full",
         "scenario-memory-transport-compact",
@@ -3836,10 +3797,7 @@
         "scenario-memory-transport-missing-pin",
         "scenario-memory-transport-currentness"
       ],
-      "pf02-fixed-exports": [
-        "scenario-owner-fixed-context",
-        "scenario-owner-fixed-hermes"
-      ]
+      "pf02-fixed-exports": ["scenario-owner-fixed-context", "scenario-owner-fixed-hermes"]
     },
     "authority": "None. The native callbacks are honest fictional lease/permit/original IO, not source-granted permission or actual native activation.",
     "coverageMeaning": "Required external finite semantic comparisons only. Legacy row associations preserve caller mapping, not authentication of every internal test. No private S02 data, score or oracle is used.",

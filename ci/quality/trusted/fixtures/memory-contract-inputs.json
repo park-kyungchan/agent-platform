@@ -42,9 +42,7 @@
               "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ]
+          "allowedReaders": ["fixture-reader"]
         },
         "claimKey": "choice"
       },
@@ -93,9 +91,7 @@
               "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ]
+          "allowedReaders": ["fixture-reader"]
         },
         "claimKey": "choice"
       },
@@ -144,9 +140,7 @@
               "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ]
+          "allowedReaders": ["fixture-reader"]
         },
         "claimKey": "choice"
       },
@@ -195,9 +189,7 @@
               "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ]
+          "allowedReaders": ["fixture-reader"]
         },
         "claimKey": "choice"
       },
@@ -239,9 +231,7 @@
               "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ],
+          "allowedReaders": ["fixture-reader"],
           "claimKey": "choice"
         },
         "claimKey": "choice"
@@ -276,9 +266,7 @@
               "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ],
+          "allowedReaders": ["fixture-reader"],
           "claimKey": "choice"
         },
         "claimKey": "choice"
@@ -326,9 +314,7 @@
               "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ]
+          "allowedReaders": ["fixture-reader"]
         },
         "claimKey": "choice"
       },
@@ -359,9 +345,7 @@
               "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ],
+          "allowedReaders": ["fixture-reader"],
           "claim": {
             "key": "choice",
             "value": "A"
@@ -404,9 +388,7 @@
               "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ]
+          "allowedReaders": ["fixture-reader"]
         },
         "claimKey": "choice"
       },
@@ -456,9 +438,7 @@
               "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99"
             }
           ],
-          "allowedReaders": [
-            "fixture-reader"
-          ]
+          "allowedReaders": ["fixture-reader"]
         },
         "claimKey": "choice"
       },
@@ -476,155 +456,98 @@
   },
   "scenarios": {
     "memory-authority-standing": {
-      "rows": [
-        "standing-a"
-      ]
+      "rows": ["standing-a"]
     },
     "memory-authority-inference": {
-      "rows": [
-        "inference"
-      ]
+      "rows": ["inference"]
     },
     "memory-authority-no-adoption": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "omitAdoption": true
     },
     "memory-authority-governing": {
-      "rows": [
-        "governing-a",
-        "inference"
-      ]
+      "rows": ["governing-a", "inference"]
     },
     "memory-authority-governing-false": {
-      "rows": [
-        "governing-a",
-        "inference"
-      ],
+      "rows": ["governing-a", "inference"],
       "governing": false
     },
     "memory-authority-governing-absent": {
-      "rows": [
-        "governing-a",
-        "inference"
-      ],
+      "rows": ["governing-a", "inference"],
       "omitGoverning": true
     },
     "memory-authority-decision": {
-      "rows": [
-        "adopted-decision"
-      ]
+      "rows": ["adopted-decision"]
     },
     "memory-authority-decision-false": {
-      "rows": [
-        "adopted-decision"
-      ],
+      "rows": ["adopted-decision"],
       "governing": false
     },
     "memory-conflict-governing": {
-      "rows": [
-        "governing-a",
-        "governing-b",
-        "inference"
-      ]
+      "rows": ["governing-a", "governing-b", "inference"]
     },
     "memory-conflict-standing": {
-      "rows": [
-        "standing-a",
-        "standing-b"
-      ]
+      "rows": ["standing-a", "standing-b"]
     },
     "memory-conflict-owner-isolation": {
-      "rows": [
-        "standing-a",
-        "standing-other"
-      ]
+      "rows": ["standing-a", "standing-other"]
     },
     "memory-history-revoked": {
-      "rows": [
-        "revoked"
-      ],
+      "rows": ["revoked"],
       "mode": "history",
       "asOf": "2026-10-19T12:00:00Z"
     },
     "memory-history-current": {
-      "rows": [
-        "revoked"
-      ]
+      "rows": ["revoked"]
     },
     "memory-history-denied": {
-      "rows": [
-        "revoked"
-      ],
+      "rows": ["revoked"],
       "mode": "history",
       "deny": true
     },
     "memory-breadth-unscoped": {
-      "rows": [
-        "standing-a",
-        "broad-other-work"
-      ]
+      "rows": ["standing-a", "broad-other-work"]
     },
     "memory-breadth-work": {
-      "rows": [
-        "standing-a",
-        "broad-other-work"
-      ],
+      "rows": ["standing-a", "broad-other-work"],
       "work": {
         "projectId": "p",
         "workId": "w"
       }
     },
     "memory-transport-full": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "transport": "full"
     },
     "memory-transport-compact": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "transport": "compact"
     },
     "memory-transport-dispatch": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "transport": "dispatch"
     },
     "memory-transport-resume": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "transport": "resume"
     },
     "memory-transport-stale-dispatch": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "transport": "dispatch",
       "staleDigest": true
     },
     "memory-transport-stale-resume": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "transport": "resume",
       "staleDigest": true
     },
     "memory-transport-missing-pin": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "transport": "dispatch",
       "omitDigest": true
     },
     "memory-transport-currentness": {
-      "rows": [
-        "standing-a"
-      ],
+      "rows": ["standing-a"],
       "transport": "resume",
       "graphDrift": true
     }

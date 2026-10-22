@@ -9146,14 +9146,10 @@
     {
       "id": "scenario-memory-authority-standing",
       "family": "pf01-memory-authority",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-authority-standing"
-      ],
+      "args": ["memory-authority-standing"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -9187,9 +9183,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "standing-a"
-            ]
+            "equals": ["standing-a"]
           },
           {
             "pointer": "/result/mode",
@@ -9203,9 +9197,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -9298,14 +9290,10 @@
     {
       "id": "scenario-memory-authority-inference",
       "family": "pf01-memory-authority",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-authority-inference"
-      ],
+      "args": ["memory-authority-inference"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -9339,9 +9327,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "inference"
-            ]
+            "equals": ["inference"]
           },
           {
             "pointer": "/result/mode",
@@ -9355,9 +9341,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "model-inference",
                 "id": "inference",
                 "kind": "knowledge",
@@ -9447,14 +9431,10 @@
     {
       "id": "scenario-memory-authority-no-adoption",
       "family": "pf01-memory-authority",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-authority-no-adoption"
-      ],
+      "args": ["memory-authority-no-adoption"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -9488,9 +9468,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "standing-a"
-            ]
+            "equals": ["standing-a"]
           },
           {
             "pointer": "/result/mode",
@@ -9504,9 +9482,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -9592,14 +9568,10 @@
     {
       "id": "scenario-memory-authority-governing",
       "family": "pf01-memory-authority",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-authority-governing"
-      ],
+      "args": ["memory-authority-governing"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -9633,9 +9605,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "inference"
-            ]
+            "equals": ["inference"]
           },
           {
             "pointer": "/result/mode",
@@ -9649,9 +9619,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "model-inference",
                 "id": "inference",
                 "kind": "knowledge",
@@ -9713,9 +9681,7 @@
           {
             "pointer": "/result/governing/0/document",
             "equals": {
-              "allowedReaders": [
-                "fixture-reader"
-              ],
+              "allowedReaders": ["fixture-reader"],
               "claim": {
                 "key": "choice",
                 "value": "A"
@@ -9803,14 +9769,10 @@
     {
       "id": "scenario-memory-authority-governing-false",
       "family": "pf01-memory-authority",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-authority-governing-false"
-      ],
+      "args": ["memory-authority-governing-false"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -9844,9 +9806,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "inference"
-            ]
+            "equals": ["inference"]
           },
           {
             "pointer": "/result/mode",
@@ -9860,9 +9820,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "model-inference",
                 "id": "inference",
                 "kind": "knowledge",
@@ -9924,9 +9882,7 @@
           {
             "pointer": "/result/governing/0/document",
             "equals": {
-              "allowedReaders": [
-                "fixture-reader"
-              ],
+              "allowedReaders": ["fixture-reader"],
               "claim": {
                 "key": "choice",
                 "value": "A"
@@ -10014,14 +9970,10 @@
     {
       "id": "scenario-memory-authority-governing-absent",
       "family": "pf01-memory-authority",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-authority-governing-absent"
-      ],
+      "args": ["memory-authority-governing-absent"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -10055,9 +10007,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "inference"
-            ]
+            "equals": ["inference"]
           },
           {
             "pointer": "/result/mode",
@@ -10071,9 +10021,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "model-inference",
                 "id": "inference",
                 "kind": "knowledge",
@@ -10135,9 +10083,7 @@
           {
             "pointer": "/result/governing/0/document",
             "equals": {
-              "allowedReaders": [
-                "fixture-reader"
-              ],
+              "allowedReaders": ["fixture-reader"],
               "claim": {
                 "key": "choice",
                 "value": "A"
@@ -10218,14 +10164,10 @@
     {
       "id": "scenario-memory-authority-decision",
       "family": "pf01-memory-authority",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-authority-decision"
-      ],
+      "args": ["memory-authority-decision"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -10259,9 +10201,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "adopted-decision"
-            ]
+            "equals": ["adopted-decision"]
           },
           {
             "pointer": "/result/mode",
@@ -10275,9 +10215,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "adopted-decision",
                 "kind": "decision",
@@ -10367,9 +10305,7 @@
           {
             "pointer": "/result/governing/0/document",
             "equals": {
-              "allowedReaders": [
-                "fixture-reader"
-              ],
+              "allowedReaders": ["fixture-reader"],
               "claim": {
                 "key": "choice",
                 "value": "A"
@@ -10440,14 +10376,10 @@
     {
       "id": "scenario-memory-authority-decision-false",
       "family": "pf01-memory-authority",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-authority-decision-false"
-      ],
+      "args": ["memory-authority-decision-false"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -10481,9 +10413,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "adopted-decision"
-            ]
+            "equals": ["adopted-decision"]
           },
           {
             "pointer": "/result/mode",
@@ -10497,9 +10427,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "adopted-decision",
                 "kind": "decision",
@@ -10619,14 +10547,10 @@
     {
       "id": "scenario-memory-conflict-governing",
       "family": "pf01-memory-conflict",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-conflict-governing"
-      ],
+      "args": ["memory-conflict-governing"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -10660,9 +10584,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "inference"
-            ]
+            "equals": ["inference"]
           },
           {
             "pointer": "/result/mode",
@@ -10676,9 +10598,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "model-inference",
                 "id": "inference",
                 "kind": "knowledge",
@@ -10740,9 +10660,7 @@
           {
             "pointer": "/result/governing/0/document",
             "equals": {
-              "allowedReaders": [
-                "fixture-reader"
-              ],
+              "allowedReaders": ["fixture-reader"],
               "claim": {
                 "key": "choice",
                 "value": "A"
@@ -10783,9 +10701,7 @@
           {
             "pointer": "/result/governing/1/document",
             "equals": {
-              "allowedReaders": [
-                "fixture-reader"
-              ],
+              "allowedReaders": ["fixture-reader"],
               "claim": {
                 "key": "choice",
                 "value": "B"
@@ -10888,14 +10804,10 @@
     {
       "id": "scenario-memory-conflict-standing",
       "family": "pf01-memory-conflict",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-conflict-standing"
-      ],
+      "args": ["memory-conflict-standing"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -10929,10 +10841,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "standing-a",
-              "standing-b"
-            ]
+            "equals": ["standing-a", "standing-b"]
           },
           {
             "pointer": "/result/mode",
@@ -10946,9 +10855,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -11006,9 +10913,7 @@
                 "value": "B"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-b",
                 "kind": "preference",
@@ -11155,14 +11060,10 @@
     {
       "id": "scenario-memory-conflict-owner-isolation",
       "family": "pf01-memory-conflict",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-conflict-owner-isolation"
-      ],
+      "args": ["memory-conflict-owner-isolation"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -11196,10 +11097,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "standing-a",
-              "standing-other"
-            ]
+            "equals": ["standing-a", "standing-other"]
           },
           {
             "pointer": "/result/mode",
@@ -11213,9 +11111,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -11273,9 +11169,7 @@
                 "value": "B"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-other",
                 "kind": "preference",
@@ -11405,14 +11299,10 @@
     {
       "id": "scenario-memory-history-revoked",
       "family": "pf01-memory-history",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-history-revoked"
-      ],
+      "args": ["memory-history-revoked"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -11446,9 +11336,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "revoked"
-            ]
+            "equals": ["revoked"]
           },
           {
             "pointer": "/result/mode",
@@ -11474,9 +11362,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "revoked",
                 "kind": "preference",
@@ -11558,14 +11444,10 @@
     {
       "id": "scenario-memory-history-current",
       "family": "pf01-memory-history",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-history-current"
-      ],
+      "args": ["memory-history-current"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -11635,14 +11517,10 @@
     {
       "id": "scenario-memory-history-denied",
       "family": "pf01-memory-history",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-history-denied"
-      ],
+      "args": ["memory-history-denied"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -11712,14 +11590,10 @@
     {
       "id": "scenario-memory-breadth-unscoped",
       "family": "pf01-memory-breadth",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-breadth-unscoped"
-      ],
+      "args": ["memory-breadth-unscoped"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -11753,10 +11627,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "broad-other-work",
-              "standing-a"
-            ]
+            "equals": ["broad-other-work", "standing-a"]
           },
           {
             "pointer": "/result/mode",
@@ -11770,9 +11641,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -11830,9 +11699,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "broad-other-work",
                 "kind": "preference",
@@ -11935,14 +11802,10 @@
     {
       "id": "scenario-memory-breadth-work",
       "family": "pf01-memory-breadth",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-breadth-work"
-      ],
+      "args": ["memory-breadth-work"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -11976,10 +11839,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "broad-other-work",
-              "standing-a"
-            ]
+            "equals": ["broad-other-work", "standing-a"]
           },
           {
             "pointer": "/result/mode",
@@ -11993,9 +11853,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -12053,9 +11911,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "broad-other-work",
                 "kind": "preference",
@@ -12158,14 +12014,10 @@
     {
       "id": "scenario-memory-transport-full",
       "family": "pf01-memory-transport",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-transport-full"
-      ],
+      "args": ["memory-transport-full"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -12199,9 +12051,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "standing-a"
-            ]
+            "equals": ["standing-a"]
           },
           {
             "pointer": "/result/mode",
@@ -12215,9 +12065,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -12361,9 +12209,7 @@
                     "mode": "write"
                   }
                 ],
-                "acceptanceCriteria": [
-                  "safe"
-                ],
+                "acceptanceCriteria": ["safe"],
                 "dependencies": [],
                 "dependencyTasks": [],
                 "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
@@ -12542,9 +12388,7 @@
                     "mode": "write"
                   }
                 ],
-                "acceptanceCriteria": [
-                  "safe"
-                ],
+                "acceptanceCriteria": ["safe"],
                 "dependencies": [],
                 "dependencyTasks": [],
                 "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
@@ -12647,14 +12491,10 @@
     {
       "id": "scenario-memory-transport-compact",
       "family": "pf01-memory-transport",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-transport-compact"
-      ],
+      "args": ["memory-transport-compact"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -12688,9 +12528,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "standing-a"
-            ]
+            "equals": ["standing-a"]
           },
           {
             "pointer": "/result/mode",
@@ -12704,9 +12542,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -12850,9 +12686,7 @@
                     "mode": "write"
                   }
                 ],
-                "acceptanceCriteria": [
-                  "safe"
-                ],
+                "acceptanceCriteria": ["safe"],
                 "dependencies": [],
                 "dependencyTasks": [],
                 "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
@@ -12973,14 +12807,10 @@
     {
       "id": "scenario-memory-transport-dispatch",
       "family": "pf01-memory-transport",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-transport-dispatch"
-      ],
+      "args": ["memory-transport-dispatch"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -13014,9 +12844,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "standing-a"
-            ]
+            "equals": ["standing-a"]
           },
           {
             "pointer": "/result/mode",
@@ -13030,9 +12858,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -13176,9 +13002,7 @@
                     "mode": "write"
                   }
                 ],
-                "acceptanceCriteria": [
-                  "safe"
-                ],
+                "acceptanceCriteria": ["safe"],
                 "dependencies": [],
                 "dependencyTasks": [],
                 "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
@@ -13357,9 +13181,7 @@
                     "mode": "write"
                   }
                 ],
-                "acceptanceCriteria": [
-                  "safe"
-                ],
+                "acceptanceCriteria": ["safe"],
                 "dependencies": [],
                 "dependencyTasks": [],
                 "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
@@ -13462,14 +13284,10 @@
     {
       "id": "scenario-memory-transport-resume",
       "family": "pf01-memory-transport",
-      "callers": [
-        "Memory/v1 public producer and native caller callback contract"
-      ],
+      "callers": ["Memory/v1 public producer and native caller callback contract"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-transport-resume"
-      ],
+      "args": ["memory-transport-resume"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -13503,9 +13321,7 @@
           },
           {
             "pointer": "/hitIds",
-            "equals": [
-              "standing-a"
-            ]
+            "equals": ["standing-a"]
           },
           {
             "pointer": "/result/mode",
@@ -13519,9 +13335,7 @@
                 "value": "A"
               },
               "record": {
-                "allowedReaders": [
-                  "fixture-reader"
-                ],
+                "allowedReaders": ["fixture-reader"],
                 "authority": "owner-adopted",
                 "id": "standing-a",
                 "kind": "preference",
@@ -13665,9 +13479,7 @@
                     "mode": "write"
                   }
                 ],
-                "acceptanceCriteria": [
-                  "safe"
-                ],
+                "acceptanceCriteria": ["safe"],
                 "dependencies": [],
                 "dependencyTasks": [],
                 "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
@@ -13846,9 +13658,7 @@
                     "mode": "write"
                   }
                 ],
-                "acceptanceCriteria": [
-                  "safe"
-                ],
+                "acceptanceCriteria": ["safe"],
                 "dependencies": [],
                 "dependencyTasks": [],
                 "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
@@ -13951,14 +13761,10 @@
     {
       "id": "scenario-memory-transport-stale-dispatch",
       "family": "pf01-memory-transport",
-      "callers": [
-        "Memory/v1 selected Task effective contract native callback"
-      ],
+      "callers": ["Memory/v1 selected Task effective contract native callback"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-transport-stale-dispatch"
-      ],
+      "args": ["memory-transport-stale-dispatch"],
       "expected": {
         "kind": "throw",
         "name": "Error",
@@ -13968,14 +13774,10 @@
     {
       "id": "scenario-memory-transport-stale-resume",
       "family": "pf01-memory-transport",
-      "callers": [
-        "Memory/v1 selected Task effective contract native callback"
-      ],
+      "callers": ["Memory/v1 selected Task effective contract native callback"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-transport-stale-resume"
-      ],
+      "args": ["memory-transport-stale-resume"],
       "expected": {
         "kind": "throw",
         "name": "Error",
@@ -13985,14 +13787,10 @@
     {
       "id": "scenario-memory-transport-missing-pin",
       "family": "pf01-memory-transport",
-      "callers": [
-        "Memory/v1 selected Task effective contract native callback"
-      ],
+      "callers": ["Memory/v1 selected Task effective contract native callback"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-transport-missing-pin"
-      ],
+      "args": ["memory-transport-missing-pin"],
       "expected": {
         "kind": "throw",
         "name": "Error",
@@ -14002,14 +13800,10 @@
     {
       "id": "scenario-memory-transport-currentness",
       "family": "pf01-memory-transport",
-      "callers": [
-        "Memory/v1 selected Task effective contract native callback"
-      ],
+      "callers": ["Memory/v1 selected Task effective contract native callback"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "memory-transport-currentness"
-      ],
+      "args": ["memory-transport-currentness"],
       "expected": {
         "kind": "throw",
         "name": "Error",
@@ -14019,14 +13813,10 @@
     {
       "id": "scenario-owner-fixed-context",
       "family": "pf02-fixed-exports",
-      "callers": [
-        "maintained context/Hermes canonical and source-owner facades"
-      ],
+      "callers": ["maintained context/Hermes canonical and source-owner facades"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "owner-fixed-context"
-      ],
+      "args": ["owner-fixed-context"],
       "expected": {
         "kind": "predicates",
         "values": [
@@ -14091,14 +13881,10 @@
     {
       "id": "scenario-owner-fixed-hermes",
       "family": "pf02-fixed-exports",
-      "callers": [
-        "maintained context/Hermes canonical and source-owner facades"
-      ],
+      "callers": ["maintained context/Hermes canonical and source-owner facades"],
       "module": "ci/quality/trusted/scenario-adapters.ts",
       "exportName": "run",
-      "args": [
-        "owner-fixed-hermes"
-      ],
+      "args": ["owner-fixed-hermes"],
       "expected": {
         "kind": "predicates",
         "values": [

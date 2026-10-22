@@ -3,7 +3,11 @@ import { join, resolve } from "node:path";
 import { contextProjectionPaths } from "../../../source-projection";
 import { scratch, hash, write, capture } from "./support";
 const namespaceKinds = (api: Record<string, unknown>) =>
-  Object.fromEntries(Object.keys(api).sort().map((name) => [name, typeof api[name]]));
+  Object.fromEntries(
+    Object.keys(api)
+      .sort()
+      .map((name) => [name, typeof api[name]]),
+  );
 const nativePaths = [
   "package.json",
   "bun.lock",
@@ -144,7 +148,12 @@ export async function ownerFixture(source: string, root: string) {
 }
 export async function ownerScenario(source: string, id: string): Promise<unknown> {
   if (
-    ["owner-hermes-positive", "owner-hermes-first-import", "owner-hermes-after-drift", "owner-fixed-hermes"].includes(id)
+    [
+      "owner-hermes-positive",
+      "owner-hermes-first-import",
+      "owner-hermes-after-drift",
+      "owner-fixed-hermes",
+    ].includes(id)
   ) {
     const generator = (await import(
       join(source, "packages/native-hermes-adapter/src/source-provider/generate.ts")
@@ -158,9 +167,7 @@ export async function ownerScenario(source: string, id: string): Promise<unknown
       const adapter = (await import(
         join(f.codeOwnerRoot, "src/ontology-driven/provider-source.ts")
       )) as {
-        observeHermesContextProvider: (
-          root: string,
-        ) => Promise<{
+        observeHermesContextProvider: (root: string) => Promise<{
           schema: string;
           packageName: string;
           pins: { path: string; sha256: string }[];
@@ -190,9 +197,12 @@ export async function ownerScenario(source: string, id: string): Promise<unknown
           module: name,
           facade: Object.keys(facade).sort(),
           canonical: Object.keys(canonical).sort(),
-          ...(id === "owner-fixed-hermes" ? {
-            facadeKinds: namespaceKinds(facade), canonicalKinds: namespaceKinds(canonical),
-          } : {}),
+          ...(id === "owner-fixed-hermes"
+            ? {
+                facadeKinds: namespaceKinds(facade),
+                canonicalKinds: namespaceKinds(canonical),
+              }
+            : {}),
         });
       }
       return {
@@ -343,10 +353,13 @@ export async function ownerScenario(source: string, id: string): Promise<unknown
       };
       const context = await loader.loadCodexOwnerContext();
       await context.verifyCurrentSourceClosure();
-      if (id === "owner-fixed-context") return {
-        facade: namespaceKinds(context.index),
-        canonical: namespaceKinds(await import(join(f.common, "packages/work-continuity/src/context/index.ts"))),
-      };
+      if (id === "owner-fixed-context")
+        return {
+          facade: namespaceKinds(context.index),
+          canonical: namespaceKinds(
+            await import(join(f.common, "packages/work-continuity/src/context/index.ts")),
+          ),
+        };
       const git = context.gitWork as unknown as Record<string, unknown>;
       const method = context.workMethod as unknown as Record<string, unknown>;
       return {
