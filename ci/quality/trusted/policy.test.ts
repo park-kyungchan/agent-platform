@@ -212,7 +212,7 @@ test("actual worker config refuses auth/socket mounts, privileged env and host n
     "LANG=C.UTF-8",
     "CI=true",
     "RUNNER_TEMP=/job/tmp",
-  "TMPDIR=/job/tmp",
+    "TMPDIR=/job/tmp",
   ];
   const raw = {
     Id: id,
@@ -249,7 +249,7 @@ test("actual worker config refuses auth/socket mounts, privileged env and host n
       r.Config.Env = env.filter((value) => value !== "TMPDIR=/job/tmp");
     },
     (r: typeof raw) => {
-      r.Config.Env = env.map((value) => value === "TMPDIR=/job/tmp" ? "TMPDIR=/tmp" : value);
+      r.Config.Env = env.map((value) => (value === "TMPDIR=/job/tmp" ? "TMPDIR=/tmp" : value));
     },
     (r: typeof raw) => {
       r.HostConfig.Tmpfs["/job"] = r.HostConfig.Tmpfs["/job"].replace(",exec,", ",noexec,");
