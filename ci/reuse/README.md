@@ -110,6 +110,14 @@ command and refuses drift. Keep the resulting readback with exact source review
 and publication evidence. The common repository's own source workflow requires
 the same record before its source checks.
 
+The protected-main review gate waits up to300seconds for genuinely absent
+exact-head review status, retaining its5second poll cadence. A late response,
+present hold, invalid publisher or malformed proof cannot turn that wait into
+success. Root prepares actual-M receipt/status publication before merge and
+publishes promptly after the exact merge joins; the longer wait does not replace
+that ordering. Caller/evaluation budgets and token/lease/admission validity are
+unchanged. See [`docs/operational-timeouts.json`](../../docs/operational-timeouts.json).
+
 This is required, source-attributed provenance, not cryptographic authentication
 of a native author or proof that one author wrote every line of a merged tree.
 The native owner must refresh the captured author/Work for each new authoring

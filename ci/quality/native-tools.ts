@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "./operational-timeouts";
 import { createHash } from "node:crypto";
 import {
   chmod,
@@ -60,7 +61,7 @@ export async function runNativeCommand(
   name: string,
   argv: string[],
   cwd: string,
-  timeoutMs = 90_000,
+  timeoutMs: number = operationalTimeouts.nativeCommandMs,
   environment: Record<string, string> = {},
 ): Promise<NativeCommandResult> {
   const started = performance.now();
@@ -173,7 +174,9 @@ export async function installPinnedTool(pin: ToolPin, cacheRoot?: string): Promi
     throw Error("Native tool cache parent must have an exact canonical path.");
   const temporary = await mkdtemp(join(parent, ".verified-install-"));
   try {
-    const response = await fetch(pin.url, { signal: AbortSignal.timeout(60_000) });
+    const response = await fetch(pin.url, {
+      signal: AbortSignal.timeout(operationalTimeouts.networkMs),
+    });
     if (!response.ok)
       throw Error("Native tool download failed: " + pin.name + " HTTP " + response.status);
     const declaredLength = Number(response.headers.get("content-length") ?? "0");

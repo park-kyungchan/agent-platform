@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "./operational-timeouts";
 import { createHash } from "node:crypto";
 import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -83,7 +84,7 @@ export async function runSecretCheck(
   rootPath: string,
   files: readonly string[],
   tool: VerifiedSecretTool,
-  timeoutMs = 90_000,
+  timeoutMs: number = operationalTimeouts.nativeCommandMs,
 ): Promise<SecretCheckResult> {
   const started = performance.now(),
     root = resolve(rootPath);
@@ -103,7 +104,7 @@ export async function runSecretCheck(
     !/^[a-f0-9]{64}$/.test(tool.binarySha256) ||
     !Number.isSafeInteger(timeoutMs) ||
     timeoutMs < 1000 ||
-    timeoutMs > 90_000
+    timeoutMs > operationalTimeouts.nativeCommandMs
   ) {
     throw Error("Secret scan requires an exact verified native tool and bounded timeout.");
   }
@@ -163,7 +164,7 @@ export async function runSecretCheck(
         "--max-archive-depth=0",
         "--max-decode-depth=0",
         "--max-target-megabytes=2",
-        "--timeout=60",
+        "--timeout=" + operationalTimeouts.secretScanSeconds,
         sourceRoot,
       ],
       {

@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { randomUUID } from "node:crypto";
 import { appendFile, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -129,7 +130,7 @@ export class WorkerController {
   async docker(args: string[], maxBytes = 4_000_000) {
     return fixedProcess(["/usr/bin/docker", ...args], {
       cwd: this.policyRoot,
-      timeoutMs: 120000,
+      timeoutMs: operationalTimeouts.processMs,
       maxBytes,
     });
   }
@@ -230,7 +231,12 @@ export class WorkerController {
     try {
       result = await fixedProcess(
         ["/usr/bin/docker", "start", "--attach", "--interactive", containerId],
-        { cwd: this.policyRoot, stdin: spec.stdin, timeoutMs: 900000, maxBytes: 8_000_000 },
+        {
+          cwd: this.policyRoot,
+          stdin: spec.stdin,
+          timeoutMs: operationalTimeouts.workerMs,
+          maxBytes: 8_000_000,
+        },
       );
     } catch (error) {
       await this.record({

@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { spawn } from "node:child_process";
 import { insist, sha256 } from "./policy";
 
@@ -49,7 +50,7 @@ export async function fixedProcess(
   const timer = setTimeout(() => {
     timedOut = true;
     kill();
-  }, options.timeoutMs ?? 120000);
+  }, options.timeoutMs ?? operationalTimeouts.processMs);
   try {
     const code = await new Promise<number>((done, reject) => {
       child.once("error", reject);

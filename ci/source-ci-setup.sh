@@ -33,7 +33,7 @@ def need(condition, code):
 
 def command(argv, cwd):
     p = subprocess.run(argv, cwd=cwd, env=clean_env, stdin=subprocess.DEVNULL,
-                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=600)
     need(p.returncode == 0, "FIXED_COMMAND_FAILED")
     need(len(p.stdout) <= 65536 and len(p.stderr) <= 65536, "COMMAND_METADATA_BUDGET")
     return p.stdout.decode("utf-8").strip()

@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { prepareProbeEnvironment } from "./probe-environment";
 import { expect, test } from "bun:test";
 import { resolve, join } from "node:path";
@@ -29,7 +30,10 @@ async function execute(c: SemanticCase, path = join(root, c.module)) {
       cwd: "/tmp",
       env: await prepareProbeEnvironment(),
       stdin: Buffer.from(JSON.stringify(semanticRequest(c))),
-      timeoutMs: c.module === scenarioModule ? 120000 : 15000,
+      timeoutMs:
+        c.module === scenarioModule
+          ? operationalTimeouts.processMs
+          : operationalTimeouts.behaviorCallMs,
       maxBytes: 128000,
     },
   );
@@ -171,7 +175,7 @@ test("actual complete production catalogue reaches aggregate and pure issuer, re
       Date.now(),
     ),
   ).toThrow();
-}, 600000);
+}, 3_000_000);
 
 test("the immutable P coverage map accounts for the actual full legacy denominator", async () => {
   const minimum = await readPolicyMinimum(root);

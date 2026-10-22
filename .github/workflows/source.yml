@@ -14,7 +14,7 @@ jobs:
   source:
     name: Canonical source checks
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -50,7 +50,8 @@ jobs:
   quality:
     name: Quality and architecture checks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 50m inner tests + 1m completion drain; next whole minute encloses that 51m wrapper.
+    timeout-minutes: 52
     outputs:
       artifact-digest: ${{ steps.evidence.outputs.artifact-digest }}
     steps:
@@ -99,7 +100,7 @@ jobs:
     name: Prospective merge integration
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 75
     steps:
       # Default checkout retains this PR event's GitHub synthetic merge commit.
       # Authored-head source/quality/native-review checks remain separate jobs.
@@ -156,7 +157,7 @@ jobs:
   native-review:
     name: Exact head native independent review
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -184,7 +185,7 @@ jobs:
     if: ${{ always() }}
     needs: [source, quality, merge-integration, native-review]
     runs-on: ubuntu-latest
-    timeout-minutes: 1
+    timeout-minutes: 5
     steps:
       - name: Require source quality and exact head native review
         env:

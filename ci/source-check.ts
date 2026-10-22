@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "./quality/operational-timeouts";
 import {
   validateReceiptWithEvidence,
   validatePlatformReviewWithEvidence,
@@ -566,7 +567,13 @@ async function sourceChecks() {
       .map((path) => join(common, path));
     if (tests.length)
       packageChecks.push(() =>
-        run(packageRoot, [process.execPath, "test", "--timeout", "120000", ...tests]),
+        run(packageRoot, [
+          process.execPath,
+          "test",
+          "--timeout",
+          String(operationalTimeouts.sourceTestMs),
+          ...tests,
+        ]),
       );
   }
   const packageStarted = performance.now();
@@ -587,7 +594,7 @@ async function sourceChecks() {
       process.execPath,
       "test",
       "--timeout",
-      "120000",
+      String(operationalTimeouts.sourceTestMs),
       ...qualityTests.map((path) => join(common, path)),
     ]);
   // Each guard runs in a fresh process, retaining native first-import/cache checks.
@@ -833,6 +840,15 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
     throw Error(
       "Exact native review head, repository, authenticated read and expected status creator are required",
     );
+  const now = options.now ?? (() => performance.now());
+  const deadline = now() + operationalTimeouts.reviewPublicationMs;
+  const trustedMainPush =
+    env.GITHUB_ACTIONS === "true" &&
+    env.GITHUB_EVENT_NAME === "push" &&
+    env.GITHUB_REF === "refs/heads/main" &&
+    env.GITHUB_REF_PROTECTED === "true" &&
+    env.GITHUB_SHA === head;
+  let readingStatuses = true;
   async function api(path: string) {
     const response = await fetch("https://api.github.com/repos/" + repository + "/" + path, {
       headers: {
@@ -841,25 +857,24 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
         "X-GitHub-Api-Version": "2022-11-28",
       },
       redirect: "error",
+      signal: AbortSignal.timeout(
+        readingStatuses && trustedMainPush
+          ? Math.max(1, Math.floor(Math.min(operationalTimeouts.networkMs, deadline - now())))
+          : operationalTimeouts.networkMs,
+      ),
     });
     if (!response.ok) throw Error("Native review API read failed: " + response.status);
     return (await response.json()) as any;
   }
   const readApi = options.readApi ?? api;
-  const now = options.now ?? (() => performance.now());
   const delay =
     options.delay ??
     ((milliseconds) => new Promise<void>((done) => setTimeout(done, milliseconds)));
-  const deadline = now() + 60_000;
-  const trustedMainPush =
-    env.GITHUB_ACTIONS === "true" &&
-    env.GITHUB_EVENT_NAME === "push" &&
-    env.GITHUB_REF === "refs/heads/main" &&
-    env.GITHUB_REF_PROTECTED === "true" &&
-    env.GITHUB_SHA === head;
   let statuses = await readApi(`commits/${head}/statuses?per_page=100`);
   let waitingAnnounced = false;
   for (;;) {
+    if (trustedMainPush && now() >= deadline)
+      throw Error("Native independent review status missing within publication wait");
     if (
       !Array.isArray(statuses) ||
       statuses.length > 100 ||
@@ -893,7 +908,7 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
     if (remaining <= 0) break;
     if (!waitingAnnounced) {
       console.log(
-        "Exact-head review status absent on protected main push; waiting up to 60 seconds for publication",
+        "Exact-head review status absent on protected main push; waiting up to 300 seconds for publication",
       );
       waitingAnnounced = true;
     }
@@ -901,6 +916,7 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
     if (now() >= deadline) break;
     statuses = await readApi(`commits/${head}/statuses?per_page=100`);
   }
+  readingStatuses = false;
   const status = statuses.find((value: any) => value.context === "native-independent-review");
   if (
     !status ||

@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { prepareProbeEnvironment } from "./probe-environment";
 import { loadBehaviorModule } from "./scenario-adapters";
 import { callBehavior } from "./semantic";
@@ -51,7 +52,7 @@ async function install(): Promise<void> {
     {
       cwd: source,
       env: { HOME: "/job/home", BUN_INSTALL_CACHE_DIR: "/prepared/bun-cache" },
-      timeoutMs: 600000,
+      timeoutMs: operationalTimeouts.frozenInstallMs,
     },
   );
   insist(r.code === 0 && !r.timedOut, "FROZEN_INSTALL_FAILED");
@@ -106,7 +107,7 @@ async function main(): Promise<void> {
       {
         cwd: root,
         env: { HOME: "/job/home", BUN_INSTALL_CACHE_DIR: "/job/cache" },
-        timeoutMs: 120000,
+        timeoutMs: operationalTimeouts.processMs,
       },
     );
     process.stdout.write(r.stdout);

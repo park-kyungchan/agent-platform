@@ -7,6 +7,7 @@ import { ESLint } from "eslint";
 import * as prettier from "prettier";
 import ts from "typescript";
 import tseslint from "typescript-eslint";
+import { operationalTimeouts } from "./operational-timeouts";
 import {
   readArchitectureSnapshot,
   validateArchitecture,
@@ -572,7 +573,7 @@ export async function runQuality(
               "quality-negative-fixtures",
               [process.execPath, "test", "ci/"],
               root,
-              360_000,
+              operationalTimeouts.qualityFixturesMs,
               {
                 QUALITY_NATIVE_TESTS: "1",
                 GITLEAKS_VERIFY_BINARY: installedSecretTool!.path,

@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../../operational-timeouts";
 import { join } from "node:path";
 import { scratch, git, commit, write, bytes, hash, inputFixture, capture } from "./support";
 import type {
@@ -551,7 +552,7 @@ async function readBlob(root: string, at: string, path: string): Promise<string>
   const result = await import("../process").then(({ fixedProcess }) =>
     fixedProcess(["/usr/bin/git", "-C", root, "cat-file", "blob", oid], {
       cwd: root,
-      timeoutMs: 10000,
+      timeoutMs: operationalTimeouts.scenarioCommandMs,
       maxBytes: 1000000,
     }),
   );

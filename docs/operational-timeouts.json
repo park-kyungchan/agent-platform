@@ -1,0 +1,74 @@
+{
+  "schema": "agent-platform.operational-timeout-policy.v1",
+  "baselineCommit": "b308033be9fceca4279e114d99a038f51a33ed12",
+  "factor": 5,
+  "application": "Apply once to source-owned operational defaults and fixed CI, command, network and completion waits. Never multiply a supplied caller budget or an already-scaled value.",
+  "ciDefaultsMilliseconds": {
+    "nativeCommand": [90000, 450000],
+    "networkResponse": [60000, 300000],
+    "fixedProcess": [120000, 600000],
+    "sourceRuntimePreparation": [120000, 600000],
+    "sourceTestDefault": [120000, 600000],
+    "releaseCoverageWatchdog": [120000, 600000],
+    "protectedMainReviewPublication": [60000, 300000],
+    "frozenInstall": [600000, 3000000],
+    "sourceFetch": [180000, 900000],
+    "workerOccurrence": [900000, 4500000],
+    "scenarioCommand": [10000, 50000],
+    "behaviorCall": [15000, 75000]
+  },
+  "workflowsMinutes": {
+    "source": [15, 75],
+    "quality": [10, 52],
+    "merge-integration": [15, 75],
+    "native-review": [3, 15],
+    "source-gate": [1, 5],
+    "trusted-source": [60, 300]
+  },
+  "enclosingCorrection": {
+    "baselineDefect": "The quality-negative-fixtures command had a 360000ms outer timeout while required preflight and semantic tests each explicitly allowed 600000ms. Blind fivefold scaling leaves a 1800000ms outer timeout below 3000000ms inner tests.",
+    "selectedCommandMilliseconds": 3060000,
+    "reason": "Allow the longest 3000000ms inner test plus one finite 60000ms completion/output-drain allowance. 51 minutes is the minimum enclosing command bound under that allowance; 52 minutes is the next whole workflow minute strictly above it, replacing the otherwise insufficient 50 minutes.",
+    "aggregateSemantics": "Workflow and worker bounds are aggregate wall-clock ceilings, not reservations for every sequential child to consume its full limit. Preparation includes install and tool downloads/extraction within its 75-minute worker ceiling. Exhaustion still fails the original occurrence; a longer deadline does not authorize replay."
+  },
+  "otherConsumers": [
+    "Secret scanner inner wait60s->300s; default and maximum outer wait90s->450s. Explicit admitted shorter outer waits remain literal.",
+    "Hosted CI bootstrap fixed commands120s->600s; source-runtime preparation120s->600s ends before continuing source checks.",
+    "Evidence writer flock30s->150s and SQLite busy wait30000ms->150000ms bound lock acquisition, not lock ownership or lease validity.",
+    "Codex checkout observation and Git Work read/owner commands10s->50s; finite source compiler/bootstrap30s->150s.",
+    "Research capture default45000ms->225000ms and fixed bridge grace5000ms->25000ms. Existing dynamic two-stage multiplier is unchanged; supplied timeoutMs is passed unchanged to the bridge.",
+    "Research request operational ceiling180000ms->900000ms; lower bound1000ms and attempt count remain unchanged. The numeric ceiling does not change the generated TypeScript interface. This prepared dependency-copy successor still requires its semantic owner's reviewed source/pin adoption.",
+    "Research update total900000ms->4500000ms, per-command600000ms->3000000ms, fixed validation wait20000ms->100000ms and termination grace5s->25s. Supplied total/command budgets and min(command, remaining-total) remain unchanged.",
+    "Affected fixed test-process and enclosing test watchdogs scale once; synthetic latency, expiry and freshness fixtures do not."
+  ],
+  "preserved": [
+    "Caller-supplied command, capture, recovery and evaluation budgets",
+    "Token, JWT, lease, intent, admission and permission validity, including fictional expiry fixtures",
+    "Audit age/freshness, allowed clock skew, evidence/custody retention and immutable historical records",
+    "5000ms review polling cadence, communication heartbeat and supported tool blocking-wait maximum",
+    "Evaluation budgets, token limits, native background-review input-token caps and attempt counts",
+    "Native owner, first-import/source closure, effect fencing, no-replay and independent exact-source review requirements"
+  ],
+  "reviewPublication": {
+    "wait": "Only genuine absent exact-head status on an actual protected-main push may wait up to300s. PR/dispatch/foreign contexts, present holds, wrong publisher, malformed replies and API errors remain fail-fast. A response returning at or after the publication deadline cannot supply timely proof.",
+    "operatorOrder": "Root must prepare the bounded actual-M receipt/status cutover before eventual merge and publish promptly after joining exact actual M. Increasing the absence wait alone does not fix publication ordering. No new publisher, retry loop or native effect is introduced."
+  },
+  "verification": {
+    "executionBoundary": "Authored, not executed by the source author. Run only in the qualified UID1000/networknone runner with its exact frozen source/dependency/tool/owner closure.",
+    "qualityPrerequisite": "Full quality also requires the existing separately admitted real credential-free dependency audit and exact prepared tools. Root uses that audit's trusted offline consumer; do not attempt a network-dependent audit in a networknone worker or label a missing audit successful. The entrypoints below identify required checks, not new effect permission or an offline full-quality pass.",
+    "commands": [
+      "bun test ci/review-gate.test.ts ci/quality/operational-timeouts.test.ts ci/quality/secret-check.test.ts ci/quality/source-runtime.test.ts ci/quality/harness-scenarios/ci-oracles.test.ts",
+      "bun test --timeout 600000 ci/quality/trusted/preflight.test.ts ci/quality/trusted/scenarios.test.ts ci/quality/trusted/semantic.test.ts ci/quality/trusted/source-completion.test.ts ci/quality/trusted/policy.test.ts",
+      "bun test --timeout 600000 ci/quality/trusted/release.test.ts",
+      "bun run check:handoff",
+      "bun run check:imports",
+      "bun run check:quality",
+      "bun ci/source-check.ts",
+      "bun ci/verify-runtime-layout.ts"
+    ],
+    "remaining": "Root supplies reviewed current source-provider and dependency-copy pin successors, affected package/old-owner checks, immutable committed-P coverage closure, independent review and authenticated publication. Merge, installed activation, native use, formal completion and Acceptance remain separate."
+  },
+  "nativePermissionGranted": false,
+  "wholeWorkComplete": false,
+  "AcceptanceDecision": null
+}

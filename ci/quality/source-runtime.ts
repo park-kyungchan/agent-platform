@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "./operational-timeouts";
 import { createHash } from "node:crypto";
 import {
   appendFile,
@@ -205,7 +206,7 @@ export async function continueSourceCi(role: SourceCiRole): Promise<boolean> {
   const scratch = await mkdtemp(join(temporary, "agent-platform-source-bun143-"));
   await chmod(scratch, 0o700);
   const controller = new AbortController(),
-    timer = setTimeout(() => controller.abort(), 120_000);
+    timer = setTimeout(() => controller.abort(), operationalTimeouts.sourceRuntimeMs);
   let published = false;
   try {
     const archiveBytes = await download(controller.signal);

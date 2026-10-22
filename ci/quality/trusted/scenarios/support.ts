@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../../operational-timeouts";
 import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, writeFile, readFile, rm, lstat } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -61,7 +62,7 @@ export async function git(root: string, args: string[], stdin?: string): Promise
         GIT_COMMITTER_EMAIL: "scenario@example.invalid",
       },
       stdin: stdin === undefined ? undefined : Buffer.from(stdin),
-      timeoutMs: 10000,
+      timeoutMs: operationalTimeouts.scenarioCommandMs,
       maxBytes: 1000000,
     },
   );
