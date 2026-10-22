@@ -12,7 +12,8 @@ import {
   type TrustedPolicy,
   type WorkerObservation,
 } from "./policy";
-import { fixedProcess, outputMetadata } from "./process";
+import { fixedProcess, outputMetadata, type ProcessResult } from "./process";
+import { parseDriverFailure } from "./driver-failure";
 
 export interface WorkerMount {
   source: string;
@@ -283,6 +284,10 @@ export class WorkerController {
       observation,
       transport: outputMetadata(result),
       finalInspectSha256: sha256(final.stdout),
+      driverFailure:
+        observation.exitCode !== 0 || result.code !== 0 || result.timedOut
+          ? parseDriverFailure(result.stderr, spec.role, spec.argv)
+          : null,
     });
     insist(
       result.code === observation.exitCode || observation.exitCode !== 0,
@@ -296,6 +301,35 @@ export class WorkerController {
       sha256(recipe) === this.policy.workerRecipeSha256 &&
         recipe.toString().startsWith("FROM " + baseImage + "\n"),
       "PINNED_WORKER_RECIPE_REQUIRED",
+    );
+    await this.record({
+      phase: "base-registration-intent",
+      baseImage,
+      platform: "linux/amd64",
+      retryAllowed: false,
+    });
+    let registration: ProcessResult;
+    try {
+      registration = await this.docker(["pull", "--platform=linux/amd64", baseImage], 128000);
+    } catch (error) {
+      await this.record({
+        phase: "base-registration-result",
+        baseImage,
+        transport: null,
+        errorSha256: sha256(error instanceof Error ? error.message : String(error)),
+        retryAllowed: false,
+      });
+      throw error;
+    }
+    await this.record({
+      phase: "base-registration-result",
+      baseImage,
+      transport: outputMetadata(registration),
+      retryAllowed: false,
+    });
+    insist(
+      registration.code === 0 && !registration.timedOut,
+      "BASE_REGISTRATION_UNKNOWN_RECONCILE_REQUIRED",
     );
     await this.record({ phase: "image-build-intent", recipeSha256: sha256(recipe), baseImage });
     const result = await this.docker(
