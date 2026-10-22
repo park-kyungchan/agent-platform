@@ -131,7 +131,7 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
                 if(document.record.kind!=="decision"||!use.decision||!lease.qualifyGoverning)throw Error("MEMORY_ACTUAL_GOVERNING_DECISION_REQUIRED");
                 assertMemory("GoverningDocument",use.decision);
                 if(canonicalMemory(use.decision.owner)!==canonicalMemory(document.record.owner)||!use.decision.sourceRefs.every(source=>document.record.sourceRefs.some(acquiredSource=>canonicalMemory(source)===canonicalMemory(acquiredSource)))||(document.claim&&document.claim.key!==use.decision.claim.key))throw Error("MEMORY_ACTUAL_GOVERNING_SOURCE_SCOPE_MISMATCH");
-                if(use.decision.status!=="active"||!validAt(use.decision,now)||!await lease.qualifyGoverning(address,use.decision,permit))use=null;
+                if(!use.decision.allowedReaders.includes(lease.readerId)||use.decision.status!=="active"||!validAt(use.decision,now)||!await lease.qualifyGoverning(address,use.decision,permit))use=null;
               }else if(!["preference","procedure","knowledge"].includes(document.record.kind)||!((use.kind==="standing-preference"&&document.record.kind==="preference")||use.kind==="standing-procedure"))throw Error("MEMORY_ADOPTION_CLASS_MISMATCH");
               await current();
             }

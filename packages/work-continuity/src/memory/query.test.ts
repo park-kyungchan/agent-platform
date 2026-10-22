@@ -147,6 +147,9 @@ test("current actual governing original closes a recalled summary claim even wit
  const out=await withMemoryQuery(query({query:"API_Z9"}),owner,value=>value);
  expect(out.hits.map(hit=>hit.document.record.id)).toEqual(["adopted","summary"]);expect(out.counts.governingClosure).toBe(1);expect(out.conflicts[0]!.selectedGoverningValue).toBe("Korean");
  expect(out.hits[0]!.currentInstructionEligible).toBe(true);
+ decision.allowedReaders=["another-reader"];
+ const excludedDecision=await withMemoryQuery(query({query:"API_Z9"}),owner,value=>value);expect(excludedDecision.hits.map(hit=>hit.document.record.id)).toEqual(["summary"]);expect(excludedDecision.governing).toEqual([]);
+ decision.allowedReaders=adopted.record.allowedReaders;
  f.state.governingQualified=false;
  const unqualified=await withMemoryQuery(query({query:"API_Z9"}),owner,value=>value);expect(unqualified.hits.map(hit=>hit.document.record.id)).toEqual(["summary"]);
 });
