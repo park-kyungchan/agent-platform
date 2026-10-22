@@ -4033,7 +4033,7 @@
     "predecessorApiQualification": {
       "path": "execution/S04-sublead/correction-v4/predecessor-namespace.root-receipt.json",
       "sha256": "475439627de7565cee81dab800d9917f29a157a820e886c8711882094163bd52",
-      "fixedApiSha256": "3e3cbb5965a5dc260e0b760e50cd572ccb3e120c4be3203ee549f89e2cc9fde3",
+      "exportTableSha256": "3e3cbb5965a5dc260e0b760e50cd572ccb3e120c4be3203ee549f89e2cc9fde3",
       "result": "Root-observed exact4cd context19+Hermes37 canonical/facade match; no native authority or current650 fixture qualification inferred."
     },
     "sourceReady": false,
