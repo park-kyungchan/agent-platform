@@ -7,6 +7,12 @@ import type {
 } from "./generated/memory-v1.ts";
 
 export type MemoryHeader = Omit<MemoryRecord, "text">;
+/** Local/legacy key bytes have meaning only within their exact semantic owner.
+ * Equal keys, parent scopes and discovery overlap confer no override relation. */
+export interface MemoryClaimIdentity {
+  owner: Scope;
+  key: string;
+}
 export type GoverningHeader = Omit<GoverningDocument, "schema" | "text" | "claim"> & {
   claimKey: string;
 };

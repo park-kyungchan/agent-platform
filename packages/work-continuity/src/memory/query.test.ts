@@ -167,9 +167,12 @@ test("actual current governing Decision prevails over decision-kind/owner-adopte
   expect(out.hits[0]!.usage).toBe("advisory-evidence");
   expect(out.conflicts[0]).toEqual({
     claimKey: "language",
+    claimIdentity: { owner: { kind: "user", userId: "synthetic-user" }, key: "language" },
     conflictingEvidence: true,
     governingConflict: false,
     selectedGoverningValue: "Korean",
+    resolution: "resolved",
+    incompleteSources: [],
   });
   expect(out.nativePermissionGranted).toBe(false);
   expect(out.semanticAcceptanceEstablished).toBe(false);

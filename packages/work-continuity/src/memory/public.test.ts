@@ -7,7 +7,7 @@ import { nativeFixture, memory } from "./fixtures/native-reader.ts";
 
 test("fresh explicit public Memory package imports have one production implementation without eager legacy dependency changes", async () => {
   const root = new URL("../../../../", import.meta.url).pathname;
-  const script = `import {strict as assert} from 'node:assert';import * as memory from '@palantirkc/work-continuity/memory/v1';import * as legacy from '@palantirkc/work-continuity/git-work';const direct=await import(${JSON.stringify(join(root, "packages/work-continuity/src/memory/query.ts"))});assert.equal(memory.withMemoryQuery,direct.withMemoryQuery);assert.equal('withMemoryQuery' in legacy,false);assert.equal(typeof memory.decodeMemory,'function');console.log('memory-public-route-pass');`;
+  const script = `import {strict as assert} from 'node:assert';import * as memory from '@palantirkc/work-continuity/memory/v1';import * as legacy from '@palantirkc/work-continuity/git-work';const direct=await import(${JSON.stringify(join(root, "packages/work-continuity/src/memory/query.ts"))});assert.equal(memory.withMemoryQuery,direct.withMemoryQuery);assert.equal(memory.memoryClaimKey,direct.memoryClaimKey);assert.equal('memoryClaimKey' in legacy,false);assert.equal('withMemoryQuery' in legacy,false);assert.equal(typeof memory.decodeMemory,'function');console.log('memory-public-route-pass');`;
   const child = Bun.spawn(
     [process.execPath, "--no-env-file", "--no-install", "--no-macros", "--no-addons", "-e", script],
     { cwd: root, stdout: "pipe", stderr: "pipe" },

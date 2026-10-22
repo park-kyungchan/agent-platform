@@ -40,8 +40,39 @@ Instruction eligibility requires separate authenticated native adoption proof fr
 already acquired originals. Actual decisions additionally require the actual
 Governing document, matching source/scope, allowed reader, current status and native
 applicability qualification. Recalled summaries close over already acquired actual
-governing originals before budgets. Conflicting governing decisions remain
-unresolved. Aggregate retained envelopes (including legacy metadata) are bounded at 2 MiB;
+governing originals before discretionary hit budgets. Current applicable governing
+originals and their conflicts are built before lexical selection: a search miss
+does not remove a current obligation or select a policy winner. Advisory Memory
+recall still requires relevance; this closure does not promote unrelated Memory.
+
+Claims use the exact canonical tuple `(owner Scope, local key)`, consistently for
+recall closure, conflict output, unique resolution and standing eligibility.
+`claimKey` and every legacy key retain their original bytes; conflict output adds
+`claimIdentity` so callers can distinguish independently owned policies. Subject
+overlap, selected Work, parent scope and equal key/value text do not establish
+override or applicability. Native `qualifyGoverning` must establish applicability
+in the request context. Cross-scope override/refinement is not inferred by this
+API; any such relationship needs an explicit native-qualified authority mapping,
+not a caller-supplied alias. Memory adoption still requires its actual Decision
+to have the same exact owner and local claim.
+
+Known permitted current authority sources that are unavailable or omitted by
+source/original/envelope budgets retain their exact source, owner, record class
+and claim provenance. Only their affected owner-qualified claims have
+`resolution: incomplete`, null `selectedGoverningValue` and held standing
+eligibility. Observed conflicts stay explicit even when closure is incomplete.
+Historical, unrelated, non-authoritative and unscoped unknown gaps do not invent
+a relationship to an otherwise complete claim. Unscoped discovery gaps still
+make overall source coverage partial; a resolved claim is scoped to its known
+current permitted inventory, not proof that every unknown source was discovered.
+Metadata beyond the 1000-source acquisition limit is still validated and currently
+authorized before recording a scoped omission; its bodies are never read.
+Governing output omissions also hold the affected claim, and authority warnings
+precede advisory hits. If the required metadata cannot fit, the whole query
+rejects rather than return a positive resolution without its provenance.
+
+Conflicting governing decisions remain unresolved. Aggregate retained envelopes
+(including legacy metadata) are bounded at 2 MiB;
 original acquisition is bounded at 16 MiB plus the final bounded read. Budget
 omissions are explicit. Full rows, source gaps and omissions stay visible; the query does not
 select a winner by recency, summary wording, or an enum.

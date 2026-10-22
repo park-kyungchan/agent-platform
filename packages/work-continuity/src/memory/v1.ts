@@ -11,11 +11,13 @@ export {
   withMemoryQuery,
   createMemoryQueryView,
   memorySourceKey,
+  memoryClaimKey,
   type MemoryQueryResult,
 } from "./query.ts";
 export {
   MemoryAcquisitionGap,
   type MemoryAddress,
+  type MemoryClaimIdentity,
   type MemoryHeader,
   type GoverningHeader,
   type MemoryInventory,
