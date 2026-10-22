@@ -153,6 +153,30 @@
       "sha256": "c41e34c02a2ac6cad4e09afe474a88cc581cea75fb4d5d926f457d40515a3533",
       "capabilityId": "work-continuity",
       "reason": "Canonical v3 Work contract definition and source implementation metadata. Work semantic ownership stays with codex-harness-engineering; existing Ontology generation and immutable releases retain their owner. Source only, no native permission or adoption."
+    },
+    {
+      "path": "packages/work-continuity/contracts/memory-v1.schema.json",
+      "sha256": "00b51da4a7b20abdf3ca73a927b79c53bf669b023fc9717c11d01cadef965281",
+      "capabilityId": "work-continuity",
+      "reason": "Canonical generated normative B2 Memory/query definition; native User Memory transactional custody and source/authority/permission boundaries retained. Source only, no native permission or adoption."
+    },
+    {
+      "path": "packages/work-continuity/src/memory/fixtures/public/corpus.public.json",
+      "sha256": "26ed9d6a800ebbdf249b1edf8858cdabe6c2958b67cadd6c463b2cc004e9ccf1",
+      "capabilityId": "work-continuity",
+      "reason": "Fixed independently authored synthetic Korean source-conformance corpus/expectations, preserved byte-for-byte. Fixture definition only; no actual user/native records, policy authority or native adoption."
+    },
+    {
+      "path": "packages/work-continuity/src/memory/fixtures/public/corpus.public.records.json",
+      "sha256": "d1af44ead38d293bede2a6afa9ab689adf1896155c3a10797c36af56a4e82b99",
+      "capabilityId": "work-continuity",
+      "reason": "Fixed independently authored synthetic Korean source-conformance corpus/expectations, preserved byte-for-byte. Fixture definition only; no actual user/native records, policy authority or native adoption."
+    },
+    {
+      "path": "packages/work-continuity/src/memory/fixtures/public/corpus.public.queries.json",
+      "sha256": "918aa2d7ad0fb1d32ca0d47531429e872dfc93e00e7d6f8bd1c4ff7c8c0ffe0d",
+      "capabilityId": "work-continuity",
+      "reason": "Fixed independently authored synthetic Korean source-conformance corpus/expectations, preserved byte-for-byte. Fixture definition only; no actual user/native records, policy authority or native adoption."
     }
   ],
   "stagedSources": [

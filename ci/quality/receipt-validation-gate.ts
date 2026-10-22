@@ -380,3 +380,113 @@ export async function ownerScopedReviewGate(policy: OwnerReviewPolicy): Promise<
   );
   console.log(JSON.stringify(result));
 }
+
+/** A successor is an explicit wrapper around the complete immutable original v2 proof.
+ * Only exact tree/manifest reuse is supported, with latest authenticated statuses on BOTH heads.
+ * A current hold never falls back to the original success. No native authorship is authenticated.
+ */
+export async function validatePlatformReviewWithEvidence(
+  receipt: unknown,
+  head: string,
+  tree: string,
+  repository: string,
+  reader: ReviewEvidenceReader & {
+    readCommit: (head: string) => Promise<unknown>;
+    readStatuses: (head: string) => Promise<unknown>;
+  },
+  publisher: { id: string; login?: string },
+): Promise<void> {
+  const r = record(receipt);
+  if (r.schema !== "native-independent-review-successor.v1") {
+    await validateReceiptWithEvidence(receipt, head, tree, repository, reader);
+    return;
+  }
+  const expected = [
+    "schema",
+    "binding",
+    "headSha",
+    "reviewedTreeSha",
+    "reviewedSourceManifestSha256",
+    "reviewer",
+    "author",
+    "conclusion",
+    "unresolvedFindings",
+    "reuse",
+  ]
+    .sort()
+    .join("|");
+  const reuse = record(r.reuse),
+    originalHead = reuse.originalHead;
+  if (
+    Object.keys(r).sort().join("|") !== expected ||
+    Object.keys(reuse).sort().join("|") !== "originalHead|receiptCommit|receiptSha256" ||
+    typeof originalHead !== "string" ||
+    !/^[a-f0-9]{40}$/.test(originalHead) ||
+    originalHead === head ||
+    typeof reuse.receiptCommit !== "string" ||
+    !/^[a-f0-9]{40}$/.test(reuse.receiptCommit) ||
+    typeof reuse.receiptSha256 !== "string" ||
+    !/^[a-f0-9]{64}$/.test(reuse.receiptSha256) ||
+    r.headSha !== head ||
+    r.reviewedTreeSha !== tree ||
+    r.conclusion !== "pass" ||
+    r.unresolvedFindings !== 0
+  )
+    throw Error("Explicit exact-head successor binding required");
+  const commit = record(await reader.readCommit(originalHead));
+  if (commit.sha !== originalHead || record(commit.tree).sha !== tree)
+    throw Error("Successor reuse requires identical actual reviewed tree");
+  const manifest = deriveReviewedSourceManifest(await reader.readTree(tree), tree);
+  if (r.reviewedSourceManifestSha256 !== manifest.sha256)
+    throw Error("Successor reuse manifest differs from actual source");
+  const path = `native-reviews/${originalHead}.json`;
+  const originalBytes = decodeBoundedReviewFile(
+    await reader.readFile(path, reuse.receiptCommit),
+    path,
+    32768,
+  );
+  if (
+    (await import("node:crypto")).createHash("sha256").update(originalBytes).digest("hex") !==
+    reuse.receiptSha256
+  )
+    throw Error("Original review receipt exact bytes differ");
+  const original: unknown = JSON.parse(Buffer.from(originalBytes).toString("utf8")),
+    proof = record(original);
+  if (proof.schema !== "native-independent-review.v2")
+    throw Error(
+      "Successor requires direct original full v2 proof, not a summary or recursive reuse",
+    );
+  await validateReceiptWithEvidence(original, originalHead, tree, repository, reader);
+  for (const field of ["binding", "reviewer", "author"]) {
+    const a = record(r[field]),
+      b = record(proof[field]);
+    if (
+      Object.keys(a).sort().join("|") !== Object.keys(b).sort().join("|") ||
+      Object.keys(a).some((key) => a[key] !== b[key])
+    )
+      throw Error("Successor must retain original ownership and independent native identities");
+  }
+  // Retain the already validated string type inside asynchronous status reads.
+  const originalStatusHead: string = originalHead;
+  async function currentOriginalStatus() {
+    const statuses = await reader.readStatuses(originalStatusHead);
+    if (!Array.isArray(statuses) || statuses.length > 100)
+      throw Error("Original current statuses unavailable");
+    const s = record(statuses.find((v) => record(v).context === "native-independent-review"));
+    const creator = record(s.creator);
+    const url = `https://github.com/${repository}/blob/${reuse.receiptCommit}/${path}`;
+    if (
+      !Number.isSafeInteger(s.id) ||
+      Number(s.id) <= 0 ||
+      s.state !== "success" ||
+      String(creator.id) !== publisher.id ||
+      (publisher.login && creator.login !== publisher.login) ||
+      s.target_url !== url
+    )
+      throw Error("Original latest review held, changed or from another publisher");
+    return s.id;
+  }
+  const before = await currentOriginalStatus();
+  if (before !== (await currentOriginalStatus()))
+    throw Error("Original latest review changed during reuse");
+}

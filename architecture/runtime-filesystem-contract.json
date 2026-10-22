@@ -278,5 +278,46 @@
       "authority": "none",
       "nativePermissionGranted": false
     }
-  ]
+  ],
+  "immutableSourceSuccessor": {
+    "schema": "agent-platform.immutable-source-layout.v1",
+    "classification": "implemented-source-contract-not-native-migration",
+    "canonicalWriter": "park-kyungchan/agent-platform",
+    "contentApi": "@palantirkc/work-continuity/source/v1",
+    "contentBinding": "common.source-content.v1",
+    "locationBinding": "common.source-location.v1",
+    "providerBinding": "common.source-provider.v1",
+    "recoveryBinding": "common.original-source-recovery.v1",
+    "map": {
+      "source": "/srv/agent-platform/source/agent-platform.git",
+      "release": "/srv/agent-platform/releases/agent-platform/<full-commit>/<content-sha256>",
+      "runtimeReleaseView": "/opt/agent-platform/releases/agent-platform/<full-commit>/<content-sha256>",
+      "workspace": "/srv/agent-platform/workspaces/<project>/<work>/<task>/<attempt>",
+      "custody": "/var/lib/agent-platform/custody",
+      "receipts": "/var/lib/agent-platform/receipts/<native-owner>",
+      "bindings": "/etc/agent-platform/bindings/<runtime>/<profile>.json",
+      "cache": "/var/cache/agent-platform",
+      "ephemeral": "/run/agent-platform"
+    },
+    "nativeOwnerExceptions": {
+      "rootHome": "/root",
+      "hermesBacking": "/docker/hermes-agent-2q3y/data",
+      "hermesView": "/opt/data",
+      "hermesUid": 10000,
+      "herdrBacking": "/docker/herdr-runtime/home",
+      "herdrView": "/home/palantirkc",
+      "herdrUid": 1000,
+      "hermesUpdater": "/docker/hermes-agent-2q3y/bin/hermes-main-update",
+      "codeServer": "separate owner/service; no source-adoption privilege change"
+    },
+    "rules": [
+      "Native observer must join exact content, physical path, mount namespace, actual UID/GID, authenticated profile/role and loaded tool image. Paths/digests grant no permission.",
+      "Current selection is native-owner-current; recovery uses original immutable content/location/registration/receipt, never current/latest.",
+      "Independent Git common directories across trust boundaries; exact single-writer task lanes, no broad RW/native-home/socket mounts.",
+      "No source/native state transplant, native data copy, helper/lock/profile/config/trust mutation or adoption follows from this source contract.",
+      "Preserve all previous v1 locations/projections as explicit historical/current exceptions until separately owner-qualified adoption; do not rewrite original evidence."
+    ],
+    "nativePermissionGranted": false,
+    "nativeAdoptionEstablished": false
+  }
 }

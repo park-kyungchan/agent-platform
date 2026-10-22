@@ -17,7 +17,8 @@
     "./backend/review/source-coverage": "./src/backend/review/source-coverage.ts",
     "./backend/review/handoff-contract": "./src/backend/review/handoff-contract.ts",
     "./backend/review/native-trace": "./src/backend/review/native-trace.ts",
-    "./backend/review/review-evidence": "./src/backend/review/review-evidence.ts"
+    "./backend/review/review-evidence": "./src/backend/review/review-evidence.ts",
+    "./academy/context-admission": "./src/academy/context-admission.ts"
   },
   "dependencies": {
     "zod": "4.6.5"

@@ -1,4 +1,7 @@
-import { validateReceiptWithEvidence } from "./quality/receipt-validation-gate";
+import {
+  validateReceiptWithEvidence,
+  validatePlatformReviewWithEvidence,
+} from "./quality/receipt-validation-gate";
 import { runIndependentPackageTests } from "./package-tests";
 import {
   contextProjectionPaths,
@@ -8,6 +11,7 @@ import {
 } from "./source-projection";
 import { validateSourceProviderProjections } from "./verify-runtime-layout";
 export { validateIndependentReviewReceipt } from "./quality/receipt-validator";
+import { captureInstalledRuntimeClosure } from "../packages/native-hermes-adapter/src/source-provider/dependency-closure.ts";
 import { createHash } from "node:crypto";
 import {
   cp,
@@ -22,7 +26,9 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-const sourceRoot = resolve(import.meta.dir, "..");
+let sourceRoot = resolve(import.meta.dir, "..");
+let trustedControllerRoot: string | null = null;
+let trustedSourceRunning = false;
 const sha = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 const json = async (path: string) => JSON.parse(await readFile(path, "utf8"));
 const writeJson = async (path: string, value: unknown) => {
@@ -257,6 +263,21 @@ async function prepareQaTree() {
     join(resolve(process.env.RUNNER_TEMP ?? tmpdir()), "agent-platform-source-"),
   );
   const common = join(qaBase, "projects/agent-platform");
+  // Fresh token-free metadata retains the actual committed source and tracked paths.
+  // Copy current source data below; never copy native Git configuration or hooks.
+  await mkdir(dirname(common), { recursive: true });
+  await run(qaBase, [
+    "git",
+    "-c",
+    "core.hooksPath=/dev/null",
+    "clone",
+    "--no-hardlinks",
+    "--no-checkout",
+    "--",
+    sourceRoot,
+    common,
+  ]);
+  await run(common, ["git", "-c", "core.hooksPath=/dev/null", "read-tree", "HEAD"]);
   await cp(sourceRoot, common, {
     recursive: true,
     dereference: false,
@@ -265,6 +286,10 @@ async function prepareQaTree() {
         .split(sep)
         .some((part) => ["node_modules", ".git", ".private"].includes(part)),
   });
+  if (trustedControllerRoot) {
+    const { pinQaController } = await import("./quality/trusted/qa-inputs");
+    await pinQaController(common, trustedControllerRoot);
+  }
   const fixture = await json(join(common, "owner-fixture/manifest.json"));
   if (
     fixture.schema !== "agent-platform.finite-native-owner-code-fixture.v1" ||
@@ -306,6 +331,19 @@ async function prepareQaTree() {
   project.payload.details.sourceOwnerRoot = common;
   await writeJson(join(common, "project.json"), project);
   await run(common, [process.execPath, "install", "--frozen-lockfile", "--ignore-scripts"]);
+  // Use the same canonical installed dependency observer as the source provider.
+  // The synthetic owner must keep the already frozen runtime, including transitive bindings.
+  const qaRuntime = await captureInstalledRuntimeClosure(
+    common,
+    async (path, maxBytes) => {
+      const bytes = await readFile(path);
+      if (bytes.length > maxBytes) throw Error("QA dependency source exceeds its byte bound");
+      return bytes;
+    },
+    sha,
+    false,
+    [join(common, "packages/work-continuity/src/context/index.ts")],
+  );
   for (const owner of ["codex-harness-engineering"]) {
     const root = join(qaBase, "projects", owner);
     await mkdir(join(root, "releases"), { recursive: true });
@@ -323,6 +361,14 @@ async function prepareQaTree() {
       private: true,
       type: "module",
       dependencies,
+      overrides: Object.fromEntries(
+        qaRuntime.dependencies
+          .filter(({ name }) => name !== "@palantirkc/ontology")
+          .map(({ name, root: dependencyRoot }) => [
+            name,
+            "file:" + relative(root, join(common, dependencyRoot)),
+          ]),
+      ),
     });
     // Synthetic owner lock is generated only from finite local package bindings, then frozen.
     await run(root, [process.execPath, "install", "--ignore-scripts"]);
@@ -443,7 +489,7 @@ async function sourceChecks() {
   );
   // Resolve the scope from the installed QA tree; a clean checkout needs no root dependencies.
   const { readQualityScope, readTrackedMarkdown, testFile } = (await import(
-    join(common, "ci/quality/scope.ts")
+    join(trustedControllerRoot ?? common, "ci/quality/scope.ts")
   )) as {
     readTrackedMarkdown(root: string): Promise<string[]>;
     testFile(path: string): boolean;
@@ -459,6 +505,11 @@ async function sourceChecks() {
     }>;
   };
   const scope = await readQualityScope(common, undefined, await readTrackedMarkdown(sourceRoot));
+  if (trustedControllerRoot) {
+    const required = await readQualityScope(trustedControllerRoot);
+    scope.testFiles = [...new Set([...required.testFiles, ...scope.testFiles])].sort();
+    scope.lintFiles = [...new Set([...required.lintFiles, ...scope.lintFiles])].sort();
+  }
   const immutable = {
     "0.1.0": "650385dfebbeb0c78711ac5be0f4762ffd8a19aefc79e06be505c841d4db3add",
     "0.2.0": "3f9995d0b91d2ad39dfc7cedbb6e35b1cb9d29c2e57223ca0c076d2030319406",
@@ -514,7 +565,9 @@ async function sourceChecks() {
       .filter((path) => path.startsWith(`packages/${entry.name}/`))
       .map((path) => join(common, path));
     if (tests.length)
-      packageChecks.push(() => run(packageRoot, [process.execPath, "test", ...tests]));
+      packageChecks.push(() =>
+        run(packageRoot, [process.execPath, "test", "--timeout", "120000", ...tests]),
+      );
   }
   const packageStarted = performance.now();
   const packageStartedAt = new Date().toISOString();
@@ -533,6 +586,8 @@ async function sourceChecks() {
     await run(common, [
       process.execPath,
       "test",
+      "--timeout",
+      "120000",
       ...qualityTests.map((path) => join(common, path)),
     ]);
   // Each guard runs in a fresh process, retaining native first-import/cache checks.
@@ -727,6 +782,31 @@ console.log(JSON.stringify({recordClass:'source-only-work-method-source-drift-re
   );
 }
 
+/** P-loaded finite controller; subject source is an explicit parameter, never a module import. */
+export async function runTrustedSourceChecks(
+  targetRoot: string,
+  policyRoot: string,
+): Promise<void> {
+  if (
+    trustedSourceRunning ||
+    resolve(policyRoot) !== resolve(import.meta.dir, "..") ||
+    resolve(targetRoot) === resolve(policyRoot) ||
+    (await realpath(targetRoot)) !== targetRoot
+  )
+    throw Error("Exact distinct trusted controller and source roots required");
+  trustedSourceRunning = true;
+  const prior = sourceRoot;
+  sourceRoot = targetRoot;
+  trustedControllerRoot = policyRoot;
+  try {
+    await sourceChecks();
+  } finally {
+    sourceRoot = prior;
+    trustedControllerRoot = null;
+    trustedSourceRunning = false;
+  }
+}
+
 export interface ReviewGateOptions {
   env?: NodeJS.ProcessEnv;
   readApi?: (path: string) => Promise<unknown>;
@@ -862,10 +942,19 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
   const receipt = JSON.parse(Buffer.from(content.content, "base64").toString("utf8"));
   const commit = await readApi("git/commits/" + head);
   if (commit.sha !== head) throw Error("GitHub API returned another commit");
-  await validateReceiptWithEvidence(receipt, head, commit.tree?.sha, repository, {
-    readTree: async (treeSha) => readApi(`git/trees/${treeSha}?recursive=1`),
-    readFile: async (path, ref) => readApi(`contents/${path}?ref=${ref}`),
-  });
+  await validatePlatformReviewWithEvidence(
+    receipt,
+    head,
+    commit.tree?.sha,
+    repository,
+    {
+      readTree: async (treeSha) => readApi(`git/trees/${treeSha}?recursive=1`),
+      readFile: async (path, ref) => readApi(`contents/${path}?ref=${ref}`),
+      readCommit: async (sha) => readApi(`git/commits/${sha}`),
+      readStatuses: async (sha) => readApi(`commits/${sha}/statuses?per_page=100`),
+    },
+    { id: expectedCreator, login: expectedLogin },
+  );
   console.log(
     JSON.stringify({
       schema: "agent-platform.native-review-ci.v1",

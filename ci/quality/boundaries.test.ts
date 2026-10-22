@@ -226,7 +226,10 @@ test("authored head and prospective merge both run full quality while native rev
     const job = workflow.jobs[name]!;
     const nativeCheckout = job.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
     expect(nativeCheckout?.with?.["fetch-depth"]).toBe(0);
-    const sourceCheck = job.steps.find((step) => step.run === "bun ci/source-check.ts");
+    const sourceCheck = job.steps.find(
+      (step) =>
+        step.run === "/usr/bin/env RUNNER_TEMP=/job/tmp TMPDIR=/job/tmp bun ci/source-check.ts",
+    );
     expect(sourceCheck?.env?.COMMON_BASE_SHA).toBe("${{ github.event.pull_request.base.sha }}");
     expect(
       job.steps.some((step) => step.run?.split("\n").includes("bun ci/verify-runtime-layout.ts")),

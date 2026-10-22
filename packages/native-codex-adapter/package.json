@@ -6,7 +6,8 @@
   "exports": {
     "./hooks": "./src/native/hooks.ts",
     "./home-context": "./src/native/home-context.ts",
-    "./evaluation-ledger": "./src/native/evaluation-ledger.ts"
+    "./evaluation-ledger": "./src/native/evaluation-ledger.ts",
+    "./source/v1": "./src/native/source-v1.ts"
   },
   "dependencies": {
     "@palantirkc/work-continuity": "file:../work-continuity"

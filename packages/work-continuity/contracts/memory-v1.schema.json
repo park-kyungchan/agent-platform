@@ -1,0 +1,332 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agent-platform.invalid/contracts/memory-v1.schema.json",
+  "title": "MemoryV1",
+  "$ref": "#/$defs/MemoryDocument",
+  "$defs": {
+    "Scope": {
+      "$ref": "git-work-v3.schema.json#/$defs/Scope"
+    },
+    "SourceRef": {
+      "$ref": "git-work-v3.schema.json#/$defs/SourceRef"
+    },
+    "TaskRef": {
+      "$ref": "git-work-v3.schema.json#/$defs/TaskRef"
+    },
+    "WorkRef": {
+      "$ref": "git-work-v3.schema.json#/$defs/WorkRef"
+    },
+    "Id": {
+      "$ref": "git-work-v3.schema.json#/$defs/Id"
+    },
+    "Digest": {
+      "$ref": "git-work-v3.schema.json#/$defs/Digest"
+    },
+    "Revision": {
+      "$ref": "git-work-v3.schema.json#/$defs/Revision"
+    },
+    "Json": {
+      "$ref": "git-work-v3.schema.json#/$defs/Json"
+    },
+    "Timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{3})?Z$"
+    },
+    "MemoryRecord": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "owner": {
+          "$ref": "#/$defs/Scope"
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Scope"
+          },
+          "maxItems": 100
+        },
+        "kind": {
+          "enum": [
+            "preference",
+            "decision",
+            "episode",
+            "procedure",
+            "knowledge"
+          ]
+        },
+        "status": {
+          "enum": [
+            "candidate",
+            "active",
+            "superseded",
+            "revoked"
+          ]
+        },
+        "authority": {
+          "enum": [
+            "source-observation",
+            "model-inference",
+            "owner-adopted"
+          ]
+        },
+        "sourceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "maxItems": 100,
+          "minItems": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "allowedReaders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 100,
+          "uniqueItems": true
+        },
+        "validFrom": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "validUntil": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "owner",
+        "subjects",
+        "kind",
+        "status",
+        "authority",
+        "sourceRefs",
+        "text",
+        "allowedReaders"
+      ],
+      "additionalProperties": false
+    },
+    "Claim": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/Id"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "LegacyBinding": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "$ref": "#/$defs/Id"
+        },
+        "identityKey": {
+          "$ref": "#/$defs/Id"
+        },
+        "generationId": {
+          "$ref": "#/$defs/Id"
+        },
+        "claimKey": {
+          "$ref": "#/$defs/Id"
+        },
+        "original": {
+          "$ref": "#/$defs/SourceRef"
+        },
+        "metadata": {
+          "$ref": "#/$defs/Json"
+        }
+      },
+      "required": [
+        "protocol",
+        "identityKey",
+        "original",
+        "metadata"
+      ],
+      "additionalProperties": false
+    },
+    "MemoryDocument": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.memory-document.v1"
+        },
+        "record": {
+          "$ref": "#/$defs/MemoryRecord"
+        },
+        "claim": {
+          "$ref": "#/$defs/Claim"
+        },
+        "legacy": {
+          "$ref": "#/$defs/LegacyBinding"
+        }
+      },
+      "required": [
+        "schema",
+        "record"
+      ],
+      "additionalProperties": false
+    },
+    "GoverningDocument": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.memory-governing.v1"
+        },
+        "id": {
+          "$ref": "#/$defs/Id"
+        },
+        "revision": {
+          "$ref": "#/$defs/Revision"
+        },
+        "owner": {
+          "$ref": "#/$defs/Scope"
+        },
+        "recordClass": {
+          "enum": [
+            "decision",
+            "spec"
+          ]
+        },
+        "status": {
+          "enum": [
+            "active",
+            "superseded",
+            "revoked"
+          ]
+        },
+        "sourceRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SourceRef"
+          },
+          "maxItems": 100,
+          "minItems": 1
+        },
+        "allowedReaders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Id"
+          },
+          "maxItems": 100,
+          "uniqueItems": true
+        },
+        "claim": {
+          "$ref": "#/$defs/Claim"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000
+        },
+        "validFrom": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "validUntil": {
+          "$ref": "#/$defs/Timestamp"
+        }
+      },
+      "required": [
+        "schema",
+        "id",
+        "revision",
+        "owner",
+        "recordClass",
+        "status",
+        "sourceRefs",
+        "allowedReaders",
+        "claim",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "MemoryQuery": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "const": "common.memory-query.v1"
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "mode": {
+          "enum": [
+            "current",
+            "history"
+          ]
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Scope"
+          },
+          "maxItems": 100
+        },
+        "work": {
+          "$ref": "#/$defs/WorkRef"
+        },
+        "task": {
+          "$ref": "#/$defs/TaskRef"
+        },
+        "effectiveDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "transport": {
+          "enum": [
+            "full",
+            "compact",
+            "dispatch",
+            "resume"
+          ]
+        },
+        "asOf": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "maxChars": {
+          "type": "integer",
+          "minimum": 512,
+          "maximum": 64000
+        }
+      },
+      "required": [
+        "schema",
+        "purpose",
+        "query",
+        "mode"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -17,6 +17,7 @@ import {
   readToolPins,
   runNativeCommand,
   runWorkflowTools,
+  type NativeCommandResult,
 } from "./native-tools";
 import { runSecretCheck, verifySecretCanary, type VerifiedSecretTool } from "./secret-check";
 import { exactSourceFile, readQualityScope, safeSourcePath, type QualityScope } from "./scope";
@@ -171,9 +172,10 @@ async function collectAnyDebt(scope: QualityScope): Promise<AnyDebt[]> {
 export async function checkFormatting(
   scope: QualityScope,
   write = false,
+  policyRoot = scope.root,
 ): Promise<{ files: number; changed: string[]; status: "pass" | "fail" }> {
   const config = JSON.parse(
-    await exactSourceFile(scope.root, ".prettierrc.json"),
+    await exactSourceFile(policyRoot, ".prettierrc.json"),
   ) as prettier.Options;
   const changed: string[] = [];
   for (const path of scope.formatFiles) {
@@ -217,7 +219,10 @@ export function createTypedLinter(root: string, projectPath: string): ESLint {
   });
 }
 
-export async function checkTypedLint(scope: QualityScope): Promise<{
+export async function checkTypedLint(
+  scope: QualityScope,
+  policyRoot = scope.root,
+): Promise<{
   files: number;
   findings: {
     path: string;
@@ -239,7 +244,7 @@ export async function checkTypedLint(scope: QualityScope): Promise<{
       projectPath,
       JSON.stringify(
         {
-          extends: join(scope.root, "ci/quality/tsconfig.json"),
+          extends: join(policyRoot, "ci/quality/tsconfig.json"),
           files: scope.lintFiles.map((path) => join(scope.root, path)),
           include: [],
         },
@@ -260,7 +265,7 @@ export async function checkTypedLint(scope: QualityScope): Promise<{
     );
     const current = await collectAnyDebt(scope);
     const baseline = JSON.parse(
-      await exactSourceFile(scope.root, "ci/quality/any-baseline.json"),
+      await exactSourceFile(policyRoot, "ci/quality/any-baseline.json"),
     ) as AnyBaseline;
     const newDebt = compareAnyBaseline(current, baseline);
     return {
@@ -274,6 +279,81 @@ export async function checkTypedLint(scope: QualityScope): Promise<{
   }
 }
 
+/** Immutable P checkers read subject bytes; no candidate scripts/plugins/config are imported. */
+export async function runTrustedStaticQuality(
+  root: string,
+  policyRoot: string,
+  toolCacheRoot: string,
+) {
+  if (
+    resolve(policyRoot) !== resolve(import.meta.dir, "../..") ||
+    resolve(root) === resolve(policyRoot)
+  )
+    throw Error("Exact immutable P parser and distinct subject required");
+  const own = await readQualityScope(policyRoot),
+    candidate = await readQualityScope(root);
+  const union = (a: string[], b: string[]) => [...new Set([...a, ...b])].sort();
+  const selected: QualityScope = {
+    ...candidate,
+    canonicalTypescript: union(own.canonicalTypescript, candidate.canonicalTypescript),
+    auxiliaryTypescript: union(own.auxiliaryTypescript, candidate.auxiliaryTypescript),
+    lintFiles: union(own.lintFiles, candidate.lintFiles),
+    testFiles: union(own.testFiles, candidate.testFiles),
+    testTypescript: union(own.testTypescript, candidate.testTypescript),
+    formatFiles: union(own.formatFiles, candidate.formatFiles),
+    secretFiles: union(own.secretFiles, candidate.secretFiles),
+    workflows: union(own.workflows, candidate.workflows),
+    actions: union(own.actions, candidate.actions),
+  };
+  // Loss of an old-P test/source is a failure. Only a separately adopted P-prime can retire it.
+  for (const path of union(selected.formatFiles, selected.secretFiles))
+    await exactSourceFile(root, path);
+  const checks: { id: string; status: "pass" | "fail" }[] = [];
+  const add = (id: string, pass: boolean) => checks.push({ id, status: pass ? "pass" : "fail" });
+  add("format", (await checkFormatting(selected, false, policyRoot)).status === "pass");
+  add("typed-lint", (await checkTypedLint(selected, policyRoot)).status === "pass");
+  const policy = JSON.parse(
+    await exactSourceFile(policyRoot, "architecture/quality-policy.json"),
+  ) as ArchitecturePolicy;
+  add(
+    "architecture",
+    validateArchitecture(await readArchitectureSnapshot(root, policyRoot), policy).status ===
+      "pass",
+  );
+  const workflow = await runWorkflowTools(
+    root,
+    selected.workflows,
+    selected.actions,
+    toolCacheRoot,
+    policyRoot,
+  );
+  add(
+    "workflow-security",
+    workflow.commands.every((c) => c.exitCode === 0 && !c.timedOut),
+  );
+  const pin = (await readToolPins(policyRoot)).find((p) => p.name === "gitleaks");
+  if (!pin) throw Error("P-owned secret tool absent");
+  const installed = await installPinnedTool(pin, toolCacheRoot);
+  const tool: VerifiedSecretTool = {
+    path: installed.path,
+    binarySha256: installed.binarySha256,
+    pin: { name: "gitleaks", version: pin.version, sha256: pin.sha256 },
+  };
+  await verifySecretCanary(tool);
+  add(
+    "maintained-secrets",
+    (await runSecretCheck(root, selected.secretFiles, tool)).status === "pass",
+  );
+  return {
+    schema: "agent-platform.trusted-static-quality.v1",
+    status: checks.every((c) => c.status === "pass") ? "pass" : "fail",
+    checks,
+    tests: selected.testFiles.length,
+    files: selected.lintFiles.length,
+    nativePermissionGranted: false,
+  };
+}
+
 export type QualityMode =
   "all" | "format" | "format:write" | "lint" | "workflows" | "architecture" | "baseline:any";
 
@@ -281,6 +361,7 @@ export async function runQuality(
   rootPath: string,
   mode: QualityMode,
   observe?: QualityProgressObserver,
+  trusted?: { policyRoot: string; dependencyAudit: () => Promise<NativeCommandResult> },
 ): Promise<QualityReport> {
   const started = performance.now(),
     startedAt = new Date().toISOString(),
@@ -453,11 +534,13 @@ export async function runQuality(
       await perform(
         "dependency-vulnerabilities",
         () =>
-          runNativeCommand(
-            "bun-audit",
-            [process.execPath, "audit", "--json", "--audit-level=high"],
-            root,
-          ),
+          trusted
+            ? trusted.dependencyAudit()
+            : runNativeCommand(
+                "bun-audit",
+                [process.execPath, "audit", "--json", "--audit-level=high"],
+                root,
+              ),
         (result) =>
           (result as { exitCode: number; timedOut: boolean }).exitCode === 0 &&
           !(result as { timedOut: boolean }).timedOut,
@@ -489,7 +572,7 @@ export async function runQuality(
               "quality-negative-fixtures",
               [process.execPath, "test", "ci/"],
               root,
-              90_000,
+              360_000,
               {
                 QUALITY_NATIVE_TESTS: "1",
                 GITLEAKS_VERIFY_BINARY: installedSecretTool!.path,

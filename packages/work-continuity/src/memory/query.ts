@@ -1,0 +1,879 @@
+import type { Scope, SourceRef } from "../git-work/generated/v3.ts";
+import { readGitWorkV3Context } from "../git-work/effective-contract.ts";
+import type { MemoryQuery, MemoryDocument, GoverningDocument } from "./generated/memory-v1.ts";
+import { assertMemory, canonicalMemory, decodeMemory, memoryDigest } from "./codec.ts";
+import { rankMemory, retrievalVersion } from "./ranking.ts";
+import {
+  MemoryAcquisitionGap,
+  type MemoryClaimIdentity,
+  type MemoryAddress,
+  type NativeMemoryReader,
+  type NativeMemoryUse,
+  type NativeMemoryPermit,
+} from "./reader.ts";
+
+type Acquired = { key: string; source: SourceRef; currentness: MemoryAddress["currentness"] } & (
+  | { kind: "memory"; document: MemoryDocument; use?: NativeMemoryUse }
+  | { kind: "governing"; document: GoverningDocument; governs: boolean }
+);
+type ClaimGap = {
+  code: string;
+  source: SourceRef;
+  kind: MemoryAddress["kind"];
+  recordClass: string;
+  original?: SourceRef;
+};
+type StandingClaimSource = {
+  source: SourceRef;
+  adoptionSource: SourceRef;
+  kind: "standing-preference" | "standing-procedure";
+  value: string;
+};
+export interface MemoryQueryResult {
+  schema: "common.memory-query-result.v1";
+  mode: MemoryQuery["mode"];
+  readerId: string;
+  policyGeneration: string;
+  ownerPolicyGenerations: Record<string, string>;
+  observedAtUtc: string;
+  asOf: string;
+  hits: Array<
+    Omit<Extract<Acquired, { kind: "memory" }>, "use"> & {
+      usage: "advisory-evidence";
+      currentInstructionEligible: boolean;
+      adoptionSource?: SourceRef;
+      timeCoverage: "known" | "unknown";
+      temporalStatus: string;
+    }
+  >;
+  governing: Array<Extract<Acquired, { kind: "governing" }>>;
+  conflicts: Array<{
+    claimKey: string;
+    claimIdentity: MemoryClaimIdentity;
+    conflictingEvidence: boolean;
+    governingConflict: boolean;
+    /** Present only for contradictory qualified current standing uses. These
+     * originals remain evidence; they never become Decision governing rows. */
+    standingConflict?: true;
+    standingSources?: StandingClaimSource[];
+    selectedGoverningValue: string | null;
+    resolution: "resolved" | "conflict" | "incomplete" | "unqualified";
+    incompleteSources: ClaimGap[];
+  }>;
+  taskContext?: ReturnType<typeof readGitWorkV3Context>;
+  counts: {
+    discovered: number;
+    acquired: number;
+    denied: number;
+    statusExcluded: number;
+    timeExcluded: number;
+    scopeExcluded: number;
+    matched: number;
+    governingClosure: number;
+  };
+  omissions: {
+    sourceLimit: number;
+    hitLimit: number;
+    hitChars: number;
+    governing: number;
+    conflicts: number;
+  };
+  acquisitionGaps: Array<{
+    code: string;
+    source?: SourceRef;
+    owner?: Scope;
+    kind?: MemoryAddress["kind"];
+    recordClass?: string;
+    original?: SourceRef;
+    claimIdentity?: MemoryClaimIdentity;
+  }>;
+  sourceCoverage: "complete" | "partial";
+  index: {
+    version: string;
+    lifetime: "query";
+    disposed: true;
+    persistentBodies: false;
+    rebuildWatermark: string;
+  };
+  authority: "none";
+  nativePermissionGranted: false;
+  semanticAcceptanceEstablished: false;
+}
+const scopeKey = (scope: Scope) => canonicalMemory(scope);
+/** Canonical internal join, not a rewritten legacy key or a native grant. */
+export function memoryClaimKey(identity: MemoryClaimIdentity): string {
+  return canonicalMemory([identity.owner, identity.key]);
+}
+export function memorySourceKey(address: MemoryAddress): string {
+  return memoryDigest(
+    canonicalMemory([
+      address.source,
+      address.header.owner,
+      address.header.id,
+      address.header.revision,
+    ]),
+  );
+}
+function instant(value: string): number {
+  const time = Date.parse(value);
+  if (
+    !Number.isFinite(time) ||
+    new Date(time).toISOString().replace(".000Z", "Z") !== value.replace(".000Z", "Z")
+  )
+    throw Error("MEMORY_EXACT_UTC_TIME_REQUIRED");
+  return time;
+}
+function validAt(header: { validFrom?: string; validUntil?: string }, at: number): boolean {
+  const from = header.validFrom === undefined ? -Infinity : instant(header.validFrom);
+  const until = header.validUntil === undefined ? Infinity : instant(header.validUntil);
+  if (from >= until) throw Error("MEMORY_INVALID_VALIDITY_INTERVAL");
+  return from <= at && at < until;
+}
+/** Snapshot a plain bounded native result before retaining it or awaiting more
+ * callbacks. No optional/extra Decision on a standing proof can reach consumers. */
+function snapshotMemoryUse(input: unknown): NativeMemoryUse {
+  canonicalMemory(input);
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    throw Error("MEMORY_NATIVE_USE_SHAPE_MISMATCH");
+  const kind = (input as { kind?: unknown }).kind;
+  const expected =
+    kind === "governing-decision"
+      ? "decision,kind,source"
+      : kind === "standing-preference" || kind === "standing-procedure"
+        ? "kind,source"
+        : null;
+  if (!expected || Object.keys(input).sort().join(",") !== expected)
+    throw Error("MEMORY_NATIVE_USE_SHAPE_MISMATCH");
+  // Exact source and actual governing schema/semantic joins are checked by the
+  // ingestion producer below before this private snapshot becomes an admitted use.
+  return structuredClone(input) as NativeMemoryUse;
+}
+function validateHeader(address: MemoryAddress): void {
+  if (
+    !address ||
+    !["current", "historical", "unknown"].includes(address.currentness) ||
+    !["memory", "governing"].includes(address.kind) ||
+    !address.source ||
+    Object.hasOwn(address.header, "text")
+  )
+    throw Error("MEMORY_BODY_IN_DISCOVERY_METADATA");
+  if (address.kind === "memory") {
+    assertMemory("MemoryRecord", { ...address.header, text: "metadata validation" });
+    if (address.claimKey !== undefined)
+      assertMemory("MemoryDocument", {
+        schema: "common.memory-document.v1",
+        record: { ...address.header, text: "metadata validation" },
+        claim: { key: address.claimKey, value: "metadata validation" },
+      });
+  } else {
+    if (Object.hasOwn(address.header, "claim") || Object.hasOwn(address.header, "schema"))
+      throw Error("MEMORY_BODY_IN_DISCOVERY_METADATA");
+    const { claimKey, ...header } = address.header;
+    assertMemory("GoverningDocument", {
+      ...header,
+      schema: "common.memory-governing.v1",
+      claim: { key: claimKey, value: "metadata validation" },
+      text: "metadata validation",
+    });
+  }
+  if (
+    Object.keys(address.source).sort().join(",") !== "digest,owner,revision,uri" ||
+    !address.source.owner?.trim() ||
+    !address.source.uri?.trim() ||
+    !address.source.revision?.trim() ||
+    !/^[a-f0-9]{64}$/.test(address.source.digest)
+  )
+    throw Error("MEMORY_EXACT_SOURCE_REQUIRED");
+}
+/** Production query boundary. Native reader authentication/policy is separate
+ * from all JSON requests/source flags. No persistent text/result/embedding cache
+ * exists. Every query and view use reauthorizes current originals and policy.
+ * Native consumers retain custody/invalidation of copies already delivered.
+ */
+export async function withMemoryQuery<T>(
+  input: unknown,
+  owner: NativeMemoryReader,
+  consume: (result: MemoryQueryResult) => T | Promise<T>,
+): Promise<T> {
+  assertMemory("MemoryQuery", input);
+  const request = structuredClone(input);
+  if (!owner || typeof owner.withCurrentRead !== "function")
+    throw Error("MEMORY_CURRENT_NATIVE_READER_REQUIRED");
+  if (
+    request.task &&
+    request.work &&
+    (request.task.projectId !== request.work.projectId ||
+      request.task.workId !== request.work.workId)
+  )
+    throw Error("MEMORY_CONTEXT_SCOPE_MISMATCH");
+  if (
+    ["dispatch", "resume"].includes(request.transport ?? "full") &&
+    (!request.task || !request.effectiveDigest)
+  )
+    throw Error("MEMORY_EXACT_TASK_CONTEXT_REQUIRED");
+  return owner.withCurrentRead(request, async (lease) => {
+    if (
+      !lease.readerId?.trim() ||
+      !lease.policyGeneration?.trim() ||
+      !Object.keys(lease.ownerPolicyGenerations).length ||
+      Object.values(lease.ownerPolicyGenerations).some((value) => !value.trim())
+    )
+      throw Error("MEMORY_CURRENT_AUTHENTICATED_POLICY_REQUIRED");
+    const policy = canonicalMemory(lease.ownerPolicyGenerations),
+      generation = lease.policyGeneration;
+    const at = instant(request.asOf ?? lease.nowUtc),
+      now = instant(lease.nowUtc),
+      started = performance.now();
+    if (request.mode === "current" && request.asOf !== undefined && at !== now)
+      throw Error("MEMORY_HISTORY_MODE_REQUIRED_FOR_ASOF");
+    const current = async () => {
+      await lease.assertCurrent();
+      if (
+        lease.policyGeneration !== generation ||
+        canonicalMemory(lease.ownerPolicyGenerations) !== policy ||
+        instant(lease.expiresAtUtc) <= now + (performance.now() - started)
+      )
+        throw Error("MEMORY_POLICY_CHANGED_OR_EXPIRED");
+    };
+    await current();
+    const qualifyGoverning = async (
+      address: MemoryAddress,
+      document: GoverningDocument,
+      permit: NativeMemoryPermit,
+    ): Promise<boolean> => {
+      if (!lease.qualifyGoverning) return false;
+      const candidate = structuredClone(document),
+        expected = canonicalMemory(document);
+      const verdict = await lease.qualifyGoverning(structuredClone(address), candidate, permit);
+      await current();
+      if (canonicalMemory(candidate) !== expected)
+        throw Error("MEMORY_GOVERNING_QUALIFICATION_MUTATED_DOCUMENT");
+      return verdict === true;
+    };
+    let taskContext: ReturnType<typeof readGitWorkV3Context> | undefined;
+    if (request.task) {
+      if (!lease.readTaskGraph) throw Error("MEMORY_EXACT_TASK_GRAPH_READER_REQUIRED");
+      const graph = await lease.readTaskGraph(request.task);
+      await current();
+      taskContext = readGitWorkV3Context({
+        graph,
+        task: request.task,
+        mode: request.transport ?? "full",
+        ...(request.effectiveDigest ? { expectedDigest: request.effectiveDigest } : {}),
+      });
+    }
+    const inventory = await lease.discover({
+      mode: request.mode,
+      purpose: request.purpose,
+      ...(request.scopes ? { scopes: request.scopes } : {}),
+    });
+    await current();
+    const counts = {
+      discovered: inventory.entries.length,
+      acquired: 0,
+      denied: 0,
+      statusExcluded: 0,
+      timeExcluded: 0,
+      scopeExcluded: 0,
+      matched: 0,
+      governingClosure: 0,
+    };
+    const omissions = {
+      sourceLimit: 0,
+      hitLimit: 0,
+      hitChars: 0,
+      governing: 0,
+      conflicts: 0,
+    };
+    const gaps: MemoryQueryResult["acquisitionGaps"] = inventory.gaps.map((gap) => ({
+      code: gap.code,
+    }));
+    if (inventory.truncated) gaps.push({ code: "owner-inventory-truncated" });
+    const acquired: Acquired[] = [],
+      seen = new Set<string>();
+    const claimIdentities = new Map<string, MemoryClaimIdentity>();
+    const incompleteClaims = new Map<string, ClaimGap[]>();
+    const claimKey = (owner: Scope, key: string) => {
+      const identity = { owner, key },
+        encoded = memoryClaimKey(identity);
+      claimIdentities.set(encoded, identity);
+      return encoded;
+    };
+    // Only current, permitted, potentially authoritative sources hold a claim.
+    // Unknown unrelated discovery gaps cannot invent a relationship to it.
+    const noteGap = (address: MemoryAddress, code: string, original?: SourceRef) => {
+      const key = address.kind === "governing" ? address.header.claimKey : address.claimKey;
+      const identity = key === undefined ? undefined : { owner: address.header.owner, key };
+      const provenance = {
+        code,
+        source: address.source,
+        owner: address.header.owner,
+        kind: address.kind,
+        recordClass:
+          address.kind === "governing" ? address.header.recordClass : address.header.kind,
+        ...(original ? { original } : {}),
+        ...(identity ? { claimIdentity: identity } : {}),
+      };
+      gaps.push(provenance);
+      if (
+        identity &&
+        address.currentness === "current" &&
+        address.header.status === "active" &&
+        validAt(address.header, now) &&
+        (address.kind === "governing" || address.header.authority === "owner-adopted")
+      ) {
+        const encoded = claimKey(identity.owner, identity.key);
+        const sources = incompleteClaims.get(encoded) ?? [];
+        sources.push({
+          code,
+          source: address.source,
+          kind: address.kind,
+          recordClass: provenance.recordClass,
+          ...(original ? { original } : {}),
+        });
+        incompleteClaims.set(encoded, sources);
+      }
+    };
+    let acquiredBytes = 0,
+      originalBytesTotal = 0;
+    try {
+      for (const [sourceIndex, original] of inventory.entries.entries()) {
+        await current();
+        validateHeader(original);
+        const address = structuredClone(original),
+          header = address.header;
+        const identity = canonicalMemory([
+          address.source.owner,
+          address.source.uri,
+          address.source.revision,
+        ]);
+        if (seen.has(identity)) throw Error("MEMORY_DUPLICATE_SOURCE_IDENTITY");
+        seen.add(identity);
+        if (
+          ![address.source, ...header.sourceRefs].every((source) =>
+            Object.hasOwn(lease.ownerPolicyGenerations, source.owner),
+          ) ||
+          !header.allowedReaders.includes(lease.readerId)
+        ) {
+          counts.denied++;
+          continue;
+        }
+        if (
+          request.scopes &&
+          !request.scopes.some(
+            (scope) =>
+              scopeKey(scope) === scopeKey(header.owner) ||
+              (address.kind === "memory" &&
+                address.header.subjects.some((subject) => scopeKey(subject) === scopeKey(scope))),
+          )
+        ) {
+          counts.scopeExcluded++;
+          continue;
+        }
+        if (
+          request.mode === "current" &&
+          (header.status !== "active" || address.currentness !== "current")
+        ) {
+          counts.statusExcluded++;
+          continue;
+        }
+        const inTime = validAt(header, at);
+        if (request.mode === "current" && !inTime) {
+          counts.timeExcluded++;
+          continue;
+        }
+        const permit = await lease.authorize(address, {
+          mode: request.mode,
+          purpose: request.purpose,
+        });
+        await current();
+        if (!permit || typeof permit !== "object") {
+          counts.denied++;
+          continue;
+        }
+        if (sourceIndex >= 1000 || acquiredBytes >= 2_097_152 || originalBytesTotal >= 16_777_216) {
+          omissions.sourceLimit++;
+          noteGap(
+            address,
+            sourceIndex >= 1000
+              ? "source-count-limit"
+              : acquiredBytes >= 2_097_152
+                ? "envelope-byte-limit"
+                : "original-byte-limit",
+          );
+          continue;
+        }
+        let bytes: Uint8Array;
+        let readingOriginal: SourceRef | undefined;
+        try {
+          if (typeof lease.readOriginal !== "function")
+            throw Error("MEMORY_EXACT_ORIGINAL_READER_REQUIRED");
+          let originalBudgetOmitted = false;
+          for (const source of address.header.sourceRefs) {
+            readingOriginal = source;
+            if (originalBytesTotal >= 16_777_216) {
+              originalBudgetOmitted = true;
+              break;
+            }
+            const originalBytes = await lease.readOriginal(source, permit);
+            await current();
+            if (
+              originalBytes.byteLength > 16_777_216 ||
+              memoryDigest(originalBytes) !== source.digest
+            )
+              throw Error("MEMORY_ORIGINAL_SOURCE_HASH_MISMATCH");
+            originalBytesTotal += originalBytes.byteLength;
+            if (originalBytesTotal > 16_777_216) {
+              originalBudgetOmitted = true;
+              break;
+            }
+          }
+          if (originalBudgetOmitted) {
+            omissions.sourceLimit++;
+            noteGap(address, "original-byte-limit", readingOriginal);
+            continue;
+          }
+          readingOriginal = undefined;
+          bytes = await lease.acquire(address, permit);
+        } catch (error) {
+          await current();
+          if (!(error instanceof MemoryAcquisitionGap)) throw error;
+          noteGap(address, error.code, readingOriginal);
+          continue;
+        }
+        await current();
+        if (bytes.byteLength > 1_048_576 || memoryDigest(bytes) !== address.source.digest)
+          throw Error("MEMORY_SOURCE_BYTES_MISMATCH");
+        counts.acquired++;
+        // Bound the complete canonical envelope, including legacy metadata and
+        // claim values, before parsing/retaining it. Text-only accounting allows
+        // tiny summaries to carry unbounded aggregate source payloads.
+        acquiredBytes += bytes.byteLength;
+        if (acquiredBytes > 2_097_152) {
+          omissions.sourceLimit++;
+          noteGap(address, "envelope-byte-limit");
+          continue;
+        }
+        const key = memorySourceKey(address);
+        if (address.kind === "memory") {
+          const document = decodeMemory("MemoryDocument", bytes),
+            { text, ...actual } = document.record;
+          if (
+            canonicalMemory(actual) !== canonicalMemory(address.header) ||
+            (document.claim?.key ?? undefined) !== address.claimKey
+          )
+            throw Error("MEMORY_AUTHENTICATED_METADATA_MISMATCH");
+          let use: NativeMemoryUse | null = null;
+          if (
+            address.currentness === "current" &&
+            document.record.status === "active" &&
+            document.record.authority === "owner-adopted" &&
+            validAt(document.record, now) &&
+            lease.qualifyMemoryUse
+          ) {
+            const qualifiedDocument = structuredClone(document);
+            const proposed = await lease.qualifyMemoryUse(
+              structuredClone(address),
+              qualifiedDocument,
+              permit,
+            );
+            await current();
+            if (canonicalMemory(qualifiedDocument) !== canonicalMemory(document))
+              throw Error("MEMORY_ADOPTION_QUALIFICATION_MUTATED_DOCUMENT");
+            if (proposed !== null) {
+              const candidate = snapshotMemoryUse(proposed);
+              if (
+                !document.record.sourceRefs.some(
+                  (source) => canonicalMemory(source) === canonicalMemory(candidate.source),
+                )
+              )
+                throw Error("MEMORY_ADOPTION_SOURCE_NOT_ACQUIRED");
+              if (candidate.kind === "governing-decision") {
+                if (document.record.kind !== "decision" || !lease.qualifyGoverning)
+                  throw Error("MEMORY_ACTUAL_GOVERNING_DECISION_REQUIRED");
+                assertMemory("GoverningDocument", candidate.decision);
+                if (
+                  candidate.decision.recordClass !== "decision" ||
+                  canonicalMemory(candidate.decision.owner) !==
+                    canonicalMemory(document.record.owner) ||
+                  !candidate.decision.sourceRefs.every((source) =>
+                    document.record.sourceRefs.some(
+                      (acquiredSource) =>
+                        canonicalMemory(source) === canonicalMemory(acquiredSource),
+                    ),
+                  ) ||
+                  (document.claim && document.claim.key !== candidate.decision.claim.key)
+                )
+                  throw Error("MEMORY_ACTUAL_GOVERNING_SOURCE_SCOPE_MISMATCH");
+                if (
+                  candidate.decision.allowedReaders.includes(lease.readerId) &&
+                  candidate.decision.status === "active" &&
+                  validAt(candidate.decision, now) &&
+                  (await qualifyGoverning(address, candidate.decision, permit))
+                )
+                  use = candidate;
+              } else {
+                if (
+                  !["preference", "procedure", "knowledge"].includes(document.record.kind) ||
+                  !(
+                    (candidate.kind === "standing-preference" &&
+                      document.record.kind === "preference") ||
+                    candidate.kind === "standing-procedure"
+                  )
+                )
+                  throw Error("MEMORY_ADOPTION_CLASS_MISMATCH");
+                use = candidate;
+              }
+              await current();
+            }
+          }
+          acquired.push({
+            kind: "memory",
+            source: address.source,
+            currentness: address.currentness,
+            key,
+            document,
+            ...(use ? { use } : {}),
+          });
+        } else {
+          const document = decodeMemory("GoverningDocument", bytes),
+            { schema: _, text, claim, ...actual } = document;
+          const { claimKey, ...expected } = address.header;
+          if (canonicalMemory(actual) !== canonicalMemory(expected) || claim.key !== claimKey)
+            throw Error("MEMORY_AUTHENTICATED_METADATA_MISMATCH");
+          const governs =
+            address.currentness === "current" &&
+            document.status === "active" &&
+            validAt(document, now) &&
+            !!lease.qualifyGoverning &&
+            (await qualifyGoverning(address, document, permit));
+          await current();
+          acquired.push({
+            kind: "governing",
+            source: address.source,
+            currentness: address.currentness,
+            key,
+            document,
+            governs,
+          });
+        }
+      }
+      await current();
+      // Native applicability and authority are established before advisory
+      // retrieval. A lexical miss cannot erase an already qualified obligation.
+      const governingRows: Array<Extract<Acquired, { kind: "governing" }>> = acquired.flatMap(
+        (row) =>
+          row.kind === "governing"
+            ? [row]
+            : row.use?.kind === "governing-decision"
+              ? [
+                  {
+                    kind: "governing" as const,
+                    source: row.use.source,
+                    currentness: row.currentness,
+                    key: row.key + "/actual-governing",
+                    document: row.use.decision,
+                    governs: true,
+                  },
+                ]
+              : [],
+      );
+      const claimOf = (row: Acquired) =>
+        row.kind === "memory"
+          ? row.document.claim
+            ? claimKey(row.document.record.owner, row.document.claim.key)
+            : undefined
+          : claimKey(row.document.owner, row.document.claim.key);
+      const actualClaimOf = (row: Extract<Acquired, { kind: "memory" }>) =>
+        row.use?.kind === "governing-decision"
+          ? claimKey(row.use.decision.owner, row.use.decision.claim.key)
+          : undefined;
+      const currentAuthority = new Map<string, Array<Extract<Acquired, { kind: "governing" }>>>();
+      for (const row of governingRows)
+        if (row.governs) {
+          const key = claimKey(row.document.owner, row.document.claim.key);
+          const group = currentAuthority.get(key) ?? [];
+          group.push(row);
+          currentAuthority.set(key, group);
+        }
+      // Adoption establishes each standing use's applicability, not a winner
+      // among incompatible uses. Only fully qualified current snapshots enter
+      // this set; historical/unadopted summaries remain ordinary evidence.
+      const currentStanding = new Map<string, StandingClaimSource[]>();
+      for (const row of acquired)
+        if (
+          row.kind === "memory" &&
+          row.use &&
+          row.use.kind !== "governing-decision" &&
+          row.document.claim
+        ) {
+          const key = claimOf(row)!,
+            sources = currentStanding.get(key) ?? [];
+          sources.push({
+            source: row.source,
+            adoptionSource: row.use.source,
+            kind: row.use.kind,
+            value: row.document.claim.value,
+          });
+          currentStanding.set(key, sources);
+        }
+      const standingConflicts = new Map(
+        [...currentStanding].filter(([, sources]) => new Set(sources.map((s) => s.value)).size > 1),
+      );
+      const ranked = rankMemory(
+        acquired.map((row) =>
+          row.kind === "memory" ? row.document.record.text : row.document.text,
+        ),
+        request.query,
+      );
+      counts.matched = ranked.indices.length;
+      // Work affects relevance among matching rows; it never filters permitted scopes.
+      const contextWork = request.task ?? request.work;
+      const relevant = (row: Acquired) =>
+        contextWork &&
+        [
+          row.kind === "memory" ? row.document.record.owner : row.document.owner,
+          ...(row.kind === "memory" ? row.document.record.subjects : []),
+        ].some(
+          (scope) =>
+            "workId" in scope &&
+            scope.workId === contextWork.workId &&
+            scope.projectId === contextWork.projectId,
+        )
+          ? 1
+          : 0;
+      // Lexical recall of a summary must also surface the actual applicable
+      // governing original for that claim, even when its wording differs. This
+      // closes over already permitted/acquired sources, never new body reads.
+      const claimScores = new Map<string, number>();
+      for (const index of ranked.indices) {
+        const claim = claimOf(acquired[index]!);
+        if (claim)
+          claimScores.set(claim, Math.max(claimScores.get(claim) ?? 0, ranked.scores.get(index)!));
+      }
+      const candidateScores = new Map(ranked.scores);
+      for (const [index, row] of acquired.entries())
+        if (row.kind === "memory") {
+          const key = actualClaimOf(row);
+          if (key && claimScores.has(key)) candidateScores.set(index, claimScores.get(key)!);
+        }
+      counts.governingClosure = candidateScores.size - ranked.indices.length;
+      const selected = [...candidateScores.keys()]
+        .sort((a, b) => {
+          const left = acquired[a]!,
+            right = acquired[b]!;
+          const score = (row: Acquired, index: number) =>
+            Math.max(candidateScores.get(index)!, claimScores.get(claimOf(row) ?? "") ?? 0);
+          return (
+            score(right, b) - score(left, a) ||
+            Number(right.kind === "memory" && right.use?.kind === "governing-decision") -
+              Number(left.kind === "memory" && left.use?.kind === "governing-decision") ||
+            relevant(right) - relevant(left) ||
+            a - b
+          );
+        })
+        .map((index) => acquired[index]!);
+      const result: MemoryQueryResult = {
+        schema: "common.memory-query-result.v1",
+        mode: request.mode,
+        readerId: lease.readerId,
+        policyGeneration: generation,
+        ownerPolicyGenerations: JSON.parse(policy) as Record<string, string>,
+        observedAtUtc: lease.nowUtc,
+        asOf: request.asOf ?? lease.nowUtc,
+        hits: [],
+        governing: [],
+        conflicts: [],
+        ...(taskContext ? { taskContext } : {}),
+        counts,
+        omissions,
+        acquisitionGaps: gaps,
+        sourceCoverage:
+          inventory.truncated || gaps.length || omissions.sourceLimit ? "partial" : "complete",
+        index: {
+          version: retrievalVersion,
+          lifetime: "query",
+          disposed: true,
+          persistentBodies: false,
+          rebuildWatermark: memoryDigest(
+            canonicalMemory([generation, policy, acquired.map((row) => row.source)]),
+          ),
+        },
+        authority: "none",
+        nativePermissionGranted: false,
+        semanticAcceptanceEstablished: false,
+      };
+      const budget = request.maxChars ?? 16000,
+        limit = request.limit ?? 10;
+      const fits = () => JSON.stringify(result).length <= budget;
+      if (!fits()) throw Error("MEMORY_METADATA_BUDGET_EXCEEDED");
+      const matchedClaims = new Set<string>([
+        ...currentAuthority.keys(),
+        ...standingConflicts.keys(),
+        ...incompleteClaims.keys(),
+        ...selected.flatMap((row) =>
+          row.kind === "memory"
+            ? [
+                ...(row.document.claim ? [claimOf(row)!] : []),
+                ...(row.use?.kind === "governing-decision" ? [actualClaimOf(row)!] : []),
+              ]
+            : [claimOf(row)!],
+        ),
+      ]);
+      const withheld = new Map<string, ClaimGap[]>();
+      for (const row of governingRows)
+        if (matchedClaims.has(claimOf(row)!)) {
+          result.governing.push(row);
+          if (result.governing.length > 20 || !fits()) {
+            result.governing.pop();
+            omissions.governing++;
+            if (row.governs) {
+              const key = claimOf(row)!,
+                sources = withheld.get(key) ?? [];
+              sources.push({
+                code: "governing-output-limit",
+                source: row.source,
+                kind: "governing",
+                recordClass: row.document.recordClass,
+              });
+              withheld.set(key, sources);
+            }
+          }
+        }
+      // Authority warnings precede discretionary hits in the bounded envelope.
+      for (const key of matchedClaims) {
+        // Evidence includes each admitted summary claim AND every exact actual
+        // governing document, whether directly acquired or derived from a fully
+        // qualified governing-decision use. Optional absent summaries stay absent.
+        const values = [
+          ...acquired.flatMap((row) =>
+            row.kind === "memory" && claimOf(row) === key ? [row.document.claim!.value] : [],
+          ),
+          ...governingRows
+            .filter((row) => claimOf(row) === key)
+            .map((row) => row.document.claim.value),
+        ];
+        const authoritative = currentAuthority.get(key) ?? [];
+        const activeValues = [...new Set(authoritative.map((row) => row.document.claim.value))];
+        const standingSources = standingConflicts.get(key);
+        const incompleteSources = [
+          ...(incompleteClaims.get(key) ?? []),
+          ...(withheld.get(key) ?? []),
+        ];
+        const incomplete = incompleteSources.length > 0;
+        result.conflicts.push({
+          claimKey: claimIdentities.get(key)!.key,
+          claimIdentity: claimIdentities.get(key)!,
+          conflictingEvidence: new Set(values).size > 1,
+          governingConflict: activeValues.length > 1,
+          ...(standingSources ? { standingConflict: true as const, standingSources } : {}),
+          selectedGoverningValue:
+            !incomplete && activeValues.length === 1 ? activeValues[0]! : null,
+          resolution: incomplete
+            ? "incomplete"
+            : activeValues.length > 1
+              ? "conflict"
+              : activeValues.length === 1
+                ? "resolved"
+                : standingSources
+                  ? "conflict"
+                  : "unqualified",
+          incompleteSources,
+        });
+        if (!fits()) {
+          result.conflicts.pop();
+          omissions.conflicts++;
+        }
+      }
+      for (const row of selected)
+        if (row.kind === "memory") {
+          if (result.hits.length >= limit) {
+            omissions.hitLimit++;
+            continue;
+          }
+          const { use, ...visibleRow } = row;
+          const key = actualClaimOf(row) ?? claimOf(row);
+          const resolution = key
+            ? result.conflicts.find((c) => memoryClaimKey(c.claimIdentity) === key)
+            : undefined;
+          const claimReady =
+            !key ||
+            (!!resolution &&
+              !["incomplete", "conflict"].includes(resolution.resolution) &&
+              (!resolution.selectedGoverningValue ||
+                !row.document.claim ||
+                resolution.selectedGoverningValue === row.document.claim.value));
+          result.hits.push({
+            ...visibleRow,
+            usage: "advisory-evidence",
+            currentInstructionEligible:
+              !!use &&
+              claimReady &&
+              !omissions.conflicts &&
+              (use.kind !== "governing-decision" ||
+                (resolution?.resolution === "resolved" &&
+                  result.governing.some((g) => g.key === row.key + "/actual-governing"))),
+            ...(use ? { adoptionSource: use.source } : {}),
+            timeCoverage:
+              row.document.record.validFrom || row.document.record.validUntil ? "known" : "unknown",
+            temporalStatus:
+              row.document.record.status === "candidate"
+                ? "candidate"
+                : row.document.record.status === "superseded"
+                  ? "historical-superseded"
+                  : row.document.record.status === "revoked"
+                    ? "historical-revoked"
+                    : row.document.record.validUntil &&
+                        instant(row.document.record.validUntil) <= at
+                      ? "historical-expired"
+                      : row.document.record.validFrom && instant(row.document.record.validFrom) > at
+                        ? "future"
+                        : row.currentness !== "current"
+                          ? "historical-revision"
+                          : "current",
+          });
+          if (!fits()) {
+            result.hits.pop();
+            omissions.hitChars++;
+          }
+        }
+      if (omissions.conflicts)
+        for (const conflict of result.conflicts) {
+          conflict.selectedGoverningValue = null;
+          conflict.resolution = "incomplete";
+        }
+      if (!fits()) throw Error("MEMORY_RESULT_BUDGET_EXCEEDED");
+      await current();
+      const returned = await consume(structuredClone(result));
+      await current();
+      return returned;
+    } finally {
+      acquired.splice(0);
+      seen.clear();
+      claimIdentities.clear();
+      incompleteClaims.clear();
+    }
+  });
+}
+/** A reusable view retains only query metadata, never acquired bodies or ranks.
+ * Every use re-enters all current native leases. Closing refuses future uses. */
+export function createMemoryQueryView(input: unknown, owner: NativeMemoryReader) {
+  assertMemory("MemoryQuery", input);
+  const query = structuredClone(input);
+  let closed = false;
+  return Object.freeze({
+    withCurrent<T>(consume: (result: MemoryQueryResult) => T | Promise<T>): Promise<T> {
+      if (closed) throw Error("MEMORY_VIEW_CLOSED");
+      return withMemoryQuery(query, owner, (result) => {
+        if (closed) throw Error("MEMORY_VIEW_CLOSED");
+        return consume(result);
+      });
+    },
+    close() {
+      closed = true;
+    },
+    toJSON() {
+      return { schema: "common.memory-view.v1", persistentBodies: false };
+    },
+  });
+}

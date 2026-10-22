@@ -1,3 +1,4 @@
+import type { NativeMemoryReader } from "../packages/work-continuity/src/memory/reader.ts";
 import {
   preflightQualityImprovement,
   compareQualityImprovement,
@@ -97,12 +98,18 @@ export async function runHarness(
   argv: string[],
   nativeOwner?: NativeGitIdentityOwner,
   nativeMigrationOwner?: NativeLegacyMigrationOwner,
+  nativeMemoryReader?: NativeMemoryReader,
 ): Promise<unknown> {
   const [command, path, extra] = argv;
   if (argv.length !== (command === "transition" || command === "source" ? 3 : 2))
     throw Error(usage);
   const request = object(await readRequest(path));
   switch (command) {
+    case "memory-query": {
+      if (!nativeMemoryReader) throw Error("MEMORY_CURRENT_NATIVE_READER_REQUIRED");
+      const { withMemoryQuery } = await import("../packages/work-continuity/src/memory/v1.ts");
+      return withMemoryQuery(request, nativeMemoryReader, (result) => result);
+    }
     case "context-v3": {
       documentationFields(request, ["graph", "task", "mode", "expectedDigest", "snapshot"]);
       if (request.snapshot !== undefined) {
