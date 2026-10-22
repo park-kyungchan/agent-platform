@@ -7404,7 +7404,7 @@
         "values": [
           {
             "pointer": "/pinCount",
-            "equals": 14
+            "equals": 16
           },
           {
             "pointer": "/sourceLocation",
