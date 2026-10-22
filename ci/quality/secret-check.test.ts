@@ -116,9 +116,9 @@ printf '[]' > "$report"
     expect(result.status).toBe("pass");
   }
   for (const timeoutMs of [999, 450_001, Number.POSITIVE_INFINITY])
-    await expect(
-      runSecretCheck(root, ["src/clean.ts"], fictional, timeoutMs),
-    ).rejects.toThrow("bounded timeout");
+    await expect(runSecretCheck(root, ["src/clean.ts"], fictional, timeoutMs)).rejects.toThrow(
+      "bounded timeout",
+    );
 });
 
 // Root integration should resolve the verified cached tool and call verifySecretCanary from check:quality.
