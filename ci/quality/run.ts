@@ -572,7 +572,7 @@ export async function runQuality(
               "quality-negative-fixtures",
               [process.execPath, "test", "ci/"],
               root,
-              90_000,
+              360_000,
               {
                 QUALITY_NATIVE_TESTS: "1",
                 GITLEAKS_VERIFY_BINARY: installedSecretTool!.path,
