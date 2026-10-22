@@ -241,14 +241,17 @@ export async function withMemoryQuery<T>(
       governing: 0,
       conflicts: 0,
     };
-    const gaps: MemoryQueryResult["acquisitionGaps"] = inventory.gaps.map((gap) => ({ code: gap.code }));
+    const gaps: MemoryQueryResult["acquisitionGaps"] = inventory.gaps.map((gap) => ({
+      code: gap.code,
+    }));
     if (inventory.truncated) gaps.push({ code: "owner-inventory-truncated" });
     const acquired: Acquired[] = [],
       seen = new Set<string>();
     const claimIdentities = new Map<string, MemoryClaimIdentity>();
     const incompleteClaims = new Map<string, ClaimGap[]>();
     const claimKey = (owner: Scope, key: string) => {
-      const identity = { owner, key }, encoded = memoryClaimKey(identity);
+      const identity = { owner, key },
+        encoded = memoryClaimKey(identity);
       claimIdentities.set(encoded, identity);
       return encoded;
     };
@@ -258,21 +261,32 @@ export async function withMemoryQuery<T>(
       const key = address.kind === "governing" ? address.header.claimKey : address.claimKey;
       const identity = key === undefined ? undefined : { owner: address.header.owner, key };
       const provenance = {
-        code, source: address.source, owner: address.header.owner, kind: address.kind,
-        recordClass: address.kind === "governing" ? address.header.recordClass : address.header.kind,
+        code,
+        source: address.source,
+        owner: address.header.owner,
+        kind: address.kind,
+        recordClass:
+          address.kind === "governing" ? address.header.recordClass : address.header.kind,
         ...(original ? { original } : {}),
         ...(identity ? { claimIdentity: identity } : {}),
       };
       gaps.push(provenance);
       if (
-        identity && address.currentness === "current" && address.header.status === "active" &&
+        identity &&
+        address.currentness === "current" &&
+        address.header.status === "active" &&
         validAt(address.header, now) &&
         (address.kind === "governing" || address.header.authority === "owner-adopted")
       ) {
         const encoded = claimKey(identity.owner, identity.key);
         const sources = incompleteClaims.get(encoded) ?? [];
-        sources.push({ code, source: address.source, kind: address.kind, recordClass: provenance.recordClass,
-          ...(original ? { original } : {}) });
+        sources.push({
+          code,
+          source: address.source,
+          kind: address.kind,
+          recordClass: provenance.recordClass,
+          ...(original ? { original } : {}),
+        });
         incompleteClaims.set(encoded, sources);
       }
     };
@@ -335,8 +349,14 @@ export async function withMemoryQuery<T>(
         }
         if (sourceIndex >= 1000 || acquiredBytes >= 2_097_152 || originalBytesTotal >= 16_777_216) {
           omissions.sourceLimit++;
-          noteGap(address, sourceIndex >= 1000 ? "source-count-limit" :
-            acquiredBytes >= 2_097_152 ? "envelope-byte-limit" : "original-byte-limit");
+          noteGap(
+            address,
+            sourceIndex >= 1000
+              ? "source-count-limit"
+              : acquiredBytes >= 2_097_152
+                ? "envelope-byte-limit"
+                : "original-byte-limit",
+          );
           continue;
         }
         let bytes: Uint8Array;
@@ -484,24 +504,40 @@ export async function withMemoryQuery<T>(
       // Native applicability and authority are established before advisory
       // retrieval. A lexical miss cannot erase an already qualified obligation.
       const governingRows: Array<Extract<Acquired, { kind: "governing" }>> = acquired.flatMap(
-        (row) => row.kind === "governing" ? [row] : row.use?.decision ? [{
-          kind: "governing" as const, source: row.use.source,
-          currentness: row.currentness, key: row.key + "/actual-governing",
-          document: row.use.decision, governs: true,
-        }] : [],
+        (row) =>
+          row.kind === "governing"
+            ? [row]
+            : row.use?.decision
+              ? [
+                  {
+                    kind: "governing" as const,
+                    source: row.use.source,
+                    currentness: row.currentness,
+                    key: row.key + "/actual-governing",
+                    document: row.use.decision,
+                    governs: true,
+                  },
+                ]
+              : [],
       );
-      const claimOf = (row: Acquired) => row.kind === "memory"
-        ? row.document.claim ? claimKey(row.document.record.owner, row.document.claim.key) : undefined
-        : claimKey(row.document.owner, row.document.claim.key);
-      const actualClaimOf = (row: Extract<Acquired, { kind: "memory" }>) => row.use?.decision
-        ? claimKey(row.use.decision.owner, row.use.decision.claim.key) : undefined;
+      const claimOf = (row: Acquired) =>
+        row.kind === "memory"
+          ? row.document.claim
+            ? claimKey(row.document.record.owner, row.document.claim.key)
+            : undefined
+          : claimKey(row.document.owner, row.document.claim.key);
+      const actualClaimOf = (row: Extract<Acquired, { kind: "memory" }>) =>
+        row.use?.decision
+          ? claimKey(row.use.decision.owner, row.use.decision.claim.key)
+          : undefined;
       const currentAuthority = new Map<string, Array<Extract<Acquired, { kind: "governing" }>>>();
-      for (const row of governingRows) if (row.governs) {
-        const key = claimKey(row.document.owner, row.document.claim.key);
-        const group = currentAuthority.get(key) ?? [];
-        group.push(row);
-        currentAuthority.set(key, group);
-      }
+      for (const row of governingRows)
+        if (row.governs) {
+          const key = claimKey(row.document.owner, row.document.claim.key);
+          const group = currentAuthority.get(key) ?? [];
+          group.push(row);
+          currentAuthority.set(key, group);
+        }
       const ranked = rankMemory(
         acquired.map((row) =>
           row.kind === "memory" ? row.document.record.text : row.document.text,
@@ -534,10 +570,11 @@ export async function withMemoryQuery<T>(
           claimScores.set(claim, Math.max(claimScores.get(claim) ?? 0, ranked.scores.get(index)!));
       }
       const candidateScores = new Map(ranked.scores);
-      for (const [index, row] of acquired.entries()) if (row.kind === "memory") {
-        const key = actualClaimOf(row);
-        if (key && claimScores.has(key)) candidateScores.set(index, claimScores.get(key)!);
-      }
+      for (const [index, row] of acquired.entries())
+        if (row.kind === "memory") {
+          const key = actualClaimOf(row);
+          if (key && claimScores.has(key)) candidateScores.set(index, claimScores.get(key)!);
+        }
       counts.governingClosure = candidateScores.size - ranked.indices.length;
       const selected = [...candidateScores.keys()]
         .sort((a, b) => {
@@ -589,7 +626,8 @@ export async function withMemoryQuery<T>(
       const fits = () => JSON.stringify(result).length <= budget;
       if (!fits()) throw Error("MEMORY_METADATA_BUDGET_EXCEEDED");
       const matchedClaims = new Set<string>([
-        ...currentAuthority.keys(), ...incompleteClaims.keys(),
+        ...currentAuthority.keys(),
+        ...incompleteClaims.keys(),
         ...selected.flatMap((row) =>
           row.kind === "memory"
             ? [
@@ -607,29 +645,46 @@ export async function withMemoryQuery<T>(
             result.governing.pop();
             omissions.governing++;
             if (row.governs) {
-              const key = claimOf(row)!, sources = withheld.get(key) ?? [];
-              sources.push({ code: "governing-output-limit", source: row.source,
-                kind: "governing", recordClass: row.document.recordClass });
+              const key = claimOf(row)!,
+                sources = withheld.get(key) ?? [];
+              sources.push({
+                code: "governing-output-limit",
+                source: row.source,
+                kind: "governing",
+                recordClass: row.document.recordClass,
+              });
               withheld.set(key, sources);
             }
           }
         }
       // Authority warnings precede discretionary hits in the bounded envelope.
       for (const key of matchedClaims) {
-        const values = acquired.flatMap((row) => claimOf(row) === key
-          ? [row.kind === "memory" ? row.document.claim!.value : row.document.claim.value] : []);
+        const values = acquired.flatMap((row) =>
+          claimOf(row) === key
+            ? [row.kind === "memory" ? row.document.claim!.value : row.document.claim.value]
+            : [],
+        );
         const authoritative = currentAuthority.get(key) ?? [];
         const activeValues = [...new Set(authoritative.map((row) => row.document.claim.value))];
-        const incompleteSources = [...(incompleteClaims.get(key) ?? []), ...(withheld.get(key) ?? [])];
+        const incompleteSources = [
+          ...(incompleteClaims.get(key) ?? []),
+          ...(withheld.get(key) ?? []),
+        ];
         const incomplete = incompleteSources.length > 0;
         result.conflicts.push({
           claimKey: claimIdentities.get(key)!.key,
           claimIdentity: claimIdentities.get(key)!,
           conflictingEvidence: new Set(values).size > 1,
           governingConflict: activeValues.length > 1,
-          selectedGoverningValue: !incomplete && activeValues.length === 1 ? activeValues[0]! : null,
-          resolution: incomplete ? "incomplete" : activeValues.length > 1 ? "conflict" :
-            activeValues.length === 1 ? "resolved" : "unqualified",
+          selectedGoverningValue:
+            !incomplete && activeValues.length === 1 ? activeValues[0]! : null,
+          resolution: incomplete
+            ? "incomplete"
+            : activeValues.length > 1
+              ? "conflict"
+              : activeValues.length === 1
+                ? "resolved"
+                : "unqualified",
           incompleteSources,
         });
         if (!fits()) {
@@ -645,17 +700,23 @@ export async function withMemoryQuery<T>(
           }
           const { use, ...visibleRow } = row;
           const key = actualClaimOf(row) ?? claimOf(row);
-          const resolution = key ? result.conflicts.find((c) => memoryClaimKey(c.claimIdentity) === key) : undefined;
-          const claimReady = !key || (!!resolution &&
-            !["incomplete", "conflict"].includes(resolution.resolution) &&
-            (!resolution.selectedGoverningValue || !row.document.claim ||
-              resolution.selectedGoverningValue === row.document.claim.value));
+          const resolution = key
+            ? result.conflicts.find((c) => memoryClaimKey(c.claimIdentity) === key)
+            : undefined;
+          const claimReady =
+            !key ||
+            (!!resolution &&
+              !["incomplete", "conflict"].includes(resolution.resolution) &&
+              (!resolution.selectedGoverningValue ||
+                !row.document.claim ||
+                resolution.selectedGoverningValue === row.document.claim.value));
           result.hits.push({
             ...visibleRow,
             usage: "advisory-evidence",
             currentInstructionEligible:
               !!use &&
-              claimReady && !omissions.conflicts &&
+              claimReady &&
+              !omissions.conflicts &&
               (!use.decision ||
                 (resolution?.resolution === "resolved" &&
                   result.governing.some((g) => g.key === row.key + "/actual-governing"))),
