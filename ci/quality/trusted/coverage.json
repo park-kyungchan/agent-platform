@@ -3,8 +3,8 @@
   "claim": "bounded-p-semantic-v1",
   "fullS04Completion": false,
   "fullCanonicalAssertionCompletion": "unknown",
-  "readiness": "G01-G04 finite source adapters are implemented, not executed. Root must compose exact selected public S02 source, resolve Root-owned G05 and independently qualify all cases/source closure/review. Full canonical internal assertion completion remains unknown.",
-  "caseCount": 155,
+  "readiness": "Revision5 source extensions PF01/PF02 and bounded PF03 payload correction are authored, not executed. All original155 cases and whole legacy workload remain required. Root must qualify exact composed production, fixed predecessor namespace metadata and all real negative source mutations. Full canonical internal completion remains unknown.",
+  "caseCount": 181,
   "caseFamilies": {
     "effective-contract": [
       "effective-contract-positive",
@@ -31,7 +31,10 @@
       "run-allocation-reject-caller-id",
       "run-allocation-reject-started"
     ],
-    "effect-preservation": ["effect-inventory-positive", "effect-inventory-overlap"],
+    "effect-preservation": [
+      "effect-inventory-positive",
+      "effect-inventory-overlap"
+    ],
     "milestones": [
       "formal-completion-positive",
       "formal-completion-reject-unsynced",
@@ -86,8 +89,15 @@
       "evidence-changed-source-stale",
       "evidence-expired-stale"
     ],
-    "quality-evidence": ["quality-stop-authority-breach", "quality-stop-effects-breach"],
-    "source-path": ["relative-source-path", "parent-source-escape", "absolute-source-escape"],
+    "quality-evidence": [
+      "quality-stop-authority-breach",
+      "quality-stop-effects-breach"
+    ],
+    "source-path": [
+      "relative-source-path",
+      "parent-source-escape",
+      "absolute-source-escape"
+    ],
     "g01-source": [
       "scenario-git-source-positive",
       "scenario-git-source-hash",
@@ -130,8 +140,13 @@
       "scenario-owner-first-memory",
       "scenario-owner-first-work-method"
     ],
-    "g02-exports": ["scenario-owner-public-exports"],
-    "g02-native-source": ["scenario-owner-native-positive", "scenario-owner-native-after-drift"],
+    "g02-exports": [
+      "scenario-owner-public-exports"
+    ],
+    "g02-native-source": [
+      "scenario-owner-native-positive",
+      "scenario-owner-native-after-drift"
+    ],
     "g02-hermes": [
       "scenario-owner-hermes-positive",
       "scenario-owner-hermes-first-import",
@@ -204,7 +219,10 @@
       "scenario-operational-context-positive",
       "scenario-operational-context-forbidden-effect"
     ],
-    "g04-wiki": ["scenario-operational-wiki-positive", "scenario-operational-wiki-forged-quote"],
+    "g04-wiki": [
+      "scenario-operational-wiki-positive",
+      "scenario-operational-wiki-forged-quote"
+    ],
     "g04-inception": [
       "scenario-operational-inception-positive",
       "scenario-operational-inception-effect-negative",
@@ -218,6 +236,44 @@
     "g04-runtime-documentation": [
       "scenario-operational-docs-positive",
       "scenario-operational-docs-hash-negative"
+    ],
+    "pf01-memory-authority": [
+      "scenario-memory-authority-standing",
+      "scenario-memory-authority-inference",
+      "scenario-memory-authority-no-adoption",
+      "scenario-memory-authority-governing",
+      "scenario-memory-authority-governing-false",
+      "scenario-memory-authority-governing-absent",
+      "scenario-memory-authority-decision",
+      "scenario-memory-authority-decision-false"
+    ],
+    "pf01-memory-conflict": [
+      "scenario-memory-conflict-governing",
+      "scenario-memory-conflict-standing",
+      "scenario-memory-conflict-owner-isolation"
+    ],
+    "pf01-memory-history": [
+      "scenario-memory-history-revoked",
+      "scenario-memory-history-current",
+      "scenario-memory-history-denied"
+    ],
+    "pf01-memory-breadth": [
+      "scenario-memory-breadth-unscoped",
+      "scenario-memory-breadth-work"
+    ],
+    "pf01-memory-transport": [
+      "scenario-memory-transport-full",
+      "scenario-memory-transport-compact",
+      "scenario-memory-transport-dispatch",
+      "scenario-memory-transport-resume",
+      "scenario-memory-transport-stale-dispatch",
+      "scenario-memory-transport-stale-resume",
+      "scenario-memory-transport-missing-pin",
+      "scenario-memory-transport-currentness"
+    ],
+    "pf02-fixed-exports": [
+      "scenario-owner-fixed-context",
+      "scenario-owner-fixed-hermes"
     ]
   },
   "interfaceSources": [
@@ -3166,6 +3222,43 @@
       ],
       "coverage": "fixed-related-contract-families",
       "limitation": "No shared-process assertion completion, private evaluator exposure or native adoption inferred. Original 74 coverage rows are preserved."
+    },
+    {
+      "path": "ci/quality/trusted/preflight.test.ts",
+      "semanticCases": [
+        "scenario-memory-authority-standing",
+        "scenario-memory-authority-inference",
+        "scenario-memory-authority-no-adoption",
+        "scenario-memory-authority-governing",
+        "scenario-memory-authority-governing-false",
+        "scenario-memory-authority-governing-absent",
+        "scenario-memory-authority-decision",
+        "scenario-memory-authority-decision-false",
+        "scenario-memory-conflict-governing",
+        "scenario-memory-conflict-standing",
+        "scenario-memory-conflict-owner-isolation",
+        "scenario-memory-history-revoked",
+        "scenario-memory-history-current",
+        "scenario-memory-history-denied",
+        "scenario-memory-breadth-unscoped",
+        "scenario-memory-breadth-work",
+        "scenario-memory-transport-full",
+        "scenario-memory-transport-compact",
+        "scenario-memory-transport-dispatch",
+        "scenario-memory-transport-resume",
+        "scenario-memory-transport-stale-dispatch",
+        "scenario-memory-transport-stale-resume",
+        "scenario-memory-transport-missing-pin",
+        "scenario-memory-transport-currentness",
+        "scenario-owner-fixed-context",
+        "scenario-owner-fixed-hermes"
+      ],
+      "limitation": "Required real disposable source control-flow/export mutations and genuine positives; author has not run them. P fixture tests do not authenticate the whole shared-process internal assertion workload."
+    },
+    {
+      "path": "ci/quality/trusted/token-policy.test.ts",
+      "semanticCases": [],
+      "limitation": "Pure P token payload request/response fixture, no candidate or live App token. Actual native qualification remains Root-owned."
     }
   ],
   "canonicalWorkload": [
@@ -3218,7 +3311,10 @@
         "sourceCheck QA creation and frozen install",
         "prepare network manifest-only closure"
       ],
-      "files": ["ci/source-check.ts", "ci/quality/trusted/driver.ts"],
+      "files": [
+        "ci/source-check.ts",
+        "ci/quality/trusted/driver.ts"
+      ],
       "nextPatch": "Root first reconciles original failed occurrence exact missing nested QA lock inputs/cache entries; no blind retry. Extract an exact data-only nested-QA manifest/lock recipe from canonical source-check as a pinned Root-owned proposal, then prefetch that exact closure in the existing credential-free preparation worker with ignore-scripts and no candidate source/config. Keep network-none QA and real audit. This is provisioning evidence, never a source assertion verdict.",
       "cases": [
         "current failed cache miss remains failed/no source verdict",
@@ -3306,7 +3402,10 @@
         "readNativeAdapterSourceClosure",
         "observeHermesContextProvider"
       ],
-      "files": ["ci/source-check.ts", "ci/source-projection.ts"],
+      "files": [
+        "ci/source-check.ts",
+        "ci/source-projection.ts"
+      ],
       "nextPatch": "Add a fixed owner-source fixture scenario adapter to existing probe worker with the exact canonical owner-fixture and P-generated disposable registration graph. Return source bytes/observed error per named call, not P assertion verdicts. Host compares v1-v6 pin sets, drift-before/after and fresh-process first-import refusals. Keep original first-import guards and caches.",
       "cases": [
         "v1-v6 context registrations",
@@ -3407,7 +3506,10 @@
         "sourceCheck QA creation and frozen install",
         "prepare network manifest-only closure"
       ],
-      "files": ["ci/source-check.ts", "ci/quality/trusted/driver.ts"],
+      "files": [
+        "ci/source-check.ts",
+        "ci/quality/trusted/driver.ts"
+      ],
       "nextPatch": "Root first reconciles original failed occurrence exact missing nested QA lock inputs/cache entries; no blind retry. Extract an exact data-only nested-QA manifest/lock recipe from canonical source-check as a pinned Root-owned proposal, then prefetch that exact closure in the existing credential-free preparation worker with ignore-scripts and no candidate source/config. Keep network-none QA and real audit. This is provisioning evidence, never a source assertion verdict.",
       "cases": [
         "current failed cache miss remains failed/no source verdict",
@@ -3674,7 +3776,10 @@
       "scenario-operational-context-positive",
       "scenario-operational-context-forbidden-effect"
     ],
-    "g04-wiki": ["scenario-operational-wiki-positive", "scenario-operational-wiki-forged-quote"],
+    "g04-wiki": [
+      "scenario-operational-wiki-positive",
+      "scenario-operational-wiki-forged-quote"
+    ],
     "g04-inception": [
       "scenario-operational-inception-positive",
       "scenario-operational-inception-effect-negative",
@@ -3689,5 +3794,152 @@
       "scenario-operational-docs-positive",
       "scenario-operational-docs-hash-negative"
     ]
+  },
+  "revision5Extension": {
+    "predecessorHead": "b392fd6105d694a09a5a655e7c4d6b436867676f",
+    "predecessorTree": "44ee57da704973d713e032345f2633a7f8fa08bc",
+    "original155CasesUnchanged": true,
+    "original155DefinitionDigest": "fb562bb44de0823b4cee80cf6ec8afaad30215002e4fc37d1ab10cae5b5c0ba1",
+    "originalLegacyRowsPreserved": 83,
+    "newCases": {
+      "pf01-memory-authority": [
+        "scenario-memory-authority-standing",
+        "scenario-memory-authority-inference",
+        "scenario-memory-authority-no-adoption",
+        "scenario-memory-authority-governing",
+        "scenario-memory-authority-governing-false",
+        "scenario-memory-authority-governing-absent",
+        "scenario-memory-authority-decision",
+        "scenario-memory-authority-decision-false"
+      ],
+      "pf01-memory-conflict": [
+        "scenario-memory-conflict-governing",
+        "scenario-memory-conflict-standing",
+        "scenario-memory-conflict-owner-isolation"
+      ],
+      "pf01-memory-history": [
+        "scenario-memory-history-revoked",
+        "scenario-memory-history-current",
+        "scenario-memory-history-denied"
+      ],
+      "pf01-memory-breadth": [
+        "scenario-memory-breadth-unscoped",
+        "scenario-memory-breadth-work"
+      ],
+      "pf01-memory-transport": [
+        "scenario-memory-transport-full",
+        "scenario-memory-transport-compact",
+        "scenario-memory-transport-dispatch",
+        "scenario-memory-transport-resume",
+        "scenario-memory-transport-stale-dispatch",
+        "scenario-memory-transport-stale-resume",
+        "scenario-memory-transport-missing-pin",
+        "scenario-memory-transport-currentness"
+      ],
+      "pf02-fixed-exports": [
+        "scenario-owner-fixed-context",
+        "scenario-owner-fixed-hermes"
+      ]
+    },
+    "authority": "None. The native callbacks are honest fictional lease/permit/original IO, not source-granted permission or actual native activation.",
+    "coverageMeaning": "Required external finite semantic comparisons only. Legacy row associations preserve caller mapping, not authentication of every internal test. No private S02 data, score or oracle is used.",
+    "sourceBinding": {
+      "commit": "02039500384e7778469ebbb74c3d611ac109eaa3",
+      "tree": "18e219262746916940a0ea3990fb6cf8b4ee503a",
+      "productionOnly": true,
+      "sources": [
+        {
+          "path": "packages/work-continuity/src/memory/v1.ts",
+          "sha256": "368de21754745baaa77f55b62ad8a676ca4880aed6395cee14e591560d9f7223",
+          "gitBlob": "61c1f078b982fbc2d471d340ee1949171c9e331c"
+        },
+        {
+          "path": "packages/work-continuity/src/memory/reader.ts",
+          "sha256": "49fe016f9ea930270b886d76bfdce2b8b6fc26319e9ff826c9513970c8fab059",
+          "gitBlob": "e2d7daa99c5a953df65ba3be67124897565fc347"
+        },
+        {
+          "path": "packages/work-continuity/src/memory/query.ts",
+          "sha256": "070abb79f7cdbdc2f666b29609348584225bdd85263997fc88297b2f80b07b61",
+          "gitBlob": "54b4e32364124fe33e78e392aa73058bbf300e8c"
+        },
+        {
+          "path": "packages/work-continuity/src/memory/codec.ts",
+          "sha256": "8bb09e961a294a63e6d79c70cc0044594060255bd381cf570baee485775e7018",
+          "gitBlob": "b62b53af6b07518f473e01c69f3474f4b257d125"
+        },
+        {
+          "path": "packages/work-continuity/src/memory/ranking.ts",
+          "sha256": "d924a08369233d3985cb38a9b911cfdd6b431b8232389ac5240cc50276879539",
+          "gitBlob": "c4ad0ed25d11d4a66a53ff758130437ee100e602"
+        },
+        {
+          "path": "packages/work-continuity/src/memory/generated/memory-v1.ts",
+          "sha256": "49b1916dbcf3febe7731c399a1b7cb6006e762c9512448963a88c16fd124730e",
+          "gitBlob": "6c5a7c0b0ba23992129f14b74933159f47640a05"
+        },
+        {
+          "path": "packages/work-continuity/src/memory/generated/memory-v1-validators.js",
+          "sha256": "0575c01a48d72133e05c42887aa5e887712fdba40d82c749a123a02efa75e848",
+          "gitBlob": "7353bd9b285d418d73595bdd1e4d0bd86ed42ac9"
+        },
+        {
+          "path": "packages/work-continuity/contracts/memory-v1.schema.json",
+          "sha256": "00b51da4a7b20abdf3ca73a927b79c53bf669b023fc9717c11d01cadef965281",
+          "gitBlob": "48bfd95f5602937096bbb3b44a088dc4f3c0d2f2"
+        },
+        {
+          "path": "packages/work-continuity/src/git-work/effective-contract.ts",
+          "sha256": "2f1450b923925cf0dc07a690f7ba1d0eb083f7e6873c9e43279fde986f1fe71a",
+          "gitBlob": "62ac27a9a2b54c334d90fb9c52a4dbac0cfaac02"
+        }
+      ]
+    },
+    "fixedExports": {
+      "path": "ci/quality/trusted/predecessor-api.json",
+      "sha256": "3e3cbb5965a5dc260e0b760e50cd572ccb3e120c4be3203ee549f89e2cc9fde3",
+      "requiredContextSymbols": 19,
+      "requiredHermesModules": [
+        "ontology-driven/work-context",
+        "ontology-driven/contracts",
+        "ontology-driven/current-intent",
+        "ontology-driven/domain-context",
+        "ontology-driven/role-registry",
+        "ontology-driven/audit-adapter",
+        "ontology-driven/pinned-reader",
+        "adoption/semantic-context",
+        "adoption/evaluation-budget"
+      ],
+      "status": "Static complete source-derived table; exact Root predecessor namespace observation pending. New required comparisons never derive the denominator from H/M.",
+      "supersedesPartialPredicates": [
+        "scenario-owner-public-exports",
+        "scenario-owner-hermes-positive"
+      ],
+      "historicalPredicatesRetained": true
+    },
+    "defectDetectionCases": {
+      "governingFalseQualification": {
+        "positive": "scenario-memory-authority-governing-false",
+        "realMutation": "query.ts return verdict === true -> true"
+      },
+      "historyCurrentExclusion": {
+        "positive": "scenario-memory-history-current",
+        "realMutation": "query.ts removes active/current filter"
+      },
+      "composition": {
+        "positive": "scenario-memory-transport-compact",
+        "realMutation": "query.ts forces full transport"
+      },
+      "contextExport": {
+        "positive": "scenario-owner-fixed-context",
+        "realMutation": "context/index.ts drops recordBoundary reexport"
+      },
+      "hermesExport": {
+        "positive": "scenario-owner-fixed-hermes",
+        "realMutation": "work-context.ts REVIEWED_PACK_MANIFEST loses export; generated facade also loses it"
+      }
+    },
+    "actualExecution": "unknown; source-only author did not execute any candidate/test/formatter/build",
+    "rootMetadataRequest": "execution/S04-sublead/correction-v4/root-metadata-request.json"
   }
 }

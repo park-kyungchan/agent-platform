@@ -1,10 +1,12 @@
 {
-  "revision": 3,
+  "revision": 4,
   "protectedTag": "trusted-ci-v1",
   "reviewPublisherLogin": "park-kyungchan",
   "maxAuditAgeSeconds": 21600,
   "eligibilityClaim": "bounded-p-semantic-v1",
   "semanticCatalogue": "ci/quality/trusted/semantic-catalogue.json",
   "coverage": "ci/quality/trusted/coverage.json",
-  "scenarioAdapters": "ci/quality/trusted/scenario-adapters.ts"
+  "scenarioAdapters": "ci/quality/trusted/scenario-adapters.ts",
+  "predecessorApi": "ci/quality/trusted/predecessor-api.json",
+  "sourceExtension": "revision5-PF01-PF02"
 }

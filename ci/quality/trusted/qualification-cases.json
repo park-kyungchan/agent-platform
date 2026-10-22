@@ -76,5 +76,18 @@
     "candidate-permission-is-not-author"
   ],
   "scenarioDocumentation": "SCENARIOS.md",
-  "requiredCaseCount": 155
+  "requiredCaseCount": 181,
+  "revision5": {
+    "requiredCases": 181,
+    "allOriginal155Retained": true,
+    "sourceOnly": true,
+    "requiredRootChecks": [
+      "PF01 actual genuine composed source positive cases and governing/history/composition source mutation negatives",
+      "PF02 Root-only approved4cd exact namespace metadata must match fixed complete table; actual recordBoundary and Hermes symbol loss both rejected",
+      "PF03 pure bounded token request/response fixture; no actual token issuance",
+      "complete original legacy source/quality workloads, source-provider closure and independent exact-source review"
+    ],
+    "formalCompletion": false,
+    "nativeEffects": false
+  }
 }

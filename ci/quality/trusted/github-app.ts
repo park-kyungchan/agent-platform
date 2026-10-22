@@ -5,7 +5,6 @@ import {
   appId,
   installationId,
   repositoryId,
-  repository,
   insist,
   object,
   checkName,
@@ -16,13 +15,8 @@ import { boundedBody, githubReader, repoPath, verifyPolicyRef } from "./provider
 import { nativeProvider, verifyAndBuild } from "./attest";
 import { verifyCurrentTarget } from "./source";
 
-export const requestedPermissions = {
-  actions: "read",
-  checks: "write",
-  contents: "read",
-  metadata: "read",
-  statuses: "write",
-} as const;
+export { requestedPermissions } from "./token-policy";
+import { boundedTokenRequest, validateBoundedTokenResponse } from "./token-policy";
 /** Pure cryptography for fixture tests. It supplies no access to the installed key or App transport. */
 export function signAttestorJwt(key: string | Buffer, now: number): string {
   insist(Number.isSafeInteger(now) && now > 0, "CURRENT_CLOCK_REQUIRED");
@@ -96,7 +90,7 @@ export async function issueNative(context: NativeContext): Promise<void> {
     "ACTUAL_INSTALLATION_MISMATCH",
   );
   // Broad configured installation grants are left untouched; only this token is narrowed.
-  const tokenRequest = { repository_ids: [repositoryId], permissions: requestedPermissions };
+  const tokenRequest = boundedTokenRequest();
   assertNativeContext(context);
   context.record({
     phase: "mint-intent",
@@ -113,29 +107,7 @@ export async function issueNative(context: NativeContext): Promise<void> {
     tokenRequest,
   );
   jwt = "";
-  insist(
-    typeof minted.token === "string" &&
-      minted.token.length >= 20 &&
-      minted.token.length <= 512 &&
-      typeof minted.expires_at === "string" &&
-      Date.parse(minted.expires_at) > Date.now() &&
-      Date.parse(minted.expires_at) <= Date.now() + 3660000,
-    "BOUNDED_INSTALLATION_TOKEN_REQUIRED",
-  );
-  const permissions = object(minted.permissions);
-  insist(
-    Object.keys(permissions).sort().join() === Object.keys(requestedPermissions).sort().join() &&
-      Object.entries(requestedPermissions).every(([k, v]) => permissions[k] === v),
-    "TOKEN_PERMISSION_EXPANSION",
-  );
-  insist(
-    minted.repository_selection === "selected" &&
-      Array.isArray(minted.repositories) &&
-      minted.repositories.length === 1 &&
-      object(minted.repositories[0]).id === repositoryId &&
-      object(minted.repositories[0]).full_name === repository,
-    "TOKEN_REPOSITORY_EXPANSION",
-  );
+  validateBoundedTokenResponse(minted, Date.now());
   context.record({
     phase: "mint-result",
     appId,

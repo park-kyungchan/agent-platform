@@ -2,6 +2,8 @@ import { cp, mkdir, readFile, writeFile, symlink, readdir, rm } from "node:fs/pr
 import { join, resolve } from "node:path";
 import { contextProjectionPaths } from "../../../source-projection";
 import { scratch, hash, write, capture } from "./support";
+const namespaceKinds = (api: Record<string, unknown>) =>
+  Object.fromEntries(Object.keys(api).sort().map((name) => [name, typeof api[name]]));
 const nativePaths = [
   "package.json",
   "bun.lock",
@@ -142,7 +144,7 @@ export async function ownerFixture(source: string, root: string) {
 }
 export async function ownerScenario(source: string, id: string): Promise<unknown> {
   if (
-    ["owner-hermes-positive", "owner-hermes-first-import", "owner-hermes-after-drift"].includes(id)
+    ["owner-hermes-positive", "owner-hermes-first-import", "owner-hermes-after-drift", "owner-fixed-hermes"].includes(id)
   ) {
     const generator = (await import(
       join(source, "packages/native-hermes-adapter/src/source-provider/generate.ts")
@@ -188,10 +190,14 @@ export async function ownerScenario(source: string, id: string): Promise<unknown
           module: name,
           facade: Object.keys(facade).sort(),
           canonical: Object.keys(canonical).sort(),
+          ...(id === "owner-fixed-hermes" ? {
+            facadeKinds: namespaceKinds(facade), canonicalKinds: namespaceKinds(canonical),
+          } : {}),
         });
       }
       return {
         publicExports,
+        ...(id === "owner-fixed-hermes" ? { moduleNames: publicExports.map((m) => m.module) } : {}),
         schema: proof.schema,
         packageName: proof.packageName,
         pinPaths: proof.pins.map((p) => p.path.replace(f.fixtureRoot, "<fixture>")),
@@ -326,7 +332,7 @@ export async function ownerScenario(source: string, id: string): Promise<unknown
       "owner-first-work-method": "work-method.ts",
     };
     if (imports[id]) await import(join(f.common, "packages/work-continuity/src", imports[id]!));
-    if (["owner-public-exports", ...Object.keys(imports)].includes(id)) {
+    if (["owner-public-exports", "owner-fixed-context", ...Object.keys(imports)].includes(id)) {
       const loader = (await import(join(f.owner, "src/native/context-owner.ts"))) as {
         loadCodexOwnerContext: () => Promise<{
           index: Record<string, unknown>;
@@ -337,6 +343,10 @@ export async function ownerScenario(source: string, id: string): Promise<unknown
       };
       const context = await loader.loadCodexOwnerContext();
       await context.verifyCurrentSourceClosure();
+      if (id === "owner-fixed-context") return {
+        facade: namespaceKinds(context.index),
+        canonical: namespaceKinds(await import(join(f.common, "packages/work-continuity/src/context/index.ts"))),
+      };
       const git = context.gitWork as unknown as Record<string, unknown>;
       const method = context.workMethod as unknown as Record<string, unknown>;
       return {

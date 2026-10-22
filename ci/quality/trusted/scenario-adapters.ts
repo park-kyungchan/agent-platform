@@ -1,5 +1,34 @@
+const memoryContractIds = new Set([
+  "memory-authority-standing",
+  "memory-authority-inference",
+  "memory-authority-no-adoption",
+  "memory-authority-governing",
+  "memory-authority-governing-false",
+  "memory-authority-governing-absent",
+  "memory-authority-decision",
+  "memory-authority-decision-false",
+  "memory-conflict-governing",
+  "memory-conflict-standing",
+  "memory-conflict-owner-isolation",
+  "memory-history-revoked",
+  "memory-history-current",
+  "memory-history-denied",
+  "memory-breadth-unscoped",
+  "memory-breadth-work",
+  "memory-transport-full",
+  "memory-transport-compact",
+  "memory-transport-dispatch",
+  "memory-transport-resume",
+  "memory-transport-stale-dispatch",
+  "memory-transport-stale-resume",
+  "memory-transport-missing-pin",
+  "memory-transport-currentness",
+]);
 /** P-owned fixed fixture adapters within the existing probe worker. No expected answers here. */
 const fixedScenarioIds = new Set([
+  ...memoryContractIds,
+  "owner-fixed-context",
+  "owner-fixed-hermes",
   "git-source-positive",
   "git-source-hash",
   "git-source-missing",
@@ -103,6 +132,8 @@ export async function loadBehaviorModule(
       if (id.startsWith("git-")) return (await import("./scenarios/git")).gitScenario(root, id);
       if (id.startsWith("owner-"))
         return (await import("./scenarios/owner")).ownerScenario(root, id);
+      if (memoryContractIds.has(id))
+        return (await import("./scenarios/memory-contract")).memoryContractScenario(root, id);
       if (id.startsWith("memory-"))
         return (await import("./scenarios/memory")).memoryScenario(root, id);
       if (

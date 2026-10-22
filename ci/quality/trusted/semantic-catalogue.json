@@ -9142,6 +9142,5229 @@
           }
         ]
       }
+    },
+    {
+      "id": "scenario-memory-authority-standing",
+      "family": "pf01-memory-authority",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-authority-standing"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "standing-a"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/adoption",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-authority-inference",
+      "family": "pf01-memory-authority",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-authority-inference"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "inference"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/inference/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "model-inference",
+                "id": "inference",
+                "kind": "knowledge",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture inference"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-inference",
+              "revision": "1",
+              "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/inference/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/inference/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/calls/adoption",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-inference",
+                "revision": "1",
+                "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-authority-no-adoption",
+      "family": "pf01-memory-authority",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-authority-no-adoption"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "standing-a"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/calls/adoption",
+            "equals": []
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-authority-governing",
+      "family": "pf01-memory-authority",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-authority-governing"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "inference"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/inference/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "model-inference",
+                "id": "inference",
+                "kind": "knowledge",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture inference"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-inference",
+              "revision": "1",
+              "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/inference/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/inference/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/result/governing/0/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-governing-a",
+              "revision": "1",
+              "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/document",
+            "equals": {
+              "allowedReaders": [
+                "fixture-reader"
+              ],
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "id": "decision-a",
+              "owner": {
+                "kind": "user",
+                "userId": "fixture-user"
+              },
+              "recordClass": "decision",
+              "revision": 1,
+              "schema": "common.memory-governing.v1",
+              "sourceRefs": [
+                {
+                  "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266",
+                  "owner": "fixture-owner",
+                  "revision": "1",
+                  "uri": "fictional:decision-evidence"
+                }
+              ],
+              "status": "active",
+              "text": "Fixture actual governing decision-a"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/governs",
+            "equals": true
+          },
+          {
+            "pointer": "/result/conflicts/0/resolution",
+            "equals": "resolved"
+          },
+          {
+            "pointer": "/result/conflicts/0/selectedGoverningValue",
+            "equals": "A"
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-governing-a",
+                "revision": "1",
+                "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-evidence",
+                "revision": "1",
+                "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-governing-a",
+                "revision": "1",
+                "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-inference",
+                "revision": "1",
+                "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-authority-governing-false",
+      "family": "pf01-memory-authority",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-authority-governing-false"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "inference"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/inference/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "model-inference",
+                "id": "inference",
+                "kind": "knowledge",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture inference"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-inference",
+              "revision": "1",
+              "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/inference/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/inference/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/result/governing/0/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-governing-a",
+              "revision": "1",
+              "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/document",
+            "equals": {
+              "allowedReaders": [
+                "fixture-reader"
+              ],
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "id": "decision-a",
+              "owner": {
+                "kind": "user",
+                "userId": "fixture-user"
+              },
+              "recordClass": "decision",
+              "revision": 1,
+              "schema": "common.memory-governing.v1",
+              "sourceRefs": [
+                {
+                  "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266",
+                  "owner": "fixture-owner",
+                  "revision": "1",
+                  "uri": "fictional:decision-evidence"
+                }
+              ],
+              "status": "active",
+              "text": "Fixture actual governing decision-a"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/governs",
+            "equals": false
+          },
+          {
+            "pointer": "/result/conflicts/0/resolution",
+            "equals": "unqualified"
+          },
+          {
+            "pointer": "/result/conflicts/0/selectedGoverningValue",
+            "equals": null
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-governing-a",
+                "revision": "1",
+                "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-evidence",
+                "revision": "1",
+                "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-governing-a",
+                "revision": "1",
+                "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-inference",
+                "revision": "1",
+                "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-authority-governing-absent",
+      "family": "pf01-memory-authority",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-authority-governing-absent"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "inference"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/inference/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "model-inference",
+                "id": "inference",
+                "kind": "knowledge",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture inference"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-inference",
+              "revision": "1",
+              "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/inference/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/inference/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/result/governing/0/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-governing-a",
+              "revision": "1",
+              "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/document",
+            "equals": {
+              "allowedReaders": [
+                "fixture-reader"
+              ],
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "id": "decision-a",
+              "owner": {
+                "kind": "user",
+                "userId": "fixture-user"
+              },
+              "recordClass": "decision",
+              "revision": 1,
+              "schema": "common.memory-governing.v1",
+              "sourceRefs": [
+                {
+                  "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266",
+                  "owner": "fixture-owner",
+                  "revision": "1",
+                  "uri": "fictional:decision-evidence"
+                }
+              ],
+              "status": "active",
+              "text": "Fixture actual governing decision-a"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/governs",
+            "equals": false
+          },
+          {
+            "pointer": "/result/conflicts/0/resolution",
+            "equals": "unqualified"
+          },
+          {
+            "pointer": "/result/conflicts/0/selectedGoverningValue",
+            "equals": null
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-evidence",
+                "revision": "1",
+                "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-governing-a",
+                "revision": "1",
+                "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-inference",
+                "revision": "1",
+                "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-authority-decision",
+      "family": "pf01-memory-authority",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-authority-decision"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "adopted-decision"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "adopted-decision",
+                "kind": "decision",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:decision-a-original"
+                  },
+                  {
+                    "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:decision-evidence"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture adopted-decision"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-adopted-decision",
+              "revision": "1",
+              "digest": "fba0aa71c87d8d79e345f610a709c305ca5597eb8dd4ecbd895a18fb3b74d934"
+            }
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/calls/adoption",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-adopted-decision",
+                "revision": "1",
+                "digest": "fba0aa71c87d8d79e345f610a709c305ca5597eb8dd4ecbd895a18fb3b74d934"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-adopted-decision",
+                "revision": "1",
+                "digest": "fba0aa71c87d8d79e345f610a709c305ca5597eb8dd4ecbd895a18fb3b74d934"
+              }
+            ]
+          },
+          {
+            "pointer": "/result/governing/0/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:decision-a-original",
+              "revision": "1",
+              "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/document",
+            "equals": {
+              "allowedReaders": [
+                "fixture-reader"
+              ],
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "id": "decision-a",
+              "owner": {
+                "kind": "user",
+                "userId": "fixture-user"
+              },
+              "recordClass": "decision",
+              "revision": 1,
+              "schema": "common.memory-governing.v1",
+              "sourceRefs": [
+                {
+                  "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266",
+                  "owner": "fixture-owner",
+                  "revision": "1",
+                  "uri": "fictional:decision-evidence"
+                }
+              ],
+              "status": "active",
+              "text": "Fixture actual governing decision-a"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/governs",
+            "equals": true
+          },
+          {
+            "pointer": "/result/conflicts/0/selectedGoverningValue",
+            "equals": "A"
+          },
+          {
+            "pointer": "/result/conflicts/0/resolution",
+            "equals": "resolved"
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-a-original",
+                "revision": "1",
+                "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-evidence",
+                "revision": "1",
+                "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-adopted-decision",
+                "revision": "1",
+                "digest": "fba0aa71c87d8d79e345f610a709c305ca5597eb8dd4ecbd895a18fb3b74d934"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-authority-decision-false",
+      "family": "pf01-memory-authority",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-authority-decision-false"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "adopted-decision"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "adopted-decision",
+                "kind": "decision",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:decision-a-original"
+                  },
+                  {
+                    "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:decision-evidence"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture adopted-decision"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-adopted-decision",
+              "revision": "1",
+              "digest": "fba0aa71c87d8d79e345f610a709c305ca5597eb8dd4ecbd895a18fb3b74d934"
+            }
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/adopted-decision/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/calls/adoption",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-adopted-decision",
+                "revision": "1",
+                "digest": "fba0aa71c87d8d79e345f610a709c305ca5597eb8dd4ecbd895a18fb3b74d934"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-adopted-decision",
+                "revision": "1",
+                "digest": "fba0aa71c87d8d79e345f610a709c305ca5597eb8dd4ecbd895a18fb3b74d934"
+              }
+            ]
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/result/conflicts/0/selectedGoverningValue",
+            "equals": null
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-a-original",
+                "revision": "1",
+                "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-evidence",
+                "revision": "1",
+                "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-adopted-decision",
+                "revision": "1",
+                "digest": "fba0aa71c87d8d79e345f610a709c305ca5597eb8dd4ecbd895a18fb3b74d934"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-conflict-governing",
+      "family": "pf01-memory-conflict",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-conflict-governing"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "inference"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/inference/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "model-inference",
+                "id": "inference",
+                "kind": "knowledge",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture inference"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-inference",
+              "revision": "1",
+              "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+            }
+          },
+          {
+            "pointer": "/hitsById/inference/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/inference/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/inference/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/result/governing/0/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-governing-a",
+              "revision": "1",
+              "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/document",
+            "equals": {
+              "allowedReaders": [
+                "fixture-reader"
+              ],
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "id": "decision-a",
+              "owner": {
+                "kind": "user",
+                "userId": "fixture-user"
+              },
+              "recordClass": "decision",
+              "revision": 1,
+              "schema": "common.memory-governing.v1",
+              "sourceRefs": [
+                {
+                  "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266",
+                  "owner": "fixture-owner",
+                  "revision": "1",
+                  "uri": "fictional:decision-evidence"
+                }
+              ],
+              "status": "active",
+              "text": "Fixture actual governing decision-a"
+            }
+          },
+          {
+            "pointer": "/result/governing/0/governs",
+            "equals": true
+          },
+          {
+            "pointer": "/result/governing/1/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-governing-b",
+              "revision": "1",
+              "digest": "3dabc4e92950d2a37bed6e44e5f2aee3f98b4107ce9aa515ff88729400d8b660"
+            }
+          },
+          {
+            "pointer": "/result/governing/1/document",
+            "equals": {
+              "allowedReaders": [
+                "fixture-reader"
+              ],
+              "claim": {
+                "key": "choice",
+                "value": "B"
+              },
+              "id": "decision-b",
+              "owner": {
+                "kind": "user",
+                "userId": "fixture-user"
+              },
+              "recordClass": "decision",
+              "revision": 1,
+              "schema": "common.memory-governing.v1",
+              "sourceRefs": [
+                {
+                  "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266",
+                  "owner": "fixture-owner",
+                  "revision": "1",
+                  "uri": "fictional:decision-evidence"
+                }
+              ],
+              "status": "active",
+              "text": "Fixture actual governing decision-b"
+            }
+          },
+          {
+            "pointer": "/result/governing/1/governs",
+            "equals": true
+          },
+          {
+            "pointer": "/result/conflicts/0/governingConflict",
+            "equals": true
+          },
+          {
+            "pointer": "/result/conflicts/0/resolution",
+            "equals": "conflict"
+          },
+          {
+            "pointer": "/result/conflicts/0/selectedGoverningValue",
+            "equals": null
+          },
+          {
+            "pointer": "/result/conflicts/0/claimIdentity",
+            "equals": {
+              "owner": {
+                "kind": "user",
+                "userId": "fixture-user"
+              },
+              "key": "choice"
+            }
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-evidence",
+                "revision": "1",
+                "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:decision-evidence",
+                "revision": "1",
+                "digest": "5d0940c5bdfa8fc4c780df39b50a288098cf15bc4904c2a9c0151a5187264266"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-governing-a",
+                "revision": "1",
+                "digest": "7f3f09ec9fbee76610e8bd8d0c5d50676b7b4937c703f41673f8e0e48e486056"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-governing-b",
+                "revision": "1",
+                "digest": "3dabc4e92950d2a37bed6e44e5f2aee3f98b4107ce9aa515ff88729400d8b660"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-inference",
+                "revision": "1",
+                "digest": "ed2ef5132bde897d3b39fd98063859fde44fc0ecbf980bf40eb09c9f759e985d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-conflict-standing",
+      "family": "pf01-memory-conflict",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-conflict-standing"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "standing-a",
+              "standing-b"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-b/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "B"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-b",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-b"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-b"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-b/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-b",
+              "revision": "1",
+              "digest": "48b1bdca1e4b1735920f9efe43021de030e592da2e3f44ac1c527a50babbec0a"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-b/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-b/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/standing-b/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/result/conflicts/0/standingConflict",
+            "equals": true
+          },
+          {
+            "pointer": "/result/conflicts/0/standingSources",
+            "equals": [
+              {
+                "source": {
+                  "owner": "fixture-owner",
+                  "uri": "fictional:envelope-standing-a",
+                  "revision": "1",
+                  "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+                },
+                "adoptionSource": {
+                  "owner": "fixture-owner",
+                  "uri": "fictional:standing-a",
+                  "revision": "1",
+                  "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+                },
+                "kind": "standing-preference",
+                "value": "A"
+              },
+              {
+                "source": {
+                  "owner": "fixture-owner",
+                  "uri": "fictional:envelope-standing-b",
+                  "revision": "1",
+                  "digest": "48b1bdca1e4b1735920f9efe43021de030e592da2e3f44ac1c527a50babbec0a"
+                },
+                "adoptionSource": {
+                  "owner": "fixture-owner",
+                  "uri": "fictional:standing-b",
+                  "revision": "1",
+                  "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99"
+                },
+                "kind": "standing-preference",
+                "value": "B"
+              }
+            ]
+          },
+          {
+            "pointer": "/result/conflicts/0/governingConflict",
+            "equals": false
+          },
+          {
+            "pointer": "/result/conflicts/0/resolution",
+            "equals": "conflict"
+          },
+          {
+            "pointer": "/result/conflicts/0/selectedGoverningValue",
+            "equals": null
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-b",
+                "revision": "1",
+                "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-b",
+                "revision": "1",
+                "digest": "48b1bdca1e4b1735920f9efe43021de030e592da2e3f44ac1c527a50babbec0a"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-conflict-owner-isolation",
+      "family": "pf01-memory-conflict",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-conflict-owner-isolation"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "standing-a",
+              "standing-other"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-other/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "B"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-other",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "other-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-b"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-other"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-other/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-other",
+              "revision": "1",
+              "digest": "b3418c90c70d7b4cd7aab062b5dc57c669c75d8903bf17c8388b81a9a060574b"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-other/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-other/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-other/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/result/conflicts/0/claimIdentity",
+            "equals": {
+              "owner": {
+                "kind": "user",
+                "userId": "fixture-user"
+              },
+              "key": "choice"
+            }
+          },
+          {
+            "pointer": "/result/conflicts/0/resolution",
+            "equals": "unqualified"
+          },
+          {
+            "pointer": "/result/conflicts/0/governingConflict",
+            "equals": false
+          },
+          {
+            "pointer": "/result/conflicts/1/claimIdentity",
+            "equals": {
+              "owner": {
+                "kind": "user",
+                "userId": "other-user"
+              },
+              "key": "choice"
+            }
+          },
+          {
+            "pointer": "/result/conflicts/1/resolution",
+            "equals": "unqualified"
+          },
+          {
+            "pointer": "/result/conflicts/1/governingConflict",
+            "equals": false
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-b",
+                "revision": "1",
+                "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-other",
+                "revision": "1",
+                "digest": "b3418c90c70d7b4cd7aab062b5dc57c669c75d8903bf17c8388b81a9a060574b"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-history-revoked",
+      "family": "pf01-memory-history",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-history-revoked"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "revoked"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "history"
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/adoption",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/hitsById/revoked/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "revoked",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "revoked",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture revoked"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/revoked/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-revoked",
+              "revision": "1",
+              "digest": "ef7203b6d6f720434a604455ca55794572672aa71f2e5f2bee663c9b836f5020"
+            }
+          },
+          {
+            "pointer": "/hitsById/revoked/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/revoked/currentInstructionEligible",
+            "equals": false
+          },
+          {
+            "pointer": "/hitsById/revoked/temporalStatus",
+            "equals": "historical-revoked"
+          },
+          {
+            "pointer": "/result/asOf",
+            "equals": "2026-10-19T12:00:00Z"
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-revoked",
+                "revision": "1",
+                "digest": "ef7203b6d6f720434a604455ca55794572672aa71f2e5f2bee663c9b836f5020"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-history-current",
+      "family": "pf01-memory-history",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-history-current"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": []
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/adoption",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": []
+          },
+          {
+            "pointer": "/result/counts/statusExcluded",
+            "equals": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-history-denied",
+      "family": "pf01-memory-history",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-history-denied"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": []
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "history"
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/adoption",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": []
+          },
+          {
+            "pointer": "/result/counts/denied",
+            "equals": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-breadth-unscoped",
+      "family": "pf01-memory-breadth",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-breadth-unscoped"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "broad-other-work",
+              "standing-a"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "broad-other-work",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-b"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "other"
+                  }
+                ],
+                "text": "Fixture broad-other-work"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-broad-other-work",
+              "revision": "1",
+              "digest": "d08cc0307c3c6c2008a12d1a58f5638c52e8c7c1864c76dd32c8650fdbf93a19"
+            }
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/calls/tasks",
+            "equals": []
+          },
+          {
+            "pointer": "/result/counts/scopeExcluded",
+            "equals": 0
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-b",
+                "revision": "1",
+                "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-broad-other-work",
+                "revision": "1",
+                "digest": "d08cc0307c3c6c2008a12d1a58f5638c52e8c7c1864c76dd32c8650fdbf93a19"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-breadth-work",
+      "family": "pf01-memory-breadth",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-breadth-work"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "broad-other-work",
+              "standing-a"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "broad-other-work",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-b"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "other"
+                  }
+                ],
+                "text": "Fixture broad-other-work"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-broad-other-work",
+              "revision": "1",
+              "digest": "d08cc0307c3c6c2008a12d1a58f5638c52e8c7c1864c76dd32c8650fdbf93a19"
+            }
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/broad-other-work/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/calls/tasks",
+            "equals": []
+          },
+          {
+            "pointer": "/result/counts/scopeExcluded",
+            "equals": 0
+          },
+          {
+            "pointer": "/result/governing",
+            "equals": []
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-b",
+                "revision": "1",
+                "digest": "3db755763f80e0a3acb465e10bd7ff2c55b2cd53f415fe7d4817605edecf4a99"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              },
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-broad-other-work",
+                "revision": "1",
+                "digest": "d08cc0307c3c6c2008a12d1a58f5638c52e8c7c1864c76dd32c8650fdbf93a19"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-transport-full",
+      "family": "pf01-memory-transport",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-transport-full"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "standing-a"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/expandedContext",
+            "equals": {
+              "schema": "common.git-work-context.v3",
+              "mode": "full",
+              "effective": {
+                "schema": "common.git-work-effective.v3",
+                "task": {
+                  "projectId": "p",
+                  "workId": "w",
+                  "taskId": "t"
+                },
+                "workRevision": 1,
+                "taskRevision": 1,
+                "workContracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "taskOverrides": {},
+                "contracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "holdReasons": [],
+                "externalArtifacts": [],
+                "parentTaskChain": [],
+                "taskResources": [
+                  {
+                    "resource": "source/p",
+                    "mode": "write"
+                  }
+                ],
+                "acceptanceCriteria": [
+                  "safe"
+                ],
+                "dependencies": [],
+                "dependencyTasks": [],
+                "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
+              },
+              "status": "source-qualified",
+              "holdReasons": [],
+              "contractSources": [
+                {
+                  "id": "spec",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "spec",
+                  "sourceRefs": [],
+                  "body": {
+                    "acceptanceCriteria": [
+                      {
+                        "id": "safe",
+                        "text": "Preserve effects and authority"
+                      }
+                    ]
+                  },
+                  "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                },
+                {
+                  "id": "plan",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "plan",
+                  "sourceRefs": [],
+                  "body": {
+                    "appliesToSpec": {
+                      "id": "spec",
+                      "owner": {
+                        "kind": "work",
+                        "projectId": "p",
+                        "workId": "w"
+                      },
+                      "revision": 1,
+                      "kind": "spec",
+                      "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                    },
+                    "objective": "Exact source checks"
+                  },
+                  "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                },
+                {
+                  "id": "issue",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "issue",
+                  "sourceRefs": [],
+                  "body": {
+                    "objective": "Preserve source/native boundaries"
+                  },
+                  "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                }
+              ],
+              "authority": "none",
+              "nativePermissionGranted": false,
+              "semanticAcceptanceEstablished": false
+            }
+          },
+          {
+            "pointer": "/calls/tasks",
+            "equals": [
+              {
+                "projectId": "p",
+                "workId": "w",
+                "taskId": "t"
+              }
+            ]
+          },
+          {
+            "pointer": "/result/taskContext",
+            "equals": {
+              "schema": "common.git-work-context.v3",
+              "mode": "full",
+              "effective": {
+                "schema": "common.git-work-effective.v3",
+                "task": {
+                  "projectId": "p",
+                  "workId": "w",
+                  "taskId": "t"
+                },
+                "workRevision": 1,
+                "taskRevision": 1,
+                "workContracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "taskOverrides": {},
+                "contracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "holdReasons": [],
+                "externalArtifacts": [],
+                "parentTaskChain": [],
+                "taskResources": [
+                  {
+                    "resource": "source/p",
+                    "mode": "write"
+                  }
+                ],
+                "acceptanceCriteria": [
+                  "safe"
+                ],
+                "dependencies": [],
+                "dependencyTasks": [],
+                "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
+              },
+              "status": "source-qualified",
+              "holdReasons": [],
+              "contractSources": [
+                {
+                  "id": "spec",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "spec",
+                  "sourceRefs": [],
+                  "body": {
+                    "acceptanceCriteria": [
+                      {
+                        "id": "safe",
+                        "text": "Preserve effects and authority"
+                      }
+                    ]
+                  },
+                  "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                },
+                {
+                  "id": "plan",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "plan",
+                  "sourceRefs": [],
+                  "body": {
+                    "appliesToSpec": {
+                      "id": "spec",
+                      "owner": {
+                        "kind": "work",
+                        "projectId": "p",
+                        "workId": "w"
+                      },
+                      "revision": 1,
+                      "kind": "spec",
+                      "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                    },
+                    "objective": "Exact source checks"
+                  },
+                  "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                },
+                {
+                  "id": "issue",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "issue",
+                  "sourceRefs": [],
+                  "body": {
+                    "objective": "Preserve source/native boundaries"
+                  },
+                  "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                }
+              ],
+              "authority": "none",
+              "nativePermissionGranted": false,
+              "semanticAcceptanceEstablished": false
+            }
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-transport-compact",
+      "family": "pf01-memory-transport",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-transport-compact"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "standing-a"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/expandedContext",
+            "equals": {
+              "schema": "common.git-work-context.v3",
+              "mode": "compact",
+              "effective": {
+                "schema": "common.git-work-effective.v3",
+                "task": {
+                  "projectId": "p",
+                  "workId": "w",
+                  "taskId": "t"
+                },
+                "workRevision": 1,
+                "taskRevision": 1,
+                "workContracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "taskOverrides": {},
+                "contracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "holdReasons": [],
+                "externalArtifacts": [],
+                "parentTaskChain": [],
+                "taskResources": [
+                  {
+                    "resource": "source/p",
+                    "mode": "write"
+                  }
+                ],
+                "acceptanceCriteria": [
+                  "safe"
+                ],
+                "dependencies": [],
+                "dependencyTasks": [],
+                "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
+              },
+              "status": "source-qualified",
+              "holdReasons": [],
+              "contractSources": [
+                {
+                  "id": "spec",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "spec",
+                  "sourceRefs": [],
+                  "body": {
+                    "acceptanceCriteria": [
+                      {
+                        "id": "safe",
+                        "text": "Preserve effects and authority"
+                      }
+                    ]
+                  },
+                  "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                },
+                {
+                  "id": "plan",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "plan",
+                  "sourceRefs": [],
+                  "body": {
+                    "appliesToSpec": {
+                      "id": "spec",
+                      "owner": {
+                        "kind": "work",
+                        "projectId": "p",
+                        "workId": "w"
+                      },
+                      "revision": 1,
+                      "kind": "spec",
+                      "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                    },
+                    "objective": "Exact source checks"
+                  },
+                  "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                },
+                {
+                  "id": "issue",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "issue",
+                  "sourceRefs": [],
+                  "body": {
+                    "objective": "Preserve source/native boundaries"
+                  },
+                  "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                }
+              ],
+              "authority": "none",
+              "nativePermissionGranted": false,
+              "semanticAcceptanceEstablished": false
+            }
+          },
+          {
+            "pointer": "/calls/tasks",
+            "equals": [
+              {
+                "projectId": "p",
+                "workId": "w",
+                "taskId": "t"
+              }
+            ]
+          },
+          {
+            "pointer": "/result/taskContext/schema",
+            "equals": "common.git-work-context.compact.v3"
+          },
+          {
+            "pointer": "/result/taskContext/effectiveDigest",
+            "equals": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-transport-dispatch",
+      "family": "pf01-memory-transport",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-transport-dispatch"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "standing-a"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/expandedContext",
+            "equals": {
+              "schema": "common.git-work-context.v3",
+              "mode": "dispatch",
+              "effective": {
+                "schema": "common.git-work-effective.v3",
+                "task": {
+                  "projectId": "p",
+                  "workId": "w",
+                  "taskId": "t"
+                },
+                "workRevision": 1,
+                "taskRevision": 1,
+                "workContracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "taskOverrides": {},
+                "contracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "holdReasons": [],
+                "externalArtifacts": [],
+                "parentTaskChain": [],
+                "taskResources": [
+                  {
+                    "resource": "source/p",
+                    "mode": "write"
+                  }
+                ],
+                "acceptanceCriteria": [
+                  "safe"
+                ],
+                "dependencies": [],
+                "dependencyTasks": [],
+                "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
+              },
+              "status": "source-qualified",
+              "holdReasons": [],
+              "contractSources": [
+                {
+                  "id": "spec",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "spec",
+                  "sourceRefs": [],
+                  "body": {
+                    "acceptanceCriteria": [
+                      {
+                        "id": "safe",
+                        "text": "Preserve effects and authority"
+                      }
+                    ]
+                  },
+                  "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                },
+                {
+                  "id": "plan",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "plan",
+                  "sourceRefs": [],
+                  "body": {
+                    "appliesToSpec": {
+                      "id": "spec",
+                      "owner": {
+                        "kind": "work",
+                        "projectId": "p",
+                        "workId": "w"
+                      },
+                      "revision": 1,
+                      "kind": "spec",
+                      "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                    },
+                    "objective": "Exact source checks"
+                  },
+                  "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                },
+                {
+                  "id": "issue",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "issue",
+                  "sourceRefs": [],
+                  "body": {
+                    "objective": "Preserve source/native boundaries"
+                  },
+                  "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                }
+              ],
+              "authority": "none",
+              "nativePermissionGranted": false,
+              "semanticAcceptanceEstablished": false
+            }
+          },
+          {
+            "pointer": "/calls/tasks",
+            "equals": [
+              {
+                "projectId": "p",
+                "workId": "w",
+                "taskId": "t"
+              }
+            ]
+          },
+          {
+            "pointer": "/result/taskContext",
+            "equals": {
+              "schema": "common.git-work-context.v3",
+              "mode": "dispatch",
+              "effective": {
+                "schema": "common.git-work-effective.v3",
+                "task": {
+                  "projectId": "p",
+                  "workId": "w",
+                  "taskId": "t"
+                },
+                "workRevision": 1,
+                "taskRevision": 1,
+                "workContracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "taskOverrides": {},
+                "contracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "holdReasons": [],
+                "externalArtifacts": [],
+                "parentTaskChain": [],
+                "taskResources": [
+                  {
+                    "resource": "source/p",
+                    "mode": "write"
+                  }
+                ],
+                "acceptanceCriteria": [
+                  "safe"
+                ],
+                "dependencies": [],
+                "dependencyTasks": [],
+                "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
+              },
+              "status": "source-qualified",
+              "holdReasons": [],
+              "contractSources": [
+                {
+                  "id": "spec",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "spec",
+                  "sourceRefs": [],
+                  "body": {
+                    "acceptanceCriteria": [
+                      {
+                        "id": "safe",
+                        "text": "Preserve effects and authority"
+                      }
+                    ]
+                  },
+                  "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                },
+                {
+                  "id": "plan",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "plan",
+                  "sourceRefs": [],
+                  "body": {
+                    "appliesToSpec": {
+                      "id": "spec",
+                      "owner": {
+                        "kind": "work",
+                        "projectId": "p",
+                        "workId": "w"
+                      },
+                      "revision": 1,
+                      "kind": "spec",
+                      "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                    },
+                    "objective": "Exact source checks"
+                  },
+                  "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                },
+                {
+                  "id": "issue",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "issue",
+                  "sourceRefs": [],
+                  "body": {
+                    "objective": "Preserve source/native boundaries"
+                  },
+                  "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                }
+              ],
+              "authority": "none",
+              "nativePermissionGranted": false,
+              "semanticAcceptanceEstablished": false
+            }
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-transport-resume",
+      "family": "pf01-memory-transport",
+      "callers": [
+        "Memory/v1 public producer and native caller callback contract"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-transport-resume"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/result/schema",
+            "equals": "common.memory-query-result.v1"
+          },
+          {
+            "pointer": "/result/authority",
+            "equals": "none"
+          },
+          {
+            "pointer": "/result/nativePermissionGranted",
+            "equals": false
+          },
+          {
+            "pointer": "/result/semanticAcceptanceEstablished",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/persistentBodies",
+            "equals": false
+          },
+          {
+            "pointer": "/result/index/disposed",
+            "equals": true
+          },
+          {
+            "pointer": "/result/sourceCoverage",
+            "equals": "complete"
+          },
+          {
+            "pointer": "/hitIds",
+            "equals": [
+              "standing-a"
+            ]
+          },
+          {
+            "pointer": "/result/mode",
+            "equals": "current"
+          },
+          {
+            "pointer": "/hitsById/standing-a/document",
+            "equals": {
+              "claim": {
+                "key": "choice",
+                "value": "A"
+              },
+              "record": {
+                "allowedReaders": [
+                  "fixture-reader"
+                ],
+                "authority": "owner-adopted",
+                "id": "standing-a",
+                "kind": "preference",
+                "owner": {
+                  "kind": "user",
+                  "userId": "fixture-user"
+                },
+                "revision": 1,
+                "sourceRefs": [
+                  {
+                    "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4",
+                    "owner": "fixture-owner",
+                    "revision": "1",
+                    "uri": "fictional:standing-a"
+                  }
+                ],
+                "status": "active",
+                "subjects": [
+                  {
+                    "kind": "project",
+                    "projectId": "p"
+                  }
+                ],
+                "text": "Fixture standing-a"
+              },
+              "schema": "common.memory-document.v1"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/source",
+            "equals": {
+              "owner": "fixture-owner",
+              "uri": "fictional:envelope-standing-a",
+              "revision": "1",
+              "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+            }
+          },
+          {
+            "pointer": "/hitsById/standing-a/usage",
+            "equals": "advisory-evidence"
+          },
+          {
+            "pointer": "/hitsById/standing-a/currentInstructionEligible",
+            "equals": true
+          },
+          {
+            "pointer": "/hitsById/standing-a/temporalStatus",
+            "equals": "current"
+          },
+          {
+            "pointer": "/expandedContext",
+            "equals": {
+              "schema": "common.git-work-context.v3",
+              "mode": "resume",
+              "effective": {
+                "schema": "common.git-work-effective.v3",
+                "task": {
+                  "projectId": "p",
+                  "workId": "w",
+                  "taskId": "t"
+                },
+                "workRevision": 1,
+                "taskRevision": 1,
+                "workContracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "taskOverrides": {},
+                "contracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "holdReasons": [],
+                "externalArtifacts": [],
+                "parentTaskChain": [],
+                "taskResources": [
+                  {
+                    "resource": "source/p",
+                    "mode": "write"
+                  }
+                ],
+                "acceptanceCriteria": [
+                  "safe"
+                ],
+                "dependencies": [],
+                "dependencyTasks": [],
+                "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
+              },
+              "status": "source-qualified",
+              "holdReasons": [],
+              "contractSources": [
+                {
+                  "id": "spec",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "spec",
+                  "sourceRefs": [],
+                  "body": {
+                    "acceptanceCriteria": [
+                      {
+                        "id": "safe",
+                        "text": "Preserve effects and authority"
+                      }
+                    ]
+                  },
+                  "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                },
+                {
+                  "id": "plan",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "plan",
+                  "sourceRefs": [],
+                  "body": {
+                    "appliesToSpec": {
+                      "id": "spec",
+                      "owner": {
+                        "kind": "work",
+                        "projectId": "p",
+                        "workId": "w"
+                      },
+                      "revision": 1,
+                      "kind": "spec",
+                      "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                    },
+                    "objective": "Exact source checks"
+                  },
+                  "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                },
+                {
+                  "id": "issue",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "issue",
+                  "sourceRefs": [],
+                  "body": {
+                    "objective": "Preserve source/native boundaries"
+                  },
+                  "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                }
+              ],
+              "authority": "none",
+              "nativePermissionGranted": false,
+              "semanticAcceptanceEstablished": false
+            }
+          },
+          {
+            "pointer": "/calls/tasks",
+            "equals": [
+              {
+                "projectId": "p",
+                "workId": "w",
+                "taskId": "t"
+              }
+            ]
+          },
+          {
+            "pointer": "/result/taskContext",
+            "equals": {
+              "schema": "common.git-work-context.v3",
+              "mode": "resume",
+              "effective": {
+                "schema": "common.git-work-effective.v3",
+                "task": {
+                  "projectId": "p",
+                  "workId": "w",
+                  "taskId": "t"
+                },
+                "workRevision": 1,
+                "taskRevision": 1,
+                "workContracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "taskOverrides": {},
+                "contracts": {
+                  "issue": {
+                    "id": "issue",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "issue",
+                    "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                  },
+                  "spec": {
+                    "id": "spec",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "spec",
+                    "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                  },
+                  "plan": {
+                    "id": "plan",
+                    "owner": {
+                      "kind": "work",
+                      "projectId": "p",
+                      "workId": "w"
+                    },
+                    "revision": 1,
+                    "kind": "plan",
+                    "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                  }
+                },
+                "holdReasons": [],
+                "externalArtifacts": [],
+                "parentTaskChain": [],
+                "taskResources": [
+                  {
+                    "resource": "source/p",
+                    "mode": "write"
+                  }
+                ],
+                "acceptanceCriteria": [
+                  "safe"
+                ],
+                "dependencies": [],
+                "dependencyTasks": [],
+                "digest": "5afa5ea1c0760ea574e324bd6d3b39f0d0e0e769502a545a11b18424474a9efc"
+              },
+              "status": "source-qualified",
+              "holdReasons": [],
+              "contractSources": [
+                {
+                  "id": "spec",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "spec",
+                  "sourceRefs": [],
+                  "body": {
+                    "acceptanceCriteria": [
+                      {
+                        "id": "safe",
+                        "text": "Preserve effects and authority"
+                      }
+                    ]
+                  },
+                  "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                },
+                {
+                  "id": "plan",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "plan",
+                  "sourceRefs": [],
+                  "body": {
+                    "appliesToSpec": {
+                      "id": "spec",
+                      "owner": {
+                        "kind": "work",
+                        "projectId": "p",
+                        "workId": "w"
+                      },
+                      "revision": 1,
+                      "kind": "spec",
+                      "digest": "209c347f32949ce7d9432475538746986ab302b661e46e94bd2218e29d423279"
+                    },
+                    "objective": "Exact source checks"
+                  },
+                  "digest": "65b29d6e78bb4d369e3e09c302a9f68949d7bc729e723f336a497312c53bf33c"
+                },
+                {
+                  "id": "issue",
+                  "owner": {
+                    "kind": "work",
+                    "projectId": "p",
+                    "workId": "w"
+                  },
+                  "revision": 1,
+                  "kind": "issue",
+                  "sourceRefs": [],
+                  "body": {
+                    "objective": "Preserve source/native boundaries"
+                  },
+                  "digest": "fb562855dee4d8c48812c46a62bd94c2d412ed775bbda0a264ba38343f543c58"
+                }
+              ],
+              "authority": "none",
+              "nativePermissionGranted": false,
+              "semanticAcceptanceEstablished": false
+            }
+          },
+          {
+            "pointer": "/calls/originals",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:standing-a",
+                "revision": "1",
+                "digest": "f4f6a7d85b789738ef6f0c696a30c6baf48063a8795c4a821ce9efeee63b18c4"
+              }
+            ]
+          },
+          {
+            "pointer": "/calls/bodies",
+            "equals": [
+              {
+                "owner": "fixture-owner",
+                "uri": "fictional:envelope-standing-a",
+                "revision": "1",
+                "digest": "c1c809fcd61405d58ccc54dde398dad00330e262c8eb95a2dbfa4e0f11f4c087"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-memory-transport-stale-dispatch",
+      "family": "pf01-memory-transport",
+      "callers": [
+        "Memory/v1 selected Task effective contract native callback"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-transport-stale-dispatch"
+      ],
+      "expected": {
+        "kind": "throw",
+        "name": "Error",
+        "message": "V3_STALE_EFFECTIVE_CONTRACT"
+      }
+    },
+    {
+      "id": "scenario-memory-transport-stale-resume",
+      "family": "pf01-memory-transport",
+      "callers": [
+        "Memory/v1 selected Task effective contract native callback"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-transport-stale-resume"
+      ],
+      "expected": {
+        "kind": "throw",
+        "name": "Error",
+        "message": "V3_STALE_EFFECTIVE_CONTRACT"
+      }
+    },
+    {
+      "id": "scenario-memory-transport-missing-pin",
+      "family": "pf01-memory-transport",
+      "callers": [
+        "Memory/v1 selected Task effective contract native callback"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-transport-missing-pin"
+      ],
+      "expected": {
+        "kind": "throw",
+        "name": "Error",
+        "message": "MEMORY_EXACT_TASK_CONTEXT_REQUIRED"
+      }
+    },
+    {
+      "id": "scenario-memory-transport-currentness",
+      "family": "pf01-memory-transport",
+      "callers": [
+        "Memory/v1 selected Task effective contract native callback"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "memory-transport-currentness"
+      ],
+      "expected": {
+        "kind": "throw",
+        "name": "Error",
+        "message": "MEMORY_POLICY_CHANGED_OR_EXPIRED"
+      }
+    },
+    {
+      "id": "scenario-owner-fixed-context",
+      "family": "pf02-fixed-exports",
+      "callers": [
+        "maintained context/Hermes canonical and source-owner facades"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "owner-fixed-context"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/facade",
+            "equals": {
+              "boundedProjection": "function",
+              "decideWorkMethodAdmission": "function",
+              "evaluateWorkMethodCoverage": "function",
+              "localContextIo": "object",
+              "readCheckpoint": "function",
+              "readWorkContext": "function",
+              "recordBoundary": "function",
+              "sha256": "function",
+              "validateCheckpoint": "function",
+              "validateWorkContextRequest": "function",
+              "validateWorkMethodPacket": "function",
+              "validateWorkMethodReceipt": "function",
+              "validateWorkMethodStanding": "function",
+              "workMethodAdviceRequiredSources": "function",
+              "workMethodCoverageRequiredSources": "function",
+              "workMethodPacketSha256": "function",
+              "workMethodReceiptSha256": "function",
+              "workMethodRequiredSources": "function",
+              "writeCheckpoint": "function"
+            }
+          },
+          {
+            "pointer": "/canonical",
+            "equals": {
+              "boundedProjection": "function",
+              "decideWorkMethodAdmission": "function",
+              "evaluateWorkMethodCoverage": "function",
+              "localContextIo": "object",
+              "readCheckpoint": "function",
+              "readWorkContext": "function",
+              "recordBoundary": "function",
+              "sha256": "function",
+              "validateCheckpoint": "function",
+              "validateWorkContextRequest": "function",
+              "validateWorkMethodPacket": "function",
+              "validateWorkMethodReceipt": "function",
+              "validateWorkMethodStanding": "function",
+              "workMethodAdviceRequiredSources": "function",
+              "workMethodCoverageRequiredSources": "function",
+              "workMethodPacketSha256": "function",
+              "workMethodReceiptSha256": "function",
+              "workMethodRequiredSources": "function",
+              "writeCheckpoint": "function"
+            }
+          }
+        ],
+        "relations": [
+          {
+            "left": "/facade",
+            "right": "/canonical",
+            "equal": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "scenario-owner-fixed-hermes",
+      "family": "pf02-fixed-exports",
+      "callers": [
+        "maintained context/Hermes canonical and source-owner facades"
+      ],
+      "module": "ci/quality/trusted/scenario-adapters.ts",
+      "exportName": "run",
+      "args": [
+        "owner-fixed-hermes"
+      ],
+      "expected": {
+        "kind": "predicates",
+        "values": [
+          {
+            "pointer": "/publicExports/0/module",
+            "equals": "ontology-driven/work-context"
+          },
+          {
+            "pointer": "/publicExports/0/facadeKinds",
+            "equals": {
+              "REVIEWED_PACK_MANIFEST": "string",
+              "checkActionContext": "function",
+              "nativeObservation": "function",
+              "readWorkContext": "function",
+              "workBinding": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/0/canonicalKinds",
+            "equals": {
+              "REVIEWED_PACK_MANIFEST": "string",
+              "checkActionContext": "function",
+              "nativeObservation": "function",
+              "readWorkContext": "function",
+              "workBinding": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/1/module",
+            "equals": "ontology-driven/contracts"
+          },
+          {
+            "pointer": "/publicExports/1/facadeKinds",
+            "equals": {
+              "OntologyContextError": "function",
+              "SEMANTIC_OWNER": "string",
+              "UPPER_ONTOLOGY": "object",
+              "exactKeys": "function",
+              "hash": "function",
+              "identity": "function",
+              "object": "function",
+              "parsedJson": "function",
+              "pin": "function",
+              "requireValue": "function",
+              "strings": "function",
+              "text": "function",
+              "timestamp": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/1/canonicalKinds",
+            "equals": {
+              "OntologyContextError": "function",
+              "SEMANTIC_OWNER": "string",
+              "UPPER_ONTOLOGY": "object",
+              "exactKeys": "function",
+              "hash": "function",
+              "identity": "function",
+              "object": "function",
+              "parsedJson": "function",
+              "pin": "function",
+              "requireValue": "function",
+              "strings": "function",
+              "text": "function",
+              "timestamp": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/2/module",
+            "equals": "ontology-driven/current-intent"
+          },
+          {
+            "pointer": "/publicExports/2/facadeKinds",
+            "equals": {
+              "currentIntentRecord": "function",
+              "readCurrentIntent": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/2/canonicalKinds",
+            "equals": {
+              "currentIntentRecord": "function",
+              "readCurrentIntent": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/3/module",
+            "equals": "ontology-driven/domain-context"
+          },
+          {
+            "pointer": "/publicExports/3/facadeKinds",
+            "equals": {
+              "bindDomainContext": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/3/canonicalKinds",
+            "equals": {
+              "bindDomainContext": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/4/module",
+            "equals": "ontology-driven/role-registry"
+          },
+          {
+            "pointer": "/publicExports/4/facadeKinds",
+            "equals": {
+              "profileRoleRegistry": "function",
+              "renderProfileRoleParagraph": "function",
+              "selectProfileRole": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/4/canonicalKinds",
+            "equals": {
+              "profileRoleRegistry": "function",
+              "renderProfileRoleParagraph": "function",
+              "selectProfileRole": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/5/module",
+            "equals": "ontology-driven/audit-adapter"
+          },
+          {
+            "pointer": "/publicExports/5/facadeKinds",
+            "equals": {
+              "adaptAuditSession": "function",
+              "auditProjectionEvidence": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/5/canonicalKinds",
+            "equals": {
+              "adaptAuditSession": "function",
+              "auditProjectionEvidence": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/6/module",
+            "equals": "ontology-driven/pinned-reader"
+          },
+          {
+            "pointer": "/publicExports/6/facadeKinds",
+            "equals": {
+              "createPinnedReader": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/6/canonicalKinds",
+            "equals": {
+              "createPinnedReader": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/7/module",
+            "equals": "adoption/semantic-context"
+          },
+          {
+            "pointer": "/publicExports/7/facadeKinds",
+            "equals": {
+              "SEMANTIC_CONTEXT_NEEDS": "object",
+              "SEMANTIC_CONTEXT_OWNER": "string",
+              "SemanticContextError": "function",
+              "projectSemanticContext": "function",
+              "semanticContextRequest": "function",
+              "semanticContextSourceNames": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/7/canonicalKinds",
+            "equals": {
+              "SEMANTIC_CONTEXT_NEEDS": "object",
+              "SEMANTIC_CONTEXT_OWNER": "string",
+              "SemanticContextError": "function",
+              "projectSemanticContext": "function",
+              "semanticContextRequest": "function",
+              "semanticContextSourceNames": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/8/module",
+            "equals": "adoption/evaluation-budget"
+          },
+          {
+            "pointer": "/publicExports/8/facadeKinds",
+            "equals": {
+              "admitEvaluationRun": "function",
+              "normalizeEvaluationUsage": "function",
+              "reconcileEvaluationRun": "function",
+              "validateEvaluationBudget": "function"
+            }
+          },
+          {
+            "pointer": "/publicExports/8/canonicalKinds",
+            "equals": {
+              "admitEvaluationRun": "function",
+              "normalizeEvaluationUsage": "function",
+              "reconcileEvaluationRun": "function",
+              "validateEvaluationBudget": "function"
+            }
+          },
+          {
+            "pointer": "/moduleNames",
+            "equals": [
+              "ontology-driven/work-context",
+              "ontology-driven/contracts",
+              "ontology-driven/current-intent",
+              "ontology-driven/domain-context",
+              "ontology-driven/role-registry",
+              "ontology-driven/audit-adapter",
+              "ontology-driven/pinned-reader",
+              "adoption/semantic-context",
+              "adoption/evaluation-budget"
+            ]
+          }
+        ],
+        "relations": [
+          {
+            "left": "/publicExports/0/facadeKinds",
+            "right": "/publicExports/0/canonicalKinds",
+            "equal": true
+          },
+          {
+            "left": "/publicExports/1/facadeKinds",
+            "right": "/publicExports/1/canonicalKinds",
+            "equal": true
+          },
+          {
+            "left": "/publicExports/2/facadeKinds",
+            "right": "/publicExports/2/canonicalKinds",
+            "equal": true
+          },
+          {
+            "left": "/publicExports/3/facadeKinds",
+            "right": "/publicExports/3/canonicalKinds",
+            "equal": true
+          },
+          {
+            "left": "/publicExports/4/facadeKinds",
+            "right": "/publicExports/4/canonicalKinds",
+            "equal": true
+          },
+          {
+            "left": "/publicExports/5/facadeKinds",
+            "right": "/publicExports/5/canonicalKinds",
+            "equal": true
+          },
+          {
+            "left": "/publicExports/6/facadeKinds",
+            "right": "/publicExports/6/canonicalKinds",
+            "equal": true
+          },
+          {
+            "left": "/publicExports/7/facadeKinds",
+            "right": "/publicExports/7/canonicalKinds",
+            "equal": true
+          },
+          {
+            "left": "/publicExports/8/facadeKinds",
+            "right": "/publicExports/8/canonicalKinds",
+            "equal": true
+          }
+        ]
+      }
     }
   ],
   "preservedOriginalProbeIds": [
@@ -9152,5 +14375,46 @@
     "candidate-permission-is-not-author"
   ],
   "scenarioScope": "Fixed fictional G01-G04 API/IO calls; independent external assertions; no native permission, internal assertion completion or S02-private oracle",
-  "originalCaseCount": 66
+  "originalCaseCount": 66,
+  "sourceExtensions": [
+    {
+      "id": "revision5-PF01-PF02",
+      "predecessorHead": "b392fd6105d694a09a5a655e7c4d6b436867676f",
+      "preservedOriginalCases": 155,
+      "newCaseIds": [
+        "scenario-memory-authority-standing",
+        "scenario-memory-authority-inference",
+        "scenario-memory-authority-no-adoption",
+        "scenario-memory-authority-governing",
+        "scenario-memory-authority-governing-false",
+        "scenario-memory-authority-governing-absent",
+        "scenario-memory-authority-decision",
+        "scenario-memory-authority-decision-false",
+        "scenario-memory-conflict-governing",
+        "scenario-memory-conflict-standing",
+        "scenario-memory-conflict-owner-isolation",
+        "scenario-memory-history-revoked",
+        "scenario-memory-history-current",
+        "scenario-memory-history-denied",
+        "scenario-memory-breadth-unscoped",
+        "scenario-memory-breadth-work",
+        "scenario-memory-transport-full",
+        "scenario-memory-transport-compact",
+        "scenario-memory-transport-dispatch",
+        "scenario-memory-transport-resume",
+        "scenario-memory-transport-stale-dispatch",
+        "scenario-memory-transport-stale-resume",
+        "scenario-memory-transport-missing-pin",
+        "scenario-memory-transport-currentness",
+        "scenario-owner-fixed-context",
+        "scenario-owner-fixed-hermes"
+      ],
+      "publicMemorySource": "02039500384e7778469ebbb74c3d611ac109eaa3",
+      "fixedApiSource": {
+        "head": "4cd6eea995700177159a3d3d42bf63024fb5fc13",
+        "tree": "eff40f0a35c8fbc25377eab478dd0c01166e0eb3"
+      },
+      "runtimeQualification": "pending Root; not a source verdict"
+    }
+  ]
 }
