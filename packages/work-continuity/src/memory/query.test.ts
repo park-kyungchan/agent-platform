@@ -160,3 +160,16 @@ test("current-policy requalification rebuilds views after a denial; closing duri
  f.state.afterAcquire=()=>view.close();let consumed=false;
  await expect(view.withCurrent(()=>{consumed=true;})).rejects.toThrow("VIEW_CLOSED");expect(consumed).toBe(false);
 });
+
+test("whole canonical document budget includes legacy metadata even when summary text is tiny",async()=>{
+ const docs=[0,1,2].map(i=>{const doc=memory("large-legacy-"+i,"언어");doc.legacy={protocol:"synthetic-legacy",identityKey:doc.record.id,original:doc.record.sourceRefs[0]!,metadata:"x".repeat(900_000)};return doc;});
+ const f=nativeFixture(docs),out=await result(query({maxChars:64000}),f);
+ expect(out.counts.acquired).toBe(3);expect(out.counts.matched).toBe(2);expect(out.omissions.sourceLimit).toBe(1);expect(out.sourceCoverage).toBe("partial");expect(out.hits).toEqual([]);expect(out.omissions.hitChars).toBe(2);
+});
+test("aggregate original acquisition budget omits a source before derived body acquisition and reports partial coverage",async()=>{
+ const bytes=new TextEncoder().encode("x".repeat(6_000_000)),digest=memoryDigest(bytes);
+ const docs=[0,1,2].map(i=>memory("original-budget-"+i,"언어",{sourceRefs:[{owner:"synthetic-owner",uri:"fixture://large-original/"+i,revision:"1",digest}]}));
+ const f=nativeFixture(docs);
+ const owner:NativeMemoryReader={async withCurrentRead(q,consume){return f.owner.withCurrentRead(q,lease=>consume({...lease,readOriginal:async()=>bytes}));}};
+ const out=await withMemoryQuery(query(),owner,value=>value);expect(out.hits).toHaveLength(2);expect(f.reads.size).toBe(2);expect(out.omissions.sourceLimit).toBe(1);expect(out.sourceCoverage).toBe("partial");
+});

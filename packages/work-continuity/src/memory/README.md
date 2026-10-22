@@ -41,7 +41,9 @@ already acquired originals. Actual decisions additionally require the actual
 Governing document, matching source/scope, allowed reader, current status and native
 applicability qualification. Recalled summaries close over already acquired actual
 governing originals before budgets. Conflicting governing decisions remain
-unresolved. Full rows, source gaps and omissions stay visible; the query does not
+unresolved. Aggregate retained envelopes (including legacy metadata) are bounded at 2 MiB;
+original acquisition is bounded at 16 MiB plus the final bounded read. Budget
+omissions are explicit. Full rows, source gaps and omissions stay visible; the query does not
 select a winner by recency, summary wording, or an enum.
 
 The retained literal AND algorithm measured no recall on the frozen natural

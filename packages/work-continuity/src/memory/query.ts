@@ -88,7 +88,7 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
     const gaps: Array<{code:string}> = inventory.gaps.map(gap => ({code:gap.code}));
     if (inventory.truncated) gaps.push({code:"owner-inventory-truncated"});
     const acquired: Acquired[] = [], seen = new Set<string>();
-    let textBytes = 0;
+    let acquiredBytes = 0, originalBytesTotal = 0;
     try {
       for (const original of inventory.entries.slice(0,1000)) {
         await current();
@@ -106,22 +106,30 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
         let bytes: Uint8Array;
         try {
           if(typeof lease.readOriginal!=="function")throw Error("MEMORY_EXACT_ORIGINAL_READER_REQUIRED");
+          let originalBudgetOmitted=false;
           for(const source of address.header.sourceRefs){
+            if(originalBytesTotal>=16_777_216){originalBudgetOmitted=true;break;}
             const originalBytes=await lease.readOriginal(source,permit);await current();
             if(originalBytes.byteLength>16_777_216||memoryDigest(originalBytes)!==source.digest)throw Error("MEMORY_ORIGINAL_SOURCE_HASH_MISMATCH");
+            originalBytesTotal+=originalBytes.byteLength;
+            if(originalBytesTotal>16_777_216){originalBudgetOmitted=true;break;}
           }
+          if(originalBudgetOmitted){omissions.sourceLimit++;continue;}
           bytes=await lease.acquire(address,permit);
         }
         catch(error) { await current(); if (!(error instanceof MemoryAcquisitionGap)) throw error; gaps.push({code:error.code});continue; }
         await current();
         if (bytes.byteLength>1_048_576 || memoryDigest(bytes)!==address.source.digest) throw Error("MEMORY_SOURCE_BYTES_MISMATCH");
         counts.acquired++;
+        // Bound the complete canonical envelope, including legacy metadata and
+        // claim values, before parsing/retaining it. Text-only accounting allows
+        // tiny summaries to carry unbounded aggregate source payloads.
+        acquiredBytes+=bytes.byteLength;
+        if(acquiredBytes>2_097_152){omissions.sourceLimit++;continue;}
         const key = memorySourceKey(address);
         if (address.kind === "memory") {
           const document=decodeMemory("MemoryDocument",bytes), {text,...actual}=document.record;
           if (canonicalMemory(actual)!==canonicalMemory(address.header) || (document.claim?.key ?? undefined)!==address.claimKey) throw Error("MEMORY_AUTHENTICATED_METADATA_MISMATCH");
-          textBytes+=Buffer.byteLength(text);
-          if (textBytes>2_097_152) {omissions.sourceLimit++;continue;}
           let use:NativeMemoryUse|null=null;
           if(address.currentness==="current"&&document.record.status==="active"&&document.record.authority==="owner-adopted"&&validAt(document.record,now)&&lease.qualifyMemoryUse){
             use=await lease.qualifyMemoryUse(address,document,permit);await current();
@@ -141,8 +149,6 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
           const document=decodeMemory("GoverningDocument",bytes), {schema:_,text,claim,...actual}=document;
           const {claimKey,...expected}=address.header;
           if (canonicalMemory(actual)!==canonicalMemory(expected) || claim.key!==claimKey) throw Error("MEMORY_AUTHENTICATED_METADATA_MISMATCH");
-          textBytes+=Buffer.byteLength(text)+Buffer.byteLength(claim.value);
-          if (textBytes>2_097_152) {omissions.sourceLimit++;continue;}
           const governs=address.currentness==="current" && document.status==="active" && validAt(document,now) && !!lease.qualifyGoverning && await lease.qualifyGoverning(address,document,permit);
           await current(); acquired.push({kind:"governing",source:address.source,currentness:address.currentness,key,document,governs});
         }
