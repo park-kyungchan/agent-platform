@@ -11,7 +11,7 @@ function response() {
       contents: "read",
       metadata: "read",
       statuses: "read",
-    },
+    } as const,
     repository_selection: "selected",
     repositories: [{ id: 1413326539, full_name: "park-kyungchan/agent-platform" }],
   };

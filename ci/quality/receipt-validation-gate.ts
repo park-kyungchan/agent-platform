@@ -466,8 +466,10 @@ export async function validatePlatformReviewWithEvidence(
     )
       throw Error("Successor must retain original ownership and independent native identities");
   }
+  // Retain the already validated string type inside asynchronous status reads.
+  const originalStatusHead: string = originalHead;
   async function currentOriginalStatus() {
-    const statuses = await reader.readStatuses(originalHead);
+    const statuses = await reader.readStatuses(originalStatusHead);
     if (!Array.isArray(statuses) || statuses.length > 100)
       throw Error("Original current statuses unavailable");
     const s = record(statuses.find((v) => record(v).context === "native-independent-review"));
