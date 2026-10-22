@@ -11,6 +11,9 @@ import {
 } from "./source-projection";
 import { validateSourceProviderProjections } from "./verify-runtime-layout";
 export { validateIndependentReviewReceipt } from "./quality/receipt-validator";
+import {
+  captureInstalledRuntimeClosure,
+} from "../packages/native-hermes-adapter/src/source-provider/dependency-closure.ts";
 import { createHash } from "node:crypto";
 import {
   cp,
@@ -315,6 +318,19 @@ async function prepareQaTree() {
   project.payload.details.sourceOwnerRoot = common;
   await writeJson(join(common, "project.json"), project);
   await run(common, [process.execPath, "install", "--frozen-lockfile", "--ignore-scripts"]);
+  // Use the same canonical installed dependency observer as the source provider.
+  // The synthetic owner must keep the already frozen runtime, including transitive bindings.
+  const qaRuntime = await captureInstalledRuntimeClosure(
+    common,
+    async (path, maxBytes) => {
+      const bytes = await readFile(path);
+      if (bytes.length > maxBytes) throw Error("QA dependency source exceeds its byte bound");
+      return bytes;
+    },
+    sha,
+    false,
+    [join(common, "packages/work-continuity/src/context/index.ts")],
+  );
   for (const owner of ["codex-harness-engineering"]) {
     const root = join(qaBase, "projects", owner);
     await mkdir(join(root, "releases"), { recursive: true });
@@ -332,6 +348,14 @@ async function prepareQaTree() {
       private: true,
       type: "module",
       dependencies,
+      overrides: Object.fromEntries(
+        qaRuntime.dependencies
+          .filter(({ name }) => name !== "@palantirkc/ontology")
+          .map(({ name, root: dependencyRoot }) => [
+            name,
+            "file:" + relative(root, join(common, dependencyRoot)),
+          ]),
+      ),
     });
     // Synthetic owner lock is generated only from finite local package bindings, then frozen.
     await run(root, [process.execPath, "install", "--ignore-scripts"]);
