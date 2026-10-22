@@ -1,0 +1,26 @@
+{
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a16408-b4ce-7ce2-8bbe-f781eb748a7d"
+  },
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "conclusion": "pass",
+  "headSha": "b308033be9fceca4279e114d99a038f51a33ed12",
+  "reuse": {
+    "originalHead": "9f92e391c4e618f3159d2642c57b2fe35bf1d635",
+    "receiptCommit": "a21b456be0fd855227d9b2ab977b451e5065523e",
+    "receiptSha256": "1c617ec72dbbe1a6c97e13500cbaf1a00a7e5cdbb9d1a187fcff163462fa3f2a"
+  },
+  "reviewedSourceManifestSha256": "daba9cfcace416b585a0a80bb596a6d3af274fed976b30f94e49d2beb82e97cb",
+  "reviewedTreeSha": "02940d4cd9aeed45fa1a281343f81b2644717cfb",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a163ef-7c7b-7b60-9a93-74c1688e82eb"
+  },
+  "schema": "native-independent-review-successor.v1",
+  "unresolvedFindings": 0
+}
