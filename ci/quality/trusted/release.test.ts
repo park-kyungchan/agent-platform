@@ -7,15 +7,22 @@ import { git, scratch, commit } from "./scenarios/support";
 
 const source = resolve(import.meta.dir, "../../..");
 const newlyAdmitted = [
-  "coordination/source-adapters.test.ts", "coordination/source-closure.test.ts",
-  "coordination/source-history.test.ts", "coordination/source-output.test.ts",
-  "coordination/source-tooling.test.ts", "coordination/source.test.ts", "memory/native-use.test.ts",
+  "coordination/source-adapters.test.ts",
+  "coordination/source-closure.test.ts",
+  "coordination/source-history.test.ts",
+  "coordination/source-output.test.ts",
+  "coordination/source-tooling.test.ts",
+  "coordination/source.test.ts",
+  "memory/native-use.test.ts",
 ].map((path) => "packages/work-continuity/src/" + path);
 
 test("actual current P minimum and clean exact buildPolicy admit every full source test; a missing coverage row refuses both before workers", async () => {
-  const minimum = await readPolicyMinimum(source), canonical = await readQualityScope(source);
+  const minimum = await readPolicyMinimum(source),
+    canonical = await readQualityScope(source);
   expect(minimum.packageTests).toEqual(canonical.testFiles);
-  expect(minimum.qualityTests).toEqual(canonical.lintFiles.filter((p) => p.startsWith("ci/") && testFile(p)));
+  expect(minimum.qualityTests).toEqual(
+    canonical.lintFiles.filter((p) => p.startsWith("ci/") && testFile(p)),
+  );
   expect(minimum.supportFiles).toEqual(canonical.testSupportFiles);
   for (const path of newlyAdmitted) expect(minimum.packageTests).toContain(path);
   const head = await git(source, ["rev-parse", "HEAD"]);
@@ -41,7 +48,11 @@ test("actual current P minimum and clean exact buildPolicy admit every full sour
     const after = await readQualityScope(policyRoot);
     expect(after.testFiles).toEqual(canonical.testFiles);
     expect(after.lintFiles).toEqual(canonical.lintFiles);
-    await expect(readPolicyMinimum(policyRoot)).rejects.toThrow("EVERY_P_MINIMUM_REQUIRES_EXPLICIT_COVERAGE");
-    await expect(buildPolicy(policyRoot, incompleteHead)).rejects.toThrow("EVERY_P_MINIMUM_REQUIRES_EXPLICIT_COVERAGE");
+    await expect(readPolicyMinimum(policyRoot)).rejects.toThrow(
+      "EVERY_P_MINIMUM_REQUIRES_EXPLICIT_COVERAGE",
+    );
+    await expect(buildPolicy(policyRoot, incompleteHead)).rejects.toThrow(
+      "EVERY_P_MINIMUM_REQUIRES_EXPLICIT_COVERAGE",
+    );
   });
 }, 120000);

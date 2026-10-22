@@ -59,9 +59,12 @@ export async function ownerFixture(source: string, root: string, nativeLock = fa
       name: "fictional-owner",
       private: true,
       type: "module",
-      overrides: Object.fromEntries(dependencies.packages.map(({ name }) => [
-        name, "file:../agent-platform/node_modules/" + name,
-      ])),
+      overrides: Object.fromEntries(
+        dependencies.packages.map(({ name }) => [
+          name,
+          "file:../agent-platform/node_modules/" + name,
+        ]),
+      ),
       dependencies: {
         "@palantirkc/work-continuity": "file:../agent-platform/packages/work-continuity",
         "@palantirkc/native-codex-adapter": "file:../agent-platform/packages/native-codex-adapter",
@@ -70,11 +73,20 @@ export async function ownerFixture(source: string, root: string, nativeLock = fa
   );
   if (nativeLock) {
     // Real lock for this exact fictional package/local dependency graph, never a copied foreign lock.
-    const generated = await fixedProcess([
-      process.execPath, "--no-env-file", "--no-install", "install", "--offline",
-      "--ignore-scripts", "--lockfile-only",
-    ], { cwd: owner, env: await prepareProbeEnvironment(), timeoutMs: 120000, maxBytes: 128000 });
-    if (generated.code !== 0 || generated.timedOut) throw Error("FICTIONAL_OWNER_FROZEN_LOCAL_LOCK_REQUIRED");
+    const generated = await fixedProcess(
+      [
+        process.execPath,
+        "--no-env-file",
+        "--no-install",
+        "install",
+        "--offline",
+        "--ignore-scripts",
+        "--lockfile-only",
+      ],
+      { cwd: owner, env: await prepareProbeEnvironment(), timeoutMs: 120000, maxBytes: 128000 },
+    );
+    if (generated.code !== 0 || generated.timedOut)
+      throw Error("FICTIONAL_OWNER_FROZEN_LOCAL_LOCK_REQUIRED");
     await readFile(join(owner, "bun.lock"));
   }
   await mkdir(join(owner, "node_modules/@palantirkc"), { recursive: true });
@@ -221,7 +233,11 @@ export async function ownerScenario(source: string, id: string): Promise<unknown
     }
   }
   return scratch("owner", async (root) => {
-    const f = await ownerFixture(source, root, ["owner-native-positive", "owner-native-after-drift"].includes(id));
+    const f = await ownerFixture(
+      source,
+      root,
+      ["owner-native-positive", "owner-native-after-drift"].includes(id),
+    );
     const guard = (await import(join(f.owner, "src/native/context-provider.ts"))) as {
       readRegisteredContextProvider: (
         root: string,
