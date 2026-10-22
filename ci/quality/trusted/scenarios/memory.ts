@@ -657,7 +657,8 @@ export async function memoryScenario(sourceRoot: string, id: string): Promise<un
       });
       const datasetPath = "work/p/w/inputs/dataset.json",
         policyPath = "work/p/w/inputs/policy.json";
-      await write(root, datasetPath, bytes(input("dataset", compiled.dataset)));
+      // Preserve the producer property order covered by its review binding.
+      await write(root, datasetPath, JSON.stringify(input("dataset", compiled.dataset)) + "\n");
       await write(root, policyPath, bytes(input("policy", compiled.policy)));
       const request = {
         ...compiled.request,
