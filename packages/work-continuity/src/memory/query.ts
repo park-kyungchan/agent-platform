@@ -103,6 +103,7 @@ export async function withMemoryQuery<T>(input: unknown, owner: NativeMemoryRead
         if (request.mode === "current" && !inTime) { counts.timeExcluded++; continue; }
         const permit = await lease.authorize(address,{mode:request.mode,purpose:request.purpose}); await current();
         if (!permit || typeof permit !== "object") {counts.denied++;continue;}
+        if(acquiredBytes>=2_097_152||originalBytesTotal>=16_777_216){omissions.sourceLimit++;continue;}
         let bytes: Uint8Array;
         try {
           if(typeof lease.readOriginal!=="function")throw Error("MEMORY_EXACT_ORIGINAL_READER_REQUIRED");

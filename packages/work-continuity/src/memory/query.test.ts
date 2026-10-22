@@ -162,9 +162,9 @@ test("current-policy requalification rebuilds views after a denial; closing duri
 });
 
 test("whole canonical document budget includes legacy metadata even when summary text is tiny",async()=>{
- const docs=[0,1,2].map(i=>{const doc=memory("large-legacy-"+i,"언어");doc.legacy={protocol:"synthetic-legacy",identityKey:doc.record.id,original:doc.record.sourceRefs[0]!,metadata:"x".repeat(900_000)};return doc;});
+ const docs=[0,1,2,3].map(i=>{const doc=memory("large-legacy-"+i,"언어");doc.legacy={protocol:"synthetic-legacy",identityKey:doc.record.id,original:doc.record.sourceRefs[0]!,metadata:Array.from({length:15},()=>"x".repeat(60_000))};return doc;});
  const f=nativeFixture(docs),out=await result(query({maxChars:64000}),f);
- expect(out.counts.acquired).toBe(3);expect(out.counts.matched).toBe(2);expect(out.omissions.sourceLimit).toBe(1);expect(out.sourceCoverage).toBe("partial");expect(out.hits).toEqual([]);expect(out.omissions.hitChars).toBe(2);
+ expect(out.counts.acquired).toBe(3);expect(f.reads.size).toBe(3);expect(out.counts.matched).toBe(2);expect(out.omissions.sourceLimit).toBe(2);expect(out.sourceCoverage).toBe("partial");expect(out.hits).toEqual([]);expect(out.omissions.hitChars).toBe(2);
 });
 test("aggregate original acquisition budget omits a source before derived body acquisition and reports partial coverage",async()=>{
  const bytes=new TextEncoder().encode("x".repeat(6_000_000)),digest=memoryDigest(bytes);
