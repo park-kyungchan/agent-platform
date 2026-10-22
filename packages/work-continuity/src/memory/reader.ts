@@ -1,12 +1,20 @@
 import type { Graph, TaskRef, Scope, SourceRef } from "../git-work/generated/v3.ts";
-import type { MemoryRecord, MemoryQuery, GoverningDocument, MemoryDocument } from "./generated/memory-v1.ts";
+import type {
+  MemoryRecord,
+  MemoryQuery,
+  GoverningDocument,
+  MemoryDocument,
+} from "./generated/memory-v1.ts";
 
 export type MemoryHeader = Omit<MemoryRecord, "text">;
-export type GoverningHeader = Omit<GoverningDocument, "schema" | "text" | "claim"> & { claimKey: string };
-export type MemoryAddress = { source: SourceRef; currentness: "current" | "historical" | "unknown"; claimKey?: string } & (
-  | { kind: "memory"; header: MemoryHeader }
-  | { kind: "governing"; header: GoverningHeader }
-);
+export type GoverningHeader = Omit<GoverningDocument, "schema" | "text" | "claim"> & {
+  claimKey: string;
+};
+export type MemoryAddress = {
+  source: SourceRef;
+  currentness: "current" | "historical" | "unknown";
+  claimKey?: string;
+} & ({ kind: "memory"; header: MemoryHeader } | { kind: "governing"; header: GoverningHeader });
 /** Opaque native object: never accepted from a query, JSON grant or source descriptor. */
 export type NativeMemoryPermit = object;
 export interface MemoryInventory {
@@ -34,20 +42,36 @@ export interface NativeMemoryReadLease {
   expiresAtUtc: string;
   assertCurrent(): void | Promise<void>;
   discover(input: Pick<MemoryQuery, "scopes" | "mode" | "purpose">): Promise<MemoryInventory>;
-  authorize(address: MemoryAddress, input: Pick<MemoryQuery, "mode" | "purpose">): Promise<NativeMemoryPermit | null>;
+  authorize(
+    address: MemoryAddress,
+    input: Pick<MemoryQuery, "mode" | "purpose">,
+  ): Promise<NativeMemoryPermit | null>;
   /** Return the exact permitted immutable original bytes, not a summary/cache claim. */
   readOriginal(source: SourceRef, permit: NativeMemoryPermit): Promise<Uint8Array>;
   acquire(address: MemoryAddress, permit: NativeMemoryPermit): Promise<Uint8Array>;
   /** Authenticate adoption evidence/applicability from already acquired originals. */
-  qualifyMemoryUse?(address: MemoryAddress, document: MemoryDocument, permit: NativeMemoryPermit): Promise<NativeMemoryUse | null>;
+  qualifyMemoryUse?(
+    address: MemoryAddress,
+    document: MemoryDocument,
+    permit: NativeMemoryPermit,
+  ): Promise<NativeMemoryUse | null>;
   /** Actual governing Decision/Spec verification and applicability, not a Memory label. */
-  qualifyGoverning?(address: MemoryAddress, document: GoverningDocument, permit: NativeMemoryPermit): Promise<boolean>;
+  qualifyGoverning?(
+    address: MemoryAddress,
+    document: GoverningDocument,
+    permit: NativeMemoryPermit,
+  ): Promise<boolean>;
   /** Exact current/historical source-qualified graph, never an inferred latest graph. */
   readTaskGraph?(task: TaskRef): Promise<Graph>;
 }
 export interface NativeMemoryReader {
-  withCurrentRead<T>(request: Readonly<MemoryQuery>, consume: (lease: NativeMemoryReadLease) => Promise<T>): Promise<T>;
+  withCurrentRead<T>(
+    request: Readonly<MemoryQuery>,
+    consume: (lease: NativeMemoryReadLease) => Promise<T>,
+  ): Promise<T>;
 }
 export class MemoryAcquisitionGap extends Error {
-  constructor(readonly code: "missing" | "unreachable" | "denied") { super("MEMORY_SOURCE_" + code.toUpperCase()); }
+  constructor(readonly code: "missing" | "unreachable" | "denied") {
+    super("MEMORY_SOURCE_" + code.toUpperCase());
+  }
 }

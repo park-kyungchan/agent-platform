@@ -252,32 +252,32 @@
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/codec.ts",
           "relativePath": "packages/work-continuity/src/memory/codec.ts",
-          "sha256": "49aa40c9c5eea00297d7345ca9151ba6529f95776496b568d01f5d3f7884309a"
+          "sha256": "8bb09e961a294a63e6d79c70cc0044594060255bd381cf570baee485775e7018"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/legacy.ts",
           "relativePath": "packages/work-continuity/src/memory/legacy.ts",
-          "sha256": "1f147768cb0cfd456afd33c51a529eb35f967ed8811ee32196840a63c732d5a6"
+          "sha256": "8e43d139002c82e56d730b42afd15297050a32d4a5cf2c39379321401cb9ca91"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/query.ts",
           "relativePath": "packages/work-continuity/src/memory/query.ts",
-          "sha256": "524cdfdab41512fe7c245928f4e9fd058315acbecdec7545d338f244b814f521"
+          "sha256": "1ccf4903b5e5f1d78c2245f88cb403c0f72fd8210cfded45267757d6b035beec"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/ranking.ts",
           "relativePath": "packages/work-continuity/src/memory/ranking.ts",
-          "sha256": "9c19d7513d259683f2e75a37fb646091a0ceed486f378b616de9fddbab488e32"
+          "sha256": "d924a08369233d3985cb38a9b911cfdd6b431b8232389ac5240cc50276879539"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/reader.ts",
           "relativePath": "packages/work-continuity/src/memory/reader.ts",
-          "sha256": "d3748e0f650e3ff4ac5003448ceeee0730f75db0b5a46c34450b8b874bfed481"
+          "sha256": "cc45748326dbc3403db0c6c224f7bd3c8008edec493b6dd2d21f520f847c8ef1"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/v1.ts",
           "relativePath": "packages/work-continuity/src/memory/v1.ts",
-          "sha256": "389040286fceb8eca308102d8e5a24582584faac428d6084421a50be68f2402e"
+          "sha256": "bd8bb066eae20af37c4192dcedd02b77611e5b5c54bb1f275ef2e6c341261c77"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/operational-state.ts",
@@ -1184,7 +1184,7 @@
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/operational-context/src/academy/context-admission.ts",
           "relativePath": "packages/operational-context/src/academy/context-admission.ts",
-          "sha256": "3fadd0f7729f7d4f802e463e08582b6b73cfae0f10f414937697be59315d1c35"
+          "sha256": "c0558462d6cc182aaa482b5eff174adf47133ae2aa56fbcbd8ab2e5236c14f47"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/operational-context/src/backend/intent-context/contract.ts",
