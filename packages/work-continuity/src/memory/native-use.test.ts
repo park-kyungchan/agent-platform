@@ -336,7 +336,10 @@ test("a known standing contradiction holds only its owner/key and a foreign winn
   const out = await withMemoryQuery(request(), f.owner, (r) => r);
   expect(out.hits).toHaveLength(5);
   expect(
-    out.hits.filter((h) => h.currentInstructionEligible).map((h) => h.document.record.id).sort(),
+    out.hits
+      .filter((h) => h.currentInstructionEligible)
+      .map((h) => h.document.record.id)
+      .sort(),
   ).toEqual(["foreign-resolution", "independent-key", "independent-standing"]);
   const unresolved = out.conflicts.find(
     (c) =>
@@ -404,7 +407,10 @@ test.each(standingKinds)(
     const out = await withMemoryQuery(request(), f.owner, (r) => r);
     expect(out.hits).toHaveLength(3);
     expect(
-      out.hits.filter((h) => h.currentInstructionEligible).map((h) => h.document.record.id).sort(),
+      out.hits
+        .filter((h) => h.currentInstructionEligible)
+        .map((h) => h.document.record.id)
+        .sort(),
     ).toEqual(["actual-resolution", "resolved-alpha"]);
     expect(out.governing).toHaveLength(1);
     expect(out.governing[0]!.document).toEqual(rows[2]!.actual!);
