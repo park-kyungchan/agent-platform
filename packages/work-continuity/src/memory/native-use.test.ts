@@ -264,7 +264,11 @@ test("two claim-less summaries report the same actual conflicts as direct govern
   const out = await withMemoryQuery(request(), adopted.owner, (r) => r);
   const equivalent = await withMemoryQuery(request(), direct.owner, (r) => r);
   expect(rows.every((r) => !Object.hasOwn(r.document, "claim"))).toBe(true);
-  expect(out.governing.map((g) => g.document)).toEqual(rows.map((r) => r.actual));
+  const expectedOriginals = rows.map((r) => {
+    if (!r.actual) throw Error("Synthetic actual Decision required");
+    return r.actual;
+  });
+  expect(out.governing.map((g) => g.document)).toEqual(expectedOriginals);
   expect(out.governing.map((g) => g.document)).toEqual(equivalent.governing.map((g) => g.document));
   expect(out.conflicts).toEqual(equivalent.conflicts);
   expect(out.conflicts[0]).toMatchObject({
