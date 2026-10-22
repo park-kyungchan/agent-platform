@@ -37,6 +37,7 @@ const env = [
   "LANG=C.UTF-8",
   "CI=true",
   "RUNNER_TEMP=/job/tmp",
+  "TMPDIR=/job/tmp",
 ];
 /** Validate actual daemon state before any candidate code can start. No report flags are accepted. */
 export function validateWorkerInspect(raw: unknown, s: WorkerSpec, id: string): void {
@@ -89,7 +90,7 @@ export function validateWorkerInspect(raw: unknown, s: WorkerSpec, id: string): 
   );
   insist(
     same(object(host.Tmpfs), {
-      "/job": "rw,nosuid,nodev,size=2147483648,uid=1000,gid=1000,mode=0700",
+      "/job": "rw,nosuid,nodev,exec,size=2147483648,uid=1000,gid=1000,mode=0700",
       "/tmp": "rw,nosuid,nodev,noexec,size=268435456,uid=1000,gid=1000,mode=0700",
     }),
     "PRIVATE_TMPFS_REQUIRED",
@@ -165,7 +166,7 @@ export class WorkerController {
       "--pids-limit",
       "256",
       "--tmpfs",
-      "/job:rw,nosuid,nodev,size=2147483648,uid=1000,gid=1000,mode=0700",
+      "/job:rw,nosuid,nodev,exec,size=2147483648,uid=1000,gid=1000,mode=0700",
       "--tmpfs",
       "/tmp:rw,nosuid,nodev,noexec,size=268435456,uid=1000,gid=1000,mode=0700",
       "--interactive",

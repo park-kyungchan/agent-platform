@@ -10,7 +10,7 @@ RUN curl --fail --show-error --location --proto '=https' --proto-redir '=https' 
     && chmod 0555 /usr/local/bin/bun \
     && rm /tmp/bun.zip
 RUN mkdir /prepared && chown 1000:1000 /prepared
-ENV HOME=/job/home LANG=C.UTF-8 CI=true RUNNER_TEMP=/job/tmp
+ENV HOME=/job/home LANG=C.UTF-8 CI=true RUNNER_TEMP=/job/tmp TMPDIR=/job/tmp
 USER 1000:1000
 WORKDIR /job
-ENTRYPOINT ["/usr/bin/env", "-i", "HOME=/job/home", "PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8", "CI=true", "RUNNER_TEMP=/job/tmp"]
+ENTRYPOINT ["/usr/bin/env", "-i", "HOME=/job/home", "PATH=/usr/local/bin:/usr/bin:/bin", "LANG=C.UTF-8", "CI=true", "RUNNER_TEMP=/job/tmp", "TMPDIR=/job/tmp"]

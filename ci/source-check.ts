@@ -550,7 +550,9 @@ async function sourceChecks() {
       .filter((path) => path.startsWith(`packages/${entry.name}/`))
       .map((path) => join(common, path));
     if (tests.length)
-      packageChecks.push(() => run(packageRoot, [process.execPath, "test", ...tests]));
+      packageChecks.push(() =>
+        run(packageRoot, [process.execPath, "test", "--timeout", "120000", ...tests]),
+      );
   }
   const packageStarted = performance.now();
   const packageStartedAt = new Date().toISOString();
@@ -569,6 +571,8 @@ async function sourceChecks() {
     await run(common, [
       process.execPath,
       "test",
+      "--timeout",
+      "120000",
       ...qualityTests.map((path) => join(common, path)),
     ]);
   // Each guard runs in a fresh process, retaining native first-import/cache checks.

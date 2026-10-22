@@ -5,6 +5,7 @@ import { mkdir } from "node:fs/promises";
 export async function prepareProbeEnvironment(): Promise<Record<string, string>> {
   const env = {
     HOME: "/job/home",
+    TMPDIR: "/job/tmp",
     BUN_INSTALL_CACHE_DIR: "/job/bun-cache",
     BUN_RUNTIME_TRANSPILER_CACHE_PATH: "/job/transpiler-cache",
   };

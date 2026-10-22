@@ -212,6 +212,7 @@ test("actual worker config refuses auth/socket mounts, privileged env and host n
     "LANG=C.UTF-8",
     "CI=true",
     "RUNNER_TEMP=/job/tmp",
+  "TMPDIR=/job/tmp",
   ];
   const raw = {
     Id: id,
@@ -235,7 +236,7 @@ test("actual worker config refuses auth/socket mounts, privileged env and host n
       NanoCpus: 2000000000,
       PidsLimit: 256,
       Tmpfs: {
-        "/job": "rw,nosuid,nodev,size=2147483648,uid=1000,gid=1000,mode=0700",
+        "/job": "rw,nosuid,nodev,exec,size=2147483648,uid=1000,gid=1000,mode=0700",
         "/tmp": "rw,nosuid,nodev,noexec,size=268435456,uid=1000,gid=1000,mode=0700",
       },
     },
@@ -244,6 +245,15 @@ test("actual worker config refuses auth/socket mounts, privileged env and host n
   };
   expect(() => validateWorkerInspect(raw, spec, id)).not.toThrow();
   for (const mutate of [
+    (r: typeof raw) => {
+      r.Config.Env = env.filter((value) => value !== "TMPDIR=/job/tmp");
+    },
+    (r: typeof raw) => {
+      r.Config.Env = env.map((value) => value === "TMPDIR=/job/tmp" ? "TMPDIR=/tmp" : value);
+    },
+    (r: typeof raw) => {
+      r.HostConfig.Tmpfs["/job"] = r.HostConfig.Tmpfs["/job"].replace(",exec,", ",noexec,");
+    },
     (r: typeof raw) => {
       r.Config.Env = [...env, "GITHUB_TOKEN=fixture-not-a-credential"];
     },
