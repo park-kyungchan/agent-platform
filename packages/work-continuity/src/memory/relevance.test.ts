@@ -236,7 +236,9 @@ test("fixed independent public Korean corpus measures the declared equivalent le
     JSON.stringify(report, null, 2) + "\n",
   );
   // The qualified runner retains this public synthetic report outside the source tree.
-  console.log(JSON.stringify({ schema: "local.s02-public-relevance-transport.v1", observation: report }));
+  console.log(
+    JSON.stringify({ schema: "local.s02-public-relevance-transport.v1", observation: report }),
+  );
   expect(queries.queries).toHaveLength(23);
   expect(forbidden).toBe(0);
   expect(exposureMismatches).toBe(0);
