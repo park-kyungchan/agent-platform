@@ -35,11 +35,10 @@ jobs:
         env:
           COMMON_CI_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify canonical source in finite owner QA tree
-        run: bun ci/source-check.ts
+        run: /usr/bin/env RUNNER_TEMP=/job/tmp TMPDIR=/job/tmp bun ci/source-check.ts
         working-directory: /job/source
         env:
           COMMON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          RUNNER_TEMP: /job/tmp
           TMPDIR: /job/tmp
       - name: Verify common runtime layout and native skill source
         working-directory: /job/source
@@ -144,11 +143,10 @@ jobs:
           retention-days: 14
           include-hidden-files: false
       - name: Verify prospective merge in finite owner QA tree
-        run: bun ci/source-check.ts
+        run: /usr/bin/env RUNNER_TEMP=/job/tmp TMPDIR=/job/tmp bun ci/source-check.ts
         working-directory: /job/source
         env:
           COMMON_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          RUNNER_TEMP: /job/tmp
           TMPDIR: /job/tmp
       - name: Verify prospective merge runtime layout and native skill source
         run: bun ci/verify-runtime-layout.ts
