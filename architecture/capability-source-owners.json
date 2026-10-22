@@ -255,6 +255,31 @@
           "sha256": "8bb09e961a294a63e6d79c70cc0044594060255bd381cf570baee485775e7018"
         },
         {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/fixtures/native-reader.ts",
+          "relativePath": "packages/work-continuity/src/memory/fixtures/native-reader.ts",
+          "sha256": "24627b38e37642191c4c4a695f44f8ad0cbf6a9fb4a3d6fe0ddbae4d4a6de06a"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/fixtures/public-reader.ts",
+          "relativePath": "packages/work-continuity/src/memory/fixtures/public-reader.ts",
+          "sha256": "46ddd872506ddbd8e4e350f467cf4a11d6aac291b286dbcab3ca7ae0da36868b"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/generated/memory-v1-validators.d.ts",
+          "relativePath": "packages/work-continuity/src/memory/generated/memory-v1-validators.d.ts",
+          "sha256": "1f1a75dfff3a926052afcc413ca97e32f11330bc034411d97658e2d8f140a3ac"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/generated/memory-v1-validators.js",
+          "relativePath": "packages/work-continuity/src/memory/generated/memory-v1-validators.js",
+          "sha256": "0575c01a48d72133e05c42887aa5e887712fdba40d82c749a123a02efa75e848"
+        },
+        {
+          "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/generated/memory-v1.ts",
+          "relativePath": "packages/work-continuity/src/memory/generated/memory-v1.ts",
+          "sha256": "49b1916dbcf3febe7731c399a1b7cb6006e762c9512448963a88c16fd124730e"
+        },
+        {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/memory/legacy.ts",
           "relativePath": "packages/work-continuity/src/memory/legacy.ts",
           "sha256": "8e43d139002c82e56d730b42afd15297050a32d4a5cf2c39379321401cb9ca91"

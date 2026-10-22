@@ -11,7 +11,7 @@
     "workId": "ontology-driven-platform-integration-20261017",
     "taskId": "5c4a393f-8033-4451-a8f6-7a0ba1321539"
   },
-  "sourceBaseSha": "657ca0a4722cac847c6e133444ee7a82d3d950f8",
+  "sourceBaseSha": "f925c6ad3ff82ef4a047ae0053b7c7e4ee471398",
   "author": {
     "runtime": "native-codex",
     "threadId": "01a15e93-a450-71f0-bfe4-2352ea19068b",
@@ -20,7 +20,7 @@
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-22T00:29:12.887Z",
+  "capturedAtUtc": "2026-10-22T00:35:38.610Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
