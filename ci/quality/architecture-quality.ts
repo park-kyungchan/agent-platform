@@ -576,9 +576,12 @@ export async function loadImportScanner(
     return result;
   };
 }
-export async function readArchitectureSnapshot(sourceRoot: string): Promise<ArchitectureSnapshot> {
+export async function readArchitectureSnapshot(
+  sourceRoot: string,
+  parserRoot = sourceRoot,
+): Promise<ArchitectureSnapshot> {
   const root = resolve(sourceRoot),
-    scanImports = await loadImportScanner(root);
+    scanImports = await loadImportScanner(parserRoot);
   if ((await realpath(root)) !== root)
     throw Error("Architecture source root must be its exact canonical path.");
   const exactFile = async (path: string): Promise<Buffer> => {

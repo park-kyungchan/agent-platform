@@ -266,10 +266,11 @@ export async function runWorkflowTools(
   workflows: string[],
   actions: string[] = [],
   cacheRoot?: string,
+  pinRoot = root,
 ): Promise<{ tools: InstalledTool[]; commands: NativeCommandResult[] }> {
   if (!workflows.length) throw Error("Workflow audit refuses an empty denominator.");
   for (const file of [...workflows, ...actions]) await exactSourceFile(root, file);
-  const pins = await readToolPins(root),
+  const pins = await readToolPins(pinRoot),
     tools: InstalledTool[] = [];
   for (const pin of pins.filter((pin) => pin.name !== "gitleaks"))
     tools.push(await installPinnedTool(pin, cacheRoot));

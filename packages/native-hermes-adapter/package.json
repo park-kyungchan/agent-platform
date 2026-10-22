@@ -29,7 +29,8 @@
     "./platform-rearchitecture/owner-readers": "./src/platform-rearchitecture/owner-readers.ts",
     "./platform-current-work/context": "./src/platform-current-work/context.ts",
     "./platform-current-work/provider": "./src/platform-current-work/provider.ts",
-    "./platform-current-work/build": "./src/platform-current-work/build.ts"
+    "./platform-current-work/build": "./src/platform-current-work/build.ts",
+    "./source-provider/v1": "./src/source-provider/binding-v1.ts"
   },
   "dependencies": {
     "@palantirkc/ontology": "file:releases/palantirkc-ontology-0.2.0.tgz",

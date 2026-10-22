@@ -1,0 +1,28 @@
+{
+  "schema": "agent-platform.native-trusted-ci-profile.v2",
+  "active": false,
+  "ownerId": "git-source-owner:1413326539",
+  "ownerThread": "<actual-accountable-native-Root-thread>",
+  "authorityRevision": 0,
+  "sourceRoot": "/opt/agent-platform/trusted-ci/releases/<independently-reviewed-P>",
+  "sourceHead": "<P-full-SHA>",
+  "sourceTree": "<P-tree>",
+  "fileSha256": {},
+  "policy": null,
+  "ghPath": "/usr/bin/gh",
+  "ghSha256": "<native-owner-observed-executable-SHA256>",
+  "activationPrerequisites": [
+    "Independently qualify all original66+89 fixed G01-G04 scenario cases at the exact unified P/H/M after Root composes public S02 4e0 and resolves original G05 provisioning; adjudicate coverage against full S04 source contract. Full legacy internal assertion completion remains unknown and source/native activation are separate.",
+    "Apply exact Root-owned canonical-controller proposal and qualify all required checks in the serialized private runner",
+    "Publish independent exact commit/tree review with current zero unresolved findings; accountable Lead explicitly integrates expected head",
+    "Native owner verifies actual loaded source/tool/dependency closure and installs read-only Root-owned release; no candidate execution on issuer host",
+    "Derive policy from that exact P with buildPolicy, preserve full installed dependency inventory, bind current authority and actual native owner thread",
+    "Qualify protected immutable lightweight tag trusted-ci-v1, dispatcher, API run/jobs/steps/artifact path and exact bounded ZIP member",
+    "Keep current required contexts; separately qualify narrow App token/check readback and App-bound rule before any activation",
+    "Create separate Root-only native intent and current lease, preserve one-shot journal and existing writer lock until exact reconciliation"
+  ],
+  "credentialsIncluded": false,
+  "sourceProofGrantsNativePermission": false,
+  "automaticMerge": false,
+  "humanAcceptance": false
+}

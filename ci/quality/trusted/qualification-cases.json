@@ -1,0 +1,80 @@
+{
+  "schema": "agent-platform.trusted-ci-qualification-cases.v1",
+  "scope": "Prepared full finite G01-G04 scenario adaptations with all original 66 minima, Root-owned G05 and public 4e0 composition prerequisite; no execution/native adoption/measured improvement claim",
+  "consumer": "agent-platform protected source CI and fixed external native App issuer",
+  "cases": [
+    {
+      "id": "valid-exact-source",
+      "kind": "control",
+      "expected": "Every actual production semantic case reaches the external supervisor/aggregate/pure issuer success path for correct implementations, with bounded claim and fullLegacyAssertionsAuthenticated=false; original full legacy checks remain required"
+    },
+    {
+      "id": "candidate-exit-zero-or-skip",
+      "kind": "detection",
+      "designIssue": "S04-D01",
+      "expected": "Actual C01 source verdict/early exit is observed as exit-zero-only legacy workload but rejected by external behavior comparisons and aggregate/pure issuer; wrong return/throw/missing/timeout/OOM also rejected"
+    },
+    {
+      "id": "forged-or-stale-provider-artifact",
+      "kind": "detection",
+      "designIssue": "S04-D02",
+      "expected": "Current raw workflow path/ref/P/actor/trigger/attempt/job/step/archive/member bytes must agree; no raw JSON publication capability"
+    },
+    {
+      "id": "held-or-forged-review-successor",
+      "kind": "detection",
+      "designIssue": "S04-D03",
+      "expected": "Canonical original result, source tree/manifest, author and latest publisher status remain required; explicit identical-tree successor only"
+    },
+    {
+      "id": "relabelled-H-as-M-or-base-drift",
+      "kind": "detection",
+      "designIssue": "S04-D04",
+      "expected": "Actual subject commit/tree/parents/source manifest/dependencies and current H/B/attempt are required; no fake main prospective pass"
+    },
+    {
+      "id": "missing-network-audit-or-worker-access",
+      "kind": "detection",
+      "designIssue": "S04-D05",
+      "expected": "Required frozen credential-free preparation and real current audit precede offline non-root capability-free workers; no missing phase can pass"
+    }
+  ],
+  "comparison": {
+    "baseline": "Pinned admitted baseline plus the four original Root unexecuted drafts, preserved in assignment input hashes",
+    "candidate": "Exact correction-v3 successor of Root-qualified 41ba; 155 immutable P cases with actual fixed scenario calls and external comparisons; Root must bind final unified source and helper/dependency closure",
+    "equivalentExposureRequired": true,
+    "actualComparableObservations": null,
+    "behaviorGain": "unknown",
+    "defectDetectionGain": "unknown",
+    "efficiencyGain": "unknown",
+    "nextDecision": "Root composes exact selected public S02 production source, reconciles original G05 failure without blind retry, privately qualifies every fixed scenario/canonical required workload and obtains independent exact-source coverage review. No native or full internal assertion completion inferred."
+  },
+  "allowedChanges": [
+    "ci/quality/trusted/",
+    ".github/workflows/trusted-source.yml",
+    "templates/trusted-ci-policy.example.json",
+    "templates/trusted-ci-caller.example.yml",
+    ".github/source-author.json",
+    "exact shared-file source-proposals only"
+  ],
+  "limits": {
+    "privateQualificationAttemptsBeforeReassessment": 2,
+    "actualProviderEffects": 0,
+    "nativeActivationEffects": 0,
+    "extraPaidEvaluationCalls": 0
+  },
+  "independentValidationOwner": "Root serialized qualification and a separate accountable exact-tree reviewer",
+  "acceptanceDecision": null,
+  "catalogue": "semantic-catalogue.json",
+  "coverage": "coverage.json",
+  "fullS04Completion": false,
+  "preservedOriginalProbes": [
+    "relative-source-path",
+    "parent-source-escape",
+    "absolute-source-escape",
+    "null-native-author-refused",
+    "candidate-permission-is-not-author"
+  ],
+  "scenarioDocumentation": "SCENARIOS.md",
+  "requiredCaseCount": 155
+}
