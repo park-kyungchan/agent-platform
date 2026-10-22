@@ -11,9 +11,7 @@ import {
 } from "./source-projection";
 import { validateSourceProviderProjections } from "./verify-runtime-layout";
 export { validateIndependentReviewReceipt } from "./quality/receipt-validator";
-import {
-  captureInstalledRuntimeClosure,
-} from "../packages/native-hermes-adapter/src/source-provider/dependency-closure.ts";
+import { captureInstalledRuntimeClosure } from "../packages/native-hermes-adapter/src/source-provider/dependency-closure.ts";
 import { createHash } from "node:crypto";
 import {
   cp,
