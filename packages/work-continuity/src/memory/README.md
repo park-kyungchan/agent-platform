@@ -55,6 +55,15 @@ Only that admitted use can produce an adopted governing row or actual claim.
 Native results are copied into private query snapshots. Qualification callbacks
 receive detached documents and cannot mutate the exact document being admitted.
 Normal standing preferences/procedures remain eligible without Decision authority.
+Two fully qualified current standing uses with different values for the same
+exact owner/local claim stay ineligible until an actual qualified governing
+original resolves that claim. `standingConflict: true` and `standingSources`
+retain their exact envelope/adoption references and values, even on a lexical
+miss. Without a governing winner their `resolution` is `conflict`; with one,
+only standing uses compatible with its value are eligible. Standing sources
+never enter `governing` or set `governingConflict`. Single/compatible standing
+uses, independently owned claims, and historical or unadopted evidence keep
+their existing meanings. There is no implicit recency or summary-text winner.
 
 `conflictingEvidence` includes values from both admitted summary claims and actual
 governing documents, grouped by the same exact owner-qualified claim identity.

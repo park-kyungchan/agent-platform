@@ -23,6 +23,12 @@ type ClaimGap = {
   recordClass: string;
   original?: SourceRef;
 };
+type StandingClaimSource = {
+  source: SourceRef;
+  adoptionSource: SourceRef;
+  kind: "standing-preference" | "standing-procedure";
+  value: string;
+};
 export interface MemoryQueryResult {
   schema: "common.memory-query-result.v1";
   mode: MemoryQuery["mode"];
@@ -46,6 +52,10 @@ export interface MemoryQueryResult {
     claimIdentity: MemoryClaimIdentity;
     conflictingEvidence: boolean;
     governingConflict: boolean;
+    /** Present only for contradictory qualified current standing uses. These
+     * originals remain evidence; they never become Decision governing rows. */
+    standingConflict?: true;
+    standingSources?: StandingClaimSource[];
     selectedGoverningValue: string | null;
     resolution: "resolved" | "conflict" | "incomplete" | "unqualified";
     incompleteSources: ClaimGap[];
@@ -586,6 +596,30 @@ export async function withMemoryQuery<T>(
           group.push(row);
           currentAuthority.set(key, group);
         }
+      // Adoption establishes each standing use's applicability, not a winner
+      // among incompatible uses. Only fully qualified current snapshots enter
+      // this set; historical/unadopted summaries remain ordinary evidence.
+      const currentStanding = new Map<string, StandingClaimSource[]>();
+      for (const row of acquired)
+        if (
+          row.kind === "memory" &&
+          row.use &&
+          row.use.kind !== "governing-decision" &&
+          row.document.claim
+        ) {
+          const key = claimOf(row)!,
+            sources = currentStanding.get(key) ?? [];
+          sources.push({
+            source: row.source,
+            adoptionSource: row.use.source,
+            kind: row.use.kind,
+            value: row.document.claim.value,
+          });
+          currentStanding.set(key, sources);
+        }
+      const standingConflicts = new Map(
+        [...currentStanding].filter(([, sources]) => new Set(sources.map((s) => s.value)).size > 1),
+      );
       const ranked = rankMemory(
         acquired.map((row) =>
           row.kind === "memory" ? row.document.record.text : row.document.text,
@@ -675,6 +709,7 @@ export async function withMemoryQuery<T>(
       if (!fits()) throw Error("MEMORY_METADATA_BUDGET_EXCEEDED");
       const matchedClaims = new Set<string>([
         ...currentAuthority.keys(),
+        ...standingConflicts.keys(),
         ...incompleteClaims.keys(),
         ...selected.flatMap((row) =>
           row.kind === "memory"
@@ -720,6 +755,7 @@ export async function withMemoryQuery<T>(
         ];
         const authoritative = currentAuthority.get(key) ?? [];
         const activeValues = [...new Set(authoritative.map((row) => row.document.claim.value))];
+        const standingSources = standingConflicts.get(key);
         const incompleteSources = [
           ...(incompleteClaims.get(key) ?? []),
           ...(withheld.get(key) ?? []),
@@ -730,6 +766,7 @@ export async function withMemoryQuery<T>(
           claimIdentity: claimIdentities.get(key)!,
           conflictingEvidence: new Set(values).size > 1,
           governingConflict: activeValues.length > 1,
+          ...(standingSources ? { standingConflict: true as const, standingSources } : {}),
           selectedGoverningValue:
             !incomplete && activeValues.length === 1 ? activeValues[0]! : null,
           resolution: incomplete
@@ -738,7 +775,9 @@ export async function withMemoryQuery<T>(
               ? "conflict"
               : activeValues.length === 1
                 ? "resolved"
-                : "unqualified",
+                : standingSources
+                  ? "conflict"
+                  : "unqualified",
           incompleteSources,
         });
         if (!fits()) {
