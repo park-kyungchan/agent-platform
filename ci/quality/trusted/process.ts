@@ -88,7 +88,8 @@ export function processFailureMetadata(error: unknown) {
   }
   return {
     failureKind: "spawn-or-transport",
-    errorSha256: typeof message === "string" ? createHash("sha256").update(message).digest("hex") : null,
+    errorSha256:
+      typeof message === "string" ? createHash("sha256").update(message).digest("hex") : null,
     captureComplete: false,
     retryAllowed: false,
   };
@@ -151,11 +152,17 @@ export async function fixedProcess(
   }, options.timeoutMs ?? operationalTimeouts.processMs);
   try {
     // Even spawn errors settle at close; output and the exact child are drained first.
-    const result = await new Promise<{ code: number | null; signal: string | null; error?: Error }>((done) => {
-      let spawnError: Error | undefined;
-      child.once("error", (error) => { spawnError = error; });
-      child.once("close", (code, signal) => done({ code, signal, error: spawnError ?? streamError }));
-    });
+    const result = await new Promise<{ code: number | null; signal: string | null; error?: Error }>(
+      (done) => {
+        let spawnError: Error | undefined;
+        child.once("error", (error) => {
+          spawnError = error;
+        });
+        child.once("close", (code, signal) =>
+          done({ code, signal, error: spawnError ?? streamError }),
+        );
+      },
+    );
     if (capture.exceeded) throw capture.failure(timedOut, result.code, result.signal);
     if (result.error) throw result.error;
     return {

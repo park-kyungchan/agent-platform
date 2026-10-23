@@ -118,11 +118,15 @@ export async function runNativeCommand(
     ]);
     const exit = results[2]!;
     if (capture.exceeded)
-      throw capture.failure(timedOut, exit.status === "fulfilled" ? exit.value as number : null, child.signalCode);
-    for (const result of results)
-      if (result.status === "rejected") throw result.reason;
+      throw capture.failure(
+        timedOut,
+        exit.status === "fulfilled" ? (exit.value as number) : null,
+        child.signalCode,
+      );
+    for (const result of results) if (result.status === "rejected") throw result.reason;
     if (exit.status !== "fulfilled") throw Error("NATIVE_COMMAND_EXIT_UNKNOWN");
-    const stdout = capture.bytes("stdout"), stderr = capture.bytes("stderr");
+    const stdout = capture.bytes("stdout"),
+      stderr = capture.bytes("stderr");
     return {
       name,
       exitCode: exit.value as number,
@@ -386,9 +390,18 @@ export function sourceTestFailureDiagnostics(
       if (result.length < 16) result.push({ path, line, column });
     }
   }
-  return { locations: result, total: seen.size, omitted: seen.size - result.length, diagnosticComplete: seen.size === result.length };
+  return {
+    locations: result,
+    total: seen.size,
+    omitted: seen.size - result.length,
+    diagnosticComplete: seen.size === result.length,
+  };
 }
 
-export function sourceTestFailureLocations(stderr: string, root: string, testFiles: readonly string[]) {
+export function sourceTestFailureLocations(
+  stderr: string,
+  root: string,
+  testFiles: readonly string[],
+) {
   return sourceTestFailureDiagnostics(stderr, root, testFiles).locations;
 }

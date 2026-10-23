@@ -10,7 +10,12 @@ import { runTrustedSourceChecks } from "../../source-check";
 import { verifyRuntimeLayout } from "../../verify-runtime-layout";
 import { fixedProcess } from "./process";
 import { insist, object, safePath, sha256, trustedDigest } from "./policy";
-import { driverDiagnosticLimit, qualityDriverDiagnostic, encodeDriverFailure, type DriverFailurePhase } from "./driver-failure";
+import {
+  driverDiagnosticLimit,
+  qualityDriverDiagnostic,
+  encodeDriverFailure,
+  type DriverFailurePhase,
+} from "./driver-failure";
 
 const source = "/prepared/source",
   policy = "/policy";
@@ -184,7 +189,12 @@ async function main(): Promise<void> {
     });
     console.log(summary);
     if (result.status !== "pass") {
-      const diagnostic = qualityDriverDiagnostic(result, Buffer.byteLength(serialized), sha256(serialized), driverDiagnosticLimit - Buffer.byteLength(summary + "\n"));
+      const diagnostic = qualityDriverDiagnostic(
+        result,
+        Buffer.byteLength(serialized),
+        sha256(serialized),
+        driverDiagnosticLimit - Buffer.byteLength(summary + "\n"),
+      );
       console.log(JSON.stringify(diagnostic));
     }
     insist(result.status === "pass", "CANDIDATE_QUALITY_FAILED");

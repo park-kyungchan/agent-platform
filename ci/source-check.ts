@@ -62,9 +62,12 @@ export async function runSourceCommand(
   let failed = false;
   try {
     result = await runNativeCommand(
-      "source-command", argv, cwd,
+      "source-command",
+      argv,
+      cwd,
       options.timeoutMs ?? operationalTimeouts.workerMs,
-      {}, { maxBytes: options.maxBytes },
+      {},
+      { maxBytes: options.maxBytes },
     );
     if (result.exitCode !== 0 || result.timedOut) {
       failed = true;
@@ -77,10 +80,14 @@ export async function runSourceCommand(
   const transport = result?.rawOutput ?? processFailureMetadata(failure);
   const locations = sourceTestFailureDiagnostics(
     result?.stderr ?? "",
-    options.knownTestFiles ? cwd : diagnosticRoot ?? cwd,
+    options.knownTestFiles ? cwd : (diagnosticRoot ?? cwd),
     options.knownTestFiles ?? diagnosticPaths,
   );
-  if (!result || result.timedOut || (failed && !(options.knownTestFiles ?? diagnosticPaths).length)) {
+  if (
+    !result ||
+    result.timedOut ||
+    (failed && !(options.knownTestFiles ?? diagnosticPaths).length)
+  ) {
     locations.total = null;
     locations.omitted = null;
     locations.diagnosticComplete = false;
@@ -90,7 +97,12 @@ export async function runSourceCommand(
     commandOrdinal: ordinal,
     label: "source-command",
     status: failed ? "fail" : "pass",
-    failureKind: result ? result.timedOut ? "timeout" : result.exitCode !== 0 ? "nonzero" : null
+    failureKind: result
+      ? result.timedOut
+        ? "timeout"
+        : result.exitCode !== 0
+          ? "nonzero"
+          : null
       : processFailureMetadata(failure).failureKind,
     exitCode: result?.exitCode ?? ("exitCode" in transport ? transport.exitCode : null),
     timedOut: result?.timedOut ?? ("timedOut" in transport && transport.timedOut === true),
@@ -100,7 +112,10 @@ export async function runSourceCommand(
     locationOmitted: locations.omitted,
     diagnosticComplete: locations.diagnosticComplete,
   };
-  while (Buffer.byteLength(JSON.stringify(diagnostic) + "\n") > 2048 && diagnostic.failureLocations.length) {
+  while (
+    Buffer.byteLength(JSON.stringify(diagnostic) + "\n") > 2048 &&
+    diagnostic.failureLocations.length
+  ) {
     diagnostic.failureLocations.pop();
     diagnostic.diagnosticComplete = false;
     if (diagnostic.locationTotal !== null)
@@ -117,9 +132,12 @@ export async function runSourceCommand(
     if (Buffer.byteLength(JSON.stringify(diagnostic) + "\n") > 2048)
       throw Error("SOURCE_COMMAND_DIAGNOSTIC_BUDGET");
     if (options.observe) await options.observe(diagnostic);
-    else await new Promise<void>((done, reject) => {
-      process.stdout.write(JSON.stringify(diagnostic) + "\n", (error) => error ? reject(error) : done());
-    });
+    else
+      await new Promise<void>((done, reject) => {
+        process.stdout.write(JSON.stringify(diagnostic) + "\n", (error) =>
+          error ? reject(error) : done(),
+        );
+      });
   } catch (error) {
     if (!failed) throw error;
     // A diagnostic write failure does not replace the original command failure or permit replay.

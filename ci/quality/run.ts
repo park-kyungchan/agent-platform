@@ -82,17 +82,26 @@ export function qualityFailureMetadata(error: unknown) {
   const metadata = processFailureMetadata(error);
   if (error instanceof ProcessOutputLimitError) return metadata;
   const codes = [
-    "QUALITY_REPORT_DESTINATION_REQUIRED", "QUALITY_REPORT_OWNED_DIRECTORY_REQUIRED",
-    "QUALITY_REPORT_OUTPUT_LIMIT", "QUALITY_REPORT_SCHEMA_REQUIRED",
-    "QUALITY_REPORT_SOURCE_IDENTITY_REQUIRED", "QUALITY_REPORT_READBACK_REQUIRED",
-    "QUALITY_SUMMARY_OUTPUT_LIMIT", "QUALITY_REPORT_SUMMARY_DESTINATION_REQUIRED",
+    "QUALITY_REPORT_DESTINATION_REQUIRED",
+    "QUALITY_REPORT_OWNED_DIRECTORY_REQUIRED",
+    "QUALITY_REPORT_OUTPUT_LIMIT",
+    "QUALITY_REPORT_SCHEMA_REQUIRED",
+    "QUALITY_REPORT_SOURCE_IDENTITY_REQUIRED",
+    "QUALITY_REPORT_READBACK_REQUIRED",
+    "QUALITY_SUMMARY_OUTPUT_LIMIT",
+    "QUALITY_REPORT_SUMMARY_DESTINATION_REQUIRED",
   ];
   let message: unknown;
-  try { message = error && Object.getOwnPropertyDescriptor(error, "message")?.value; } catch { /* finite fallback */ }
+  try {
+    message = error && Object.getOwnPropertyDescriptor(error, "message")?.value;
+  } catch {
+    /* finite fallback */
+  }
   return {
     ...metadata,
     failureKind: "quality-check-exception",
-    code: typeof message === "string" && codes.includes(message) ? message : "QUALITY_CHECK_EXCEPTION",
+    code:
+      typeof message === "string" && codes.includes(message) ? message : "QUALITY_CHECK_EXCEPTION",
   };
 }
 
@@ -631,14 +640,28 @@ export async function runQuality(
 export const qualityReportLimit = 4_000_000;
 export const qualitySummaryLimit = 8192;
 
-export async function validateQualityReportDestination(path: string, temporaryRoot: string): Promise<void> {
-  if (!temporaryRoot || resolve(temporaryRoot) !== temporaryRoot || resolve(path) !== path ||
-      dirname(path) !== temporaryRoot ||
-      !["agent-platform-quality.json", "agent-platform-merge-quality.json"].includes(basename(path)) ||
-      await realpath(temporaryRoot) !== temporaryRoot)
+export async function validateQualityReportDestination(
+  path: string,
+  temporaryRoot: string,
+): Promise<void> {
+  if (
+    !temporaryRoot ||
+    resolve(temporaryRoot) !== temporaryRoot ||
+    resolve(path) !== path ||
+    dirname(path) !== temporaryRoot ||
+    !["agent-platform-quality.json", "agent-platform-merge-quality.json"].includes(
+      basename(path),
+    ) ||
+    (await realpath(temporaryRoot)) !== temporaryRoot
+  )
     throw Error("QUALITY_REPORT_DESTINATION_REQUIRED");
   const parent = await lstat(temporaryRoot);
-  if (!parent.isDirectory() || parent.isSymbolicLink() || parent.uid !== process.getuid?.() || parent.mode & 0o022)
+  if (
+    !parent.isDirectory() ||
+    parent.isSymbolicLink() ||
+    parent.uid !== process.getuid?.() ||
+    parent.mode & 0o022
+  )
     throw Error("QUALITY_REPORT_OWNED_DIRECTORY_REQUIRED");
 }
 
@@ -650,37 +673,79 @@ export async function writeQualityReportSummary(
 ) {
   await validateQualityReportDestination(path, temporaryRoot);
   const original = JSON.stringify(report);
-  if (Buffer.byteLength(original) > qualityReportLimit)
-    throw Error("QUALITY_REPORT_OUTPUT_LIMIT");
-  if (report.schema !== "agent-platform.quality-report.v1" ||
-      report.verificationClass !== "canonical-source-quality-only" ||
-      !["all", "format", "format:write", "lint", "workflows", "architecture", "baseline:any"].includes(report.mode) ||
-      !["pass", "fail"].includes(report.status) ||
-      report.nativePermissionGranted !== false || report.environmentAdoptionEstablished !== false || report.acceptanceDecision !== null ||
-      !Array.isArray(report.checks) || !report.checks.length || report.checks.length > qualityCheckIds.length ||
-      new Set(report.checks.map((c) => c.id)).size !== report.checks.length ||
-      !report.checks.every((c) => (qualityCheckIds as readonly string[]).includes(c.id) &&
-        ["pass", "fail", "skipped"].includes(c.status) && Number.isFinite(c.durationMs) && c.durationMs >= 0) ||
-      report.status !== (report.checks.every((c) => c.status === "pass") ? "pass" : "fail"))
+  if (Buffer.byteLength(original) > qualityReportLimit) throw Error("QUALITY_REPORT_OUTPUT_LIMIT");
+  if (
+    report.schema !== "agent-platform.quality-report.v1" ||
+    report.verificationClass !== "canonical-source-quality-only" ||
+    ![
+      "all",
+      "format",
+      "format:write",
+      "lint",
+      "workflows",
+      "architecture",
+      "baseline:any",
+    ].includes(report.mode) ||
+    !["pass", "fail"].includes(report.status) ||
+    report.nativePermissionGranted !== false ||
+    report.environmentAdoptionEstablished !== false ||
+    report.acceptanceDecision !== null ||
+    !Array.isArray(report.checks) ||
+    !report.checks.length ||
+    report.checks.length > qualityCheckIds.length ||
+    new Set(report.checks.map((c) => c.id)).size !== report.checks.length ||
+    !report.checks.every(
+      (c) =>
+        (qualityCheckIds as readonly string[]).includes(c.id) &&
+        ["pass", "fail", "skipped"].includes(c.status) &&
+        Number.isFinite(c.durationMs) &&
+        c.durationMs >= 0,
+    ) ||
+    report.status !== (report.checks.every((c) => c.status === "pass") ? "pass" : "fail")
+  )
     throw Error("QUALITY_REPORT_SCHEMA_REQUIRED");
   // Arbitrary detail fields are not established credential-free. Retain every check and an
   // exact fingerprint of its full details; the legacy default still exposes its original report.
-  if (!Number.isFinite(report.durationMs) || report.durationMs < 0 ||
-      ![report.startedAt, report.finishedAt].every((value) => /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(value)))
+  if (
+    !Number.isFinite(report.durationMs) ||
+    report.durationMs < 0 ||
+    ![report.startedAt, report.finishedAt].every((value) =>
+      /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(value),
+    )
+  )
     throw Error("QUALITY_REPORT_SCHEMA_REQUIRED");
   const identity = report.sourceIdentity;
-  if (identity && (Object.keys(identity).join("|") !== "actualCheckoutSha|githubEventSha|sourceRegistrySha256|lockSha256|workingTreeHasChanges" ||
-      ![identity.actualCheckoutSha, identity.githubEventSha].every((value) => value === null || /^[a-f0-9]{40}$/.test(value)) ||
-      ![identity.sourceRegistrySha256, identity.lockSha256].every((value) => /^[a-f0-9]{64}$/.test(value)) ||
-      !(identity.workingTreeHasChanges === null || typeof identity.workingTreeHasChanges === "boolean")))
+  if (
+    identity &&
+    (Object.keys(identity).join("|") !==
+      "actualCheckoutSha|githubEventSha|sourceRegistrySha256|lockSha256|workingTreeHasChanges" ||
+      ![identity.actualCheckoutSha, identity.githubEventSha].every(
+        (value) => value === null || /^[a-f0-9]{40}$/.test(value),
+      ) ||
+      ![identity.sourceRegistrySha256, identity.lockSha256].every((value) =>
+        /^[a-f0-9]{64}$/.test(value),
+      ) ||
+      !(
+        identity.workingTreeHasChanges === null ||
+        typeof identity.workingTreeHasChanges === "boolean"
+      ))
+  )
     throw Error("QUALITY_REPORT_SOURCE_IDENTITY_REQUIRED");
   const snapshot = report.sourceSnapshot;
-  if (snapshot && (snapshot.schema !== "agent-platform.quality-source-snapshot.v1" ||
-      !/^[a-f0-9]{64}$/.test(snapshot.contentSha256) || !/^[a-f0-9]{64}$/.test(snapshot.scopeSha256) ||
-      !Array.isArray(snapshot.files) || hash(JSON.stringify(snapshot.files)) !== snapshot.contentSha256))
+  if (
+    snapshot &&
+    (snapshot.schema !== "agent-platform.quality-source-snapshot.v1" ||
+      !/^[a-f0-9]{64}$/.test(snapshot.contentSha256) ||
+      !/^[a-f0-9]{64}$/.test(snapshot.scopeSha256) ||
+      !Array.isArray(snapshot.files) ||
+      hash(JSON.stringify(snapshot.files)) !== snapshot.contentSha256)
+  )
     throw Error("QUALITY_REPORT_SOURCE_IDENTITY_REQUIRED");
   const diagnostic = qualityDriverDiagnostic(report, Buffer.byteLength(original), hash(original));
-  while (Buffer.byteLength(JSON.stringify(diagnostic)) > 4096 && diagnostic.failureLocations.length) {
+  while (
+    Buffer.byteLength(JSON.stringify(diagnostic)) > 4096 &&
+    diagnostic.failureLocations.length
+  ) {
     diagnostic.failureLocations.pop();
     diagnostic.diagnosticComplete = false;
     if (diagnostic.locationTotal !== null)
@@ -701,7 +766,12 @@ export async function writeQualityReportSummary(
     acceptanceDecision: null,
     checks: report.checks.map((check) => {
       const details = JSON.stringify(check.details) ?? "null";
-      const checkDiagnostic = qualityDriverDiagnostic({ checks: [check] }, Buffer.byteLength(details), hash(details), 4096);
+      const checkDiagnostic = qualityDriverDiagnostic(
+        { checks: [check] },
+        Buffer.byteLength(details),
+        hash(details),
+        4096,
+      );
       return {
         id: check.id,
         status: check.status,
@@ -709,15 +779,19 @@ export async function writeQualityReportSummary(
         details: {
           evidenceBytes: Buffer.byteLength(details),
           evidenceSha256: hash(details),
-          ...(check.id === "source-snapshot" && snapshot ? {
-            sourceContentSha256: snapshot.contentSha256,
-            sourceScopeSha256: snapshot.scopeSha256,
-          } : {}),
+          ...(check.id === "source-snapshot" && snapshot
+            ? {
+                sourceContentSha256: snapshot.contentSha256,
+                sourceScopeSha256: snapshot.scopeSha256,
+              }
+            : {}),
           rawDetailsRetained: false,
-          ...(check.status === "fail" ? {
-            failureLocations: checkDiagnostic.failureLocations,
-            diagnosticComplete: false,
-          } : {}),
+          ...(check.status === "fail"
+            ? {
+                failureLocations: checkDiagnostic.failureLocations,
+                diagnosticComplete: false,
+              }
+            : {}),
         },
       };
     }),
@@ -725,7 +799,11 @@ export async function writeQualityReportSummary(
   const bytes = Buffer.from(JSON.stringify(safeReport, null, 2) + "\n");
   if (bytes.length > qualityReportLimit) throw Error("QUALITY_REPORT_OUTPUT_LIMIT");
   // Exclusive/no-follow creation refuses stale files and symlink destinations before write.
-  const file = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+  const file = await open(
+    path,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+    0o600,
+  );
   try {
     await file.writeFile(bytes);
     await file.sync();
@@ -733,11 +811,20 @@ export async function writeQualityReportSummary(
     await file.close();
   }
   const info = await lstat(path);
-  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || info.size !== bytes.length || await realpath(path) !== path)
+  if (
+    !info.isFile() ||
+    info.isSymbolicLink() ||
+    info.nlink !== 1 ||
+    info.size !== bytes.length ||
+    (await realpath(path)) !== path
+  )
     throw Error("QUALITY_REPORT_READBACK_REQUIRED");
   const observed = await readFile(path);
-  if (!bytes.equals(observed) || hash(observed.toString("utf8")) !== hash(bytes.toString("utf8")) ||
-      JSON.parse(observed.toString("utf8")).schema !== report.schema)
+  if (
+    !bytes.equals(observed) ||
+    hash(observed.toString("utf8")) !== hash(bytes.toString("utf8")) ||
+    JSON.parse(observed.toString("utf8")).schema !== report.schema
+  )
     throw Error("QUALITY_REPORT_READBACK_REQUIRED");
   const summary = {
     schema: "agent-platform.quality-report-summary.v1",
@@ -770,11 +857,28 @@ export async function writeQualityReportSummary(
 if (import.meta.main) {
   if (process.env.QUALITY_REPORT_OUTPUT !== undefined) {
     try {
-      if (process.env.QUALITY_REPORT_OUTPUT !== "summary" || !process.env.QUALITY_REPORT_PATH || !process.env.RUNNER_TEMP)
+      if (
+        process.env.QUALITY_REPORT_OUTPUT !== "summary" ||
+        !process.env.QUALITY_REPORT_PATH ||
+        !process.env.RUNNER_TEMP
+      )
         throw Error("QUALITY_REPORT_SUMMARY_DESTINATION_REQUIRED");
-      await validateQualityReportDestination(process.env.QUALITY_REPORT_PATH, process.env.RUNNER_TEMP);
+      await validateQualityReportDestination(
+        process.env.QUALITY_REPORT_PATH,
+        process.env.RUNNER_TEMP,
+      );
     } catch (error) {
-      console.log(JSON.stringify({ schema: "agent-platform.quality-report-summary.v1", status: "fail", retained: false, reference: null, diagnosticComplete: false, failure: qualityFailureMetadata(error), nativePermissionGranted: false }));
+      console.log(
+        JSON.stringify({
+          schema: "agent-platform.quality-report-summary.v1",
+          status: "fail",
+          retained: false,
+          reference: null,
+          diagnosticComplete: false,
+          failure: qualityFailureMetadata(error),
+          nativePermissionGranted: false,
+        }),
+      );
       process.exit(1);
     }
   }
@@ -849,18 +953,24 @@ if (import.meta.main) {
     try {
       if (outputMode !== "summary" || !reportPath || !process.env.RUNNER_TEMP)
         throw Error("QUALITY_REPORT_SUMMARY_DESTINATION_REQUIRED");
-      console.log(JSON.stringify(await writeQualityReportSummary(report, reportPath, process.env.RUNNER_TEMP)));
+      console.log(
+        JSON.stringify(
+          await writeQualityReportSummary(report, reportPath, process.env.RUNNER_TEMP),
+        ),
+      );
     } catch (error) {
       report.status = "fail";
-      console.log(JSON.stringify({
-        schema: "agent-platform.quality-report-summary.v1",
-        status: "fail",
-        retained: false,
-        reference: null,
-        diagnosticComplete: false,
-        failure: qualityFailureMetadata(error),
-        nativePermissionGranted: false,
-      }));
+      console.log(
+        JSON.stringify({
+          schema: "agent-platform.quality-report-summary.v1",
+          status: "fail",
+          retained: false,
+          reference: null,
+          diagnosticComplete: false,
+          failure: qualityFailureMetadata(error),
+          nativePermissionGranted: false,
+        }),
+      );
     }
   } else {
     if (reportPath) {
@@ -870,7 +980,10 @@ if (import.meta.main) {
       } catch (error) {
         report.status = "fail";
         report.checks.push({
-          id: "report-write", status: "fail", durationMs: 0, details: qualityFailureMetadata(error),
+          id: "report-write",
+          status: "fail",
+          durationMs: 0,
+          details: qualityFailureMetadata(error),
         });
       }
     }
