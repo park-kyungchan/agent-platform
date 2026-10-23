@@ -81,8 +81,11 @@ export function processFailureMetadata(error: unknown) {
     return { failureKind: "output-limit", ...error.metadata };
   let message: unknown;
   try {
-    const descriptor = error && Object.getOwnPropertyDescriptor(error, "message");
-    message = descriptor && "value" in descriptor ? descriptor.value : undefined;
+    const descriptor =
+      error === null || error === undefined
+        ? undefined
+        : Object.getOwnPropertyDescriptor(error, "message");
+    message = descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
   } catch {
     // No accessor or arbitrary exception conversion is allowed on the diagnostic path.
   }

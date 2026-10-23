@@ -121,7 +121,7 @@ export async function runNativeCommand(
       throw capture.failure(
         timedOut,
         exit.status === "fulfilled" ? (exit.value as number) : null,
-        child.signalCode,
+        typeof child.signalCode === "string" ? child.signalCode : null,
       );
     for (const result of results) if (result.status === "rejected") throw result.reason;
     if (exit.status !== "fulfilled") throw Error("NATIVE_COMMAND_EXIT_UNKNOWN");

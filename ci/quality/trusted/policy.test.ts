@@ -843,7 +843,7 @@ test("candidate failure summaries bind counts, hashes and admitted locations wit
     Buffer.from(JSON.stringify(summary) + "\n" + JSON.stringify(d) + "\n");
   expect(
     parseDriverDiagnostic(encode(diagnostic), "candidate", command("candidate-quality"), [path]),
-  ).toEqual(diagnostic);
+  ).toEqual(diagnostic as unknown as Record<string, unknown>);
   expect(JSON.stringify(diagnostic)).not.toContain("PRIVATE-DIAGNOSTIC");
   for (const mutation of [
     { ...diagnostic, status: "pass" },
@@ -1071,5 +1071,5 @@ test("candidate diagnostic plus its existing summary stays within the combined d
       command("candidate-quality"),
       locations.map((l) => l.path),
     ),
-  ).toEqual(diagnostic);
+  ).toEqual(diagnostic as unknown as Record<string, unknown>);
 });
