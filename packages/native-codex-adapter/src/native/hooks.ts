@@ -200,7 +200,7 @@ export function observeNativeWorkCheckout(
   observation: NativeWorkCheckoutObservation,
   provider: Awaited<ReturnType<NativeContextLoader>>,
 ): void {
-  const deadline = Date.now() + 10_000;
+  const deadline = Date.now() + 50_000;
   const fields = [
     "schema",
     "repositoryRoot",

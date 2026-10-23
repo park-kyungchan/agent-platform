@@ -350,7 +350,7 @@
       "selection": "Exact immutable P readQualityScope decides required membership; staged exclusions remain explicit",
       "semanticCases": [],
       "coverage": "legacy-workload-only",
-      "limitation": "Fixed external API/data/IO invariants are separately compared on the report host. They do not authenticate this test file or its internal/shared-process completion, general correctness, actual native use or Acceptance. Complete P-selected legacy workload remains mandatory."
+      "limitation": "Fixed external API/data/IO invariants are separately compared on the report host. They do not authenticate this test file or its internal/shared-process completion, general correctness, actual native use or Acceptance. Complete P-selected legacy workload remains mandatory. Existing-file output prevention tests cover bounded known locations with explicit omission/unknown counts and the actual source child metadata export before nonzero/cap/spawn/timeout failure. No raw private sentinel is admitted to diagnostics; execution remains required."
     },
     {
       "path": "ci/quality/harness-scenarios/ci-oracles.test.ts",
@@ -420,7 +420,7 @@
       "selection": "Exact immutable P readQualityScope decides required membership; staged exclusions remain explicit",
       "semanticCases": [],
       "coverage": "legacy-workload-only",
-      "limitation": "Fixed external API/data/IO invariants are separately compared on the report host. They do not authenticate this test file or its internal/shared-process completion, general correctness, actual native use or Acceptance. Complete P-selected legacy workload remains mandatory."
+      "limitation": "Fixed external API/data/IO invariants are separately compared on the report host. They do not authenticate this test file or its internal/shared-process completion, general correctness, actual native use or Acceptance. Complete P-selected legacy workload remains mandatory. Existing-file output prevention tests cover real Bun raw combined byte boundaries and distinct outcomes, safe bounded source report retention/readback, and finite quality catch metadata. Authored source only; execution and actual full-workload volume qualification remain required."
     },
     {
       "path": "ci/quality/trusted/policy.test.ts",
@@ -583,7 +583,7 @@
         "scenario-operational-docs-hash-negative"
       ],
       "coverage": "partial-related-contracts",
-      "limitation": "Fixed external API/data/IO invariants are separately compared on the report host. They do not authenticate this test file or its internal/shared-process completion, general correctness, actual native use or Acceptance. Complete P-selected legacy workload remains mandatory."
+      "limitation": "Fixed external API/data/IO invariants are separately compared on the report host. They do not authenticate this test file or its internal/shared-process completion, general correctness, actual native use or Acceptance. Complete P-selected legacy workload remains mandatory. Existing-file output prevention tests cover real fixed-process byte boundaries, strict diagnostic-only static/candidate envelopes and same-occurrence inert create/inspect/attach/registration/build failure journals/cleanup. No Docker/native effects or authenticated completion are established by these source tests."
     },
     {
       "path": "ci/quality/trusted/review.test.ts",
@@ -3343,6 +3343,13 @@
         "scenario-owner-dependency-drift"
       ],
       "limitation": "This P-owned bootstrap test directly invokes readPolicyMinimum and buildPolicy against the full exact current committed source, then removes exactly one newly admitted coverage row in a clean private clone while retaining all tests/source selection. Both guards must refuse. The associated external cases are related source/denominator invariants only; this metadata test grants no native permission or authenticated completion of internal legacy assertions."
+    },
+    {
+      "path": "ci/quality/operational-timeouts.test.ts",
+      "selection": "Exact immutable P readQualityScope decides required membership; staged exclusions remain explicit",
+      "semanticCases": [],
+      "coverage": "legacy-workload-only",
+      "limitation": "Prepared real child termination and exact caller-budget tests, mocked provider response-bound checks, workflow nesting checks and research-request range validation are required source workload. No existing external181 case authenticates these timer assertions or their shared-process completion. Root isolated execution and independent exact-source review remain required; no native permission, replay, measured gain, full assertion authentication or Acceptance is claimed."
     }
   ],
   "canonicalWorkload": [

@@ -89,6 +89,38 @@ test("an empty, duplicate or protected source denominator is rejected before sca
   );
 });
 
+test("scanner accepts scaled outer bounds and selects a 300-second inner wait", async () => {
+  const root = await fixture();
+  // This fictional executable checks argv only; it makes no claim about real secret detection.
+  const script = `#!/bin/sh
+report=
+timeout=
+for arg in "$@"; do
+  case "$arg" in
+    --report-path=*) report="\${arg#--report-path=}" ;;
+    --timeout=*) timeout="\${arg#--timeout=}" ;;
+  esac
+done
+test "$timeout" = 300 && test -n "$report" || exit 7
+printf '[]' > "$report"
+`;
+  const path = join(root, "fictional-scanner");
+  await writeFile(path, script, { mode: 0o700 });
+  const fictional = {
+    ...tool,
+    path,
+    binarySha256: createHash("sha256").update(script).digest("hex"),
+  };
+  for (const timeoutMs of [225_000, 450_000]) {
+    const result = await runSecretCheck(root, ["src/clean.ts"], fictional, timeoutMs);
+    expect(result.status).toBe("pass");
+  }
+  for (const timeoutMs of [999, 450_001, Number.POSITIVE_INFINITY])
+    await expect(runSecretCheck(root, ["src/clean.ts"], fictional, timeoutMs)).rejects.toThrow(
+      "bounded timeout",
+    );
+});
+
 // Root integration should resolve the verified cached tool and call verifySecretCanary from check:quality.
 // Native tests accept only an explicitly supplied digest-verified binary, never auto-install globally.
 test.if(Boolean(binary && binarySha256))(

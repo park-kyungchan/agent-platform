@@ -1,5 +1,6 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { spawn } from "node:child_process";
-import { insist, sha256 } from "./policy";
+import { createHash } from "node:crypto";
 
 export interface ProcessResult {
   code: number;
@@ -7,7 +8,97 @@ export interface ProcessResult {
   stdout: Buffer;
   stderr: Buffer;
 }
-/** Bounded, non-shell, credential-free child execution. Never inherit the controller environment. */
+export interface OutputLimitMetadata {
+  maxBytes: number;
+  retainedBytes: number;
+  observedStdoutBytes: number;
+  observedStderrBytes: number;
+  observedCombinedBytes: number;
+  observedStdoutSha256: string;
+  observedStderrSha256: string;
+  hashScope: "observed-raw-bytes";
+  captureComplete: false;
+  limitExceeded: true;
+  timedOut: boolean;
+  exitCode: number | null;
+  signal: string | null;
+  retryAllowed: false;
+}
+export class ProcessOutputLimitError extends Error {
+  constructor(readonly metadata: OutputLimitMetadata) {
+    super("TRUSTED_CI_PROCESS_OUTPUT_LIMIT");
+  }
+}
+
+/** Shared byte accounting only: no policy imports, environment or process ownership. */
+export class ProcessOutputCapture {
+  readonly chunks = { stdout: [] as Buffer[], stderr: [] as Buffer[] };
+  private readonly hashes = { stdout: createHash("sha256"), stderr: createHash("sha256") };
+  private readonly counts = { stdout: 0, stderr: 0 };
+  retainedBytes = 0;
+  exceeded = false;
+  constructor(readonly maxBytes = 4_000_000) {
+    if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0)
+      throw Error("TRUSTED_CI_PROCESS_OUTPUT_BUDGET_INVALID");
+  }
+  observe(key: "stdout" | "stderr", chunk: Uint8Array): void {
+    this.counts[key] += chunk.byteLength;
+    this.hashes[key].update(chunk);
+    const remaining = this.maxBytes - this.retainedBytes;
+    if (remaining > 0) {
+      const kept = Buffer.from(chunk.subarray(0, remaining));
+      this.chunks[key].push(kept);
+      this.retainedBytes += kept.length;
+    }
+    this.exceeded = this.counts.stdout + this.counts.stderr > this.maxBytes;
+  }
+  bytes(key: "stdout" | "stderr"): Buffer {
+    return Buffer.concat(this.chunks[key]);
+  }
+  failure(timedOut: boolean, exitCode: number | null, signal: string | null) {
+    return new ProcessOutputLimitError({
+      maxBytes: this.maxBytes,
+      retainedBytes: this.retainedBytes,
+      observedStdoutBytes: this.counts.stdout,
+      observedStderrBytes: this.counts.stderr,
+      observedCombinedBytes: this.counts.stdout + this.counts.stderr,
+      observedStdoutSha256: this.hashes.stdout.copy().digest("hex"),
+      observedStderrSha256: this.hashes.stderr.copy().digest("hex"),
+      hashScope: "observed-raw-bytes",
+      captureComplete: false,
+      limitExceeded: true,
+      timedOut,
+      exitCode,
+      signal,
+      retryAllowed: false,
+    });
+  }
+}
+
+/** Finite failure metadata only. An unknown transport outcome never permits replay. */
+export function processFailureMetadata(error: unknown) {
+  if (error instanceof ProcessOutputLimitError)
+    return { failureKind: "output-limit", ...error.metadata };
+  let message: unknown;
+  try {
+    const descriptor =
+      error === null || error === undefined
+        ? undefined
+        : Object.getOwnPropertyDescriptor(error, "message");
+    message = descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
+  } catch {
+    // No accessor or arbitrary exception conversion is allowed on the diagnostic path.
+  }
+  return {
+    failureKind: "spawn-or-transport",
+    errorSha256:
+      typeof message === "string" ? createHash("sha256").update(message).digest("hex") : null,
+    captureComplete: false,
+    retryAllowed: false,
+  };
+}
+
+/** Bounded, non-shell child execution. Never inherit the controller environment. */
 export async function fixedProcess(
   argv: readonly string[],
   options: {
@@ -18,59 +109,84 @@ export async function fixedProcess(
     maxBytes?: number;
   },
 ): Promise<ProcessResult> {
-  insist(argv.length > 0 && argv.every((a) => !a.includes("\0")), "FIXED_ARGV_REQUIRED");
+  if (!argv.length || !argv.every((a) => !a.includes("\0")))
+    throw Error("TRUSTED_CI_FIXED_ARGV_REQUIRED");
+  const capture = new ProcessOutputCapture(options.maxBytes);
   const child = spawn(argv[0]!, argv.slice(1), {
     cwd: options.cwd,
     env: { PATH: "/usr/local/bin:/usr/bin:/bin", LANG: "C.UTF-8", ...options.env },
     stdio: ["pipe", "pipe", "pipe"],
     detached: true,
   });
-  const chunks = { stdout: [] as Buffer[], stderr: [] as Buffer[] };
-  let size = 0,
-    timedOut = false,
-    exceeded = false;
+  let timedOut = false,
+    killed = false;
   const kill = () => {
+    if (killed) return;
+    killed = true;
     try {
-      process.kill(-child.pid!, "SIGKILL");
+      if (child.pid) process.kill(-child.pid, "SIGKILL");
+      else child.kill("SIGKILL");
     } catch {
       child.kill("SIGKILL");
     }
   };
-  for (const key of ["stdout", "stderr"] as const)
-    child[key].on("data", (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > (options.maxBytes ?? 4_000_000)) {
-        exceeded = true;
-        kill();
-      } else chunks[key].push(Buffer.from(chunk));
-    });
+  const stdout = (chunk: Buffer) => {
+    capture.observe("stdout", chunk);
+    if (capture.exceeded) kill();
+  };
+  const stderr = (chunk: Buffer) => {
+    capture.observe("stderr", chunk);
+    if (capture.exceeded) kill();
+  };
+  let streamError: Error | undefined;
+  const readError = (error: Error) => {
+    streamError ??= error;
+    kill();
+  };
+  child.stdout.on("error", readError);
+  child.stderr.on("error", readError);
+  child.stdout.on("data", stdout);
+  child.stderr.on("data", stderr);
   child.stdin.on("error", () => {});
   child.stdin.end(options.stdin);
   const timer = setTimeout(() => {
     timedOut = true;
     kill();
-  }, options.timeoutMs ?? 120000);
+  }, options.timeoutMs ?? operationalTimeouts.processMs);
   try {
-    const code = await new Promise<number>((done, reject) => {
-      child.once("error", reject);
-      child.once("close", (code) => done(code ?? 255));
-    });
-    insist(!exceeded, "PROCESS_OUTPUT_LIMIT");
+    // Even spawn errors settle at close; output and the exact child are drained first.
+    const result = await new Promise<{ code: number | null; signal: string | null; error?: Error }>(
+      (done) => {
+        let spawnError: Error | undefined;
+        child.once("error", (error) => {
+          spawnError = error;
+        });
+        child.once("close", (code, signal) =>
+          done({ code, signal, error: spawnError ?? streamError }),
+        );
+      },
+    );
+    if (capture.exceeded) throw capture.failure(timedOut, result.code, result.signal);
+    if (result.error) throw result.error;
     return {
-      code,
+      code: result.code ?? 255,
       timedOut,
-      stdout: Buffer.concat(chunks.stdout),
-      stderr: Buffer.concat(chunks.stderr),
+      stdout: capture.bytes("stdout"),
+      stderr: capture.bytes("stderr"),
     };
   } finally {
     clearTimeout(timer);
+    child.stdout.off("error", readError);
+    child.stderr.off("error", readError);
+    child.stdout.off("data", stdout);
+    child.stderr.off("data", stderr);
   }
 }
 export const outputMetadata = (r: ProcessResult) => ({
   code: r.code,
   timedOut: r.timedOut,
   stdoutBytes: r.stdout.length,
-  stdoutSha256: sha256(r.stdout),
+  stdoutSha256: createHash("sha256").update(r.stdout).digest("hex"),
   stderrBytes: r.stderr.length,
-  stderrSha256: sha256(r.stderr),
+  stderrSha256: createHash("sha256").update(r.stderr).digest("hex"),
 });

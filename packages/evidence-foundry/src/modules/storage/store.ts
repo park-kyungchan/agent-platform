@@ -188,7 +188,7 @@ export class Store {
         "flock",
         "--exclusive",
         "--timeout",
-        "30",
+        "150",
         join(this.root, "writer.lock"),
         "sh",
         "-c",
@@ -269,7 +269,7 @@ export class Store {
   private openDatabase() {
     this.db?.close();
     this.db = new Database(join(this.root, "indexes", "projection.sqlite"), { create: true });
-    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=30000;
+    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=150000;
       CREATE TABLE IF NOT EXISTS objects(id TEXT PRIMARY KEY, object_type TEXT, project_id TEXT, scope TEXT, version INTEGER, json TEXT);
       CREATE TABLE IF NOT EXISTS links(id TEXT PRIMARY KEY, from_id TEXT, to_id TEXT, link_type TEXT, json TEXT);
       CREATE TABLE IF NOT EXISTS history(id TEXT, version INTEGER, kind TEXT, hash TEXT, sequence INTEGER);

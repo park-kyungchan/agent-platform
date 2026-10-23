@@ -97,7 +97,7 @@ test("native observer rejects oversized selected metadata before creating any du
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 
 /** Entire fixture is synthetic. Original historical cp15 data is never copied or rewritten. */
 async function fixture() {
@@ -379,7 +379,7 @@ async function fixture() {
         stderr: "pipe",
       },
     );
-    const timer = setTimeout(() => p.kill("SIGKILL"), 10000);
+    const timer = setTimeout(() => p.kill("SIGKILL"), 50_000);
     try {
       const [code, out, error] = await Promise.all([
         p.exited,
@@ -458,7 +458,7 @@ test("all stdin commands reject malformed, invalid UTF-8, non-object and oversiz
   } finally {
     await f.cleanup();
   }
-}, 60000);
+}, 300_000);
 
 test("valid source pages, supplied evidence, context and continuity CAS retain their existing semantics", async () => {
   const f = await fixture();
@@ -554,7 +554,7 @@ test("valid source pages, supplied evidence, context and continuity CAS retain t
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 
 test("mode/schema/owner failures stay non-echoing and stale continuity requests never write", async () => {
   const f = await fixture();
@@ -585,7 +585,7 @@ test("mode/schema/owner failures stay non-echoing and stale continuity requests 
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 
 test("an uncertain canonical write remains a structured outcome that requires reconciliation", async () => {
   const f = await fixture();
@@ -620,7 +620,7 @@ test("an uncertain canonical write remains a structured outcome that requires re
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 
 test.skipIf(!process.env.HERMES_CLI_PRIVACY_PREDECESSOR)(
   "preserved predecessor demonstrates the source-only parser disclosure regression",

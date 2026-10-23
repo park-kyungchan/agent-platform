@@ -57,11 +57,13 @@ export interface SourceAuthorReadback {
 }
 
 function record(value: unknown, keys: string[]): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw Error("Exact source-author fields required");
+  const actualKeys = Object.keys(value).sort();
+  const expectedKeys = [...keys].sort();
   if (
-    !value ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    Object.keys(value).sort().join("|") !== [...keys].sort().join("|")
+    actualKeys.length !== expectedKeys.length ||
+    actualKeys.some((key, index) => key !== expectedKeys[index])
   )
     throw Error("Exact source-author fields required");
   return value as Record<string, unknown>;

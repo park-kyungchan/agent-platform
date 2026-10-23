@@ -95,7 +95,7 @@ export async function collectAttempt(
   const outputPath = join(runDirectory, `attempt-${attempt}.txt`);
   const stdoutPath = join(runDirectory, `attempt-${attempt}.stdout.txt`);
   const stderrPath = join(runDirectory, `attempt-${attempt}.stderr.txt`);
-  const timeoutMs = request.timeoutMs ?? 45000;
+  const timeoutMs = request.timeoutMs ?? 225_000;
   const diagnostics: CaptureDiagnostic[] = [];
   const artifacts: CaptureArtifact[] = [];
   const sanitizedEvents: unknown[] = [];
@@ -121,7 +121,7 @@ export async function collectAttempt(
         killed = true;
         child.kill("SIGKILL");
       },
-      timeoutMs * (mode === "dynamic" ? 2 : 1) + 5000,
+      timeoutMs * (mode === "dynamic" ? 2 : 1) + 25_000,
     );
     try {
       [stdout, stderr, exitCode] = await Promise.all([

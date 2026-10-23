@@ -229,7 +229,7 @@ export async function buildHermesPlatformSource(request: PlatformBuildRequest) {
         stdout: "pipe",
         stderr: "pipe",
       });
-      const timer = setTimeout(() => child.kill("SIGKILL"), 30000);
+      const timer = setTimeout(() => child.kill("SIGKILL"), 150_000);
       let completed: {
         exitCode: number;
         stdout: { sha256: string; bytes: number };

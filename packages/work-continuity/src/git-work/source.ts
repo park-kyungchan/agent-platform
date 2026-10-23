@@ -198,7 +198,7 @@ async function git(root: string, args: string[], maxBytes: number): Promise<Uint
   const stream = child.stdout.getReader();
   const chunks: Uint8Array[] = [];
   let count = 0;
-  const timer = setTimeout(() => child.kill(), 10_000);
+  const timer = setTimeout(() => child.kill(), 50_000);
   try {
     while (true) {
       const result = await stream.read();

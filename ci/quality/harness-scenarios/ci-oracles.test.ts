@@ -96,14 +96,15 @@ test("PT-QC-06: exact proof arriving inside the existing wait succeeds; late pro
   await reviewGate(positive.options);
   expect(positive.elapsed()).toBe(15000);
   expect(positive.paths.some((p) => p.startsWith("contents/native-reviews/"))).toBe(true);
-  // Captured example was 4,072 seconds late, far outside the existing 60 second admission window.
+  // Captured example was 4,072 seconds late, outside the 300-second publication wait.
+  // Permission/admission validity is unchanged.
   const late = gateFixture(4072000);
   const absent = await reviewGate(late.options).then(
     () => null,
     (error: unknown) => error,
   );
   expect(absent).toMatchObject({ message: expect.stringContaining("status missing") });
-  expect(late.elapsed()).toBe(60000);
+  expect(late.elapsed()).toBe(300000);
   expect(late.paths.every((p) => p.startsWith("commits/"))).toBe(true);
   const arrived = gateFixture();
   await reviewGate(arrived.options);

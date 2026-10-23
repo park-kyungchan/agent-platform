@@ -502,22 +502,6 @@
       ]
     },
     {
-      "id": "codex.cli.wsl",
-      "url": "https://learn.chatgpt.com/docs/windows/wsl.md",
-      "finalUrl": "https://learn.chatgpt.com/docs/windows/wsl.md",
-      "retrievedAt": "2026-10-13T23:52:17.784Z",
-      "status": 200,
-      "captureOutcome": "success",
-      "expectedPredicateMatched": true,
-      "responseContent": [
-        {
-          "sha256": "7bc7cabfbe456741e7c93ec7fb1e006e82176e052446a66f87926602114bd59e",
-          "bytes": 3403,
-          "complete": true
-        }
-      ]
-    },
-    {
       "id": "codex.cli.commands",
       "url": "https://learn.chatgpt.com/docs/developer-commands.md?surface=cli",
       "finalUrl": "https://learn.chatgpt.com/docs/developer-commands.md?surface=cli",
@@ -1647,21 +1631,6 @@
       "freshnessPolicy": "general"
     },
     {
-      "id": "codex.cli.wsl",
-      "surface": "codex.cli",
-      "topic": "wsl",
-      "aliases": ["wsl2", "리눅스"],
-      "canonicalUrl": "https://learn.chatgpt.com/docs/windows/wsl",
-      "preferredUrl": "https://learn.chatgpt.com/docs/windows/wsl.md",
-      "fallbackUrl": "https://learn.chatgpt.com/docs/windows/wsl",
-      "evidenceStatus": "index-listed",
-      "sourceId": "openai-index",
-      "checkedOn": "2026-10-14",
-      "notes": "",
-      "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
-      "freshnessPolicy": "general"
-    },
-    {
       "id": "codex.cli.windows-sandbox",
       "surface": "codex.cli",
       "topic": "windows-sandbox",
@@ -1672,7 +1641,7 @@
       "evidenceStatus": "index-listed",
       "sourceId": "openai-index",
       "checkedOn": "2026-10-14",
-      "notes": "Windows native and WSL are distinct execution environments.",
+      "notes": "Windows native runtime guidance; remote Desktop connectivity does not establish a local native runtime.",
       "sectionSelection": "Discover actual headings in the retrieved representation; never synthesize heading IDs.",
       "freshnessPolicy": "general"
     },
@@ -2308,25 +2277,9 @@
       "evidenceStatus": "index-listed",
       "sourceId": "hermes-client-backend-index-review-20261018",
       "checkedOn": "2026-10-18",
-      "notes": "Windows native runtime guidance. Do not infer a local native backend, Git Bash or WSL installation solely from a Windows Desktop connection to a remote backend.",
+      "notes": "Windows native runtime guidance. Do not infer a local native backend or Git Bash installation solely from a Windows Desktop connection to a remote backend.",
       "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
       "pageId": "user-guide/windows-native",
-      "freshnessPolicy": "revalidate"
-    },
-    {
-      "id": "hermes.agent.windows-wsl",
-      "surface": "hermes.agent",
-      "topic": "windows-wsl",
-      "aliases": ["wsl", "wsl2", "windows-wsl2", "윈도우WSL"],
-      "canonicalUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-wsl-quickstart",
-      "preferredUrl": "https://hermes-agent.nousresearch.com/docs/user-guide/windows-wsl-quickstart",
-      "fallbackUrl": null,
-      "evidenceStatus": "index-listed",
-      "sourceId": "hermes-client-backend-index-review-20261018",
-      "checkedOn": "2026-10-18",
-      "notes": "Windows WSL2 runtime guidance, distinct from a native Windows Desktop app and a Linux VPS backend.",
-      "sectionSelection": "Discover actual headings in the selected page; read only the section needed for the explicit Client or Backend question.",
-      "pageId": "user-guide/windows-wsl-quickstart",
       "freshnessPolicy": "revalidate"
     },
     {

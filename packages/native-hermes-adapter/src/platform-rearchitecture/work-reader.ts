@@ -58,7 +58,7 @@ export function configuredNativeManifestPin() {
     return PLATFORM_NATIVE_MANIFEST_SHA256;
   throw Error("Native bundle requires an independently promoted manifest SHA256");
 }
-/** Linux/WSL native seam: open each component relative to a held no-follow directory FD. */
+/** Linux native seam: open each component relative to a held no-follow directory FD. */
 export async function readExactFile(path: string, maxBytes: number, expectedSha256?: string) {
   if (
     !isAbsolute(path) ||

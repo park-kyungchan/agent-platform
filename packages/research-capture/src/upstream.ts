@@ -341,7 +341,7 @@ export async function prepareRuntime(context: RuntimeBuildContext): Promise<Acti
       "--css-selector",
       "#ready",
       "--timeout",
-      "20000",
+      "100000",
     ]);
     const staticText = await readFile(staticFile, "utf8");
     const dynamicText = await readFile(dynamicFile, "utf8");
@@ -398,8 +398,8 @@ export async function updateUpstream(
     failures: [],
     candidate: null,
   };
-  const timeoutMs = options.timeoutMs ?? 900_000;
-  const commandTimeoutMs = options.commandTimeoutMs ?? 600_000;
+  const timeoutMs = options.timeoutMs ?? 4_500_000;
+  const commandTimeoutMs = options.commandTimeoutMs ?? 3_000_000;
   if (
     !Number.isFinite(timeoutMs) ||
     timeoutMs <= 0 ||
@@ -417,7 +417,7 @@ export async function updateUpstream(
     if (remaining <= 0) throw new Error(`Update exceeded ${timeoutMs} ms total timeout`);
     const started = Date.now();
     const process = Bun.spawn(
-      ["/usr/bin/timeout", "--signal=TERM", "--kill-after=5s", `${remaining / 1000}s`, ...argv],
+      ["/usr/bin/timeout", "--signal=TERM", "--kill-after=25s", `${remaining / 1000}s`, ...argv],
       {
         cwd,
         stdout: "pipe",

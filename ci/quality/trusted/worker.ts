@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { randomUUID } from "node:crypto";
 import { appendFile, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
@@ -12,7 +13,13 @@ import {
   type TrustedPolicy,
   type WorkerObservation,
 } from "./policy";
-import { fixedProcess, outputMetadata } from "./process";
+import {
+  fixedProcess,
+  outputMetadata,
+  processFailureMetadata,
+  type ProcessResult,
+} from "./process";
+import { parseDriverFailure, parseDriverDiagnostic } from "./driver-failure";
 
 export interface WorkerMount {
   source: string;
@@ -128,12 +135,63 @@ export class WorkerController {
   async docker(args: string[], maxBytes = 4_000_000) {
     return fixedProcess(["/usr/bin/docker", ...args], {
       cwd: this.policyRoot,
-      timeoutMs: 120000,
+      timeoutMs: operationalTimeouts.processMs,
       maxBytes,
     });
   }
   async record(value: unknown): Promise<void> {
     await appendFile(this.journal, JSON.stringify(value) + "\n", { mode: 0o600 });
+  }
+  private async failureRecord(value: Record<string, unknown>, error: unknown): Promise<void> {
+    try {
+      await this.record({ ...value, transport: null, ...processFailureMetadata(error) });
+    } catch {
+      // A failed journal cannot establish retention. Preserve the original transport error.
+    }
+  }
+  private async observedDocker(
+    phase: string,
+    context: Record<string, unknown>,
+    args: string[],
+    maxBytes: number,
+  ): Promise<ProcessResult> {
+    try {
+      return await this.docker(args, maxBytes);
+    } catch (error) {
+      await this.failureRecord({ phase, ...context }, error);
+      throw error;
+    }
+  }
+  async attach(containerId: string, stdin?: Uint8Array): Promise<ProcessResult> {
+    return fixedProcess(["/usr/bin/docker", "start", "--attach", "--interactive", containerId], {
+      cwd: this.policyRoot,
+      stdin,
+      timeoutMs: operationalTimeouts.workerMs,
+      maxBytes: 8_000_000,
+    });
+  }
+  private async stopKnownWorker(occurrence: string, containerId: string): Promise<void> {
+    try {
+      const result = await this.docker(["kill", "--signal", "KILL", containerId], 4096);
+      await this.record({
+        phase: "worker-cleanup-result",
+        occurrence,
+        containerId,
+        transport: outputMetadata(result),
+        cleanupUnknown: result.code !== 0 || result.timedOut,
+        retryAllowed: false,
+      });
+    } catch (error) {
+      await this.failureRecord(
+        {
+          phase: "worker-cleanup-result",
+          occurrence,
+          containerId,
+          cleanupUnknown: true,
+        },
+        error,
+      );
+    }
   }
   async run(
     subject: Subject,
@@ -193,7 +251,7 @@ export class WorkerController {
       spec: { ...spec, stdin: undefined },
       stdinSha256: spec.stdin ? sha256(spec.stdin) : null,
     });
-    const created = await this.docker(args, 4096);
+    const created = await this.observedDocker("create-result", { occurrence, name }, args, 4096);
     await this.record({
       phase: "create-result",
       occurrence,
@@ -207,7 +265,12 @@ export class WorkerController {
     );
     const containerId = created.stdout.toString().trim();
     await this.record({ phase: "created", occurrence, containerId });
-    const inspected = await this.docker(["inspect", containerId], 128000);
+    const inspected = await this.observedDocker(
+      "inspect-result",
+      { occurrence, containerId },
+      ["inspect", containerId],
+      128000,
+    );
     await this.record({
       phase: "inspect-result",
       occurrence,
@@ -227,26 +290,25 @@ export class WorkerController {
     });
     let result;
     try {
-      result = await fixedProcess(
-        ["/usr/bin/docker", "start", "--attach", "--interactive", containerId],
-        { cwd: this.policyRoot, stdin: spec.stdin, timeoutMs: 900000, maxBytes: 8_000_000 },
-      );
+      result = await this.attach(containerId, spec.stdin);
     } catch (error) {
-      await this.record({
-        phase: "worker-transport-failure",
-        occurrence,
-        containerId,
-        errorSha256: sha256(error instanceof Error ? error.message : String(error)),
-        retryAllowed: false,
-      });
-      await this.docker(["kill", "--signal", "KILL", containerId], 4096);
+      await this.failureRecord(
+        { phase: "worker-transport-failure", occurrence, containerId },
+        error,
+      );
+      await this.stopKnownWorker(occurrence, containerId);
       throw error;
     }
     if (result.timedOut) {
-      // Stop this exact known worker; preserve it and all observations for reconciliation.
-      await this.docker(["kill", "--signal", "KILL", containerId], 4096);
+      // Stop only this known occurrence; a failed cleanup is journaled and remains unknown.
+      await this.stopKnownWorker(occurrence, containerId);
     }
-    const final = await this.docker(["inspect", containerId], 128000);
+    const final = await this.observedDocker(
+      "final-inspect-result",
+      { occurrence, containerId },
+      ["inspect", containerId],
+      128000,
+    );
     insist(final.code === 0 && !final.timedOut, "FINAL_INSPECT_UNKNOWN_RECONCILE_REQUIRED");
     const state = object(
       (JSON.parse(final.stdout.toString()) as Record<string, unknown>[])[0]!.State,
@@ -278,11 +340,36 @@ export class WorkerController {
       stderrSha256: sha256(result.stderr),
       boundaryVerified: true,
     };
+    let driverDiagnostic: Record<string, unknown> | null = null;
+    let diagnosticReason = "missing-or-invalid";
+    try {
+      const coverage = object(
+        JSON.parse(await readFile(this.policyRoot + "/ci/quality/trusted/coverage.json", "utf8")),
+      );
+      const knownPaths = Array.isArray(coverage.legacyTests)
+        ? coverage.legacyTests
+            .map(object)
+            .map((row) => row.path)
+            .filter((path): path is string => typeof path === "string")
+        : [];
+      driverDiagnostic = parseDriverDiagnostic(result.stdout, spec.role, spec.argv, knownPaths);
+      if (driverDiagnostic) diagnosticReason = "validated-diagnostic-only";
+    } catch {
+      diagnosticReason = "collection-failed";
+    }
     await this.record({
       phase: "result",
       observation,
       transport: outputMetadata(result),
       finalInspectSha256: sha256(final.stdout),
+      diagnosticOnly: true,
+      driverDiagnostic,
+      diagnosticReason,
+      diagnosticStdoutSha256: sha256(result.stdout),
+      driverFailure:
+        observation.exitCode !== 0 || result.code !== 0 || result.timedOut
+          ? parseDriverFailure(result.stderr, spec.role, spec.argv)
+          : null,
     });
     insist(
       result.code === observation.exitCode || observation.exitCode !== 0,
@@ -297,8 +384,41 @@ export class WorkerController {
         recipe.toString().startsWith("FROM " + baseImage + "\n"),
       "PINNED_WORKER_RECIPE_REQUIRED",
     );
-    await this.record({ phase: "image-build-intent", recipeSha256: sha256(recipe), baseImage });
-    const result = await this.docker(
+    const occurrence = randomUUID();
+    await this.record({
+      phase: "base-registration-intent",
+      occurrence,
+      baseImage,
+      platform: "linux/amd64",
+      retryAllowed: false,
+    });
+    let registration: ProcessResult;
+    try {
+      registration = await this.docker(["pull", "--platform=linux/amd64", baseImage], 128000);
+    } catch (error) {
+      await this.failureRecord({ phase: "base-registration-result", occurrence, baseImage }, error);
+      throw error;
+    }
+    await this.record({
+      phase: "base-registration-result",
+      occurrence,
+      baseImage,
+      transport: outputMetadata(registration),
+      retryAllowed: false,
+    });
+    insist(
+      registration.code === 0 && !registration.timedOut,
+      "BASE_REGISTRATION_UNKNOWN_RECONCILE_REQUIRED",
+    );
+    await this.record({
+      phase: "image-build-intent",
+      occurrence,
+      recipeSha256: sha256(recipe),
+      baseImage,
+    });
+    const result = await this.observedDocker(
+      "image-build-result",
+      { occurrence, baseImage },
       [
         "build",
         "--pull=false",
@@ -318,13 +438,24 @@ export class WorkerController {
     );
     await this.record({
       phase: "image-build-result",
+      occurrence,
       transport: outputMetadata(result),
       retryAllowed: false,
     });
     insist(result.code === 0 && !result.timedOut, "IMAGE_BUILD_UNKNOWN_RECONCILE_REQUIRED");
     const id = result.stdout.toString().trim();
-    const base = await this.docker(["image", "inspect", baseImage], 128000);
-    const built = await this.docker(["image", "inspect", id], 128000);
+    const base = await this.observedDocker(
+      "base-image-inspect-failure",
+      { occurrence, baseImage },
+      ["image", "inspect", baseImage],
+      128000,
+    );
+    const built = await this.observedDocker(
+      "built-image-inspect-failure",
+      { occurrence, imageId: id },
+      ["image", "inspect", id],
+      128000,
+    );
     insist(
       base.code === 0 && built.code === 0 && !base.timedOut && !built.timedOut,
       "IMAGE_METADATA_REQUIRED",

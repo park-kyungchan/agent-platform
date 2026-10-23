@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { readFile, readdir, lstat, realpath, mkdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { deriveReviewedSourceManifest } from "../receipt-validator";
@@ -187,7 +188,7 @@ export async function checkout(root: string, head: string, token: string): Promi
     {
       cwd: root,
       maxBytes: 128000,
-      timeoutMs: 180000,
+      timeoutMs: operationalTimeouts.sourceFetchMs,
       env: {
         ...gitEnv,
         GIT_CONFIG_COUNT: "1",

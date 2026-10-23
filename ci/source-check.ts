@@ -1,3 +1,6 @@
+import { runNativeCommand, sourceTestFailureDiagnostics } from "./quality/native-tools";
+import { processFailureMetadata } from "./quality/trusted/process";
+import { operationalTimeouts } from "./quality/operational-timeouts";
 import {
   validateReceiptWithEvidence,
   validatePlatformReviewWithEvidence,
@@ -35,32 +38,113 @@ const writeJson = async (path: string, value: unknown) => {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(value, null, 2) + "\n");
 };
-const commandEvidence: {
-  command: string[];
-  startedAt: string;
-  finishedAt: string;
-  durationMs: number;
-  exitCode: number;
-}[] = [];
-async function run(cwd: string, argv: string[]): Promise<void> {
-  const started = performance.now();
+const commandEvidence: Record<string, unknown>[] = [];
+let commandSequence = 0;
+let diagnosticRoot: string | null = null;
+let diagnosticPaths: string[] = [];
+
+/** The real source child boundary: bounded metadata is emitted before its failure escapes. */
+export async function runSourceCommand(
+  cwd: string,
+  argv: string[],
+  options: {
+    maxBytes?: number;
+    timeoutMs?: number;
+    knownTestFiles?: readonly string[];
+    observe?: (diagnostic: Record<string, unknown>) => Promise<void>;
+  } = {},
+): Promise<void> {
+  const ordinal = ++commandSequence;
   const startedAt = new Date().toISOString();
-  const child = Bun.spawn(argv, {
-    cwd,
-    stdout: "inherit",
-    stderr: "inherit",
-    env: { ...process.env, CI: "true" },
-  });
-  const exitCode = await child.exited;
+  const started = performance.now();
+  let result: Awaited<ReturnType<typeof runNativeCommand>> | undefined;
+  let failure: unknown;
+  let failed = false;
+  try {
+    result = await runNativeCommand(
+      "source-command",
+      argv,
+      cwd,
+      options.timeoutMs ?? operationalTimeouts.workerMs,
+      {},
+      { maxBytes: options.maxBytes },
+    );
+    if (result.exitCode !== 0 || result.timedOut) {
+      failed = true;
+      failure = Error(result.timedOut ? "SOURCE_COMMAND_TIMEOUT" : "SOURCE_COMMAND_NONZERO");
+    }
+  } catch (error) {
+    failed = true;
+    failure = error;
+  }
+  const transport = result?.rawOutput ?? processFailureMetadata(failure);
+  const locations = sourceTestFailureDiagnostics(
+    result?.stderr ?? "",
+    options.knownTestFiles ? cwd : (diagnosticRoot ?? cwd),
+    options.knownTestFiles ?? diagnosticPaths,
+  );
+  if (
+    !result ||
+    result.timedOut ||
+    (failed && !(options.knownTestFiles ?? diagnosticPaths).length)
+  ) {
+    locations.total = null;
+    locations.omitted = null;
+    locations.diagnosticComplete = false;
+  }
+  const diagnostic = {
+    schema: "agent-platform.source-command-diagnostic.v1",
+    commandOrdinal: ordinal,
+    label: "source-command",
+    status: failed ? "fail" : "pass",
+    failureKind: result
+      ? result.timedOut
+        ? "timeout"
+        : result.exitCode !== 0
+          ? "nonzero"
+          : null
+      : processFailureMetadata(failure).failureKind,
+    exitCode: result?.exitCode ?? ("exitCode" in transport ? transport.exitCode : null),
+    timedOut: result?.timedOut ?? ("timedOut" in transport && transport.timedOut === true),
+    transport,
+    failureLocations: locations.locations,
+    locationTotal: locations.total,
+    locationOmitted: locations.omitted,
+    diagnosticComplete: locations.diagnosticComplete,
+  };
+  while (
+    Buffer.byteLength(JSON.stringify(diagnostic) + "\n") > 2048 &&
+    diagnostic.failureLocations.length
+  ) {
+    diagnostic.failureLocations.pop();
+    diagnostic.diagnosticComplete = false;
+    if (diagnostic.locationTotal !== null)
+      diagnostic.locationOmitted = diagnostic.locationTotal - diagnostic.failureLocations.length;
+  }
   commandEvidence.push({
-    command: argv.slice(1),
+    ...diagnostic,
+    commandSha256: sha(JSON.stringify(argv)),
     startedAt,
     finishedAt: new Date().toISOString(),
     durationMs: Math.round(performance.now() - started),
-    exitCode,
   });
-  if (exitCode !== 0) throw Error("Source check failed: " + argv.join(" ").slice(0, 300));
+  try {
+    if (Buffer.byteLength(JSON.stringify(diagnostic) + "\n") > 2048)
+      throw Error("SOURCE_COMMAND_DIAGNOSTIC_BUDGET");
+    if (options.observe) await options.observe(diagnostic);
+    else
+      await new Promise<void>((done, reject) => {
+        process.stdout.write(JSON.stringify(diagnostic) + "\n", (error) =>
+          error ? reject(error) : done(),
+        );
+      });
+  } catch (error) {
+    if (!failed) throw error;
+    // A diagnostic write failure does not replace the original command failure or permit replay.
+  }
+  if (failed) throw failure;
 }
+const run = runSourceCommand;
 async function files(root: string): Promise<string[]> {
   const result: string[] = [];
   for (const entry of await readdir(root, { withFileTypes: true })) {
@@ -505,6 +589,8 @@ async function sourceChecks() {
     }>;
   };
   const scope = await readQualityScope(common, undefined, await readTrackedMarkdown(sourceRoot));
+  diagnosticRoot = common;
+  diagnosticPaths = [...scope.testFiles];
   if (trustedControllerRoot) {
     const required = await readQualityScope(trustedControllerRoot);
     scope.testFiles = [...new Set([...required.testFiles, ...scope.testFiles])].sort();
@@ -566,7 +652,13 @@ async function sourceChecks() {
       .map((path) => join(common, path));
     if (tests.length)
       packageChecks.push(() =>
-        run(packageRoot, [process.execPath, "test", "--timeout", "120000", ...tests]),
+        run(packageRoot, [
+          process.execPath,
+          "test",
+          "--timeout",
+          String(operationalTimeouts.sourceTestMs),
+          ...tests,
+        ]),
       );
   }
   const packageStarted = performance.now();
@@ -582,12 +674,13 @@ async function sourceChecks() {
       "Elapsed package phase wall time; overlapping command durations are not summed.",
   };
   const qualityTests = scope.lintFiles.filter((path) => path.startsWith("ci/") && testFile(path));
+  diagnosticPaths = [...new Set([...scope.testFiles, ...qualityTests])];
   if (qualityTests.length)
     await run(common, [
       process.execPath,
       "test",
       "--timeout",
-      "120000",
+      String(operationalTimeouts.sourceTestMs),
       ...qualityTests.map((path) => join(common, path)),
     ]);
   // Each guard runs in a fresh process, retaining native first-import/cache checks.
@@ -801,6 +894,8 @@ export async function runTrustedSourceChecks(
   try {
     await sourceChecks();
   } finally {
+    diagnosticRoot = null;
+    diagnosticPaths = [];
     sourceRoot = prior;
     trustedControllerRoot = null;
     trustedSourceRunning = false;
@@ -833,6 +928,15 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
     throw Error(
       "Exact native review head, repository, authenticated read and expected status creator are required",
     );
+  const now = options.now ?? (() => performance.now());
+  const deadline = now() + operationalTimeouts.reviewPublicationMs;
+  const trustedMainPush =
+    env.GITHUB_ACTIONS === "true" &&
+    env.GITHUB_EVENT_NAME === "push" &&
+    env.GITHUB_REF === "refs/heads/main" &&
+    env.GITHUB_REF_PROTECTED === "true" &&
+    env.GITHUB_SHA === head;
+  let readingStatuses = true;
   async function api(path: string) {
     const response = await fetch("https://api.github.com/repos/" + repository + "/" + path, {
       headers: {
@@ -841,25 +945,24 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
         "X-GitHub-Api-Version": "2022-11-28",
       },
       redirect: "error",
+      signal: AbortSignal.timeout(
+        readingStatuses && trustedMainPush
+          ? Math.max(1, Math.floor(Math.min(operationalTimeouts.networkMs, deadline - now())))
+          : operationalTimeouts.networkMs,
+      ),
     });
     if (!response.ok) throw Error("Native review API read failed: " + response.status);
     return (await response.json()) as any;
   }
   const readApi = options.readApi ?? api;
-  const now = options.now ?? (() => performance.now());
   const delay =
     options.delay ??
     ((milliseconds) => new Promise<void>((done) => setTimeout(done, milliseconds)));
-  const deadline = now() + 60_000;
-  const trustedMainPush =
-    env.GITHUB_ACTIONS === "true" &&
-    env.GITHUB_EVENT_NAME === "push" &&
-    env.GITHUB_REF === "refs/heads/main" &&
-    env.GITHUB_REF_PROTECTED === "true" &&
-    env.GITHUB_SHA === head;
   let statuses = await readApi(`commits/${head}/statuses?per_page=100`);
   let waitingAnnounced = false;
   for (;;) {
+    if (trustedMainPush && now() >= deadline)
+      throw Error("Native independent review status missing within publication wait");
     if (
       !Array.isArray(statuses) ||
       statuses.length > 100 ||
@@ -893,7 +996,7 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
     if (remaining <= 0) break;
     if (!waitingAnnounced) {
       console.log(
-        "Exact-head review status absent on protected main push; waiting up to 60 seconds for publication",
+        "Exact-head review status absent on protected main push; waiting up to 300 seconds for publication",
       );
       waitingAnnounced = true;
     }
@@ -901,6 +1004,7 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
     if (now() >= deadline) break;
     statuses = await readApi(`commits/${head}/statuses?per_page=100`);
   }
+  readingStatuses = false;
   const status = statuses.find((value: any) => value.context === "native-independent-review");
   if (
     !status ||

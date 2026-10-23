@@ -112,7 +112,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/source.ts",
-          "sha256": "6275eb8cb65a865b92e8027ff7d42ba206d4f873ae59f77172cb67dc4ea5368f",
+          "sha256": "34ecbb5a0c092c16a421bacc644916b6dca8cc52659df35870d8e06aae6cfe2b",
           "relativePath": "packages/work-continuity/src/git-work/source.ts"
         },
         {
@@ -147,7 +147,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/runtime-docs/types.ts",
-          "sha256": "ea4c29c10018bc56849d3b97b1f5024a174b962e6565e6e860a920618d1d973b",
+          "sha256": "cac188bc26c62098e3f2bbee549cbb3add6dafabd24a1d1c60370c867fe184e9",
           "relativePath": "packages/work-continuity/src/runtime-docs/types.ts"
         },
         {
@@ -282,7 +282,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/git-work/git-owner-transaction.ts",
-          "sha256": "04d122d39ae2c3a326e3b849af929942778edef3cc47fcaaa877d6e2dd83cb58",
+          "sha256": "407181ad67e5490aa03f8c4e2ba5f982024a731ac619f550673499380112998e",
           "relativePath": "packages/work-continuity/src/git-work/git-owner-transaction.ts"
         },
         {
@@ -383,7 +383,7 @@
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/coordination/source-bootstrap.ts",
           "relativePath": "packages/work-continuity/src/coordination/source-bootstrap.ts",
-          "sha256": "4376f1ab344c03ce62e3b343f4167165c10a45c6bc2fc41cdcecb9a1defad3dc"
+          "sha256": "463395800cc92e7268d31b9f0f0863c2875b9f4e0281150537044671a322fd2d"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/coordination/source-contract.ts",
@@ -586,7 +586,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/evidence-foundry/src/modules/storage/store.ts",
-          "sha256": "66e8ef7948c400bc440ea60a8260adaf4e78374449aede1e9791907d91d334c7",
+          "sha256": "ede3e76558385f3a378da6c14772e9a1ed73693fe3c42800539f9b81a5409b67",
           "relativePath": "packages/evidence-foundry/src/modules/storage/store.ts"
         },
         {
@@ -674,12 +674,12 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/research-capture/src/bundle.ts",
-          "sha256": "24c1715be36922e8cdff3fe73ade027d884b27b518a72f27c166f0e6c0b842eb",
+          "sha256": "8bc3a6645ae932f4212b9de0a69b459b2e5e825422940eef0a966ec0cfb27c93",
           "relativePath": "packages/research-capture/src/bundle.ts"
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/research-capture/src/upstream.ts",
-          "sha256": "e7a3a3d35ea45da9bbaf66e1b87baa5e1b4258fb8170251beae052a54bd9468f",
+          "sha256": "4cb0b74a07556a6a82478674564dba8454040c6799a8d50c43fdd83c20ca0c1e",
           "relativePath": "packages/research-capture/src/upstream.ts"
         },
         {
@@ -699,7 +699,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/research-capture/schemas/research-request.schema.json",
-          "sha256": "38162a1dcd6caa47b79ac13e4c6ba31e3542703097b4a1829e53e6381f3a7b05",
+          "sha256": "bbc95fa8ed7d1cd9195aa3cac05125118f9e157f6d90a106fb9431118edddb55",
           "relativePath": "packages/research-capture/schemas/research-request.schema.json"
         },
         {
@@ -795,7 +795,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-codex-adapter/src/native/hooks.ts",
-          "sha256": "9d1f8f3365d8ebc78c03c0365ae555db32a0c2b455f23649564e361d266b2c74",
+          "sha256": "0d65dd034252de775ed854750ba30255269f4f0e5849af6faf8d5563daa5ed10",
           "relativePath": "packages/native-codex-adapter/src/native/hooks.ts"
         },
         {
@@ -997,7 +997,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-current-work/build.ts",
-          "sha256": "0718cda412121377558bf8b943e077cf850f82e6653fc286636a868611109eb8",
+          "sha256": "bfa63fa67e67647ac5f42e7c04aa6b8553fe2e0cf59ef9493026994e67359bd8",
           "relativePath": "packages/native-hermes-adapter/src/platform-current-work/build.ts"
         },
         {
@@ -1142,7 +1142,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-rearchitecture/work-reader.ts",
-          "sha256": "ce4088b71e4c98eeac8eb0ad622e627ae2a83ff8fc84738b17413c0ee48d3711",
+          "sha256": "38fdd8e9a93f7523a66bac467e17d39780633dd286eea0d4b28aefa891c83fd2",
           "relativePath": "packages/native-hermes-adapter/src/platform-rearchitecture/work-reader.ts"
         },
         {

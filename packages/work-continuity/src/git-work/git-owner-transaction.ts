@@ -72,7 +72,7 @@ async function run(
         root,
         ...args,
       ],
-      { env, encoding: "utf8", timeout: 10_000, maxBuffer: 4_194_304 },
+      { env, encoding: "utf8", timeout: 50_000, maxBuffer: 4_194_304 },
       (error, stdout) =>
         error ? reject(Error("V3_GIT_OPERATION_FAILED:" + args[0])) : resolve(stdout),
     );

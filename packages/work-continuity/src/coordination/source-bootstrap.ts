@@ -150,7 +150,7 @@ export async function compileSourceBootstrap(
           },
         },
       );
-      const timer = setTimeout(() => child.kill("SIGKILL"), 30000);
+      const timer = setTimeout(() => child.kill("SIGKILL"), 150_000);
       const outputHash = async (stream: ReadableStream<Uint8Array>) => {
         const reader = stream.getReader();
         let length = 0;

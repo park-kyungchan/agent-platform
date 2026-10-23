@@ -40,7 +40,7 @@ async function inDirectory(run: (directory: string) => Promise<void>) {
 describe("retained official concept routes", () => {
   test("preserves all original routes, sources, captures and provenance", () => {
     expect(jsonSha(registry.routes.slice(0, 98))).toBe(
-      "4a903d9460c882a69ae1ef0ebc8e92836a10ecd24cae4f8ea03dd00719892dcf",
+      "da961c064785a28810eff1715ccb7a699709194b3fbb8828cc3a0f068483e1a2",
     );
     expect(
       jsonSha(
@@ -50,7 +50,7 @@ describe("retained official concept routes", () => {
       ),
     ).toBe("2481c4560b460bfa3a5a2be9e99205d74f0267dca4244247ef4b8af07969d728");
     expect(jsonSha(registry.captures)).toBe(
-      "effa1f444128308e32e8e39cc02a3ce8301e713c0b6c768ff37bf883badd3331",
+      "2150f18bdeb5ee63d4d3bcf45434a0865d64cac1d6141e3483f94aa3468c35fc",
     );
     expect(jsonSha(registry.provenance)).toBe(
       "9070b52bb9c9acddd5cf15c2ea0b5a12ce0451a6934212fca88ba6cadf988877",
