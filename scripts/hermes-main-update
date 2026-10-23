@@ -1075,12 +1075,24 @@ PY
 }
 
 gateway_canary() {
-  local code curl_rc=0 diagnostic_code
+  local code curl_rc=0 diagnostic_code body_file
   need curl
+  need mktemp
   record_phase gateway-canary running
   printf 'Gateway canary starting: %s\n' "$CANARY_URL"
-  code="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+  # curl retries may rewind/truncate --output; /dev/null is not a regular file.
+  if ! body_file="$(mktemp -- "${TMPDIR:-/tmp}/hermes-gateway-canary.XXXXXX")"; then
+    record_phase gateway-canary failed "response sink creation failed; curl not invoked"
+    printf 'Gateway canary could not create its private response sink.\n' >&2
+    return 1
+  fi
+  code="$(curl --silent --show-error --output "$body_file" --write-out '%{http_code}' \
     --max-time 10 --retry 5 --retry-delay 2 --retry-connrefused "$CANARY_URL")" || curl_rc=$?
+  if ! rm -- "$body_file"; then
+    record_phase gateway-canary failed "response sink cleanup failed; curl_exit=$curl_rc"
+    printf 'Gateway canary response sink cleanup failed: curl_exit=%s\n' "$curl_rc" >&2
+    return 1
+  fi
   if [[ "$code" =~ ^[0-9]{3}$ ]]; then
     diagnostic_code="$code"
   else

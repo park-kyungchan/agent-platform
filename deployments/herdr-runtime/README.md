@@ -11,7 +11,7 @@ common naming and ownership semantics are recorded in `agent-platform`.
 
 ## Inputs and persistence
 
-The image pins Herdr 0.9.5, Codex CLI 0.162.1, Bun 1.4.3, and Node.js 22.23.3. `versions.json` records their upstream identities. Debian packages resolve at build time, so deployment verification must record the resulting image ID.
+The image pins Herdr 0.9.5, Codex CLI 0.163.0, Bun 1.4.3, and Node.js 22.23.3. `versions.json` records their upstream identities. Debian packages resolve at build time, so deployment verification must record the resulting image ID.
 
 Bun 1.4.3 is the verified stable release selected for the shared VPS runtime. The
 Dockerfile retains its exact upstream image digest so future agents inherit the

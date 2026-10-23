@@ -3,7 +3,7 @@ FROM oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7
 FROM node:22.23.3-bookworm-slim@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG CODEX_VERSION=0.162.1
+ARG CODEX_VERSION=0.163.0
 ARG HERDR_VERSION=0.9.5
 ARG HERDR_SHA256=14d9e8bc8b4a9e0118d77c32266f76d461f09b40342eb23752960bd89f59929d
 
@@ -11,7 +11,7 @@ LABEL org.opencontainers.image.title="Herdr Codex runtime" \
       org.opencontainers.image.description="Dedicated SSH and Herdr runtime, isolated from Hermes" \
       io.palantirkc.owner="vps-operations" \
       io.palantirkc.herdr.version="0.9.5" \
-      io.palantirkc.codex.version="0.162.1"
+      io.palantirkc.codex.version="0.163.0"
 
 RUN apt-get update \
  && apt-get install --yes --no-install-recommends \
