@@ -1229,7 +1229,7 @@
         "/opt/data/workspace/backend-ontology/runtime/intent-context/cli.ts",
         "/opt/data/shared-llm-wiki/typed/operational-ontology/v1/query.ts"
       ],
-      "ownerBoundary": "Eight contracts/projections preserve native namespaces and exact Zod4.6.5. Seven pure modules and one callback-injected evaluation module share canonical source. Existing native reader callback, CLI, task/evidence/data stores and policy remain owner. Source-pinned generated native modules/old-path forwarders preserve remote readers; no invented remote common checkout.",
+      "ownerBoundary": "Eight contracts/projections preserve native namespaces and exact Zod4.6.7. Seven pure modules and one callback-injected evaluation module share canonical source. Existing native reader callback, CLI, task/evidence/data stores and policy remain owner. Source-pinned generated native modules/old-path forwarders preserve remote readers; no invented remote common checkout.",
       "nativePermissionGranted": false,
       "nativeAdapterOwnerRoots": [
         "/opt/data/workspace/backend-ontology",
@@ -1239,7 +1239,7 @@
       "packageName": "@palantirkc/operational-context",
       "packageManifest": {
         "path": "/home/palantirkc/projects/agent-platform/packages/operational-context/package.json",
-        "sha256": "362b247b7476a6557528cb92c8b4d265e3d3d212a9d35e0fced67a914d14e85d"
+        "sha256": "95bd81aa311f30f88e80a7e32f73589126c8fe4dcb9af78ae03acf10b149bdad"
       },
       "sourcePins": [
         {
