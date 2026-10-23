@@ -203,9 +203,9 @@ for (const { name, logicalWork } of [
     expect(() => captureCodexSourceAuthor(invalidSelection, base, env, at)).toThrow(
       "Exact source-author fields required",
     );
-    expect(() =>
-      captureHermesHookSourceAuthor(invalidSelection, base, schemaHook, at, {}),
-    ).toThrow("Exact source-author fields required");
+    expect(() => captureHermesHookSourceAuthor(invalidSelection, base, schemaHook, at, {})).toThrow(
+      "Exact source-author fields required",
+    );
     for (const valid of [
       metadata(),
       captureHermesHookSourceAuthor(selection, base, schemaHook, at, {}),
