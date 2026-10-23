@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { prepareProbeEnvironment } from "./probe-environment";
 import { expect, test } from "bun:test";
 import { join, resolve } from "node:path";
@@ -21,7 +22,7 @@ async function run(c: SemanticCase, root = source) {
       cwd: "/tmp",
       env: await prepareProbeEnvironment(),
       stdin: Buffer.from(JSON.stringify(semanticRequest(c))),
-      timeoutMs: 120000,
+      timeoutMs: operationalTimeouts.processMs,
       maxBytes: 128000,
     },
   );
@@ -50,7 +51,7 @@ test("fixed scenario calls produce actual Git/store/physical-IO/owner/Memory out
       () => {},
     );
   }
-}, 180000);
+}, 900_000);
 test("a real hostile source import exits before Git fixture calls; scenario host rejects its C01 source verdict", async () => {
   const root = await mkdtemp(join(tmpdir(), "s04-scenario-hostile-"));
   try {

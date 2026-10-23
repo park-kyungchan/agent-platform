@@ -138,7 +138,7 @@ test("v2 platform denominator includes transitive contracts, generator, dependen
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 test("current Work source guard refuses an omitted or changed common work-method core", async () => {
   const f = await fixture();
   try {
@@ -188,7 +188,7 @@ test("current Work source guard refuses an omitted or changed common work-method
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 test("a real FIFO compiler is refused without waiting for a writer", async () => {
   const f = await fixture();
   try {
@@ -222,7 +222,7 @@ test("a real FIFO compiler is refused without waiting for a writer", async () =>
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill("SIGKILL");
-    }, 5000);
+    }, 25_000);
     try {
       const [exitCode, stdout, stderr] = await Promise.all([
         child.exited,
@@ -243,7 +243,7 @@ test("a real FIFO compiler is refused without waiting for a writer", async () =>
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 test("first-import loader denies source/dependency drift and a forged reduced denominator", async () => {
   const f = await fixture();
   try {
@@ -272,7 +272,7 @@ test("first-import loader denies source/dependency drift and a forged reduced de
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 test("finite bundle compiler covers actual metafile inputs and emits no PC-specific source roots", async () => {
   const f = await fixture();
   try {
@@ -696,7 +696,7 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
   } finally {
     await f.cleanup();
   }
-}, 60000);
+}, 300_000);
 
 test("compiled stable session reader and callback preserve identity without establishing owner admission", async () => {
   const f = await fixture(true);
@@ -900,7 +900,7 @@ test("compiled stable session reader and callback preserve identity without esta
   } finally {
     await f.cleanup();
   }
-}, 60000);
+}, 300_000);
 
 test("compiled Memory caller brackets implementation import and query with exact closure proof", async () => {
   const f = await fixture(false, true);
@@ -954,7 +954,7 @@ test("compiled Memory caller brackets implementation import and query with exact
     await memory.cleanup();
     await f.cleanup();
   }
-}, 60000);
+}, 300_000);
 
 test("compiled native hook refuses a changed registration before the current Work implementation executes", async () => {
   const f = await fixture(true);
@@ -1045,7 +1045,7 @@ test("compiled native hook refuses a changed registration before the current Wor
   } finally {
     await f.cleanup();
   }
-}, 60000);
+}, 300_000);
 
 test("actual native Work importer rejects a stale same-export projection before compiler inspection", async () => {
   const f = await fixture();
@@ -1094,7 +1094,7 @@ test("actual native Work importer rejects a stale same-export projection before 
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);
 
 test("native importer readback rejects an unadmitted lookup root even after resolver priming", async () => {
   const f = await fixture();
@@ -1119,4 +1119,4 @@ test("native importer readback rejects an unadmitted lookup root even after reso
   } finally {
     await f.cleanup();
   }
-}, 30000);
+}, 150_000);

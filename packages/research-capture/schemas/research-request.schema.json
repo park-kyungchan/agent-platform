@@ -43,7 +43,7 @@
     "timeoutMs": {
       "type": "integer",
       "minimum": 1000,
-      "maximum": 180000
+      "maximum": 900000
     },
     "maxAttempts": {
       "type": "integer",

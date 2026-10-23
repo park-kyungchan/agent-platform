@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { buildEligibilityCheck } from "./eligibility";
 import { lstatSync, realpathSync, readFileSync } from "node:fs";
 import { assertNativeContext, readOwnerReconciliation } from "./native";
@@ -61,7 +62,7 @@ async function gh(
       env: { HOME: "/root", GH_HOST: "github.com", GH_PROMPT_DISABLED: "1" },
       stdin: body ? Buffer.from(JSON.stringify(body)) : undefined,
       maxBytes: 8_000_000,
-      timeoutMs: 60000,
+      timeoutMs: operationalTimeouts.networkMs,
     },
   );
   insist(r.code === 0 && !r.timedOut, "NATIVE_PROVIDER_OUTCOME_UNKNOWN_RECONCILE_REQUIRED");

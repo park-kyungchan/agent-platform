@@ -148,13 +148,47 @@ test("a present valid status on a full page is validated rather than treated as 
   expect(f.statusReads).toBe(1);
 });
 
-test("genuine absence stops within sixty seconds without fetching a receipt", async () => {
+test("genuine absence stops at 300 seconds without fetching a receipt", async () => {
   const f = fixture();
   f.setStatuses(() => []);
   await expect(reviewGate(f.options)).rejects.toThrow("status missing");
-  expect(f.elapsed).toBe(60_000);
+  expect(f.elapsed).toBe(300_000);
   expect(f.statusReads).toBeGreaterThan(1);
   expect(f.delays.every((delay) => delay <= 5000)).toBe(true);
+  expect(f.paths.every((path) => path.startsWith("commits/"))).toBe(true);
+});
+
+test("publication at 65 and 295 seconds validates the full canonical chain", async () => {
+  for (const arrival of [65_000, 295_000]) {
+    const f = fixture();
+    f.setStatuses((_read, elapsed) => (elapsed < arrival ? [] : [f.status]));
+    await reviewGate(f.options);
+    expect(f.elapsed).toBe(arrival);
+    expect(f.delays.every((delay) => delay === 5000)).toBe(true);
+    expect(f.paths.some((path) => path.includes("native-review-results/"))).toBe(true);
+  }
+});
+
+test("publication at or after 300 seconds cannot replace original absence", async () => {
+  for (const arrival of [300_000, 305_000]) {
+    const f = fixture();
+    f.setStatuses((_read, elapsed) => (elapsed < arrival ? [] : [f.status]));
+    await expect(reviewGate(f.options)).rejects.toThrow("status missing");
+    expect(f.elapsed).toBe(300_000);
+    expect(f.paths.every((path) => path.startsWith("commits/"))).toBe(true);
+  }
+});
+
+test("an API response returning only after the publication deadline is still late", async () => {
+  const f = fixture();
+  const read = f.options.readApi!;
+  f.options.readApi = async (path) => {
+    const result = await read(path);
+    if (path.includes("/statuses?")) await f.options.delay!(300_001);
+    return result;
+  };
+  await expect(reviewGate(f.options)).rejects.toThrow("status missing");
+  expect(f.statusReads).toBe(1);
   expect(f.paths.every((path) => path.startsWith("commits/"))).toBe(true);
 });
 

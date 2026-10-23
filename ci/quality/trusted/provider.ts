@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import {
   insist,
   object,
@@ -52,7 +53,7 @@ export function githubReader(token: string): ProviderReader {
     insist(url.origin === "https://api.github.com", "FIXED_PROVIDER_REQUIRED");
     return fetch(url, {
       redirect: "manual",
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(operationalTimeouts.networkMs),
       headers: {
         Authorization: "Bearer " + token,
         Accept: "application/vnd.github+json",
@@ -88,7 +89,7 @@ export function githubReader(token: string): ProviderReader {
       const archive = await fetch(url, {
         redirect: "error",
         credentials: "omit",
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(operationalTimeouts.networkMs),
       });
       const bytes = await boundedBody(archive, 8_000_000);
       insist(archive.status === 200, "ARTIFACT_DOWNLOAD_FAILED");

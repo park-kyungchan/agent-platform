@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../../operational-timeouts";
 import { stageFrozenFixtureDependencies } from "./dependencies";
 import { prepareProbeEnvironment } from "../probe-environment";
 import { fixedProcess } from "../process";
@@ -83,7 +84,12 @@ export async function ownerFixture(source: string, root: string, nativeLock = fa
         "--ignore-scripts",
         "--lockfile-only",
       ],
-      { cwd: owner, env: await prepareProbeEnvironment(), timeoutMs: 120000, maxBytes: 128000 },
+      {
+        cwd: owner,
+        env: await prepareProbeEnvironment(),
+        timeoutMs: operationalTimeouts.processMs,
+        maxBytes: 128000,
+      },
     );
     if (generated.code !== 0 || generated.timedOut)
       throw Error("FICTIONAL_OWNER_FROZEN_LOCAL_LOCK_REQUIRED");

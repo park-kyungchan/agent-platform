@@ -14,8 +14,21 @@ import {
 import { readReportArchive } from "./artifact";
 import { verifyRun, verifyPolicyRef, type ProviderReader } from "./provider";
 import { WorkerController, validateWorkerInspect, type WorkerSpec } from "./worker";
-import { type ProcessResult, outputMetadata } from "./process";
-import { driverFailureLimit, encodeDriverFailure, parseDriverFailure } from "./driver-failure";
+import {
+  fixedProcess,
+  ProcessOutputCapture,
+  ProcessOutputLimitError,
+  type ProcessResult,
+  outputMetadata,
+} from "./process";
+import {
+  qualityDriverDiagnostic,
+  parseDriverDiagnostic,
+  driverDiagnosticLimit,
+  driverFailureLimit,
+  encodeDriverFailure,
+  parseDriverFailure,
+} from "./driver-failure";
 
 const h = (s: string) => s.repeat(64),
   oid = (s: string) => s.repeat(40);
@@ -462,6 +475,7 @@ class RegistrationWorker extends WorkerController {
     stderr: Buffer.alloc(0),
   };
   inspectCode = 0;
+  buildFailure: Error | null = null;
   baseMetadata = { Os: "linux", Architecture: "amd64", RepoDigests: [baseImage] };
   builtMetadata = { Id: "sha256:" + h("f"), Os: "linux", Architecture: "amd64" };
   override async record(value: unknown): Promise<void> {
@@ -476,6 +490,7 @@ class RegistrationWorker extends WorkerController {
       if (this.registration instanceof Error) throw this.registration;
       return this.registration;
     }
+    if (args[0] === "build" && this.buildFailure) throw this.buildFailure;
     if (args[0] === "build")
       return {
         code: 0,
@@ -682,4 +697,379 @@ test("driver diagnostic parser rejects mixed, truncated, forged and wrong-bounda
     expect(parseDriverFailure(bytes, "prepare", argv)).toBeNull();
   expect(parseDriverFailure(Buffer.from(encoded), "audit", argv)).toBeNull();
   expect(parseDriverFailure(Buffer.from(encoded), "prepare", ["untrusted-command"])).toBeNull();
+});
+
+test("fixedProcess counts raw combined bytes at zero/below/equal/above its explicit cap", async () => {
+  for (const size of [0, 63, 64, 65]) {
+    for (const stream of ["stdout", "stderr", "both"] as const) {
+      const first = stream === "stderr" ? 0 : stream === "both" ? Math.floor(size / 2) : size;
+      const argv = [
+        process.execPath,
+        "-e",
+        `import {writeSync} from 'node:fs';writeSync(1,Buffer.alloc(${first},97));writeSync(2,Buffer.alloc(${size - first},98));`,
+      ];
+      if (size <= 64) {
+        const result = await fixedProcess(argv, { cwd: "/tmp", maxBytes: 64, timeoutMs: 5000 });
+        expect(result.code).toBe(0);
+        expect(result.timedOut).toBe(false);
+        expect(result.stdout.length + result.stderr.length).toBe(size);
+      } else {
+        let failure: unknown;
+        try {
+          await fixedProcess(argv, { cwd: "/tmp", maxBytes: 64, timeoutMs: 5000 });
+        } catch (error) {
+          failure = error;
+        }
+        expect(failure).toBeInstanceOf(ProcessOutputLimitError);
+        const metadata = (failure as ProcessOutputLimitError).metadata;
+        expect(metadata).toMatchObject({
+          maxBytes: 64,
+          retainedBytes: 64,
+          limitExceeded: true,
+          captureComplete: false,
+          hashScope: "observed-raw-bytes",
+          retryAllowed: false,
+        });
+        expect(metadata.observedCombinedBytes).toBeGreaterThan(64);
+        expect(metadata.observedCombinedBytes).toBe(
+          metadata.observedStdoutBytes + metadata.observedStderrBytes,
+        );
+        expect(JSON.stringify(metadata)).not.toContain('"stdout":');
+      }
+    }
+  }
+}, 30_000);
+
+test("fixedProcess preserves raw split UTF8, invalid budgets, nonzero, spawn and timeout boundaries", async () => {
+  const argv = [
+    process.execPath,
+    "-e",
+    "import {writeSync} from 'node:fs';writeSync(1,Buffer.from([240]));writeSync(1,Buffer.from([159,152,128]));writeSync(2,Buffer.from([255]));",
+  ];
+  const result = await fixedProcess(argv, { cwd: "/tmp", maxBytes: 5 });
+  expect(result.stdout).toEqual(Buffer.from([240, 159, 152, 128]));
+  expect(result.stderr).toEqual(Buffer.from([255]));
+  expect(outputMetadata(result).stdoutSha256).toBe(sha256(Buffer.from([240, 159, 152, 128])));
+  for (const maxBytes of [0, -1, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+    await expect(fixedProcess(["/missing-fixture"], { cwd: "/tmp", maxBytes })).rejects.toThrow(
+      "OUTPUT_BUDGET_INVALID",
+    );
+  expect(
+    (await fixedProcess([process.execPath, "-e", "process.exit(17)"], { cwd: "/tmp" })).code,
+  ).toBe(17);
+  await expect(fixedProcess(["/missing-fixture-executable"], { cwd: "/tmp" })).rejects.toThrow();
+  const timed = await fixedProcess([process.execPath, "-e", "setTimeout(()=>{},5000)"], {
+    cwd: "/tmp",
+    timeoutMs: 50,
+  });
+  expect(timed.timedOut).toBe(true);
+  const capture = new ProcessOutputCapture(1);
+  capture.observe("stdout", Buffer.from([255, 254]));
+  expect(capture.failure(true, null, "SIGKILL").metadata).toMatchObject({
+    timedOut: true,
+    captureComplete: false,
+    observedStdoutSha256: sha256(Buffer.from([255, 254])),
+  });
+});
+
+function diagnosticStatic(status: "pass" | "fail") {
+  return {
+    schema: "agent-platform.trusted-static-quality.v1",
+    status,
+    checks: ["format", "typed-lint", "architecture", "workflow-security", "maintained-secrets"].map(
+      (id, i) => ({ id, status: i === 0 ? status : "pass" }),
+    ),
+    tests: 94,
+    files: 200,
+    nativePermissionGranted: false,
+  };
+}
+test("driver diagnostics preserve the static projection and reject noncanonical/private/forged envelopes", () => {
+  const value = diagnosticStatic("fail"),
+    argv = command("static-quality");
+  const encoded = JSON.stringify(value) + "\n";
+  expect(parseDriverDiagnostic(Buffer.from(encoded), "checker", argv, [])).toEqual(value);
+  expect(
+    parseDriverDiagnostic(
+      Buffer.from(JSON.stringify(diagnosticStatic("pass")) + "\n"),
+      "checker",
+      argv,
+      [],
+    ),
+  ).toMatchObject({ status: "pass" });
+  for (const text of [
+    encoded.slice(0, -1),
+    "\ufeff" + encoded,
+    encoded + "private\n",
+    encoded.replace('"status":"fail"', '"status":"fail","status":"fail"'),
+    JSON.stringify({ ...value, secret: "PRIVATE-DIAGNOSTIC" }) + "\n",
+    JSON.stringify({ ...value, checks: [null] }) + "\n",
+    JSON.stringify({ ...value, status: "pass" }) + "\n",
+    "x".repeat(driverDiagnosticLimit + 1),
+  ])
+    expect(parseDriverDiagnostic(Buffer.from(text), "checker", argv, [])).toBeNull();
+  expect(parseDriverDiagnostic(Buffer.from([255]), "checker", argv, [])).toBeNull();
+  expect(parseDriverDiagnostic(Buffer.from(encoded), "candidate", argv, [])).toBeNull();
+  expect(parseDriverDiagnostic(Buffer.from(encoded), "checker", ["untrusted"], [])).toBeNull();
+});
+
+test("candidate failure summaries bind counts, hashes and admitted locations without retaining raw details", () => {
+  const path = "ci/quality/failure-locations.test.ts";
+  const report = {
+    checks: [
+      {
+        id: "quality-negative-fixtures",
+        status: "fail" as const,
+        details: {
+          error: "PRIVATE-DIAGNOSTIC",
+          failureDiagnostics: {
+            locations: [{ path, line: 42, column: 7 }],
+            total: 1,
+            omitted: 0,
+            diagnosticComplete: true,
+          },
+        },
+      },
+    ],
+  };
+  const diagnostic = qualityDriverDiagnostic(report, 500, h("a"));
+  const summary = {
+    status: "fail",
+    reportSha256: h("a"),
+    checks: diagnostic.checks,
+    externalAuditSha256: h("b"),
+  };
+  const encode = (d: unknown) =>
+    Buffer.from(JSON.stringify(summary) + "\n" + JSON.stringify(d) + "\n");
+  expect(
+    parseDriverDiagnostic(encode(diagnostic), "candidate", command("candidate-quality"), [path]),
+  ).toEqual(diagnostic as unknown as Record<string, unknown>);
+  expect(JSON.stringify(diagnostic)).not.toContain("PRIVATE-DIAGNOSTIC");
+  for (const mutation of [
+    { ...diagnostic, status: "pass" },
+    { ...diagnostic, failed: 0 },
+    { ...diagnostic, reference: "arbitrary-store" },
+    { ...diagnostic, failureLocations: [{ path: "../private.test.ts", line: 1, column: 1 }] },
+    { ...diagnostic, checks: [null] },
+    { ...diagnostic, checks: [{ id: "arbitrary", status: "fail" }] },
+    { ...diagnostic, extra: true },
+  ])
+    expect(
+      parseDriverDiagnostic(encode(mutation), "candidate", command("candidate-quality"), [path]),
+    ).toBeNull();
+  expect(
+    parseDriverDiagnostic(encode(diagnostic), "candidate", command("candidate-quality"), []),
+  ).toBeNull();
+});
+
+class FailureJournalWorker extends WorkerController {
+  records: Record<string, unknown>[] = [];
+  calls: string[][] = [];
+  failAt = "";
+  cleanupFails = false;
+  failure = new ProcessOutputCapture(1);
+  diagnostic = diagnosticStatic("fail");
+  constructor() {
+    super(fixture().p, resolve(import.meta.dir, "../../.."), "unused-inert-journal");
+    this.failure.observe("stdout", Buffer.from("PRIVATE-DIAGNOSTIC"));
+  }
+  override async record(value: unknown) {
+    this.records.push(value as Record<string, unknown>);
+  }
+  override async attach(): Promise<ProcessResult> {
+    if (this.failAt === "attach") throw this.failure.failure(false, null, "SIGKILL");
+    return {
+      code: 1,
+      timedOut: false,
+      stdout: Buffer.from(JSON.stringify(this.diagnostic) + "\n"),
+      stderr: Buffer.from(
+        encodeDriverFailure(
+          new Error("TRUSTED_CI_TRUSTED_STATIC_CHECK_FAILED"),
+          "static-quality",
+          "static-quality",
+        ),
+      ),
+    };
+  }
+  override async docker(args: string[]): Promise<ProcessResult> {
+    this.calls.push(args);
+    if (args[0] === this.failAt || (args[0] === "kill" && this.cleanupFails))
+      throw this.failure.failure(false, null, "SIGKILL");
+    if (args[0] === "create")
+      return {
+        code: 0,
+        timedOut: false,
+        stdout: Buffer.from(h("a") + "\n"),
+        stderr: Buffer.alloc(0),
+      };
+    if (args[0] === "kill")
+      return { code: 0, timedOut: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
+    if (args[0] === "inspect") {
+      const started = this.records.some((row) => row.phase === "start-intent");
+      const environment = [
+        "HOME=/job/home",
+        "PATH=/usr/local/bin:/usr/bin:/bin",
+        "LANG=C.UTF-8",
+        "CI=true",
+        "RUNNER_TEMP=/job/tmp",
+        "TMPDIR=/job/tmp",
+      ];
+      const config = {
+        Id: h("a"),
+        Image: "sha256:" + h("b"),
+        Config: {
+          User: "1000:1000",
+          WorkingDir: "/job",
+          Env: environment,
+          Entrypoint: ["/usr/bin/env", "-i", ...environment],
+          Cmd: command("static-quality"),
+        },
+        HostConfig: {
+          NetworkMode: "none",
+          Privileged: false,
+          ReadonlyRootfs: true,
+          CapDrop: ["ALL"],
+          SecurityOpt: ["no-new-privileges:true"],
+          PidMode: "",
+          IpcMode: "private",
+          Memory: 2147483648,
+          NanoCpus: 2000000000,
+          PidsLimit: 256,
+          Tmpfs: {
+            "/job": "rw,nosuid,nodev,exec,size=2147483648,uid=1000,gid=1000,mode=0700",
+            "/tmp": "rw,nosuid,nodev,noexec,size=268435456,uid=1000,gid=1000,mode=0700",
+          },
+        },
+        Mounts: [],
+        State: started
+          ? { Running: false, Status: "exited", OOMKilled: false, ExitCode: 1 }
+          : { Running: false, Status: "created" },
+      };
+      return {
+        code: 0,
+        timedOut: false,
+        stdout: Buffer.from(JSON.stringify([config])),
+        stderr: Buffer.alloc(0),
+      };
+    }
+    throw Error("Unexpected inert command");
+  }
+}
+const failureSpec: WorkerSpec = {
+  role: "checker",
+  imageId: "sha256:" + h("b"),
+  network: "none",
+  mounts: [],
+  argv: command("static-quality"),
+};
+test("same-occurrence create/inspect/attach cap failures journal before cleanup and never retry", async () => {
+  for (const phase of ["create", "inspect", "attach"]) {
+    const worker = new FailureJournalWorker();
+    worker.failAt = phase;
+    await expect(worker.run(fixture().e.target.authored, failureSpec)).rejects.toThrow(
+      "PROCESS_OUTPUT_LIMIT",
+    );
+    const failure = worker.records.find((r) => r.failureKind === "output-limit")!;
+    expect(failure).toMatchObject({
+      captureComplete: false,
+      retryAllowed: false,
+      observedCombinedBytes: 18,
+    });
+    expect(failure.occurrence).toBe(worker.records[0]!.occurrence);
+    expect(worker.calls.filter((args) => args[0] === "create")).toHaveLength(1);
+    expect(worker.calls.filter((args) => args[0] === "kill")).toHaveLength(
+      phase === "attach" ? 1 : 0,
+    );
+    expect(JSON.stringify(worker.records)).not.toContain("PRIVATE-DIAGNOSTIC");
+  }
+  const worker = new FailureJournalWorker();
+  worker.failAt = "attach";
+  worker.cleanupFails = true;
+  await expect(worker.run(fixture().e.target.authored, failureSpec)).rejects.toThrow(
+    "PROCESS_OUTPUT_LIMIT",
+  );
+  expect(worker.records.at(-1)).toMatchObject({
+    phase: "worker-cleanup-result",
+    cleanupUnknown: true,
+  });
+});
+test("actual worker result journals static failure diagnostics and preserves its failed process", async () => {
+  const worker = new FailureJournalWorker();
+  const result = await worker.run(fixture().e.target.authored, failureSpec);
+  expect(result.observation.exitCode).toBe(1);
+  expect(worker.records.at(-1)).toMatchObject({
+    phase: "result",
+    diagnosticOnly: true,
+    driverDiagnostic: diagnosticStatic("fail"),
+    driverFailure: { code: "TRUSTED_CI_TRUSTED_STATIC_CHECK_FAILED" },
+  });
+});
+
+test("output-capped registration/build preserve their correlated intent and no-build/no-retry fences", async () => {
+  const capture = new ProcessOutputCapture(1);
+  capture.observe("stderr", Buffer.from("PRIVATE-BUILD-OUTPUT"));
+  for (const stage of ["registration", "build"]) {
+    const worker = await registrationWorker();
+    const error = capture.failure(false, null, "SIGKILL");
+    if (stage === "registration") worker.registration = error;
+    else worker.buildFailure = error;
+    await expect(worker.build()).rejects.toBe(error);
+    const diagnostic = worker.records.find((r) => r.failureKind === "output-limit")!;
+    expect(diagnostic).toMatchObject({
+      captureComplete: false,
+      retryAllowed: false,
+      observedStderrBytes: Buffer.byteLength("PRIVATE-BUILD-OUTPUT"),
+    });
+    expect(diagnostic.occurrence).toBe(worker.records[0]!.occurrence);
+    expect(worker.calls.filter(({ args }) => args[0] === "pull")).toHaveLength(1);
+    expect(worker.calls.filter(({ args }) => args[0] === "build")).toHaveLength(
+      stage === "registration" ? 0 : 1,
+    );
+    expect(worker.calls.some(({ args }) => args[0] === "image")).toBe(false);
+    expect(JSON.stringify(worker.records)).not.toContain("PRIVATE-BUILD-OUTPUT");
+  }
+});
+
+test("candidate diagnostic plus its existing summary stays within the combined display budget", () => {
+  const locations = Array.from({ length: 16 }, (_, i) => ({
+    path: `ci/${"x".repeat(470)}${i}.test.ts`,
+    line: i + 1,
+    column: 1,
+  }));
+  const report = {
+    checks: [
+      {
+        id: "quality-negative-fixtures",
+        status: "fail" as const,
+        details: {
+          failureDiagnostics: { locations, total: 16, omitted: 0, diagnosticComplete: true },
+        },
+      },
+    ],
+  };
+  const summary = {
+    status: "fail",
+    reportSha256: h("a"),
+    checks: report.checks.map(({ id, status }) => ({ id, status })),
+    externalAuditSha256: h("b"),
+  };
+  const prefix = JSON.stringify(summary) + "\n";
+  const diagnostic = qualityDriverDiagnostic(
+    report,
+    1000,
+    h("a"),
+    driverDiagnosticLimit - Buffer.byteLength(prefix),
+  );
+  const bytes = Buffer.from(prefix + JSON.stringify(diagnostic) + "\n");
+  expect(bytes.length).toBeLessThanOrEqual(driverDiagnosticLimit);
+  expect(diagnostic.diagnosticComplete).toBe(false);
+  expect(diagnostic.locationOmitted).toBeGreaterThan(0);
+  expect(
+    parseDriverDiagnostic(
+      bytes,
+      "candidate",
+      command("candidate-quality"),
+      locations.map((l) => l.path),
+    ),
+  ).toEqual(diagnostic as unknown as Record<string, unknown>);
 });

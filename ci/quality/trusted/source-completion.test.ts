@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -29,7 +30,11 @@ async function exercise(candidate: string) {
               join(import.meta.dir, "fixtures", candidate),
               witness,
             ],
-            { cwd: scratch, timeoutMs: 10000, maxBytes: 16384 },
+            {
+              cwd: scratch,
+              timeoutMs: operationalTimeouts.scenarioCommandMs,
+              maxBytes: 16384,
+            },
           );
           return {
             stdout: run.stdout,

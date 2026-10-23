@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { sign } from "node:crypto";
 import { assertNativeContext, readAppKeyForNative } from "./native";
 import type { NativeContext } from "./native-types";
@@ -37,7 +38,7 @@ async function api(
   const r = await fetch(url, {
     method,
     redirect: "error",
-    signal: AbortSignal.timeout(60000),
+    signal: AbortSignal.timeout(operationalTimeouts.networkMs),
     headers: {
       Authorization: "Bearer " + token,
       Accept: "application/vnd.github+json",

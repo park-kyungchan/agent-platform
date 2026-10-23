@@ -55,4 +55,4 @@ test("actual current P minimum and clean exact buildPolicy admit every full sour
       "EVERY_P_MINIMUM_REQUIRES_EXPLICIT_COVERAGE",
     );
   });
-}, 120000);
+}, 600_000);

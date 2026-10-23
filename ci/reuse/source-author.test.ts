@@ -157,6 +157,93 @@ test("Hermes observation uses documented session/extra fields without Task infer
   ).toThrow();
 });
 
+const schemaHook = {
+  hook_event_name: "pre_llm_call",
+  session_id: "20990101_000000_schema_fixture",
+  extra: { task_id: null, run_id: null },
+};
+
+for (const { name, logicalWork } of [
+  {
+    name: "one delimiter-collapsed key",
+    logicalWork: { "domainId|projectId|taskId|workId": "fixture-scope" },
+  },
+  {
+    name: "two delimiter-collapsed keys",
+    logicalWork: { "domainId|projectId": "fixture-scope", "taskId|workId": "fixture-task" },
+  },
+  {
+    name: "a renamed key with the same field count",
+    logicalWork: {
+      domainId: selection.logicalWork.domainId,
+      projectId: selection.logicalWork.projectId,
+      workId: selection.logicalWork.workId,
+      "taskId|foreign": selection.logicalWork.taskId,
+    },
+  },
+  {
+    name: "a missing named key",
+    logicalWork: {
+      domainId: selection.logicalWork.domainId,
+      projectId: selection.logicalWork.projectId,
+      workId: selection.logicalWork.workId,
+    },
+  },
+  {
+    name: "an extra named key",
+    logicalWork: { ...selection.logicalWork, extraId: "fixture-extra" },
+  },
+  { name: "null", logicalWork: null },
+  { name: "a string", logicalWork: "fixture-scope" },
+  { name: "an empty array", logicalWork: [] },
+  { name: "an array with all named fields", logicalWork: Object.assign([], selection.logicalWork) },
+]) {
+  test("logical Work rejects " + name + " across capture and metadata paths", () => {
+    const invalidSelection = { ...selection, logicalWork };
+    expect(() => captureCodexSourceAuthor(invalidSelection, base, env, at)).toThrow(
+      "Exact source-author fields required",
+    );
+    expect(() => captureHermesHookSourceAuthor(invalidSelection, base, schemaHook, at, {})).toThrow(
+      "Exact source-author fields required",
+    );
+    for (const valid of [
+      metadata(),
+      captureHermesHookSourceAuthor(selection, base, schemaHook, at, {}),
+    ])
+      expect(() => validateSourceAuthorMetadata({ ...valid, logicalWork })).toThrow(
+        "Exact source-author fields required",
+      );
+  });
+}
+
+test("valid named scope fields retain values regardless of insertion order", () => {
+  const reordered = {
+    logicalWork: {
+      taskId: selection.logicalWork.taskId,
+      workId: selection.logicalWork.workId,
+      projectId: selection.logicalWork.projectId,
+      domainId: selection.logicalWork.domainId,
+    },
+    sourceOwner: {
+      domainId: selection.sourceOwner.domainId,
+      projectId: selection.sourceOwner.projectId,
+      repository: selection.sourceOwner.repository,
+    },
+  };
+  for (const value of [
+    captureCodexSourceAuthor(reordered, base, env, at),
+    captureHermesHookSourceAuthor(reordered, base, schemaHook, at, {}),
+  ]) {
+    expect(value.sourceOwner).toEqual(selection.sourceOwner);
+    expect(value.logicalWork).toEqual(selection.logicalWork);
+    expect(value.author.nativeTaskId).toBeNull();
+    expect(value.author.nativeRunId).toBeNull();
+    expect(value.nativeAuthorshipAuthenticated).toBe(false);
+    expect(value.publisherIdentityInferred).toBe(false);
+    expect(validateSourceAuthorMetadata(value)).toEqual(value);
+  }
+});
+
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "native-source-author-test-"));
   roots.push(root);

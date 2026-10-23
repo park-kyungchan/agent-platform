@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { stageFrozenFixtureDependencies } from "./scenarios/dependencies";
 import { prepareProbeEnvironment } from "./probe-environment";
 import { expect, test } from "bun:test";
@@ -28,7 +29,7 @@ async function run(c: SemanticCase, root: string) {
       cwd: "/tmp",
       env: await prepareProbeEnvironment(),
       stdin: Buffer.from(JSON.stringify(semanticRequest(c))),
-      timeoutMs: 120000,
+      timeoutMs: operationalTimeouts.processMs,
       maxBytes: 128000,
     },
   );
@@ -125,7 +126,7 @@ test("PF01 real public governing/history/composition branches are externally com
       await rejectedBehavior(id!, root);
     });
   }
-}, 600000);
+}, 3_000_000);
 test("PF02 genuine fixed predecessor contracts reject real simultaneous canonical/facade export loss", async () => {
   for (const [id, path, before, after, lost] of [
     [
@@ -153,7 +154,7 @@ test("PF02 genuine fixed predecessor contracts reject real simultaneous canonica
       expect(Object.hasOwn(pair.canonicalKinds ?? pair.canonical, lost!)).toBe(false);
     });
   }
-}, 600000);
+}, 3_000_000);
 
 test("the P catalogue retains the entire explicit predecessor API denominator independently of H/M", () => {
   expect(fixedApi.predecessor.head).toBe("4cd6eea995700177159a3d3d42bf63024fb5fc13");

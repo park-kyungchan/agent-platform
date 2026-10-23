@@ -1,3 +1,5 @@
+import { ProcessOutputCapture } from "./trusted/process";
+import { operationalTimeouts } from "./operational-timeouts";
 import { createHash } from "node:crypto";
 import {
   chmod,
@@ -45,6 +47,14 @@ export interface NativeCommandResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  rawOutput?: {
+    stdoutBytes: number;
+    stderrBytes: number;
+    stdoutSha256: string;
+    stderrSha256: string;
+    captureComplete: boolean;
+    hashScope: "observed-raw-bytes";
+  };
 }
 export interface InstalledTool {
   pin: ToolPin;
@@ -60,9 +70,11 @@ export async function runNativeCommand(
   name: string,
   argv: string[],
   cwd: string,
-  timeoutMs = 90_000,
+  timeoutMs: number = operationalTimeouts.nativeCommandMs,
   environment: Record<string, string> = {},
+  options: { maxBytes?: number } = {},
 ): Promise<NativeCommandResult> {
+  const capture = new ProcessOutputCapture(options.maxBytes);
   const started = performance.now();
   const child = Bun.spawn(argv, {
     cwd,
@@ -70,24 +82,67 @@ export async function runNativeCommand(
     stderr: "pipe",
     env: { ...process.env, ...environment, CI: "true" },
   });
-  let timedOut = false;
+  let timedOut = false,
+    killed = false;
+  const kill = () => {
+    if (!killed) {
+      killed = true;
+      child.kill("SIGKILL");
+    }
+  };
   const timer = setTimeout(() => {
     timedOut = true;
-    child.kill();
+    kill();
   }, timeoutMs);
+  const drain = async (key: "stdout" | "stderr", stream: ReadableStream<Uint8Array>) => {
+    const reader = stream.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        capture.observe(key, value);
+        if (capture.exceeded) kill();
+      }
+    } catch (error) {
+      kill();
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
+  };
   try {
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
+    const results = await Promise.allSettled([
+      drain("stdout", child.stdout),
+      drain("stderr", child.stderr),
       child.exited,
     ]);
+    const exit = results[2]!;
+    if (capture.exceeded)
+      throw capture.failure(
+        timedOut,
+        exit.status === "fulfilled" ? (exit.value as number) : null,
+        // Driver metadata admits only null/SIGKILL/SIGTERM (see trusted/driver-failure.ts).
+        typeof child.signalCode === "string" ? child.signalCode : null,
+      );
+    for (const result of results) if (result.status === "rejected") throw result.reason;
+    if (exit.status !== "fulfilled") throw Error("NATIVE_COMMAND_EXIT_UNKNOWN");
+    const stdout = capture.bytes("stdout"),
+      stderr = capture.bytes("stderr");
     return {
       name,
-      exitCode,
+      exitCode: exit.value as number,
       durationMs: Math.round(performance.now() - started),
-      stdout,
-      stderr,
+      stdout: stdout.toString("utf8"),
+      stderr: stderr.toString("utf8"),
       timedOut,
+      rawOutput: {
+        stdoutBytes: stdout.length,
+        stderrBytes: stderr.length,
+        stdoutSha256: hash(stdout),
+        stderrSha256: hash(stderr),
+        captureComplete: !timedOut,
+        hashScope: "observed-raw-bytes",
+      },
     };
   } finally {
     clearTimeout(timer);
@@ -173,7 +228,9 @@ export async function installPinnedTool(pin: ToolPin, cacheRoot?: string): Promi
     throw Error("Native tool cache parent must have an exact canonical path.");
   const temporary = await mkdtemp(join(parent, ".verified-install-"));
   try {
-    const response = await fetch(pin.url, { signal: AbortSignal.timeout(60_000) });
+    const response = await fetch(pin.url, {
+      signal: AbortSignal.timeout(operationalTimeouts.networkMs),
+    });
     if (!response.ok)
       throw Error("Native tool download failed: " + pin.name + " HTTP " + response.status);
     const declaredLength = Number(response.headers.get("content-length") ?? "0");
@@ -299,4 +356,53 @@ export async function runWorkflowTools(
     ),
   ];
   return { tools, commands };
+}
+
+/** Bounded stack locations in known source tests only; never retain messages or snippets. */
+export function sourceTestFailureDiagnostics(
+  stderr: string,
+  root: string,
+  testFiles: readonly string[],
+) {
+  const result: { path: string; line: number; column: number }[] = [];
+  if (Buffer.byteLength(stderr) > 1_048_576 || testFiles.length > 1024)
+    return { locations: result, total: null, omitted: null, diagnosticComplete: false };
+  const seen = new Set<string>(),
+    known = new Map<string, string>();
+  for (const path of testFiles.slice(0, 1024)) {
+    if (!safeSourcePath(path) || path.length > 512 || !/\.(?:test|spec)\.[cm]?tsx?$/.test(path))
+      continue;
+    known.set(resolve(root, path), path);
+  }
+  for (const rawFrame of stderr.split("\n")) {
+    const frame = rawFrame.replace(/\u001b\[[0-9;]*m/g, "");
+    const match =
+      /^\s*at (?:[^()\r\n]+ )?\((\/[^\r\n]+):([1-9][0-9]{0,6}):([1-9][0-9]{0,6})\)\s*$/.exec(
+        frame,
+      ) ?? /^\s*at (\/[^\r\n]+):([1-9][0-9]{0,6}):([1-9][0-9]{0,6})\s*$/.exec(frame);
+    if (!match) continue;
+    const path = known.get(match[1]!);
+    if (!path) continue;
+    const line = Number(match[2]),
+      column = Number(match[3]);
+    const key = JSON.stringify([path, line, column]);
+    if (!seen.has(key)) {
+      seen.add(key);
+      if (result.length < 16) result.push({ path, line, column });
+    }
+  }
+  return {
+    locations: result,
+    total: seen.size,
+    omitted: seen.size - result.length,
+    diagnosticComplete: seen.size === result.length,
+  };
+}
+
+export function sourceTestFailureLocations(
+  stderr: string,
+  root: string,
+  testFiles: readonly string[],
+) {
+  return sourceTestFailureDiagnostics(stderr, root, testFiles).locations;
 }

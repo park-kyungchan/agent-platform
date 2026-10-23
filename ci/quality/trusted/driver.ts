@@ -1,3 +1,4 @@
+import { operationalTimeouts } from "../operational-timeouts";
 import { prepareProbeEnvironment } from "./probe-environment";
 import { loadBehaviorModule } from "./scenario-adapters";
 import { callBehavior } from "./semantic";
@@ -9,7 +10,12 @@ import { runTrustedSourceChecks } from "../../source-check";
 import { verifyRuntimeLayout } from "../../verify-runtime-layout";
 import { fixedProcess } from "./process";
 import { insist, object, safePath, sha256, trustedDigest } from "./policy";
-import { encodeDriverFailure, type DriverFailurePhase } from "./driver-failure";
+import {
+  driverDiagnosticLimit,
+  qualityDriverDiagnostic,
+  encodeDriverFailure,
+  type DriverFailurePhase,
+} from "./driver-failure";
 
 const source = "/prepared/source",
   policy = "/policy";
@@ -51,7 +57,7 @@ async function install(): Promise<void> {
     {
       cwd: source,
       env: { HOME: "/job/home", BUN_INSTALL_CACHE_DIR: "/prepared/bun-cache" },
-      timeoutMs: 600000,
+      timeoutMs: operationalTimeouts.frozenInstallMs,
     },
   );
   insist(r.code === 0 && !r.timedOut, "FROZEN_INSTALL_FAILED");
@@ -106,7 +112,7 @@ async function main(): Promise<void> {
       {
         cwd: root,
         env: { HOME: "/job/home", BUN_INSTALL_CACHE_DIR: "/job/cache" },
-        timeoutMs: 120000,
+        timeoutMs: operationalTimeouts.processMs,
       },
     );
     process.stdout.write(r.stdout);
@@ -118,8 +124,8 @@ async function main(): Promise<void> {
     phase = "static-quality";
     // P parser/config/checker/tool code reads candidate bytes. It never imports candidate code/config.
     const result = await runTrustedStaticQuality(source, policy, "/prepared/tools");
-    insist(result.status === "pass", "TRUSTED_STATIC_CHECK_FAILED");
     console.log(JSON.stringify(result));
+    insist(result.status === "pass", "TRUSTED_STATIC_CHECK_FAILED");
     return;
   }
   if (id === "probe") {
@@ -174,15 +180,24 @@ async function main(): Promise<void> {
         externalAudit: audit,
       }),
     });
+    const serialized = JSON.stringify(result);
+    const summary = JSON.stringify({
+      status: result.status,
+      reportSha256: sha256(serialized),
+      checks: result.checks.map(({ id, status }) => ({ id, status })),
+      externalAuditSha256: trustedDigest(audit),
+    });
+    console.log(summary);
+    if (result.status !== "pass") {
+      const diagnostic = qualityDriverDiagnostic(
+        result,
+        Buffer.byteLength(serialized),
+        sha256(serialized),
+        driverDiagnosticLimit - Buffer.byteLength(summary + "\n"),
+      );
+      console.log(JSON.stringify(diagnostic));
+    }
     insist(result.status === "pass", "CANDIDATE_QUALITY_FAILED");
-    console.log(
-      JSON.stringify({
-        status: result.status,
-        reportSha256: sha256(JSON.stringify(result)),
-        checks: result.checks.map(({ id, status }) => ({ id, status })),
-        externalAuditSha256: trustedDigest(audit),
-      }),
-    );
     return;
   }
   throw Error("TRUSTED_CI_UNKNOWN_DRIVER");
