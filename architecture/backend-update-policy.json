@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "helperPath": "/docker/hermes-agent-2q3y/bin/hermes-main-update",
-  "helperSha256": "9c5a271f1d9358ae3525bdd52aa5c31fe286e9ab07c6eaa20b7d50fbec13a317",
+  "helperSha256": "dc77a912542c021b4d5478a982030deed3c0a2d8a4afeb967e73bab7750e0b2a",
   "root": "/docker/hermes-agent-2q3y",
   "updaterRoot": "/docker/hermes-agent-2q3y/.main-updater",
   "upstream": "https://github.com/NousResearch/hermes-agent.git",

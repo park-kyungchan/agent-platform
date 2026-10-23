@@ -1512,7 +1512,9 @@ prepare_latest() {
   record_phase "$PHASE" passed "candidate prepared"
   printf 'Prepared candidate %s\n' "$CANDIDATE_TAG"
   if [[ "$OVERLAY_MODE" == 1 ]]; then
-    printf 'Deploy with: %s deploy --sha %s --overlay-file %s --overlay-sha256 %s --approve-deploy\n' "$0" "$CANDIDATE_SHA" "$OVERLAY_FILE" "$OVERLAY_SHA256"
+    printf 'Deploy with: %s deploy --sha %s --overlay-file %s --overlay-sha256 %s' "$0" "$CANDIDATE_SHA" "$OVERLAY_FILE" "$OVERLAY_SHA256"
+    [[ "${FONT_READABILITY:-0}" == 1 ]] && printf ' --bot-desktop --font-readability --release-tag %s' "$RELEASE_TAG"
+    printf ' --approve-deploy\n'
   else
     printf 'Deploy with: %s deploy --sha %s' "$0" "$CANDIDATE_SHA"
     [[ "$BOT_DESKTOP" == 1 ]] && printf ' --bot-desktop'

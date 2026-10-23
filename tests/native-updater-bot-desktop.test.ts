@@ -236,6 +236,36 @@ test('font-derived builder retains Desktop build opt-in, dirty stamp and refuses
 });
 
 const fontPatch=await readFile(new URL('../deployments/hermes-font-readability.patch',import.meta.url),'utf8');
+test('font prepare emits deploy options that select the exact prepared candidate',async()=>{
+ const f=await fixture(fontOptions,`
+acquire_lock(){ :; }
+prepare_exit_handler(){ :; }
+current_facts(){ CURRENT_SHA=${SHA}; CURRENT_TAG=other; }
+resolve_candidate_once(){ CANDIDATE_SHA="$REQUESTED_SHA"; CANDIDATE_SOURCE=synthetic; set_candidate_tag; }
+start_log(){ :; }
+record_phase(){ :; }
+check_free_space(){ :; }
+resume_recorded_candidate(){ return 0; }
+smoke_candidate(){ :; }
+validate_runtime_image(){ :; }
+write_candidate_state(){ :; }
+deploy_candidate(){ CANDIDATE_SHA="$REQUESTED_SHA"; set_candidate_tag; printf 'SELECTED:%s\\n' "$CANDIDATE_TAG"; }
+`);
+ const overlays=join(f.root,'.main-updater/overlays');await mkdir(overlays,{recursive:true});
+ const patchPath=join(overlays,FONT_PATCH+'.patch');await writeFile(patchPath,fontPatch);
+ const prepared=await f.run(['prepare','--sha',FONT_SHA,'--bot-desktop','--font-readability','--release-tag','v0.22.2','--overlay-file',patchPath,'--overlay-sha256',FONT_PATCH]);
+ expect({code:prepared.code,stderr:prepared.stderr}).toEqual({code:0,stderr:''});
+ expect(prepared.stdout).toContain('Prepared candidate '+FONT_TAG);
+ const hint=prepared.stdout.split('\n').find(line=>line.startsWith('Deploy with: '));expect(hint).toBeDefined();
+ const argv=hint!.slice('Deploy with: '.length).split(/\s+/);
+ expect(argv[0]).toBe(f.script);expect(argv[1]).toBe('deploy');
+ expect(argv).toContain('--bot-desktop');expect(argv).toContain('--font-readability');
+ expect(argv[argv.indexOf('--release-tag')+1]).toBe('v0.22.2');expect(argv).toContain('--approve-deploy');
+ const selected=await f.run(argv.slice(1));
+ expect({code:selected.code,stderr:selected.stderr,stdout:selected.stdout}).toEqual({code:0,stderr:'',stdout:'SELECTED:'+FONT_TAG+'\n'});
+ expect(await f.calls()).toEqual([]);
+});
+
 const normalizer=fontPatch.split('\n').filter(x=>x.startsWith('+')&&!x.startsWith('+++')).map(x=>x.slice(1)).join('\n').split('RUN ')[1]!.replaceAll('\\\n','\n');
 test('exact font patch changes direct regular assets only and propagates first-directory failure',async()=>{
  expect(new Bun.CryptoHasher('sha256').update(fontPatch).digest('hex')).toBe(FONT_PATCH);
