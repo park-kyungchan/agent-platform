@@ -28,7 +28,7 @@ For example, ask: "Use installed-version documentation for Hermes remote-gateway
 | Installation and distribution            | `installation` (`install`)             | `getting-started/installation`        |
 | Platform support matrix                  | `platform-support`                     | `getting-started/platform-support`    |
 | Windows native runtime                   | `windows-native` (`windows`)           | `user-guide/windows-native`           |
-| WSL2 runtime                             | `windows-wsl` (`wsl2`)                 | `user-guide/windows-wsl-quickstart`   |
+| Docker Backend runtime                   | `docker` (`container`)                | `user-guide/docker`                  |
 | Dashboard and connection troubleshooting | `web-dashboard` (`dashboard`)          | `user-guide/features/web-dashboard`   |
 | Multiple profile gateways                | `multi-profile-gateways`               | `user-guide/multi-profile-gateways`   |
 
@@ -65,7 +65,7 @@ const plan = reader.select({
   surface: "codex.cli",
   topic: "hooks",
   freshness: "installed",
-  executionHost: "local.wsl",
+  executionHost: "hostinger.host",
 });
 ```
 
