@@ -20,7 +20,7 @@
   "unresolvedFindings": 0,
   "provenance": {
     "owner": "codex-harness-engineering",
-    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/undefined/native-review-results/dc1e23d8046927c85e0e4d50bbb45ef7b92cf2bd.json",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/9b335b52c6fb30f9ed16b9ebc634897fe587358c/native-review-results/dc1e23d8046927c85e0e4d50bbb45ef7b92cf2bd.json",
     "sha256": "04c67c310a75e11eba0f731a0222ea8ee3118cf8e739ff0eda539f6752b42153"
   }
 }
