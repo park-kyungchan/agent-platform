@@ -280,9 +280,16 @@ PY
   fi
   if [[ "$CURRENT_OVERLAY_SHA256" =~ ^[0-9a-f]{64}$ ]]; then
     if [[ "$CURRENT_BOT_DESKTOP" == 1 ]]; then
-      font_tuple_valid "$CURRENT_SHA" "$CURRENT_BOT_DESKTOP" "$CURRENT_RELEASE_TAG" "$CURRENT_OVERLAY_SHA256" || die "running desktop variant has an unapproved overlay"
-      python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("dirty") is True and d.get("baseVersion")=="0.22.2" and d.get("displayVersion")=="0.22.2" and d.get("distance")==0 else 1)' <<<"$stamp_output" || die "font-derived runtime stamp is not honest"
       expected_tag="${IMAGE_PREFIX}${CURRENT_SHA}-desktop-overlay-${CURRENT_OVERLAY_SHA256}"
+      [[ "$CURRENT_TAG" == "$expected_tag" ]] || die "running Compose tag does not match the image source, overlay, and Bot Screen identities"
+      python3 -c 'import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d.get("dirty") is True and d.get("baseVersion")=="0.22.2" and d.get("displayVersion")=="0.22.2" and d.get("distance")==0 else 1)' <<<"$stamp_output" || die "font-derived runtime stamp is not honest"
+      # A stopped promotion may leave saved current absent/stale. Infer only this
+      # reviewed release from the verified immutable facts above, in memory.
+      # This neither reconstructs history nor claims a completed deployment.
+      if [[ -z "$CURRENT_RELEASE_TAG" ]] && font_tuple_valid "$CURRENT_SHA" "$CURRENT_BOT_DESKTOP" "$FONT_RELEASE_TAG" "$CURRENT_OVERLAY_SHA256"; then
+        CURRENT_RELEASE_TAG="$FONT_RELEASE_TAG"
+      fi
+      font_tuple_valid "$CURRENT_SHA" "$CURRENT_BOT_DESKTOP" "$CURRENT_RELEASE_TAG" "$CURRENT_OVERLAY_SHA256" || die "running desktop variant has an unapproved overlay"
     else
       expected_tag="${IMAGE_PREFIX}${CURRENT_SHA}-overlay-${CURRENT_OVERLAY_SHA256}"
     fi

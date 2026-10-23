@@ -79,6 +79,8 @@ export interface FontReadabilityProof {
 export interface BackendSnapshot {
   /** Native helper stdout from a fresh immutable-image probe in this verification invocation. */
   fontReadabilityProof?: FontReadabilityProof;
+  /** Full serving observations bracket the one font probe; required identities must agree. */
+  fontProbeIncarnationPreserved?: boolean;
   schemaVersion: 1;
   observedAtUtc: string;
   hostId: string;
@@ -328,6 +330,7 @@ export function evaluateBackendSnapshot(target: HermesTarget, policy: BackendUpd
     ownerIncarnationPreserved: snapshot.ownerPreserved === true,
   };
   if (policy.fontReadability) {
+    checks.fontProbeIncarnationPreserved = snapshot.fontProbeIncarnationPreserved === true;
     checks.freshImageFontReadability = !!snapshot.fontReadabilityProof &&
       snapshot.fontReadabilityProof.schema === 1 && snapshot.fontReadabilityProof.check === 'font-readability' && snapshot.fontReadabilityProof.result === 'passed' &&
       snapshot.fontReadabilityProof.uid === 10000 && snapshot.fontReadabilityProof.files === 10 && snapshot.fontReadabilityProof.fresh_container === true && snapshot.fontReadabilityProof.live_data_mounted === false &&
@@ -370,6 +373,38 @@ try:
 except Exception as exc:health={'code':getattr(exc,'code',0),'commit':None}
 print(json.dumps({'identify':identity,'nativeServing':owner is not None,'nativeOwnerPid':owner.pid if owner else None,'profiles':profiles,'status':{k:status[k] for k in ['gateway_state','desired_state','answering_pid'] if k in status},'health':health,'adapters':adapters,'configuredActiveAdapters':sorted(name for name,enabled in configured.items() if enabled)}))
 `;
+// Compare stable identities only. Missing identities must fail even when absent
+// from both observations; timestamps, slot age text and FD counts are not identities.
+function fontRuntimeIdentity(snapshot: BackendSnapshot): unknown[] | null {
+  const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
+  const number = (value: unknown, minimum = 1): value is number => Number.isSafeInteger(value) && (value as number) >= minimum;
+  const process = (owner: GatewayOwner | null | undefined): unknown[] | null => {
+    if (!owner || !number(owner.hostPid) || !number(owner.localPid) || !number(owner.startTicks) || !text(owner.namespace) || !text(owner.containerId) || !number(owner.uid, 0)) return null;
+    return [owner.hostPid, owner.localPid, owner.startTicks, owner.namespace, owner.containerId, owner.uid];
+  };
+  const lock = (value: BackendSnapshot['updaterLock']): unknown[] | null =>
+    number(value?.device, 0) && number(value?.inode) && typeof value?.held === 'boolean' ? [value.device, value.inode, value.held] : null;
+  const owner = process(snapshot.gatewayOwner), gatewayLock = lock(snapshot.gatewayLock), updaterLock = lock(snapshot.updaterLock);
+  const current = snapshot.current;
+  if (!owner || !gatewayLock || !updaterLock || !snapshot.gatewayOwner || !(snapshot.gatewayOwner.matchingFdCount > 0) || snapshot.gatewayLock.holders.length !== 1) return null;
+  const holder = process(snapshot.gatewayLock.holders[0]);
+  if (!holder || JSON.stringify(holder) !== JSON.stringify(owner)) return null;
+  if (!current || !shaPattern.test(current.sha) || !text(current.tag) || !imagePattern.test(current.image_id) || !digestPattern.test(current.overlay_sha256 ?? '') || !shaPattern.test(current.overlay_tree_sha ?? '')) return null;
+  if (!text(snapshot.hostId) || !text(snapshot.project) || !digestPattern.test(snapshot.helperSha256) || !snapshot.containers.length) return null;
+  const containers: unknown[][] = [];
+  for (const container of [...snapshot.containers].sort((a, b) => a.service.localeCompare(b.service))) {
+    const slot = container.rootSlot;
+    const slotIdentity = slot.up ? process(slot.identity) : null;
+    if (!text(container.service) || !text(container.containerId) || !imagePattern.test(container.imageId) || !text(container.namespace) || !text(container.dataSource) || typeof slot.up !== 'boolean' || (slot.up && (!slotIdentity || !number(slot.localPid)))) return null;
+    if (!shaPattern.test(container.revision) || !shaPattern.test(container.stamp.commit ?? '') || !shaPattern.test(container.provenance.revision ?? '') || !digestPattern.test(container.overlaySha256 ?? '') || container.stamp.overlaySha256 !== container.overlaySha256 || container.stamp.overlayTreeSha !== current.overlay_tree_sha) return null;
+    containers.push([container.service, container.containerId, container.imageId, container.namespace, container.dataSource,
+      slot.up, slot.localPid, slotIdentity, container.revision, container.overlaySha256, container.botDesktop,
+      container.stamp.commit, container.stamp.overlaySha256, container.stamp.overlayTreeSha, container.stamp.dirty, container.stamp.displayVersion, container.provenance.revision]);
+  }
+  return [snapshot.hostId, snapshot.project, snapshot.helperSha256, updaterLock, gatewayLock, owner, holder,
+    current.sha, current.tag, current.image_id, current.overlay_sha256, current.overlay_tree_sha, containers];
+}
+
 export async function verifyBackend(target: HermesTarget, policy: BackendUpdatePolicy, sha: string, runDir: string): Promise<BackendSnapshot> {
   validatePolicy(target, policy); validateSha(sha); backendImageArguments(policy, sha);
   const source = pythonContext(target, policy) + snapshotPython + `\nnative_code=${JSON.stringify('import json\nrequest=' + literal(target) + '\n' + nativeProbePython)}\n` + String.raw`
@@ -384,18 +419,25 @@ out['ownerPreserved']=after==owner and (after_lock['device'],after_lock['inode']
 out['observedAtUtc']=datetime.datetime.now(datetime.timezone.utc).isoformat()
 print(json.dumps(out))
 `;
-  const snapshot = await remote<BackendSnapshot>(target, 'verify', source, runDir);
+  let snapshot = await remote<BackendSnapshot>(target, 'verify', source, runDir);
   if (policy.fontReadability) {
     const current = snapshot.current;
     if (!current || current.sha !== sha || current.tag !== imageTag(policy, sha) || !imagePattern.test(current.image_id) || !shaPattern.test(current.overlay_tree_sha ?? '') || current.overlay_sha256 !== policy.overlay?.sha256 || snapshot.containers.some(c => c.imageId !== current.image_id)) throw new Error('Font verification current image tuple differs');
     const argv = [policy.helperPath, 'verify-font-readability', ...backendImageArguments(policy, sha), '--probe-image-id', current.image_id, '--probe-overlay-tree', current.overlay_tree_sha!];
-    snapshot.fontReadabilityProof = await remote<FontReadabilityProof>(target, 'verify-font-readability', pythonContext(target, policy) + helperGuard(policy) + `\nargv=${literal(argv)}\n` + String.raw`
+    const before = fontRuntimeIdentity(snapshot);
+    const proof = await remote<FontReadabilityProof>(target, 'verify-font-readability', pythonContext(target, policy) + helperGuard(policy) + `\nargv=${literal(argv)}\n` + String.raw`
 import subprocess
 result=subprocess.run(argv,text=True,capture_output=True,timeout=90)
 assert result.returncode==0,'Fresh font verification failed; do not accept metadata or replay an unknown writer'
 assert len(result.stdout.encode())<=4096,'Font verification output exceeds bound'
 print(json.dumps(json.loads(result.stdout)))
 `, runDir);
+    // Reuse the complete UID/HOME guarded native serving collector after the
+    // single probe. A transport failure propagates with its original receipt.
+    snapshot = await remote<BackendSnapshot>(target, 'verify', source, runDir);
+    const after = fontRuntimeIdentity(snapshot);
+    snapshot.fontReadabilityProof = proof;
+    snapshot.fontProbeIncarnationPreserved = before !== null && after !== null && JSON.stringify(before) === JSON.stringify(after);
   }
   snapshot.verification = evaluateBackendSnapshot(target, policy, sha, snapshot);
   await saveJson(join(runDir, `backend-verification-${randomUUID()}.json`), snapshot);

@@ -61,7 +61,7 @@ if(command==='docker'){
    if(c.fontMode!==420)fail();
    out(JSON.stringify({schema:1,check:'font-readability',result:'passed',uid:10000,files:10,fresh_container:true,live_data_mounted:false}));
   }
-  if(a.at(-1)==='/etc/hermes/image-provenance.json')out(JSON.stringify({revision:c.sha}));
+  if(a.at(-1)==='/etc/hermes/image-provenance.json')out(JSON.stringify({revision:c.provenanceRevision??c.sha}));
   if(a.at(-1)==='/opt/hermes/install-stamp.json')out(JSON.stringify({commit:c.sha,baseVersion:'0.21.6',displayVersion:'0.21.6',distance:0,dirty:false,...c.stamp}));fail();
  }
  if(a[0]==='compose')process.exit(0);fail();
@@ -303,4 +303,73 @@ test('readonly font verification joins exact image/tree and creates no updater d
  await f.configure({fontMode:0o600});const bad=await f.run(args);expect(bad.code).toBe(1);expect(bad.stderr).toContain('fresh UID10000');
  const writer=await f.run([...args,'--approve-deploy']);expect(writer.code).toBe(1);expect(writer.stderr).toContain('no writer options');
  expect(await readdir(join(f.root,'.main-updater'))).toEqual(['overlays']);
+});
+
+
+// Execute only the extracted read-only function; all image facts are synthetic.
+const extractCurrentFunction = (name: string): string => {
+ const found=source.match(new RegExp('^'+name+'\\(\\) \\{\\n.*?^\\}', 'ms'));
+ if(!found)throw Error('Missing source function '+name);
+ return found[0];
+};
+async function currentFontFacts(options:Record<string,unknown>={},current:unknown={sha:FONT_SHA,tag:FONT_TAG,release_tag:'v0.22.2'},tag=FONT_TAG,absent=false){
+ const f=await fixture({...fontOptions,...options,images:{[ID]:ID,...(options.images as Record<string,string>??fontOptions.images)}});
+ // Isolated synthetic metadata; never use the helper's real updater roots/setup.
+ const state=join(f.root,'synthetic-current.json');
+ if(!absent)await writeFile(state,JSON.stringify({current,previous:{sentinel:'original-history'},candidate:null}));
+ const before=absent?'':await readFile(state,'utf8');
+ const program=`set -Eeuo pipefail
+STATE=${shellQuote(state)}; IMAGE_PREFIX=hermes-agent:main-
+FONT_SOURCE_SHA=${FONT_SHA}; FONT_RELEASE_TAG=v0.22.2; FONT_PATCH_SHA=${FONT_PATCH}
+${['die','valid_sha','valid_overlay_sha','valid_release_tag','font_tuple_valid','bot_desktop_image_valid','current_facts'].map(extractCurrentFunction).join('\n')}
+compose_image_ref(){ printf '%s\\n' ${shellQuote(tag)}; }
+running_container(){ printf 'synthetic-container\\n'; }
+docker(){
+ if [[ "$1" == inspect ]]; then printf '%s\\n' ${shellQuote(ID)}; else command docker "$@"; fi
+}
+current_facts
+printf '%s\\n' "$CURRENT_RELEASE_TAG|$CURRENT_OVERLAY_TREE_SHA"
+`;
+ const file=join(f.root,'current-only.sh');await writeFile(file,program);
+ const child=Bun.spawn(['bash',file],{env:f.env,stdout:'pipe',stderr:'pipe'});
+ const [stdout,stderr,code]=await Promise.all([new Response(child.stdout).text(),new Response(child.stderr).text(),child.exited]);
+ expect(absent?await Bun.file(state).exists():await readFile(state,'utf8')).toBe(absent?false:before);
+ expect((await f.calls()).every(c=>c[0]==='docker'&&(c[1]==='image'&&c[2]==='inspect'||c[1]==='run'))).toBe(true);
+ expect(await readdir(f.root)).not.toContain('.main-updater');
+ return {code,stdout,stderr};
+}
+
+test('current font recovery infers only missing release identity without reconstructing history',async()=>{
+ for(const [name,current,absent] of [
+  ['matching',{sha:FONT_SHA,tag:FONT_TAG,release_tag:'v0.22.2'},false],
+  ['stale',{sha:SHA,tag:DESKTOP,release_tag:'v0.21.6'},false],
+  ['missing-release',{sha:FONT_SHA,tag:FONT_TAG},false],
+  ['missing-current',null,false],['absent-state',null,true],
+ ] as const){
+  const out=await currentFontFacts({},current,FONT_TAG,absent);
+  expect({name,...out}).toMatchObject({name,code:0,stdout:`v0.22.2|${TREE}\n`});
+ }
+});
+
+test('current font recovery rejects wrong tuple, stamp, provenance and explicit release metadata',async()=>{
+ const stamp=fontOptions.stamp;
+ for(const options of [
+  {sha:SHA},{overlayLabel:'c'.repeat(64)},{desktopLabel:'0'},
+  {stamp:{...stamp,commit:SHA}},{stamp:{...stamp,overlaySha256:'c'.repeat(64)}},
+  {stamp:{...stamp,overlayTreeSha:'invalid'}},{stamp:{...stamp,overlayTreeSha:''}},
+  {stamp:{...stamp,dirty:false}},{stamp:{...stamp,baseVersion:'0.22.1'}},
+  {stamp:{...stamp,displayVersion:'0.22.1'}},{stamp:{...stamp,distance:1}},
+  {provenanceRevision:SHA},
+ ])expect((await currentFontFacts(options,null)).code).toBe(1);
+ const wrongTag=FONT_TAG+'-other';
+ expect((await currentFontFacts({images:{[wrongTag]:ID}},null,wrongTag)).code).toBe(1);
+ for(const release_tag of ['v0.22.1','garbage'])expect((await currentFontFacts({},{sha:FONT_SHA,tag:FONT_TAG,release_tag})).code).toBe(1);
+});
+
+test('current recovery preserves pristine Desktop and ordinary overlay behavior',async()=>{
+ const pristine=await currentFontFacts({sha:SHA,overlayLabel:'',images:{[DESKTOP]:ID}},null,DESKTOP);
+ expect(pristine).toMatchObject({code:0,stdout:'|\n'});
+ const ordinaryTag=`hermes-agent:main-${SHA}-overlay-${FONT_PATCH}`;
+ const ordinary=await currentFontFacts({sha:SHA,desktopLabel:'',images:{[ordinaryTag]:ID}},null,ordinaryTag);
+ expect(ordinary).toMatchObject({code:0,stdout:`|${TREE}\n`});
 });

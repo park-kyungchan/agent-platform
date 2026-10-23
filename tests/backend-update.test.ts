@@ -314,7 +314,7 @@ test('font verification never qualifies metadata without a matching fresh immuta
  observed.native!.identify!.code_sha=font.sha;observed.native!.health.commit=font.sha;
  expect(evaluateBackendSnapshot(target,desired,font.sha,observed).checks.freshImageFontReadability).toBe(false);
  const proof={schema:1,check:'font-readability',result:'passed',uid:10000,files:10,fresh_container:true,live_data_mounted:false,imageId:image,overlaySha256:font.patchSha256,overlayTreeSha:'a'.repeat(40)} as const;
- observed.fontReadabilityProof=proof;expect(evaluateBackendSnapshot(target,desired,font.sha,observed).passed).toBe(true);
+ observed.fontProbeIncarnationPreserved=true;observed.fontReadabilityProof=proof;expect(evaluateBackendSnapshot(target,desired,font.sha,observed).passed).toBe(true);
  for(const change of [{imageId:'sha256:'+'0'.repeat(64)},{overlayTreeSha:'0'.repeat(40)},{fresh_container:false},{uid:0},{live_data_mounted:true}]){
   observed.fontReadabilityProof={...proof,...change} as unknown as typeof proof;expect(evaluateBackendSnapshot(target,desired,font.sha,observed).checks.freshImageFontReadability).toBe(false);
  }
@@ -365,6 +365,89 @@ console.log(JSON.stringify({scenario,status,calls,completeCheckpoint:saved.some(
    expect(result.completeCheckpoint).toBe(!scenario.endsWith('bad')&&!scenario.startsWith('deploy-'));
    if(scenario==='pristine'){expect(result.calls).toContain('prepare');expect(result.calls).toContain('deploy');}
    else{expect(result.calls).not.toContain('prepare');expect(result.calls).not.toContain('deploy');}
+  }
+ }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+
+test('font probe binds completion to fresh full serving and unchanged required incarnation identities',async()=>{
+ const root=resolve(import.meta.dir,'..'),dir=await mkdtemp(join(tmpdir(),'font-incarnation-'));
+ const font=fontReadabilityIdentity;
+ const desired:BackendUpdatePolicy={...policy,fontReadability:true,botDesktop:true,releaseTag:font.releaseTag,overlay:{path:`${policy.updaterRoot}/overlays/${font.patchSha256}.patch`,sha256:font.patchSha256}};
+ const derived=snapshot();Object.assign(derived.current!,{sha:font.sha,tag:`hermes-agent:main-${font.sha}-desktop-overlay-${font.patchSha256}`,overlay_sha256:font.patchSha256});
+ for(const c of derived.containers){Object.assign(c,{revision:font.sha,overlaySha256:font.patchSha256,botDesktop:true});Object.assign(c.stamp,{commit:font.sha,overlaySha256:font.patchSha256,dirty:true,displayVersion:'0.22.2'});c.provenance.revision=font.sha;}
+ derived.native!.identify!.code_sha=font.sha;derived.native!.health.commit=font.sha;
+ const file=join(dir,'oracle.ts');
+ const script=`import {mock} from 'bun:test';
+import {mkdir,readdir,readFile} from 'node:fs/promises';
+const root=${JSON.stringify(root)},target=${JSON.stringify(target)},desired=${JSON.stringify(desired)},before=${JSON.stringify(derived)},base=${JSON.stringify(dir)},scenario=Bun.argv[2];
+const dir=base+'/'+scenario;await mkdir(dir);const calls=[],saved=[];let probes=0,observations=0;
+const ordinary=scenario==='ordinary',policy=ordinary?{...desired,fontReadability:false,overlay:undefined}:desired;
+if(ordinary){before.current.tag='hermes-agent:main-'+before.current.sha+'-desktop';before.current.overlay_sha256=null;for(const c of before.containers){c.overlaySha256=null;c.stamp.overlaySha256=undefined;c.stamp.dirty=false;}}
+const after=structuredClone(before);
+// Incidental observation timing/order/slot formatting must not be an identity.
+after.observedAtUtc=new Date(Date.now()+1).toISOString();after.containers.reverse();after.containers.forEach(c=>c.rootSlot.raw+=' synthetic age');
+const owner=after.gatewayOwner,container=after.containers.find(c=>c.service===target.gatewayService);
+if(scenario==='owner-death'){after.native.nativeServing=false;after.ownerPreserved=false;}
+if(scenario==='container'){container.containerId='replacement';owner.containerId='replacement';}
+if(scenario==='image'){for(const c of after.containers)c.imageId='sha256:'+'1'.repeat(64);after.current.image_id=container.imageId;}
+if(scenario==='host-pid')owner.hostPid++;
+if(scenario==='local-pid'){owner.localPid++;container.rootSlot.localPid++;after.native.identify.pid++;after.native.nativeOwnerPid++;after.native.status.answering_pid++;for(const p of after.native.profiles)p.nativeOwnerPid++;for(const a of after.native.adapters)a.writerPid++;}
+if(scenario==='start'){owner.startTicks++;after.native.identify.start_time++;}
+if(scenario==='namespace'){owner.namespace='pid:[new]';container.namespace=owner.namespace;}
+if(scenario==='gateway-lock')after.gatewayLock.inode++;
+if(scenario==='lock-device')after.gatewayLock.device++;
+if(scenario==='updater-lock')after.updaterLock.inode++;
+if(scenario==='holder')after.gatewayLock.holders=[{...owner,hostPid:999}];
+if(scenario==='source'){after.current.sha='1'.repeat(40);for(const c of after.containers){c.revision=after.current.sha;c.stamp.commit=after.current.sha;c.provenance.revision=after.current.sha;}}
+if(scenario==='patch'){after.current.overlay_sha256='1'.repeat(64);for(const c of after.containers){c.overlaySha256=after.current.overlay_sha256;c.stamp.overlaySha256=after.current.overlay_sha256;}}
+if(scenario==='tree'){after.current.overlay_tree_sha='1'.repeat(40);for(const c of after.containers)c.stamp.overlayTreeSha=after.current.overlay_tree_sha;}
+if(scenario==='container-tree')container.stamp.overlayTreeSha='1'.repeat(40);
+if(scenario==='mount')for(const c of after.containers)c.dataSource='/replacement';
+if(scenario==='missing-host-pid'){delete owner.hostPid;delete before.gatewayOwner.hostPid;}
+if(scenario==='missing-tree'){delete container.stamp.overlayTreeSha;delete before.containers.find(c=>c.service===target.gatewayService).stamp.overlayTreeSha;}
+if(scenario==='missing-updater-lock'){delete after.updaterLock.inode;delete before.updaterLock.inode;}
+mock.module(root+'/src/adapters/ssh.ts',()=>({executeRemotePython:async(_t,operation,source)=>{
+ if(operation.startsWith('backend-verify-font-readability-')){
+  probes++;calls.push('font');
+  if(!source.includes(before.current.image_id)||!source.includes(before.current.overlay_tree_sha))throw Error('UNBOUND_PROBE');
+  if(scenario==='probe-transport')return {exitCode:7,stdout:'',reason:'synthetic-probe-failure',remoteOutcome:'unknown'};
+  let proof={schema:1,check:'font-readability',result:'passed',uid:10000,files:10,fresh_container:true,live_data_mounted:false,imageId:before.current.image_id,overlaySha256:before.current.overlay_sha256,overlayTreeSha:before.current.overlay_tree_sha};
+  if(scenario==='proof-mismatch')proof.imageId='sha256:'+'0'.repeat(64);
+  if(scenario==='proof-missing')proof={};
+  return {exitCode:0,stdout:JSON.stringify(proof)};
+ }
+ if(!operation.startsWith('backend-verify-'))throw Error('UNEXPECTED_OPERATION:'+operation);
+ observations++;calls.push('serving');
+ if(!source.includes('host_gateway_serving')||!source.includes('ownerPreserved')||!source.includes('--user')||!source.includes('HERMES_HOME='))throw Error('NOT_FULL_GUARDED_SERVING');
+ if(probes&&scenario==='post-transport')return {exitCode:7,stdout:'',reason:'synthetic-post-failure',remoteOutcome:'unknown'};
+ return {exitCode:0,stdout:JSON.stringify(probes?after:before)};
+}}));
+const native=await import(root+'/src/adapters/backend-update.ts'),{backendIdentity}=await import(root+'/src/update/cli.ts'),{runUpdate}=await import(root+'/src/update/workflow.ts');
+let returned=null,error=null,result;
+try{result=await runUpdate({id:'synthetic-font-incarnation',mode:'backend-only',apply:true,backendSha:before.current.sha},{
+ inspectBackend:async()=>backendIdentity(before,policy),resolveMain:async()=>{throw Error('NO_MAIN')},inspectDesktop:async()=>{throw Error('NO_DESKTOP')},updateDesktop:async()=>{throw Error('NO_DESKTOP')},prepareBackend:async()=>{throw Error('NO_PREPARE')},deployBackend:async()=>{throw Error('NO_DEPLOY')},
+ verifyBackend:async()=>{returned=await native.verifyBackend(target,policy,before.current.sha,dir);return backendIdentity(returned,policy)},save:async s=>saved.push(s)});
+}catch(e){error=e.message;}
+const evidence=[];for(const f of await readdir(dir)){if(f.startsWith('backend-verification-'))evidence.push(JSON.parse(await readFile(dir+'/'+f,'utf8')));}
+console.log(JSON.stringify({scenario,calls,probes,observations,status:result?.status,error,complete:saved.some(s=>s.phase==='complete'),returned,evidence}));`;
+ try{
+  await writeFile(file,script);
+  for(const scenario of ['owner-death','stable','ordinary','container','image','host-pid','local-pid','start','namespace','gateway-lock','lock-device','updater-lock','holder','source','patch','tree','container-tree','mount','missing-host-pid','missing-tree','missing-updater-lock','post-transport','probe-transport','proof-missing','proof-mismatch']){
+   const p=Bun.spawn([process.execPath,file,scenario],{cwd:root,stdout:'pipe',stderr:'pipe'});
+   const [out,err,code]=await Promise.all([new Response(p.stdout).text(),new Response(p.stderr).text(),p.exited]);
+   expect({scenario,code,err}).toMatchObject({scenario,code:0});const result=JSON.parse(out);
+   const pass=['stable','ordinary'].includes(scenario);
+   expect({scenario,complete:result.complete}).toEqual({scenario,complete:pass});
+   expect(result.probes).toBe(scenario==='ordinary'?0:1);
+   expect(result.observations).toBe(scenario==='ordinary'||scenario==='probe-transport'?1:2);
+   expect(result.calls).toEqual(scenario==='ordinary'?['serving']:scenario==='probe-transport'?['serving','font']:['serving','font','serving']);
+   if(result.returned){
+    expect(result.returned.verification.passed).toBe(pass);
+    expect(result.evidence).toEqual([result.returned]);
+    if(scenario==='stable')expect(result.returned.containers[0].service).toBe('hermes-serve');
+   }else expect(['post-transport','probe-transport']).toContain(scenario);
+   if(scenario.endsWith('transport'))expect(result.error??result.status).toBeTruthy();
   }
  }finally{await rm(dir,{recursive:true,force:true});}
 });
