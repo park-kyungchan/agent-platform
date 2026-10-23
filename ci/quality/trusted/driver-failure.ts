@@ -429,6 +429,8 @@ export function parseDriverDiagnostic(
   argv: readonly string[],
   knownPaths: readonly string[],
 ): Record<string, unknown> | null {
+  // TextDecoder otherwise strips a leading BOM before canonical-byte checks.
+  if (stdout[0] === 0xef && stdout[1] === 0xbb && stdout[2] === 0xbf) return null;
   if (
     !stdout.byteLength ||
     argv.length !== 5 ||
