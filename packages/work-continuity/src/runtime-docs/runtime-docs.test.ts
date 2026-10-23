@@ -319,9 +319,9 @@ describe("real docs CLI transport", () => {
 });
 
 describe("portable docs-only Runtime Index", () => {
-  test("selects all120 registered routes and their aliases without execution admission", () => {
+  test("selects all118 registered routes and their aliases without execution admission", () => {
     const reader = createDocumentationReader(registry);
-    expect(reader.registry.routes).toHaveLength(120);
+    expect(reader.registry.routes).toHaveLength(118);
     for (const route of registry.routes) {
       for (const topic of [route.topic, ...route.aliases]) {
         const plan = reader.select({ surface: route.surface, topic });
@@ -332,6 +332,29 @@ describe("portable docs-only Runtime Index", () => {
         expect(Object.hasOwn(plan, "execution")).toBe(false);
       }
     }
+  });
+  test("retired documentation routes and execution host are unavailable", () => {
+    const reader = createDocumentationReader(registry);
+    for (const [surface, topics] of [
+      ["codex.cli", ["wsl", "wsl2", "리눅스"]],
+      ["hermes.agent", ["windows-wsl", "wsl", "wsl2", "windows-wsl2", "윈도우WSL"]],
+    ] as const) {
+      for (const topic of topics) {
+        const plan = reader.select({ surface, topic });
+        expect(plan.status).toBe("NEEDS_DISCOVERY");
+        expect(plan.primary).toBeNull();
+        expect(plan.executionAuthority).toBe("none");
+        expect(plan.nativePermissionGranted).toBe(false);
+      }
+    }
+    expect(reader.registry.captures.some((capture) => capture.id === "codex.cli.wsl")).toBe(false);
+    expect(() =>
+      reader.select({ surface: "codex.cli", topic: "hooks", executionHost: "local.wsl" }),
+    ).toThrow("INVALID_EXECUTION_HOST");
+    expect(
+      reader.select({ surface: "codex.cli", topic: "hooks", executionHost: "hostinger.host" })
+        .status,
+    ).toBe("SELECTED");
   });
   test("Hermes Client/Backend topics preserve distinct official pages and limited evidence", () => {
     const reader = createDocumentationReader(registry);
@@ -345,7 +368,6 @@ describe("portable docs-only Runtime Index", () => {
       ["installer", "installation", "getting-started/installation"],
       ["support-matrix", "platform-support", "getting-started/platform-support"],
       ["windows", "windows-native", "user-guide/windows-native"],
-      ["wsl2", "windows-wsl", "user-guide/windows-wsl-quickstart"],
       ["dashboard", "web-dashboard", "user-guide/features/web-dashboard"],
       ["multi-gateway", "multi-profile-gateways", "user-guide/multi-profile-gateways"],
     ]) {
@@ -467,7 +489,7 @@ describe("portable docs-only Runtime Index", () => {
       path: "routing.json",
       sha256: "968068af391a6d6948ba047933172fb5030c3fcc430a3a66199a3e4e567ba48a",
     });
-    expect(reader.registry.captures).toHaveLength(28);
+    expect(reader.registry.captures).toHaveLength(27);
     expect(
       reader.registry.captures.some((capture) => capture.retrievedAt.startsWith("2026-10-17")),
     ).toBe(false);
@@ -609,7 +631,7 @@ describe("portable docs-only Runtime Index", () => {
     expect(reader.select({ surface: "codex.cli", topic: "hooks" }).primary?.canonicalUrl).toBe(
       original,
     );
-    expect(reader.registry.routes).toHaveLength(120);
+    expect(reader.registry.routes).toHaveLength(118);
     expect(Object.isFrozen(reader.registry.routes)).toBe(true);
     expect(Object.isFrozen(selected.primary)).toBe(true);
     expect(() =>

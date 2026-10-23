@@ -147,7 +147,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/work-continuity/src/runtime-docs/types.ts",
-          "sha256": "ea4c29c10018bc56849d3b97b1f5024a174b962e6565e6e860a920618d1d973b",
+          "sha256": "cac188bc26c62098e3f2bbee549cbb3add6dafabd24a1d1c60370c867fe184e9",
           "relativePath": "packages/work-continuity/src/runtime-docs/types.ts"
         },
         {
@@ -1142,7 +1142,7 @@
         },
         {
           "path": "/home/palantirkc/projects/agent-platform/packages/native-hermes-adapter/src/platform-rearchitecture/work-reader.ts",
-          "sha256": "ce4088b71e4c98eeac8eb0ad622e627ae2a83ff8fc84738b17413c0ee48d3711",
+          "sha256": "38fdd8e9a93f7523a66bac467e17d39780633dd286eea0d4b28aefa891c83fd2",
           "relativePath": "packages/native-hermes-adapter/src/platform-rearchitecture/work-reader.ts"
         },
         {

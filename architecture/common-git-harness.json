@@ -48,7 +48,7 @@
   "nativeOwners": {
     "loopsSessionsToolsPermissions": "Native Codex/Hermes",
     "originalsAndEvidence": "Existing original/evidence owners",
-    "activation": "Each WSL2/VPS Lead verifies and explicitly activates after pulling completed main"
+    "activation": "Each srv1873899 VPS Lead verifies and explicitly activates after pulling completed main"
   },
   "runtimeActivationEstablished": false,
   "wholeWorkAcceptanceEstablished": false,
@@ -57,7 +57,7 @@
   "sharedDefinitionInputs": [
     {
       "path": "architecture/runtime-documentation-routing/registry.json",
-      "sha256": "e61246e90bad04b6ece19aa793b23e9472b0df16ed6ece948e6da67434eb7f91",
+      "sha256": "164b5a8075178413244fea8dcc856f18ceceda03f5cee28c4067d1f24807909c",
       "ownerId": "agent-platform",
       "purpose": "Shared docs-only source definition; no native execution or active pointer"
     },

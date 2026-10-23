@@ -14,7 +14,6 @@ export const DOCUMENTATION_SURFACES = [
 ] as const;
 export type DocumentationSurface = (typeof DOCUMENTATION_SURFACES)[number];
 export const DOCUMENTATION_HOSTS = [
-  "local.wsl",
   "local.windows",
   "hostinger.host",
   "hostinger.container",

@@ -3,7 +3,7 @@
   "recordClass": "accepted-user-direction-for-native-connectors-not-runtime-or-tool-registry",
   "owner": "agent-platform",
   "decisionRef": "../hermes-harness-engineering/decisions/mcp-connector-consolidation.json",
-  "environments": ["WSL2 Codex", "hermes-agent-2q3y"],
+  "environments": ["srv1873899 VPS Codex", "hermes-agent-2q3y"],
   "default": "Use the native runtime MCP client with an existing maintained provider MCP server for external service connectors.",
   "customTools": "Review existing custom tools, plugins and service API wrappers for equivalent MCP capabilities. Migrate active consumers and retire redundant implementations after actual native consumption succeeds.",
   "selection": [

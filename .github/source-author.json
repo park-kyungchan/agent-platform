@@ -8,19 +8,19 @@
   "logicalWork": {
     "domainId": "native-harness",
     "projectId": "agent-platform",
-    "workId": "s04-release-candidate",
-    "taskId": "tsc-strict-fix"
+    "workId": "wsl-removal",
+    "taskId": "repair-pr69-public-documentation-consumer-regression"
   },
-  "sourceBaseSha": "f382e1f7e0d6bb50476ace3f3c4a90b9e1bc5afe",
+  "sourceBaseSha": "8bcc89483367d4a6d58670a6db8732cdd7ce0bf5",
   "author": {
     "runtime": "native-codex",
-    "threadId": "01a1686f-f50f-7b43-92c6-d5b8dd4caa75",
+    "threadId": "01a168e3-923e-75a0-952e-9e12f0dee390",
     "sessionId": null,
     "nativeTaskId": null,
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-23T11:23:05.913Z",
+  "capturedAtUtc": "2026-10-23T13:13:33.096Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
