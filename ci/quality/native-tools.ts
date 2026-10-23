@@ -121,6 +121,7 @@ export async function runNativeCommand(
       throw capture.failure(
         timedOut,
         exit.status === "fulfilled" ? (exit.value as number) : null,
+        // Driver metadata admits only null/SIGKILL/SIGTERM (see trusted/driver-failure.ts).
         typeof child.signalCode === "string" ? child.signalCode : null,
       );
     for (const result of results) if (result.status === "rejected") throw result.reason;
