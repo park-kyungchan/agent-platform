@@ -224,9 +224,9 @@ captureDependencies = captureInstalledRuntimeClosure;
 
 // Keep the existing v1 consumer's exact single-line marker grammar.
 // prettier-ignore
-const expectedRegistrationSha256 = "c5aa6c6f781da5405111157266373c8b9c1434ca904f0a7d1053ee7120686d4a";
+const expectedRegistrationSha256 = "d687f3b688cf80f9a70fb09229e98571065b3eba33db2af290056a7f5566276e";
 // prettier-ignore
-const expectedSuccessorSha256 = "5aa4f30c406a3f72ab6570e032b0d34f0ce612ff8819e7ede5ce4f6232462b53";
+const expectedSuccessorSha256 = "72b34a3da6d16a72fd4455864e160b1844ef22a6d0e7a18ac5eaf3c99a859c75";
 const codeOwnerRoot = resolve(import.meta.dir, "../..");
 const providerRoot = resolve(codeOwnerRoot, "../agent-platform");
 const selfPath = join(codeOwnerRoot, "src/ontology-driven/provider-source.ts");

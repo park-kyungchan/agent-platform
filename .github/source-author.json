@@ -7,20 +7,20 @@
   },
   "logicalWork": {
     "domainId": "native-harness",
-    "projectId": "agent-platform",
-    "workId": "wsl-removal",
-    "taskId": "repair-pr69-public-documentation-consumer-regression"
+    "projectId": "codex-harness-engineering",
+    "workId": "git-sync-cleanup-20261023",
+    "taskId": "complete-pr38-zod-source-successor"
   },
-  "sourceBaseSha": "8bcc89483367d4a6d58670a6db8732cdd7ce0bf5",
+  "sourceBaseSha": "49d7671e24e06c910900dbdd3a0375160853b5f1",
   "author": {
     "runtime": "native-codex",
-    "threadId": "01a168e3-923e-75a0-952e-9e12f0dee390",
+    "threadId": "01a168e6-7eac-7a70-956d-adce169fee88",
     "sessionId": null,
     "nativeTaskId": null,
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-23T13:13:33.096Z",
+  "capturedAtUtc": "2026-10-23T14:34:10.698Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
