@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "helperPath": "/docker/hermes-agent-2q3y/bin/hermes-main-update",
-  "helperSha256": "01113a1994280a0b0aa9639b9ca4e94e05a14a0099ff2ce47ce917b0a8898928",
+  "helperSha256": "3f36e01b72bbdbcc1bb9b7f78965f769497819a96e0ba51123194395f96bedd8",
   "root": "/docker/hermes-agent-2q3y",
   "updaterRoot": "/docker/hermes-agent-2q3y/.main-updater",
   "upstream": "https://github.com/NousResearch/hermes-agent.git",
@@ -16,5 +16,6 @@
     "inode": 1051378
   },
   "botDesktop": true,
-  "releaseTag": "v0.22.0"
+  "releaseTag": "v0.22.0",
+  "fontReadability": false
 }

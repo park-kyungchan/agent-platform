@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import type { HermesTarget } from '../adapters/ssh';
-import { inspectBackend, resolveLatestMain, prepareBackend, deployBackend, verifyBackend, stageBackendOverlay, type BackendSnapshot, type BackendUpdatePolicy, type PreparedBackendCandidate } from '../adapters/backend-update';
+import { releaseStampMatches, fontReadabilityIdentity, inspectBackend, resolveLatestMain, prepareBackend, deployBackend, verifyBackend, stageBackendOverlay, type BackendSnapshot, type BackendUpdatePolicy, type PreparedBackendCandidate } from '../adapters/backend-update';
 import type { DesktopSnapshot, DesktopUpdateTarget } from '../adapters/desktop-update';
 import { runUpdate, type BackendIdentity, type DesktopIdentity, type UpdateCheckpoint, type UpdateMode } from './workflow';
 import { loadCheckpoint, saveCheckpoint } from './checkpoints';
@@ -47,7 +47,7 @@ export const backendIdentity = (snapshot: BackendSnapshot, policy: BackendUpdate
   const current = snapshot.current;
   if (!current) throw new Error('Backend native current state is missing');
   return { sha: current.sha, imageId: current.image_id,
-    healthy: snapshot.helperSha256 === policy.helperSha256 && snapshot.containers.length === policy.services.length && policy.services.every(service => snapshot.containers.filter(container => container.service === service).length === 1) && snapshot.containers.every(container => container.running && container.health === 'healthy' && container.imageId === current.image_id && container.revision === current.sha && container.stamp.commit === current.sha && container.provenance.revision === current.sha && (container.overlaySha256 ?? null) === (policy.overlay?.sha256 ?? null) && (!policy.botDesktop || container.botDesktop === true) && (!policy.releaseTag || (container.stamp.dirty === false && container.stamp.displayVersion === policy.releaseTag.slice(1)))),
+    healthy: snapshot.helperSha256 === policy.helperSha256 && (!policy.fontReadability || current.sha === fontReadabilityIdentity.sha && current.tag === `hermes-agent:main-${current.sha}-desktop-overlay-${fontReadabilityIdentity.patchSha256}`) && snapshot.containers.length === policy.services.length && policy.services.every(service => snapshot.containers.filter(container => container.service === service).length === 1) && snapshot.containers.every(container => container.running && container.health === 'healthy' && container.imageId === current.image_id && container.revision === current.sha && container.stamp.commit === current.sha && container.provenance.revision === current.sha && (container.overlaySha256 ?? null) === (policy.overlay?.sha256 ?? null) && (!policy.botDesktop || container.botDesktop === true) && releaseStampMatches(policy, container.stamp)),
     verified: snapshot.verification?.passed === true };
 };
 export const desktopIdentity = (snapshot: DesktopSnapshot, preUpdateEligible?: boolean): DesktopIdentity => {
