@@ -8,19 +8,19 @@
   "logicalWork": {
     "domainId": "native-harness",
     "projectId": "agent-platform",
-    "workId": "s04-release-candidate",
-    "taskId": "tsc-strict-fix"
+    "workId": "wsl-removal",
+    "taskId": "wsl-remnant-removal"
   },
-  "sourceBaseSha": "f382e1f7e0d6bb50476ace3f3c4a90b9e1bc5afe",
+  "sourceBaseSha": "a945b1c43bbb7118910ae200d54b0d95121186e6",
   "author": {
     "runtime": "native-codex",
-    "threadId": "01a1686f-f50f-7b43-92c6-d5b8dd4caa75",
+    "threadId": "01a168cc-d4d2-7090-930c-1d5ec1ef6766",
     "sessionId": null,
     "nativeTaskId": null,
     "nativeRunId": null,
     "observedVia": "CODEX_THREAD_ID"
   },
-  "capturedAtUtc": "2026-10-23T11:23:05.913Z",
+  "capturedAtUtc": "2026-10-23T12:47:40.261Z",
   "nativeAuthorshipAuthenticated": false,
   "publisherIdentityInferred": false
 }
