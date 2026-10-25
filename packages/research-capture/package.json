@@ -20,7 +20,7 @@
     "@palantirkc/ontology-research-v0-1": "file:releases/palantirkc-ontology-0.1.0.tgz"
   },
   "devDependencies": {
-    "bun-types": "1.4.3",
+    "bun-types": "1.4.4",
     "typescript": "5.9.3"
   },
   "description": "Common implementation provider for legacy-owned research capture; native runtime and schema ownership stay with scrapling-research."
