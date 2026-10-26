@@ -5,13 +5,14 @@ export type ReviewBinding = {
   evidenceOwner: "codex-harness-engineering";
   scope: "canonical-source-ci-quality";
 };
-/** Runtimes whose independent review identities this gate accepts. The set is
- * explicit: an unknown or empty runtime is refused, never passed through. */
-export const REVIEW_RUNTIMES = ["muse", "codex", "hermes", "native-codex"] as const;
-export type ReviewRuntime = (typeof REVIEW_RUNTIMES)[number];
-export type NativeReviewIdentity = { runtime: ReviewRuntime; taskId: string };
-const isReviewRuntime = (value: unknown): value is ReviewRuntime =>
-  typeof value === "string" && (REVIEW_RUNTIMES as readonly string[]).includes(value);
+/** Review runtime is a self-declared descriptor, not a brand allowlist:
+ * any well-formed descriptor is admissible, and trust anchors on the fixed
+ * publisher's authenticated status plus exact digest bindings. Registering
+ * a new CLI must never require a gate code change. */
+export const REVIEW_RUNTIME_DESCRIPTOR = /^[a-z0-9][a-z0-9-]{0,63}$/;
+export type NativeReviewIdentity = { runtime: string; taskId: string };
+const isReviewRuntime = (value: unknown): value is string =>
+  typeof value === "string" && REVIEW_RUNTIME_DESCRIPTOR.test(value);
 export type ReviewReceiptV2 = {
   schema: "native-independent-review.v2";
   binding: ReviewBinding;

@@ -187,8 +187,10 @@ describe("versioned exact-head independent review receipt", () => {
       { ...receipt, reviewer: { ...receipt.author, taskId: " " + receipt.author.taskId } },
       { ...receipt, reviewer: { ...receipt.reviewer, taskId: "reviewer\nidentity" } },
       { ...receipt, author: { ...receipt.author, taskId: "author\u0000identity" } },
-      { ...receipt, author: { ...receipt.author, runtime: "other" } },
-      { ...receipt, reviewer: { ...receipt.reviewer, runtime: "other" } },
+      { ...receipt, author: { ...receipt.author, runtime: "" } },
+      { ...receipt, reviewer: { ...receipt.reviewer, runtime: "" } },
+      { ...receipt, reviewer: { ...receipt.reviewer, runtime: "Native-Codex" } },
+      { ...receipt, reviewer: { ...receipt.reviewer, runtime: "-bad" } },
       { ...receipt, conclusion: "fail" },
       { ...receipt, unresolvedFindings: 1 },
       { ...receipt, schema: "native-independent-review.v3" },
@@ -250,6 +252,34 @@ describe("versioned exact-head independent review receipt", () => {
         sourceManifestSha256: manifest.sha256,
       }),
     ).toThrow();
+  });
+  test("accepts a first-seen runtime descriptor (grok) with distinct tasks", async () => {
+    const { result, receipt, reader } = fixture();
+    const grokResult = {
+      ...result,
+      reviewer: { runtime: "grok", taskId: "grok-reviewer-thread" },
+      author: { runtime: "grok", taskId: "grok-author-thread" },
+    };
+    const grokBytes = Buffer.from(JSON.stringify(grokResult));
+    const grokReceipt = {
+      ...receipt,
+      reviewer: grokResult.reviewer,
+      author: grokResult.author,
+      provenance: {
+        ...receipt.provenance,
+        sha256: createHash("sha256").update(grokBytes).digest("hex"),
+      },
+    };
+    const grokReader: ReviewEvidenceReader = {
+      readTree: reader.readTree,
+      readFile: async (path, commit) => {
+        const found = await reader.readFile(path, commit);
+        return { ...(found as object), content: grokBytes.toString("base64"), size: grokBytes.length };
+      },
+    };
+    await expect(
+      validateReceiptWithEvidence(grokReceipt, head, tree, repository, grokReader),
+    ).resolves.toMatchObject({ version: 2 });
   });
   test("rejects cross-record runtime mismatch even with the same taskId", async () => {
     const { result, receipt, reader } = fixture();
