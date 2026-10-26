@@ -26,13 +26,16 @@ export interface AuthorLogicalWork {
   workId: string;
   taskId: string;
 }
+/** Author runtime is a self-declared descriptor, not a brand allowlist
+ * (same descriptor shape as the review gate, declared locally on purpose). */
+export const SOURCE_AUTHOR_RUNTIME_DESCRIPTOR = /^[a-z0-9][a-z0-9-]{0,63}$/;
 export interface NativeSourceAuthor {
-  runtime: "native-codex" | "native-hermes";
+  runtime: string;
   threadId: string | null;
   sessionId: string | null;
   nativeTaskId: string | null;
   nativeRunId: string | null;
-  observedVia: "CODEX_THREAD_ID" | "pre_llm_call.session_id";
+  observedVia: string;
 }
 export interface SourceAuthorMetadata {
   schema: "agent-platform.source-author-metadata.v1";
@@ -137,16 +140,12 @@ export function validateSourceAuthorMetadata(value: unknown): SourceAuthorMetada
     input.publisherIdentityInferred !== false ||
     !nullableId(author.nativeTaskId) ||
     !nullableId(author.nativeRunId) ||
-    !(
-      (author.runtime === "native-codex" &&
-        thread(author.threadId) &&
-        author.sessionId === null &&
-        author.observedVia === "CODEX_THREAD_ID") ||
-      (author.runtime === "native-hermes" &&
-        author.threadId === null &&
-        id(author.sessionId) &&
-        author.observedVia === "pre_llm_call.session_id")
-    ) ||
+    typeof author.runtime !== "string" ||
+    !SOURCE_AUTHOR_RUNTIME_DESCRIPTOR.test(author.runtime) ||
+    (author.threadId !== null && !thread(author.threadId)) ||
+    (author.sessionId !== null && !id(author.sessionId)) ||
+    (author.threadId === null) === (author.sessionId === null) ||
+    !id(author.observedVia) ||
     [author.nativeTaskId, author.nativeRunId].some(
       (native) => native !== null && Object.values(selected.logicalWork).includes(String(native)),
     )
@@ -155,21 +154,50 @@ export function validateSourceAuthorMetadata(value: unknown): SourceAuthorMetada
   return structuredClone(input) as unknown as SourceAuthorMetadata;
 }
 
-/** Runs in the native author's process, never in GHA to invent an original identity. */
+/** Single capture core. Runs in the author's own process, never in GHA to
+ * invent an original identity. The caller supplies its observed identity;
+ * the descriptor is recorded, never trusted as authentication. */
+export function captureDescriptorSourceAuthor(
+  selection: unknown,
+  sourceBaseSha: string,
+  identity: unknown,
+  env: NodeJS.ProcessEnv = process.env,
+  capturedAtUtc = new Date().toISOString(),
+): SourceAuthorMetadata {
+  if (env.GITHUB_ACTIONS === "true" || env.CI === "true")
+    throw Error("Observed source-author capture required before publication");
+  const author = record(identity, [
+    "runtime",
+    "threadId",
+    "sessionId",
+    "nativeTaskId",
+    "nativeRunId",
+    "observedVia",
+  ]) as unknown as NativeSourceAuthor;
+  return validateSourceAuthorMetadata({
+    schema: "agent-platform.source-author-metadata.v1",
+    ...scope(selection),
+    sourceBaseSha,
+    author,
+    capturedAtUtc,
+    nativeAuthorshipAuthenticated: false,
+    publisherIdentityInferred: false,
+  });
+}
+
+/** Thin Codex adapter supplying its observed thread identity. */
 export function captureCodexSourceAuthor(
   selection: unknown,
   sourceBaseSha: string,
   env: NodeJS.ProcessEnv,
   capturedAtUtc = new Date().toISOString(),
 ): SourceAuthorMetadata {
-  if (env.GITHUB_ACTIONS === "true" || env.CI === "true" || !thread(env.CODEX_THREAD_ID))
+  if (!thread(env.CODEX_THREAD_ID))
     throw Error("Native Codex source-author environment required before publication");
-  const selected = scope(selection);
-  return validateSourceAuthorMetadata({
-    schema: "agent-platform.source-author-metadata.v1",
-    ...selected,
+  return captureDescriptorSourceAuthor(
+    selection,
     sourceBaseSha,
-    author: {
+    {
       runtime: "native-codex",
       threadId: env.CODEX_THREAD_ID,
       sessionId: null,
@@ -177,10 +205,9 @@ export function captureCodexSourceAuthor(
       nativeRunId: null,
       observedVia: "CODEX_THREAD_ID",
     },
+    env,
     capturedAtUtc,
-    nativeAuthorshipAuthenticated: false,
-    publisherIdentityInferred: false,
-  });
+  );
 }
 
 /** Native Hermes owner supplies only these documented hook fields, not a raw event/session. */
@@ -196,11 +223,10 @@ export function captureHermesHookSourceAuthor(
   const hook = record(observedHook, ["hook_event_name", "session_id", "extra"]);
   const extra = record(hook.extra, ["task_id", "run_id"]);
   if (hook.hook_event_name !== "pre_llm_call") throw Error("Observed Hermes hook required");
-  return validateSourceAuthorMetadata({
-    schema: "agent-platform.source-author-metadata.v1",
-    ...scope(selection),
+  return captureDescriptorSourceAuthor(
+    selection,
     sourceBaseSha,
-    author: {
+    {
       runtime: "native-hermes",
       threadId: null,
       sessionId: hook.session_id,
@@ -208,10 +234,9 @@ export function captureHermesHookSourceAuthor(
       nativeRunId: extra.run_id,
       observedVia: "pre_llm_call.session_id",
     },
+    env,
     capturedAtUtc,
-    nativeAuthorshipAuthenticated: false,
-    publisherIdentityInferred: false,
-  });
+  );
 }
 
 export async function sourceAuthorGit(root: string, args: string[]): Promise<string> {

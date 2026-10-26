@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   captureCodexSourceAuthor,
+  captureDescriptorSourceAuthor,
   captureHermesHookSourceAuthor,
   parseSourceAuthorJson,
   sourceAuthorGit,
@@ -500,4 +501,73 @@ test("symlink metadata and unrelated/missing source bases cannot enter the commi
   expect((await readFile(join(f.root, "project.json"), "utf8")).includes("fixture-owner")).toBe(
     true,
   );
+});
+
+test("descriptor capture accepts a first-seen runtime and still refuses CI", () => {
+  const value = captureDescriptorSourceAuthor(
+    selection,
+    base,
+    {
+      runtime: "muse",
+      threadId: "00000000-0000-4000-8000-0000000000aa",
+      sessionId: null,
+      nativeTaskId: null,
+      nativeRunId: null,
+      observedVia: "muse-session-log",
+    },
+    {},
+    at,
+  );
+  expect(value.author.runtime).toBe("muse");
+  expect(validateSourceAuthorMetadata(parseSourceAuthorJson(encode(value)))).toEqual(value);
+  expect(() =>
+    captureDescriptorSourceAuthor(
+      selection,
+      base,
+      {
+        runtime: "muse",
+        threadId: "00000000-0000-4000-8000-0000000000aa",
+        sessionId: null,
+        nativeTaskId: null,
+        nativeRunId: null,
+        observedVia: "muse-session-log",
+      },
+      { CI: "true" },
+      at,
+    ),
+  ).toThrow();
+  expect(() =>
+    captureDescriptorSourceAuthor(
+      selection,
+      base,
+      {
+        runtime: "Bad Runtime",
+        threadId: "00000000-0000-4000-8000-0000000000aa",
+        sessionId: null,
+        nativeTaskId: null,
+        nativeRunId: null,
+        observedVia: "muse-session-log",
+      },
+      {},
+      at,
+    ),
+  ).toThrow();
+});
+
+test("existing native-codex and native-hermes metadata still validate unchanged", () => {
+  const codex = metadata();
+  expect(validateSourceAuthorMetadata(parseSourceAuthorJson(encode(codex)))).toEqual(codex);
+  const hermes = captureHermesHookSourceAuthor(
+    selection,
+    base,
+    {
+      hook_event_name: "pre_llm_call",
+      session_id: "fictional-hermes-session",
+      extra: { task_id: null, run_id: null },
+    },
+    at,
+    {},
+  );
+  expect(hermes.author.runtime).toBe("native-hermes");
+  expect(validateSourceAuthorMetadata(parseSourceAuthorJson(encode(hermes)))).toEqual(hermes);
 });
