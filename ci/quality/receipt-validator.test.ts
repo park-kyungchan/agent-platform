@@ -201,6 +201,56 @@ describe("versioned exact-head independent review receipt", () => {
       ).toThrow();
     expect(() => validateIndependentReviewReceipt(receipt, head, tree)).toThrow();
   });
+  test("accepts muse author and distinct muse reviewer; refuses self-review and missing runtime", async () => {
+    const { result, receipt, reader } = fixture();
+    const museResult = {
+      ...result,
+      reviewer: { runtime: "muse" as const, taskId: "muse-reviewer-thread" },
+      author: { runtime: "muse" as const, taskId: "muse-author-thread" },
+    };
+    const museBytes = Buffer.from(JSON.stringify(museResult));
+    const museReceipt = {
+      ...receipt,
+      reviewer: museResult.reviewer,
+      author: museResult.author,
+      provenance: {
+        ...receipt.provenance,
+        sha256: createHash("sha256").update(museBytes).digest("hex"),
+      },
+    };
+    const museReader: ReviewEvidenceReader = {
+      readTree: reader.readTree,
+      readFile: async (path, commit) => {
+        const found = await reader.readFile(path, commit);
+        return { ...(found as object), content: museBytes.toString("base64"), size: museBytes.length };
+      },
+    };
+    await expect(
+      validateReceiptWithEvidence(museReceipt, head, tree, repository, museReader),
+    ).resolves.toMatchObject({ version: 2 });
+    // Self-review: same taskId for reviewer and author is refused.
+    const selfReceipt = {
+      ...museReceipt,
+      reviewer: { ...museResult.reviewer, taskId: museResult.author.taskId },
+    };
+    expect(() =>
+      validateIndependentReviewReceipt(selfReceipt, head, tree, {
+        repository,
+        sourceManifestSha256: manifest.sha256,
+      }),
+    ).toThrow();
+    // Missing runtime is refused, never passed through.
+    const noRuntime = {
+      ...museReceipt,
+      reviewer: { taskId: "muse-reviewer-thread" },
+    };
+    expect(() =>
+      validateIndependentReviewReceipt(noRuntime, head, tree, {
+        repository,
+        sourceManifestSha256: manifest.sha256,
+      }),
+    ).toThrow();
+  });
   test("rejects mutable, external, cross-repository and wrong-result provenance", () => {
     const { receipt } = fixture();
     for (const resultRef of [

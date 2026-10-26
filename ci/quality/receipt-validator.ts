@@ -5,7 +5,13 @@ export type ReviewBinding = {
   evidenceOwner: "codex-harness-engineering";
   scope: "canonical-source-ci-quality";
 };
-export type NativeReviewIdentity = { runtime: "native-codex"; taskId: string };
+/** Runtimes whose independent review identities this gate accepts. The set is
+ * explicit: an unknown or empty runtime is refused, never passed through. */
+export const REVIEW_RUNTIMES = ["muse", "codex", "hermes", "native-codex"] as const;
+export type ReviewRuntime = (typeof REVIEW_RUNTIMES)[number];
+export type NativeReviewIdentity = { runtime: ReviewRuntime; taskId: string };
+const isReviewRuntime = (value: unknown): value is ReviewRuntime =>
+  typeof value === "string" && (REVIEW_RUNTIMES as readonly string[]).includes(value);
 export type ReviewReceiptV2 = {
   schema: "native-independent-review.v2";
   binding: ReviewBinding;
@@ -287,8 +293,8 @@ function validateExactNativeReview(
     value.headSha !== head ||
     value.reviewedTreeSha !== tree ||
     value.reviewedSourceManifestSha256 !== manifestSha256 ||
-    reviewer.runtime !== "native-codex" ||
-    author.runtime !== "native-codex" ||
+    !isReviewRuntime(reviewer.runtime) ||
+    !isReviewRuntime(author.runtime) ||
     !taskId(reviewer.taskId) ||
     !taskId(author.taskId) ||
     reviewer.taskId === author.taskId ||
