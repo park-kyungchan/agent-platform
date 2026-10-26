@@ -187,8 +187,10 @@ describe("versioned exact-head independent review receipt", () => {
       { ...receipt, reviewer: { ...receipt.author, taskId: " " + receipt.author.taskId } },
       { ...receipt, reviewer: { ...receipt.reviewer, taskId: "reviewer\nidentity" } },
       { ...receipt, author: { ...receipt.author, taskId: "author\u0000identity" } },
-      { ...receipt, author: { ...receipt.author, runtime: "other" } },
-      { ...receipt, reviewer: { ...receipt.reviewer, runtime: "other" } },
+      { ...receipt, author: { ...receipt.author, runtime: "" } },
+      { ...receipt, reviewer: { ...receipt.reviewer, runtime: "" } },
+      { ...receipt, reviewer: { ...receipt.reviewer, runtime: "Native-Codex" } },
+      { ...receipt, reviewer: { ...receipt.reviewer, runtime: "-bad" } },
       { ...receipt, conclusion: "fail" },
       { ...receipt, unresolvedFindings: 1 },
       { ...receipt, schema: "native-independent-review.v3" },
@@ -200,6 +202,115 @@ describe("versioned exact-head independent review receipt", () => {
         }),
       ).toThrow();
     expect(() => validateIndependentReviewReceipt(receipt, head, tree)).toThrow();
+  });
+  test("accepts muse author and distinct muse reviewer; refuses self-review and missing runtime", async () => {
+    const { result, receipt, reader } = fixture();
+    const museResult = {
+      ...result,
+      reviewer: { runtime: "muse" as const, taskId: "muse-reviewer-thread" },
+      author: { runtime: "muse" as const, taskId: "muse-author-thread" },
+    };
+    const museBytes = Buffer.from(JSON.stringify(museResult));
+    const museReceipt = {
+      ...receipt,
+      reviewer: museResult.reviewer,
+      author: museResult.author,
+      provenance: {
+        ...receipt.provenance,
+        sha256: createHash("sha256").update(museBytes).digest("hex"),
+      },
+    };
+    const museReader: ReviewEvidenceReader = {
+      readTree: reader.readTree,
+      readFile: async (path, commit) => {
+        const found = await reader.readFile(path, commit);
+        return { ...(found as object), content: museBytes.toString("base64"), size: museBytes.length };
+      },
+    };
+    await expect(
+      validateReceiptWithEvidence(museReceipt, head, tree, repository, museReader),
+    ).resolves.toMatchObject({ version: 2 });
+    // Self-review: same taskId for reviewer and author is refused.
+    const selfReceipt = {
+      ...museReceipt,
+      reviewer: { ...museResult.reviewer, taskId: museResult.author.taskId },
+    };
+    expect(() =>
+      validateIndependentReviewReceipt(selfReceipt, head, tree, {
+        repository,
+        sourceManifestSha256: manifest.sha256,
+      }),
+    ).toThrow();
+    // Missing runtime is refused, never passed through.
+    const noRuntime = {
+      ...museReceipt,
+      reviewer: { taskId: "muse-reviewer-thread" },
+    };
+    expect(() =>
+      validateIndependentReviewReceipt(noRuntime, head, tree, {
+        repository,
+        sourceManifestSha256: manifest.sha256,
+      }),
+    ).toThrow();
+  });
+  test("accepts a first-seen runtime descriptor (grok) with distinct tasks", async () => {
+    const { result, receipt, reader } = fixture();
+    const grokResult = {
+      ...result,
+      reviewer: { runtime: "grok", taskId: "grok-reviewer-thread" },
+      author: { runtime: "grok", taskId: "grok-author-thread" },
+    };
+    const grokBytes = Buffer.from(JSON.stringify(grokResult));
+    const grokReceipt = {
+      ...receipt,
+      reviewer: grokResult.reviewer,
+      author: grokResult.author,
+      provenance: {
+        ...receipt.provenance,
+        sha256: createHash("sha256").update(grokBytes).digest("hex"),
+      },
+    };
+    const grokReader: ReviewEvidenceReader = {
+      readTree: reader.readTree,
+      readFile: async (path, commit) => {
+        const found = await reader.readFile(path, commit);
+        return { ...(found as object), content: grokBytes.toString("base64"), size: grokBytes.length };
+      },
+    };
+    await expect(
+      validateReceiptWithEvidence(grokReceipt, head, tree, repository, grokReader),
+    ).resolves.toMatchObject({ version: 2 });
+  });
+  test("rejects cross-record runtime mismatch even with the same taskId", async () => {
+    const { result, receipt, reader } = fixture();
+    const museReceipt = {
+      ...receipt,
+      reviewer: { runtime: "muse" as const, taskId: "shared-task" },
+      author: { runtime: "muse" as const, taskId: "muse-author-thread" },
+    };
+    const hermesResult = {
+      ...result,
+      reviewer: { runtime: "hermes" as const, taskId: "shared-task" },
+      author: { runtime: "muse" as const, taskId: "muse-author-thread" },
+    };
+    const hermesBytes = Buffer.from(JSON.stringify(hermesResult));
+    const boundReceipt = {
+      ...museReceipt,
+      provenance: {
+        ...receipt.provenance,
+        sha256: createHash("sha256").update(hermesBytes).digest("hex"),
+      },
+    };
+    const mismatchReader: ReviewEvidenceReader = {
+      readTree: reader.readTree,
+      readFile: async (path, commit) => {
+        const found = await reader.readFile(path, commit);
+        return { ...(found as object), content: hermesBytes.toString("base64"), size: hermesBytes.length };
+      },
+    };
+    await expect(
+      validateReceiptWithEvidence(boundReceipt, head, tree, repository, mismatchReader),
+    ).rejects.toThrow();
   });
   test("rejects mutable, external, cross-repository and wrong-result provenance", () => {
     const { receipt } = fixture();

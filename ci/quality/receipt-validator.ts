@@ -5,7 +5,14 @@ export type ReviewBinding = {
   evidenceOwner: "codex-harness-engineering";
   scope: "canonical-source-ci-quality";
 };
-export type NativeReviewIdentity = { runtime: "native-codex"; taskId: string };
+/** Review runtime is a self-declared descriptor, not a brand allowlist:
+ * any well-formed descriptor is admissible, and trust anchors on the fixed
+ * publisher's authenticated status plus exact digest bindings. Registering
+ * a new CLI must never require a gate code change. */
+export const REVIEW_RUNTIME_DESCRIPTOR = /^[a-z0-9][a-z0-9-]{0,63}$/;
+export type NativeReviewIdentity = { runtime: string; taskId: string };
+const isReviewRuntime = (value: unknown): value is string =>
+  typeof value === "string" && REVIEW_RUNTIME_DESCRIPTOR.test(value);
 export type ReviewReceiptV2 = {
   schema: "native-independent-review.v2";
   binding: ReviewBinding;
@@ -265,7 +272,9 @@ export function verifyIndependentReviewResult(
   const value = object(receipt);
   if (
     object(result.reviewer).taskId !== object(value.reviewer).taskId ||
-    object(result.author).taskId !== object(value.author).taskId
+    object(result.reviewer).runtime !== object(value.reviewer).runtime ||
+    object(result.author).taskId !== object(value.author).taskId ||
+    object(result.author).runtime !== object(value.author).runtime
   ) {
     throw new Error("Immutable independent review result identities differ from its receipt");
   }
@@ -287,8 +296,8 @@ function validateExactNativeReview(
     value.headSha !== head ||
     value.reviewedTreeSha !== tree ||
     value.reviewedSourceManifestSha256 !== manifestSha256 ||
-    reviewer.runtime !== "native-codex" ||
-    author.runtime !== "native-codex" ||
+    !isReviewRuntime(reviewer.runtime) ||
+    !isReviewRuntime(author.runtime) ||
     !taskId(reviewer.taskId) ||
     !taskId(author.taskId) ||
     reviewer.taskId === author.taskId ||
@@ -380,7 +389,9 @@ export function validateOwnerReviewProof(
   if (
     identities &&
     (object(proof.reviewer).taskId !== identities.reviewer.taskId ||
-      object(proof.author).taskId !== identities.author.taskId)
+      object(proof.reviewer).runtime !== identities.reviewer.runtime ||
+      object(proof.author).taskId !== identities.author.taskId ||
+      object(proof.author).runtime !== identities.author.runtime)
   )
     throw new Error("Owner review native identities differ across immutable evidence");
 }

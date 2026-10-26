@@ -280,8 +280,9 @@ export async function validateOwnerScopedReviewWithEvidence(
     );
   }
   const rawUrl = `https://github.com/${repository}/blob/${refs.rawNativeResult.commit}/${refs.rawNativeResult.path}`;
+  const reviewerRuntime = record(record(receipt).reviewer).runtime;
   if (
-    evidence.payload.method !== "native-codex-independent-source-review" ||
+    evidence.payload.method !== `${reviewerRuntime}-independent-source-review` ||
     evidence.payload.sourceUrl !== rawUrl ||
     evidence.payload.upstreamRevision !== head ||
     evidence.payload.result.outcome !== "success" ||
