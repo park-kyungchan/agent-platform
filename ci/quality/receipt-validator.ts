@@ -271,7 +271,9 @@ export function verifyIndependentReviewResult(
   const value = object(receipt);
   if (
     object(result.reviewer).taskId !== object(value.reviewer).taskId ||
-    object(result.author).taskId !== object(value.author).taskId
+    object(result.reviewer).runtime !== object(value.reviewer).runtime ||
+    object(result.author).taskId !== object(value.author).taskId ||
+    object(result.author).runtime !== object(value.author).runtime
   ) {
     throw new Error("Immutable independent review result identities differ from its receipt");
   }
@@ -386,7 +388,9 @@ export function validateOwnerReviewProof(
   if (
     identities &&
     (object(proof.reviewer).taskId !== identities.reviewer.taskId ||
-      object(proof.author).taskId !== identities.author.taskId)
+      object(proof.reviewer).runtime !== identities.reviewer.runtime ||
+      object(proof.author).taskId !== identities.author.taskId ||
+      object(proof.author).runtime !== identities.author.runtime)
   )
     throw new Error("Owner review native identities differ across immutable evidence");
 }

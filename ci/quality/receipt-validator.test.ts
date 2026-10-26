@@ -251,6 +251,37 @@ describe("versioned exact-head independent review receipt", () => {
       }),
     ).toThrow();
   });
+  test("rejects cross-record runtime mismatch even with the same taskId", async () => {
+    const { result, receipt, reader } = fixture();
+    const museReceipt = {
+      ...receipt,
+      reviewer: { runtime: "muse" as const, taskId: "shared-task" },
+      author: { runtime: "muse" as const, taskId: "muse-author-thread" },
+    };
+    const hermesResult = {
+      ...result,
+      reviewer: { runtime: "hermes" as const, taskId: "shared-task" },
+      author: { runtime: "muse" as const, taskId: "muse-author-thread" },
+    };
+    const hermesBytes = Buffer.from(JSON.stringify(hermesResult));
+    const boundReceipt = {
+      ...museReceipt,
+      provenance: {
+        ...receipt.provenance,
+        sha256: createHash("sha256").update(hermesBytes).digest("hex"),
+      },
+    };
+    const mismatchReader: ReviewEvidenceReader = {
+      readTree: reader.readTree,
+      readFile: async (path, commit) => {
+        const found = await reader.readFile(path, commit);
+        return { ...(found as object), content: hermesBytes.toString("base64"), size: hermesBytes.length };
+      },
+    };
+    await expect(
+      validateReceiptWithEvidence(boundReceipt, head, tree, repository, mismatchReader),
+    ).rejects.toThrow();
+  });
   test("rejects mutable, external, cross-repository and wrong-result provenance", () => {
     const { receipt } = fixture();
     for (const resultRef of [
