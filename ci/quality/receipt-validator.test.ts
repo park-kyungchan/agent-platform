@@ -399,6 +399,7 @@ function ownerFixture(
     result: OwnerReviewResult;
     evidence: EvidenceArtifact;
     verification: VerificationArtifact;
+    proof: OwnerReviewProof;
   }) => void,
 ) {
   const policy: OwnerReviewPolicy = {
@@ -489,7 +490,7 @@ function ownerFixture(
       },
     },
   };
-  change?.({ raw, result, evidence, verification });
+  change?.({ raw, result, evidence, verification, proof });
   const files = new Map<string, Buffer>();
   function put(role: string, value: unknown): ImmutableResult {
     const path = `${role}/${head}.json`,
@@ -599,6 +600,41 @@ describe("additive owner-scoped review gate", () => {
     expect(verified.nativePermissionGranted).toBe(false);
     expect(verified.acceptanceEstablished).toBe(false);
     expect(reads.filter((path) => path.startsWith("file:"))).toHaveLength(5);
+  });
+  test("gate accepts muse reviewer evidence method and rejects method/runtime mismatch", async () => {
+    const muse = ownerFixture((values) => {
+      for (const record of [values.raw, values.result, values.proof]) {
+        record.reviewer = { runtime: "muse", taskId: "/fixture/independent-review" };
+        record.author = { runtime: "muse", taskId: "/fixture/author" };
+      }
+      values.evidence.payload.method = "muse-independent-source-review";
+      (values.evidence.payload.details as { review: unknown }).review = {
+        ...(values.evidence.payload.details as { review: object }).review,
+        reviewer: { runtime: "muse", taskId: "/fixture/independent-review" },
+        author: { runtime: "muse", taskId: "/fixture/author" },
+      };
+      (values.verification.payload.details as { review: unknown }).review = {
+        ...(values.verification.payload.details as { review: object }).review,
+        reviewer: { runtime: "muse", taskId: "/fixture/independent-review" },
+        author: { runtime: "muse", taskId: "/fixture/author" },
+      };
+    });
+    const verified = await validateOwnerScopedReviewWithEvidence(
+      muse.policy,
+      { repository: muse.policy.repository, head },
+      muse.reader,
+    );
+    expect(verified.publisherAuthenticated).toBe(true);
+    const mismatched = ownerFixture((values) => {
+      values.evidence.payload.method = "codex-independent-source-review";
+    });
+    await expect(
+      validateOwnerScopedReviewWithEvidence(
+        mismatched.policy,
+        { repository: mismatched.policy.repository, head },
+        mismatched.reader,
+      ),
+    ).rejects.toThrow();
   });
   test("constructs real acyclic Git publication commits before validating unchanged raw output", async () => {
     const root = await mkdtemp(join(tmpdir(), "owner-review-publication-"));
