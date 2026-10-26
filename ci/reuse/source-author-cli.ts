@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import {
   captureCodexSourceAuthor,
+  captureDescriptorSourceAuthor,
   parseSourceAuthorJson,
   sourceAuthorGit,
   verifyCommittedSourceAuthor,
@@ -14,6 +15,12 @@ if (import.meta.main) {
       const base = await sourceAuthorGit(process.cwd(), ["rev-parse", "HEAD"]);
       const metadata = captureCodexSourceAuthor(selection, base, process.env);
       console.log(JSON.stringify(metadata, null, 2));
+    } else if (args[0] === "capture-descriptor" && args.length === 3) {
+      const selection = parseSourceAuthorJson(await readFile(args[1]!));
+      const identity = parseSourceAuthorJson(await readFile(args[2]!));
+      const base = await sourceAuthorGit(process.cwd(), ["rev-parse", "HEAD"]);
+      const metadata = captureDescriptorSourceAuthor(selection, base, identity, process.env);
+      console.log(JSON.stringify(metadata, null, 2));
     } else if (args[0] === "verify" && args.length === 1) {
       const repository = process.env.COMMON_CI_REPOSITORY ?? "";
       if (process.env.GITHUB_ACTIONS === "true" && repository !== process.env.GITHUB_REPOSITORY)
@@ -26,7 +33,7 @@ if (import.meta.main) {
         metadataPath: process.env.COMMON_CI_SOURCE_AUTHOR_METADATA,
       });
       console.log(JSON.stringify(readback));
-    } else throw Error("Use capture <exact-scope.json> or verify with explicit source inputs");
+    } else throw Error("Use capture <exact-scope.json>, capture-descriptor <scope.json> <identity.json> or verify with explicit source inputs");
   } catch {
     console.error(
       "Source-author metadata refused: require actual native capture and exact committed readback",
