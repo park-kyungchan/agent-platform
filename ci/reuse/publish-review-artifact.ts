@@ -5,8 +5,9 @@ import { resolve } from "node:path";
 import {
   authenticatedReviewReader,
   reviewArtifactWorkflow,
+  reviewArtifactBranch,
   validateRawReviewArtifact,
-  validateReviewArtifact,
+  validatePublishedReviewArtifact,
   type ReviewArtifactPolicy,
 } from "../quality/review-artifact";
 import {
@@ -15,13 +16,7 @@ import {
 } from "../quality/receipt-validator";
 import { locatedError } from "./located-error";
 
-/** Native publisher only: preserve the actual reviewer bytes, upload once, verify, then attest. */
-async function publish() {
-  if (process.env.CI || process.env.GITHUB_ACTIONS || !process.env.CODEX_THREAD_ID)
-    throw Error("Native publisher context required");
-  const [head, rawPath, branch, ...extra] = Bun.argv.slice(2);
-  if (!/^[a-f0-9]{40}$/.test(head ?? "") || !rawPath || !branch || extra.length)
-    throw Error("Use publish-review-artifact.ts <exact-head> <raw-native.json> <pushed-branch>");
+export async function nativeReviewPolicy(): Promise<ReviewArtifactPolicy> {
   let policy: ReviewArtifactPolicy = {
     repository: "park-kyungchan/agent-platform",
     publisher: { id: "241037670", login: "park-kyungchan", type: "User" },
@@ -54,6 +49,16 @@ async function publish() {
       },
     };
   }
+  return policy;
+}
+
+/** Native publisher only: preserve the actual reviewer bytes, upload once, verify, then attest. */
+export async function publishNativeReviewArtifact(head: string, rawPath: string) {
+  if (process.env.CI || process.env.GITHUB_ACTIONS)
+    throw Error("Native publisher context required");
+  if (!/^[a-f0-9]{40}$/.test(head) || !rawPath)
+    throw Error("Use publish-review-artifact.ts <exact-head> <raw-native.json>");
+  const policy = await nativeReviewPolicy();
   function gh(args: string[]) {
     const result = Bun.spawnSync(["gh", ...args], {
       stdin: "ignore",
@@ -122,7 +127,10 @@ async function publish() {
   console.log(JSON.stringify({ phase: "dispatch", requestId, headSha: head, retryAllowed: false }));
   await post(
     "actions/workflows/native-review-evidence.yml/dispatches",
-    { ref: branch, inputs: { head, request_id: requestId, raw_base64: bytes.toString("base64") } },
+    {
+      ref: reviewArtifactBranch,
+      inputs: { head, request_id: requestId, raw_base64: bytes.toString("base64") },
+    },
     204,
   );
   const deadline = Date.now() + 600_000;
@@ -163,7 +171,10 @@ async function publish() {
     json: async (path: string) =>
       path === `commits/${head}/statuses?per_page=100` ? [status] : reader.json(path),
   };
-  await validateReviewArtifact({ policy, head: head!, status }, preflight);
+  await validatePublishedReviewArtifact(
+    { policy, head: head!, status, rawBytes: bytes },
+    preflight,
+  );
   console.log(
     JSON.stringify({
       phase: "artifact-verified",
@@ -188,12 +199,18 @@ async function publish() {
     `commits/${head}/statuses?per_page=100`,
   )) as (typeof status)[];
   const latest = statuses.find((item) => item.context === "native-independent-review");
-  const result = await validateReviewArtifact({ policy, head: head!, status: latest }, reader);
+  const result = await validatePublishedReviewArtifact(
+    { policy, head: head!, status: latest, rawBytes: bytes },
+    reader,
+  );
   console.log(JSON.stringify({ phase: "published", requestId, ...result }));
 }
 if (import.meta.main) {
   try {
-    await publish();
+    const [head, rawPath, ...extra] = Bun.argv.slice(2);
+    if (!head || !rawPath || extra.length)
+      throw Error("Use publish-review-artifact.ts <exact-head> <raw-native.json>");
+    await publishNativeReviewArtifact(head, rawPath);
   } catch (error) {
     console.error(locatedError(error, "review_artifact_refused"));
     process.exitCode = 1;

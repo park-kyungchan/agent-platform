@@ -6,6 +6,7 @@ import {
   type NativeReviewIdentity,
 } from "./receipt-validator";
 
+export const reviewArtifactBranch = "main";
 export const reviewArtifactWorkflow = ".github/workflows/native-review-evidence.yml";
 export const reviewArtifactMember = "native-review.json";
 export const reviewArtifactMaximum = 45_000;
@@ -120,9 +121,9 @@ export async function validateReviewArtifact(
       Number(repo.id) > 0 &&
       headRepo.id === repo.id &&
       /^[a-f0-9]{40}$/.test(String(run.head_sha)) &&
-      typeof run.head_branch === "string" &&
+      run.head_branch === reviewArtifactBranch &&
       (run.path === reviewArtifactWorkflow ||
-        run.path === `${reviewArtifactWorkflow}@refs/heads/${run.head_branch}`),
+        run.path === `${reviewArtifactWorkflow}@refs/heads/${reviewArtifactBranch}`),
     "EXACT_REPOSITORY_WORKFLOW_REQUIRED",
   );
   const artifact = object(await json(`actions/artifacts/${target.artifactId}`)),
@@ -255,4 +256,15 @@ export function authenticatedReviewReader(repository: string, token: string): Re
       return body(download, 100_000);
     },
   };
+}
+
+/** The native publisher must compare transport bytes to its actual independent observation. */
+export async function validatePublishedReviewArtifact(
+  input: { policy: ReviewArtifactPolicy; head: string; status: unknown; rawBytes: Uint8Array },
+  reader: ReviewArtifactReader,
+) {
+  const nativeRawSha256 = sha256(input.rawBytes);
+  const result = await validateReviewArtifact(input, reader);
+  need(result.rawSha256 === nativeRawSha256, "ORIGINAL_NATIVE_BYTES_REQUIRED");
+  return result;
 }

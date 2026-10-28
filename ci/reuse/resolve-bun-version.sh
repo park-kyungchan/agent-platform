@@ -11,7 +11,7 @@ if [[ -n "$version_file" ]]; then
   version=$(cat -- "$GITHUB_WORKSPACE/$version_file")
 fi
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-  echo 'bun_version_required@ci/reuse/resolve-bun-version.sh:15' >&2
+  echo 'bun_version_required@ci/reuse/resolve-bun-version.sh:14' >&2
   exit 1
 }
 printf 'bun-version=%s\n' "$version" >> "$GITHUB_OUTPUT"

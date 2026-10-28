@@ -15,3 +15,12 @@ For Git-native common Work use the `@palantirkc/work-continuity/git-work` reader
 For substantial quality or efficiency improvement, use docs/constrained-improvement.md: predeclare the actual consumer target, useful goal, independent validation, allowed changes, bounded limits and next decision. Compare equivalent baseline/candidate exposure except for the declared treatment; use quality-preflight/quality-compare for criterion transitions and preserve the v1 improvement-* efficiency contract. Distinguish behavior gain from independently controlled defect-detection gain, regression, preserved quality and insufficient evidence. Keep missing measurements unknown. Preserve observations, evaluator results and accept/repair/defer/stop proposals separately from AcceptanceDecision. Routine tasks need no extra ceremony; native owners retain execution and activation.
 
 Automatic merge is prohibited. Publish independent exact-commit/tree review evidence and its authenticated status before opening a PR. The accountable Lead checks current findings, source and required checks, then explicitly merges the expected head. Review reuse requires identical reviewed tree, an explicit successor binding and current zero-unresolved-finding state. Each runtime Lead later verifies and explicitly activates the merged source; pulling main alone does not activate native configuration.
+
+## PR delivery
+
+1. Commit fresh native source-author metadata, push the exact head, and keep source/quality checks green.
+2. From this checkout run `bun ci/reuse/review-pr.ts <pushed-head> native-claude` for a fresh read-only Opus review and authenticated artifact status.
+3. Keep the unchanged raw output printed by the command; findings or transport/source drift stop publication.
+4. `native-muse --smoke` exercises mechanical source/session transport only and cannot qualify the review gate.
+5. Open the PR after review status passes; resolve current findings/threads and require source, quality and prospective-merge checks.
+6. The accountable Lead explicitly merges the reviewed expected head. Automatic merge, native activation and user Acceptance stay separate.

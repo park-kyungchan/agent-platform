@@ -38,6 +38,17 @@ test("shared action resolves one exact owner version from literal or .bun-versio
         stderr: "pipe",
       });
       expect((await child.exited) === 0).toBe(accepted);
+      if (!accepted) {
+        const stderr = await new Response(child.stderr).text();
+        const source = (
+          await readFile(join(import.meta.dir, "resolve-bun-version.sh"), "utf8")
+        ).split("\n");
+        const match = /^(bun_version_[a-z_]+)@ci\/reuse\/resolve-bun-version\.sh:([0-9]+)\n$/.exec(
+          stderr,
+        );
+        expect(match).not.toBeNull();
+        expect(source[Number(match![2]) - 1]).toContain(match![1] + "@");
+      }
       expect(await readFile(output, "utf8")).toBe(accepted ? "bun-version=1.4.3\n" : "");
     }
     await rm(file);

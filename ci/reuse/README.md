@@ -172,3 +172,20 @@ Native review remains separate from this action. The additive
 [artifact transport](../quality/review-artifacts.md) accepts unchanged externally
 produced native output under the fixed publisher's authenticated exact-head
 status. The source action cannot dispatch that workflow or post that status.
+
+## Native review and publication command
+
+From a clean caller checkout at its pushed PR head, use the reviewed common
+checkout's `ci/reuse/review-pr.ts <head> native-claude`. This one command verifies
+source-author provenance and pushed source, starts a fresh read-only native Opus
+session, preserves exact stdout/stderr, validates owner/source/independence and
+zero findings, then publishes the native artifact and exact-head status. It loads
+fixed caller policy from the reviewed consumer projection. No private work-state
+file or operations helper is required. The default-main workflow must exist first.
+
+Adapters are in `review-runtimes.ts`; they invoke installed native CLIs and never
+create provider clients or modify global models/configuration. `native-claude
+--smoke` and `native-muse --smoke` perform bounded mechanical transport checks
+through real native sessions; smoke output cannot publish the independent-review
+status. Muse currently has mechanical-only authorization. Extending judgment
+review to another runtime requires its own reviewed adapter and native policy.

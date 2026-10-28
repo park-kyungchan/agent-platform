@@ -2,11 +2,16 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "../..");
 const sourceFiles = new Set([
-  "run.ts",
-  "source-author.ts",
-  "source-author-cli.ts",
-  "publish-review-artifact.ts",
-  "located-error.ts",
+  "ci/reuse/run.ts",
+  "ci/reuse/source-author.ts",
+  "ci/reuse/source-author-cli.ts",
+  "ci/reuse/publish-review-artifact.ts",
+  "ci/reuse/review-pr.ts",
+  "ci/reuse/review-runtimes.ts",
+  "ci/reuse/located-error.ts",
+  "ci/quality/review-artifact.ts",
+  "ci/quality/artifact-archive.ts",
+  "ci/quality/receipt-validator.ts",
 ]);
 
 function sourceLocation(stack: string): string | undefined {
@@ -15,9 +20,9 @@ function sourceLocation(stack: string): string | undefined {
     const frame = line.match(/(?:\(|\s)((?:file:\/\/)?\/[^\n()]+\.ts):(\d{1,7}):\d+\)?$/);
     if (!frame || Number(frame[2]) < 1) continue;
     const path = frame[1].replace(/^file:\/\//, "");
-    const prefix = `${root}/ci/reuse/`;
+    const prefix = `${root}/`;
     if (path.startsWith(prefix) && sourceFiles.has(path.slice(prefix.length)))
-      return `ci/reuse/${path.slice(prefix.length)}:${frame[2]}`;
+      return `${path.slice(prefix.length)}:${frame[2]}`;
   }
 }
 

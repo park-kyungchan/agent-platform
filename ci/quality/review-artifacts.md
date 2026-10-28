@@ -37,12 +37,14 @@ identities, `conclusion: pass`, `unresolvedFindings: 0` and `findings: []`.
 The native parent keeps those bytes unchanged. AP's native publisher runs:
 
 ```sh
-bun --no-env-file ci/reuse/publish-review-artifact.ts <head> <raw.json> <pushed-branch>
+bun --no-env-file ci/reuse/publish-review-artifact.ts <head> <raw.json>
 ```
 
 The helper checks existing publisher authentication, committed source-author
 identity and actual GitHub source. It dispatches the evidence-only workflow,
-checks the successful external dispatch/run and exact raw artifact, then posts
+dispatches only the default main workflow, checks the successful external run
+and requires its artifact bytes to equal the native original before status
+publication and on final readback, then posts
 its authenticated status with the artifact's immutable ID and archive digest.
 No model runs in Actions and no CI token receives status or dispatch permission.
 Uncertain dispatch/publication is reconciled by the printed request/run/artifact

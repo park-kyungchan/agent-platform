@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test";
+import { ownerScopedReviewGate } from "./receipt-validation-gate";
 import { createHash } from "node:crypto";
 import {
   authenticatedReviewReader,
   validateReviewArtifact,
+  validatePublishedReviewArtifact,
   type ReviewArtifactReader,
 } from "./review-artifact";
 import { deriveReviewedSourceManifest } from "./receipt-validator";
@@ -40,23 +42,31 @@ function zip(text: string, name = "native-review.json") {
   end.writeUInt32LE(local.length + filename.length + data.length, 16);
   return Buffer.concat([local, filename, data, central, filename, end]);
 }
-function fixture() {
+function fixture(owner = false) {
   const head = "a".repeat(40),
     tree = "b".repeat(40),
     repository = "fixture/owner";
   const publisher = { id: "42", login: "native-publisher", type: "User" as const };
-  const binding = {
-    codeOwner: "agent-platform",
-    evidenceOwner: "codex-harness-engineering",
-    scope: "canonical-source-ci-quality",
-  };
+  const binding: Record<string, string> = owner
+    ? {
+        repository,
+        projectId: "fixture-owner",
+        domainId: "fixture-domain",
+        semanticOwner: "fixture-owner",
+        scope: "source-check",
+      }
+    : {
+        codeOwner: "agent-platform",
+        evidenceOwner: "codex-harness-engineering",
+        scope: "canonical-source-ci-quality",
+      };
   const treeResponse = {
     sha: tree,
     truncated: false,
     tree: [{ path: "source.ts", type: "blob", mode: "100644", sha: "c".repeat(40) }],
   };
   const raw = {
-    schema: "native-independent-review-output.v1",
+    schema: owner ? "owner-scoped-native-review-output.v1" : "native-independent-review-output.v1",
     reviewStatus: "complete",
     binding: { ...binding },
     headSha: head,
@@ -81,7 +91,7 @@ function fixture() {
     repository: repo,
     head_repository: { ...repo },
     head_sha: head,
-    head_branch: "candidate",
+    head_branch: "main",
     path: ".github/workflows/native-review-evidence.yml",
   };
   const artifact = {
@@ -189,6 +199,9 @@ test("artifact review rejects source, publisher, run and raw native identity sub
       f.run.path = "other.yml";
     },
     (f) => {
+      f.run.head_branch = "authored-branch";
+    },
+    (f) => {
       f.artifact.expired = true;
     },
     (f) => {
@@ -288,5 +301,60 @@ test("untrusted storage origins and redirect chains refuse before any credential
     }
   } finally {
     globalThis.fetch = original;
+  }
+});
+
+test("native publication refuses policy-valid substituted raw bytes before an authenticated status can be posted", async () => {
+  const f = fixture(),
+    original = Buffer.from(JSON.stringify(f.raw));
+  expect(
+    (await validatePublishedReviewArtifact({ ...f.input, rawBytes: original }, f.reader)).rawSha256,
+  ).toBe(hash(original));
+  f.raw.reviewer.taskId = "CI-fabricated-independent-id";
+  f.seal();
+  // The ordinary CI verifier sees a structurally valid proof; only the native original binds custody.
+  await expect(validateReviewArtifact(f.input, f.reader)).resolves.toHaveProperty("rawSha256");
+  await expect(
+    validatePublishedReviewArtifact({ ...f.input, rawBytes: original }, f.reader),
+  ).rejects.toThrow("ORIGINAL_NATIVE_BYTES_REQUIRED");
+});
+
+test("owner-scoped CI consumes the same artifact transport under its own fixed policy", async () => {
+  const f = fixture(true),
+    original = globalThis.fetch,
+    names = ["GITHUB_REPOSITORY", "REVIEW_HEAD_SHA", "GITHUB_TOKEN"] as const,
+    old = names.map((n) => process.env[n]);
+  process.env.GITHUB_REPOSITORY = f.input.policy.repository;
+  process.env.REVIEW_HEAD_SHA = f.head;
+  process.env.GITHUB_TOKEN = "fictional-token";
+  try {
+    globalThis.fetch = (async (url: string | URL | Request) => {
+      const target = new URL(String(url));
+      if (target.hostname === "fixture.blob.core.windows.net")
+        return new Response(Buffer.from(await f.reader.archive(22)));
+      const path =
+        target.pathname.slice(("/repos/" + f.input.policy.repository + "/").length) + target.search;
+      if (path === "actions/artifacts/22/zip")
+        return new Response(null, {
+          status: 302,
+          headers: { location: "https://fixture.blob.core.windows.net/archive" },
+        });
+      return new Response(JSON.stringify(await f.reader.json(path)), { status: 200 });
+    }) as unknown as typeof fetch;
+    await ownerScopedReviewGate({
+      repository: f.input.policy.repository,
+      projectId: "fixture-owner",
+      domainId: "fixture-domain",
+      semanticOwner: "fixture-owner",
+      scope: "source-check",
+      statusContext: "native-independent-review",
+      publisher: f.input.policy.publisher,
+    });
+  } finally {
+    globalThis.fetch = original;
+    names.forEach((name, i) => {
+      if (old[i] === undefined) delete process.env[name];
+      else process.env[name] = old[i];
+    });
   }
 });

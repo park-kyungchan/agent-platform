@@ -1,3 +1,4 @@
+import { reviewArtifactTarget } from "../quality/review-artifact";
 import { expect, test } from "bun:test";
 import { locatedError } from "./located-error";
 
@@ -36,4 +37,15 @@ test("the actual author CLI boundary reports its refusal location", async () => 
   expect(exitCode).toBe(1);
   expect(stdout).toBe("");
   expect(stderr.trim()).toMatch(/^source_author_refused@ci\/reuse\/source-author-cli\.ts:\d+$/);
+});
+
+test("native publisher diagnostics retain actual admitted quality throw sites", () => {
+  try {
+    reviewArtifactTarget("https://foreign.invalid/", "fixture/owner");
+    throw Error("expected refusal");
+  } catch (error) {
+    expect(locatedError(error, "review_artifact_refused")).toMatch(
+      /^review_artifact_refused@ci\/quality\/review-artifact\.ts:[1-9][0-9]*$/,
+    );
+  }
 });
