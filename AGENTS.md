@@ -19,7 +19,7 @@ Automatic merge is prohibited. Publish independent exact-commit/tree review evid
 ## PR delivery
 
 1. Commit fresh native source-author metadata, push the exact head, and keep source/quality checks green.
-2. From this checkout run `bun ci/reuse/review-pr.ts <pushed-head> native-claude` for a fresh read-only Opus review and authenticated artifact status.
+2. From this checkout run `bun ci/reuse/review-pr.ts <pushed-head> <reviewer-runtime>` for a fresh read-only review and authenticated artifact status; the current user-approved temporary reviewer is `native-codex` (gpt-6.1-sol/high).
 3. Keep the unchanged raw output printed by the command; findings or transport/source drift stop publication.
 4. A second native caller may run the same command with `--check`; it verifies existing proof and issues no independent judgment.
 5. Open the PR after review status passes; resolve current findings/threads and require source, quality and prospective-merge checks.

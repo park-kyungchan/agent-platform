@@ -10,7 +10,7 @@ import {
 } from "../quality/review-artifact";
 import { nativeReviewPolicy, publishNativeReviewArtifact } from "./publish-review-artifact";
 import { verifyCommittedSourceAuthor } from "./source-author";
-import { reviewerInvocation } from "./review-runtimes";
+import { reviewerInvocation, codexReviewThread } from "./review-runtimes";
 import { locatedError } from "./located-error";
 
 /** One native command: exact pushed PR head -> fresh independent native output -> verified status. */
@@ -84,12 +84,13 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
     console.log(JSON.stringify({ phase: "verified-existing-native-review", ...result }));
     return;
   }
-  const sessionId = randomUUID(),
-    command = reviewerInvocation(runtime, sessionId, smoke);
-  if (!Bun.which(command[0]!)) throw Error("Requested native reviewer CLI is not installed");
-  if (!smoke && runtime === author.metadata.author.runtime)
-    throw Error("Choose an independent reviewer runtime family");
+  const sessionId = randomUUID();
   const directory = await mkdtemp(join(tmpdir(), `native-review-${head.slice(0, 9)}-`));
+  const rawPath = join(directory, "native.raw.json"),
+    eventsPath = join(directory, "native.events.jsonl"),
+    stderrPath = join(directory, "native.stderr.log");
+  const command = reviewerInvocation(runtime, sessionId, smoke, rawPath);
+  if (!Bun.which(command[0]!)) throw Error("Requested native reviewer CLI is not installed");
   const proof = {
     schema: smoke ? "native-review-smoke.v1" : "native-independent-review-output.v1",
     reviewStatus: "complete",
@@ -97,7 +98,10 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
     headSha: head,
     reviewedTreeSha: tree,
     reviewedSourceManifestSha256: manifest.sha256,
-    reviewer: { runtime, taskId: sessionId },
+    reviewer: {
+      runtime,
+      taskId: runtime === "native-codex" ? "OBSERVE_CODEX_THREAD_ID" : sessionId,
+    },
     author: {
       runtime: author.metadata.author.runtime,
       taskId: author.metadata.author.threadId ?? author.metadata.author.sessionId,
@@ -107,11 +111,9 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
     findings: [],
   };
   const prompt = smoke
-    ? `Mechanical transport smoke only. Do not inspect files, run tools, perform source review or claim Acceptance. Return ONLY this JSON object, unchanged in meaning and without markdown. This record is ineligible for native-independent-review status.\n${JSON.stringify(proof, null, 2)}\n`
-    : `You are a fresh independent native source reviewer. Read-only: no edits, writes, ref/index/config changes, publication, subagents or private user-data reads. Read AGENTS.md and review the exact pushed head ${head}, tree ${tree}, against the target-main merge base ${reviewBase} in ${root}. Review the entire PR diff ${reviewBase}..${head}, not only the last commit. Read immutable committed bytes with git show ${head}:path. Inspect all public technical changes and actionable correctness/security/regression/scope defects. Never read private student/class-record bodies or print private path names; private custody changes are metadata-only. CI cannot mint independent native review. Raw native output, source/publisher/run/artifact/digest/latest-status joins must be exact. Do not assume checks passed or native activation/Acceptance occurred. Return ONLY valid JSON without fences with the following exact proof fields. If findings remain, set conclusion fail and the exact unresolved count, with severity/path/line/explanation/suggestedFix per finding. Otherwise pass/zero/empty findings.\n${JSON.stringify(proof, null, 2)}\n`;
-  const promptPath = join(directory, "prompt.txt"),
-    rawPath = join(directory, "native.raw.json"),
-    stderrPath = join(directory, "native.stderr.log");
+    ? `Mechanical transport smoke only. Do not inspect files, run tools, perform source review or claim Acceptance. Return ONLY this JSON object, unchanged in meaning and without markdown. For native-codex, replace OBSERVE_CODEX_THREAD_ID with your actual native CODEX_THREAD_ID observed in a read-only tool call. This record is ineligible for native-independent-review status.\n${JSON.stringify(proof, null, 2)}\n`
+    : `You are a fresh independent native source reviewer. Read-only: no edits, writes, ref/index/config changes, publication, subagents or private user-data reads. Read AGENTS.md and review the exact pushed head ${head}, tree ${tree}, against the target-main merge base ${reviewBase} in ${root}. Review the entire PR diff ${reviewBase}..${head}, not only the last commit. Read immutable committed bytes with git show ${head}:path. Inspect all public technical changes and actionable correctness/security/regression/scope defects. Never read private student/class-record bodies or print private path names; private custody changes are metadata-only. CI cannot mint independent native review. Raw native output, source/publisher/run/artifact/digest/latest-status joins must be exact. Do not assume checks passed or native activation/Acceptance occurred. For native-codex, read your actual CODEX_THREAD_ID from your native tool environment and replace OBSERVE_CODEX_THREAD_ID; never copy the author or invocation ID. Return ONLY valid JSON without fences with the following exact proof fields. If findings remain, set conclusion fail and the exact unresolved count, with severity/path/line/explanation/suggestedFix per finding. Otherwise pass/zero/empty findings.\n${JSON.stringify(proof, null, 2)}\n`;
+  const promptPath = join(directory, "prompt.txt");
   await writeFile(promptPath, prompt, { mode: 0o600 });
   // Muse takes a positional prompt; Claude's print mode reads stdin. Both use an actual native session UUID.
   const argv = runtime === "native-muse" ? [...command, "--prompt-file", promptPath] : command;
@@ -120,7 +122,9 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
       phase: smoke ? "native-smoke" : "native-review",
       headSha: head,
       reviewerRuntime: runtime,
-      reviewerSessionId: sessionId,
+      reviewerSessionId: runtime === "native-codex" ? null : sessionId,
+      invocationId: sessionId,
+      ...(runtime === "native-codex" ? { eventsPath } : {}),
       rawPath,
       stderrPath,
     }),
@@ -132,7 +136,7 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
     stderr: "pipe",
   });
   const [, , exit] = await Promise.all([
-    Bun.write(rawPath, child.stdout),
+    Bun.write(runtime === "native-codex" ? eventsPath : rawPath, child.stdout),
     Bun.write(stderrPath, child.stderr),
     child.exited,
   ]);
@@ -144,6 +148,28 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
   )
     throw Error("Source changed during native review; no status published");
   const raw = await readFile(rawPath);
+  if (runtime === "native-codex") {
+    const actualThread = codexReviewThread(await readFile(eventsPath));
+    const observed = JSON.parse(raw.toString());
+    if (
+      observed.reviewer?.runtime !== runtime ||
+      observed.reviewer?.taskId !== actualThread ||
+      actualThread === (author.metadata.author.threadId ?? author.metadata.author.sessionId)
+    )
+      throw Error("Actual native Codex reviewer identity differs or repeats author");
+    proof.reviewer.taskId = actualThread;
+    console.log(
+      JSON.stringify({
+        phase: "native-identity-bound",
+        headSha: head,
+        reviewerRuntime: runtime,
+        reviewerSessionId: actualThread,
+        rawPath,
+        eventsPath,
+        stderrPath,
+      }),
+    );
+  }
   if (smoke) {
     const result = JSON.parse(raw.toString());
     if (JSON.stringify(result) !== JSON.stringify(proof))
@@ -153,7 +179,7 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
         phase: "smoke-pass",
         headSha: head,
         reviewerRuntime: runtime,
-        reviewerSessionId: sessionId,
+        reviewerSessionId: proof.reviewer.taskId,
         rawPath,
         rawSha256: createHash("sha256").update(raw).digest("hex"),
         reviewStatusEligible: false,

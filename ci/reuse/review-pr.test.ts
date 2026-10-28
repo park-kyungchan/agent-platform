@@ -1,3 +1,4 @@
+import { codexReviewThread } from "./review-runtimes";
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 
@@ -80,4 +81,20 @@ test("consumer policy discovery reads fixed JSON in both current layouts and nev
       await rm(root, { recursive: true, force: true });
     }
   }
+});
+
+test("native Codex review identity must come from exactly one real thread event", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  const event = JSON.stringify({ type: "thread.started", thread_id: id }) + "\n";
+  expect(
+    codexReviewThread(Buffer.from(event + JSON.stringify({ type: "turn.completed" }) + "\n")),
+  ).toBe(id);
+  for (const text of [
+    "",
+    JSON.stringify({ type: "thread.started", thread_id: "logical-task" }) + "\n",
+    event + event,
+    JSON.stringify({ type: "turn.completed" }) + "\n",
+    event + "not-json\n",
+  ])
+    expect(() => codexReviewThread(Buffer.from(text))).toThrow();
 });

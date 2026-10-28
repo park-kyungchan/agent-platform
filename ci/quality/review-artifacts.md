@@ -14,7 +14,9 @@ Validation: valid externally produced zero-finding raw output must pass; wrong
 source, author/reviewer identity, publisher, run, attempt, repository, workflow,
 artifact, digest, archive member, current hold and changed latest status must
 refuse. Existing receipt controls continue to pass. Focused tests and complete
-source/quality checks precede a fresh read-only Claude Opus exact-head review.
+source/quality checks precede a fresh read-only native exact-head review under the user-approved reviewer policy.
+The 2026-10-28 temporary user direction admits gpt-6.1-sol/high with distinct
+native author/reviewer threads; it changes no active/global model settings.
 Hosted transport must be observed before claiming operational completion.
 
 Allowed treatment: CI review transport, source policy/tests/projections, shared

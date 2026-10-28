@@ -195,3 +195,11 @@ same source/owner/reviewer bindings and validates the existing exact artifact an
 authenticated status without issuing a new judgment or republishing. A mechanical
 caller such as Muse may invoke this path with reviewer `native-claude`; the
 independent source judgment still belongs to the actual Opus session.
+
+The user's temporary 2026-10-28 direction also admits `native-codex`, invoking
+`gpt-6.1-sol` with high reasoning and per-run bypass flags in a fresh ephemeral
+native session. No global model, config or credentials change. The command keeps
+JSONL events, final native message and stderr unchanged, and joins the final
+reviewer ID to the actual `thread.started` event. Author and reviewer IDs must be
+distinct; same-family review is admitted only under the user's current direction.
+Use `native-claude` again when the user replaces the temporary reviewer.
