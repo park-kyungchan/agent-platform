@@ -742,6 +742,7 @@ async function nativeCase(scenario = "pass", predecessor = false) {
   let posts = 0,
     launches = 0,
     revoked = false;
+  const pendingFences: unknown[] = [];
   const states: Record<string, unknown>[] = [
     {
       id: 1,
@@ -933,7 +934,8 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     bindCompletedCodexReview,
     ProcessOutputCapture,
     async () => mergeAssignment,
-    async () => {
+    async (...args: unknown[]) => {
+      pendingFences.push(args[4]);
       if (scenario === "merge-parent-held" && launches) throw Error("FULL_PARENT_HELD");
       return mergeAssignment;
     },
@@ -946,6 +948,7 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     context,
     id,
     states,
+    pendingFences,
     get posts() {
       return posts;
     },
@@ -976,6 +979,18 @@ test("MERGE-CORRESPONDENCE actual native invocation retains its opaque prepared 
   ).toBe("merge-correspondence");
   expect(h.launches).toBe(1);
   expect(h.posts).toBe(1);
+});
+
+test("CURRENTNESS native bounded checks carry the exact pending-head anchor through actual invocation", async () => {
+  const h = await nativeCase("merge-pass"),
+    assignment = await h.api.prepareMergeCorrespondenceAssignment(h.context),
+    attempt = await h.api.beginNativeReviewAttempt(h.context, h.id, assignment);
+  await h.api.invokeNativeReview(h.context, attempt, "native-codex");
+  expect(
+    h.pendingFences.slice(-2).map((value) => (value as { id?: number } | undefined)?.id),
+  ).toEqual([101, 101]);
+  expect(h.posts).toBe(1);
+  expect(h.launches).toBe(1);
 });
 
 test("MERGE-CORRESPONDENCE caller JSON cannot mint an assignment or start pending", async () => {

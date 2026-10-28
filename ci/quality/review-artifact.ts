@@ -28,6 +28,28 @@ export interface ReviewArtifactPolicy {
   publisher: { id: string; login: string; type: "User" | "Bot" };
   binding: Record<string, string>;
 }
+type ArtifactResult = {
+  schema: "native-independent-review-artifact-ci.v1";
+  headSha: string;
+  reviewedTreeSha: string;
+  manifest: ReturnType<typeof deriveReviewedSourceManifest>;
+  artifact: ReturnType<typeof reviewArtifactTarget>;
+  rawSha256: string;
+  reviewer: NativeReviewIdentity;
+  author: NativeReviewIdentity;
+  reviewAssignment?: MergeCorrespondenceAssignment;
+  publisherAuthenticated: true;
+  nativeAuthenticationEstablished: false;
+  nativePermissionGranted: false;
+  acceptanceEstablished: false;
+};
+type FullParentEvidence = {
+  head: string;
+  review: MergeCorrespondenceAssignment["parentReview"];
+  status: Record<string, unknown>;
+  proof: Record<string, unknown>;
+  kind: "artifact" | "legacy";
+};
 const object = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 const sha256 = (v: Uint8Array) => createHash("sha256").update(v).digest("hex");
@@ -210,8 +232,14 @@ export function validateLegacyReviewAttempt(
 export async function validateReviewArtifact(
   input: { policy: ReviewArtifactPolicy; head: string; status: unknown },
   reader: ReviewArtifactReader,
-  fullParentOnly = false,
 ) {
+  return (await consumeReviewArtifact(input, reader)).result;
+}
+async function consumeReviewArtifact(
+  input: { policy: ReviewArtifactPolicy; head: string; status: unknown },
+  reader: ReviewArtifactReader,
+  fullParentOnly = false,
+): Promise<{ result: ArtifactResult; raw: Record<string, unknown> }> {
   // Snapshot every policy/reader before an untrusted callback can yield.
   const policy = structuredClone(input.policy),
     head = input.head,
@@ -289,27 +317,39 @@ export async function validateReviewArtifact(
     candidate,
     Object.hasOwn(policy.binding, "codeOwner"),
   );
-  if (assignment)
-    await validateMergeCorrespondenceAssignment(policy, head, assignment, { json, archive });
   const commit = object(await json(`git/commits/${head}`)),
     tree = object(commit.tree).sha;
   need(commit.sha === head && typeof tree === "string", "EXACT_SOURCE_COMMIT_REQUIRED");
   const manifest = deriveReviewedSourceManifest(await json(`git/trees/${tree}?recursive=1`), tree);
   const raw = validateRawReviewArtifact(bytes, policy, head, tree, manifest.sha256);
-  const latest = await json(`commits/${head}/statuses?per_page=100`);
-  need(
-    Array.isArray(latest) &&
-      latest.length <= 100 &&
-      same(
-        latest.find((s) => object(s).context === "native-independent-review"),
-        status,
-      ),
-    "LATEST_STATUS_CHANGED",
-  );
-  validateArtifactAttempt(latest as unknown[], status, raw, policy, head);
-  if (assignment)
-    await validateMergeCorrespondenceAssignment(policy, head, assignment, { json, archive });
-  return {
+  if (assignment) {
+    const consumed = await consumeMergeCorrespondenceEvidence(policy, head, { json, archive });
+    need(
+      sameMergeCorrespondenceAssignment(assignment, consumed.assignment),
+      "MERGE_ASSIGNMENT_SUPERSEDED_OR_SUBSTITUTED",
+    );
+    await checkConsumedMergeEvidence(
+      policy,
+      head,
+      consumed.parent,
+      { json, archive },
+      { status, raw },
+    );
+  } else {
+    // Preserve the existing FULL transport and its single-head attempt fence.
+    const latest = await json(`commits/${head}/statuses?per_page=100`);
+    need(
+      Array.isArray(latest) &&
+        latest.length <= 100 &&
+        same(
+          latest.find((s) => object(s).context === "native-independent-review"),
+          status,
+        ),
+      "LATEST_STATUS_CHANGED",
+    );
+    validateArtifactAttempt(latest as unknown[], status, raw, policy, head);
+  }
+  const result: ArtifactResult = {
     schema: "native-independent-review-artifact-ci.v1",
     headSha: head,
     reviewedTreeSha: tree,
@@ -324,6 +364,7 @@ export async function validateReviewArtifact(
     nativePermissionGranted: false,
     acceptanceEstablished: false,
   };
+  return { result, raw };
 }
 
 /** Read the CURRENT authenticated FULL proof through the existing authority validators. */
@@ -332,7 +373,7 @@ async function currentFullParentProof(
   head: string,
   tree: string,
   reader: ReviewArtifactReader,
-): Promise<MergeCorrespondenceAssignment["parentReview"]> {
+): Promise<FullParentEvidence> {
   const json = reader.json.bind(reader),
     archive = reader.archive.bind(reader);
   async function currentStatus() {
@@ -350,17 +391,19 @@ async function currentFullParentProof(
     return status;
   }
   const before = await currentStatus();
-  let proofSha256: string;
+  let proofSha256: string, fullProof: Record<string, unknown>, kind: "artifact" | "legacy";
   if (
     String(before.target_url).startsWith(`https://github.com/${policy.repository}/actions/runs/`)
   ) {
-    const result = await validateReviewArtifact(
+    const consumed = await consumeReviewArtifact(
       { policy, head, status: before },
       { json, archive },
       true,
     );
-    need(result.reviewedTreeSha === tree, "FULL_PARENT_TREE_CHANGED");
-    proofSha256 = result.rawSha256;
+    need(consumed.result.reviewedTreeSha === tree, "FULL_PARENT_TREE_CHANGED");
+    proofSha256 = consumed.result.rawSha256;
+    fullProof = consumed.raw;
+    kind = "artifact";
   } else {
     const prefix = `https://github.com/${policy.repository}/blob/`,
       path = `native-reviews/${head}.json`,
@@ -432,13 +475,21 @@ async function currentFullParentProof(
       );
     }
     proofSha256 = sha256(bytes);
+    fullProof = proof;
+    kind = "legacy";
   }
   need(same(before, await currentStatus()), "FULL_PARENT_STATUS_CHANGED");
-  return Object.freeze({
-    statusId: Number(before.id),
-    targetUrl: String(before.target_url),
-    proofSha256,
-  });
+  return {
+    head,
+    status: before,
+    proof: fullProof,
+    kind,
+    review: Object.freeze({
+      statusId: Number(before.id),
+      targetUrl: String(before.target_url),
+      proofSha256,
+    }),
+  };
 }
 
 /** No caller-supplied boolean or scope declaration can admit a merge. */
@@ -447,6 +498,20 @@ export async function deriveMergeCorrespondenceAssignment(
   head: string,
   inputReader: ReviewArtifactReader,
 ): Promise<MergeCorrespondenceAssignment> {
+  const policy = structuredClone(inputPolicy),
+    reader = {
+      json: inputReader.json.bind(inputReader),
+      archive: inputReader.archive.bind(inputReader),
+    };
+  const consumed = await consumeMergeCorrespondenceEvidence(policy, head, reader);
+  await checkConsumedMergeEvidence(policy, head, consumed.parent, reader);
+  return consumed.assignment;
+}
+async function consumeMergeCorrespondenceEvidence(
+  inputPolicy: ReviewArtifactPolicy,
+  head: string,
+  inputReader: ReviewArtifactReader,
+) {
   const policy = structuredClone(inputPolicy),
     jsonRead = inputReader.json.bind(inputReader),
     archive = inputReader.archive.bind(inputReader),
@@ -485,14 +550,14 @@ export async function deriveMergeCorrespondenceAssignment(
   }
   const before = await protectedMerge(),
     parentHead = before.orderedParents[1],
-    parentReview = await currentFullParentProof(policy, parentHead, before.tree, { json, archive });
-  need(same(before, await protectedMerge()), "PROTECTED_MERGE_CHANGED_DURING_PROOF");
-  return parseMergeCorrespondenceAssignment({
+    parent = await currentFullParentProof(policy, parentHead, before.tree, { json, archive });
+  const assignment = parseMergeCorrespondenceAssignment({
     schema: "native-review-merge-correspondence.v1",
     kind: "merge-correspondence",
     orderedParents: before.orderedParents,
-    parentReview,
+    parentReview: parent.review,
   });
+  return { assignment, parent };
 }
 
 export async function validateMergeCorrespondenceAssignment(
@@ -500,14 +565,91 @@ export async function validateMergeCorrespondenceAssignment(
   head: string,
   value: unknown,
   reader: ReviewArtifactReader,
+  pendingStatus?: unknown,
 ): Promise<MergeCorrespondenceAssignment> {
+  policy = structuredClone(policy);
+  reader = { json: reader.json.bind(reader), archive: reader.archive.bind(reader) };
+  const pending = pendingStatus === undefined ? undefined : structuredClone(object(pendingStatus));
   const assignment = parseMergeCorrespondenceAssignment(value),
-    current = await deriveMergeCorrespondenceAssignment(policy, head, reader);
+    consumed = await consumeMergeCorrespondenceEvidence(policy, head, reader);
   need(
-    sameMergeCorrespondenceAssignment(assignment, current),
+    sameMergeCorrespondenceAssignment(assignment, consumed.assignment),
     "MERGE_ASSIGNMENT_SUPERSEDED_OR_SUBSTITUTED",
   );
+  await checkConsumedMergeEvidence(
+    policy,
+    head,
+    consumed.parent,
+    reader,
+    pending ? { status: pending } : undefined,
+  );
   return assignment;
+}
+
+/** USER contract: T0 starts this ONE short REST batch after proof consumption.
+ * Append-only attempt anchors bound T0 currentness. This is not a transactional
+ * or simultaneous return-time snapshot. Observed later changes still refuse.
+ * No proof/source reads or untrusted awaits follow the batch before return.
+ */
+async function checkConsumedMergeEvidence(
+  policy: ReviewArtifactPolicy,
+  head: string,
+  parent: FullParentEvidence,
+  reader: ReviewArtifactReader,
+  headAnchor?: { status: Record<string, unknown>; raw?: Record<string, unknown> },
+): Promise<void> {
+  const read = reader.json.bind(reader),
+    json = async (path: string) => structuredClone(await read(path));
+  // T0: all immutable evidence has been consumed; dispatch the exact three reads.
+  const [mainValue, headValue, parentValue] = await Promise.all([
+    json("branches/main"),
+    json(`commits/${head}/statuses?per_page=100`),
+    json(`commits/${parent.head}/statuses?per_page=100`),
+  ]);
+  const main = object(mainValue);
+  need(
+    main.name === "main" && main.protected === true && object(main.commit).sha === head,
+    "CONSUMED_PROTECTED_MAIN_CHANGED",
+  );
+  need(
+    Array.isArray(headValue) &&
+      headValue.length <= 100 &&
+      Array.isArray(parentValue) &&
+      parentValue.length <= 100,
+    "CONSUMED_STATUS_HISTORY_REQUIRED",
+  );
+  const parentStatus = object(
+    parentValue.find((s) => object(s).context === "native-independent-review"),
+  );
+  need(
+    same(parentStatus, parent.status) && publisher(parentStatus.creator, policy.publisher),
+    "CONSUMED_FULL_PARENT_STATUS_CHANGED",
+  );
+  if (parent.kind === "artifact")
+    validateArtifactAttempt(parentValue, parent.status, parent.proof, policy, parent.head);
+  else
+    validateLegacyReviewAttempt(
+      policy,
+      parent.head,
+      parentValue,
+      { id: parent.status.id, target_url: parent.status.target_url },
+      parent.proof,
+    );
+  if (headAnchor) {
+    const latest = object(headValue.find((s) => object(s).context === "native-independent-review"));
+    need(
+      same(latest, headAnchor.status) && publisher(latest.creator, policy.publisher),
+      "CONSUMED_HEAD_STATUS_CHANGED",
+    );
+    if (headAnchor.raw)
+      validateArtifactAttempt(headValue, headAnchor.status, headAnchor.raw, policy, head);
+    else
+      need(
+        latest.state === "pending" &&
+          latest.target_url === reviewAttemptTarget(policy.repository, head),
+        "CONSUMED_HEAD_PENDING_REQUIRED",
+      );
+  }
 }
 
 /** The bearer goes only to api.github.com; signed storage redirects are fetched without it. */

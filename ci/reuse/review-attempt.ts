@@ -63,14 +63,21 @@ export async function prepareMergeCorrespondenceAssignment(
 async function currentAssignment(
   context: TrustedReviewContext,
   handle?: PreparedMergeCorrespondenceAssignment,
+  pendingStatus?: Status,
 ) {
   if (!handle) return undefined;
   const stored = assignments.get(handle);
   need(stored && stored.context === context, "OPAQUE_MERGE_ASSIGNMENT_REQUIRED");
-  await validateMergeCorrespondenceAssignment(context.policy, context.head, stored.value, {
-    json: context.readApi,
-    archive: context.archive,
-  });
+  await validateMergeCorrespondenceAssignment(
+    context.policy,
+    context.head,
+    stored.value,
+    {
+      json: context.readApi,
+      archive: context.archive,
+    },
+    pendingStatus,
+  );
   return stored.value;
 }
 const attempts = new WeakSet<object>();
@@ -324,7 +331,7 @@ async function runNativeReview(
     await requireCurrentReviewAttempt(context, attempt);
   }
   await context.revalidate();
-  const assignment = await currentAssignment(context, attempt?.assignment);
+  const assignment = await currentAssignment(context, attempt?.assignment, attempt?.pending);
   const { head, sourceRoot: root, policy, author } = context,
     { tree, manifest } = nativeReviewSource(context);
   const repository = policy.repository,
@@ -503,7 +510,7 @@ async function runNativeReview(
       ),
       "INVOKE_OWNED_MERGE_ASSIGNMENT_REQUIRED",
     );
-    await currentAssignment(context, attempt.assignment);
+    await currentAssignment(context, attempt.assignment, attempt.pending);
   } else requireFullReviewAssignment(observation);
   need(
     observation.nativeReviewPendingStatusId === attempt.pending.id &&

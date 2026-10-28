@@ -67,9 +67,14 @@ export async function publishNativeReviewArtifact(
   const raw = validateRawReviewArtifact(bytes, policy, head!, commit.tree.sha, manifest.sha256);
   async function currentAssignment() {
     if (raw.reviewAssignment)
-      await validateMergeCorrespondenceAssignment(policy, head, raw.reviewAssignment, reader);
+      await validateMergeCorrespondenceAssignment(
+        policy,
+        head,
+        raw.reviewAssignment,
+        reader,
+        attempt.pending,
+      );
   }
-  await currentAssignment();
   const authorBytes = decodeBoundedReviewFile(
     await reader.json(`contents/.github/source-author.json?ref=${head}`),
     ".github/source-author.json",

@@ -456,6 +456,84 @@ test("MERGE-CORRESPONDENCE absent parent proof cannot be consumed as a full revi
   await expect(validateReviewArtifact(f.input, f.reader)).rejects.toThrow();
 });
 
+for (const mode of ["platform-legacy", "platform-artifact", "owner-artifact"] as const)
+  test(
+    "CURRENTNESS T0 consumed-evidence contract rejects every pre-check authority invalidation " +
+      mode,
+    async () => {
+      const fixture = () =>
+        mode === "platform-legacy"
+          ? mergeCorrespondenceFixture()
+          : withArtifactParent(mergeCorrespondenceFixture(mode === "owner-artifact"));
+      const baseline = fixture(),
+        boundaries: string[] = [],
+        baselineJson = baseline.reader.json.bind(baseline.reader),
+        baselineArchive = baseline.reader.archive.bind(baseline.reader);
+      await validateReviewArtifact(baseline.input, {
+        json: async (path) => {
+          boundaries.push("json:" + path);
+          return baselineJson(path);
+        },
+        archive: async (id) => {
+          boundaries.push("archive:" + id);
+          return baselineArchive(id);
+        },
+      });
+      // USER contract: T0 starts ONE final REST batch after proof consumption.
+      // There is no claim of transactional or simultaneous return-time currentness.
+      // The old 312-case return-time sweep remains failed immutable evidence.
+      const terminal = [
+        "json:branches/main",
+        `json:commits/${baseline.head}/statuses?per_page=100`,
+        `json:commits/${baseline.assignment.orderedParents[1]}/statuses?per_page=100`,
+      ];
+      const terminalPresent = JSON.stringify(boundaries.slice(-3)) === JSON.stringify(terminal);
+      const proofBoundaries = terminalPresent ? boundaries.slice(0, -3) : boundaries;
+      const failures: { anchor: string; ordinal: number; boundary: string }[] = [];
+      let cases = 0;
+      for (const anchor of ["head-status", "parent-status", "protected-main"] as const)
+        for (let selected = 0; selected < proofBoundaries.length; selected++) {
+          const f = fixture(),
+            json = f.reader.json.bind(f.reader),
+            archive = f.reader.archive.bind(f.reader);
+          let ordinal = 0,
+            injected = false;
+          const before = () => {
+            if (ordinal++ !== selected) return;
+            injected = true;
+            if (anchor === "head-status")
+              f.setStatuses([{ ...f.pending, id: 34 }, f.status, f.pending]);
+            if (anchor === "parent-status") f.parentStatus.state = "pending";
+            if (anchor === "protected-main") f.state.protected = false;
+          };
+          try {
+            await validateReviewArtifact(f.input, {
+              json: async (path) => {
+                before();
+                return json(path);
+              },
+              archive: async (id) => {
+                before();
+                return archive(id);
+              },
+            });
+            failures.push({ anchor, ordinal: selected, boundary: boundaries[selected]! });
+          } catch {
+            expect(injected).toBe(true);
+          }
+          cases++;
+        }
+      expect(cases).toBeGreaterThan(30);
+      expect(failures).toEqual([]);
+      expect(boundaries.slice(-3)).toEqual(terminal);
+      const parentProofRead =
+        mode === "platform-legacy"
+          ? `json:contents/native-review-results/${baseline.assignment.orderedParents[1]}.json?ref=${"1".repeat(40)}`
+          : "archive:25";
+      expect(boundaries.filter((path) => path === parentProofRead)).toHaveLength(1);
+    },
+  );
+
 test("MERGE-CORRESPONDENCE foreign parent predecessor witness uses an independent main publisher object", async () => {
   const prior = Bun.spawnSync(
     ["git", "show", "c49f75c6d912aa7662344575a7109a67950b285d:ci/quality/review-artifact.ts"],
@@ -511,6 +589,120 @@ test("MERGE-CORRESPONDENCE bounded schema is rejected by the actual old full con
     "NATIVE_RAW_OUTPUT_REQUIRED",
   );
   expect((await validateReviewArtifact(f.input, f.reader)).headSha).toBe(f.head);
+});
+
+test("CURRENTNESS actual bounded publisher fences its pending head immediately before each existing effect", async () => {
+  const { readFile } = await import("node:fs/promises"),
+    { decodeBoundedReviewFile } = await import("./receipt-validator"),
+    { validateRawReviewArtifact } = await import("./review-artifact");
+  const source = await readFile(
+      new URL("../reuse/publish-review-artifact.ts", import.meta.url),
+      "utf8",
+    ),
+    body = new Bun.Transpiler({ loader: "ts" }).transformSync(
+      source
+        .slice(
+          source.indexOf("export async function publishNativeReviewArtifact("),
+          source.indexOf("\nif (import.meta.main)"),
+        )
+        .replace("export async function", "async function"),
+    );
+  const f = mergeCorrespondenceFixture(),
+    effects: string[] = [],
+    rawBytes = Buffer.from(JSON.stringify(f.raw)),
+    context = { head: f.head, policy: f.input.policy, revalidate: async () => {} },
+    attempt = { id: "00000000-0000-4000-8000-000000000001", pending: f.pending, context };
+  f.setStatuses([f.pending]);
+  const reader = {
+    archive: f.reader.archive,
+    json: async (path: string): Promise<unknown> => {
+      if (path === "actions/workflows/native-review-evidence.yml")
+        return { path: ".github/workflows/native-review-evidence.yml", state: "active" };
+      if (path.startsWith("actions/workflows/native-review-evidence.yml/runs?"))
+        return { workflow_runs: [f.run] };
+      if (path === "actions/runs/11/artifacts?per_page=100") return { artifacts: [f.artifact] };
+      if (path.startsWith("contents/.github/source-author.json?")) {
+        const bytes = Buffer.from(
+          JSON.stringify({
+            author: { runtime: f.raw.author.runtime, threadId: f.raw.author.taskId },
+          }),
+        );
+        return {
+          type: "file",
+          path: ".github/source-author.json",
+          encoding: "base64",
+          size: bytes.length,
+          content: bytes.toString("base64"),
+        };
+      }
+      return f.reader.json(path);
+    },
+  };
+  const fakeFetch = async (url: string, options: RequestInit) => {
+    if (url.endsWith("/dispatches")) {
+      effects.push("dispatch");
+      return new Response(null, { status: 204 });
+    }
+    effects.push("status");
+    const success = { ...f.status, ...JSON.parse(String(options.body)), id: 35 };
+    f.setStatuses([success, f.pending]);
+    return new Response(JSON.stringify(success), { status: 201 });
+  };
+  const publish = new Function(
+    "Bun",
+    "process",
+    "console",
+    "fetch",
+    "requireTrustedReviewContext",
+    "requireNativeReviewAttempt",
+    "readCompletedNativeObservation",
+    "requireCurrentReviewAttempt",
+    "authenticatedReviewReader",
+    "deriveReviewedSourceManifest",
+    "validateRawReviewArtifact",
+    "decodeBoundedReviewFile",
+    "reviewArtifactWorkflow",
+    "reviewArtifactBranch",
+    "validatePublishedReviewArtifact",
+    "validateMergeCorrespondenceAssignment",
+    body + "\nreturn publishNativeReviewArtifact;",
+  )(
+    {
+      spawnSync: (args: string[]) => ({
+        exitCode: 0,
+        stdout: Buffer.from(
+          args.includes("user") ? JSON.stringify(f.status.creator) : "synthetic-token",
+        ),
+      }),
+    },
+    { env: {} },
+    { log: () => {} },
+    fakeFetch,
+    () => {},
+    () => {},
+    () => ({ bytes: rawBytes }),
+    async () => [f.pending],
+    () => reader,
+    deriveReviewedSourceManifest,
+    validateRawReviewArtifact,
+    decodeBoundedReviewFile,
+    ".github/workflows/native-review-evidence.yml",
+    "main",
+    async () => ({ headSha: f.head }),
+    async (
+      _policy: unknown,
+      _head: unknown,
+      _assignment: unknown,
+      _reader: unknown,
+      pending: unknown,
+    ) => {
+      if (pending !== attempt.pending) throw Error("MISSING_PENDING_HEAD_ANCHOR");
+      effects.push("fence");
+      return f.assignment;
+    },
+  ) as (...args: unknown[]) => Promise<void>;
+  await publish(context, { kind: "completed-native-observation" }, attempt);
+  expect(effects).toEqual(["fence", "dispatch", "fence", "status"]);
 });
 
 for (const mutation of ["missing-assignment", "full-schema", "wrong-owner-schema"] as const)
