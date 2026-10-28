@@ -1,0 +1,35 @@
+{
+  "schema": "native-independent-review.v2",
+  "nativeReviewPendingStatusId": 57498635314,
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "90784712250c1e27bf255d11ba660deeb595131b",
+  "reviewedTreeSha": "3382617ba625b7104e0c774ecbe8e074e70e3325",
+  "reviewedSourceManifestSha256": "09fdd0ca6d46cb6870178760a7a03231861a7058301e66ba9737d198b40a996f",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a183af-30a1-7b70-bb30-c18f2c4f069f",
+    "threadId": "01a183af-30a1-7b70-bb30-c18f2c4f069f",
+    "nativeTaskId": null,
+    "nativeRunId": null,
+    "role": "Independent FULL source reviewer (gpt-6.1-sol)",
+    "implementationWriter": false
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a18301-5fe2-7903-a39c-bc35c96faa9b",
+    "threadId": null,
+    "nativeTaskId": null,
+    "nativeRunId": null
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/d53236e0edcb3f0cbe6a09a005cc76f13a906e2c/native-review-results/90784712250c1e27bf255d11ba660deeb595131b.json",
+    "sha256": "af26e6705cb6f54b2f3044bc9df64b5d96a8b303d353110830119630eca93683"
+  }
+}
