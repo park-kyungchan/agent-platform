@@ -81,3 +81,24 @@ export function codexReviewThread(events: Uint8Array): string {
   if (threads.length !== 1) throw Error("Exactly one fresh native Codex thread required");
   return threads[0]!;
 }
+
+/** Join every report to the actual requested native invocation before publication. */
+export function bindNativeReviewer(
+  raw: unknown,
+  runtime: string,
+  actualTaskId: string,
+  authorTaskId: string | null,
+): void {
+  const record =
+    raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+  const reviewer =
+    record.reviewer && typeof record.reviewer === "object" && !Array.isArray(record.reviewer)
+      ? (record.reviewer as Record<string, unknown>)
+      : {};
+  if (
+    reviewer.runtime !== runtime ||
+    reviewer.taskId !== actualTaskId ||
+    actualTaskId === authorTaskId
+  )
+    throw Error("Native review report differs from the actual reviewer runtime/session");
+}

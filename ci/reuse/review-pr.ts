@@ -10,7 +10,7 @@ import {
 } from "../quality/review-artifact";
 import { nativeReviewPolicy, publishNativeReviewArtifact } from "./publish-review-artifact";
 import { verifyCommittedSourceAuthor } from "./source-author";
-import { reviewerInvocation, codexReviewThread } from "./review-runtimes";
+import { reviewerInvocation, codexReviewThread, bindNativeReviewer } from "./review-runtimes";
 import { locatedError } from "./located-error";
 
 /** One native command: exact pushed PR head -> fresh independent native output -> verified status. */
@@ -112,7 +112,7 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
   };
   const prompt = smoke
     ? `Mechanical transport smoke only. Do not inspect files, run tools, perform source review or claim Acceptance. Return ONLY this JSON object, unchanged in meaning and without markdown. For native-codex, replace OBSERVE_CODEX_THREAD_ID with your actual native CODEX_THREAD_ID observed in a read-only tool call. This record is ineligible for native-independent-review status.\n${JSON.stringify(proof, null, 2)}\n`
-    : `You are a fresh independent native source reviewer. Read-only: no edits, writes, ref/index/config changes, publication, subagents or private user-data reads. Read AGENTS.md and review the exact pushed head ${head}, tree ${tree}, against the target-main merge base ${reviewBase} in ${root}. Review the entire PR diff ${reviewBase}..${head}, not only the last commit. Read immutable committed bytes with git show ${head}:path. Inspect all public technical changes and actionable correctness/security/regression/scope defects. Never read private student/class-record bodies or print private path names; private custody changes are metadata-only. CI cannot mint independent native review. Raw native output, source/publisher/run/artifact/digest/latest-status joins must be exact. Do not assume checks passed or native activation/Acceptance occurred. For native-codex, read your actual CODEX_THREAD_ID from your native tool environment and replace OBSERVE_CODEX_THREAD_ID; never copy the author or invocation ID. Return ONLY valid JSON without fences with the following exact proof fields. If findings remain, set conclusion fail and the exact unresolved count, with severity/path/line/explanation/suggestedFix per finding. Otherwise pass/zero/empty findings.\n${JSON.stringify(proof, null, 2)}\n`;
+    : `You are a fresh independent native source reviewer. Read-only: no edits, writes, ref/index/config changes, publication, subagents or private user-data reads. Read AGENTS.md and review the exact pushed head ${head}, tree ${tree}, against the target-main merge base ${reviewBase} in ${root}. Review the entire PR diff ${reviewBase}..${head}, not only the last commit. Read immutable committed bytes with git show ${head}:path. Inspect all public technical changes and actionable correctness/security/regression/scope defects. Never read private student/class-record bodies or print private path names; private custody changes are metadata-only. CI cannot mint independent native review. Raw native output, source/publisher/run/artifact/digest/latest-status joins must be exact. Do not assume checks passed or native activation/Acceptance occurred. For native-codex, read your actual CODEX_THREAD_ID from your native tool environment and replace OBSERVE_CODEX_THREAD_ID; never copy the author or invocation ID. Write technical finding fields in English. Return ONLY valid JSON without fences with the following exact proof fields. If findings remain, set conclusion fail and the exact unresolved count, with severity/path/line/explanation/suggestedFix per finding. Otherwise pass/zero/empty findings.\n${JSON.stringify(proof, null, 2)}\n`;
   const promptPath = join(directory, "prompt.txt");
   await writeFile(promptPath, prompt, { mode: 0o600 });
   // Muse takes a positional prompt; Claude's print mode reads stdin. Both use an actual native session UUID.
@@ -148,28 +148,26 @@ export async function reviewPr(head: string, runtime: string, smoke = false, che
   )
     throw Error("Source changed during native review; no status published");
   const raw = await readFile(rawPath);
-  if (runtime === "native-codex") {
-    const actualThread = codexReviewThread(await readFile(eventsPath));
-    const observed = JSON.parse(raw.toString());
-    if (
-      observed.reviewer?.runtime !== runtime ||
-      observed.reviewer?.taskId !== actualThread ||
-      actualThread === (author.metadata.author.threadId ?? author.metadata.author.sessionId)
-    )
-      throw Error("Actual native Codex reviewer identity differs or repeats author");
-    proof.reviewer.taskId = actualThread;
-    console.log(
-      JSON.stringify({
-        phase: "native-identity-bound",
-        headSha: head,
-        reviewerRuntime: runtime,
-        reviewerSessionId: actualThread,
-        rawPath,
-        eventsPath,
-        stderrPath,
-      }),
-    );
-  }
+  const actualThread =
+    runtime === "native-codex" ? codexReviewThread(await readFile(eventsPath)) : sessionId;
+  bindNativeReviewer(
+    JSON.parse(raw.toString()),
+    runtime,
+    actualThread,
+    author.metadata.author.threadId ?? author.metadata.author.sessionId,
+  );
+  proof.reviewer.taskId = actualThread;
+  console.log(
+    JSON.stringify({
+      phase: "native-identity-bound",
+      headSha: head,
+      reviewerRuntime: runtime,
+      reviewerSessionId: actualThread,
+      rawPath,
+      ...(runtime === "native-codex" ? { eventsPath } : {}),
+      stderrPath,
+    }),
+  );
   if (smoke) {
     const result = JSON.parse(raw.toString());
     if (JSON.stringify(result) !== JSON.stringify(proof))

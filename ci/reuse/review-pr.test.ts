@@ -1,4 +1,4 @@
-import { codexReviewThread } from "./review-runtimes";
+import { codexReviewThread, bindNativeReviewer } from "./review-runtimes";
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 
@@ -97,4 +97,26 @@ test("native Codex review identity must come from exactly one real thread event"
     event + "not-json\n",
   ])
     expect(() => codexReviewThread(Buffer.from(text))).toThrow();
+});
+
+test("every formal native adapter binds the requested runtime and actual session before publication", () => {
+  const author = "00000000-0000-4000-8000-000000000001",
+    reviewer = "00000000-0000-4000-8000-000000000002";
+  for (const runtime of ["native-claude", "native-codex"]) {
+    expect(() =>
+      bindNativeReviewer({ reviewer: { runtime, taskId: reviewer } }, runtime, reviewer, author),
+    ).not.toThrow();
+    for (const raw of [
+      { reviewer: { runtime: "native-muse", taskId: reviewer } },
+      { reviewer: { runtime, taskId: "unrelated-session" } },
+      { reviewer: null },
+      {},
+    ])
+      expect(() => bindNativeReviewer(raw, runtime, reviewer, author)).toThrow(
+        "actual reviewer runtime/session",
+      );
+    expect(() =>
+      bindNativeReviewer({ reviewer: { runtime, taskId: author } }, runtime, author, author),
+    ).toThrow("actual reviewer runtime/session");
+  }
 });
