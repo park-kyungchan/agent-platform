@@ -208,3 +208,34 @@ test("successor reuse rejects late legacy success over a newer hold on either th
       ).rejects.toThrow("FRESH_LEGACY_ATTEMPT_REQUIRED");
     }
 });
+
+test("truncated status history refuses compatibility on both sides of successor reuse", async () => {
+  for (const original of [false, true]) {
+    const f = fixture(),
+      target = original ? f.originalHead : f.head;
+    const read = f.reader.readStatuses;
+    const latest = (await read(target))[0]!;
+    const history = [
+      latest,
+      ...Array.from({ length: 99 }, (_, i) => ({ ...latest, id: 100 + i, context: `other-${i}` })),
+      {
+        ...latest,
+        id: 43,
+        state: "failure",
+        target_url: `https://github.com/${f.repository}/commit/${target}#native-independent-review`,
+      },
+    ];
+    f.reader.readStatuses = async (sha: string) =>
+      sha === target ? history.slice(0, 100) : read(sha);
+    await expect(
+      validatePlatformReviewWithEvidence(
+        f.successor,
+        f.head,
+        f.tree,
+        f.repository,
+        f.reader,
+        f.publisher,
+      ),
+    ).rejects.toThrow("LEGACY_ATTEMPT_HISTORY_INCOMPLETE");
+  }
+});

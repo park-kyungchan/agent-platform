@@ -70,6 +70,55 @@ export function codexReviewThread(events: Uint8Array): string {
   return threads[0]!;
 }
 
+/** Closed one-turn completion grammar, bound to the actual final-message bytes. */
+export function bindCompletedCodexReview(events: Uint8Array, raw: Uint8Array): string {
+  const thread = codexReviewThread(events);
+  let turnStarted = false,
+    completed = false,
+    finalText: string | undefined,
+    lastMessage = false;
+  for (const line of new TextDecoder("utf-8", { fatal: true })
+    .decode(events)
+    .split("\n")
+    .filter(Boolean)) {
+    const event = JSON.parse(line) as Record<string, unknown>;
+    if (!event || typeof event !== "object" || Array.isArray(event) || completed)
+      throw Error("ACTUAL_NATIVE_COMPLETION_REQUIRED");
+    switch (event.type) {
+      case "thread.started":
+        if (turnStarted) throw Error("ACTUAL_NATIVE_COMPLETION_REQUIRED");
+        break;
+      case "turn.started":
+        if (turnStarted) throw Error("ACTUAL_NATIVE_COMPLETION_REQUIRED");
+        turnStarted = true;
+        break;
+      case "item.started":
+      case "item.updated":
+      case "item.completed": {
+        if (!turnStarted) throw Error("ACTUAL_NATIVE_COMPLETION_REQUIRED");
+        const item = event.item as Record<string, unknown> | undefined;
+        lastMessage =
+          event.type === "item.completed" &&
+          item?.type === "agent_message" &&
+          typeof item.text === "string";
+        if (lastMessage) finalText = item!.text as string;
+        break;
+      }
+      case "turn.completed":
+        if (!turnStarted || !lastMessage || finalText === undefined)
+          throw Error("ACTUAL_NATIVE_COMPLETION_REQUIRED");
+        completed = true;
+        break;
+      default:
+        throw Error("ACTUAL_NATIVE_COMPLETION_REQUIRED");
+    }
+  }
+  if (!completed) throw Error("ACTUAL_NATIVE_COMPLETION_REQUIRED");
+  if (!Buffer.from(finalText!, "utf8").equals(Buffer.from(raw)))
+    throw Error("ACTUAL_NATIVE_FINAL_MESSAGE_REQUIRED");
+  return thread;
+}
+
 /** Join every report to the actual requested native invocation before publication. */
 export function bindNativeReviewer(
   raw: unknown,

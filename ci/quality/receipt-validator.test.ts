@@ -1141,6 +1141,31 @@ test("owner legacy receipt cannot clear newer holds; fresh pending ID must bind 
   ).resolves.toHaveProperty("publisherAuthenticated", true);
 });
 
+test("truncated status history cannot establish ID-less owner legacy compatibility", async () => {
+  for (const state of ["pending", "failure"]) {
+    const f = ownerFixture(),
+      latest = { ...f.statuses[0]! };
+    const history = [
+      latest,
+      ...Array.from({ length: 99 }, (_, i) => ({ ...latest, id: 100 + i, context: `other-${i}` })),
+      {
+        ...latest,
+        id: 43,
+        state,
+        target_url: `https://github.com/${f.policy.repository}/commit/${head}#native-independent-review`,
+      },
+    ];
+    f.statuses.splice(0, f.statuses.length, ...history.slice(0, 100));
+    await expect(
+      validateOwnerScopedReviewWithEvidence(
+        f.policy,
+        { repository: f.policy.repository, head },
+        f.reader,
+      ),
+    ).rejects.toThrow("LEGACY_ATTEMPT_HISTORY_INCOMPLETE");
+  }
+});
+
 test("actual predecessor owner legacy selector accepts a late old success while the shared pending-ID fence refuses it", async () => {
   const previous = Bun.spawnSync(
     [

@@ -6,7 +6,13 @@ import {
   type TrustedReviewContext,
   validateCommittedOwnerPolicy,
 } from "./trusted-review-source";
-import { codexReviewThread, bindNativeReviewer, reviewerInvocation } from "./review-runtimes";
+import {
+  codexReviewThread,
+  bindCompletedCodexReview,
+  bindNativeReviewer,
+  reviewerInvocation,
+} from "./review-runtimes";
+import { ProcessOutputCapture } from "../quality/trusted/process";
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 
@@ -55,6 +61,47 @@ test("native Codex review identity must come from exactly one real thread event"
     event + "not-json\n",
   ])
     expect(() => codexReviewThread(Buffer.from(text))).toThrow();
+});
+
+test("native completion grammar binds only the actual terminal message and refuses every incomplete state", () => {
+  const thread = "00000000-0000-4000-8000-000000000003",
+    raw = Buffer.from('{"verdict":"synthetic"}');
+  const start = { type: "thread.started", thread_id: thread },
+    turn = { type: "turn.started" };
+  const message = { type: "item.completed", item: { type: "agent_message", text: raw.toString() } };
+  const done = { type: "turn.completed" };
+  const encode = (rows: unknown[]) =>
+    Buffer.from(rows.map((row) => JSON.stringify(row)).join("\n") + "\n");
+  const valid = [
+    start,
+    turn,
+    { type: "item.completed", item: { type: "agent_message", text: "commentary" } },
+    message,
+    done,
+  ];
+  expect(bindCompletedCodexReview(encode(valid), raw)).toBe(thread);
+  const refusals = [
+    [start, turn, message],
+    [start, turn, done],
+    [start, message, done],
+    [start, turn, message, { type: "turn.failed" }],
+    [start, turn, message, { type: "error" }],
+    [start, turn, message, { type: "unknown" }, done],
+    [start, turn, message, done, message],
+    [start, turn, message, done, done],
+    [start, turn, turn, message, done],
+    [start, turn, message, { type: "item.completed", item: { type: "command_execution" } }, done],
+    [start, start, turn, message, done],
+    [{ ...start, thread_id: "logical-task" }, turn, message, done],
+  ];
+  for (const rows of refusals) expect(() => bindCompletedCodexReview(encode(rows), raw)).toThrow();
+  for (const bytes of [
+    Buffer.from('{"verdict":"replaced"}'),
+    Buffer.concat([raw, Buffer.from("\n")]),
+  ])
+    expect(() => bindCompletedCodexReview(encode(valid), bytes)).toThrow(
+      "ACTUAL_NATIVE_FINAL_MESSAGE_REQUIRED",
+    );
 });
 test("current judgment invokes native sol only and never Claude/Opus; Muse remains mechanical", () => {
   const id = "00000000-0000-4000-8000-000000000001";
@@ -592,13 +639,24 @@ type NativeCaseApi = {
     o: unknown,
   ) => { bytes: Buffer; raw: Record<string, unknown> };
 };
-async function nativeCase(scenario = "pass") {
+async function nativeCase(scenario = "pass", predecessor = false) {
   const { readFile } = await import("node:fs/promises"),
     { createHash } = await import("node:crypto");
   const { reviewAttemptTarget, validateCompletedReviewObservation } =
     await import("../quality/review-artifact");
+  const old = predecessor
+    ? Bun.spawnSync(
+        ["git", "show", "8f78f54111f59e3af2bf702826eeefa761d2568d:ci/reuse/review-attempt.ts"],
+        { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+      )
+    : null;
+  if (old) expect(old.exitCode).toBe(0);
   const source = new Bun.Transpiler({ loader: "ts" })
-    .transformSync(await readFile(join(import.meta.dir, "review-attempt.ts"), "utf8"))
+    .transformSync(
+      old
+        ? old.stdout.toString()
+        : await readFile(join(import.meta.dir, "review-attempt.ts"), "utf8"),
+    )
     .replace(/^import[\s\S]*?;\n/gm, "")
     .replaceAll("export ", "");
   const head = "a".repeat(40),
@@ -637,6 +695,17 @@ async function nativeCase(scenario = "pass") {
     author: { metadata: { author: { runtime: "native-codex", threadId: "actual-author" } } },
     revalidate: async () => {
       if (revoked) throw Error("QUALIFIED_PIN_HELD");
+      if (scenario === "replace-negative-raw" && launches > 0) {
+        await Promise.resolve();
+        const replacement = JSON.parse(bytes.toString());
+        replacement.conclusion = "pass";
+        replacement.unresolvedFindings = 0;
+        replacement.findings = [];
+        bytes = Buffer.from(JSON.stringify(replacement));
+        eventsFile = nativeEvents(bytes);
+      }
+      if (scenario === "replace-events-file" && launches > 0)
+        eventsFile = Buffer.from("substituted event pathname");
     },
     readApi: async () => states,
   };
@@ -650,24 +719,34 @@ async function nativeCase(scenario = "pass") {
       reviewedSourceManifestSha256: manifest,
       reviewer: { runtime: "native-codex", taskId: thread },
       author: { runtime: "native-codex", taskId: "actual-author" },
-      conclusion: scenario === "negative" ? "fail" : "pass",
-      unresolvedFindings: scenario === "negative" ? 1 : 0,
-      findings:
-        scenario === "negative"
-          ? [{ path: "source.ts", line: 1, severity: "P1", explanation: "synthetic defect" }]
-          : [],
+      conclusion: ["negative", "replace-negative-raw"].includes(scenario) ? "fail" : "pass",
+      unresolvedFindings: ["negative", "replace-negative-raw"].includes(scenario) ? 1 : 0,
+      findings: ["negative", "replace-negative-raw"].includes(scenario)
+        ? [{ path: "source.ts", line: 1, severity: "P1", explanation: "synthetic defect" }]
+        : [],
       nativeReviewPendingStatusId: 101,
     }),
   );
-  const events = Buffer.from(
-    JSON.stringify({ type: "thread.started", thread_id: thread }) +
-      "\n" +
-      JSON.stringify({ type: "turn.completed" }) +
-      "\n",
-  );
-  const empty = () =>
+  const nativeEvents = (raw: Buffer) =>
+    Buffer.from(
+      JSON.stringify({ type: "thread.started", thread_id: thread }) +
+        "\n" +
+        JSON.stringify({ type: "turn.started" }) +
+        "\n" +
+        JSON.stringify({
+          type: "item.completed",
+          item: { type: "agent_message", text: raw.toString() },
+        }) +
+        "\n" +
+        JSON.stringify({ type: "turn.completed" }) +
+        "\n",
+    );
+  const events = nativeEvents(bytes);
+  let eventsFile = events;
+  const stream = (bytes = Buffer.alloc(0)) =>
     new ReadableStream<Uint8Array>({
       start(c) {
+        if (bytes.length) c.enqueue(bytes);
         c.close();
       },
     });
@@ -683,7 +762,12 @@ async function nativeCase(scenario = "pass") {
     which: () => "/synthetic-codex",
     spawn: () => {
       launches++;
-      return { stdout: empty(), stderr: empty(), exited: Promise.resolve(0) };
+      return {
+        stdout: stream(events),
+        stderr: stream(),
+        exited: Promise.resolve(0),
+        kill: () => {},
+      };
     },
     write: async () => 0,
   };
@@ -720,6 +804,8 @@ async function nativeCase(scenario = "pass") {
     "reviewDataGit",
     "reviewControllerRoot",
     "reviewControllerRepository",
+    "bindCompletedCodexReview",
+    "ProcessOutputCapture",
   ];
   const api = new Function(
     ...names,
@@ -737,7 +823,7 @@ async function nativeCase(scenario = "pass") {
     () => id,
     createHash,
     async () => "/synthetic-native-output",
-    async (path: string) => (path.endsWith("events.jsonl") ? events : bytes),
+    async (path: string) => (path.endsWith("events.jsonl") ? eventsFile : bytes),
     async () => {},
     join,
     () => "/tmp",
@@ -748,6 +834,8 @@ async function nativeCase(scenario = "pass") {
     git,
     "/synthetic-controller",
     "park-kyungchan/agent-platform",
+    bindCompletedCodexReview,
+    ProcessOutputCapture,
   ) as NativeCaseApi;
   return {
     api,
@@ -768,6 +856,34 @@ async function nativeCase(scenario = "pass") {
     },
   };
 }
+
+test("raw pathname replacement during post-exit revalidation cannot promote actual negative native judgment", async () => {
+  const old = await nativeCase("replace-negative-raw", true),
+    oldAttempt = await old.api.beginNativeReviewAttempt(old.context, old.id);
+  const forged = await old.api.invokeNativeReview(old.context, oldAttempt, "native-codex");
+  expect(
+    old.api.readCompletedNativeObservation(old.context, oldAttempt, forged).raw.conclusion,
+  ).toBe("pass");
+  const h = await nativeCase("replace-negative-raw"),
+    a = await h.api.beginNativeReviewAttempt(h.context, h.id);
+  await expect(h.api.invokeNativeReview(h.context, a, "native-codex")).rejects.toThrow(
+    "ACTUAL_NATIVE_FINAL_MESSAGE_REQUIRED",
+  );
+  expect(h.launches).toBe(1);
+  expect(h.posts).toBe(1);
+  expect(h.states[0]!.state).toBe("pending");
+});
+
+test("completed native observation uses the owned event stream even if the event pathname changes", async () => {
+  const h = await nativeCase("replace-events-file"),
+    a = await h.api.beginNativeReviewAttempt(h.context, h.id);
+  const observation = await h.api.invokeNativeReview(h.context, a, "native-codex");
+  expect(h.api.readCompletedNativeObservation(h.context, a, observation).raw.conclusion).toBe(
+    "pass",
+  );
+  expect(h.launches).toBe(1);
+  expect(h.posts).toBe(1);
+});
 
 test("a pending handle cannot fabricate completion; actual invocation owns immutable raw bytes and is single-use", async () => {
   const h = await nativeCase(),

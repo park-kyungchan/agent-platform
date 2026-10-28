@@ -165,7 +165,11 @@ export function validateLegacyReviewAttempt(
   const restoredAfterHold = prior > 0 && states.slice(1, prior).some(held),
     proof = object(receipt),
     id = proof.nativeReviewPendingStatusId;
-  if (id === undefined && !formal && !restoredAfterHold) return;
+  if (id === undefined && !formal && !restoredAfterHold) {
+    // A full page cannot establish that an older formal hold is absent.
+    need(history.length < 100, "LEGACY_ATTEMPT_HISTORY_INCOMPLETE");
+    return;
+  }
   need(
     ["native-independent-review.v2", "owner-scoped-independent-review.v1"].includes(
       String(proof.schema),

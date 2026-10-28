@@ -215,6 +215,14 @@ Uncertain status writes print the exact attempt/head/state for readback and are
 never automatically replayed. Mechanical `--smoke` and passive `--check` post no
 review status.
 
+Native observations capture child output in bounded private memory before
+post-exit callbacks. A closed single-turn Codex event parser binds the actual
+terminal agent message byte-for-byte to the raw report; replacing either output
+pathname cannot replace judgment. The shared legacy fence permits ID-less
+historical compatibility only on a short complete page, refusing the ambiguous
+100-status boundary for AP, owner, successor and controller consumers. Fresh
+pending-ID-bound full-page evidence remains supported.
+
 A second actual native caller invokes the same command with `--check` to verify
 the existing source, runtime, artifact and authenticated status without issuing a
 new judgment. `--smoke` is mechanical only and cannot publish review status.

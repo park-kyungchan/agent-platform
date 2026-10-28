@@ -3,7 +3,12 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { deriveReviewedSourceManifest } from "../quality/receipt-validator";
-import { reviewerInvocation, codexReviewThread, bindNativeReviewer } from "./review-runtimes";
+import {
+  reviewerInvocation,
+  bindCompletedCodexReview,
+  bindNativeReviewer,
+} from "./review-runtimes";
+import { ProcessOutputCapture } from "../quality/trusted/process";
 import {
   reviewAttemptTarget,
   validateCompletedReviewObservation,
@@ -317,11 +322,61 @@ async function runNativeReview(
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [, , exit] = await Promise.all([
-    Bun.write(runtime === "native-codex" ? eventsPath : rawPath, child.stdout),
-    Bun.write(stderrPath, child.stderr),
+  // Own the actual child streams before callbacks can yield or file paths can change.
+  const stdoutCapture = new ProcessOutputCapture(8_000_000),
+    stderrCapture = new ProcessOutputCapture(4_000_000);
+  let killed = false;
+  const drain = async (
+    stream: ReadableStream<Uint8Array>,
+    capture: ProcessOutputCapture,
+    key: "stdout" | "stderr",
+  ) => {
+    const reader = stream.getReader();
+    try {
+      while (true) {
+        const row = await reader.read();
+        if (row.done) return;
+        capture.observe(key, row.value);
+        if (capture.exceeded && !killed) {
+          killed = true;
+          child.kill("SIGKILL");
+        }
+      }
+    } catch (error) {
+      if (!killed) {
+        killed = true;
+        child.kill("SIGKILL");
+      }
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
+  };
+  const settled = await Promise.allSettled([
+    drain(child.stdout, stdoutCapture, "stdout"),
+    drain(child.stderr, stderrCapture, "stderr"),
     child.exited,
   ]);
+  const output = stdoutCapture.bytes("stdout"),
+    error = stderrCapture.bytes("stderr"),
+    exitResult = settled[2]!;
+  await Promise.all([
+    writeFile(runtime === "native-codex" ? eventsPath : rawPath, output, {
+      mode: 0o600,
+      flag: "wx",
+    }),
+    writeFile(stderrPath, error, { mode: 0o600, flag: "wx" }),
+  ]);
+  for (const capture of [stdoutCapture, stderrCapture])
+    if (capture.exceeded)
+      throw capture.failure(
+        false,
+        exitResult.status === "fulfilled" ? exitResult.value : null,
+        killed ? "SIGKILL" : null,
+      );
+  for (const result of settled) if (result.status === "rejected") throw result.reason;
+  if (exitResult.status !== "fulfilled") throw Error("ACTUAL_NATIVE_EXIT_REQUIRED");
+  const exit = exitResult.value;
   if (exit !== 0)
     throw Error(
       "Native reviewer failed; formal attempt remains held, inspect unchanged raw/stderr",
@@ -329,7 +384,8 @@ async function runNativeReview(
   await context.revalidate();
   const raw = await readFile(rawPath);
   const actualThread =
-    runtime === "native-codex" ? codexReviewThread(await readFile(eventsPath)) : sessionId;
+    runtime === "native-codex" ? bindCompletedCodexReview(output, raw) : sessionId;
+  if (runtime !== "native-codex") need(raw.equals(output), "ACTUAL_NATIVE_STDOUT_REQUIRED");
   bindNativeReviewer(
     JSON.parse(raw.toString()),
     runtime,

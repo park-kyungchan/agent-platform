@@ -48,6 +48,10 @@ and requires its artifact bytes to equal the native original before status
 publication and on final readback, then posts
 its authenticated status with the artifact's immutable ID and archive digest.
 Formal attempts publish authenticated pending before launching the reviewer.
+The invocation captures actual child events in bounded controller-owned memory.
+A closed one-turn parser requires successful terminal completion and exact
+equality between the raw report and its actual final-message event. Event and raw
+pathnames are audit copies, never authority for initially minting an observation.
 Correctly bound completed findings publish failure. Success requires the native raw pending-status ID to match its preceding authenticated pending status; an
 intervening hold/failure/other attempt refuses even if a late old success wins
 an API write race. Crashed/malformed reviews retain pending. Status writes are
@@ -60,6 +64,10 @@ Bootstrap the workflow through a reviewed legacy-receipt PR first: GitHub must
 know the workflow on the default branch before dispatch. Existing immutable
 receipt and explicit identical-tree successor paths remain supported. Owner
 consumers project these shared validators and retain their fixed owner policy.
+ID-less historical compatibility requires a short, complete status page. A full
+100-status page cannot prove absence of an older formal hold and fails closed.
+Fresh pending-ID-bound evidence remains admissible on a full page when its actual
+pending status and intervening states are present and valid.
 
 GitHub documents artifact IDs, archive digests and ZIP downloads in its
 [artifact REST API](https://docs.github.com/en/rest/actions/artifacts), and run

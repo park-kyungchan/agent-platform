@@ -139,11 +139,18 @@ test("prepublished PR proof passes immediately through the existing canonical va
   expect(f.statusReads).toBe(3);
 });
 
-test("a present valid status on a full page is validated rather than treated as absence", async () => {
+test("a present fresh attempt-bound status on a full page is validated rather than treated as absence", async () => {
   const f = fixture();
+  f.bindPendingStatus(41);
   f.setStatuses(() => [
     f.status,
-    ...Array.from({ length: 99 }, (_, n) => ({
+    {
+      ...f.status,
+      id: 41,
+      state: "pending",
+      target_url: `https://github.com/${f.env.GITHUB_REPOSITORY}/commit/${f.head}#native-independent-review`,
+    },
+    ...Array.from({ length: 98 }, (_, n) => ({
       id: n + 100,
       context: "other-check",
       state: "success",
@@ -325,4 +332,179 @@ test("late legacy success cannot restore old proof after a newer pending or nega
     old,
   ]);
   await expect(reviewGate(oldMarker.options)).rejects.toThrow("FRESH_LEGACY_ATTEMPT_REQUIRED");
+});
+
+test("truncated status history cannot establish ID-less AP legacy compatibility", async () => {
+  const previous = Bun.spawnSync(
+    ["git", "show", "8f78f54111f59e3af2bf702826eeefa761d2568d:ci/quality/review-artifact.ts"],
+    { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+  );
+  expect(previous.exitCode).toBe(0);
+  const text = previous.stdout.toString();
+  const body = new Bun.Transpiler({ loader: "ts" }).transformSync(
+    text
+      .slice(
+        text.indexOf("export function validateLegacyReviewAttempt("),
+        text.indexOf("/** Read-only transport."),
+      )
+      .replace("export function", "function"),
+  );
+  const legacy = new Function(
+    "object",
+    "need",
+    "reviewAttemptTarget",
+    body + "\nreturn validateLegacyReviewAttempt;",
+  )(
+    (value: unknown) => (value && typeof value === "object" && !Array.isArray(value) ? value : {}),
+    (ok: boolean, code: string) => {
+      if (!ok) throw Error(code);
+    },
+    (repository: string, head: string) =>
+      `https://github.com/${repository}/commit/${head}#native-independent-review`,
+  ) as (...args: unknown[]) => void;
+  for (const state of ["pending", "failure"]) {
+    const f = fixture();
+    const history = [
+      f.status,
+      ...Array.from({ length: 99 }, (_, i) => ({
+        ...f.status,
+        id: 100 + i,
+        context: `other-${i}`,
+      })),
+      {
+        ...f.status,
+        id: 43,
+        state,
+        target_url: `https://github.com/${f.env.GITHUB_REPOSITORY}/commit/${f.head}#native-independent-review`,
+      },
+    ];
+    expect(() =>
+      legacy(
+        {
+          repository: f.env.GITHUB_REPOSITORY,
+          publisher: { id: "123", login: "fixture-publisher" },
+        },
+        f.head,
+        history.slice(0, 100),
+        f.status,
+        f.receipt,
+      ),
+    ).not.toThrow();
+    f.setStatuses(() => history.slice(0, 100));
+    await expect(reviewGate(f.options)).rejects.toThrow("LEGACY_ATTEMPT_HISTORY_INCOMPLETE");
+  }
+});
+
+test("controller qualification reaches the same incomplete-history refusal before later CI or thread reads", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(
+    new URL("./reuse/trusted-review-source.ts", import.meta.url),
+    "utf8",
+  );
+  const selection = source.slice(
+    source.indexOf("export async function requireControllerQualification("),
+    source.indexOf("export type TrustedReviewContext"),
+  );
+  const importLine = 'const { reviewGate } = await import("../source-check");';
+  expect(selection).toContain(importLine);
+  const body = new Bun.Transpiler({ loader: "ts" }).transformSync(
+    selection
+      .replace("export async function", "async function")
+      .replace(importLine, "const { reviewGate } = await loadSource();"),
+  );
+  for (const state of ["pending", "failure"]) {
+    const f = fixture();
+    const history = [
+      f.status,
+      ...Array.from({ length: 99 }, (_, i) => ({
+        ...f.status,
+        id: 100 + i,
+        context: `other-${i}`,
+      })),
+      {
+        ...f.status,
+        id: 43,
+        state,
+        target_url: `https://github.com/${f.env.GITHUB_REPOSITORY}/commit/${f.head}#native-independent-review`,
+      },
+    ];
+    f.setStatuses(() => history.slice(0, 100));
+    let laterReads = 0;
+    const reader = {
+      json: async (path: string) => {
+        if (path === ".") return {};
+        if (path.endsWith("/pulls?per_page=100")) {
+          laterReads++;
+          return [];
+        }
+        return f.options.readApi!(path);
+      },
+      archive: async () => {
+        throw Error("UNEXPECTED_ARCHIVE");
+      },
+    };
+    // Only transport/native identity is synthetic; both qualification and source gates are actual code.
+    const qualify = new Function(
+      "authenticatedReviewReader",
+      "trustedPolicy",
+      "requirePrivateRepository",
+      "reviewRepository",
+      "record",
+      "need",
+      "reviewDataGit",
+      "reviewControllerRoot",
+      "loadSource",
+      body + "\nreturn requireControllerQualification;",
+    )(
+      () => reader,
+      {
+        controllerRepository: f.env.GITHUB_REPOSITORY,
+        publisher: { id: "123", login: "fixture-publisher" },
+      },
+      () => {},
+      () => ({}),
+      (value: unknown) => value,
+      (ok: boolean) => {
+        if (!ok) throw Error("CONTROLLER_SOURCE_REFUSED");
+      },
+      () => "b".repeat(40),
+      "/synthetic-controller",
+      async () => ({ reviewGate }),
+    ) as (head: string, token: string) => Promise<void>;
+    await expect(qualify(f.head, "fictional-test-token")).rejects.toThrow(
+      "LEGACY_ATTEMPT_HISTORY_INCOMPLETE",
+    );
+    expect(laterReads).toBe(0);
+  }
+});
+
+test("legacy completeness boundary preserves short historical pages and fresh pending-bound full pages", async () => {
+  const historical = fixture();
+  historical.setStatuses(() => [
+    historical.status,
+    ...Array.from({ length: 98 }, (_, i) => ({
+      ...historical.status,
+      id: 100 + i,
+      context: `other-${i}`,
+    })),
+  ]);
+  await expect(reviewGate(historical.options)).resolves.toBeUndefined();
+  const fresh = fixture();
+  fresh.bindPendingStatus(43);
+  fresh.status.id = 44;
+  fresh.setStatuses(() => [
+    fresh.status,
+    {
+      ...fresh.status,
+      id: 43,
+      state: "pending",
+      target_url: `https://github.com/${fresh.env.GITHUB_REPOSITORY}/commit/${fresh.head}#native-independent-review`,
+    },
+    ...Array.from({ length: 98 }, (_, i) => ({
+      ...fresh.status,
+      id: 100 + i,
+      context: `other-${i}`,
+    })),
+  ]);
+  await expect(reviewGate(fresh.options)).resolves.toBeUndefined();
 });
