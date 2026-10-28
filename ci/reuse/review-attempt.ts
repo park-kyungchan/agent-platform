@@ -330,39 +330,57 @@ async function readFullPromptFile(path: string): Promise<Buffer> {
   );
   try {
     need((await realpath(path)) === path, "EXTERNAL_PROMPT_CANONICAL_FILE_REQUIRED");
-    const file = await open(
-      path,
-      fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK,
-    );
+    const components = path.slice(1).split("/"),
+      filename = components.pop()!,
+      directoryFlags =
+        fsConstants.O_RDONLY |
+        fsConstants.O_DIRECTORY |
+        fsConstants.O_NOFOLLOW |
+        fsConstants.O_NONBLOCK;
+    let directory = await open("/", directoryFlags);
     try {
-      const before = await file.stat({ bigint: true });
-      need(
-        before.isFile() && before.size > 0n && before.size <= 45_000n,
-        "EXTERNAL_PROMPT_REGULAR_BOUNDED_FILE_REQUIRED",
-      );
-      const buffer = Buffer.alloc(45_001),
-        { bytesRead } = await file.read(buffer, 0, buffer.length, 0),
-        after = await file.stat({ bigint: true });
-      need(
-        BigInt(bytesRead) === before.size &&
-          after.size === before.size &&
-          after.dev === before.dev &&
-          after.ino === before.ino &&
-          after.mtimeNs === before.mtimeNs &&
-          after.ctimeNs === before.ctimeNs,
-        "EXTERNAL_PROMPT_CHANGED_DURING_READ",
-      );
-      const bytes = Buffer.from(buffer.subarray(0, bytesRead));
-      let text: string;
-      try {
-        text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-      } catch {
-        throw Error("NATIVE_REVIEW_ATTEMPT_EXTERNAL_PROMPT_UTF8_REQUIRED");
+      // Pin each parent until its child opens; final-component O_NOFOLLOW alone leaves ancestors mutable.
+      for (const component of components) {
+        const parent = directory;
+        directory = await open(join("/proc/self/fd", String(parent.fd), component), directoryFlags);
+        await parent.close();
       }
-      need(text.trim().length > 0 && !bytes.includes(0), "EXTERNAL_PROMPT_TEXT_REQUIRED");
-      return bytes;
+      const file = await open(
+        join("/proc/self/fd", String(directory.fd), filename),
+        fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW | fsConstants.O_NONBLOCK,
+      );
+      try {
+        const before = await file.stat({ bigint: true });
+        need(
+          before.isFile() && before.size > 0n && before.size <= 45_000n,
+          "EXTERNAL_PROMPT_REGULAR_BOUNDED_FILE_REQUIRED",
+        );
+        const buffer = Buffer.alloc(45_001),
+          { bytesRead } = await file.read(buffer, 0, buffer.length, 0),
+          after = await file.stat({ bigint: true });
+        need(
+          BigInt(bytesRead) === before.size &&
+            after.size === before.size &&
+            after.dev === before.dev &&
+            after.ino === before.ino &&
+            after.mtimeNs === before.mtimeNs &&
+            after.ctimeNs === before.ctimeNs,
+          "EXTERNAL_PROMPT_CHANGED_DURING_READ",
+        );
+        const bytes = Buffer.from(buffer.subarray(0, bytesRead));
+        let text: string;
+        try {
+          text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+        } catch {
+          throw Error("NATIVE_REVIEW_ATTEMPT_EXTERNAL_PROMPT_UTF8_REQUIRED");
+        }
+        need(text.trim().length > 0 && !bytes.includes(0), "EXTERNAL_PROMPT_TEXT_REQUIRED");
+        return bytes;
+      } finally {
+        await file.close();
+      }
     } finally {
-      await file.close();
+      await directory.close();
     }
   } catch (error) {
     if (

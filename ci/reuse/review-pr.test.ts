@@ -756,13 +756,21 @@ async function nativeCase(scenario = "pass", predecessor: boolean | string = fal
     revoked = false,
     promptReads = 0,
     promptOpens = 0,
+    openPromptDescriptorsAtLaunch = 0,
+    afterPromptRealpath: (() => Promise<void>) | undefined,
+    afterPromptOpen: ((path: string, flags: number) => Promise<void>) | undefined,
     afterPromptClose: (() => Promise<void>) | undefined;
   const childInputs: Buffer[] = [],
     writes = new Map<string, Buffer>(),
-    logs: unknown[] = [];
+    logs: unknown[] = [],
+    promptOpenCalls: { path: string; flags: number; fd: number; closed: boolean }[] = [];
   const trackedOpen = async (...args: Parameters<typeof open>) => {
-    promptOpens++;
+    const directory = Boolean(Number(args[1]) & fsConstants.O_DIRECTORY);
+    if (!directory) promptOpens++;
     const file = await open(...args);
+    const call = { path: String(args[0]), flags: Number(args[1]), fd: file.fd, closed: false };
+    promptOpenCalls.push(call);
+    await afterPromptOpen?.(call.path, call.flags);
     return new Proxy(file, {
       get(target, property) {
         if (property === "read")
@@ -773,12 +781,18 @@ async function nativeCase(scenario = "pass", predecessor: boolean | string = fal
         if (property === "close")
           return async () => {
             await target.close();
-            await afterPromptClose?.();
+            call.closed = true;
+            if (!directory) await afterPromptClose?.();
           };
         const value: unknown = Reflect.get(target, property, target);
         return typeof value === "function" ? value.bind(target) : value;
       },
     });
+  };
+  const trackedRealpath = async (path: string) => {
+    const result = await realpath(path);
+    await afterPromptRealpath?.();
+    return result;
   };
   const pendingFences: unknown[] = [];
   const states: Record<string, unknown>[] = [
@@ -897,6 +911,7 @@ async function nativeCase(scenario = "pass", predecessor: boolean | string = fal
     which: () => "/synthetic-codex",
     spawn: (_args: string[], options: { stdin: string | Uint8Array }) => {
       launches++;
+      openPromptDescriptorsAtLaunch = promptOpenCalls.filter((call) => !call.closed).length;
       childInputs.push(Buffer.from(options.stdin));
       return {
         stdout: stream(events),
@@ -974,7 +989,7 @@ async function nativeCase(scenario = "pass", predecessor: boolean | string = fal
       writes.set(path, Buffer.from(data));
     },
     trackedOpen,
-    realpath,
+    trackedRealpath,
     fsConstants,
     isAbsolute,
     normalize,
@@ -1008,6 +1023,10 @@ async function nativeCase(scenario = "pass", predecessor: boolean | string = fal
     childInputs,
     writes,
     logs,
+    promptOpenCalls,
+    get openPromptDescriptorsAtLaunch() {
+      return openPromptDescriptorsAtLaunch;
+    },
     get promptReads() {
       return promptReads;
     },
@@ -1016,6 +1035,12 @@ async function nativeCase(scenario = "pass", predecessor: boolean | string = fal
     },
     afterPromptClose: (callback: () => Promise<void>) => {
       afterPromptClose = callback;
+    },
+    afterPromptRealpath: (callback: () => Promise<void>) => {
+      afterPromptRealpath = callback;
+    },
+    afterPromptOpen: (callback: (path: string, flags: number) => Promise<void>) => {
+      afterPromptOpen = callback;
     },
     get posts() {
       return posts;
@@ -1033,8 +1058,14 @@ async function nativeCase(scenario = "pass", predecessor: boolean | string = fal
 }
 
 const fullPromptPredecessor = process.env.FULL_PROMPT_PREDECESSOR;
-if (fullPromptPredecessor && fullPromptPredecessor !== "90784712250c1e27bf255d11ba660deeb595131b")
-  throw Error("FULL_PROMPT_PREDECESSOR_EXACT_907_REQUIRED");
+if (
+  fullPromptPredecessor &&
+  ![
+    "90784712250c1e27bf255d11ba660deeb595131b",
+    "fb8dbfac620e19fa0ed5ffb99e218e3e3e3cdc68",
+  ].includes(fullPromptPredecessor)
+)
+  throw Error("FULL_PROMPT_PREDECESSOR_EXACT_COMMITTED_SOURCE_REQUIRED");
 const fullPromptBytes = Buffer.from(
   "Independent FULL source review fixture.\nPreserve every byte: π.\n",
 );
@@ -1053,6 +1084,145 @@ async function withFullPrompt(
     await rm(directory, { recursive: true, force: true });
   }
 }
+
+async function withAncestorPrompt(
+  run: (fixture: {
+    path: string;
+    ancestors: string[];
+    substitute: (level: number) => Promise<void>;
+  }) => Promise<void>,
+) {
+  const { mkdtemp, mkdir, writeFile, rename, symlink, rm } = await import("node:fs/promises"),
+    { tmpdir } = await import("node:os"),
+    root = await mkdtemp(join(tmpdir(), "full-prompt-ancestor-")),
+    components = ["live", "first", "second"],
+    ancestors = components.map((_component, index) =>
+      join(root, ...components.slice(0, index + 1)),
+    ),
+    alternate = join(root, "alternate", "first", "second"),
+    path = join(ancestors.at(-1)!, "prompt.md");
+  await mkdir(ancestors.at(-1)!, { recursive: true });
+  await mkdir(alternate, { recursive: true });
+  await writeFile(path, fullPromptBytes);
+  await writeFile(join(alternate, "prompt.md"), "Unexpected alternate FULL prompt.\n");
+  try {
+    await run({
+      path,
+      ancestors,
+      substitute: async (level) => {
+        const ancestor = ancestors[level]!,
+          replacement = join(root, "alternate", ...components.slice(1, level + 1));
+        await rename(ancestor, ancestor + ".saved");
+        await symlink(replacement, ancestor, "dir");
+      },
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+for (const level of [0, 1, 2]) {
+  test(
+    "FULL-PROMPT-ANCESTOR refuses realpath/open replacement at owned level " + level,
+    async () => {
+      await withAncestorPrompt(async ({ path, substitute }) => {
+        const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+          attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+        let replaced = false;
+        h.afterPromptRealpath(async () => {
+          await substitute(level);
+          replaced = true;
+        });
+        await expect(
+          h.api.invokeNativeReview(h.context, attempt, "native-codex", path),
+        ).rejects.toThrow("EXTERNAL_PROMPT");
+        expect(replaced).toBe(true);
+        expect(h.childInputs).toEqual([]);
+        expect(h.launches).toBe(0);
+        expect(h.promptOpenCalls.every((call) => call.closed)).toBe(true);
+      });
+    },
+  );
+
+  test(
+    "FULL-PROMPT-ANCESTOR pins selected directory before replacement at owned level " + level,
+    async () => {
+      const { constants } = await import("node:fs");
+      await withAncestorPrompt(async ({ path, ancestors, substitute }) => {
+        const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+          attempt = await h.api.beginNativeReviewAttempt(h.context, h.id),
+          component = ancestors[level]!.split("/").at(-1)!;
+        let replaced = false;
+        h.afterPromptOpen(async (opened, flags) => {
+          if (!replaced && flags & constants.O_DIRECTORY && opened.endsWith("/" + component)) {
+            await substitute(level);
+            replaced = true;
+          }
+        });
+        await h.api.invokeNativeReview(h.context, attempt, "native-codex", path);
+        expect(replaced).toBe(true);
+        expect(h.childInputs).toEqual([fullPromptBytes]);
+        expect(h.promptReads).toBe(1);
+        expect(h.openPromptDescriptorsAtLaunch).toBe(0);
+        expect(h.promptOpenCalls.every((call) => call.closed)).toBe(true);
+      });
+    },
+  );
+}
+
+test("FULL-PROMPT-ANCESTOR resolves every component through a no-follow directory descriptor", async () => {
+  const { constants } = await import("node:fs");
+  await withAncestorPrompt(async ({ path }) => {
+    const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+      attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+    await h.api.invokeNativeReview(h.context, attempt, "native-codex", path);
+    const components = path.slice(1).split("/"),
+      calls = h.promptOpenCalls;
+    expect(calls.length).toBe(components.length + 1);
+    expect(calls[0]!.path).toBe("/");
+    for (let index = 0; index < calls.length; index++) {
+      const call = calls[index]!;
+      expect(Boolean(call.flags & constants.O_NOFOLLOW)).toBe(true);
+      expect(Boolean(call.flags & constants.O_DIRECTORY)).toBe(index < calls.length - 1);
+      if (index > 0)
+        expect(call.path).toBe(
+          "/proc/self/fd/" + calls[index - 1]!.fd + "/" + components[index - 1],
+        );
+      expect(call.closed).toBe(true);
+    }
+    expect(h.childInputs).toEqual([fullPromptBytes]);
+    expect(h.promptReads).toBe(1);
+    expect(h.openPromptDescriptorsAtLaunch).toBe(0);
+  });
+});
+
+test("FULL-PROMPT-ANCESTOR retains stable regular-file input", async () => {
+  await withAncestorPrompt(async ({ path }) => {
+    const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+      attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+    await h.api.invokeNativeReview(h.context, attempt, "native-codex", path);
+    expect(h.childInputs).toEqual([fullPromptBytes]);
+    expect(h.promptReads).toBe(1);
+    expect(h.launches).toBe(1);
+  });
+});
+
+test("FULL-PROMPT-ANCESTOR retains final-component replacement refusal", async () => {
+  const { rename, symlink } = await import("node:fs/promises");
+  await withAncestorPrompt(async ({ path }) => {
+    const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+      attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+    h.afterPromptRealpath(async () => {
+      await rename(path, path + ".saved");
+      await symlink(path + ".saved", path);
+    });
+    await expect(
+      h.api.invokeNativeReview(h.context, attempt, "native-codex", path),
+    ).rejects.toThrow("EXTERNAL_PROMPT");
+    expect(h.launches).toBe(0);
+    expect(h.promptOpenCalls.every((call) => call.closed)).toBe(true);
+  });
+});
 
 test("FULL-PROMPT-INPUT snapshots one read into actual stdin, persisted bytes and immutable metadata", async () => {
   const { writeFile, readFile } = await import("node:fs/promises"),
