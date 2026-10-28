@@ -29,3 +29,55 @@ test("generic review and publisher entrypoints refuse CI before source reads or 
     }
   }
 });
+
+test("consumer policy discovery reads fixed JSON in both current layouts and never imports a consumer gate", async () => {
+  const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { nativeReviewPolicy } = await import("./publish-review-artifact");
+  for (const path of ["architecture/common-ci-provider.json", "ci/provider.json"]) {
+    const root = await mkdtemp(join(tmpdir(), "native-review-policy-"));
+    try {
+      const owner = {
+        repository: "fixture/owner",
+        projectId: "fixture-owner",
+        domainId: "fixture-domain",
+        semanticOwner: "fixture-owner",
+        scope: "source-check",
+        statusContext: "native-independent-review",
+        publisher: { id: "42", login: "native-publisher", type: "User" },
+      };
+      await mkdir(join(root, "architecture"));
+      await mkdir(join(root, "ci"));
+      await writeFile(
+        join(root, "project.json"),
+        JSON.stringify({ projectId: owner.projectId, domainId: owner.domainId }),
+      );
+      await writeFile(
+        join(root, path),
+        JSON.stringify({
+          codeOwner: "agent-platform",
+          generatedOnly: true,
+          sourceOnly: true,
+          runtimeAuthority: false,
+          nativePermissionGranted: false,
+          policy: owner,
+        }),
+      );
+      await writeFile(
+        join(root, "ci/native-review-gate.js"),
+        'throw Error("Consumer code must not execute during policy discovery");',
+      );
+      expect(await nativeReviewPolicy(root)).toMatchObject({
+        repository: owner.repository,
+        publisher: owner.publisher,
+        binding: { semanticOwner: owner.semanticOwner },
+      });
+      await writeFile(join(root, path), JSON.stringify({ codeOwner: "foreign", policy: owner }));
+      await expect(nativeReviewPolicy(root)).rejects.toThrow(
+        "Fixed source-only consumer projection required",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});

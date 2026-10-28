@@ -21,6 +21,6 @@ Automatic merge is prohibited. Publish independent exact-commit/tree review evid
 1. Commit fresh native source-author metadata, push the exact head, and keep source/quality checks green.
 2. From this checkout run `bun ci/reuse/review-pr.ts <pushed-head> native-claude` for a fresh read-only Opus review and authenticated artifact status.
 3. Keep the unchanged raw output printed by the command; findings or transport/source drift stop publication.
-4. `native-muse --smoke` exercises mechanical source/session transport only and cannot qualify the review gate.
+4. A second native caller may run the same command with `--check`; it verifies existing proof and issues no independent judgment.
 5. Open the PR after review status passes; resolve current findings/threads and require source, quality and prospective-merge checks.
 6. The accountable Lead explicitly merges the reviewed expected head. Automatic merge, native activation and user Acceptance stay separate.

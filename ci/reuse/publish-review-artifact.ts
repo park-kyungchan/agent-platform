@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { pathToFileURL } from "node:url";
+import { readFile, lstat, realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   authenticatedReviewReader,
@@ -13,10 +12,23 @@ import {
 import {
   deriveReviewedSourceManifest,
   decodeBoundedReviewFile,
+  validateOwnerReviewPolicy,
 } from "../quality/receipt-validator";
 import { locatedError } from "./located-error";
 
-export async function nativeReviewPolicy(): Promise<ReviewArtifactPolicy> {
+export async function nativeReviewPolicy(root = process.cwd()): Promise<ReviewArtifactPolicy> {
+  async function jsonFile(path: string) {
+    const file = resolve(root, path),
+      info = await lstat(file);
+    if (
+      !info.isFile() ||
+      info.isSymbolicLink() ||
+      info.size > 4_000_000 ||
+      (await realpath(file)) !== file
+    )
+      throw Error("Exact fixed review policy JSON required");
+    return JSON.parse(await readFile(file, "utf8"));
+  }
   let policy: ReviewArtifactPolicy = {
     repository: "park-kyungchan/agent-platform",
     publisher: { id: "241037670", login: "park-kyungchan", type: "User" },
@@ -26,11 +38,29 @@ export async function nativeReviewPolicy(): Promise<ReviewArtifactPolicy> {
       scope: "canonical-source-ci-quality",
     },
   };
-  const project = JSON.parse(await readFile(resolve("project.json"), "utf8"));
+  const project = await jsonFile("project.json");
   if (project.projectId !== "agent-platform") {
-    // The reviewed consumer projection owns fixed policy; CLI inputs never choose it.
-    const consumer = await import(pathToFileURL(resolve("ci/native-review-gate.js")).href);
-    const owner = consumer.policy;
+    // Discover only fixed data manifests; never execute consumer JavaScript to learn policy.
+    const manifests = [];
+    for (const path of ["architecture/common-ci-provider.json", "ci/provider.json"]) {
+      try {
+        manifests.push(await jsonFile(path));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      }
+    }
+    if (manifests.length !== 1) throw Error("Exactly one fixed consumer review manifest required");
+    const provider = manifests[0];
+    if (
+      provider.codeOwner !== "agent-platform" ||
+      provider.generatedOnly !== true ||
+      provider.sourceOnly !== true ||
+      provider.runtimeAuthority !== false ||
+      provider.nativePermissionGranted !== false
+    )
+      throw Error("Fixed source-only consumer projection required");
+    const owner = provider.policy;
+    validateOwnerReviewPolicy(owner);
     if (
       owner?.projectId !== project.projectId ||
       owner?.domainId !== project.domainId ||

@@ -3350,6 +3350,34 @@
       "semanticCases": [],
       "coverage": "legacy-workload-only",
       "limitation": "Prepared real child termination and exact caller-budget tests, mocked provider response-bound checks, workflow nesting checks and research-request range validation are required source workload. No existing external181 case authenticates these timer assertions or their shared-process completion. Root isolated execution and independent exact-source review remain required; no native permission, replay, measured gain, full assertion authentication or Acceptance is claimed."
+    },
+    {
+      "path": "ci/quality/review-artifact.test.ts",
+      "selection": "Exact immutable P readQualityScope decides required membership; staged exclusions remain explicit",
+      "semanticCases": [],
+      "coverage": "legacy-workload-only",
+      "limitation": "Required source workload for native review artifact custody, located refusals, exact caller runtime resolution and CI-origin refusal. Existing external semantic cases do not authenticate these new internal assertions. Independent native exact-source review and real externally published artifact observation remain required; no native permission, authenticated completion or Acceptance is claimed."
+    },
+    {
+      "path": "ci/reuse/bun-version.test.ts",
+      "selection": "Exact immutable P readQualityScope decides required membership; staged exclusions remain explicit",
+      "semanticCases": [],
+      "coverage": "legacy-workload-only",
+      "limitation": "Required source workload for native review artifact custody, located refusals, exact caller runtime resolution and CI-origin refusal. Existing external semantic cases do not authenticate these new internal assertions. Independent native exact-source review and real externally published artifact observation remain required; no native permission, authenticated completion or Acceptance is claimed."
+    },
+    {
+      "path": "ci/reuse/located-error.test.ts",
+      "selection": "Exact immutable P readQualityScope decides required membership; staged exclusions remain explicit",
+      "semanticCases": [],
+      "coverage": "legacy-workload-only",
+      "limitation": "Required source workload for native review artifact custody, located refusals, exact caller runtime resolution and CI-origin refusal. Existing external semantic cases do not authenticate these new internal assertions. Independent native exact-source review and real externally published artifact observation remain required; no native permission, authenticated completion or Acceptance is claimed."
+    },
+    {
+      "path": "ci/reuse/review-pr.test.ts",
+      "selection": "Exact immutable P readQualityScope decides required membership; staged exclusions remain explicit",
+      "semanticCases": [],
+      "coverage": "legacy-workload-only",
+      "limitation": "Required source workload for native review artifact custody, located refusals, exact caller runtime resolution and CI-origin refusal. Existing external semantic cases do not authenticate these new internal assertions. Independent native exact-source review and real externally published artifact observation remain required; no native permission, authenticated completion or Acceptance is claimed."
     }
   ],
   "canonicalWorkload": [
