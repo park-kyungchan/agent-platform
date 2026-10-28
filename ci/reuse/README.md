@@ -189,3 +189,9 @@ create provider clients or modify global models/configuration. `native-claude
 through real native sessions; smoke output cannot publish the independent-review
 status. Muse currently has mechanical-only authorization. Extending judgment
 review to another runtime requires its own reviewed adapter and native policy.
+
+A second native caller can run the same command with `--check`: it resolves the
+same source/owner/reviewer bindings and validates the existing exact artifact and
+authenticated status without issuing a new judgment or republishing. A mechanical
+caller such as Muse may invoke this path with reviewer `native-claude`; the
+independent source judgment still belongs to the actual Opus session.

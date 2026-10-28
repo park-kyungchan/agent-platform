@@ -3,14 +3,18 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { deriveReviewedSourceManifest } from "../quality/receipt-validator";
-import { validateRawReviewArtifact } from "../quality/review-artifact";
+import {
+  validateRawReviewArtifact,
+  authenticatedReviewReader,
+  validateReviewArtifact,
+} from "../quality/review-artifact";
 import { nativeReviewPolicy, publishNativeReviewArtifact } from "./publish-review-artifact";
 import { verifyCommittedSourceAuthor } from "./source-author";
 import { reviewerInvocation } from "./review-runtimes";
 import { locatedError } from "./located-error";
 
 /** One native command: exact pushed PR head -> fresh independent native output -> verified status. */
-export async function reviewPr(head: string, runtime: string, smoke = false) {
+export async function reviewPr(head: string, runtime: string, smoke = false, checkOnly = false) {
   if (process.env.CI || process.env.GITHUB_ACTIONS)
     throw Error("Native review cannot originate in CI");
   const root = process.cwd(),
@@ -56,6 +60,30 @@ export async function reviewPr(head: string, runtime: string, smoke = false) {
     { sha: tree, truncated: false, tree: entries },
     tree,
   );
+  const reviewBase = git(["merge-base", head, "origin/main"]);
+  if (checkOnly) {
+    const auth = Bun.spawnSync(["gh", "auth", "token"], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (auth.exitCode !== 0) throw Error("Native authenticated review check unavailable");
+    const reader = authenticatedReviewReader(policy.repository, auth.stdout.toString().trim());
+    const statuses = await reader.json(`commits/${head}/statuses?per_page=100`);
+    if (!Array.isArray(statuses)) throw Error("Native review statuses unavailable");
+    const status = statuses.find((s) => s?.context === "native-independent-review");
+    const result = await validateReviewArtifact({ policy, head, status }, reader);
+    if (
+      result.reviewer.runtime !== runtime ||
+      result.author.runtime !== author.metadata.author.runtime ||
+      result.author.taskId !==
+        (author.metadata.author.threadId ?? author.metadata.author.sessionId) ||
+      result.manifest.sha256 !== manifest.sha256
+    )
+      throw Error("Current native review/source/runtime binding differs");
+    console.log(JSON.stringify({ phase: "verified-existing-native-review", ...result }));
+    return;
+  }
   const sessionId = randomUUID(),
     command = reviewerInvocation(runtime, sessionId, smoke);
   if (!Bun.which(command[0]!)) throw Error("Requested native reviewer CLI is not installed");
@@ -80,7 +108,7 @@ export async function reviewPr(head: string, runtime: string, smoke = false) {
   };
   const prompt = smoke
     ? `Mechanical transport smoke only. Do not inspect files, run tools, perform source review or claim Acceptance. Return ONLY this JSON object, unchanged in meaning and without markdown. This record is ineligible for native-independent-review status.\n${JSON.stringify(proof, null, 2)}\n`
-    : `You are a fresh independent native source reviewer. Read-only: no edits, writes, ref/index/config changes, publication, subagents or private user-data reads. Read AGENTS.md and review the exact pushed head ${head}, tree ${tree}, against its first parent in ${root}. Inspect all public technical changes and actionable correctness/security/regression/scope defects. Never read private student/class-record bodies or print private path names; private custody changes are metadata-only. CI cannot mint independent native review. Raw native output, source/publisher/run/artifact/digest/latest-status joins must be exact. Do not assume checks passed or native activation/Acceptance occurred. Return ONLY valid JSON without fences with the following exact proof fields. If findings remain, set conclusion fail and the exact unresolved count, with severity/path/line/explanation/suggestedFix per finding. Otherwise pass/zero/empty findings.\n${JSON.stringify(proof, null, 2)}\n`;
+    : `You are a fresh independent native source reviewer. Read-only: no edits, writes, ref/index/config changes, publication, subagents or private user-data reads. Read AGENTS.md and review the exact pushed head ${head}, tree ${tree}, against the target-main merge base ${reviewBase} in ${root}. Review the entire PR diff ${reviewBase}..${head}, not only the last commit. Read immutable committed bytes with git show ${head}:path. Inspect all public technical changes and actionable correctness/security/regression/scope defects. Never read private student/class-record bodies or print private path names; private custody changes are metadata-only. CI cannot mint independent native review. Raw native output, source/publisher/run/artifact/digest/latest-status joins must be exact. Do not assume checks passed or native activation/Acceptance occurred. Return ONLY valid JSON without fences with the following exact proof fields. If findings remain, set conclusion fail and the exact unresolved count, with severity/path/line/explanation/suggestedFix per finding. Otherwise pass/zero/empty findings.\n${JSON.stringify(proof, null, 2)}\n`;
   const promptPath = join(directory, "prompt.txt"),
     rawPath = join(directory, "native.raw.json"),
     stderrPath = join(directory, "native.stderr.log");
@@ -139,9 +167,14 @@ export async function reviewPr(head: string, runtime: string, smoke = false) {
 if (import.meta.main) {
   try {
     const [head, runtime, ...flags] = Bun.argv.slice(2);
-    if (!head || !runtime || flags.some((f) => f !== "--smoke"))
-      throw Error("Use review-pr.ts <pushed-PR-head> <native-reviewer-runtime> [--smoke]");
-    await reviewPr(head, runtime, flags.includes("--smoke"));
+    if (
+      !head ||
+      !runtime ||
+      flags.some((f) => !["--smoke", "--check"].includes(f)) ||
+      (flags.includes("--smoke") && flags.includes("--check"))
+    )
+      throw Error("Use review-pr.ts <pushed-PR-head> <native-reviewer-runtime> [--smoke|--check]");
+    await reviewPr(head, runtime, flags.includes("--smoke"), flags.includes("--check"));
   } catch (error) {
     console.error(locatedError(error, "review_artifact_refused"));
     process.exitCode = 1;
