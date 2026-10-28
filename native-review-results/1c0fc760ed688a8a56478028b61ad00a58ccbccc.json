@@ -1,0 +1,24 @@
+{
+  "schema": "agent-platform.independent-review-result.v1",
+  "recordClass": "verification",
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "1c0fc760ed688a8a56478028b61ad00a58ccbccc",
+  "reviewedTreeSha": "c940b5060c138803f77c97c8d52c37d8cfb1101a",
+  "reviewedSourceManifestSha256": "f26885d7ebc640cce55cc78c9568aaf5c2b381b51ce6c5cf7942c18390ff79e3",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a1817a-3b2f-7a42-a5f2-334577859b3e"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a180d8-5733-72c2-9849-a1d1dc4e09f0"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "rawNativeOutputSha256": "8d75ffd2938e5735e6561e444dcde9afa4540dd21b52ba274449c54873d2007d",
+  "nativeAuthenticationEstablished": false
+}
