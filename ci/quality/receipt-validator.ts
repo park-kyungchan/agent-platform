@@ -281,7 +281,7 @@ export function verifyIndependentReviewResult(
 }
 
 /** Shared exact-source/independence predicate; ownership is checked separately by each schema. */
-export function validateExactNativeReview(
+export function validateNativeReviewSource(
   value: ObjectValue,
   head: string,
   tree: string,
@@ -300,10 +300,19 @@ export function validateExactNativeReview(
     !isReviewRuntime(author.runtime) ||
     !taskId(reviewer.taskId) ||
     !taskId(author.taskId) ||
-    reviewer.taskId === author.taskId ||
-    value.conclusion !== "pass" ||
-    value.unresolvedFindings !== 0
+    reviewer.taskId === author.taskId
   )
+    throw new Error("Review does not prove exact source and independent native identities");
+}
+
+export function validateExactNativeReview(
+  value: ObjectValue,
+  head: string,
+  tree: string,
+  manifestSha256: string,
+): void {
+  validateNativeReviewSource(value, head, tree, manifestSha256);
+  if (value.conclusion !== "pass" || value.unresolvedFindings !== 0)
     throw new Error("Review does not prove exact source and independent native identities");
 }
 

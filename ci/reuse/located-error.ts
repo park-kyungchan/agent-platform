@@ -8,6 +8,7 @@ const sourceFiles = new Set([
   "ci/reuse/publish-review-artifact.ts",
   "ci/reuse/review-pr.ts",
   "ci/reuse/review-runtimes.ts",
+  "ci/reuse/review-attempt.ts",
   "ci/reuse/trusted-review-source.ts",
   "ci/reuse/located-error.ts",
   "ci/quality/review-artifact.ts",

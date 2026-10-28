@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
@@ -15,10 +14,21 @@ import {
 } from "../quality/receipt-validator";
 import { locatedError } from "./located-error";
 import { requireTrustedReviewContext, type TrustedReviewContext } from "./trusted-review-source";
+import {
+  requireNativeReviewAttempt,
+  requireCurrentReviewAttempt,
+  type NativeReviewAttempt,
+} from "./review-attempt";
 
 /** Native publisher only: preserve the actual reviewer bytes, upload once, verify, then attest. */
-export async function publishNativeReviewArtifact(context: TrustedReviewContext, rawPath: string) {
+export async function publishNativeReviewArtifact(
+  context: TrustedReviewContext,
+  rawPath: string,
+  attempt: NativeReviewAttempt,
+) {
   requireTrustedReviewContext(context);
+  requireNativeReviewAttempt(context, attempt);
+  await requireCurrentReviewAttempt(context, attempt);
   const { head, policy } = context;
   await context.revalidate();
   if (process.env.CI || process.env.GITHUB_ACTIONS)
@@ -73,7 +83,7 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
   if (workflow.path !== reviewArtifactWorkflow || workflow.state !== "active")
     throw Error("Default-branch evidence workflow unavailable; merge its reviewed source first");
   await context.revalidate();
-  const requestId = randomUUID();
+  const requestId = attempt.id;
   async function post(path: string, value: unknown, expected: number) {
     const response = await fetch(`https://api.github.com/repos/${policy.repository}/${path}`, {
       method: "POST",
@@ -92,6 +102,7 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
     return expected === 204 ? null : response.json();
   }
   console.log(JSON.stringify({ phase: "dispatch", requestId, headSha: head, retryAllowed: false }));
+  await requireCurrentReviewAttempt(context, attempt);
   await post(
     "actions/workflows/native-review-evidence.yml/dispatches",
     {
@@ -136,7 +147,9 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
   const preflight = {
     ...reader,
     json: async (path: string) =>
-      path === `commits/${head}/statuses?per_page=100` ? [status] : reader.json(path),
+      path === `commits/${head}/statuses?per_page=100`
+        ? [status, ...(await requireCurrentReviewAttempt(context, attempt))]
+        : reader.json(path),
   };
   await validatePublishedReviewArtifact(
     { policy, head: head!, status, rawBytes: bytes },
@@ -153,6 +166,7 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
     }),
   );
   await context.revalidate();
+  await requireCurrentReviewAttempt(context, attempt);
   await post(
     `statuses/${head}`,
     {

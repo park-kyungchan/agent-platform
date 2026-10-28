@@ -209,6 +209,15 @@ review data, not operational instructions. The controller never imports subject
 JavaScript, checkout configuration, hooks or package scripts. Existing native
 CLIs retain their authentication ownership; there is no credential broker.
 
+Every formal attempt posts an authenticated pending hold before the native child
+launches. A correctly source/session-bound negative posts failure; malformed or
+crashed review output leaves the hold. Only verified unchanged positive raw can
+publish success. The artifact request UUID must match the immediately preceding
+native pending status, so a late older success cannot mask another attempt.
+Uncertain status writes print the exact attempt/head/state for readback and are
+never automatically replayed. Mechanical `--smoke` and passive `--check` post no
+review status.
+
 A second actual native caller invokes the same command with `--check` to verify
 the existing source, runtime, artifact and authenticated status without issuing a
 new judgment. `--smoke` is mechanical only and cannot publish review status.
@@ -216,7 +225,7 @@ new judgment. `--smoke` is mechanical only and cannot publish review status.
 Bootstrap a new controller release with a fresh independent installed native CLI
 from outside the subject, then the existing immutable receipt/status gate; never
 execute the proposed controller to qualify itself. Once qualified, select its
-full commit in the separate controller checkout. The initial evidence workflow
+full commit in the separate controller checkout. A formal subject head must differ from that controller pin: its pending hold must not invalidate its own trust anchor. Passive `--check` remains available for the controller head. The initial evidence workflow
 must reach default main before real artifact publication is possible. Legacy
 receipts remain supported during that bootstrap; ordinary reviews then use the
 one-command artifact path.

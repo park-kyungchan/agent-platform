@@ -3,6 +3,7 @@ import { readArtifactMember } from "./artifact-archive";
 import {
   deriveReviewedSourceManifest,
   validateExactNativeReview,
+  validateNativeReviewSource,
   type NativeReviewIdentity,
 } from "./receipt-validator";
 
@@ -48,7 +49,7 @@ export function reviewArtifactTarget(target: unknown, repository: string) {
   );
   return { runId: Number(match[1]), artifactId: Number(match[2]), digest: match[3]! };
 }
-export function validateRawReviewArtifact(
+export function validateCompletedReviewObservation(
   bytes: Uint8Array,
   policy: ReviewArtifactPolicy,
   head: string,
@@ -69,12 +70,68 @@ export function validateRawReviewArtifact(
       Object.keys(policy.binding).every((key) => binding[key] === policy.binding[key]),
     "EXACT_OWNER_BINDING_REQUIRED",
   );
-  validateExactNativeReview(raw, head, tree, manifest);
-  need(Array.isArray(raw.findings) && raw.findings.length === 0, "ZERO_CURRENT_FINDINGS_REQUIRED");
+  validateNativeReviewSource(raw, head, tree, manifest);
+  need(
+    Array.isArray(raw.findings) &&
+      Number.isSafeInteger(raw.unresolvedFindings) &&
+      Number(raw.unresolvedFindings) === raw.findings.length &&
+      ((raw.conclusion === "pass" && raw.findings.length === 0) ||
+        (raw.conclusion === "fail" && raw.findings.length > 0)),
+    "COMPLETE_FINDING_COUNT_REQUIRED",
+  );
   return raw as Record<string, unknown> & {
     reviewer: NativeReviewIdentity;
     author: NativeReviewIdentity;
   };
+}
+export function validateRawReviewArtifact(
+  bytes: Uint8Array,
+  policy: ReviewArtifactPolicy,
+  head: string,
+  tree: string,
+  manifest: string,
+) {
+  const raw = validateCompletedReviewObservation(bytes, policy, head, tree, manifest);
+  validateExactNativeReview(raw, head, tree, manifest);
+  return raw;
+}
+export const reviewAttemptIdPattern =
+  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+export function reviewAttemptTarget(repository: string, head: string, id: string): string {
+  need(
+    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) &&
+      /^[a-f0-9]{40}$/.test(head) &&
+      reviewAttemptIdPattern.test(id),
+    "EXACT_REVIEW_ATTEMPT_REQUIRED",
+  );
+  return `https://github.com/${repository}/commit/${head}#native-review-attempt-${id}`;
+}
+/** A completed older attempt may never overwrite a newer hold, even if its status POST wins a race. */
+export function validateArtifactAttempt(
+  history: unknown[],
+  status: unknown,
+  run: unknown,
+  policy: ReviewArtifactPolicy,
+  head: string,
+): void {
+  const title = object(run).display_title;
+  need(
+    typeof title === "string" && title.startsWith("Native review evidence "),
+    "REVIEW_ATTEMPT_RUN_REQUIRED",
+  );
+  const id = title.slice("Native review evidence ".length);
+  const states = history.filter((s) => object(s).context === "native-independent-review");
+  const pending = object(states[1]);
+  need(
+    same(states[0], status) &&
+      pending.state === "pending" &&
+      Number.isSafeInteger(pending.id) &&
+      Number(pending.id) > 0 &&
+      pending.id !== object(status).id &&
+      publisher(pending.creator, policy.publisher) &&
+      pending.target_url === reviewAttemptTarget(policy.repository, head, id),
+    "REVIEW_ATTEMPT_SUPERSEDED",
+  );
 }
 /** Read-only transport. Only the separately authenticated native publisher can attest these raw bytes. */
 export async function validateReviewArtifact(
@@ -166,6 +223,7 @@ export async function validateReviewArtifact(
       ),
     "LATEST_STATUS_CHANGED",
   );
+  validateArtifactAttempt(latest as unknown[], status, run, policy, head);
   return {
     schema: "native-independent-review-artifact-ci.v1",
     headSha: head,

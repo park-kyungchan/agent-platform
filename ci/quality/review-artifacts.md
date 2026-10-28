@@ -48,6 +48,12 @@ dispatches only the default main workflow, checks the successful external run
 and requires its artifact bytes to equal the native original before status
 publication and on final readback, then posts
 its authenticated status with the artifact's immutable ID and archive digest.
+Formal attempts publish authenticated pending before launching the reviewer.
+Correctly bound completed findings publish failure. Success requires the exact
+artifact request UUID to join its immediately preceding pending status; an
+intervening hold/failure/other attempt refuses even if a late old success wins
+an API write race. Crashed/malformed reviews retain pending. Status writes are
+not retried under uncertainty; reconcile the printed attempt/head/state first.
 No model runs in Actions and no CI token receives status or dispatch permission.
 Uncertain dispatch/publication is reconciled by the printed request/run/artifact
 IDs before any further action. Artifact expiry/deletion fails closed; retain the
