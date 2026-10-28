@@ -586,7 +586,7 @@ export async function validateMergeCorrespondenceAssignment(
   return assignment;
 }
 
-/** USER contract: T0 starts this ONE short REST batch after proof consumption.
+/** Root-adopted Guider proposal (not user-ratified): T0 starts this ONE short REST batch after proof consumption.
  * Append-only attempt anchors bound T0 currentness. This is not a transactional
  * or simultaneous return-time snapshot. Observed later changes still refuse.
  * No proof/source reads or untrusted awaits follow the batch before return.

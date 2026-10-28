@@ -14,7 +14,7 @@ import {
 } from "./review-runtimes";
 import { ProcessOutputCapture } from "../quality/trusted/process";
 import { expect, test } from "bun:test";
-import { join } from "node:path";
+import { isAbsolute, join, normalize } from "node:path";
 
 test("merge correspondence selects its closed eligibility guard before any native attempt", async () => {
   const { readFile } = await import("node:fs/promises");
@@ -690,16 +690,22 @@ type NativeCaseApi = {
   requireCurrentReviewAttempt: (c: unknown, a: unknown) => Promise<unknown[]>;
   beginNativeReviewAttempt: (c: unknown, id: string, assignment?: unknown) => Promise<unknown>;
   prepareMergeCorrespondenceAssignment: (c: unknown) => Promise<unknown>;
-  invokeNativeReview: (c: unknown, a: unknown, r: string) => Promise<unknown>;
+  invokeNativeReview: (c: unknown, a: unknown, r: string, promptFile?: unknown) => Promise<unknown>;
+  smokeNativeReview: (c: unknown, r: string, promptFile?: unknown) => Promise<void>;
   failNativeReviewAttempt: (a: unknown, o: unknown) => Promise<void>;
   readCompletedNativeObservation: (
     c: unknown,
     a: unknown,
     o: unknown,
-  ) => { bytes: Buffer; raw: Record<string, unknown> };
+  ) => {
+    bytes: Buffer;
+    raw: Record<string, unknown>;
+    prompt?: Readonly<{ path: string; sha256: string; bytes: number }>;
+  };
 };
-async function nativeCase(scenario = "pass", predecessor = false) {
-  const { readFile } = await import("node:fs/promises"),
+async function nativeCase(scenario = "pass", predecessor: boolean | string = false) {
+  const { readFile, open, realpath } = await import("node:fs/promises"),
+    { constants: fsConstants } = await import("node:fs"),
     { createHash } = await import("node:crypto");
   const { reviewAttemptTarget, validateCompletedReviewObservation } =
     await import("../quality/review-artifact");
@@ -710,7 +716,13 @@ async function nativeCase(scenario = "pass", predecessor = false) {
   } = await import("../quality/review-assignment");
   const old = predecessor
     ? Bun.spawnSync(
-        ["git", "show", "8f78f54111f59e3af2bf702826eeefa761d2568d:ci/reuse/review-attempt.ts"],
+        [
+          "git",
+          "show",
+          (typeof predecessor === "string"
+            ? predecessor
+            : "8f78f54111f59e3af2bf702826eeefa761d2568d") + ":ci/reuse/review-attempt.ts",
+        ],
         { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
       )
     : null;
@@ -741,7 +753,33 @@ async function nativeCase(scenario = "pass", predecessor = false) {
   });
   let posts = 0,
     launches = 0,
-    revoked = false;
+    revoked = false,
+    promptReads = 0,
+    promptOpens = 0,
+    afterPromptClose: (() => Promise<void>) | undefined;
+  const childInputs: Buffer[] = [],
+    writes = new Map<string, Buffer>(),
+    logs: unknown[] = [];
+  const trackedOpen = async (...args: Parameters<typeof open>) => {
+    promptOpens++;
+    const file = await open(...args);
+    return new Proxy(file, {
+      get(target, property) {
+        if (property === "read")
+          return async (...readArgs: unknown[]) => {
+            promptReads++;
+            return Reflect.apply(target.read, target, readArgs);
+          };
+        if (property === "close")
+          return async () => {
+            await target.close();
+            await afterPromptClose?.();
+          };
+        const value: unknown = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  };
   const pendingFences: unknown[] = [];
   const states: Record<string, unknown>[] = [
     {
@@ -790,9 +828,12 @@ async function nativeCase(scenario = "pass", predecessor = false) {
   };
   let bytes = Buffer.from(
     JSON.stringify({
-      schema: scenario.startsWith("merge-")
-        ? "native-independent-merge-correspondence-output.v1"
-        : "native-independent-review-output.v1",
+      schema:
+        scenario === "smoke"
+          ? "native-review-smoke.v1"
+          : scenario.startsWith("merge-")
+            ? "native-independent-merge-correspondence-output.v1"
+            : "native-independent-review-output.v1",
       reviewStatus: "complete",
       binding: context.policy.binding,
       headSha: scenario === "wrong-source" ? "e".repeat(40) : head,
@@ -805,7 +846,9 @@ async function nativeCase(scenario = "pass", predecessor = false) {
       findings: ["negative", "replace-negative-raw"].includes(scenario)
         ? [{ path: "source.ts", line: 1, severity: "P1", explanation: "synthetic defect" }]
         : [],
-      nativeReviewPendingStatusId: 101,
+      ...(scenario === "smoke"
+        ? {}
+        : { nativeReviewPendingStatusId: scenario === "wrong-pending" ? 999 : 101 }),
       ...(scenario.startsWith("merge-") && scenario !== "merge-dropped-raw"
         ? {
             reviewAssignment:
@@ -852,8 +895,9 @@ async function nativeCase(scenario = "pass", predecessor = false) {
       ),
     }),
     which: () => "/synthetic-codex",
-    spawn: () => {
+    spawn: (_args: string[], options: { stdin: string | Uint8Array }) => {
       launches++;
+      childInputs.push(Buffer.from(options.stdin));
       return {
         stdout: stream(events),
         stderr: stream(),
@@ -887,6 +931,11 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     "mkdtemp",
     "readFile",
     "writeFile",
+    "open",
+    "realpath",
+    "fsConstants",
+    "isAbsolute",
+    "normalize",
     "join",
     "tmpdir",
     "deriveReviewedSourceManifest",
@@ -907,7 +956,7 @@ async function nativeCase(scenario = "pass", predecessor = false) {
   const api = new Function(
     ...names,
     source +
-      "\nreturn {beginNativeReviewAttempt,invokeNativeReview,failNativeReviewAttempt,readCompletedNativeObservation,requireNativeReviewAttempt,requireCurrentReviewAttempt,...(typeof prepareMergeCorrespondenceAssignment === 'function' ? {prepareMergeCorrespondenceAssignment} : {})};",
+      "\nreturn {beginNativeReviewAttempt,invokeNativeReview,smokeNativeReview,failNativeReviewAttempt,readCompletedNativeObservation,requireNativeReviewAttempt,requireCurrentReviewAttempt,...(typeof prepareMergeCorrespondenceAssignment === 'function' ? {prepareMergeCorrespondenceAssignment} : {})};",
   )(
     nativeBun,
     nativeFetch,
@@ -916,12 +965,19 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     },
     reviewAttemptTarget,
     validateCompletedReviewObservation,
-    { log: () => {} },
+    { log: (value: unknown) => logs.push(value) },
     () => id,
     createHash,
     async () => "/synthetic-native-output",
     async (path: string) => (path.endsWith("events.jsonl") ? eventsFile : bytes),
-    async () => {},
+    async (path: string, data: string | Uint8Array) => {
+      writes.set(path, Buffer.from(data));
+    },
+    trackedOpen,
+    realpath,
+    fsConstants,
+    isAbsolute,
+    normalize,
     join,
     () => "/tmp",
     () => ({ sha256: manifest }),
@@ -949,6 +1005,18 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     id,
     states,
     pendingFences,
+    childInputs,
+    writes,
+    logs,
+    get promptReads() {
+      return promptReads;
+    },
+    get promptOpens() {
+      return promptOpens;
+    },
+    afterPromptClose: (callback: () => Promise<void>) => {
+      afterPromptClose = callback;
+    },
     get posts() {
       return posts;
     },
@@ -963,6 +1031,227 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     },
   };
 }
+
+const fullPromptPredecessor = process.env.FULL_PROMPT_PREDECESSOR;
+if (fullPromptPredecessor && fullPromptPredecessor !== "90784712250c1e27bf255d11ba660deeb595131b")
+  throw Error("FULL_PROMPT_PREDECESSOR_EXACT_907_REQUIRED");
+const fullPromptBytes = Buffer.from(
+  "Independent FULL source review fixture.\nPreserve every byte: π.\n",
+);
+async function withFullPrompt(
+  run: (directory: string, path: string) => Promise<void>,
+  bytes: Uint8Array = fullPromptBytes,
+) {
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises"),
+    { tmpdir } = await import("node:os");
+  const directory = await mkdtemp(join(tmpdir(), "full-prompt-input-")),
+    path = join(directory, "prompt.md");
+  await writeFile(path, bytes);
+  try {
+    await run(directory, path);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+
+test("FULL-PROMPT-INPUT snapshots one read into actual stdin, persisted bytes and immutable metadata", async () => {
+  const { writeFile, readFile } = await import("node:fs/promises"),
+    { createHash } = await import("node:crypto");
+  await withFullPrompt(async (_directory, path) => {
+    const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+      attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+    h.afterPromptClose(async () => {
+      await writeFile(path, "replacement after immutable snapshot");
+    });
+    const observation = await h.api.invokeNativeReview(h.context, attempt, "native-codex", path),
+      result = h.api.readCompletedNativeObservation(h.context, attempt, observation),
+      expectedHash = createHash("sha256").update(fullPromptBytes).digest("hex");
+    expect(h.childInputs).toEqual([fullPromptBytes]);
+    expect(h.promptReads).toBe(1);
+    expect(h.promptOpens).toBe(1);
+    expect(await readFile(path, "utf8")).toBe("replacement after immutable snapshot");
+    expect(result.prompt).toEqual({
+      path: "/synthetic-native-output/prompt.txt",
+      sha256: expectedHash,
+      bytes: fullPromptBytes.length,
+    });
+    expect(h.writes.get(result.prompt!.path)).toEqual(fullPromptBytes);
+    expect(Object.isFrozen(result.prompt)).toBe(true);
+    expect(Reflect.set(result.prompt!, "sha256", "0".repeat(64))).toBe(false);
+    expect(
+      h.api.readCompletedNativeObservation(h.context, attempt, observation).prompt?.sha256,
+    ).toBe(expectedHash);
+    expect(h.posts).toBe(1);
+    expect(h.launches).toBe(1);
+  });
+});
+
+test("FULL-PROMPT-INPUT metadata belongs to the actual opaque observation", async () => {
+  await withFullPrompt(async (_directory, path) => {
+    const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+      attempt = await h.api.beginNativeReviewAttempt(h.context, h.id),
+      observation = await h.api.invokeNativeReview(h.context, attempt, "native-codex", path),
+      result = h.api.readCompletedNativeObservation(h.context, attempt, observation);
+    expect(result.prompt?.bytes).toBe(fullPromptBytes.length);
+    expect(() =>
+      h.api.readCompletedNativeObservation(h.context, attempt, {
+        ...(observation as object),
+        prompt: result.prompt,
+      }),
+    ).toThrow("COMPLETED_NATIVE_OBSERVATION_REQUIRED");
+    expect(() =>
+      h.api.readCompletedNativeObservation({ ...h.context }, attempt, observation),
+    ).toThrow("FOREIGN_CONTEXT");
+  });
+});
+
+for (const kind of [
+  "missing",
+  "symlink",
+  "parent-symlink",
+  "relative",
+  "traversal",
+  "nul-path",
+  "directory",
+  "oversized",
+  "empty",
+  "whitespace",
+  "invalid-utf8",
+  "nul-bytes",
+  "wrong-type",
+]) {
+  test("FULL-PROMPT-INPUT refuses " + kind + " before native launch", async () => {
+    const { writeFile, symlink, mkdir } = await import("node:fs/promises");
+    await withFullPrompt(async (directory, path) => {
+      let supplied: unknown = path;
+      if (kind === "missing") supplied = join(directory, "missing.md");
+      if (kind === "symlink") {
+        supplied = join(directory, "linked.md");
+        await symlink(path, String(supplied));
+      }
+      if (kind === "parent-symlink") {
+        const realDirectory = join(directory, "real"),
+          linkedDirectory = join(directory, "linked");
+        await mkdir(realDirectory);
+        await writeFile(join(realDirectory, "prompt.md"), fullPromptBytes);
+        await symlink(realDirectory, linkedDirectory, "dir");
+        supplied = join(linkedDirectory, "prompt.md");
+      }
+      if (kind === "relative") supplied = "prompt.md";
+      if (kind === "traversal")
+        supplied = directory + "/../" + directory.split("/").at(-1) + "/prompt.md";
+      if (kind === "nul-path") supplied = path + "\0";
+      if (kind === "directory") supplied = directory;
+      if (kind === "oversized") await writeFile(path, Buffer.alloc(45001, 65));
+      if (kind === "empty") await writeFile(path, "");
+      if (kind === "whitespace") await writeFile(path, " \t\n");
+      if (kind === "invalid-utf8") await writeFile(path, Buffer.from([0xc3, 0x28]));
+      if (kind === "nul-bytes") await writeFile(path, Buffer.from("source\0prompt"));
+      if (kind === "wrong-type") supplied = 42;
+      const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+        attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+      await expect(
+        h.api.invokeNativeReview(h.context, attempt, "native-codex", supplied),
+      ).rejects.toThrow("EXTERNAL_PROMPT");
+      expect(h.launches).toBe(0);
+      expect(h.posts).toBe(1);
+    });
+  });
+}
+
+test("FULL-PROMPT-INPUT rejects bounded invocation without reading the file", async () => {
+  await withFullPrompt(async (_directory, path) => {
+    const h = await nativeCase("merge-pass", fullPromptPredecessor ?? false),
+      assignment = await h.api.prepareMergeCorrespondenceAssignment(h.context),
+      attempt = await h.api.beginNativeReviewAttempt(h.context, h.id, assignment);
+    await expect(
+      h.api.invokeNativeReview(h.context, attempt, "native-codex", path),
+    ).rejects.toThrow("EXTERNAL_PROMPT");
+    expect(h.promptOpens).toBe(0);
+    expect(h.launches).toBe(0);
+    expect(h.posts).toBe(1);
+  });
+});
+
+test("FULL-PROMPT-INPUT rejects smoke invocation without reading the file", async () => {
+  await withFullPrompt(async (_directory, path) => {
+    const h = await nativeCase("smoke", fullPromptPredecessor ?? false);
+    await expect(h.api.smokeNativeReview(h.context, "native-codex", path)).rejects.toThrow(
+      "EXTERNAL_PROMPT",
+    );
+    expect(h.promptOpens).toBe(0);
+    expect(h.launches).toBe(0);
+    expect(h.posts).toBe(0);
+  });
+});
+
+for (const kind of ["pending-held", "controller-held"]) {
+  test("FULL-PROMPT-INPUT rechecks " + kind + " after consuming the file", async () => {
+    await withFullPrompt(async (_directory, path) => {
+      const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+        attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+      h.afterPromptClose(async () => {
+        if (kind === "controller-held") h.revoke();
+        else h.states.unshift({ ...h.states[0], id: 102, state: "pending" });
+      });
+      await expect(
+        h.api.invokeNativeReview(h.context, attempt, "native-codex", path),
+      ).rejects.toThrow();
+      expect(h.promptReads).toBe(1);
+      expect(h.launches).toBe(0);
+      expect(h.posts).toBe(1);
+    });
+  });
+}
+
+for (const scenario of ["wrong-source", "wrong-pending"]) {
+  test("FULL-PROMPT-INPUT retains actual native proof rejection for " + scenario, async () => {
+    await withFullPrompt(async (_directory, path) => {
+      const h = await nativeCase(scenario, fullPromptPredecessor ?? false),
+        attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+      await expect(
+        h.api.invokeNativeReview(h.context, attempt, "native-codex", path),
+      ).rejects.toThrow();
+      expect(h.childInputs).toEqual([fullPromptBytes]);
+      expect(h.posts).toBe(1);
+    });
+  });
+}
+
+test("FULL-PROMPT-INPUT authenticates opaque attempts before opening a prompt file", async () => {
+  await withFullPrompt(async (_directory, path) => {
+    const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+      attempt = await h.api.beginNativeReviewAttempt(h.context, h.id);
+    await expect(
+      h.api.invokeNativeReview(h.context, { ...(attempt as object) }, "native-codex", path),
+    ).rejects.toThrow("AUTHENTICATED_ATTEMPT_REQUIRED");
+    expect(h.promptOpens).toBe(0);
+    expect(h.launches).toBe(0);
+  });
+});
+
+test("FULL-PROMPT-INPUT keeps default FULL stdin and observation shape unchanged", async () => {
+  const h = await nativeCase("pass", fullPromptPredecessor ?? false),
+    attempt = await h.api.beginNativeReviewAttempt(h.context, h.id),
+    observation = await h.api.invokeNativeReview(h.context, attempt, "native-codex");
+  expect(h.childInputs[0]!.toString()).toStartWith(
+    "You are a fresh independent native source reviewer.",
+  );
+  expect(
+    h.api.readCompletedNativeObservation(h.context, attempt, observation).prompt,
+  ).toBeUndefined();
+  expect(h.promptReads).toBe(0);
+  expect(h.launches).toBe(1);
+});
+
+test("FULL-PROMPT-INPUT keeps default smoke transport unchanged", async () => {
+  const h = await nativeCase("smoke", fullPromptPredecessor ?? false);
+  await h.api.smokeNativeReview(h.context, "native-codex");
+  expect(h.childInputs[0]!.toString()).toStartWith("Mechanical transport smoke only.");
+  expect(h.promptReads).toBe(0);
+  expect(h.posts).toBe(0);
+  expect(h.launches).toBe(1);
+});
 
 test("MERGE-CORRESPONDENCE actual native invocation retains its opaque prepared assignment", async () => {
   const h = await nativeCase("merge-pass"),

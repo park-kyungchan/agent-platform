@@ -479,7 +479,7 @@ for (const mode of ["platform-legacy", "platform-artifact", "owner-artifact"] as
           return baselineArchive(id);
         },
       });
-      // USER contract: T0 starts ONE final REST batch after proof consumption.
+      // Root-adopted Guider proposal (not user-ratified): T0 starts ONE final REST batch after proof consumption.
       // There is no claim of transactional or simultaneous return-time currentness.
       // The old 312-case return-time sweep remains failed immutable evidence.
       const terminal = [
