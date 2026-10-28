@@ -16,6 +16,26 @@ import { ProcessOutputCapture } from "../quality/trusted/process";
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 
+test("merge correspondence selects its closed eligibility guard before any native attempt", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const text = await readFile(join(import.meta.dir, "review-pr.ts"), "utf8");
+  const body = new Bun.Transpiler({ loader: "ts" }).transformSync(text.slice(text.indexOf("export async function reviewPr("), text.indexOf("\nif (import.meta.main)")).replace("export async function", "async function"));
+  const effects: string[] = [];
+  const run = new Function("process", "reviewControllerRepository", "createTrustedReviewContext", "prepareMergeCorrespondenceAssignment", "beginNativeReviewAttempt", "randomUUID", "invokeNativeReview", "readCompletedNativeObservation", "failNativeReviewAttempt", "publishNativeReviewArtifact", body + "\nreturn reviewPr;")(
+    { env: {} }, "fixture/controller",
+    async () => { effects.push("context"); return {}; },
+    async () => { effects.push("eligibility"); throw Error("CLOSED_MERGE_ELIGIBILITY_REQUIRED"); },
+    async () => { effects.push("pending"); return {}; },
+    () => "00000000-0000-4000-8000-000000000001",
+    async () => { effects.push("native"); return {}; },
+    () => ({ raw: { conclusion: "pass" } }),
+    async () => { effects.push("failure"); },
+    async () => { effects.push("publish"); },
+  ) as (...args: unknown[]) => Promise<void>;
+  await expect(run("fixture/owner", "a".repeat(40), "native-codex", "b".repeat(40), false, false, true)).rejects.toThrow("CLOSED_MERGE_ELIGIBILITY_REQUIRED");
+  expect(effects).toEqual(["context", "eligibility"]);
+});
+
 test("generic review and publisher entrypoints refuse CI before source reads or native/authenticated effects", async () => {
   for (const entry of ["review-pr.ts", "publish-review-artifact.ts"]) {
     for (const marker of [{ CI: "true" }, { GITHUB_ACTIONS: "true" }]) {
