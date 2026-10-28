@@ -59,7 +59,7 @@ export async function verifyReview(
     }
     return raw;
   }
-  await reviewGate({
+  const artifactReview = await reviewGate({
     env: {
       GITHUB_REPOSITORY: repository,
       REVIEW_HEAD_SHA: subject.commit,
@@ -68,7 +68,18 @@ export async function verifyReview(
       NATIVE_REVIEW_STATUS_CREATOR_LOGIN: p.reviewPublisher.login,
     },
     readApi,
+    readArchive: reader.archive.bind(reader),
   });
+  if (artifactReview) {
+    insist(
+      artifactReview.manifest.sha256 === subject.sourceManifestSha256 &&
+        artifactReview.author.runtime === author.metadata.author.runtime &&
+        artifactReview.author.taskId === author.metadata.author.threadId,
+      "OBSERVED_SOURCE_AUTHOR_REVIEW_JOIN_REQUIRED",
+    );
+    receiptSha256 = artifactReview.rawSha256;
+    receipt = artifactReview;
+  }
   insist(receiptSha256 && receipt && latest, "FULL_REVIEW_CHAIN_REQUIRED");
   const current = await reader.json(repoPath(`commits/${subject.commit}/statuses?per_page=100`));
   insist(

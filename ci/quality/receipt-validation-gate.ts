@@ -1,3 +1,4 @@
+import { authenticatedReviewReader, validateReviewArtifact } from "./review-artifact";
 import {
   decodeBoundedReviewFile,
   deriveReviewedSourceManifest,
@@ -369,12 +370,50 @@ export async function ownerScopedReviewGate(policy: OwnerReviewPolicy): Promise<
     if (!response.ok) throw new Error("Owner review authenticated API read failed");
     return response.json() as Promise<unknown>;
   }
+  const artifactReader = authenticatedReviewReader(repository, token);
+  const statuses = await api(`commits/${head}/statuses?per_page=100`);
+  if (!Array.isArray(statuses) || statuses.length > 100)
+    throw Error("Owner review statuses unavailable");
+  const status = record(statuses.find((value) => record(value).context === policy.statusContext));
+  if (
+    typeof status.target_url === "string" &&
+    status.target_url.startsWith(`https://github.com/${repository}/actions/runs/`)
+  ) {
+    const result = await validateReviewArtifact(
+      {
+        policy: {
+          repository,
+          publisher: policy.publisher,
+          binding: {
+            repository: policy.repository,
+            projectId: policy.projectId,
+            domainId: policy.domainId,
+            semanticOwner: policy.semanticOwner,
+            scope: policy.scope,
+          },
+        },
+        head,
+        status,
+      },
+      artifactReader,
+    );
+    console.log(JSON.stringify(result));
+    return;
+  }
+  let initialStatuses: unknown = structuredClone(statuses);
   const result = await validateOwnerScopedReviewWithEvidence(
     policy,
     { repository, head },
     {
       readCommit: (sha) => api(`git/commits/${sha}`),
-      readStatuses: (sha) => api(`commits/${sha}/statuses?per_page=100`),
+      readStatuses: (sha) => {
+        if (initialStatuses) {
+          const first = initialStatuses;
+          initialStatuses = null;
+          return Promise.resolve(first);
+        }
+        return api(`commits/${sha}/statuses?per_page=100`);
+      },
       readTree: (sha) => api(`git/trees/${sha}?recursive=1`),
       readFile: (path, sha) => api(`contents/${path}?ref=${sha}`),
     },

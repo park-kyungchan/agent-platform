@@ -281,7 +281,7 @@ export function verifyIndependentReviewResult(
 }
 
 /** Shared exact-source/independence predicate; ownership is checked separately by each schema. */
-function validateExactNativeReview(
+export function validateExactNativeReview(
   value: ObjectValue,
   head: string,
   tree: string,

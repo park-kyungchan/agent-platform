@@ -28,6 +28,7 @@ export async function captureQualitySources(scope: QualityScope): Promise<Qualit
       "architecture/quality-policy.json",
       "ci/quality/any-baseline.json",
       "bun.lock",
+      ".bun-version",
       ".editorconfig",
       ".prettierignore",
     ]),

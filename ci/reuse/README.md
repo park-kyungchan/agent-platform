@@ -160,3 +160,15 @@ by this source proposal.
 
 References: [private sharing](https://docs.github.com/en/actions/how-tos/reuse-automations/share-across-private-repositories),
 [reuse and access boundaries](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations).
+
+Active source CI selects `.bun-version` as its single exact version source. A
+caller may pass `bun-version-file: .bun-version` instead of the historical
+`bun-version` literal. The shared action refuses simultaneous or missing values,
+symlinks, other filenames and non-release strings before runtime setup. The
+pinned trusted-ci-v1 controller retains its independently reviewed historical
+bootstrap; changing that release requires a successor policy, not a moving tag.
+
+Native review remains separate from this action. The additive
+[artifact transport](../quality/review-artifacts.md) accepts unchanged externally
+produced native output under the fixed publisher's authenticated exact-head
+status. The source action cannot dispatch that workflow or post that status.
