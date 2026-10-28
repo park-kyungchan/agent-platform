@@ -412,6 +412,7 @@ function ownerFixture(
     evidence: EvidenceArtifact;
     verification: VerificationArtifact;
   }) => void,
+  pendingStatusId?: number,
 ) {
   const policy: OwnerReviewPolicy = {
     repository: "owner/math",
@@ -433,6 +434,7 @@ function ownerFixture(
     conclusion: "pass",
     unresolvedFindings: 0,
   };
+  if (pendingStatusId !== undefined) proof.nativeReviewPendingStatusId = pendingStatusId;
   const raw: OwnerRawNativeReview = {
     ...structuredClone(proof),
     schema: "owner-scoped-native-review-output.v1",
@@ -539,7 +541,8 @@ function ownerFixture(
   const statuses = [
     {
       id: 42,
-      context: policy.statusContext,
+      // Real GitHub status pages can mix native and unrelated contexts.
+      context: String(policy.statusContext),
       state: "success",
       creator: { ...policy.publisher, id: 123 },
       target_url: `https://github.com/${policy.repository}/blob/${receiptCommit}/${receiptPath}`,
@@ -1098,4 +1101,128 @@ describe("additive owner-scoped review gate", () => {
       ),
     ).rejects.toThrow("Unsupported");
   });
+});
+
+test("owner legacy receipt cannot clear newer holds; fresh pending ID must bind raw, result and canonical evidence", async () => {
+  for (const state of ["pending", "failure"]) {
+    const f = ownerFixture(),
+      old = { ...f.statuses[0]!, id: 40 },
+      late = { ...old, id: 44 },
+      held = {
+        ...old,
+        id: 43,
+        state,
+        target_url: `https://github.com/${f.policy.repository}/commit/${head}#native-independent-review`,
+      };
+    f.statuses.splice(0, f.statuses.length, late, held, old);
+    await expect(
+      validateOwnerScopedReviewWithEvidence(
+        f.policy,
+        { repository: f.policy.repository, head },
+        f.reader,
+      ),
+    ).rejects.toThrow("FRESH_LEGACY_ATTEMPT_REQUIRED");
+  }
+  const f = ownerFixture(undefined, 43),
+    old = { ...f.statuses[0]!, id: 40 },
+    late = { ...old, id: 44 },
+    pending = {
+      ...old,
+      id: 43,
+      state: "pending",
+      target_url: `https://github.com/${f.policy.repository}/commit/${head}#native-independent-review`,
+    };
+  f.statuses.splice(0, f.statuses.length, late, pending, old);
+  await expect(
+    validateOwnerScopedReviewWithEvidence(
+      f.policy,
+      { repository: f.policy.repository, head },
+      f.reader,
+    ),
+  ).resolves.toHaveProperty("publisherAuthenticated", true);
+});
+
+test("truncated status history cannot establish ID-less owner legacy compatibility", async () => {
+  for (const state of ["pending", "failure"]) {
+    const f = ownerFixture(),
+      latest = { ...f.statuses[0]! };
+    const history = [
+      latest,
+      ...Array.from({ length: 99 }, (_, i) => ({ ...latest, id: 100 + i, context: `other-${i}` })),
+      {
+        ...latest,
+        id: 43,
+        state,
+        target_url: `https://github.com/${f.policy.repository}/commit/${head}#native-independent-review`,
+      },
+    ];
+    f.statuses.splice(0, f.statuses.length, ...history.slice(0, 100));
+    await expect(
+      validateOwnerScopedReviewWithEvidence(
+        f.policy,
+        { repository: f.policy.repository, head },
+        f.reader,
+      ),
+    ).rejects.toThrow("LEGACY_ATTEMPT_HISTORY_INCOMPLETE");
+  }
+});
+
+test("actual predecessor owner legacy selector accepts a late old success while the shared pending-ID fence refuses it", async () => {
+  const previous = Bun.spawnSync(
+    [
+      "git",
+      "show",
+      "a0678ade528b005496ae9a6ea5f67aa65ffb81ce:ci/quality/receipt-validation-gate.ts",
+    ],
+    { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+  );
+  expect(previous.exitCode).toBe(0);
+  const text = previous.stdout
+    .toString()
+    .replaceAll(
+      '"./review-artifact"',
+      JSON.stringify(new URL("./review-artifact.ts", import.meta.url).href),
+    )
+    .replaceAll(
+      '"./receipt-validator"',
+      JSON.stringify(new URL("./receipt-validator.ts", import.meta.url).href),
+    )
+    .replaceAll(
+      '"@palantirkc/ontology"',
+      JSON.stringify(import.meta.resolve("@palantirkc/ontology")),
+    );
+  const old = await import(
+    "data:text/javascript;base64," +
+      Buffer.from(new Bun.Transpiler({ loader: "ts" }).transformSync(text)).toString("base64")
+  );
+  for (const state of ["pending", "failure"]) {
+    const f = ownerFixture(),
+      prior = { ...f.statuses[0]!, id: 40 };
+    f.statuses.splice(
+      0,
+      f.statuses.length,
+      { ...prior, id: 44 },
+      {
+        ...prior,
+        id: 43,
+        state,
+        target_url: `https://github.com/${f.policy.repository}/commit/${head}#native-independent-review`,
+      },
+      prior,
+    );
+    await expect(
+      old.validateOwnerScopedReviewWithEvidence(
+        f.policy,
+        { repository: f.policy.repository, head },
+        f.reader,
+      ),
+    ).resolves.toHaveProperty("publisherAuthenticated", true);
+    await expect(
+      validateOwnerScopedReviewWithEvidence(
+        f.policy,
+        { repository: f.policy.repository, head },
+        f.reader,
+      ),
+    ).rejects.toThrow("FRESH_LEGACY_ATTEMPT_REQUIRED");
+  }
 });

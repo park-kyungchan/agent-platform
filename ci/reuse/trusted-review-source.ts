@@ -6,6 +6,7 @@ import { authenticatedReviewReader, type ReviewArtifactPolicy } from "../quality
 import { verifyCommittedSourceAuthor } from "./source-author";
 
 const trustedPolicy = structuredClone(policyInput);
+export const reviewControllerRepository = trustedPolicy.controllerRepository;
 export const reviewControllerRoot = resolve(import.meta.dir, "../..");
 export type TrustedRepository = (typeof trustedPolicy.repositories)[number];
 type RecordValue = Record<string, unknown>;
@@ -364,6 +365,12 @@ export async function createTrustedReviewContext(
     validateCommittedOwnerPolicy(row, manifests[0]);
   }
   const policy = nativeArtifactPolicy(row);
+  Object.freeze(row.bases);
+  Object.freeze(author.metadata.author);
+  Object.freeze(author.metadata.sourceOwner);
+  Object.freeze(author.metadata.logicalWork);
+  Object.freeze(author.metadata);
+  Object.freeze(author);
   Object.freeze(policy.binding);
   Object.freeze(policy.publisher);
   Object.freeze(policy);

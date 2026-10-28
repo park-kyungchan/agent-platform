@@ -1,4 +1,8 @@
-import { authenticatedReviewReader, validateReviewArtifact } from "./review-artifact";
+import {
+  authenticatedReviewReader,
+  validateReviewArtifact,
+  validateLegacyReviewAttempt,
+} from "./review-artifact";
 import {
   decodeBoundedReviewFile,
   deriveReviewedSourceManifest,
@@ -143,7 +147,8 @@ export async function validateOwnerScopedReviewWithEvidence(
       throw new Error("Owner review latest status is absent, held or from another publisher");
     return Object.freeze({ id, target_url: targetUrl, publisherId, publisherLogin, publisherType });
   }
-  const status = selectStatus(await reader.readStatuses(head));
+  const initialStatusHistory: unknown = structuredClone(await reader.readStatuses(head));
+  const status = selectStatus(initialStatusHistory);
   const target = immutableOwnerReviewUrl(status.target_url, policy, head, "native-reviews");
   const receiptBytes = decodeBoundedReviewFile(
     await reader.readFile(target.path, target.commit),
@@ -157,6 +162,7 @@ export async function validateOwnerScopedReviewWithEvidence(
   const manifest = deriveReviewedSourceManifest(await reader.readTree(tree), tree);
   validateOwnerReviewProof(unknownReceipt, policy, head, tree, manifest.sha256);
   const receipt = unknownReceipt as OwnerReviewReceipt;
+  validateLegacyReviewAttempt(policy, head, initialStatusHistory, status, receipt);
   const provenance = record(receiptRecord.provenance);
   if (
     provenance.owner !== policy.semanticOwner ||
@@ -321,7 +327,9 @@ export async function validateOwnerScopedReviewWithEvidence(
     throw new Error(
       "Owner review verification does not hash-bind result, evidence and raw native output",
     );
-  const currentStatus = selectStatus(await reader.readStatuses(head));
+  const finalStatusHistory: unknown = structuredClone(await reader.readStatuses(head));
+  const currentStatus = selectStatus(finalStatusHistory);
+  validateLegacyReviewAttempt(policy, head, finalStatusHistory, currentStatus, receipt);
   if (
     currentStatus.id !== status.id ||
     currentStatus.target_url !== status.target_url ||
@@ -425,7 +433,7 @@ export async function ownerScopedReviewGate(policy: OwnerReviewPolicy): Promise<
  * Only exact tree/manifest reuse is supported, with latest authenticated statuses on BOTH heads.
  * A current hold never falls back to the original success. No native authorship is authenticated.
  */
-export async function validatePlatformReviewWithEvidence(
+async function validatePlatformReviewBody(
   receipt: unknown,
   head: string,
   tree: string,
@@ -524,9 +532,71 @@ export async function validatePlatformReviewWithEvidence(
       s.target_url !== url
     )
       throw Error("Original latest review held, changed or from another publisher");
+    validateLegacyReviewAttempt(
+      { repository, publisher },
+      originalStatusHead,
+      statuses,
+      { id: s.id, target_url: s.target_url },
+      proof,
+    );
     return s.id;
   }
   const before = await currentOriginalStatus();
   if (before !== (await currentOriginalStatus()))
     throw Error("Original latest review changed during reuse");
+}
+
+/** Authenticate the current receipt and its attempt history on both sides of immutable proof reads. */
+export async function validatePlatformReviewWithEvidence(
+  receipt: unknown,
+  head: string,
+  tree: string,
+  repository: string,
+  reader: OwnerReviewReader,
+  publisher: { id: string; login?: string },
+): Promise<void> {
+  const frozenReceipt: unknown = structuredClone(receipt);
+  reader = snapshotOwnerReader(reader);
+  publisher = Object.freeze({ ...publisher });
+  async function current() {
+    const history: unknown = structuredClone(await reader.readStatuses(head));
+    if (!Array.isArray(history) || history.length > 100)
+      throw Error("Current legacy review statuses unavailable");
+    const status = record(history.find((s) => record(s).context === "native-independent-review")),
+      creator = record(status.creator);
+    if (
+      !Number.isSafeInteger(status.id) ||
+      Number(status.id) <= 0 ||
+      status.state !== "success" ||
+      String(creator.id) !== publisher.id ||
+      (publisher.login && creator.login !== publisher.login) ||
+      typeof status.target_url !== "string"
+    )
+      throw Error("Current legacy review held or changed");
+    const prefix = `https://github.com/${repository}/blob/`,
+      suffix = `/native-reviews/${head}.json`,
+      target = status.target_url;
+    if (!target.startsWith(prefix) || !target.endsWith(suffix))
+      throw Error("Current immutable legacy receipt target required");
+    const commit = target.slice(prefix.length, -suffix.length);
+    if (!/^[a-f0-9]{40}$/.test(commit) || commit === head)
+      throw Error("Current immutable legacy receipt commit required");
+    const path = `native-reviews/${head}.json`,
+      bytes = decodeBoundedReviewFile(await reader.readFile(path, commit), path, 32768);
+    if (JSON.stringify(JSON.parse(Buffer.from(bytes).toString())) !== JSON.stringify(frozenReceipt))
+      throw Error("Current legacy receipt differs from authenticated status");
+    validateLegacyReviewAttempt(
+      { repository, publisher },
+      head,
+      history,
+      { id: status.id, target_url: target },
+      frozenReceipt,
+    );
+    return { id: status.id, target_url: target };
+  }
+  const before = await current();
+  await validatePlatformReviewBody(frozenReceipt, head, tree, repository, reader, publisher);
+  const after = await current();
+  if (before.id !== after.id || before.target_url !== after.target_url)
+    throw Error("Current legacy review changed during proof verification");
 }

@@ -133,14 +133,14 @@ globalThis.fetch = async (url, options) => {
  if (!String(url).startsWith("https://api.github.com/repos/owner/platform/") ||
      options?.headers?.Authorization !== "Bearer fictional-test-token") throw Error("Unexpected network or auth");
  reads++;
- if (String(url).includes("/statuses?")) return Response.json([{ context: "native-independent-review", state: "success",
+ if (String(url).includes("/statuses?")) return Response.json([{ id: 11, context: "native-independent-review", state: "success",
    creator: { id: 42, login: "fictional-reviewer" }, target_url: "https://github.com/owner/platform/blob/" + receiptCommit + "/native-reviews/" + head + ".json" }]);
- if (String(url).includes("/contents/")) return Response.json({ type: "file", encoding: "base64",
+ if (String(url).includes("/contents/")) return Response.json({ type: "file", path: "native-reviews/" + head + ".json", encoding: "base64",
    size: JSON.stringify(receipt).length, content: Buffer.from(JSON.stringify(receipt)).toString("base64") });
  if (String(url).endsWith("/git/commits/" + head)) return Response.json({ sha: head, tree: { sha: tree } });
  throw Error("Unexpected evidence read");
 };
-process.on("exit", code => { if (code === 0 && reads !== 3) throw Error("Receipt reads missing"); });
+process.on("exit", code => { if (code === 0 && reads !== 7) throw Error("Receipt reads missing"); });
 `,
       );
       const env: NodeJS.ProcessEnv = {

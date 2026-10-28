@@ -65,19 +65,23 @@ function fixture() {
     content: bytes.toString("base64"),
     size: bytes.length,
   });
+  const extra = new Map<string, Record<string, unknown>[]>();
   const reader = {
     readCommit: async (sha: string) => ({ sha, tree: { sha: actualOriginalTree } }),
     readTree: async () => treeResponse,
-    readStatuses: async () => [
-      {
+    readStatuses: async (sha: string) => {
+      const status = {
         id: 11,
         context: "native-independent-review",
-        state,
+        state: sha === head ? "success" : state,
         creator: { id: 241037670, login: "park-kyungchan" },
-        target_url: `https://github.com/${repository}/blob/${receiptCommit}/native-reviews/${originalHead}.json`,
-      },
-    ],
+        target_url: `https://github.com/${repository}/blob/${sha === head ? oid("9") : receiptCommit}/native-reviews/${sha}.json`,
+      };
+      return [...(extra.get(sha) ?? []), status];
+    },
     readFile: async (path: string, commit: string) => {
+      if (path === `native-reviews/${head}.json` && commit === oid("9"))
+        return content(path, Buffer.from(JSON.stringify(successor)));
       if (path === `native-reviews/${originalHead}.json` && commit === receiptCommit)
         return content(path, receiptBytes);
       if (path === `native-review-results/${originalHead}.json` && commit === resultCommit)
@@ -91,6 +95,8 @@ function fixture() {
     tree,
     repository,
     reader,
+    extra,
+    originalHead,
     publisher: { id: "241037670", login: "park-kyungchan" },
     hold() {
       state = "pending";
@@ -173,4 +179,63 @@ test("another tree, forged receipt digest, reviewer substitution or recursive re
       i.publisher,
     ),
   ).rejects.toThrow("successor binding");
+});
+
+test("successor reuse rejects late legacy success over a newer hold on either the original or successor head", async () => {
+  for (const original of [false, true])
+    for (const state of ["pending", "failure"]) {
+      const f = fixture(),
+        target = original ? f.originalHead : f.head;
+      const prior = (await f.reader.readStatuses(target))[0]!;
+      f.extra.set(target, [
+        { ...prior, id: 14, state: "success" },
+        {
+          ...prior,
+          id: 13,
+          state,
+          target_url: `https://github.com/${f.repository}/commit/${target}#native-independent-review`,
+        },
+      ]);
+      await expect(
+        validatePlatformReviewWithEvidence(
+          f.successor,
+          f.head,
+          f.tree,
+          f.repository,
+          f.reader,
+          f.publisher,
+        ),
+      ).rejects.toThrow("FRESH_LEGACY_ATTEMPT_REQUIRED");
+    }
+});
+
+test("truncated status history refuses compatibility on both sides of successor reuse", async () => {
+  for (const original of [false, true]) {
+    const f = fixture(),
+      target = original ? f.originalHead : f.head;
+    const read = f.reader.readStatuses;
+    const latest = (await read(target))[0]!;
+    const history = [
+      latest,
+      ...Array.from({ length: 99 }, (_, i) => ({ ...latest, id: 100 + i, context: `other-${i}` })),
+      {
+        ...latest,
+        id: 43,
+        state: "failure",
+        target_url: `https://github.com/${f.repository}/commit/${target}#native-independent-review`,
+      },
+    ];
+    f.reader.readStatuses = async (sha: string) =>
+      sha === target ? history.slice(0, 100) : read(sha);
+    await expect(
+      validatePlatformReviewWithEvidence(
+        f.successor,
+        f.head,
+        f.tree,
+        f.repository,
+        f.reader,
+        f.publisher,
+      ),
+    ).rejects.toThrow("LEGACY_ATTEMPT_HISTORY_INCOMPLETE");
+  }
 });

@@ -21,6 +21,6 @@ Automatic merge is prohibited. An owner-created draft PR may be opened first sol
 1. Push fresh native source-author metadata and open an owner-created draft solely to establish authenticated provenance.
 2. Invoke `bash <trusted-common>/ci/reuse/review-pr.sh <repository> <head> <reviewer-runtime> <controller-sha>` from a separate detached, reviewed immutable common checkout; never execute a subject controller.
 3. The command admits only pinned private owner-created same-repo PRs or exact protected main and fetches subject Git data without executing its config/hooks/scripts.
-4. Preserve actual native raw/events; current user-approved bypass reviews make no OS credential-isolation claim and refuse untrusted contributors.
+4. Formal review first publishes pending; bound findings publish failure. Preserve actual native raw/events; user-approved bypass makes no OS credential-isolation claim and refuses untrusted contributors.
 5. A second native caller uses the same command with `--check`; all evidence, CI and current findings/threads must pass before ready-for-review.
 6. The accountable Lead explicitly merges the reviewed expected head. Automatic merge, native activation and user Acceptance remain separate.

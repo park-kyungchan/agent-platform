@@ -1,6 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import {
   authenticatedReviewReader,
   reviewArtifactWorkflow,
@@ -15,16 +12,29 @@ import {
 } from "../quality/receipt-validator";
 import { locatedError } from "./located-error";
 import { requireTrustedReviewContext, type TrustedReviewContext } from "./trusted-review-source";
+import {
+  requireNativeReviewAttempt,
+  requireCurrentReviewAttempt,
+  type NativeReviewAttempt,
+  readCompletedNativeObservation,
+  type CompletedNativeObservation,
+} from "./review-attempt";
 
 /** Native publisher only: preserve the actual reviewer bytes, upload once, verify, then attest. */
-export async function publishNativeReviewArtifact(context: TrustedReviewContext, rawPath: string) {
+export async function publishNativeReviewArtifact(
+  context: TrustedReviewContext,
+  observation: CompletedNativeObservation,
+  attempt: NativeReviewAttempt,
+) {
   requireTrustedReviewContext(context);
+  requireNativeReviewAttempt(context, attempt);
+  const { bytes } = readCompletedNativeObservation(context, attempt, observation);
+  await requireCurrentReviewAttempt(context, attempt);
   const { head, policy } = context;
   await context.revalidate();
   if (process.env.CI || process.env.GITHUB_ACTIONS)
     throw Error("Native publisher context required");
-  if (!/^[a-f0-9]{40}$/.test(head) || !rawPath)
-    throw Error("Use publish-review-artifact.ts <exact-head> <raw-native.json>");
+  if (!/^[a-f0-9]{40}$/.test(head)) throw Error("Exact native observation head required");
   function gh(args: string[]) {
     const result = Bun.spawnSync(["gh", ...args], {
       stdin: "ignore",
@@ -53,8 +63,7 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
     await reader.json(`git/trees/${commit.tree.sha}?recursive=1`),
     commit.tree.sha,
   );
-  const bytes = await readFile(resolve(rawPath)),
-    raw = validateRawReviewArtifact(bytes, policy, head!, commit.tree.sha, manifest.sha256);
+  const raw = validateRawReviewArtifact(bytes, policy, head!, commit.tree.sha, manifest.sha256);
   const authorBytes = decodeBoundedReviewFile(
     await reader.json(`contents/.github/source-author.json?ref=${head}`),
     ".github/source-author.json",
@@ -73,7 +82,7 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
   if (workflow.path !== reviewArtifactWorkflow || workflow.state !== "active")
     throw Error("Default-branch evidence workflow unavailable; merge its reviewed source first");
   await context.revalidate();
-  const requestId = randomUUID();
+  const requestId = attempt.id;
   async function post(path: string, value: unknown, expected: number) {
     const response = await fetch(`https://api.github.com/repos/${policy.repository}/${path}`, {
       method: "POST",
@@ -92,6 +101,7 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
     return expected === 204 ? null : response.json();
   }
   console.log(JSON.stringify({ phase: "dispatch", requestId, headSha: head, retryAllowed: false }));
+  await requireCurrentReviewAttempt(context, attempt);
   await post(
     "actions/workflows/native-review-evidence.yml/dispatches",
     {
@@ -136,7 +146,9 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
   const preflight = {
     ...reader,
     json: async (path: string) =>
-      path === `commits/${head}/statuses?per_page=100` ? [status] : reader.json(path),
+      path === `commits/${head}/statuses?per_page=100`
+        ? [status, ...(await requireCurrentReviewAttempt(context, attempt))].slice(0, 100)
+        : reader.json(path),
   };
   await validatePublishedReviewArtifact(
     { policy, head: head!, status, rawBytes: bytes },
@@ -153,6 +165,7 @@ export async function publishNativeReviewArtifact(context: TrustedReviewContext,
     }),
   );
   await context.revalidate();
+  await requireCurrentReviewAttempt(context, attempt);
   await post(
     `statuses/${head}`,
     {

@@ -5,6 +5,7 @@ import {
   authenticatedReviewReader,
   validateReviewArtifact,
   validatePublishedReviewArtifact,
+  validateCompletedReviewObservation,
   type ReviewArtifactReader,
 } from "./review-artifact";
 import { deriveReviewedSourceManifest } from "./receipt-validator";
@@ -77,6 +78,7 @@ function fixture(owner = false) {
     conclusion: "pass",
     unresolvedFindings: 0,
     findings: [],
+    nativeReviewPendingStatusId: 32,
   };
   const actor = { ...publisher, id: 42 },
     repo = { id: 123, full_name: repository };
@@ -93,6 +95,7 @@ function fixture(owner = false) {
     head_sha: head,
     head_branch: "main",
     path: ".github/workflows/native-review-evidence.yml",
+    display_title: "Native review evidence 00000000-0000-4000-8000-000000000001",
   };
   const artifact = {
     id: 22,
@@ -109,6 +112,15 @@ function fixture(owner = false) {
     creator: { ...actor, type: "User" as "User" | "Bot" },
     target_url: "",
   };
+  const pending = {
+    ...status,
+    id: 32,
+    state: "pending",
+    target_url: `https://github.com/${repository}/commit/${head}#native-independent-review`,
+  };
+  let between: (typeof status)[] = [],
+    includePending = true;
+  let overrideStatuses: unknown[] | undefined;
   let bytes = Buffer.alloc(0),
     currentStatus = status;
   function seal(name?: string) {
@@ -127,19 +139,35 @@ function fixture(owner = false) {
       if (path === "actions/artifacts/22") return artifact;
       if (path === `git/commits/${head}`) return { sha: head, tree: { sha: tree } };
       if (path === `git/trees/${tree}?recursive=1`) return treeResponse;
-      if (path === `commits/${head}/statuses?per_page=100`) return [currentStatus];
+      if (path === `commits/${head}/statuses?per_page=100`)
+        return (
+          overrideStatuses ?? [currentStatus, ...between, ...(includePending ? [pending] : [])]
+        );
       throw Error("unexpected fixture path");
     },
   };
   return {
     head,
+    tree,
     raw,
     run,
     artifact,
     status,
+    pending,
+    setStatuses(values: unknown[]) {
+      overrideStatuses = values;
+    },
     reader,
     input: { policy: { repository, publisher, binding }, head, status },
     seal,
+    supersede() {
+      between = [
+        { ...pending, id: 34, target_url: pending.target_url.replace(/000001$/, "000002") },
+      ];
+    },
+    noAttempt() {
+      includePending = false;
+    },
     hold() {
       currentStatus = { ...status, state: "pending" };
     },
@@ -164,6 +192,77 @@ test("externally dispatched raw native review passes and source CI consumes it w
     readArchive: f.reader.archive,
   });
   expect(result?.schema).toBe("native-independent-review-artifact-ci.v1");
+});
+
+test("a late old success cannot cover a newer review hold, and artifacts require their own prior pending attempt", async () => {
+  const result = Bun.spawnSync(
+    ["git", "show", "a0678ade528b005496ae9a6ea5f67aa65ffb81ce:ci/quality/review-artifact.ts"],
+    { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+  );
+  expect(result.exitCode).toBe(0);
+  const source = result.stdout
+    .toString()
+    .replaceAll(
+      '"./artifact-archive"',
+      JSON.stringify(new URL("./artifact-archive.ts", import.meta.url).href),
+    )
+    .replaceAll(
+      '"./receipt-validator"',
+      JSON.stringify(new URL("./receipt-validator.ts", import.meta.url).href),
+    );
+  const old = await import(
+    "data:text/javascript;base64," +
+      Buffer.from(new Bun.Transpiler({ loader: "ts" }).transformSync(source)).toString("base64")
+  );
+  for (const mutate of [
+    (f: ReturnType<typeof fixture>) => f.supersede(),
+    (f: ReturnType<typeof fixture>) => f.noAttempt(),
+  ]) {
+    const f = fixture();
+    mutate(f);
+    await expect(old.validateReviewArtifact(f.input, f.reader)).resolves.toHaveProperty(
+      "rawSha256",
+    );
+    await expect(validateReviewArtifact(f.input, f.reader)).rejects.toThrow(
+      "REVIEW_ATTEMPT_SUPERSEDED",
+    );
+  }
+});
+
+test("completed negative observations retain exact source and independent identities without becoming passing evidence", () => {
+  const f = fixture();
+  const fail = {
+    ...f.raw,
+    conclusion: "fail",
+    unresolvedFindings: 1,
+    findings: [{ severity: "P1", path: "source.ts", line: 1, explanation: "synthetic defect" }],
+  };
+  const bytes = Buffer.from(JSON.stringify(fail));
+  expect(
+    validateCompletedReviewObservation(
+      bytes,
+      f.input.policy,
+      f.head,
+      f.tree,
+      f.raw.reviewedSourceManifestSha256,
+    ).conclusion,
+  ).toBe("fail");
+  for (const changed of [
+    { ...fail, headSha: "f".repeat(40) },
+    { ...fail, reviewer: fail.author },
+    { ...fail, unresolvedFindings: 0 },
+    { ...fail, conclusion: "pass" },
+  ]) {
+    expect(() =>
+      validateCompletedReviewObservation(
+        Buffer.from(JSON.stringify(changed)),
+        f.input.policy,
+        f.head,
+        f.tree,
+        f.raw.reviewedSourceManifestSha256,
+      ),
+    ).toThrow();
+  }
 });
 
 test("artifact review rejects source, publisher, run and raw native identity substitutions", async () => {
@@ -356,5 +455,165 @@ test("owner-scoped CI consumes the same artifact transport under its own fixed p
       if (old[i] === undefined) delete process.env[name];
       else process.env[name] = old[i];
     });
+  }
+});
+
+test("new pending inserted after the last publisher read but before its success POST defeats the actual old publisher and new fence", async () => {
+  const { readFile } = await import("node:fs/promises"),
+    { join } = await import("node:path");
+  const prior = Bun.spawnSync(
+    ["git", "show", "a0678ade528b005496ae9a6ea5f67aa65ffb81ce:ci/quality/review-artifact.ts"],
+    { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+  );
+  expect(prior.exitCode).toBe(0);
+  const oldArtifactSource = prior.stdout
+    .toString()
+    .replaceAll(
+      '"./artifact-archive"',
+      JSON.stringify(new URL("./artifact-archive.ts", import.meta.url).href),
+    )
+    .replaceAll(
+      '"./receipt-validator"',
+      JSON.stringify(new URL("./receipt-validator.ts", import.meta.url).href),
+    );
+  const oldArtifact = await import(
+    "data:text/javascript;base64," +
+      Buffer.from(new Bun.Transpiler({ loader: "ts" }).transformSync(oldArtifactSource)).toString(
+        "base64",
+      )
+  );
+  for (const current of [false, true]) {
+    const f = fixture(),
+      bytes = Buffer.from(JSON.stringify(f.raw)),
+      id = "00000000-0000-4000-8000-000000000001";
+    f.setStatuses([f.pending]);
+    const context = {
+        head: f.head,
+        policy: f.input.policy,
+        revalidate: async () => {},
+        readApi: f.reader.json,
+      },
+      attempt = { id, pending: f.pending, context };
+    let posts = 0;
+    const reader = {
+      archive: f.reader.archive,
+      json: async (path: string): Promise<unknown> => {
+        if (path === "actions/workflows/native-review-evidence.yml")
+          return { path: ".github/workflows/native-review-evidence.yml", state: "active" };
+        if (path.startsWith("actions/workflows/native-review-evidence.yml/runs?"))
+          return { workflow_runs: [f.run] };
+        if (path === "actions/runs/11/artifacts?per_page=100") return { artifacts: [f.artifact] };
+        if (path.startsWith("contents/.github/source-author.json?")) {
+          const body = Buffer.from(
+            JSON.stringify({
+              author: { runtime: f.raw.author.runtime, threadId: f.raw.author.taskId },
+            }),
+          );
+          return {
+            type: "file",
+            path: ".github/source-author.json",
+            encoding: "base64",
+            size: body.length,
+            content: body.toString("base64"),
+          };
+        }
+        return f.reader.json(path);
+      },
+    };
+    const fakeFetch = async (url: string, options: RequestInit) => {
+      if (url.endsWith("/dispatches")) return new Response(null, { status: 204 });
+      expect(url).toBe(
+        `https://api.github.com/repos/${f.input.policy.repository}/statuses/${f.head}`,
+      );
+      posts++;
+      const success = { ...f.status, ...JSON.parse(String(options.body)), id: 35 };
+      // Deterministic read/POST race: all old checks saw pending32; pending34 starts now.
+      f.setStatuses([success, { ...f.pending, id: 34 }, f.pending]);
+      return new Response(JSON.stringify(success), { status: 201 });
+    };
+    const fakeBun = {
+      spawnSync: (args: string[]) => ({
+        exitCode: 0,
+        stdout: Buffer.from(
+          args.includes("user") ? JSON.stringify(f.status.creator) : "synthetic-token",
+        ),
+      }),
+    };
+    const oldPub = Bun.spawnSync(
+      [
+        "git",
+        "show",
+        "a0678ade528b005496ae9a6ea5f67aa65ffb81ce:ci/reuse/publish-review-artifact.ts",
+      ],
+      { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(oldPub.exitCode).toBe(0);
+    const source = current
+      ? await readFile(join(import.meta.dir, "../reuse/publish-review-artifact.ts"), "utf8")
+      : oldPub.stdout.toString();
+    const body = new Bun.Transpiler({ loader: "ts" }).transformSync(
+      source
+        .slice(
+          source.indexOf("export async function publishNativeReviewArtifact("),
+          source.indexOf("\nif (import.meta.main)"),
+        )
+        .replace("export async function", "async function"),
+    );
+    const requireCurrent = async () => {
+      const states = (await f.reader.json(`commits/${f.head}/statuses?per_page=100`)) as {
+        id: number;
+        state: string;
+      }[];
+      if (states[0]?.id !== 32 || states[0]?.state !== "pending") throw Error("SUPERSEDED");
+      return states;
+    };
+    const names = [
+      "Bun",
+      "process",
+      "fetch",
+      "requireTrustedReviewContext",
+      "requireNativeReviewAttempt",
+      "readCompletedNativeObservation",
+      "requireCurrentReviewAttempt",
+      "authenticatedReviewReader",
+      "deriveReviewedSourceManifest",
+      "decodeBoundedReviewFile",
+      "validateRawReviewArtifact",
+      "validatePublishedReviewArtifact",
+      "reviewArtifactWorkflow",
+      "reviewArtifactBranch",
+      "readFile",
+      "resolve",
+      "randomUUID",
+      "console",
+    ];
+    const { decodeBoundedReviewFile } = await import("./receipt-validator"),
+      { validateRawReviewArtifact } = await import("./review-artifact");
+    const publish = new Function(...names, body + "\nreturn publishNativeReviewArtifact;")(
+      fakeBun,
+      { env: {} },
+      fakeFetch,
+      () => {},
+      () => {},
+      () => ({ bytes: Buffer.from(bytes) }),
+      requireCurrent,
+      () => reader,
+      deriveReviewedSourceManifest,
+      decodeBoundedReviewFile,
+      validateRawReviewArtifact,
+      current ? validatePublishedReviewArtifact : oldArtifact.validatePublishedReviewArtifact,
+      ".github/workflows/native-review-evidence.yml",
+      "main",
+      async () => bytes,
+      (p: string) => p,
+      () => id,
+      { log: () => {} },
+    ) as (...args: unknown[]) => Promise<void>;
+    const result = current
+      ? publish(context, { kind: "completed-native-observation" }, attempt)
+      : publish(context, "/synthetic-native.raw.json");
+    if (current) await expect(result).rejects.toThrow("REVIEW_ATTEMPT_SUPERSEDED");
+    else await expect(result).resolves.toBeUndefined();
+    expect(posts).toBe(1);
   }
 });

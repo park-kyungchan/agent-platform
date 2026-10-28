@@ -23,6 +23,7 @@ export type ReviewReceiptV2 = {
   author: NativeReviewIdentity;
   conclusion: "pass";
   unresolvedFindings: 0;
+  nativeReviewPendingStatusId?: number;
   provenance: {
     owner: "codex-harness-engineering";
     resultRef: string;
@@ -274,14 +275,15 @@ export function verifyIndependentReviewResult(
     object(result.reviewer).taskId !== object(value.reviewer).taskId ||
     object(result.reviewer).runtime !== object(value.reviewer).runtime ||
     object(result.author).taskId !== object(value.author).taskId ||
-    object(result.author).runtime !== object(value.author).runtime
+    object(result.author).runtime !== object(value.author).runtime ||
+    result.nativeReviewPendingStatusId !== value.nativeReviewPendingStatusId
   ) {
     throw new Error("Immutable independent review result identities differ from its receipt");
   }
 }
 
 /** Shared exact-source/independence predicate; ownership is checked separately by each schema. */
-export function validateExactNativeReview(
+export function validateNativeReviewSource(
   value: ObjectValue,
   head: string,
   tree: string,
@@ -300,10 +302,19 @@ export function validateExactNativeReview(
     !isReviewRuntime(author.runtime) ||
     !taskId(reviewer.taskId) ||
     !taskId(author.taskId) ||
-    reviewer.taskId === author.taskId ||
-    value.conclusion !== "pass" ||
-    value.unresolvedFindings !== 0
+    reviewer.taskId === author.taskId
   )
+    throw new Error("Review does not prove exact source and independent native identities");
+}
+
+export function validateExactNativeReview(
+  value: ObjectValue,
+  head: string,
+  tree: string,
+  manifestSha256: string,
+): void {
+  validateNativeReviewSource(value, head, tree, manifestSha256);
+  if (value.conclusion !== "pass" || value.unresolvedFindings !== 0)
     throw new Error("Review does not prove exact source and independent native identities");
 }
 
@@ -329,6 +340,7 @@ export type OwnerReviewProof = {
   author: NativeReviewIdentity;
   conclusion: "pass";
   unresolvedFindings: 0;
+  nativeReviewPendingStatusId?: number;
 };
 export type OwnerReviewReceipt = OwnerReviewProof & {
   schema: "owner-scoped-independent-review.v1";
@@ -391,7 +403,8 @@ export function validateOwnerReviewProof(
     (object(proof.reviewer).taskId !== identities.reviewer.taskId ||
       object(proof.reviewer).runtime !== identities.reviewer.runtime ||
       object(proof.author).taskId !== identities.author.taskId ||
-      object(proof.author).runtime !== identities.author.runtime)
+      object(proof.author).runtime !== identities.author.runtime ||
+      proof.nativeReviewPendingStatusId !== identities.nativeReviewPendingStatusId)
   )
     throw new Error("Owner review native identities differ across immutable evidence");
 }

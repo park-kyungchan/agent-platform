@@ -15,8 +15,7 @@ source, author/reviewer identity, publisher, run, attempt, repository, workflow,
 artifact, digest, archive member, current hold and changed latest status must
 refuse. Existing receipt controls continue to pass. Focused tests and complete
 source/quality checks precede a fresh read-only native exact-head review under the user-approved reviewer policy.
-The 2026-10-28 temporary user direction admits gpt-6.1-sol/high with distinct
-native author/reviewer threads; it changes no active/global model settings.
+Current user policy requires fresh sol/terra judgment and distinct native author/reviewer contexts. The command selects gpt-6.1-sol/high; Claude/Opus judgment is prohibited. Per-run settings change no active/global model configuration.
 Hosted transport must be observed before claiming operational completion.
 
 Allowed treatment: CI review transport, source policy/tests/projections, shared
@@ -48,15 +47,27 @@ dispatches only the default main workflow, checks the successful external run
 and requires its artifact bytes to equal the native original before status
 publication and on final readback, then posts
 its authenticated status with the artifact's immutable ID and archive digest.
+Formal attempts publish authenticated pending before launching the reviewer.
+The invocation captures actual child events in bounded controller-owned memory.
+A closed one-turn parser requires successful terminal completion and exact
+equality between the raw report and its actual final-message event. Event and raw
+pathnames are audit copies, never authority for initially minting an observation.
+Correctly bound completed findings publish failure. Success requires the native raw pending-status ID to match its preceding authenticated pending status; an
+intervening hold/failure/other attempt refuses even if a late old success wins
+an API write race. Crashed/malformed reviews retain pending. Status writes are
+not retried under uncertainty; reconcile the printed attempt/head/state first.
 No model runs in Actions and no CI token receives status or dispatch permission.
 Uncertain dispatch/publication is reconciled by the printed request/run/artifact
-IDs before any further action. Artifact expiry/deletion fails closed; retain the
-native raw file for a fresh external publication when required.
+IDs before any further action. Artifact expiry/deletion fails closed; retain the native raw file for audit. Reconcile existing effects before starting a fresh native invocation if the in-memory completed observation is lost.
 
 Bootstrap the workflow through a reviewed legacy-receipt PR first: GitHub must
 know the workflow on the default branch before dispatch. Existing immutable
 receipt and explicit identical-tree successor paths remain supported. Owner
 consumers project these shared validators and retain their fixed owner policy.
+ID-less historical compatibility requires a short, complete status page. A full
+100-status page cannot prove absence of an older formal hold and fails closed.
+Fresh pending-ID-bound evidence remains admissible on a full page when its actual
+pending status and intervening states are present and valid.
 
 GitHub documents artifact IDs, archive digests and ZIP downloads in its
 [artifact REST API](https://docs.github.com/en/rest/actions/artifacts), and run
