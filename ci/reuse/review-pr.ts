@@ -9,6 +9,7 @@ import {
   smokeNativeReview,
   readCompletedNativeObservation,
   nativeReviewSource,
+  prepareMergeCorrespondenceAssignment,
 } from "./review-attempt";
 import { locatedError } from "./located-error";
 
@@ -19,9 +20,12 @@ export async function reviewPr(
   controllerSha: string,
   smoke = false,
   checkOnly = false,
+  mergeCorrespondence = false,
 ) {
   if (process.env.CI || process.env.GITHUB_ACTIONS)
     throw Error("Native review cannot originate in CI");
+  if (mergeCorrespondence && (smoke || checkOnly))
+    throw Error("Merge correspondence cannot be combined with smoke/check");
   if (!smoke && !checkOnly && repository === reviewControllerRepository && head === controllerSha)
     throw Error(
       "Formal review head must be distinct from its independently qualified controller pin",
@@ -58,7 +62,10 @@ export async function reviewPr(
     await smokeNativeReview(context, runtime);
     return;
   }
-  const attempt = await beginNativeReviewAttempt(context, randomUUID());
+  const assignment = mergeCorrespondence
+    ? await prepareMergeCorrespondenceAssignment(context)
+    : undefined;
+  const attempt = await beginNativeReviewAttempt(context, randomUUID(), assignment);
   const observation = await invokeNativeReview(context, attempt, runtime);
   if (readCompletedNativeObservation(context, attempt, observation).raw.conclusion === "fail") {
     await failNativeReviewAttempt(attempt, observation);
@@ -74,11 +81,12 @@ if (import.meta.main) {
       !head ||
       !runtime ||
       !controllerSha ||
-      flags.some((f) => !["--smoke", "--check"].includes(f)) ||
-      (flags.includes("--smoke") && flags.includes("--check"))
+      flags.some((f) => !["--smoke", "--check", "--merge-correspondence"].includes(f)) ||
+      flags.length !== new Set(flags).size ||
+      flags.length > 1
     )
       throw Error(
-        "Use the separate pinned controller: review-pr.ts <repository> <head> <runtime> <controller-sha> [--smoke|--check]",
+        "Use the separate pinned controller: review-pr.ts <repository> <head> <runtime> <controller-sha> [--smoke|--check|--merge-correspondence]",
       );
     await reviewPr(
       repository,
@@ -87,6 +95,7 @@ if (import.meta.main) {
       controllerSha,
       flags.includes("--smoke"),
       flags.includes("--check"),
+      flags.includes("--merge-correspondence"),
     );
   } catch (error) {
     console.error(locatedError(error, "review_artifact_refused"));

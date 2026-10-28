@@ -4,6 +4,7 @@ import {
   reviewArtifactBranch,
   validateRawReviewArtifact,
   validatePublishedReviewArtifact,
+  validateMergeCorrespondenceAssignment,
   type ReviewArtifactPolicy,
 } from "../quality/review-artifact";
 import {
@@ -64,6 +65,16 @@ export async function publishNativeReviewArtifact(
     commit.tree.sha,
   );
   const raw = validateRawReviewArtifact(bytes, policy, head!, commit.tree.sha, manifest.sha256);
+  async function currentAssignment() {
+    if (raw.reviewAssignment)
+      await validateMergeCorrespondenceAssignment(
+        policy,
+        head,
+        raw.reviewAssignment,
+        reader,
+        attempt.pending,
+      );
+  }
   const authorBytes = decodeBoundedReviewFile(
     await reader.json(`contents/.github/source-author.json?ref=${head}`),
     ".github/source-author.json",
@@ -102,6 +113,7 @@ export async function publishNativeReviewArtifact(
   }
   console.log(JSON.stringify({ phase: "dispatch", requestId, headSha: head, retryAllowed: false }));
   await requireCurrentReviewAttempt(context, attempt);
+  await currentAssignment();
   await post(
     "actions/workflows/native-review-evidence.yml/dispatches",
     {
@@ -166,6 +178,7 @@ export async function publishNativeReviewArtifact(
   );
   await context.revalidate();
   await requireCurrentReviewAttempt(context, attempt);
+  await currentAssignment();
   await post(
     `statuses/${head}`,
     {
