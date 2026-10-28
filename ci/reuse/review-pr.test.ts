@@ -19,20 +19,58 @@ import { join } from "node:path";
 test("merge correspondence selects its closed eligibility guard before any native attempt", async () => {
   const { readFile } = await import("node:fs/promises");
   const text = await readFile(join(import.meta.dir, "review-pr.ts"), "utf8");
-  const body = new Bun.Transpiler({ loader: "ts" }).transformSync(text.slice(text.indexOf("export async function reviewPr("), text.indexOf("\nif (import.meta.main)")).replace("export async function", "async function"));
+  const body = new Bun.Transpiler({ loader: "ts" }).transformSync(
+    text
+      .slice(
+        text.indexOf("export async function reviewPr("),
+        text.indexOf("\nif (import.meta.main)"),
+      )
+      .replace("export async function", "async function"),
+  );
   const effects: string[] = [];
-  const run = new Function("process", "reviewControllerRepository", "createTrustedReviewContext", "prepareMergeCorrespondenceAssignment", "beginNativeReviewAttempt", "randomUUID", "invokeNativeReview", "readCompletedNativeObservation", "failNativeReviewAttempt", "publishNativeReviewArtifact", body + "\nreturn reviewPr;")(
-    { env: {} }, "fixture/controller",
-    async () => { effects.push("context"); return {}; },
-    async () => { effects.push("eligibility"); throw Error("CLOSED_MERGE_ELIGIBILITY_REQUIRED"); },
-    async () => { effects.push("pending"); return {}; },
+  const run = new Function(
+    "process",
+    "reviewControllerRepository",
+    "createTrustedReviewContext",
+    "prepareMergeCorrespondenceAssignment",
+    "beginNativeReviewAttempt",
+    "randomUUID",
+    "invokeNativeReview",
+    "readCompletedNativeObservation",
+    "failNativeReviewAttempt",
+    "publishNativeReviewArtifact",
+    body + "\nreturn reviewPr;",
+  )(
+    { env: {} },
+    "fixture/controller",
+    async () => {
+      effects.push("context");
+      return {};
+    },
+    async () => {
+      effects.push("eligibility");
+      throw Error("CLOSED_MERGE_ELIGIBILITY_REQUIRED");
+    },
+    async () => {
+      effects.push("pending");
+      return {};
+    },
     () => "00000000-0000-4000-8000-000000000001",
-    async () => { effects.push("native"); return {}; },
+    async () => {
+      effects.push("native");
+      return {};
+    },
     () => ({ raw: { conclusion: "pass" } }),
-    async () => { effects.push("failure"); },
-    async () => { effects.push("publish"); },
+    async () => {
+      effects.push("failure");
+    },
+    async () => {
+      effects.push("publish");
+    },
   ) as (...args: unknown[]) => Promise<void>;
-  await expect(run("fixture/owner", "a".repeat(40), "native-codex", "b".repeat(40), false, false, true)).rejects.toThrow("CLOSED_MERGE_ELIGIBILITY_REQUIRED");
+  await expect(
+    run("fixture/owner", "a".repeat(40), "native-codex", "b".repeat(40), false, false, true),
+  ).rejects.toThrow("CLOSED_MERGE_ELIGIBILITY_REQUIRED");
   expect(effects).toEqual(["context", "eligibility"]);
 });
 
@@ -650,7 +688,8 @@ test("a genuine negative re-review supersedes old success, and the hold precedes
 type NativeCaseApi = {
   requireNativeReviewAttempt: (c: unknown, a: unknown) => void;
   requireCurrentReviewAttempt: (c: unknown, a: unknown) => Promise<unknown[]>;
-  beginNativeReviewAttempt: (c: unknown, id: string) => Promise<unknown>;
+  beginNativeReviewAttempt: (c: unknown, id: string, assignment?: unknown) => Promise<unknown>;
+  prepareMergeCorrespondenceAssignment: (c: unknown) => Promise<unknown>;
   invokeNativeReview: (c: unknown, a: unknown, r: string) => Promise<unknown>;
   failNativeReviewAttempt: (a: unknown, o: unknown) => Promise<void>;
   readCompletedNativeObservation: (
@@ -664,6 +703,11 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     { createHash } = await import("node:crypto");
   const { reviewAttemptTarget, validateCompletedReviewObservation } =
     await import("../quality/review-artifact");
+  const {
+    requireFullReviewAssignment,
+    sameMergeCorrespondenceAssignment,
+    parseMergeCorrespondenceAssignment,
+  } = await import("../quality/review-assignment");
   const old = predecessor
     ? Bun.spawnSync(
         ["git", "show", "8f78f54111f59e3af2bf702826eeefa761d2568d:ci/reuse/review-attempt.ts"],
@@ -685,6 +729,16 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     id = "00000000-0000-4000-8000-000000000002",
     thread = "00000000-0000-4000-8000-000000000003";
   const actor = { id: 42, login: "native-owner", type: "User" };
+  const mergeAssignment = parseMergeCorrespondenceAssignment({
+    schema: "native-review-merge-correspondence.v1",
+    kind: "merge-correspondence",
+    orderedParents: ["c".repeat(40), "d".repeat(40)],
+    parentReview: {
+      statusId: 42,
+      targetUrl: "https://github.com/fixture/owner/full-parent",
+      proofSha256: "e".repeat(64),
+    },
+  });
   let posts = 0,
     launches = 0,
     revoked = false;
@@ -711,7 +765,11 @@ async function nativeCase(scenario = "pass", predecessor = false) {
       },
     },
     row: { projectId: "agent-platform" },
-    subject: { base: "c".repeat(40), kind: "owner-pull-request", pr: 1 },
+    subject: {
+      base: "c".repeat(40),
+      kind: scenario.startsWith("merge-") ? "protected-main" : "owner-pull-request",
+      pr: 1,
+    },
     author: { metadata: { author: { runtime: "native-codex", threadId: "actual-author" } } },
     revalidate: async () => {
       if (revoked) throw Error("QUALIFIED_PIN_HELD");
@@ -731,7 +789,9 @@ async function nativeCase(scenario = "pass", predecessor = false) {
   };
   let bytes = Buffer.from(
     JSON.stringify({
-      schema: "native-independent-review-output.v1",
+      schema: scenario.startsWith("merge-")
+        ? "native-independent-merge-correspondence-output.v1"
+        : "native-independent-review-output.v1",
       reviewStatus: "complete",
       binding: context.policy.binding,
       headSha: scenario === "wrong-source" ? "e".repeat(40) : head,
@@ -745,6 +805,17 @@ async function nativeCase(scenario = "pass", predecessor = false) {
         ? [{ path: "source.ts", line: 1, severity: "P1", explanation: "synthetic defect" }]
         : [],
       nativeReviewPendingStatusId: 101,
+      ...(scenario.startsWith("merge-") && scenario !== "merge-dropped-raw"
+        ? {
+            reviewAssignment:
+              scenario === "merge-substituted-raw"
+                ? {
+                    ...mergeAssignment,
+                    parentReview: { ...mergeAssignment.parentReview, statusId: 43 },
+                  }
+                : mergeAssignment,
+          }
+        : {}),
     }),
   );
   const nativeEvents = (raw: Buffer) =>
@@ -826,11 +897,16 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     "reviewControllerRepository",
     "bindCompletedCodexReview",
     "ProcessOutputCapture",
+    "deriveMergeCorrespondenceAssignment",
+    "validateMergeCorrespondenceAssignment",
+    "requireFullReviewAssignment",
+    "sameMergeCorrespondenceAssignment",
+    "parseMergeCorrespondenceAssignment",
   ];
   const api = new Function(
     ...names,
     source +
-      "\nreturn {beginNativeReviewAttempt,invokeNativeReview,failNativeReviewAttempt,readCompletedNativeObservation,requireNativeReviewAttempt,requireCurrentReviewAttempt};",
+      "\nreturn {beginNativeReviewAttempt,invokeNativeReview,failNativeReviewAttempt,readCompletedNativeObservation,requireNativeReviewAttempt,requireCurrentReviewAttempt,...(typeof prepareMergeCorrespondenceAssignment === 'function' ? {prepareMergeCorrespondenceAssignment} : {})};",
   )(
     nativeBun,
     nativeFetch,
@@ -856,6 +932,14 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     "park-kyungchan/agent-platform",
     bindCompletedCodexReview,
     ProcessOutputCapture,
+    async () => mergeAssignment,
+    async () => {
+      if (scenario === "merge-parent-held" && launches) throw Error("FULL_PARENT_HELD");
+      return mergeAssignment;
+    },
+    requireFullReviewAssignment,
+    sameMergeCorrespondenceAssignment,
+    parseMergeCorrespondenceAssignment,
   ) as NativeCaseApi;
   return {
     api,
@@ -876,6 +960,43 @@ async function nativeCase(scenario = "pass", predecessor = false) {
     },
   };
 }
+
+test("MERGE-CORRESPONDENCE actual native invocation retains its opaque prepared assignment", async () => {
+  const h = await nativeCase("merge-pass"),
+    assignment = await h.api.prepareMergeCorrespondenceAssignment(h.context);
+  expect(Object.isFrozen(assignment)).toBe(true);
+  expect(Object.keys(assignment as object)).toEqual(["kind"]);
+  const attempt = await h.api.beginNativeReviewAttempt(h.context, h.id, assignment),
+    observation = await h.api.invokeNativeReview(h.context, attempt, "native-codex");
+  expect(
+    (
+      h.api.readCompletedNativeObservation(h.context, attempt, observation).raw
+        .reviewAssignment as { kind: string }
+    ).kind,
+  ).toBe("merge-correspondence");
+  expect(h.launches).toBe(1);
+  expect(h.posts).toBe(1);
+});
+
+test("MERGE-CORRESPONDENCE caller JSON cannot mint an assignment or start pending", async () => {
+  const h = await nativeCase("merge-pass");
+  await expect(
+    h.api.beginNativeReviewAttempt(h.context, h.id, { kind: "prepared-merge-correspondence" }),
+  ).rejects.toThrow("OPAQUE_MERGE_ASSIGNMENT_REQUIRED");
+  expect(h.launches).toBe(0);
+  expect(h.posts).toBe(0);
+});
+
+for (const scenario of ["merge-dropped-raw", "merge-substituted-raw", "merge-parent-held"])
+  test("MERGE-CORRESPONDENCE actual observation refuses " + scenario, async () => {
+    const h = await nativeCase(scenario),
+      assignment = await h.api.prepareMergeCorrespondenceAssignment(h.context),
+      attempt = await h.api.beginNativeReviewAttempt(h.context, h.id, assignment);
+    await expect(h.api.invokeNativeReview(h.context, attempt, "native-codex")).rejects.toThrow();
+    expect(h.launches).toBe(1);
+    expect(h.posts).toBe(1);
+    expect(h.states[0]!.state).toBe("pending");
+  });
 
 test("raw pathname replacement during post-exit revalidation cannot promote actual negative native judgment", async () => {
   const old = await nativeCase("replace-negative-raw", true),

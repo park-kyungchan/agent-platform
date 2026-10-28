@@ -177,6 +177,354 @@ function fixture(owner = false) {
   };
 }
 
+function mergeCorrespondenceFixture(owner = false) {
+  const f = fixture(owner),
+    parent = "e".repeat(40),
+    base = "d".repeat(40),
+    receiptCommit = "f".repeat(40),
+    resultCommit = "1".repeat(40);
+  const parentResult: Record<string, unknown> = {
+    ...structuredClone(f.raw),
+    schema: "agent-platform.independent-review-result.v1",
+    recordClass: "verification",
+    headSha: parent,
+    nativeReviewPendingStatusId: 40,
+  };
+  const parentStatus = {
+    ...f.status,
+    creator: structuredClone(f.status.creator),
+    id: 41,
+    target_url: `https://github.com/${f.input.policy.repository}/blob/${receiptCommit}/native-reviews/${parent}.json`,
+  };
+  const parentPending = {
+    ...f.pending,
+    creator: structuredClone(f.pending.creator),
+    id: 40,
+    target_url: `https://github.com/${f.input.policy.repository}/commit/${parent}#native-independent-review`,
+  };
+  const receipt: Record<string, unknown> = {};
+  const assignment = {
+    kind: "merge-correspondence",
+    schema: "native-review-merge-correspondence.v1",
+    orderedParents: [base, parent],
+    parentReview: {
+      statusId: parentStatus.id,
+      targetUrl: parentStatus.target_url,
+      proofSha256: "",
+    },
+  };
+  const state = { protected: true, mainHead: f.head, parents: [base, parent], parentTree: f.tree };
+  const file = (path: string, body: unknown) => {
+    const bytes = Buffer.from(JSON.stringify(body));
+    return {
+      type: "file",
+      path,
+      encoding: "base64",
+      content: bytes.toString("base64"),
+      size: bytes.length,
+    };
+  };
+  function sealParent() {
+    Object.assign(receipt, parentResult, {
+      schema: "native-independent-review.v2",
+      provenance: {
+        owner: "codex-harness-engineering",
+        resultRef: `https://github.com/${f.input.policy.repository}/blob/${resultCommit}/native-review-results/${parent}.json`,
+        sha256: hash(Buffer.from(JSON.stringify(parentResult))),
+      },
+    });
+    assignment.parentReview.proofSha256 = hash(Buffer.from(JSON.stringify(receipt)));
+  }
+  sealParent();
+  f.raw.schema = owner
+    ? "owner-scoped-native-merge-correspondence-output.v1"
+    : "native-independent-merge-correspondence-output.v1";
+  (f.raw as Record<string, unknown>).reviewAssignment = assignment;
+  f.seal();
+  const reader: ReviewArtifactReader = {
+    archive: f.reader.archive,
+    async json(path) {
+      if (path === "branches/main")
+        return { name: "main", protected: state.protected, commit: { sha: state.mainHead } };
+      if (path === `git/commits/${f.head}`)
+        return {
+          sha: f.head,
+          tree: { sha: f.tree },
+          parents: state.parents.map((sha) => ({ sha })),
+        };
+      if (path === `git/commits/${parent}`) return { sha: parent, tree: { sha: state.parentTree } };
+      if (path === `commits/${parent}/statuses?per_page=100`) return [parentStatus, parentPending];
+      if (path === `contents/native-reviews/${parent}.json?ref=${receiptCommit}`)
+        return file(`native-reviews/${parent}.json`, receipt);
+      if (path === `contents/native-review-results/${parent}.json?ref=${resultCommit}`)
+        return file(`native-review-results/${parent}.json`, parentResult);
+      return f.reader.json(path);
+    },
+  };
+  return {
+    ...f,
+    reader,
+    assignment,
+    state,
+    parentStatus,
+    parentPending,
+    parentResult,
+    receipt,
+    sealParent,
+  };
+}
+
+function withArtifactParent(f: ReturnType<typeof mergeCorrespondenceFixture>, nested = false) {
+  const parent = f.assignment.orderedParents[1],
+    raw = {
+      ...structuredClone(f.raw),
+      headSha: parent,
+      nativeReviewPendingStatusId: 40,
+      schema: Object.hasOwn(f.input.policy.binding, "codeOwner")
+        ? "native-independent-review-output.v1"
+        : "owner-scoped-native-review-output.v1",
+    } as Record<string, unknown>;
+  delete raw.reviewAssignment;
+  if (nested) raw.reviewAssignment = structuredClone(f.assignment);
+  const rawBytes = Buffer.from(JSON.stringify(raw)),
+    archive = zip(rawBytes.toString()),
+    digest = hash(archive);
+  f.parentStatus.target_url = `https://github.com/${f.input.policy.repository}/actions/runs/15/artifacts/25#sha256=${digest}`;
+  f.assignment.parentReview.targetUrl = f.parentStatus.target_url;
+  f.assignment.parentReview.proofSha256 = hash(rawBytes);
+  f.seal();
+  const json = f.reader.json.bind(f.reader),
+    readArchive = f.reader.archive.bind(f.reader);
+  f.reader.archive = async (id) => (id === 25 ? archive : readArchive(id));
+  f.reader.json = async (path) => {
+    if (path === "actions/runs/15") return { ...f.run, id: 15, head_sha: parent };
+    if (path === "actions/artifacts/25")
+      return {
+        ...f.artifact,
+        id: 25,
+        name: `native-review-${parent}`,
+        digest: `sha256:${digest}`,
+        workflow_run: { ...f.artifact.workflow_run, id: 15, head_sha: parent },
+      };
+    return json(path);
+  };
+  return f;
+}
+
+for (const owner of [false, true])
+  test(
+    "MERGE-CORRESPONDENCE accepts authenticated full artifact parent " +
+      (owner ? "owner" : "platform"),
+    async () => {
+      const f = withArtifactParent(mergeCorrespondenceFixture(owner));
+      expect((await validateReviewArtifact(f.input, f.reader)).headSha).toBe(f.head);
+    },
+  );
+
+test("MERGE-CORRESPONDENCE rejects nested bounded artifact parent", async () => {
+  const f = withArtifactParent(mergeCorrespondenceFixture(), true);
+  await expect(validateReviewArtifact(f.input, f.reader)).rejects.toThrow("FULL_PARENT_REQUIRED");
+});
+
+test("MERGE-CORRESPONDENCE current ordered same-tree main with genuine full parent proof remains eligible", async () => {
+  const f = mergeCorrespondenceFixture();
+  expect((await validateReviewArtifact(f.input, f.reader)).headSha).toBe(f.head);
+});
+
+const mergeMutations: [string, (f: ReturnType<typeof mergeCorrespondenceFixture>) => void][] = [
+  [
+    "unprotected-main",
+    (f) => {
+      f.state.protected = false;
+    },
+  ],
+  [
+    "stale-main",
+    (f) => {
+      f.state.mainHead = "2".repeat(40);
+    },
+  ],
+  [
+    "swapped-parents",
+    (f) => {
+      f.state.parents.reverse();
+    },
+  ],
+  [
+    "single-parent",
+    (f) => {
+      f.state.parents.pop();
+    },
+  ],
+  [
+    "different-reviewed-tree",
+    (f) => {
+      f.state.parentTree = "2".repeat(40);
+    },
+  ],
+  [
+    "held-parent",
+    (f) => {
+      f.parentStatus.state = "pending";
+    },
+  ],
+  [
+    "foreign-parent-publisher",
+    (f) => {
+      f.parentStatus.creator.login = "foreign";
+    },
+  ],
+  [
+    "superseded-parent-status",
+    (f) => {
+      f.parentStatus.id++;
+    },
+  ],
+  [
+    "substituted-parent-digest",
+    (f) => {
+      f.assignment.parentReview.proofSha256 = "0".repeat(64);
+    },
+  ],
+  [
+    "foreign-parent-url",
+    (f) => {
+      f.assignment.parentReview.targetUrl = f.parentStatus.target_url.replace(
+        "fixture/owner",
+        "foreign/owner",
+      );
+    },
+  ],
+  [
+    "nested-bounded-parent",
+    (f) => {
+      f.parentResult.reviewAssignment = structuredClone(f.assignment);
+      f.sealParent();
+    },
+  ],
+  [
+    "successor-parent",
+    (f) => {
+      f.receipt.schema = "native-independent-review-successor.v1";
+    },
+  ],
+  [
+    "unknown-assignment-key",
+    (f) => {
+      (f.assignment as Record<string, unknown>).override = true;
+    },
+  ],
+];
+for (const [name, mutate] of mergeMutations)
+  test("MERGE-CORRESPONDENCE rejects " + name, async () => {
+    const f = mergeCorrespondenceFixture();
+    mutate(f);
+    f.seal();
+    await expect(validateReviewArtifact(f.input, f.reader)).rejects.toThrow();
+  });
+
+for (const phase of ["source-manifest", "terminal-status"] as const)
+  test("MERGE-CORRESPONDENCE rejects parent hold during " + phase, async () => {
+    const f = mergeCorrespondenceFixture(),
+      json = f.reader.json.bind(f.reader);
+    f.reader.json = async (path) => {
+      if (
+        path ===
+        (phase === "source-manifest"
+          ? `git/trees/${f.tree}?recursive=1`
+          : `commits/${f.head}/statuses?per_page=100`)
+      )
+        f.parentStatus.state = "pending";
+      return json(path);
+    };
+    await expect(validateReviewArtifact(f.input, f.reader)).rejects.toThrow();
+  });
+
+test("MERGE-CORRESPONDENCE absent parent proof cannot be consumed as a full review", async () => {
+  const f = fixture();
+  (f.raw as Record<string, unknown>).reviewAssignment = {
+    kind: "merge-correspondence",
+    schema: "native-review-merge-correspondence.v1",
+    orderedParents: ["d".repeat(40), "e".repeat(40)],
+    parentReview: {
+      statusId: 41,
+      targetUrl: "https://github.com/fixture/owner/invalid",
+      proofSha256: "f".repeat(64),
+    },
+  };
+  f.seal();
+  await expect(validateReviewArtifact(f.input, f.reader)).rejects.toThrow();
+});
+
+test("MERGE-CORRESPONDENCE foreign parent predecessor witness uses an independent main publisher object", async () => {
+  const prior = Bun.spawnSync(
+    ["git", "show", "c49f75c6d912aa7662344575a7109a67950b285d:ci/quality/review-artifact.ts"],
+    { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+  );
+  expect(prior.exitCode).toBe(0);
+  const source = prior.stdout
+    .toString()
+    .replaceAll(
+      '"./artifact-archive"',
+      JSON.stringify(new URL("./artifact-archive.ts", import.meta.url).href),
+    )
+    .replaceAll(
+      '"./receipt-validator"',
+      JSON.stringify(new URL("./receipt-validator.ts", import.meta.url).href),
+    );
+  const old = await import(
+    "data:text/javascript;base64," +
+      Buffer.from(new Bun.Transpiler({ loader: "ts" }).transformSync(source)).toString("base64")
+  );
+  const f = mergeCorrespondenceFixture();
+  // Retain the predecessor's scope-confusing envelope for its genuine counterexample.
+  f.raw.schema = "native-independent-review-output.v1";
+  f.seal();
+  f.parentStatus.creator.login = "foreign";
+  expect(f.status.creator.login).toBe("native-publisher");
+  expect((await old.validateReviewArtifact(f.input, f.reader)).headSha).toBe(f.head);
+  await expect(validateReviewArtifact(f.input, f.reader)).rejects.toThrow();
+});
+
+test("MERGE-CORRESPONDENCE bounded schema is rejected by the actual old full consumer", async () => {
+  const prior = Bun.spawnSync(
+    ["git", "show", "c49f75c6d912aa7662344575a7109a67950b285d:ci/quality/review-artifact.ts"],
+    { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" },
+  );
+  expect(prior.exitCode).toBe(0);
+  const source = prior.stdout
+    .toString()
+    .replaceAll(
+      '"./artifact-archive"',
+      JSON.stringify(new URL("./artifact-archive.ts", import.meta.url).href),
+    )
+    .replaceAll(
+      '"./receipt-validator"',
+      JSON.stringify(new URL("./receipt-validator.ts", import.meta.url).href),
+    );
+  const old = await import(
+    "data:text/javascript;base64," +
+      Buffer.from(new Bun.Transpiler({ loader: "ts" }).transformSync(source)).toString("base64")
+  );
+  const f = mergeCorrespondenceFixture();
+  await expect(old.validateReviewArtifact(f.input, f.reader)).rejects.toThrow(
+    "NATIVE_RAW_OUTPUT_REQUIRED",
+  );
+  expect((await validateReviewArtifact(f.input, f.reader)).headSha).toBe(f.head);
+});
+
+for (const mutation of ["missing-assignment", "full-schema", "wrong-owner-schema"] as const)
+  test("MERGE-CORRESPONDENCE bounded raw schema and assignment reject " + mutation, async () => {
+    const f = mergeCorrespondenceFixture();
+    if (mutation === "missing-assignment")
+      delete (f.raw as Record<string, unknown>).reviewAssignment;
+    if (mutation === "full-schema") f.raw.schema = "native-independent-review-output.v1";
+    if (mutation === "wrong-owner-schema")
+      f.raw.schema = "owner-scoped-native-merge-correspondence-output.v1";
+    f.seal();
+    await expect(validateReviewArtifact(f.input, f.reader)).rejects.toThrow();
+  });
+
 test("externally dispatched raw native review passes and source CI consumes it without repository receipt commits", async () => {
   const f = fixture();
   expect((await validateReviewArtifact(f.input, f.reader)).rawSha256).toHaveLength(64);
