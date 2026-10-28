@@ -541,7 +541,8 @@ function ownerFixture(
   const statuses = [
     {
       id: 42,
-      context: policy.statusContext,
+      // Real GitHub status pages can mix native and unrelated contexts.
+      context: String(policy.statusContext),
       state: "success",
       creator: { ...policy.publisher, id: 123 },
       target_url: `https://github.com/${policy.repository}/blob/${receiptCommit}/${receiptPath}`,
