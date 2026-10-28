@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { operationalTimeouts } from "./operational-timeouts";
 import { createHash } from "node:crypto";
 import {
@@ -12,9 +13,13 @@ import {
 } from "node:fs/promises";
 import { isAbsolute, join, resolve, sep } from "node:path";
 
+const sourceBunVersion = readFileSync(
+  new URL("../../.bun-version", import.meta.url),
+  "utf8",
+).trim();
 const release = {
-  version: "1.4.3",
-  url: "https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64.zip",
+  version: sourceBunVersion,
+  url: `https://github.com/oven-sh/bun/releases/download/bun-v${sourceBunVersion}/bun-linux-x64.zip`,
   archiveBytes: 42015139,
   archiveSha256: "3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18",
   binaryBytes: 88979072,

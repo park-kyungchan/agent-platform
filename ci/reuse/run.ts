@@ -5,6 +5,7 @@ import {
   sourceAuthorPath,
   verifyCommittedSourceAuthor,
 } from "./source-author";
+import { locatedError } from "./located-error";
 
 export interface CallerSourceInput {
   workspace: string;
@@ -160,10 +161,8 @@ export async function runCallerSource(input: CallerSourceInput): Promise<number>
 if (import.meta.main) {
   try {
     process.exitCode = await runCallerSource(parseCallerSourceInput(process.env));
-  } catch {
-    console.error(
-      "Caller source checks refused: inspect the explicit inputs, checkout and owner commands",
-    );
+  } catch (error) {
+    console.error(locatedError(error, "caller_source_refused"));
     process.exitCode = 1;
   }
 }

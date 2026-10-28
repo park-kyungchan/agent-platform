@@ -7,6 +7,7 @@ on:
 permissions:
   contents: read
   statuses: read
+  actions: read
 concurrency:
   group: source-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -23,7 +24,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: 1.4.3
+          bun-version-file: .bun-version
       - name: Require committed native source-author metadata for this exact source
         run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
         env:
@@ -62,7 +63,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: 1.4.3
+          bun-version-file: .bun-version
       - name: Require fresh authored-head metadata before quality commands
         run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
         env:
@@ -111,7 +112,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: 1.4.3
+          bun-version-file: .bun-version
       - name: Require fresh ordered-merge metadata before integration commands
         run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
         env:
@@ -168,7 +169,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          bun-version: 1.3.14
+          bun-version-file: .bun-version
       - name: Require fresh authored-head metadata before review receipt checks
         run: bun --no-env-file --no-install ci/reuse/source-author-cli.ts verify
         env:

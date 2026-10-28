@@ -240,12 +240,33 @@ export function captureHermesHookSourceAuthor(
 }
 
 export async function sourceAuthorGit(root: string, args: string[]): Promise<string> {
-  const child = Bun.spawn(["git", "-C", root, ...args], {
-    stdin: "ignore",
-    stdout: "pipe",
-    stderr: "ignore",
-    env: { ...process.env, GIT_NO_REPLACE_OBJECTS: "1", GIT_TERMINAL_PROMPT: "0" },
-  });
+  const child = Bun.spawn(
+    [
+      "git",
+      "--no-replace-objects",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "-c",
+      "core.fsmonitor=false",
+      "-C",
+      root,
+      ...args,
+    ],
+    {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "ignore",
+      env: {
+        PATH: process.env.PATH ?? "/usr/bin:/bin",
+        LANG: "C.UTF-8",
+        GIT_CONFIG_GLOBAL: "/dev/null",
+        GIT_CONFIG_NOSYSTEM: "1",
+        GIT_NO_REPLACE_OBJECTS: "1",
+        GIT_TERMINAL_PROMPT: "0",
+        GIT_OPTIONAL_LOCKS: "0",
+      },
+    },
+  );
   const [output, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
   if (code !== 0 || output.length > 2_000_000)
     throw Error("Source-author Git readback unavailable");

@@ -49,15 +49,15 @@ producer, authorize dispatch or establish Acceptance. Both paths preserve unknow
 
 ## Apply at the existing owner boundaries
 
-| Boundary                   | Apply the method                                                                                                                          |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Interview → Work/Spec/Plan | Preserve purpose, original answers and independent criteria before candidate results.                                                     |
-| Lead → worker              | Pin selected contract, relevant original decisions, dependencies, allowed changes and durable output address.                             |
-| Producer → consumer        | Test public contracts and all affected paths: common changes include Codex and Hermes adapters.                                           |
-| Interruption → recovery    | Preserve completed/uncertain effects and next safe action; never replay to improve a result.                                              |
-| Branch → integration       | Use separate Task worktrees, exact commits/trees, semantic transitions and expected refs.                                                 |
-| Review → PR/merge          | Freeze source; publish independent exact-head/tree evidence and authenticated status before PR; Lead explicitly merges the expected head. |
-| Merged source → runtime    | Each native owner separately verifies and activates; source checks do not prove native adoption.                                          |
+| Boundary                   | Apply the method                                                                                                                                                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Interview → Work/Spec/Plan | Preserve purpose, original answers and independent criteria before candidate results.                                                                                                                                                        |
+| Lead → worker              | Pin selected contract, relevant original decisions, dependencies, allowed changes and durable output address.                                                                                                                                |
+| Producer → consumer        | Test public contracts and all affected paths: common changes include Codex and Hermes adapters.                                                                                                                                              |
+| Interruption → recovery    | Preserve completed/uncertain effects and next safe action; never replay to improve a result.                                                                                                                                                 |
+| Branch → integration       | Use separate Task worktrees, exact commits/trees, semantic transitions and expected refs.                                                                                                                                                    |
+| Review → PR/merge          | Freeze/push source; owner-created draft may establish authenticated provenance. Genuine independent exact-head/tree evidence/status, CI and current finding/thread gates precede ready-for-review; Lead explicitly merges the expected head. |
+| Merged source → runtime    | Each native owner separately verifies and activates; source checks do not prove native adoption.                                                                                                                                             |
 
 Git-owned publication, concurrency and original/history preservation use the existing Git Work
 reader, branches, commits and semantic checks. A clean textual merge is not sufficient proof of

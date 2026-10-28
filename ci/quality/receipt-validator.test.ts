@@ -224,7 +224,11 @@ describe("versioned exact-head independent review receipt", () => {
       readTree: reader.readTree,
       readFile: async (path, commit) => {
         const found = await reader.readFile(path, commit);
-        return { ...(found as object), content: museBytes.toString("base64"), size: museBytes.length };
+        return {
+          ...(found as object),
+          content: museBytes.toString("base64"),
+          size: museBytes.length,
+        };
       },
     };
     await expect(
@@ -274,7 +278,11 @@ describe("versioned exact-head independent review receipt", () => {
       readTree: reader.readTree,
       readFile: async (path, commit) => {
         const found = await reader.readFile(path, commit);
-        return { ...(found as object), content: grokBytes.toString("base64"), size: grokBytes.length };
+        return {
+          ...(found as object),
+          content: grokBytes.toString("base64"),
+          size: grokBytes.length,
+        };
       },
     };
     await expect(
@@ -305,7 +313,11 @@ describe("versioned exact-head independent review receipt", () => {
       readTree: reader.readTree,
       readFile: async (path, commit) => {
         const found = await reader.readFile(path, commit);
-        return { ...(found as object), content: hermesBytes.toString("base64"), size: hermesBytes.length };
+        return {
+          ...(found as object),
+          content: hermesBytes.toString("base64"),
+          size: hermesBytes.length,
+        };
       },
     };
     await expect(

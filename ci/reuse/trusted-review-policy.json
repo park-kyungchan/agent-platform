@@ -1,0 +1,38 @@
+{
+  "schema": "agent-platform.trusted-native-review-policy.v1",
+  "mode": "private-owner-run",
+  "publisher": { "id": "241037670", "login": "park-kyungchan", "type": "User" },
+  "controllerRepository": "park-kyungchan/agent-platform",
+  "controllerRepositoryId": 1413326539,
+  "untrustedContributors": "refuse",
+  "credentialIsolationEstablished": false,
+  "repositories": [
+    {
+      "repository": "park-kyungchan/agent-platform",
+      "id": 1413326539,
+      "projectId": "agent-platform",
+      "domainId": "native-harness",
+      "semanticOwner": "codex-harness-engineering",
+      "scope": "canonical-source-ci-quality",
+      "bases": ["main"]
+    },
+    {
+      "repository": "park-kyungchan/education-platform",
+      "id": 1414002561,
+      "projectId": "education-platform",
+      "domainId": "education",
+      "semanticOwner": "education-platform",
+      "scope": "month-end-source-redesign",
+      "bases": ["main"]
+    },
+    {
+      "repository": "park-kyungchan/academy-workbench",
+      "id": 1416382638,
+      "projectId": "academy-workbench",
+      "domainId": "academy-operations",
+      "semanticOwner": "academy-workbench",
+      "scope": "month-end-mcp-source-bridge",
+      "bases": ["main", "academy/20261026-s1"]
+    }
+  ]
+}

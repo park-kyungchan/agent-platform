@@ -6,6 +6,7 @@ import {
   sourceAuthorGit,
   verifyCommittedSourceAuthor,
 } from "./source-author";
+import { locatedError } from "./located-error";
 
 if (import.meta.main) {
   try {
@@ -33,11 +34,12 @@ if (import.meta.main) {
         metadataPath: process.env.COMMON_CI_SOURCE_AUTHOR_METADATA,
       });
       console.log(JSON.stringify(readback));
-    } else throw Error("Use capture <exact-scope.json>, capture-descriptor <scope.json> <identity.json> or verify with explicit source inputs");
-  } catch {
-    console.error(
-      "Source-author metadata refused: require actual native capture and exact committed readback",
-    );
+    } else
+      throw Error(
+        "Use capture <exact-scope.json>, capture-descriptor <scope.json> <identity.json> or verify with explicit source inputs",
+      );
+  } catch (error) {
+    console.error(locatedError(error, "source_author_refused"));
     process.exitCode = 1;
   }
 }

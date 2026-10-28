@@ -16,7 +16,10 @@ inputs:
     default: .github/source-author.json
   bun-version:
     description: Exact owner-selected Bun version
-    required: true
+    required: false
+  bun-version-file:
+    description: Caller-owned .bun-version file; use instead of bun-version
+    required: false
   scripts:
     description: JSON array of existing caller package script names, in order
     required: true
@@ -26,14 +29,17 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Require an exact runtime version before setup
+    - name: Resolve the caller exact runtime version before setup
+      id: runtime
       shell: bash
       env:
         COMMON_CI_BUN_VERSION: ${{ inputs.bun-version }}
-      run: '[[ "$COMMON_CI_BUN_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]'
+        COMMON_CI_BUN_VERSION_FILE: ${{ inputs.bun-version-file }}
+        COMMON_CI_BUN_RESOLVER: ${{ github.action_path }}/../../../ci/reuse/resolve-bun-version.sh
+      run: bash "$COMMON_CI_BUN_RESOLVER"
     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
       with:
-        bun-version: ${{ inputs.bun-version }}
+        bun-version: ${{ steps.runtime.outputs.bun-version }}
     - name: Verify caller identity and run owner scripts
       shell: bash
       env:
@@ -42,7 +48,7 @@ runs:
         COMMON_CI_REPOSITORY: ${{ inputs.repository }}
         COMMON_CI_SOURCE_SHA: ${{ inputs.source-sha }}
         COMMON_CI_SOURCE_AUTHOR_METADATA: ${{ inputs.source-author-metadata }}
-        COMMON_CI_BUN_VERSION: ${{ inputs.bun-version }}
+        COMMON_CI_BUN_VERSION: ${{ steps.runtime.outputs.bun-version }}
         COMMON_CI_SCRIPTS: ${{ inputs.scripts }}
         COMMON_CI_INSTALL: ${{ inputs.install-dependencies }}
       run: bun --no-env-file --no-install "$COMMON_CI_RUNNER"

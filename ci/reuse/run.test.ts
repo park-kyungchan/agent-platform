@@ -190,7 +190,7 @@ test("wrong owner, source, runtime and unsafe script inputs refuse before execut
   ]) {
     const result = await f.run(extra);
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain("Caller source checks refused");
+    expect(result.stderr.trim()).toMatch(/^caller_source_refused@ci\/reuse\/[a-z-]+\.ts:\d+$/);
     expect(await Bun.file(join(f.owner, ".result.json")).exists()).toBe(false);
   }
 });
@@ -231,7 +231,8 @@ test("stale author metadata refuses before dependency installation or any owner 
     ).exists(),
     ownerExecuted: await Bun.file(join(f.owner, ".result.json")).exists(),
   }).toEqual({ exitCode: 1, installed: false, ownerExecuted: false });
-  expect(result.stderr).toContain("Caller source checks refused");
+  // The real child boundary preserves the precise throw site without exposing error payloads.
+  expect(result.stderr.trim()).toMatch(/^caller_source_refused@ci\/reuse\/source-author\.ts:\d+$/);
 });
 
 test("tracked source mutation refuses continuation and preserves the changed bytes", async () => {

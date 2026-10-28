@@ -1,3 +1,4 @@
+import { authenticatedReviewReader, validateReviewArtifact } from "./quality/review-artifact";
 import { runNativeCommand, sourceTestFailureDiagnostics } from "./quality/native-tools";
 import { processFailureMetadata } from "./quality/trusted/process";
 import { operationalTimeouts } from "./quality/operational-timeouts";
@@ -905,6 +906,7 @@ export async function runTrustedSourceChecks(
 export interface ReviewGateOptions {
   env?: NodeJS.ProcessEnv;
   readApi?: (path: string) => Promise<unknown>;
+  readArchive?: (id: number) => Promise<Uint8Array>;
   now?: () => number;
   delay?: (milliseconds: number) => Promise<void>;
 }
@@ -1015,6 +1017,33 @@ export async function reviewGate(options: ReviewGateOptions = {}) {
     throw Error(
       "Native independent review status missing, unsuccessful or from unexpected creator",
     );
+  if (
+    typeof status.target_url === "string" &&
+    status.target_url.startsWith(`https://github.com/${repository}/actions/runs/`)
+  ) {
+    if (!expectedLogin) throw Error("Artifact review requires the fixed publisher login");
+    const result = await validateReviewArtifact(
+      {
+        policy: {
+          repository,
+          publisher: { id: expectedCreator, login: expectedLogin, type: "User" },
+          binding: {
+            codeOwner: "agent-platform",
+            evidenceOwner: "codex-harness-engineering",
+            scope: "canonical-source-ci-quality",
+          },
+        },
+        head,
+        status,
+      },
+      {
+        json: readApi,
+        archive: options.readArchive ?? authenticatedReviewReader(repository, token).archive,
+      },
+    );
+    console.log(JSON.stringify(result));
+    return result;
+  }
   const target = new URL(status.target_url);
   const prefix = `/${repository}/blob/`,
     suffix = `/native-reviews/${head}.json`;

@@ -14,6 +14,7 @@ import stat
 import subprocess
 import sys
 
+BUN_VERSION = Path(".bun-version").read_text().strip()
 BUN_SHA256 = "7ce7d6b654eddeec20afddf2396317fba6dc19ab52788a27e894e1806bf8f24b"
 uid, gid = os.getuid(), os.getgid()
 job = Path("/job")
@@ -139,7 +140,7 @@ try:
     installed = Path(shutil.which("bun") or "")
     need(installed.is_absolute(), "SETUP_BUN_REQUIRED")
     binary = bun_bytes(installed)
-    need(command([str(installed), "--no-env-file", "--no-install", "--version"], "/") == "1.4.3",
+    need(command([str(installed), "--no-env-file", "--no-install", "--version"], "/") == BUN_VERSION,
          "EXACT_INSTALLED_BUN_VERSION_REQUIRED")
     need(bun_bytes(installed) == binary, "INSTALLED_BUN_CHANGED")
     need(not os.path.lexists(job), "EXISTING_OR_PARTIAL_JOB_REFUSED_DO_NOT_RETRY")
@@ -161,7 +162,7 @@ try:
         f.flush()
         os.fsync(f.fileno())
     need(bun_bytes(staged_bun, 0o700) == binary, "STAGED_BUN_CHANGED")
-    need(command([str(staged_bun), "--no-env-file", "--no-install", "--version"], job) == "1.4.3",
+    need(command([str(staged_bun), "--no-env-file", "--no-install", "--version"], job) == BUN_VERSION,
          "EXACT_STAGED_BUN_VERSION_REQUIRED")
     need(bun_bytes(staged_bun, 0o700) == binary, "STAGED_BUN_CHANGED")
     source = job / "source"

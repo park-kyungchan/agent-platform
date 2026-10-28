@@ -160,3 +160,63 @@ by this source proposal.
 
 References: [private sharing](https://docs.github.com/en/actions/how-tos/reuse-automations/share-across-private-repositories),
 [reuse and access boundaries](https://docs.github.com/en/actions/reference/workflows-and-actions/reusing-workflow-configurations).
+
+Active source CI selects `.bun-version` as its single exact version source. A
+caller may pass `bun-version-file: .bun-version` instead of the historical
+`bun-version` literal. The shared action refuses simultaneous or missing values,
+symlinks, other filenames and non-release strings before runtime setup. The
+pinned trusted-ci-v1 controller retains its independently reviewed historical
+bootstrap; changing that release requires a successor policy, not a moving tag.
+
+Native review remains separate from this action. The additive
+[artifact transport](../quality/review-artifacts.md) accepts unchanged externally
+produced native output under the fixed publisher's authenticated exact-head
+status. The source action cannot dispatch that workflow or post that status.
+
+## Native review and publication command
+
+Keep the controller in a **separate detached checkout of an already reviewed,
+immutable common commit**, chosen through the native owner's trusted channel.
+Never use a contributor's proposed checkout/controller as that trust anchor.
+The launcher enters the trusted controller directory before starting Bun, so
+subject Bun/project configuration cannot run at startup. No subject path is an
+executable input: the subject is fetched as Git objects into a fresh data view.
+
+```sh
+bash <trusted-common>/ci/reuse/review-pr.sh <repository> <head> <reviewer-runtime> <controller-sha>
+```
+
+For example, the current explicitly authorized temporary judgment runtime is
+`native-codex` (`gpt-6.1-sol/high`, per-run bypass/ephemeral flags). `native-claude`
+remains supported. The actual native session/thread must match the report and be
+distinct from the native source author. Raw final output, events and stderr are
+retained unchanged. Neither global model/configuration nor authentication changes.
+
+The pinned policy is `trusted-review-policy.json`: it admits only the listed
+private repository IDs owned by the authenticated publisher. GitHub metadata
+must show an open owner-created same-repository PR at the exact head and allowed
+base, or the exact authenticated protected-main head. Public repositories, forks,
+external PR authors, unrelated repositories and unassociated heads refuse before
+subject fetch or native review. Git author strings and trust booleans grant no
+admission. Owner-created drafts are allowed solely to obtain this authenticated
+provenance; genuine native review/evidence, CI and current-thread gates must pass
+before ready-for-review and explicit expected-head merge.
+
+This is the user's **trusted-root, first-party source operating profile**. The
+temporary native bypass provides **no OS credential isolation**; arbitrary
+contributor/untrusted-source review is unsupported and refused. Subject text is
+review data, not operational instructions. The controller never imports subject
+JavaScript, checkout configuration, hooks or package scripts. Existing native
+CLIs retain their authentication ownership; there is no credential broker.
+
+A second actual native caller invokes the same command with `--check` to verify
+the existing source, runtime, artifact and authenticated status without issuing a
+new judgment. `--smoke` is mechanical only and cannot publish review status.
+
+Bootstrap a new controller release with a fresh independent installed native CLI
+from outside the subject, then the existing immutable receipt/status gate; never
+execute the proposed controller to qualify itself. Once qualified, select its
+full commit in the separate controller checkout. The initial evidence workflow
+must reach default main before real artifact publication is possible. Legacy
+receipts remain supported during that bootstrap; ordinary reviews then use the
+one-command artifact path.

@@ -88,7 +88,16 @@ test("compatibility and tracked Markdown participate in byte snapshots with prot
   await put(root, source, "export const value = 1;\n");
   await put(root, forwarder, "export * from '@fixture/common';\n");
   await put(root, ".github/workflows/source.yml", "name: Fixture\non: push\njobs: {}\n");
-  for (const path of ["bun.lock", ".editorconfig", ".prettierignore"]) await put(root, path, "\n");
+  for (const path of [
+    "bun.lock",
+    ".bun-version",
+    "ci/reuse/trusted-review-policy.json",
+    "ci/reuse/review-pr.sh",
+    "ci/reuse/resolve-bun-version.sh",
+    ".editorconfig",
+    ".prettierignore",
+  ])
+    await put(root, path, "\n");
   for (const path of [
     "README.md",
     "AGENTS.md",

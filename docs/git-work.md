@@ -46,7 +46,7 @@ Completed effects cannot be replayed; uncertain effects require observation befo
 
 ## Review and runtime handoff
 
-Run `bun run check:handoff`, `bun run check:imports`, `bun run check:git-work`, `bun run check:source` and `bun run check:quality`. Commit/freeze the candidate, obtain independent exact-commit/tree review, then push and publish immutable review evidence/status before opening the PR. A changed tree requires renewed review. The Lead checks current head/base/findings and required checks, then explicitly merges the expected head.
+Run `bun run check:handoff`, `bun run check:imports`, `bun run check:git-work`, `bun run check:source` and `bun run check:quality`. Commit/freeze and push the candidate. An owner-created draft PR may be opened solely to establish authenticated provenance before independent review. Publish genuine independent exact-commit/tree evidence and its authenticated status, and pass CI and current finding/thread gates before ready-for-review. A changed tree requires renewed review. The Lead checks current head/base/findings and required checks, then explicitly merges the expected head.
 
 A merge SHA may reuse a review only with proven tree equality, an explicit independent successor binding and current zero unresolved findings. Publish the new exact-main evidence/status; explicitly rerun a review job if status arrival raced. No review-arrival observer is needed.
 
