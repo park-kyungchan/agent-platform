@@ -95,42 +95,99 @@ export function validateRawReviewArtifact(
   validateExactNativeReview(raw, head, tree, manifest);
   return raw;
 }
-export const reviewAttemptIdPattern =
-  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-export function reviewAttemptTarget(repository: string, head: string, id: string): string {
+/** One existing native status context per head; the actual pending status ID fences completion. */
+export function reviewAttemptTarget(repository: string, head: string): string {
   need(
-    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) &&
-      /^[a-f0-9]{40}$/.test(head) &&
-      reviewAttemptIdPattern.test(id),
-    "EXACT_REVIEW_ATTEMPT_REQUIRED",
+    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository) && /^[a-f0-9]{40}$/.test(head),
+    "EXACT_REVIEW_HEAD_REQUIRED",
   );
-  return `https://github.com/${repository}/commit/${head}#native-review-attempt-${id}`;
+  return `https://github.com/${repository}/commit/${head}#native-independent-review`;
 }
-/** A completed older attempt may never overwrite a newer hold, even if its status POST wins a race. */
 export function validateArtifactAttempt(
   history: unknown[],
   status: unknown,
-  run: unknown,
+  raw: Record<string, unknown>,
   policy: ReviewArtifactPolicy,
   head: string,
 ): void {
-  const title = object(run).display_title;
-  need(
-    typeof title === "string" && title.startsWith("Native review evidence "),
-    "REVIEW_ATTEMPT_RUN_REQUIRED",
-  );
-  const id = title.slice("Native review evidence ".length);
-  const states = history.filter((s) => object(s).context === "native-independent-review");
-  const pending = object(states[1]);
+  const states = history.map(object).filter((s) => s.context === "native-independent-review"),
+    pending = states[1];
   need(
     same(states[0], status) &&
+      pending &&
       pending.state === "pending" &&
       Number.isSafeInteger(pending.id) &&
       Number(pending.id) > 0 &&
+      pending.id === raw.nativeReviewPendingStatusId &&
       pending.id !== object(status).id &&
       publisher(pending.creator, policy.publisher) &&
-      pending.target_url === reviewAttemptTarget(policy.repository, head, id),
+      pending.target_url === reviewAttemptTarget(policy.repository, head),
     "REVIEW_ATTEMPT_SUPERSEDED",
+  );
+}
+/** Historical legacy stays admissible until a later formal hold supersedes that proof. */
+export function validateLegacyReviewAttempt(
+  policy: { repository: string; publisher: { id: string; login?: string; type?: string } },
+  head: string,
+  history: unknown,
+  expected: { id: unknown; target_url: unknown },
+  receipt: unknown,
+): void {
+  need(Array.isArray(history) && history.length <= 100, "LEGACY_ATTEMPT_HISTORY_REQUIRED");
+  const states = history.map(object).filter((s) => s.context === "native-independent-review"),
+    latest = states[0];
+  const owns = (s: Record<string, unknown>) =>
+    String(object(s.creator).id) === policy.publisher.id &&
+    (!policy.publisher.login || object(s.creator).login === policy.publisher.login) &&
+    (!policy.publisher.type || object(s.creator).type === policy.publisher.type);
+  need(
+    latest &&
+      latest.state === "success" &&
+      latest.id === expected.id &&
+      latest.target_url === expected.target_url &&
+      owns(latest),
+    "LEGACY_LATEST_STATUS_CHANGED",
+  );
+  const held = (s: Record<string, unknown>) =>
+    ["pending", "failure", "error"].includes(String(s.state));
+  const legacyMarker = `https://github.com/${policy.repository}/commit/${head}#native-review-attempt-`;
+  const formal = states
+    .slice(1)
+    .some(
+      (s) =>
+        held(s) &&
+        (s.target_url === reviewAttemptTarget(policy.repository, head) ||
+          (typeof s.target_url === "string" && s.target_url.startsWith(legacyMarker))),
+    );
+  const prior = states.findIndex(
+    (s, i) => i > 0 && s.state === "success" && s.target_url === latest.target_url && owns(s),
+  );
+  const restoredAfterHold = prior > 0 && states.slice(1, prior).some(held),
+    proof = object(receipt),
+    id = proof.nativeReviewPendingStatusId;
+  if (id === undefined && !formal && !restoredAfterHold) return;
+  need(
+    ["native-independent-review.v2", "owner-scoped-independent-review.v1"].includes(
+      String(proof.schema),
+    ) &&
+      Number.isSafeInteger(id) &&
+      Number(id) > 0,
+    "FRESH_LEGACY_ATTEMPT_REQUIRED",
+  );
+  const pending = states.findIndex(
+    (s, i) =>
+      i > 0 &&
+      s.id === id &&
+      s.state === "pending" &&
+      s.target_url === reviewAttemptTarget(policy.repository, head) &&
+      owns(s),
+  );
+  need(
+    pending > 0 &&
+      states
+        .slice(1, pending)
+        .every((s) => s.state === "success" && s.target_url === latest.target_url && owns(s)),
+    "LEGACY_ATTEMPT_SUPERSEDED",
   );
 }
 /** Read-only transport. Only the separately authenticated native publisher can attest these raw bytes. */
@@ -223,7 +280,7 @@ export async function validateReviewArtifact(
       ),
     "LATEST_STATUS_CHANGED",
   );
-  validateArtifactAttempt(latest as unknown[], status, run, policy, head);
+  validateArtifactAttempt(latest as unknown[], status, raw, policy, head);
   return {
     schema: "native-independent-review-artifact-ci.v1",
     headSha: head,

@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import {
   authenticatedReviewReader,
   reviewArtifactWorkflow,
@@ -18,23 +16,25 @@ import {
   requireNativeReviewAttempt,
   requireCurrentReviewAttempt,
   type NativeReviewAttempt,
+  readCompletedNativeObservation,
+  type CompletedNativeObservation,
 } from "./review-attempt";
 
 /** Native publisher only: preserve the actual reviewer bytes, upload once, verify, then attest. */
 export async function publishNativeReviewArtifact(
   context: TrustedReviewContext,
-  rawPath: string,
+  observation: CompletedNativeObservation,
   attempt: NativeReviewAttempt,
 ) {
   requireTrustedReviewContext(context);
   requireNativeReviewAttempt(context, attempt);
+  const { bytes } = readCompletedNativeObservation(context, attempt, observation);
   await requireCurrentReviewAttempt(context, attempt);
   const { head, policy } = context;
   await context.revalidate();
   if (process.env.CI || process.env.GITHUB_ACTIONS)
     throw Error("Native publisher context required");
-  if (!/^[a-f0-9]{40}$/.test(head) || !rawPath)
-    throw Error("Use publish-review-artifact.ts <exact-head> <raw-native.json>");
+  if (!/^[a-f0-9]{40}$/.test(head)) throw Error("Exact native observation head required");
   function gh(args: string[]) {
     const result = Bun.spawnSync(["gh", ...args], {
       stdin: "ignore",
@@ -63,8 +63,7 @@ export async function publishNativeReviewArtifact(
     await reader.json(`git/trees/${commit.tree.sha}?recursive=1`),
     commit.tree.sha,
   );
-  const bytes = await readFile(resolve(rawPath)),
-    raw = validateRawReviewArtifact(bytes, policy, head!, commit.tree.sha, manifest.sha256);
+  const raw = validateRawReviewArtifact(bytes, policy, head!, commit.tree.sha, manifest.sha256);
   const authorBytes = decodeBoundedReviewFile(
     await reader.json(`contents/.github/source-author.json?ref=${head}`),
     ".github/source-author.json",
@@ -148,7 +147,7 @@ export async function publishNativeReviewArtifact(
     ...reader,
     json: async (path: string) =>
       path === `commits/${head}/statuses?per_page=100`
-        ? [status, ...(await requireCurrentReviewAttempt(context, attempt))]
+        ? [status, ...(await requireCurrentReviewAttempt(context, attempt))].slice(0, 100)
         : reader.json(path),
   };
   await validatePublishedReviewArtifact(

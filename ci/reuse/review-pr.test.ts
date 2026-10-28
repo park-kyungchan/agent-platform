@@ -6,7 +6,7 @@ import {
   type TrustedReviewContext,
   validateCommittedOwnerPolicy,
 } from "./trusted-review-source";
-import { codexReviewThread, bindNativeReviewer } from "./review-runtimes";
+import { codexReviewThread, bindNativeReviewer, reviewerInvocation } from "./review-runtimes";
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 
@@ -55,6 +55,16 @@ test("native Codex review identity must come from exactly one real thread event"
     event + "not-json\n",
   ])
     expect(() => codexReviewThread(Buffer.from(text))).toThrow();
+});
+test("current judgment invokes native sol only and never Claude/Opus; Muse remains mechanical", () => {
+  const id = "00000000-0000-4000-8000-000000000001";
+  expect(reviewerInvocation("native-codex", id, false, "/synthetic-final")).toContain(
+    "gpt-6.1-sol",
+  );
+  for (const smoke of [false, true])
+    expect(() => reviewerInvocation("native-claude", id, smoke)).toThrow();
+  expect(() => reviewerInvocation("native-muse", id, false)).toThrow();
+  expect(reviewerInvocation("native-muse", id, true)).toContain("muse-spark-1.3");
 });
 
 test("every formal native adapter binds the requested runtime and actual session before publication", () => {
@@ -418,7 +428,7 @@ test("a genuine negative re-review supersedes old success, and the hold precedes
       headSha: head,
       reviewedTreeSha: tree,
       reviewedSourceManifestSha256: manifest,
-      reviewer: { runtime: "native-claude", taskId: id },
+      reviewer: { runtime: "native-codex", taskId: id },
       author: { runtime: "native-codex", taskId: "actual-native-author" },
       conclusion: "fail",
       unresolvedFindings: 1,
@@ -503,6 +513,11 @@ test("a genuine negative re-review supersedes old success, and the hold precedes
       "failNativeReviewAttempt",
       "publishNativeReviewArtifact",
       "console",
+      "reviewControllerRepository",
+      "invokeNativeReview",
+      "readCompletedNativeObservation",
+      "nativeReviewSource",
+      "smokeNativeReview",
     ];
     const run = new Function(...names, body + "\nreturn reviewPr;")(
       fakeBun,
@@ -517,7 +532,15 @@ test("a genuine negative re-review supersedes old success, and the hold precedes
       () => ["synthetic-native"],
       "/synthetic-controller",
       async () => {},
-      async () => raw,
+      async (path: string) =>
+        path.endsWith("events.jsonl")
+          ? Buffer.from(
+              JSON.stringify({ type: "thread.started", thread_id: id }) +
+                "\n" +
+                JSON.stringify({ type: "turn.completed" }) +
+                "\n",
+            )
+          : raw,
       bindNativeReviewer,
       codexReviewThread,
       validateRawReviewArtifact,
@@ -536,132 +559,334 @@ test("a genuine negative re-review supersedes old success, and the hold precedes
         state = "success";
       },
       { log: () => {} },
+      "park-kyungchan/agent-platform",
+      async () => {
+        events.push("launch");
+        return {};
+      },
+      () => ({ raw: JSON.parse(raw.toString()) }),
+      () => ({ tree, manifest: { sha256: manifest } }),
+      async () => {},
     ) as (...a: unknown[]) => Promise<void>;
     if (current) {
-      await expect(run("fixture/owner", head, "native-claude", head)).rejects.toThrow("distinct");
+      await expect(
+        run("park-kyungchan/agent-platform", head, "native-codex", head),
+      ).rejects.toThrow("distinct");
       expect(events).toEqual([]);
     }
-    await expect(run("fixture/owner", head, "native-claude", "e".repeat(40))).rejects.toThrow();
+    await expect(run("fixture/owner", head, "native-codex", "e".repeat(40))).rejects.toThrow();
     expect(events).toEqual(current ? ["pending", "launch", "failure"] : ["launch"]);
     expect(state).toBe(current ? "failure" : "success");
   }
 });
 
-test("native attempt writes authenticate, hold before review, publish bound negatives and never retry uncertain writes", async () => {
-  const { readFile } = await import("node:fs/promises");
+type NativeCaseApi = {
+  requireNativeReviewAttempt: (c: unknown, a: unknown) => void;
+  requireCurrentReviewAttempt: (c: unknown, a: unknown) => Promise<unknown[]>;
+  beginNativeReviewAttempt: (c: unknown, id: string) => Promise<unknown>;
+  invokeNativeReview: (c: unknown, a: unknown, r: string) => Promise<unknown>;
+  failNativeReviewAttempt: (a: unknown, o: unknown) => Promise<void>;
+  readCompletedNativeObservation: (
+    c: unknown,
+    a: unknown,
+    o: unknown,
+  ) => { bytes: Buffer; raw: Record<string, unknown> };
+};
+async function nativeCase(scenario = "pass") {
+  const { readFile } = await import("node:fs/promises"),
+    { createHash } = await import("node:crypto");
   const { reviewAttemptTarget, validateCompletedReviewObservation } =
     await import("../quality/review-artifact");
   const source = new Bun.Transpiler({ loader: "ts" })
     .transformSync(await readFile(join(import.meta.dir, "review-attempt.ts"), "utf8"))
     .replace(/^import[\s\S]*?;\n/gm, "")
     .replaceAll("export ", "");
-  for (const scenario of [
-    "normal",
-    "negative-after-other-pass",
-    "uncertain",
-    "wrong-owner",
-    "wrong-source",
-  ]) {
-    const head = "a".repeat(40),
-      tree = "b".repeat(40),
-      manifest = "f".repeat(64),
-      id = "00000000-0000-4000-8000-000000000002";
-    const actor = { id: 42, login: "native-owner", type: "User" };
-    let posts = 0;
-    const states: Record<string, unknown>[] = [
-      {
-        id: 1,
-        state: "success",
-        context: "native-independent-review",
-        creator: actor,
-        target_url: "https://github.com/fixture/owner/old-proof",
+  const head = "a".repeat(40),
+    tree = "b".repeat(40),
+    manifest = "f".repeat(64),
+    id = "00000000-0000-4000-8000-000000000002",
+    thread = "00000000-0000-4000-8000-000000000003";
+  const actor = { id: 42, login: "native-owner", type: "User" };
+  let posts = 0,
+    launches = 0,
+    revoked = false;
+  const states: Record<string, unknown>[] = [
+    {
+      id: 1,
+      state: "success",
+      context: "native-independent-review",
+      creator: actor,
+      target_url: "https://github.com/fixture/owner/old-proof",
+    },
+  ];
+  const context = {
+    head,
+    controllerSha: scenario === "self" ? head : "e".repeat(40),
+    sourceRoot: "/synthetic-data",
+    policy: {
+      repository: scenario === "self" ? "park-kyungchan/agent-platform" : "fixture/owner",
+      publisher: { ...actor, id: "42" },
+      binding: {
+        codeOwner: "agent-platform",
+        evidenceOwner: "codex-harness-engineering",
+        scope: "canonical-source-ci-quality",
       },
-    ];
-    const context = {
-      head,
-      policy: {
-        repository: "fixture/owner",
-        publisher: { ...actor, id: "42" },
-        binding: {
-          codeOwner: "agent-platform",
-          evidenceOwner: "codex-harness-engineering",
-          scope: "canonical-source-ci-quality",
-        },
+    },
+    row: { projectId: "agent-platform" },
+    subject: { base: "c".repeat(40), kind: "owner-pull-request", pr: 1 },
+    author: { metadata: { author: { runtime: "native-codex", threadId: "actual-author" } } },
+    revalidate: async () => {
+      if (revoked) throw Error("QUALIFIED_PIN_HELD");
+    },
+    readApi: async () => states,
+  };
+  let bytes = Buffer.from(
+    JSON.stringify({
+      schema: "native-independent-review-output.v1",
+      reviewStatus: "complete",
+      binding: context.policy.binding,
+      headSha: scenario === "wrong-source" ? "e".repeat(40) : head,
+      reviewedTreeSha: tree,
+      reviewedSourceManifestSha256: manifest,
+      reviewer: { runtime: "native-codex", taskId: thread },
+      author: { runtime: "native-codex", taskId: "actual-author" },
+      conclusion: scenario === "negative" ? "fail" : "pass",
+      unresolvedFindings: scenario === "negative" ? 1 : 0,
+      findings:
+        scenario === "negative"
+          ? [{ path: "source.ts", line: 1, severity: "P1", explanation: "synthetic defect" }]
+          : [],
+      nativeReviewPendingStatusId: 101,
+    }),
+  );
+  const events = Buffer.from(
+    JSON.stringify({ type: "thread.started", thread_id: thread }) +
+      "\n" +
+      JSON.stringify({ type: "turn.completed" }) +
+      "\n",
+  );
+  const empty = () =>
+    new ReadableStream<Uint8Array>({
+      start(c) {
+        c.close();
       },
-      author: { metadata: { author: { runtime: "native-codex", threadId: "actual-author" } } },
-      revalidate: async () => {},
-      readApi: async () => states,
-    };
-    const nativeBun = {
-      spawnSync: (args: string[]) => ({
-        exitCode: 0,
-        stdout: Buffer.from(
-          args.includes("user")
-            ? JSON.stringify({ ...actor, id: scenario === "wrong-owner" ? 99 : 42 })
-            : "fixture-token-not-a-credential",
-        ),
-      }),
-    };
-    const nativeFetch = async (_url: string, options: RequestInit) => {
-      posts++;
-      const value = { ...JSON.parse(String(options.body)), id: 100 + posts, creator: actor };
-      states.unshift(value);
-      return new Response(JSON.stringify(value), { status: scenario === "uncertain" ? 503 : 201 });
-    };
-    const api = new Function(
-      "Bun",
-      "fetch",
-      "requireTrustedReviewContext",
-      "reviewAttemptTarget",
-      "validateCompletedReviewObservation",
-      "console",
-      source +
-        "\nreturn {beginNativeReviewAttempt,failNativeReviewAttempt,requireCurrentReviewAttempt};",
-    )(nativeBun, nativeFetch, () => {}, reviewAttemptTarget, validateCompletedReviewObservation, {
-      log: () => {},
-    }) as {
-      beginNativeReviewAttempt: (c: unknown, id: string) => Promise<unknown>;
-      failNativeReviewAttempt: (a: unknown, b: Uint8Array, t: string, m: string) => Promise<void>;
-    };
-    if (scenario === "uncertain" || scenario === "wrong-owner") {
-      await expect(api.beginNativeReviewAttempt(context, id)).rejects.toThrow(
-        scenario === "uncertain" ? "OUTCOME_UNCERTAIN" : "AUTHENTICATED_OWNER_REQUIRED",
-      );
-      expect(posts).toBe(scenario === "uncertain" ? 1 : 0);
-      continue;
-    }
-    const attempt = await api.beginNativeReviewAttempt(context, id);
-    expect(states[0]!.state).toBe("pending");
-    expect(posts).toBe(1);
-    const fail = Buffer.from(
-      JSON.stringify({
-        schema: "native-independent-review-output.v1",
-        reviewStatus: "complete",
-        binding: context.policy.binding,
-        headSha: scenario === "wrong-source" ? "e".repeat(40) : head,
-        reviewedTreeSha: tree,
-        reviewedSourceManifestSha256: manifest,
-        reviewer: { runtime: "native-codex", taskId: "independent-reviewer" },
-        author: { runtime: "native-codex", taskId: "actual-author" },
-        conclusion: "fail",
-        unresolvedFindings: 1,
-        findings: [{ path: "source.ts", line: 1, severity: "P1", explanation: "synthetic defect" }],
-      }),
-    );
-    if (scenario === "negative-after-other-pass")
-      states.unshift({ ...states[0], id: 999, state: "success" });
+    });
+  const nativeBun = {
+    spawnSync: (args: string[]) => ({
+      exitCode: 0,
+      stdout: Buffer.from(
+        args.includes("user")
+          ? JSON.stringify({ ...actor, id: scenario === "wrong-owner" ? 99 : 42 })
+          : "fixture-token-not-a-credential",
+      ),
+    }),
+    which: () => "/synthetic-codex",
+    spawn: () => {
+      launches++;
+      return { stdout: empty(), stderr: empty(), exited: Promise.resolve(0) };
+    },
+    write: async () => 0,
+  };
+  const nativeFetch = async (_url: string, options: RequestInit) => {
+    posts++;
+    const value = { ...JSON.parse(String(options.body)), id: 100 + posts, creator: actor };
+    states.unshift(value);
+    return new Response(JSON.stringify(value), { status: scenario === "uncertain" ? 503 : 201 });
+  };
+  const git = (_root: string, args: string[]) =>
+    args.includes("ls-tree")
+      ? "100644 blob " + "d".repeat(40) + "\tsource.ts\0"
+      : args.includes("merge-base")
+        ? "c".repeat(40)
+        : tree;
+  const names = [
+    "Bun",
+    "fetch",
+    "requireTrustedReviewContext",
+    "reviewAttemptTarget",
+    "validateCompletedReviewObservation",
+    "console",
+    "randomUUID",
+    "createHash",
+    "mkdtemp",
+    "readFile",
+    "writeFile",
+    "join",
+    "tmpdir",
+    "deriveReviewedSourceManifest",
+    "reviewerInvocation",
+    "codexReviewThread",
+    "bindNativeReviewer",
+    "reviewDataGit",
+    "reviewControllerRoot",
+    "reviewControllerRepository",
+  ];
+  const api = new Function(
+    ...names,
+    source +
+      "\nreturn {beginNativeReviewAttempt,invokeNativeReview,failNativeReviewAttempt,readCompletedNativeObservation,requireNativeReviewAttempt,requireCurrentReviewAttempt};",
+  )(
+    nativeBun,
+    nativeFetch,
+    (c: unknown) => {
+      if (c !== context) throw Error("FOREIGN_CONTEXT");
+    },
+    reviewAttemptTarget,
+    validateCompletedReviewObservation,
+    { log: () => {} },
+    () => id,
+    createHash,
+    async () => "/synthetic-native-output",
+    async (path: string) => (path.endsWith("events.jsonl") ? events : bytes),
+    async () => {},
+    join,
+    () => "/tmp",
+    () => ({ sha256: manifest }),
+    () => ["codex"],
+    codexReviewThread,
+    bindNativeReviewer,
+    git,
+    "/synthetic-controller",
+    "park-kyungchan/agent-platform",
+  ) as NativeCaseApi;
+  return {
+    api,
+    context,
+    id,
+    states,
+    get posts() {
+      return posts;
+    },
+    get launches() {
+      return launches;
+    },
+    replaceRaw: () => {
+      bytes = Buffer.from("not the captured observation");
+    },
+    revoke: () => {
+      revoked = true;
+    },
+  };
+}
+
+test("a pending handle cannot fabricate completion; actual invocation owns immutable raw bytes and is single-use", async () => {
+  const h = await nativeCase(),
+    a = await h.api.beginNativeReviewAttempt(h.context, h.id);
+  await expect(
+    h.api.failNativeReviewAttempt(a, { kind: "completed-native-observation" }),
+  ).rejects.toThrow("COMPLETED_NATIVE_OBSERVATION_REQUIRED");
+  expect(h.posts).toBe(1);
+  expect(h.launches).toBe(0);
+  const observation = await h.api.invokeNativeReview(h.context, a, "native-codex");
+  expect(h.launches).toBe(1);
+  const original = h.api.readCompletedNativeObservation(h.context, a, observation).bytes;
+  h.replaceRaw();
+  const copy = h.api.readCompletedNativeObservation(h.context, a, observation).bytes;
+  copy.fill(0);
+  expect(
+    h.api.readCompletedNativeObservation(h.context, a, observation).bytes.equals(original),
+  ).toBe(true);
+  await expect(h.api.failNativeReviewAttempt(a, observation)).rejects.toThrow(
+    "BOUND_NEGATIVE_REVIEW_REQUIRED",
+  );
+  expect(h.posts).toBe(1);
+  await expect(h.api.invokeNativeReview(h.context, a, "native-codex")).rejects.toThrow(
+    "NATIVE_INVOCATION_ALREADY_STARTED",
+  );
+  expect(h.launches).toBe(1);
+});
+
+test("bound actual negative invalidates another completed pass, and revoked qualification blocks every mutation API", async () => {
+  const h = await nativeCase("negative"),
+    a = await h.api.beginNativeReviewAttempt(h.context, h.id),
+    observation = await h.api.invokeNativeReview(h.context, a, "native-codex");
+  h.states.unshift({ ...h.states[0], id: 999, state: "success" });
+  await h.api.failNativeReviewAttempt(a, observation);
+  expect(h.posts).toBe(2);
+  expect(h.states[0]!.state).toBe("failure");
+  await expect(h.api.failNativeReviewAttempt(a, observation)).rejects.toThrow(
+    "AUTHENTICATED_ATTEMPT_REQUIRED",
+  );
+  expect(h.posts).toBe(2);
+  const r = await nativeCase("negative"),
+    pending = await r.api.beginNativeReviewAttempt(r.context, r.id),
+    completed = await r.api.invokeNativeReview(r.context, pending, "native-codex");
+  r.revoke();
+  await expect(r.api.failNativeReviewAttempt(pending, completed)).rejects.toThrow(
+    "QUALIFIED_PIN_HELD",
+  );
+  expect(r.posts).toBe(1);
+  await expect(r.api.beginNativeReviewAttempt(r.context, r.id)).rejects.toThrow(
+    "QUALIFIED_PIN_HELD",
+  );
+  expect(r.posts).toBe(1);
+});
+
+test("formal mutation refuses same controller, wrong owner/source and uncertain POST without retry", async () => {
+  for (const scenario of ["self", "wrong-owner", "uncertain", "wrong-source"]) {
+    const h = await nativeCase(scenario);
     if (scenario === "wrong-source") {
-      await expect(api.failNativeReviewAttempt(attempt, fail, tree, manifest)).rejects.toThrow();
-      expect(posts).toBe(1);
-      expect(states[0]!.state).toBe("pending");
+      const a = await h.api.beginNativeReviewAttempt(h.context, h.id);
+      await expect(h.api.invokeNativeReview(h.context, a, "native-codex")).rejects.toThrow();
+      expect(h.posts).toBe(1);
+      expect(h.states[0]!.state).toBe("pending");
     } else {
-      await api.failNativeReviewAttempt(attempt, fail, tree, manifest);
-      expect(posts).toBe(2);
-      expect(states[0]!.state).toBe("failure");
-      await expect(api.failNativeReviewAttempt(attempt, fail, tree, manifest)).rejects.toThrow(
-        "AUTHENTICATED_ATTEMPT_REQUIRED",
+      await expect(h.api.beginNativeReviewAttempt(h.context, h.id)).rejects.toThrow(
+        scenario === "self"
+          ? "DISTINCT_CONTROLLER_REQUIRED"
+          : scenario === "uncertain"
+            ? "OUTCOME_UNCERTAIN"
+            : "AUTHENTICATED_OWNER_REQUIRED",
       );
-      expect(posts).toBe(2);
+      expect(h.posts).toBe(scenario === "uncertain" ? 1 : 0);
+      expect(h.launches).toBe(0);
     }
   }
+});
+
+test("public artifact publisher rejects bare pending and revoked controller before native auth or transport effects", async () => {
+  const { readFile } = await import("node:fs/promises"),
+    source = await readFile(join(import.meta.dir, "publish-review-artifact.ts"), "utf8");
+  const body = new Bun.Transpiler({ loader: "ts" }).transformSync(
+    source
+      .slice(
+        source.indexOf("export async function publishNativeReviewArtifact("),
+        source.indexOf("\nif (import.meta.main)"),
+      )
+      .replace("export async function", "async function"),
+  );
+  const h = await nativeCase(),
+    a = await h.api.beginNativeReviewAttempt(h.context, h.id);
+  let io = 0;
+  const publish = new Function(
+    "Bun",
+    "process",
+    "requireTrustedReviewContext",
+    "requireNativeReviewAttempt",
+    "requireCurrentReviewAttempt",
+    "readCompletedNativeObservation",
+    body + "\nreturn publishNativeReviewArtifact;",
+  )(
+    {
+      spawnSync: () => {
+        io++;
+        throw Error("UNEXPECTED_NATIVE_AUTH");
+      },
+    },
+    { env: {} },
+    () => {},
+    h.api.requireNativeReviewAttempt,
+    h.api.requireCurrentReviewAttempt,
+    h.api.readCompletedNativeObservation,
+  ) as (...args: unknown[]) => Promise<void>;
+  await expect(publish(h.context, { kind: "completed-native-observation" }, a)).rejects.toThrow(
+    "COMPLETED_NATIVE_OBSERVATION_REQUIRED",
+  );
+  expect(io).toBe(0);
+  expect(h.posts).toBe(1);
+  const observation = await h.api.invokeNativeReview(h.context, a, "native-codex");
+  h.revoke();
+  await expect(publish(h.context, observation, a)).rejects.toThrow("QUALIFIED_PIN_HELD");
+  expect(io).toBe(0);
+  expect(h.posts).toBe(1);
 });

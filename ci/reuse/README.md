@@ -186,9 +186,8 @@ executable input: the subject is fetched as Git objects into a fresh data view.
 bash <trusted-common>/ci/reuse/review-pr.sh <repository> <head> <reviewer-runtime> <controller-sha>
 ```
 
-For example, the current explicitly authorized temporary judgment runtime is
-`native-codex` (`gpt-6.1-sol/high`, per-run bypass/ephemeral flags). `native-claude`
-remains supported. The actual native session/thread must match the report and be
+The currently authorized judgment adapter is
+`native-codex` (`gpt-6.1-sol/high`, per-run bypass/ephemeral flags). Full judgment never invokes Claude/Opus; historical runtime descriptors remain readable. The actual native session/thread must match the report and be
 distinct from the native source author. Raw final output, events and stderr are
 retained unchanged. Neither global model/configuration nor authentication changes.
 
@@ -211,9 +210,7 @@ CLIs retain their authentication ownership; there is no credential broker.
 
 Every formal attempt posts an authenticated pending hold before the native child
 launches. A correctly source/session-bound negative posts failure; malformed or
-crashed review output leaves the hold. Only verified unchanged positive raw can
-publish success. The artifact request UUID must match the immediately preceding
-native pending status, so a late older success cannot mask another attempt.
+crashed review output leaves the hold. Only the actual native invocation can create an opaque completed observation, backed by a private copy of its raw bytes; both failure and success publication require it. Only verified unchanged positive raw can publish success. The actual pending status ID is bound to native raw and immutable evidence. The same existing status context fences artifact, legacy and successor reads, so a late old success cannot mask a newer hold.
 Uncertain status writes print the exact attempt/head/state for readback and are
 never automatically replayed. Mechanical `--smoke` and passive `--check` post no
 review status.
@@ -227,5 +224,4 @@ from outside the subject, then the existing immutable receipt/status gate; never
 execute the proposed controller to qualify itself. Once qualified, select its
 full commit in the separate controller checkout. A formal subject head must differ from that controller pin: its pending hold must not invalidate its own trust anchor. Passive `--check` remains available for the controller head. The initial evidence workflow
 must reach default main before real artifact publication is possible. Legacy
-receipts remain supported during that bootstrap; ordinary reviews then use the
-one-command artifact path.
+receipts remain supported during that bootstrap. Fresh bootstrap raw, normalized result and receipt bind `nativeReviewPendingStatusId` from the authenticated pending status; owner-scoped raw/Evidence/Verification retain the same field. Historical receipts remain readable until a newer formal hold supersedes them. Ordinary reviews then use the one-command artifact path.

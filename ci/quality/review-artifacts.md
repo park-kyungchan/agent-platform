@@ -15,8 +15,7 @@ source, author/reviewer identity, publisher, run, attempt, repository, workflow,
 artifact, digest, archive member, current hold and changed latest status must
 refuse. Existing receipt controls continue to pass. Focused tests and complete
 source/quality checks precede a fresh read-only native exact-head review under the user-approved reviewer policy.
-The 2026-10-28 temporary user direction admits gpt-6.1-sol/high with distinct
-native author/reviewer threads; it changes no active/global model settings.
+Current user policy requires fresh sol/terra judgment and distinct native author/reviewer contexts. The command selects gpt-6.1-sol/high; Claude/Opus judgment is prohibited. Per-run settings change no active/global model configuration.
 Hosted transport must be observed before claiming operational completion.
 
 Allowed treatment: CI review transport, source policy/tests/projections, shared
@@ -49,15 +48,13 @@ and requires its artifact bytes to equal the native original before status
 publication and on final readback, then posts
 its authenticated status with the artifact's immutable ID and archive digest.
 Formal attempts publish authenticated pending before launching the reviewer.
-Correctly bound completed findings publish failure. Success requires the exact
-artifact request UUID to join its immediately preceding pending status; an
+Correctly bound completed findings publish failure. Success requires the native raw pending-status ID to match its preceding authenticated pending status; an
 intervening hold/failure/other attempt refuses even if a late old success wins
 an API write race. Crashed/malformed reviews retain pending. Status writes are
 not retried under uncertainty; reconcile the printed attempt/head/state first.
 No model runs in Actions and no CI token receives status or dispatch permission.
 Uncertain dispatch/publication is reconciled by the printed request/run/artifact
-IDs before any further action. Artifact expiry/deletion fails closed; retain the
-native raw file for a fresh external publication when required.
+IDs before any further action. Artifact expiry/deletion fails closed; retain the native raw file for audit. Reconcile existing effects before starting a fresh native invocation if the in-memory completed observation is lost.
 
 Bootstrap the workflow through a reviewed legacy-receipt PR first: GitHub must
 know the workflow on the default branch before dispatch. Existing immutable

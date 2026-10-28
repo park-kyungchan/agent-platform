@@ -23,18 +23,6 @@ export function reviewerInvocation(
       "-",
     ];
   }
-  if (runtime === "native-claude")
-    return [
-      "claude",
-      "-p",
-      "--model",
-      "opus",
-      "--permission-mode",
-      "plan",
-      "--session-id",
-      sessionId,
-      ...(smoke ? ["--tools", ""] : []),
-    ];
   if (runtime === "native-muse" && smoke)
     return [
       "muse",

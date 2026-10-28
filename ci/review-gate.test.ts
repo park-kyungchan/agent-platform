@@ -30,7 +30,7 @@ function fixture() {
     conclusion: "pass",
     unresolvedFindings: 0,
   };
-  const resultBytes = Buffer.from(JSON.stringify(result));
+  let resultBytes = Buffer.from(JSON.stringify(result));
   const receipt = {
     ...result,
     schema: "native-independent-review.v2",
@@ -98,6 +98,12 @@ function fixture() {
     head,
     status,
     receipt,
+    bindPendingStatus(id: number) {
+      Object.assign(result, { nativeReviewPendingStatusId: id });
+      Object.assign(receipt, { nativeReviewPendingStatusId: id });
+      resultBytes = Buffer.from(JSON.stringify(result));
+      receipt.provenance.sha256 = createHash("sha256").update(resultBytes).digest("hex");
+    },
     delays,
     paths,
     get elapsed() {
@@ -130,7 +136,7 @@ test("prepublished PR proof passes immediately through the existing canonical va
   f.env.GITHUB_EVENT_NAME = "pull_request";
   await reviewGate(f.options);
   expect(f.elapsed).toBe(0);
-  expect(f.statusReads).toBe(1);
+  expect(f.statusReads).toBe(3);
 });
 
 test("a present valid status on a full page is validated rather than treated as absence", async () => {
@@ -145,7 +151,7 @@ test("a present valid status on a full page is validated rather than treated as 
   ]);
   await reviewGate(f.options);
   expect(f.elapsed).toBe(0);
-  expect(f.statusReads).toBe(1);
+  expect(f.statusReads).toBe(3);
 });
 
 test("genuine absence stops at 300 seconds without fetching a receipt", async () => {
@@ -271,6 +277,52 @@ test("immutable receipt URL and exact receipt/commit identity checks still rejec
     f.setStatuses((_read, elapsed) => (elapsed === 0 ? [] : [f.status]));
     await expect(reviewGate(f.options)).rejects.toThrow();
     expect(f.elapsed).toBe(5000);
-    expect(f.statusReads).toBe(2);
+    expect(f.statusReads).toBe(change === "receipt-head" ? 3 : 2);
   }
+});
+
+test("late legacy success cannot restore old proof after a newer pending or negative review", async () => {
+  for (const state of ["pending", "failure", "error"]) {
+    const f = fixture(),
+      old = { ...f.status, id: 40 };
+    f.status.id = 44;
+    f.setStatuses(() => [
+      f.status,
+      {
+        ...f.status,
+        id: 43,
+        state,
+        target_url: `https://github.com/${f.env.GITHUB_REPOSITORY}/commit/${f.head}#native-independent-review`,
+      },
+      old,
+    ]);
+    await expect(reviewGate(f.options)).rejects.toThrow("FRESH_LEGACY_ATTEMPT_REQUIRED");
+  }
+  const fresh = fixture();
+  fresh.bindPendingStatus(43);
+  fresh.status.id = 44;
+  fresh.setStatuses(() => [
+    fresh.status,
+    {
+      ...fresh.status,
+      id: 43,
+      state: "pending",
+      target_url: `https://github.com/${fresh.env.GITHUB_REPOSITORY}/commit/${fresh.head}#native-independent-review`,
+    },
+  ]);
+  await expect(reviewGate(fresh.options)).resolves.toBeUndefined();
+  const oldMarker = fixture(),
+    old = { ...oldMarker.status, id: 40 };
+  oldMarker.status.id = 44;
+  oldMarker.setStatuses(() => [
+    oldMarker.status,
+    {
+      ...oldMarker.status,
+      id: 43,
+      state: "failure",
+      target_url: "https://github.com/fixture/source/pull/1",
+    },
+    old,
+  ]);
+  await expect(reviewGate(oldMarker.options)).rejects.toThrow("FRESH_LEGACY_ATTEMPT_REQUIRED");
 });
