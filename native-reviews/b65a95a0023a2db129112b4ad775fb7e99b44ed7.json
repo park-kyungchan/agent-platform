@@ -1,0 +1,27 @@
+{
+  "schema": "native-independent-review.v2",
+  "nativeReviewPendingStatusId": 57469502579,
+  "binding": {
+    "codeOwner": "agent-platform",
+    "evidenceOwner": "codex-harness-engineering",
+    "scope": "canonical-source-ci-quality"
+  },
+  "headSha": "b65a95a0023a2db129112b4ad775fb7e99b44ed7",
+  "reviewedTreeSha": "c86d599bb7389fec00e594ac61257d66d928f0c6",
+  "reviewedSourceManifestSha256": "45f57d3e9bc856488eb2be72548c08f2cf92507766e7373a31ba8377eee65c15",
+  "reviewer": {
+    "runtime": "native-codex",
+    "taskId": "01a182a2-883a-7b13-9849-d8362bf2b8af"
+  },
+  "author": {
+    "runtime": "native-codex",
+    "taskId": "01a1822a-211f-7400-b988-8f705485af30"
+  },
+  "conclusion": "pass",
+  "unresolvedFindings": 0,
+  "provenance": {
+    "owner": "codex-harness-engineering",
+    "resultRef": "https://github.com/park-kyungchan/agent-platform/blob/63ac9f7bdfd0bcb31b645cb03be5f1b17a15c57a/native-review-results/b65a95a0023a2db129112b4ad775fb7e99b44ed7.json",
+    "sha256": "8322c181439574b23acb5f7cb382806877726f8b02bb07f1df8af2bd6c5fa5ee"
+  }
+}
