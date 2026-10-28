@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readFile, lstat, realpath } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   authenticatedReviewReader,
@@ -12,83 +12,19 @@ import {
 import {
   deriveReviewedSourceManifest,
   decodeBoundedReviewFile,
-  validateOwnerReviewPolicy,
 } from "../quality/receipt-validator";
 import { locatedError } from "./located-error";
-
-export async function nativeReviewPolicy(root = process.cwd()): Promise<ReviewArtifactPolicy> {
-  async function jsonFile(path: string) {
-    const file = resolve(root, path),
-      info = await lstat(file);
-    if (
-      !info.isFile() ||
-      info.isSymbolicLink() ||
-      info.size > 4_000_000 ||
-      (await realpath(file)) !== file
-    )
-      throw Error("Exact fixed review policy JSON required");
-    return JSON.parse(await readFile(file, "utf8"));
-  }
-  let policy: ReviewArtifactPolicy = {
-    repository: "park-kyungchan/agent-platform",
-    publisher: { id: "241037670", login: "park-kyungchan", type: "User" },
-    binding: {
-      codeOwner: "agent-platform",
-      evidenceOwner: "codex-harness-engineering",
-      scope: "canonical-source-ci-quality",
-    },
-  };
-  const project = await jsonFile("project.json");
-  if (project.projectId !== "agent-platform") {
-    // Discover only fixed data manifests; never execute consumer JavaScript to learn policy.
-    const manifests = [];
-    for (const path of ["architecture/common-ci-provider.json", "ci/provider.json"]) {
-      try {
-        manifests.push(await jsonFile(path));
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
-    }
-    if (manifests.length !== 1) throw Error("Exactly one fixed consumer review manifest required");
-    const provider = manifests[0];
-    if (
-      provider.codeOwner !== "agent-platform" ||
-      provider.generatedOnly !== true ||
-      provider.sourceOnly !== true ||
-      provider.runtimeAuthority !== false ||
-      provider.nativePermissionGranted !== false
-    )
-      throw Error("Fixed source-only consumer projection required");
-    const owner = provider.policy;
-    validateOwnerReviewPolicy(owner);
-    if (
-      owner?.projectId !== project.projectId ||
-      owner?.domainId !== project.domainId ||
-      owner?.statusContext !== "native-independent-review"
-    )
-      throw Error("Fixed consumer review policy unavailable");
-    policy = {
-      repository: owner.repository,
-      publisher: owner.publisher,
-      binding: {
-        repository: owner.repository,
-        projectId: owner.projectId,
-        domainId: owner.domainId,
-        semanticOwner: owner.semanticOwner,
-        scope: owner.scope,
-      },
-    };
-  }
-  return policy;
-}
+import { requireTrustedReviewContext, type TrustedReviewContext } from "./trusted-review-source";
 
 /** Native publisher only: preserve the actual reviewer bytes, upload once, verify, then attest. */
-export async function publishNativeReviewArtifact(head: string, rawPath: string) {
+export async function publishNativeReviewArtifact(context: TrustedReviewContext, rawPath: string) {
+  requireTrustedReviewContext(context);
+  const { head, policy } = context;
+  await context.revalidate();
   if (process.env.CI || process.env.GITHUB_ACTIONS)
     throw Error("Native publisher context required");
   if (!/^[a-f0-9]{40}$/.test(head) || !rawPath)
     throw Error("Use publish-review-artifact.ts <exact-head> <raw-native.json>");
-  const policy = await nativeReviewPolicy();
   function gh(args: string[]) {
     const result = Bun.spawnSync(["gh", ...args], {
       stdin: "ignore",
@@ -136,6 +72,7 @@ export async function publishNativeReviewArtifact(head: string, rawPath: string)
   };
   if (workflow.path !== reviewArtifactWorkflow || workflow.state !== "active")
     throw Error("Default-branch evidence workflow unavailable; merge its reviewed source first");
+  await context.revalidate();
   const requestId = randomUUID();
   async function post(path: string, value: unknown, expected: number) {
     const response = await fetch(`https://api.github.com/repos/${policy.repository}/${path}`, {
@@ -215,6 +152,7 @@ export async function publishNativeReviewArtifact(head: string, rawPath: string)
       targetUrl,
     }),
   );
+  await context.revalidate();
   await post(
     `statuses/${head}`,
     {
@@ -236,13 +174,13 @@ export async function publishNativeReviewArtifact(head: string, rawPath: string)
   console.log(JSON.stringify({ phase: "published", requestId, ...result }));
 }
 if (import.meta.main) {
-  try {
-    const [head, rawPath, ...extra] = Bun.argv.slice(2);
-    if (!head || !rawPath || extra.length)
-      throw Error("Use publish-review-artifact.ts <exact-head> <raw-native.json>");
-    await publishNativeReviewArtifact(head, rawPath);
-  } catch (error) {
-    console.error(locatedError(error, "review_artifact_refused"));
-    process.exitCode = 1;
-  }
+  console.error(
+    locatedError(
+      new Error(
+        "Use the pinned trusted review-pr controller; standalone publication is unsupported",
+      ),
+      "review_artifact_refused",
+    ),
+  );
+  process.exitCode = 1;
 }

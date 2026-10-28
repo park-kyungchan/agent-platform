@@ -39,7 +39,7 @@ identities, `conclusion: pass`, `unresolvedFindings: 0` and `findings: []`.
 The native parent keeps those bytes unchanged. AP's native publisher runs:
 
 ```sh
-bun --no-env-file ci/reuse/publish-review-artifact.ts <head> <raw.json>
+bash <trusted-common>/ci/reuse/review-pr.sh <repository> <head> <reviewer-runtime> <controller-sha>
 ```
 
 The helper checks existing publisher authentication, committed source-author
@@ -63,3 +63,12 @@ GitHub documents artifact IDs, archive digests and ZIP downloads in its
 actors/attempts in its [workflow run API](https://docs.github.com/en/rest/actions/workflow-runs).
 Sources retrieved with verified TLS on 2026-10-28; bounded extracts are retained
 in the operations lane-B source directory.
+
+The native controller is selected from a separate immutable reviewed checkout.
+An owner-created draft may establish authenticated PR provenance before review;
+all real review/evidence/CI/thread gates are required before ready-for-review.
+The pinned private-owner policy refuses untrusted contributor/head-repository
+provenance and unsupported unassociated heads before subject data or native
+review. Its temporary native bypass has no OS credential-isolation claim. Source
+checkouts, config, hooks, JavaScript and package scripts are never executed by
+the controller; subjects enter through a fresh Git-object data view.

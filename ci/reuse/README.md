@@ -175,31 +175,48 @@ status. The source action cannot dispatch that workflow or post that status.
 
 ## Native review and publication command
 
-From a clean caller checkout at its pushed PR head, use the reviewed common
-checkout's `ci/reuse/review-pr.ts <head> native-claude`. This one command verifies
-source-author provenance and pushed source, starts a fresh read-only native Opus
-session, preserves exact stdout/stderr, validates owner/source/independence and
-zero findings, then publishes the native artifact and exact-head status. It loads
-fixed caller policy from the reviewed consumer projection. No private work-state
-file or operations helper is required. The default-main workflow must exist first.
+Keep the controller in a **separate detached checkout of an already reviewed,
+immutable common commit**, chosen through the native owner's trusted channel.
+Never use a contributor's proposed checkout/controller as that trust anchor.
+The launcher enters the trusted controller directory before starting Bun, so
+subject Bun/project configuration cannot run at startup. No subject path is an
+executable input: the subject is fetched as Git objects into a fresh data view.
 
-Adapters are in `review-runtimes.ts`; they invoke installed native CLIs and never
-create provider clients or modify global models/configuration. `native-claude
---smoke` and `native-muse --smoke` perform bounded mechanical transport checks
-through real native sessions; smoke output cannot publish the independent-review
-status. Muse currently has mechanical-only authorization. Extending judgment
-review to another runtime requires its own reviewed adapter and native policy.
+```sh
+bash <trusted-common>/ci/reuse/review-pr.sh <repository> <head> <reviewer-runtime> <controller-sha>
+```
 
-A second native caller can run the same command with `--check`: it resolves the
-same source/owner/reviewer bindings and validates the existing exact artifact and
-authenticated status without issuing a new judgment or republishing. A mechanical
-caller such as Muse may invoke this path with reviewer `native-claude`; the
-independent source judgment still belongs to the actual Opus session.
+For example, the current explicitly authorized temporary judgment runtime is
+`native-codex` (`gpt-6.1-sol/high`, per-run bypass/ephemeral flags). `native-claude`
+remains supported. The actual native session/thread must match the report and be
+distinct from the native source author. Raw final output, events and stderr are
+retained unchanged. Neither global model/configuration nor authentication changes.
 
-The user's temporary 2026-10-28 direction also admits `native-codex`, invoking
-`gpt-6.1-sol` with high reasoning and per-run bypass flags in a fresh ephemeral
-native session. No global model, config or credentials change. The command keeps
-JSONL events, final native message and stderr unchanged, and joins the final
-reviewer ID to the actual `thread.started` event. Author and reviewer IDs must be
-distinct; same-family review is admitted only under the user's current direction.
-Use `native-claude` again when the user replaces the temporary reviewer.
+The pinned policy is `trusted-review-policy.json`: it admits only the listed
+private repository IDs owned by the authenticated publisher. GitHub metadata
+must show an open owner-created same-repository PR at the exact head and allowed
+base, or the exact authenticated protected-main head. Public repositories, forks,
+external PR authors, unrelated repositories and unassociated heads refuse before
+subject fetch or native review. Git author strings and trust booleans grant no
+admission. Owner-created drafts are allowed solely to obtain this authenticated
+provenance; genuine native review/evidence, CI and current-thread gates must pass
+before ready-for-review and explicit expected-head merge.
+
+This is the user's **trusted-root, first-party source operating profile**. The
+temporary native bypass provides **no OS credential isolation**; arbitrary
+contributor/untrusted-source review is unsupported and refused. Subject text is
+review data, not operational instructions. The controller never imports subject
+JavaScript, checkout configuration, hooks or package scripts. Existing native
+CLIs retain their authentication ownership; there is no credential broker.
+
+A second actual native caller invokes the same command with `--check` to verify
+the existing source, runtime, artifact and authenticated status without issuing a
+new judgment. `--smoke` is mechanical only and cannot publish review status.
+
+Bootstrap a new controller release with a fresh independent installed native CLI
+from outside the subject, then the existing immutable receipt/status gate; never
+execute the proposed controller to qualify itself. Once qualified, select its
+full commit in the separate controller checkout. The initial evidence workflow
+must reach default main before real artifact publication is possible. Legacy
+receipts remain supported during that bootstrap; ordinary reviews then use the
+one-command artifact path.

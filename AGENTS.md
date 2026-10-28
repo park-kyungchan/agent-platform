@@ -14,13 +14,13 @@ For Git-native common Work use the `@palantirkc/work-continuity/git-work` reader
 
 For substantial quality or efficiency improvement, use docs/constrained-improvement.md: predeclare the actual consumer target, useful goal, independent validation, allowed changes, bounded limits and next decision. Compare equivalent baseline/candidate exposure except for the declared treatment; use quality-preflight/quality-compare for criterion transitions and preserve the v1 improvement-* efficiency contract. Distinguish behavior gain from independently controlled defect-detection gain, regression, preserved quality and insufficient evidence. Keep missing measurements unknown. Preserve observations, evaluator results and accept/repair/defer/stop proposals separately from AcceptanceDecision. Routine tasks need no extra ceremony; native owners retain execution and activation.
 
-Automatic merge is prohibited. Publish independent exact-commit/tree review evidence and its authenticated status before opening a PR. The accountable Lead checks current findings, source and required checks, then explicitly merges the expected head. Review reuse requires identical reviewed tree, an explicit successor binding and current zero-unresolved-finding state. Each runtime Lead later verifies and explicitly activates the merged source; pulling main alone does not activate native configuration.
+Automatic merge is prohibited. An owner-created draft PR may be opened first solely for authenticated provenance. Publish independent exact-commit/tree evidence and its authenticated status before ready-for-review; all review, CI and current-thread gates remain mandatory before merge. The accountable Lead checks current findings, source and required checks, then explicitly merges the expected head. Review reuse requires identical reviewed tree, an explicit successor binding and current zero-unresolved-finding state. Each runtime Lead later verifies and explicitly activates the merged source; pulling main alone does not activate native configuration.
 
 ## PR delivery
 
-1. Commit fresh native source-author metadata, push the exact head, and keep source/quality checks green.
-2. From this checkout run `bun ci/reuse/review-pr.ts <pushed-head> <reviewer-runtime>` for a fresh read-only review and authenticated artifact status; the current user-approved temporary reviewer is `native-codex` (gpt-6.1-sol/high).
-3. Keep the unchanged raw output printed by the command; findings or transport/source drift stop publication.
-4. A second native caller may run the same command with `--check`; it verifies existing proof and issues no independent judgment.
-5. Open the PR after review status passes; resolve current findings/threads and require source, quality and prospective-merge checks.
-6. The accountable Lead explicitly merges the reviewed expected head. Automatic merge, native activation and user Acceptance stay separate.
+1. Push fresh native source-author metadata and open an owner-created draft solely to establish authenticated provenance.
+2. Invoke `bash <trusted-common>/ci/reuse/review-pr.sh <repository> <head> <reviewer-runtime> <controller-sha>` from a separate detached, reviewed immutable common checkout; never execute a subject controller.
+3. The command admits only pinned private owner-created same-repo PRs or exact protected main and fetches subject Git data without executing its config/hooks/scripts.
+4. Preserve actual native raw/events; current user-approved bypass reviews make no OS credential-isolation claim and refuse untrusted contributors.
+5. A second native caller uses the same command with `--check`; all evidence, CI and current findings/threads must pass before ready-for-review.
+6. The accountable Lead explicitly merges the reviewed expected head. Automatic merge, native activation and user Acceptance remain separate.

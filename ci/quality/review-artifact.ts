@@ -210,18 +210,21 @@ export function authenticatedReviewReader(repository: string, token: string): Re
   }
   async function api(path: string) {
     need(
-      /^[A-Za-z0-9_.?=&/-]+$/.test(path) && !path.split(/[/?]/).includes(".."),
+      (path === "." || /^[A-Za-z0-9_.?=&/-]+$/.test(path)) && !path.split(/[/?]/).includes(".."),
       "FIXED_API_PATH_REQUIRED",
     );
-    return fetchReview(`https://api.github.com/repos/${repository}/${path}`, {
-      redirect: "manual",
-      signal: AbortSignal.timeout(30_000),
-      headers: {
-        Authorization: "Bearer " + token,
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2026-03-10",
+    return fetchReview(
+      `https://api.github.com/repos/${repository}${path === "." ? "" : "/" + path}`,
+      {
+        redirect: "manual",
+        signal: AbortSignal.timeout(30_000),
+        headers: {
+          Authorization: "Bearer " + token,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2026-03-10",
+        },
       },
-    });
+    );
   }
   return {
     async json(path) {
