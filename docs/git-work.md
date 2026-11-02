@@ -1,5 +1,7 @@
 # Common Git Work
 
+Historical generic Work procedures and review protocol are retained below for source interpretation. Current task state and the adopted Rust migration plan govern new work; these sections do not authorize the retired controller or allocate new generic records. The separate native Memory stdin caller at the end remains under its native owner hold.
+
 GitHub is the canonical publication source for common Work, decisions and relationships. A Git commit identifies source content. Domain, Project, Work, Issue, Spec, Plan and Task IDs retain their logical meaning across branches and hosts.
 
 Start a new Work after fetching and synchronizing current main through native Git. Create its branch/worktree from that revision. Continue an existing Work on its published branch with the same IDs. Independent, separately reviewable Tasks may use separate branches/worktrees/PRs; group small dependent changes. The owning Lead explicitly merges each reviewed PR. Automatic merge is prohibited.
@@ -14,25 +16,9 @@ Same-snapshot references store a relative path and optional exact JSON fragment/
 
 The reader uses local committed Git objects, bounded regular files and explicit repository mappings. It does not fetch, reset, rebase or merge. Dirty worktree bytes are distinct from committed source. Repository IDs and owner receipts are caller-supplied declarations; native owners still authenticate authorship, custody and permissions.
 
-## Reader commands
+## Historical reader facade
 
-Install the pinned workspace dependencies with `bun install --frozen-lockfile --ignore-scripts`. A snapshot request contains:
-
-```json
-{
-  "repositoryRoot": ".",
-  "repositoryId": "park-kyungchan/agent-platform",
-  "commit": "HEAD",
-  "projectId": "codex-harness-engineering",
-  "workId": "ontology-driven-harness-operation"
-}
-```
-
-Save it outside the canonical Work as `snapshot.json`, then run `bun run harness validate snapshot.json`. The CLI resolves the selected local ref once; the public reader requires its full immutable commit SHA. `bun run check:common-work` validates and reads the delivered real Work from exact HEAD. This works from another checkout path and does not register or activate a native runtime.
-
-For context, use a request with `snapshot` containing the selection above and `context` containing `taskId`, `latestRelevant`, `maxChars` and `maxRecords`. Run `bun run harness context context-request.json`. The native caller observes relevant source currentness; `latestRelevant: "unknown"` keeps dependent qualification held. Missing unrelated historical inputs do not hold an independent selected Task. Bounds produce explicit omissions/holds.
-
-`bun run harness transition before.json after.json` checks two snapshots before integration. It rejects lost actual decisions/effect fences, invalid supersession, dependency cycles and invalid completion even when a textual merge succeeds. `bun run harness source snapshot.json <relative-path>` returns exact source receipts. `bun run harness start start-request.json` qualifies a native-owner-provided fresh-main observation or same-Work continuation; it performs no Git mutation.
+The AP root `harness` command and exported `runHarness` facade are retired. The exact [predecessor source](https://github.com/park-kyungchan/agent-platform/blob/01fe80a5a40bdca30aa8ab7c954bbac33d58e2f2/scripts/harness.ts) records the former snapshot, context, transition, source and start request contracts. Its recipes are historical, not current commands. Existing Git helpers remain exported directly from `packages/work-continuity/src/git-work/index.ts`; `scripts/verify-common-work.ts` imports them there. The retained verifier reads the delivered committed Work and shared documentation pins without activating a native runtime. Other Work check aliases remain pending their own consumer closure.
 
 ## Decisions, effects and completion
 
@@ -64,7 +50,7 @@ Source changes require the common registry and affected owner registration/build
 
 ## Native Memory stdin caller
 
-The Hermes platform source compiler also emits `read-memory.js`. Send a JSON object on stdin with exactly `snapshot`, `requestRef` and `ownerSelection`. `snapshot` is the explicit Git Work selection above. `requestRef` is a full SHA-256 snapshot Input pin with `fragment: "#/content"`. The current owner witness contains `owningRef` (a literal `refs/heads/` branch), `admittedCommit`, `policyRevision`, `activeGenerationId` and `state: "current"`. The canonical `readGitWorkMemoryRequest` reads that Work's request/dataset/policy Inputs and their original closure; the CLI carries no per-instance policy.
+The Hermes platform source compiler also emits `read-memory.js`. Send a JSON object on stdin with exactly `snapshot`, `requestRef` and `ownerSelection`. `snapshot` explicitly supplies `repositoryRoot`, `repositoryId`, an immutable `commit`, `projectId` and `workId`. `requestRef` is a full SHA-256 snapshot Input pin with `fragment: "#/content"`. The current owner witness contains `owningRef` (a literal `refs/heads/` branch), `admittedCommit`, `policyRevision`, `activeGenerationId` and `state: "current"`. The canonical `readGitWorkMemoryRequest` reads that Work's request/dataset/policy Inputs and their original closure; the CLI carries no per-instance policy.
 
 A source registration and compiler capture include the complete canonical Memory/context transitive imports and their installed projections. The CLI verifies that fixed closure before importing the implementation and again after the query, before publishing output. Stale owner refs, generations, policies or source pins fail without printing input or original bytes. The four existing compiled entrypoints retain their wire contracts. This new entrypoint is a native-tool-invocable reader, not a new tool registry or Memory implementation.
 

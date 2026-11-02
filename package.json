@@ -18,7 +18,6 @@
     "check:architecture": "bun ci/quality/run.ts architecture",
     "check:workflows": "bun ci/quality/run.ts workflows",
     "check:dependencies": "bun audit --audit-level=high",
-    "harness": "bun scripts/harness.ts",
     "check:git-work": "bun test packages/work-continuity/src/git-work packages/work-continuity/src/runtime-docs",
     "check:common-work": "bun scripts/verify-common-work.ts"
   },

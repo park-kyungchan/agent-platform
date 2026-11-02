@@ -36,22 +36,26 @@ Existing `gateway`, `docker`, `tui`, `profiles` and `sessions` routes retain the
 
 Use a separate request for each component. A Windows Client request can use `topic: "desktop-client"` and `executionHost: "local.windows"`; a Docker Backend question can use its relevant topic and `executionHost: "hostinger.container"`. An updater running in WSL2 does not establish that Desktop itself runs in WSL2. Bot Screen placement is another runtime observation.
 
-Save this JSON as a request file and run the existing public CLI shown below:
+Use the existing public reader directly, with a separate observation for the selected component:
 
-```json
-{
-  "request": {
-    "surface": "hermes.agent",
-    "topic": "bot-screen",
-    "freshness": "installed",
-    "executionHost": "hostinger.container"
-  }
-}
+```ts
+import { readDocumentationRegistry } from "@palantirkc/work-continuity/runtime-docs";
+
+const reader = await readDocumentationRegistry();
+const plan = reader.select(
+  {
+    surface: "hermes.agent",
+    topic: "bot-screen",
+    freshness: "installed",
+    executionHost: "hostinger.container",
+  },
+  { installedVersion: "0.22.0" },
+);
 ```
 
-After observing that component's installed version, supply it as `observations.installedVersion` in the envelope. A planned update to `0.22.2` is not an installed-version observation. The API accepts one applicable version per request; it does not authenticate or combine a Client/Backend version pair. Current public pages are not patch-version compatibility evidence, and these routes deliberately omit `documentationVersion`.
+Supply `observations.installedVersion` only after observing that component. The example's `0.22.0` is a caller claim; a planned update to `0.22.2` is not an installed-version observation. The API accepts one applicable version per request; it does not authenticate or combine a Client/Backend version pair. Current public pages are not patch-version compatibility evidence, and these routes deliberately omit `documentationVersion`.
 
-The old `bun run docs status/find/sections/read` instructions refer to a separate historical reader project. Use that reader only if its owning source, cache and entrypoint are present and verified. This checkout uses `bun --no-env-file --no-install scripts/harness.ts docs <request.json>` and the API below. It does not restore or refresh the historical corpus cache.
+The old `bun run docs status/find/sections/read` instructions refer to a separate historical reader project. Use that reader only if its owning source, cache and entrypoint are present and verified. The AP root CLI transport is retired; its [predecessor source](https://github.com/park-kyungchan/agent-platform/blob/01fe80a5a40bdca30aa8ab7c954bbac33d58e2f2/scripts/harness.ts) preserves the historical request envelope. Use the direct API in this checkout. It does not restore or refresh the historical corpus cache.
 
 An unchanged index digest does not establish unchanged page or corpus bytes. The user's October 7 cache and October 13 document counts remain dated observations. Keep corpus byte offsets paired with the original corpus hash; use a selected current official page when freshness or coverage requires it. Do not fetch the entire corpus for a known topic.
 
@@ -75,20 +79,11 @@ Requests allow only `surface`, `topic`, `freshness`, `executionHost` and `target
 
 Optional observations supply an installed version and cached-page evidence for documentation planning. These are caller assertions, not authenticated host observations. Cache reuse requires an exact canonical page, applicable version and matching independently confirmed body digest. Sensitive/latest reads additionally require current-task revalidation. A missing/conflicting installed version or documentation-version mismatch produces an explicit evidence gap and retrieval direction. An SDK documentation version does not prove compatibility with an installed runtime patch release.
 
-## Public CLI transport
+## Direct reader observations
 
-From the repository root, `bun --no-env-file --no-install scripts/harness.ts docs <request.json>` accepts every existing flat `DocumentationRequest` unchanged. It also accepts an explicit `{ "request": { ... }, "observations": { ... } }` envelope; `observations` may be omitted or `{}`. For example, this executable shell snippet creates and removes a disposable request file:
+Pass the request and optional typed `DocumentationObservations` separately to `reader.select(request, observations)`. The existing API is a documentation planner; it does not probe an installed runtime, authenticate a host or cache, fetch documentation, store cache data or grant permission. Canonical page/version/digest matching and current-task revalidation decide reuse; an asserted revalidation flag or matching strings alone are not independent proof. Partial page evidence and page/discovery/excerpt limits remain intact, as do `executionAuthority: "none"` and `nativePermissionGranted: false`.
 
-```sh
-request=$(mktemp)
-trap 'rm -f "$request"' EXIT
-printf '%s\n' '{"request":{"surface":"hermes.agent","topic":"tui","freshness":"installed"},"observations":{"installedVersion":"0.22.0"}}' > "$request"
-bun --no-env-file --no-install scripts/harness.ts docs "$request"
-```
-
-The envelope allows only `request` and optional `observations`. The request retains the canonical reader's existing validation. Observations allow only optional `installedVersion` and `cache`. A supplied cache requires string `canonicalUrl`, `bodySha256`, `independentlyConfirmedBodySha256` and boolean `revalidatedInCurrentTask`, with optional string `targetVersion`. Observation strings must be nonblank and contain no C0/DEL control characters; their maximum lengths are 120 UTF-16 code units for versions, 2000 for the URL and 64 for each digest field. The whole JSON file retains its 1,048,576-byte limit. Nulls, arrays, wrong scalar types, unknown fields and oversized values are rejected with exit code 1 and no plan on stdout.
-
-The CLI passes validated observations unchanged to the sole canonical `reader.select(request, observations)`. It does not probe an installed runtime, authenticate a host or cache, fetch documentation, store cache data or grant permission. Canonical page/version/digest matching and current-task revalidation still decide reuse; an asserted revalidation flag or matching strings alone are not independent proof. The example's `0.22.0` is a caller claim, not installation/authentication/compatibility evidence. Partial page evidence and all page/discovery/excerpt limits remain intact, as do `executionAuthority: "none"` and `nativePermissionGranted: false`.
+The deleted CLI's envelope validation, stdout/stderr protocol and 1,048,576-byte request-file limit were transport-only. They are preserved in the [historical source](https://github.com/park-kyungchan/agent-platform/blob/01fe80a5a40bdca30aa8ab7c954bbac33d58e2f2/scripts/harness.ts), not a current reader contract. The existing registry file reader retains its 262,144-byte limit and canonical request/registry validation.
 
 The reader accepts only enumerated official HTTPS hosts with surface-specific restrictions. Preferred/fallback URLs must represent the same canonical document, including the GitHub body API's exact single `pathname` query. Unicode aliases normalize to NFC. Registry changes require a new reader instance and source/version readback.
 

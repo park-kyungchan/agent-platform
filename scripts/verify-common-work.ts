@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 import {
+  gitReadEnvironment,
+  resolveGitWorkSelection,
   openGitWork,
   readGitWorkContext,
   validateGitWorkRecords,
@@ -8,7 +10,6 @@ import {
   type GitWorkRecord,
 } from "../packages/work-continuity/src/git-work/index.ts";
 import { createDocumentationReader } from "../packages/work-continuity/src/runtime-docs/index.ts";
-import { gitReadEnvironment, resolveGitWorkSelection } from "./harness.ts";
 
 /** Source-only verification from the original Git checkout, including when
  * finite-owner QA runs this script from its separate dependency-installed tree. */
