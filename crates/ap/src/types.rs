@@ -25,13 +25,38 @@ pub struct ClaudeProfile {
     pub instructions: Entry,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Entry {
     Missing,
     File { text: String },
     Symlink { target: String },
     Unsupported { reason: UnsupportedShape },
+}
+
+// Internally tagged unit variants accept extra fields despite deny_unknown_fields.
+// Deserialize the empty variant as a struct while preserving the public unit API.
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum EntryInput {
+    Missing {},
+    File { text: String },
+    Symlink { target: String },
+    Unsupported { reason: UnsupportedShape },
+}
+
+impl<'de> Deserialize<'de> for Entry {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(match EntryInput::deserialize(deserializer)? {
+            EntryInput::Missing {} => Self::Missing,
+            EntryInput::File { text } => Self::File { text },
+            EntryInput::Symlink { target } => Self::Symlink { target },
+            EntryInput::Unsupported { reason } => Self::Unsupported { reason },
+        })
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
