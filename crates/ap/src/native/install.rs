@@ -253,10 +253,10 @@ pub(super) fn command_dir(path: &str, spec: &Spec) -> Result<Dir> {
             return Err(err("path_collision", "command_dir"));
         }
     }
-    if let Environment::Disposable { root } = &spec.environment {
-        if !io::beneath(path, root) {
-            return Err(err("invalid_path", "command_dir"));
-        }
+    if let Environment::Disposable { root } = &spec.environment
+        && !io::beneath(path, root)
+    {
+        return Err(err("invalid_path", "command_dir"));
     }
     let command = Dir::private(path, spec.uid)?;
     let current = command

@@ -440,13 +440,12 @@ impl<'a> Stage<'a> {
             let _ = fs::unlinkat(&dir.fd, name.as_str(), AtFlags::empty());
             return Err(err("stage_validation", "stage"));
         }
-        if let (Some(old), Some(new)) = (&before.stamp, &snapshot.stamp) {
-            if matches!(desired, Entry::File { .. })
-                && (old.uid, old.gid, old.mode) != (new.uid, new.gid, new.mode)
-            {
-                let _ = fs::unlinkat(&dir.fd, name.as_str(), AtFlags::empty());
-                return Err(err("stage_validation", "stage"));
-            }
+        if let (Some(old), Some(new)) = (&before.stamp, &snapshot.stamp)
+            && matches!(desired, Entry::File { .. })
+            && (old.uid, old.gid, old.mode) != (new.uid, new.gid, new.mode)
+        {
+            let _ = fs::unlinkat(&dir.fd, name.as_str(), AtFlags::empty());
+            return Err(err("stage_validation", "stage"));
         }
         fs::fsync(&dir.fd).map_err(|_| err("io_error", "stage"))?;
         Ok(Self {
