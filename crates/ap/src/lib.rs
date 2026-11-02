@@ -1,5 +1,8 @@
-//! Pure proposed native instruction artifacts. No environment or filesystem discovery.
-//! The S02 foundation deliberately returns RendererUnimplemented until the leaf is supplied.
+//! Pure rendering plus explicitly scoped Linux public-instruction installation.
+//! Native installation is an explicit separate Linux API; render remains pure.
+
+#[cfg(target_os = "linux")]
+pub mod native;
 
 mod renderer;
 mod types;

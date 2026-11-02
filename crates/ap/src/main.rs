@@ -33,6 +33,10 @@ fn fail(code: &str, field: &str, status: u8) -> ExitCode {
 
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    #[cfg(target_os = "linux")]
+    if let Some(result) = ap::native::cli::dispatch(&args) {
+        return result;
+    }
     if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
         return if io::stdout().lock().write_all(HELP.as_bytes()).is_ok() {
             ExitCode::SUCCESS

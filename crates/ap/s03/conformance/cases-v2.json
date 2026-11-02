@@ -1,0 +1,557 @@
+{
+  "contract_version": 2,
+  "cases": [
+    {
+      "id": "install-twice",
+      "setup": "empty",
+      "scope": "both",
+      "expected": {
+        "outcome": "installed",
+        "phases": [
+          "applied",
+          "applied"
+        ],
+        "codex_target": "@ROOT@/source/AGENTS.md",
+        "claude_text": "@ROOT_IMPORT@\n"
+      }
+    },
+    {
+      "id": "claude-comment",
+      "setup": "comment",
+      "scope": "claude",
+      "expected": {
+        "outcome": "installed",
+        "phases": [
+          "applied"
+        ],
+        "codex_target": null,
+        "claude_text": "# User comment\n@ROOT_IMPORT@\n"
+      }
+    },
+    {
+      "id": "claude-no-final-newline",
+      "setup": "no-newline",
+      "scope": "claude",
+      "expected": {
+        "outcome": "installed",
+        "phases": [
+          "applied"
+        ],
+        "codex_target": null,
+        "claude_text": "# User comment\n@ROOT_IMPORT@\n"
+      }
+    },
+    {
+      "id": "relative-link",
+      "setup": "relative-link",
+      "scope": "codex",
+      "expected": {
+        "outcome": "installed",
+        "phases": [
+          "unchanged"
+        ],
+        "codex_target": "../source/AGENTS.md",
+        "claude_text": null
+      }
+    },
+    {
+      "id": "existing-native",
+      "setup": "native",
+      "scope": "both",
+      "expected": {
+        "outcome": "installed",
+        "phases": [
+          "unchanged",
+          "unchanged"
+        ],
+        "codex_target": "@ROOT@/source/AGENTS.md",
+        "claude_text": "# User instructions (Claude Code)\n\n@ROOT_IMPORT@\n"
+      }
+    },
+    {
+      "id": "owned-conflict",
+      "setup": "owned-conflict",
+      "scope": "codex",
+      "expected": {
+        "outcome": "instruction_conflict",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "override",
+      "setup": "override",
+      "scope": "codex",
+      "expected": {
+        "outcome": "instruction_conflict",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "claude-link",
+      "setup": "claude-link",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsupported_target",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "dangling-link",
+      "setup": "dangling-link",
+      "scope": "codex",
+      "expected": {
+        "outcome": "unsupported_target",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "link-chain",
+      "setup": "link-chain",
+      "scope": "codex",
+      "expected": {
+        "outcome": "unsupported_target",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "ancestor-link",
+      "setup": "ancestor-link",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsafe_topology",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "unsafe-mode",
+      "setup": "unsafe-mode",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsafe_metadata",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "special-mode",
+      "setup": "special-mode",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsafe_metadata",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "unsafe-dir-mode",
+      "setup": "unsafe-dir-mode",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsafe_metadata",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "wrong-uid",
+      "setup": "wrong-uid",
+      "scope": "both",
+      "expected": {
+        "outcome": "uid_mismatch",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "foreign-owner",
+      "setup": "foreign-owner",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsafe_metadata",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "hardlink",
+      "setup": "hardlink",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsafe_metadata",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "directory-target",
+      "setup": "directory-target",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsupported_target",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "fifo-target",
+      "setup": "fifo-target",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsupported_target",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "source-link",
+      "setup": "source-link",
+      "scope": "both",
+      "expected": {
+        "outcome": "unsafe_topology",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "source-write-mode",
+      "setup": "source-write-mode",
+      "scope": "both",
+      "expected": {
+        "outcome": "unsafe_metadata",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "source-hardlink",
+      "setup": "source-hardlink",
+      "scope": "both",
+      "expected": {
+        "outcome": "unsafe_metadata",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "nonutf8",
+      "setup": "nonutf8",
+      "scope": "claude",
+      "expected": {
+        "outcome": "unsupported_text",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "large-file",
+      "setup": "large-file",
+      "scope": "claude",
+      "expected": {
+        "outcome": "input_too_large",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "unrelated-config-race",
+      "setup": "config-edit",
+      "scope": "both",
+      "expected": {
+        "outcome": "installed",
+        "phases": [
+          "applied",
+          "applied"
+        ],
+        "codex_target": "@ROOT@/source/AGENTS.md",
+        "claude_text": "@ROOT_IMPORT@\n"
+      }
+    },
+    {
+      "id": "owned-plan-race",
+      "setup": "plan-edit",
+      "scope": "claude",
+      "expected": {
+        "outcome": "partial",
+        "phases": [
+          "conflicted"
+        ],
+        "codex_target": null,
+        "claude_text": "# Edited after plan\n"
+      }
+    },
+    {
+      "id": "source-plan-race",
+      "setup": "source-edit",
+      "scope": "both",
+      "expected": {
+        "outcome": "expected_before_conflict",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "no-coordination",
+      "setup": "no-coordination",
+      "scope": "both",
+      "expected": {
+        "outcome": "ownership_unestablished",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "lock-busy",
+      "setup": "lock-busy",
+      "scope": "claude",
+      "expected": {
+        "outcome": "lock_busy",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "rollback-unrelated",
+      "setup": "rollback-edit",
+      "scope": "claude",
+      "expected": {
+        "outcome": "recovered",
+        "phases": [
+          "recovered"
+        ],
+        "codex_target": null,
+        "claude_text": "# User comment\n# Later unrelated\n"
+      }
+    },
+    {
+      "id": "rollback-bridge",
+      "setup": "rollback-bridge",
+      "scope": "claude",
+      "expected": {
+        "outcome": "recovered",
+        "phases": [
+          "recovered"
+        ],
+        "codex_target": null,
+        "claude_text": "# User comment\n# Later unrelated\n"
+      }
+    },
+    {
+      "id": "rollback-owned-conflict",
+      "setup": "rollback-conflict",
+      "scope": "claude",
+      "expected": {
+        "outcome": "recovery_required",
+        "phases": [
+          "conflicted"
+        ],
+        "codex_target": null,
+        "claude_text": "@/different/source\n"
+      }
+    },
+    {
+      "id": "rollback-created-keeps-comment",
+      "setup": "rollback-created-edit",
+      "scope": "claude",
+      "expected": {
+        "outcome": "recovered",
+        "phases": [
+          "recovered"
+        ],
+        "codex_target": null,
+        "claude_text": "# Later unrelated\n"
+      }
+    },
+    {
+      "id": "rollback-created-deletes",
+      "setup": "rollback-created",
+      "scope": "both",
+      "expected": {
+        "outcome": "recovered",
+        "phases": [
+          "recovered",
+          "recovered"
+        ],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "rollback-twice",
+      "setup": "rollback-twice",
+      "scope": "both",
+      "expected": {
+        "outcome": "recovered",
+        "phases": [
+          "recovered",
+          "recovered"
+        ],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "doctor-hook",
+      "setup": "doctor",
+      "scope": "both",
+      "expected": {
+        "outcome": "diagnosed",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "scope-no-unselected-read",
+      "setup": "scope",
+      "scope": "codex",
+      "expected": {
+        "outcome": "installed",
+        "phases": [
+          "applied"
+        ],
+        "codex_target": "@ROOT@/source/AGENTS.md",
+        "claude_text": null
+      }
+    },
+    {
+      "id": "crlf-preserved",
+      "setup": "crlf",
+      "scope": "claude",
+      "expected": {
+        "outcome": "installed",
+        "phases": [
+          "applied"
+        ],
+        "codex_target": null,
+        "claude_text": "# User comment\r\n@ROOT_IMPORT@\r\n"
+      }
+    },
+    {
+      "id": "nested-profiles",
+      "setup": "nested",
+      "scope": "both",
+      "expected": {
+        "outcome": "path_collision",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "forged-plan",
+      "setup": "forged",
+      "scope": "claude",
+      "expected": {
+        "outcome": "invalid_plan",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    },
+    {
+      "id": "state-reuse",
+      "setup": "state-reuse",
+      "scope": "both",
+      "expected": {
+        "outcome": "state_exists",
+        "phases": [],
+        "codex_target": null,
+        "claude_text": null
+      }
+    }
+  ],
+  "internal_fault_cases": [
+    {
+      "id": "recheck-edit",
+      "point": "before_recheck",
+      "expected": [
+        "conflicted",
+        "pending"
+      ]
+    },
+    {
+      "id": "after-first-replace",
+      "point": "after_replace",
+      "expected": [
+        "prepared",
+        "pending"
+      ]
+    },
+    {
+      "id": "after-first-persist",
+      "point": "after_persist",
+      "expected": [
+        "applied",
+        "pending"
+      ]
+    },
+    {
+      "id": "killed-after-rename",
+      "point": "exit_after_replace",
+      "expected": [
+        "prepared",
+        "pending"
+      ]
+    },
+    {
+      "id": "recovery-killed-after-rename",
+      "point": "exit_after_recover_replace",
+      "expected": [
+        "applied",
+        "recovering"
+      ]
+    },
+    {
+      "id": "ancestor-replaced",
+      "point": "before_recheck",
+      "expected": [
+        "conflicted",
+        "pending"
+      ]
+    },
+    {
+      "id": "late-override",
+      "point": "before_recheck",
+      "expected": [
+        "conflicted",
+        "pending"
+      ]
+    },
+    {
+      "id": "later-file-fails",
+      "point": "second_before_recheck",
+      "expected": [
+        "applied",
+        "conflicted"
+      ]
+    }
+  ]
+}
