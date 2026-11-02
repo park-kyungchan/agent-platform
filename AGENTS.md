@@ -4,7 +4,7 @@
 
 Read `/root/.agents/AGENTS.md`, then the assigned task's current state and selected contract before effects. For this migration, use `/home/palantirkc/work/ws-replan/STATE.md`, `ORCHESTRATION.md` and `CURRENT-PLAN.md`, which locates the user-adopted final Rust review ZIP dated 2026-11-02. Current user instructions and that adopted ZIP supersede earlier Rust plans, memories and this checkout's legacy harness procedures. Final execution approval was received at 2026-11-02T15:28Z; former WAIT snapshots are historical. The Lead owns task STATE/ORCHESTRATION and releases dependent slices.
 
-S01 is documentation and selected-consumer reconciliation only: no runtime/config installation, deletion, source implementation, builds, dependencies, live source calls or business effects. Its candidate requires independent Muse review and Lead acceptance before S02/S05 are released. See [selected dispositions and evidence](docs/rust-migration-dispositions.md).
+S01 was documentation and selected-consumer reconciliation only. Its guidance does not freeze later assignments at S01: current task STATE and the Lead's exact slice boundary govern. See [dated S01 dispositions](docs/rust-migration-dispositions.md) and [bounded S04 consumer closure](docs/s04-closed-consumers.md). Independent review and Lead acceptance still release dependent slices.
 
 ## Ownership and destination
 

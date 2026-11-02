@@ -1,0 +1,188 @@
+{
+  "base": "5ff309f579c521c489b20f19d95b806138967cea",
+  "observed_at": "2026-11-02T18:17:41.820169+00:00",
+  "scope": "static only; no compiler, candidate, Bun test or conformance judge executed",
+  "checks": [
+    {
+      "label": "shell_syntax",
+      "argv": [
+        "bash",
+        "-n",
+        "ci/check-rust-source.sh"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "diff_whitespace",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "frozen_source_unchanged",
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "5ff309f579c521c489b20f19d95b806138967cea",
+        "--",
+        "crates/ap",
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "bootstrap_callers_closed",
+      "argv": [
+        "rg",
+        "-n",
+        "--hidden",
+        "source-ci-setup",
+        "--glob",
+        "!.git",
+        "--glob",
+        "!node_modules/**",
+        "--glob",
+        "!docs/s04/**",
+        "--glob",
+        "!docs/s04-closed-consumers.md"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "recovery_main",
+      "argv": [
+        "git",
+        "rev-parse",
+        "refs/heads/main"
+      ],
+      "exit": 0,
+      "stdout": "1e6b771729366955cc48aa4fa48d35e6de6fe00c\n",
+      "stderr": ""
+    },
+    {
+      "label": "recovery_s03",
+      "argv": [
+        "git",
+        "rev-parse",
+        "refs/heads/rust/s03-scoped-install-20261102"
+      ],
+      "exit": 0,
+      "stdout": "5ff309f579c521c489b20f19d95b806138967cea\n",
+      "stderr": ""
+    },
+    {
+      "label": "recovery_blob",
+      "argv": [
+        "git",
+        "ls-tree",
+        "5ff309f579c521c489b20f19d95b806138967cea",
+        "--",
+        "ci/source-ci-setup.sh"
+      ],
+      "exit": 0,
+      "stdout": "100644 blob f965aaef0c9d093835b0eaaa850b6113d8d49c02\tci/source-ci-setup.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "frozen_data_syntax",
+      "argv": [
+        "python3",
+        "-I",
+        "-B",
+        "-c",
+        "import ast,json,tomllib\nfrom pathlib import Path\nfiles=[Path(\"crates/ap/conformance/verify.py\"),Path(\"crates/ap/s03/conformance/verify-v2.py\"),Path(\"crates/ap/s03/conformance/verify-commands-v1.py\")]\nfor p in files: ast.parse(p.read_bytes(),filename=str(p))\nfor p in [Path(\"Cargo.toml\"),Path(\"crates/ap/Cargo.toml\"),Path(\"rust-toolchain.toml\")]: tomllib.loads(p.read_text())\nfor p in Path(\"crates/ap\").rglob(\"*.json\"): json.loads(p.read_bytes())\nprint(\"3 frozen Python judges parsed; Rust TOML and all ap JSON parsed; no candidate or judge executed\")\n"
+      ],
+      "exit": 0,
+      "stdout": "3 frozen Python judges parsed; Rust TOML and all ap JSON parsed; no candidate or judge executed\n",
+      "stderr": ""
+    },
+    {
+      "label": "typescript_and_workflow_static",
+      "command": "Bun.Transpiler.transformSync on 4 edited TS files; Bun.YAML.parse and explicit workflow ref/pin/permissions/job assertions (no source imports)",
+      "exit": 0,
+      "stdout": "4 TS syntax passes; YAML/ref/pin/permissions/jobs pass; old automatic prerequisites absent\n",
+      "stderr": ""
+    },
+    {
+      "label": "closure_document_links",
+      "argv": [
+        "python3",
+        "-I",
+        "-B",
+        "-c",
+        "from pathlib import Path\nimport re\nfor name in [\"README.md\",\"AGENTS.md\",\"docs/s04-closed-consumers.md\"]:\n p=Path(name)\n for target in re.findall(r\"\\[[^\\]]*\\]\\(([^)]+)\\)\",p.read_text()):\n  if \"://\" in target or target.startswith(\"#\"): continue\n  dest=target.split(\"#\",1)[0]\n  assert (p.parent/dest).exists(), (name,target)\nprint(\"README/AGENTS/S04 local Markdown links exist\")\n"
+      ],
+      "exit": 0,
+      "stdout": "README/AGENTS/S04 local Markdown links exist\n",
+      "stderr": ""
+    },
+    {
+      "label": "all_protected_source_unchanged",
+      "argv": [
+        "git",
+        "diff",
+        "--exit-code",
+        "5ff309f579c521c489b20f19d95b806138967cea",
+        "--",
+        "crates/ap",
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
+        "architecture/capability-source-owners.json",
+        "packages/work-continuity",
+        "packages/native-codex-adapter",
+        "packages/native-hermes-adapter",
+        "ci/quality/trusted"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "label": "base_exact_bootstrap_callers",
+      "argv": [
+        "git",
+        "grep",
+        "-n",
+        "source-ci-setup",
+        "5ff309f579c521c489b20f19d95b806138967cea",
+        "--",
+        ".github",
+        "ci",
+        "package.json",
+        "packages",
+        "scripts",
+        "verification",
+        "architecture"
+      ],
+      "exit": 0,
+      "stdout": "5ff309f579c521c489b20f19d95b806138967cea:.github/workflows/source.yml:35:        run: bash ci/source-ci-setup.sh\n5ff309f579c521c489b20f19d95b806138967cea:.github/workflows/source.yml:74:        run: bash ci/source-ci-setup.sh\n5ff309f579c521c489b20f19d95b806138967cea:.github/workflows/source.yml:123:        run: bash ci/source-ci-setup.sh\n",
+      "stderr": ""
+    },
+    {
+      "label": "final_diff_whitespace",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

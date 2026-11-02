@@ -49,21 +49,11 @@ console.log(JSON.stringify(results));
 });
 
 test("enclosing operational limits outlast individual required inner checks", async () => {
-  const sourceWorkflow = Bun.YAML.parse(
-    await readFile(resolve(root, ".github/workflows/source.yml"), "utf8"),
-  ) as { jobs: Record<string, { "timeout-minutes": number }> };
   const trustedWorkflow = Bun.YAML.parse(
     await readFile(resolve(root, ".github/workflows/trusted-source.yml"), "utf8"),
   ) as { jobs: Record<string, { "timeout-minutes": number }> };
-  expect(sourceWorkflow.jobs["native-review"]!["timeout-minutes"]).toBe(15);
   expect(operationalTimeouts.reviewPublicationMs).toBe(300_000);
   expect(operationalTimeouts.qualityFixturesMs).toBeGreaterThan(3_000_000);
-  expect(sourceWorkflow.jobs.quality!["timeout-minutes"] * 60_000).toBeGreaterThan(
-    operationalTimeouts.qualityFixturesMs,
-  );
-  expect(sourceWorkflow.jobs["merge-integration"]!["timeout-minutes"] * 60_000).toBeGreaterThan(
-    operationalTimeouts.qualityFixturesMs,
-  );
   expect(operationalTimeouts.workerMs).toBeGreaterThan(operationalTimeouts.frozenInstallMs);
   expect(operationalTimeouts.workerMs).toBeGreaterThan(operationalTimeouts.qualityFixturesMs);
   expect(trustedWorkflow.jobs["trusted-source"]!["timeout-minutes"] * 60_000).toBeGreaterThan(
