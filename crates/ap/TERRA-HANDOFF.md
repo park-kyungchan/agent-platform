@@ -23,6 +23,8 @@
 4. Complete algorithm: implement only DESIGN.md ordered steps, including first
    refusal precedence, static error fields, lexical link normalization, narrow
    import recognition/refusals, exact text retention and byte-sorted outputs.
+   Fence detection unconditionally refuses any fence-bearing existing Claude file,
+   including when canonical_path is absent, as DESIGN step6 specifies.
    Private helpers belong in renderer.rs. No new modules or APIs are necessary.
    Remove RendererUnimplemented from the leaf's behavior without removing the
    public error enum value (CLI still distinguishes that intentional stub).

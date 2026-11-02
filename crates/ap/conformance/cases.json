@@ -3156,6 +3156,190 @@
           ]
         }
       }
+    },
+    {
+      "id": "claude-fence-no-canonical-closed",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "```text\nopaque\n```\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-fence-no-canonical-open",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "~~~text\nopaque\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-fence-import-outside",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "```text\nopaque\n```\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-crlf-with-lone-cr",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# Personal\r\nopaque\rtrailing"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_text",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-relative-target-dot",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "."
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "missing"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-relative-target-dotdot",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": ".."
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "missing"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instructions"
+        }
+      }
     }
   ]
 }

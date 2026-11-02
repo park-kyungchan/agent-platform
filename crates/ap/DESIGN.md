@@ -124,11 +124,14 @@ Both initial adapters are required; adapters are not inferred from directory nam
      More than one exact import, OR any occurrence of canonical_path in any
      non-exact line, gives `instruction_conflict/claude.instructions`. This
      deliberately refuses ambiguous quoted/inline/fenced/prose mentions rather
-     than claiming a full Markdown/native import parser. A fenced exact import
-     line is also refused: if ANY line, after removing leading ASCII spaces and
-     tabs, starts with three backticks or three tildes and canonical_path occurs
-     anywhere in the file, return that same
-     conflict. Other imports (different paths) and Markdown are untouched.
+     than claiming a full Markdown/native import parser. Fence-bearing text
+     is unsupported for import ownership: if ANY line, after removing leading
+     ASCII spaces and tabs, starts with three backticks or three tildes, return
+     that same conflict, whether or not canonical_path is already present.
+     This conservative refusal includes closed/unclosed fences and exact imports
+     outside them. Otherwise an append could make the next render refuse its own
+     output, violating the pure projection requirement. Other imports (different
+     paths) and non-fenced Markdown are untouched.
      Exactly one admissible exact import -> preserve all original bytes, even
      an absent final newline. No import -> append one: if nonempty text lacks a
      final EOL, first append the selected EOL; then `@` + canonical_path + EOL.
