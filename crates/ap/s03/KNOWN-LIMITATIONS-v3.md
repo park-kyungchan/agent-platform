@@ -41,8 +41,8 @@ plan/apply request or state: these contain several copies of instruction text,
 and JSON escaping may expand it further. There is no single promised maximum
 installable file size independent of its contents and selected scope.
 
-Independent review reproduced a 600,006-byte Claude file refused at apply stdin
-with exit 2 (`input_too_large`, field `stdin`), and a 400,006-byte file whose plan
+Independent review reproduced a 600,007-byte Claude file refused at apply stdin
+with exit 2 (`input_too_large`, field `stdin`), and a 400,007-byte file whose plan
 fit but whose staged state exceeded the state limit. The latter returned exit 5
 (`recovery_required`, error `input_too_large`, field `state`) before any target
 rename. The target remained unchanged and explicit recovery succeeded from the
