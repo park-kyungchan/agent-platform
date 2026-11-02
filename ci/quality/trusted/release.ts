@@ -6,11 +6,10 @@ import {
   object,
   sha256,
   trustedDigest,
-  validateTrustedPolicy,
   type TrustedPolicy,
   requiredSemanticCases,
 } from "./policy";
-import { dependencyInputs, git } from "./source";
+import { dependencyInputs } from "./source";
 
 /** Hash data only. No package manager, candidate module, preload or configuration is evaluated. */
 export async function fileInventory(root: string): Promise<Record<string, string>> {
@@ -35,39 +34,6 @@ export async function fileInventory(root: string): Promise<Record<string, string
   await walk(root);
   return pins;
 }
-export async function buildPolicy(root: string, release: string): Promise<TrustedPolicy> {
-  insist(
-    (await git(root, ["rev-parse", "HEAD"])) === release &&
-      (await git(root, ["status", "--porcelain", "--untracked-files=normal"])) === "",
-    "CLEAN_EXACT_POLICY_CHECKOUT_REQUIRED",
-  );
-  const def = object(
-    JSON.parse(await readFile(join(root, "ci/quality/trusted/policy-definition.json"), "utf8")),
-  );
-  const pins = await fileInventory(root);
-  const legacyMinimum = await readPolicyMinimum(root);
-  const p: TrustedPolicy = {
-    schema: "agent-platform.trusted-ci-policy.v2",
-    release,
-    revision: Number(def.revision),
-    protectedTag: String(def.protectedTag),
-    workflowSha256: pins[".github/workflows/trusted-source.yml"]!,
-    controllerClosureSha256: trustedDigest(pins),
-    workerRecipeSha256: pins["ci/quality/trusted/worker.Dockerfile"]!,
-    toolPinsSha256: pins["ci/quality/tool-pins.json"]!,
-    dependencyInputs: await dependencyInputs(root),
-    dispatcher: { id: 241037670 },
-    reviewPublisher: { id: 241037670, login: String(def.reviewPublisherLogin) },
-    maxAuditAgeSeconds: Number(def.maxAuditAgeSeconds),
-    probes: structuredClone(requiredSemanticCases),
-    catalogueSha256: trustedDigest(requiredSemanticCases),
-    coverageSha256: pins["ci/quality/trusted/coverage.json"]!,
-    legacyMinimum,
-  };
-  validateTrustedPolicy(p);
-  return p;
-}
-
 /** Read P's actual complete minimum. Candidate/profile-supplied lists cannot reduce it. */
 export async function readPolicyMinimum(root: string): Promise<TrustedPolicy["legacyMinimum"]> {
   const scope = await readQualityScope(root, "architecture/quality-policy.json", []);

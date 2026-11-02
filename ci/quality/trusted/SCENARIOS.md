@@ -1,3 +1,5 @@
+> Historical controller qualification record. The current source manual workflow, controller and exclusive policy bootstrap were retired after `00ff3eefb3948ba669031ca08789f118eea30d87`. Requirements and unexecuted next steps below describe that predecessor; they are not current Rust migration instructions. Use current task STATE and the adopted final ZIP. Original bytes remain in Git at that predecessor.
+
 # Finite G01–G04 scenario adaptations
 
 The revision4 predecessor retained 66 original P cases and added 89 scenarios. Revision5 retains all 155 definitions and adds 26 required comparisons (24 Memory contract scenarios and two fixed export cases), for 181 cases per required subject. The original 155 case source text and historical results remain unchanged. All expected values, pointer comparisons, equality relations and finite shape checks are in the immutable host catalogue. Every required case is compared outside the candidate process. Missing exports, fixture setup errors, extra stdout, early exit, unsupported results, nonzero exit, timeout and OOM cannot stand for a passed case.

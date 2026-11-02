@@ -163,3 +163,11 @@ cannot claim a future Stop succeeded. Lead must verify retention and reconcile
 children before closing this pane. Next task uses a fresh session unless STATE
 records a concrete continuity exception. Task STATE/ORCHESTRATION/preparation
 were read-only throughout.
+
+## Later manual-controller source closure
+
+After `00ff3eefb3948ba669031ca08789f118eea30d87`, the manual `trusted-source.yml` workflow, exclusive `controller.ts` entry point, `buildPolicy` export and exclusive bootstrap test are retired from current source. The operational timeout test no longer opens that removed YAML; its other process, provider, research and explicit-budget checks remain. The unused native dispatch payload and policy examples are also removed. The complete original bytes remain in that predecessor Git commit. The S01 historical workflow link resolves to its retained GitHub blob.
+
+A fresh bounded read found GitHub workflow ID392713044 active with zero runs and no exact remote `refs/tags/trusted-ci-v1` at that observation. Those are dated observations, not a universal statement about remote or native clients. No dispatch, native profile, token, registration, service or remote activation setting changes here.
+
+The surviving-caller table above records the first increment's observations. Its manual-dispatch source edge is now closed. `release.ts` keeps its separately consumed inventory, minimum-reader and installed-input verifier; policy/native/semantic helpers, source-author libraries, bounded process helpers, runtime ownership and domain journals/locks remain subject to their own closures. This change does not renew the retired policy or claim a full legacy aggregate pass, full S04/P6 completion or production activation.

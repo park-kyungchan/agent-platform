@@ -1,11 +1,8 @@
 import { expect, test } from "bun:test";
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { operationalTimeouts } from "./operational-timeouts";
 import { fixedProcess } from "./trusted/process";
 import { validateRequest } from "../../packages/research-capture/src/capture";
-
-const root = resolve(import.meta.dir, "../..");
 
 test("command children keep scaled defaults and exact overrides without replay", async () => {
   // Isolate the timer interception from the test runner. Only the child's clock is accelerated.
@@ -49,16 +46,10 @@ console.log(JSON.stringify(results));
 });
 
 test("enclosing operational limits outlast individual required inner checks", async () => {
-  const trustedWorkflow = Bun.YAML.parse(
-    await readFile(resolve(root, ".github/workflows/trusted-source.yml"), "utf8"),
-  ) as { jobs: Record<string, { "timeout-minutes": number }> };
   expect(operationalTimeouts.reviewPublicationMs).toBe(300_000);
   expect(operationalTimeouts.qualityFixturesMs).toBeGreaterThan(3_000_000);
   expect(operationalTimeouts.workerMs).toBeGreaterThan(operationalTimeouts.frozenInstallMs);
   expect(operationalTimeouts.workerMs).toBeGreaterThan(operationalTimeouts.qualityFixturesMs);
-  expect(trustedWorkflow.jobs["trusted-source"]!["timeout-minutes"] * 60_000).toBeGreaterThan(
-    operationalTimeouts.workerMs,
-  );
   expect(operationalTimeouts.nativeCommandMs).toBeGreaterThan(
     operationalTimeouts.secretScanSeconds * 1000,
   );
