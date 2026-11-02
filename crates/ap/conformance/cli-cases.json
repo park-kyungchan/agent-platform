@@ -1,0 +1,165 @@
+{
+  "contract_version": 1,
+  "cases": [
+    {
+      "id": "invalid-json",
+      "args": [
+        "render"
+      ],
+      "stdin": "{",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      }
+    },
+    {
+      "id": "two-documents",
+      "args": [
+        "render"
+      ],
+      "stdin": "{\"schema_version\":1,\"canonical_path\":\"/root/.agents/AGENTS.md\",\"codex\":{\"config_dir\":\"/root/.codex\",\"instructions\":{\"kind\":\"symlink\",\"target\":\"/root/.agents/AGENTS.md\"},\"instruction_override\":{\"kind\":\"missing\"}},\"claude\":{\"config_dir\":\"/root/.claude\",\"instructions\":{\"kind\":\"file\",\"text\":\"# User instructions (Claude Code)\\n\\n@/root/.agents/AGENTS.md\\n\"}},\"preserved\":[]}{\"schema_version\":1,\"canonical_path\":\"/root/.agents/AGENTS.md\",\"codex\":{\"config_dir\":\"/root/.codex\",\"instructions\":{\"kind\":\"symlink\",\"target\":\"/root/.agents/AGENTS.md\"},\"instruction_override\":{\"kind\":\"missing\"}},\"claude\":{\"config_dir\":\"/root/.claude\",\"instructions\":{\"kind\":\"file\",\"text\":\"# User instructions (Claude Code)\\n\\n@/root/.agents/AGENTS.md\\n\"}},\"preserved\":[]}",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      }
+    },
+    {
+      "id": "unknown-envelope",
+      "args": [
+        "render"
+      ],
+      "stdin": "{\"schema_version\":1,\"canonical_path\":\"/root/.agents/AGENTS.md\",\"codex\":{\"config_dir\":\"/root/.codex\",\"instructions\":{\"kind\":\"symlink\",\"target\":\"/root/.agents/AGENTS.md\"},\"instruction_override\":{\"kind\":\"missing\"}},\"claude\":{\"config_dir\":\"/root/.claude\",\"instructions\":{\"kind\":\"file\",\"text\":\"# User instructions (Claude Code)\\n\\n@/root/.agents/AGENTS.md\\n\"}},\"preserved\":[],\"future\":true}",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      }
+    },
+    {
+      "id": "missing-required",
+      "args": [
+        "render"
+      ],
+      "stdin": "{\"schema_version\": 1, \"canonical_path\": \"/root/.agents/AGENTS.md\", \"codex\": {\"config_dir\": \"/root/.codex\", \"instructions\": {\"kind\": \"symlink\", \"target\": \"/root/.agents/AGENTS.md\"}, \"instruction_override\": {\"kind\": \"missing\"}}, \"claude\": {\"config_dir\": \"/root/.claude\", \"instructions\": {\"kind\": \"file\", \"text\": \"# User instructions (Claude Code)\\n\\n@/root/.agents/AGENTS.md\\n\"}}}",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      }
+    },
+    {
+      "id": "null-is-not-missing",
+      "args": [
+        "render"
+      ],
+      "stdin": "{\"schema_version\":1,\"canonical_path\":\"/root/.agents/AGENTS.md\",\"codex\":{\"config_dir\":\"/root/.codex\",\"instructions\":{\"kind\":\"symlink\",\"target\":\"/root/.agents/AGENTS.md\"},\"instruction_override\":{\"kind\":\"missing\"}},\"claude\":{\"config_dir\":\"/root/.claude\",\"instructions\":{\"kind\":\"file\",\"text\":\"# User instructions (Claude Code)\\n\\n@/root/.agents/AGENTS.md\\n\"}},\"preserved\":null}",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      }
+    },
+    {
+      "id": "unknown-profile-field",
+      "args": [
+        "render"
+      ],
+      "stdin": "{\"schema_version\":1,\"canonical_path\":\"/root/.agents/AGENTS.md\",\"codex\":{\"future\":1,\"config_dir\":\"/root/.codex\",\"instructions\":{\"kind\":\"symlink\",\"target\":\"/root/.agents/AGENTS.md\"},\"instruction_override\":{\"kind\":\"missing\"}},\"claude\":{\"config_dir\":\"/root/.claude\",\"instructions\":{\"kind\":\"file\",\"text\":\"# User instructions (Claude Code)\\n\\n@/root/.agents/AGENTS.md\\n\"}},\"preserved\":[]}",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      }
+    },
+    {
+      "id": "unknown-entry-field",
+      "args": [
+        "render"
+      ],
+      "stdin": "{\"schema_version\":1,\"canonical_path\":\"/root/.agents/AGENTS.md\",\"codex\":{\"config_dir\":\"/root/.codex\",\"instructions\":{\"kind\":\"symlink\",\"target\":\"/root/.agents/AGENTS.md\"},\"instruction_override\":{\"kind\":\"missing\",\"future\":1}},\"claude\":{\"config_dir\":\"/root/.claude\",\"instructions\":{\"kind\":\"file\",\"text\":\"# User instructions (Claude Code)\\n\\n@/root/.agents/AGENTS.md\\n\"}},\"preserved\":[]}",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      }
+    },
+    {
+      "id": "duplicate-struct-field",
+      "args": [
+        "render"
+      ],
+      "stdin": "{\"schema_version\":1,\"canonical_path\":\"/root/.agents/AGENTS.md\",\"codex\":{\"config_dir\":\"/root/.codex\",\"instructions\":{\"kind\":\"symlink\",\"target\":\"/root/.agents/AGENTS.md\"},\"instruction_override\":{\"kind\":\"missing\"}},\"claude\":{\"config_dir\":\"/root/.claude\",\"instructions\":{\"kind\":\"file\",\"text\":\"# User instructions (Claude Code)\\n\\n@/root/.agents/AGENTS.md\\n\"}},\"preserved\":[],\"schema_version\":1}",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      }
+    },
+    {
+      "id": "invalid-utf8",
+      "args": [
+        "render"
+      ],
+      "stdin": "",
+      "expected": {
+        "exit": 2,
+        "code": "invalid_input",
+        "field": "stdin"
+      },
+      "stdin_hex": "ff"
+    },
+    {
+      "id": "oversized-before-json",
+      "args": [
+        "render"
+      ],
+      "stdin": "",
+      "expected": {
+        "exit": 2,
+        "code": "input_too_large",
+        "field": "stdin"
+      },
+      "stdin_repeat": {
+        "text": " ",
+        "count": 1048577
+      }
+    },
+    {
+      "id": "no-args",
+      "args": [],
+      "stdin": "",
+      "expected": {
+        "exit": 2,
+        "code": "usage",
+        "field": "args"
+      }
+    },
+    {
+      "id": "extra-arg",
+      "args": [
+        "render",
+        "--install"
+      ],
+      "stdin": "",
+      "expected": {
+        "exit": 2,
+        "code": "usage",
+        "field": "args"
+      }
+    },
+    {
+      "id": "unknown-command",
+      "args": [
+        "doctor"
+      ],
+      "stdin": "",
+      "expected": {
+        "exit": 2,
+        "code": "usage",
+        "field": "args"
+      }
+    }
+  ]
+}

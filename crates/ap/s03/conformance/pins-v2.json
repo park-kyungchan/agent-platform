@@ -1,0 +1,6 @@
+{
+  "CONTRACT-v1.md": "e977d966b3a53fdd0c8568ef2b3af0eff1bd2c266aa2d90075baecbf98434f9d",
+  "CORRECTION-v2.md": "34912d9444d179645d8fb6b25cba55ad8bd9164d2b4e75814e5a43fd9a720c0c",
+  "conformance/cases-v2.json": "5b8d55fdd853e7b6d3ba7286477e009a36a00ed8344ec1053611878ad853ac64",
+  "conformance/verify-v2.py": "282da276f54e657a3c4bba05c43a1310e71d8193ed8a76756ac62512ef425497"
+}

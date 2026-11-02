@@ -70,19 +70,8 @@ test("shared action resolves one exact owner version from literal or .bun-versio
   }
 });
 
-test("all active AP source jobs consume the one version file; evidence CI cannot manufacture or publish review", async () => {
+test("retained evidence CI cannot manufacture or publish review", async () => {
   const root = join(import.meta.dir, "../..");
-  const source = Bun.YAML.parse(
-    await readFile(join(root, ".github/workflows/source.yml"), "utf8"),
-  ) as Workflow;
-  for (const name of ["source", "quality", "merge-integration", "native-review"]) {
-    const setup = source.jobs[name]!.steps.find((step) =>
-      step.uses?.startsWith("oven-sh/setup-bun@"),
-    );
-    expect(setup!.with).toEqual({ "bun-version-file": ".bun-version" });
-  }
-  expect((await readFile(join(root, ".bun-version"), "utf8")).trim()).toBe(Bun.version);
-  expect(source.permissions).toEqual({ contents: "read", statuses: "read", actions: "read" });
   const evidence = Bun.YAML.parse(
     await readFile(join(root, ".github/workflows/native-review-evidence.yml"), "utf8"),
   ) as Workflow;

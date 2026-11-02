@@ -1,0 +1,226 @@
+{
+  "contract_version": 1,
+  "cases": [
+    {
+      "id": "additive-install-help",
+      "args": [
+        "install",
+        "--help"
+      ],
+      "stdin": "",
+      "expected": {
+        "exit": 0,
+        "stdout": "Usage: ap install plan|apply|recover < request.json\nap doctor inspect < spec.json\nExplicit Linux profiles/source; disposable or externally coordinated writers.\nNo hook execution; native loading requires separate evidence.\n",
+        "stderr": ""
+      }
+    },
+    {
+      "id": "install-plan-invalid-json",
+      "args": [
+        "install",
+        "plan"
+      ],
+      "stdin": "{",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-plan-unknown-fields",
+      "args": [
+        "install",
+        "plan"
+      ],
+      "stdin": "{\"extra\":true}",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-plan-null-input",
+      "args": [
+        "install",
+        "plan"
+      ],
+      "stdin": "null",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-plan-two-documents",
+      "args": [
+        "install",
+        "plan"
+      ],
+      "stdin": "{}{}",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-apply-invalid-json",
+      "args": [
+        "install",
+        "apply"
+      ],
+      "stdin": "{",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-apply-unknown-fields",
+      "args": [
+        "install",
+        "apply"
+      ],
+      "stdin": "{\"extra\":true}",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-apply-null-input",
+      "args": [
+        "install",
+        "apply"
+      ],
+      "stdin": "null",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-apply-two-documents",
+      "args": [
+        "install",
+        "apply"
+      ],
+      "stdin": "{}{}",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-recover-invalid-json",
+      "args": [
+        "install",
+        "recover"
+      ],
+      "stdin": "{",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-recover-unknown-fields",
+      "args": [
+        "install",
+        "recover"
+      ],
+      "stdin": "{\"extra\":true}",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-recover-null-input",
+      "args": [
+        "install",
+        "recover"
+      ],
+      "stdin": "null",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "install-recover-two-documents",
+      "args": [
+        "install",
+        "recover"
+      ],
+      "stdin": "{}{}",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "doctor-inspect-invalid-json",
+      "args": [
+        "doctor",
+        "inspect"
+      ],
+      "stdin": "{",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "doctor-inspect-unknown-fields",
+      "args": [
+        "doctor",
+        "inspect"
+      ],
+      "stdin": "{\"extra\":true}",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "doctor-inspect-null-input",
+      "args": [
+        "doctor",
+        "inspect"
+      ],
+      "stdin": "null",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    },
+    {
+      "id": "doctor-inspect-two-documents",
+      "args": [
+        "doctor",
+        "inspect"
+      ],
+      "stdin": "{}{}",
+      "expected": {
+        "exit": 2,
+        "stdout": "",
+        "stderr": "{\"error\":{\"code\":\"invalid_input\",\"field\":\"stdin\"}}\n"
+      }
+    }
+  ]
+}

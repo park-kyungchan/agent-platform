@@ -1,0 +1,3345 @@
+{
+  "contract_version": 1,
+  "cases": [
+    {
+      "id": "observed-native-pointers-noop",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "both-missing-create-proposals-only",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "missing"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "missing"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "missing"
+              },
+              "after": {
+                "kind": "file",
+                "text": "@/root/.agents/AGENTS.md\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "missing"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": true
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "empty-claude",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": ""
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": ""
+              },
+              "after": {
+                "kind": "file",
+                "text": "@/root/.agents/AGENTS.md\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "append-after-no-final-lf",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# Personal\nKeep me"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# Personal\nKeep me"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# Personal\nKeep me\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "append-after-lf",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# Personal\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# Personal\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# Personal\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "append-crlf",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# Personal\r\nKeep me\r\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# Personal\r\nKeep me\r\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# Personal\r\nKeep me\r\n@/root/.agents/AGENTS.md\r\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "append-crlf-missing-final",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# Personal\r\nKeep me"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# Personal\r\nKeep me"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# Personal\r\nKeep me\r\n@/root/.agents/AGENTS.md\r\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "preserve-foreign-import",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "@/other/rules.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "@/other/rules.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "@/other/rules.md\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "unicode-content",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "개인 지침 🦀\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "개인 지침 🦀\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "개인 지침 🦀\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "noop-import-no-final-newline",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "@/root/.agents/AGENTS.md"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "@/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "file",
+                "text": "@/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "noop-import-crlf",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# Personal\r\n@/root/.agents/AGENTS.md\r\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# Personal\r\n@/root/.agents/AGENTS.md\r\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# Personal\r\n@/root/.agents/AGENTS.md\r\n"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "relative-or-dot-link-11",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "../.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "../.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "../.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "relative-or-dot-link-12",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "./../.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "./../.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "./../.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "relative-or-dot-link-13",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.codex/../.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.codex/../.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.codex/../.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "ap01-opaque-configs-comments-env-matcher-distinction",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "/root/.codex/hooks.json",
+            "text": "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"vendor-check ${KEEP}\"}]},{\"matcher\":\"Read\",\"hooks\":[{\"type\":\"command\",\"command\":\"different-check\"}]}],\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]},\"unknownHookKey\":true}\n"
+          },
+          {
+            "path": "/root/.codex/config.toml",
+            "text": "# keep this TOML comment\nunknown_future_key = \"${UNCHANGED}\"\n[mcp_servers.third_party]\ncommand = \"${VENDOR_BIN}\"\nargs = [\"--opaque\"]\n[mcp_servers.hindsight]\ncommand = \"official-hindsight\"\n"
+          },
+          {
+            "path": "/root/.claude/settings.json",
+            "text": "{\n  \"unknown\": {\"future\": null},\n  \"hooks\": {\"SessionStart\": [{\"matcher\":\"*\",\"hooks\":[{\"type\":\"command\",\"command\":\"herdr-report\"}]}], \"Stop\": [{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]}\n}\n"
+          },
+          {
+            "path": "/root/.claude.json",
+            "text": "{\"mcpServers\":{\"third_party\":{\"command\":\"${BIN}\",\"env\":{\"REFERENCE\":\"${ENV_ONLY}\"}},\"hindsight\":{\"command\":\"official-hindsight\"}},\"unknownFutureSetting\":0}\n"
+          }
+        ]
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": [
+            {
+              "path": "/root/.claude.json",
+              "text": "{\"mcpServers\":{\"third_party\":{\"command\":\"${BIN}\",\"env\":{\"REFERENCE\":\"${ENV_ONLY}\"}},\"hindsight\":{\"command\":\"official-hindsight\"}},\"unknownFutureSetting\":0}\n"
+            },
+            {
+              "path": "/root/.claude/settings.json",
+              "text": "{\n  \"unknown\": {\"future\": null},\n  \"hooks\": {\"SessionStart\": [{\"matcher\":\"*\",\"hooks\":[{\"type\":\"command\",\"command\":\"herdr-report\"}]}], \"Stop\": [{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]}\n}\n"
+            },
+            {
+              "path": "/root/.codex/config.toml",
+              "text": "# keep this TOML comment\nunknown_future_key = \"${UNCHANGED}\"\n[mcp_servers.third_party]\ncommand = \"${VENDOR_BIN}\"\nargs = [\"--opaque\"]\n[mcp_servers.hindsight]\ncommand = \"official-hindsight\"\n"
+            },
+            {
+              "path": "/root/.codex/hooks.json",
+              "text": "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"vendor-check ${KEEP}\"}]},{\"matcher\":\"Read\",\"hooks\":[{\"type\":\"command\",\"command\":\"different-check\"}]}],\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]},\"unknownHookKey\":true}\n"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ap01-input-order-does-not-change-output",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "/root/.claude.json",
+            "text": "{\"mcpServers\":{\"third_party\":{\"command\":\"${BIN}\",\"env\":{\"REFERENCE\":\"${ENV_ONLY}\"}},\"hindsight\":{\"command\":\"official-hindsight\"}},\"unknownFutureSetting\":0}\n"
+          },
+          {
+            "path": "/root/.claude/settings.json",
+            "text": "{\n  \"unknown\": {\"future\": null},\n  \"hooks\": {\"SessionStart\": [{\"matcher\":\"*\",\"hooks\":[{\"type\":\"command\",\"command\":\"herdr-report\"}]}], \"Stop\": [{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]}\n}\n"
+          },
+          {
+            "path": "/root/.codex/config.toml",
+            "text": "# keep this TOML comment\nunknown_future_key = \"${UNCHANGED}\"\n[mcp_servers.third_party]\ncommand = \"${VENDOR_BIN}\"\nargs = [\"--opaque\"]\n[mcp_servers.hindsight]\ncommand = \"official-hindsight\"\n"
+          },
+          {
+            "path": "/root/.codex/hooks.json",
+            "text": "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"vendor-check ${KEEP}\"}]},{\"matcher\":\"Read\",\"hooks\":[{\"type\":\"command\",\"command\":\"different-check\"}]}],\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]},\"unknownHookKey\":true}\n"
+          }
+        ]
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": [
+            {
+              "path": "/root/.claude.json",
+              "text": "{\"mcpServers\":{\"third_party\":{\"command\":\"${BIN}\",\"env\":{\"REFERENCE\":\"${ENV_ONLY}\"}},\"hindsight\":{\"command\":\"official-hindsight\"}},\"unknownFutureSetting\":0}\n"
+            },
+            {
+              "path": "/root/.claude/settings.json",
+              "text": "{\n  \"unknown\": {\"future\": null},\n  \"hooks\": {\"SessionStart\": [{\"matcher\":\"*\",\"hooks\":[{\"type\":\"command\",\"command\":\"herdr-report\"}]}], \"Stop\": [{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]}\n}\n"
+            },
+            {
+              "path": "/root/.codex/config.toml",
+              "text": "# keep this TOML comment\nunknown_future_key = \"${UNCHANGED}\"\n[mcp_servers.third_party]\ncommand = \"${VENDOR_BIN}\"\nargs = [\"--opaque\"]\n[mcp_servers.hindsight]\ncommand = \"official-hindsight\"\n"
+            },
+            {
+              "path": "/root/.codex/hooks.json",
+              "text": "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"vendor-check ${KEEP}\"}]},{\"matcher\":\"Read\",\"hooks\":[{\"type\":\"command\",\"command\":\"different-check\"}]}],\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]},\"unknownHookKey\":true}\n"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "artifact-byte-order-not-adapter-order",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/a/codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/z/claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/a/codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            },
+            {
+              "path": "/z/claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "schema-refused-before-path",
+      "request": {
+        "schema_version": 2,
+        "canonical_path": "$HOME/no",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_schema",
+          "field": "schema_version"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-18",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-19",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "relative/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-20",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root//AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-21",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/./AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-22",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/../AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-23",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/AGENTS.md/",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-24",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/a b/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-25",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "${HOME}/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-26",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "~/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-27",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/한글.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-canonical-path-28",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/null\u0000.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "canonical_path"
+        }
+      }
+    },
+    {
+      "id": "invalid-codex-dir",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "$CODEX_HOME",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "codex.config_dir"
+        }
+      }
+    },
+    {
+      "id": "invalid-claude-dir",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude/",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "claude.config_dir"
+        }
+      }
+    },
+    {
+      "id": "same-profile-dir",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "path_collision",
+          "field": "profiles"
+        }
+      }
+    },
+    {
+      "id": "canonical-owned-path-collision-32",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.codex/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "path_collision",
+          "field": "profiles"
+        }
+      }
+    },
+    {
+      "id": "canonical-owned-path-collision-33",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.codex/AGENTS.override.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "path_collision",
+          "field": "profiles"
+        }
+      }
+    },
+    {
+      "id": "canonical-owned-path-collision-34",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.claude/CLAUDE.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "path_collision",
+          "field": "profiles"
+        }
+      }
+    },
+    {
+      "id": "preserved-invalid-path",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "$HOME/settings",
+            "text": "keep"
+          }
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "preserved.path"
+        }
+      }
+    },
+    {
+      "id": "preserved-duplicate",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "/root/.codex/hooks.json",
+            "text": "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"vendor-check ${KEEP}\"}]},{\"matcher\":\"Read\",\"hooks\":[{\"type\":\"command\",\"command\":\"different-check\"}]}],\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]},\"unknownHookKey\":true}\n"
+          },
+          {
+            "path": "/root/.codex/hooks.json",
+            "text": "{\"hooks\":{\"PreToolUse\":[{\"matcher\":\"Bash\",\"hooks\":[{\"type\":\"command\",\"command\":\"vendor-check ${KEEP}\"}]},{\"matcher\":\"Read\",\"hooks\":[{\"type\":\"command\",\"command\":\"different-check\"}]}],\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"hindsight-stop\"}]}]},\"unknownHookKey\":true}\n"
+          }
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "duplicate_preserved_path",
+          "field": "preserved.path"
+        }
+      }
+    },
+    {
+      "id": "preserved-reserved-collision-37",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "/root/.codex/AGENTS.md",
+            "text": "keep"
+          }
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "path_collision",
+          "field": "preserved.path"
+        }
+      }
+    },
+    {
+      "id": "preserved-reserved-collision-38",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "/root/.codex/AGENTS.override.md",
+            "text": "keep"
+          }
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "path_collision",
+          "field": "preserved.path"
+        }
+      }
+    },
+    {
+      "id": "preserved-reserved-collision-39",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "/root/.claude/CLAUDE.md",
+            "text": "keep"
+          }
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "path_collision",
+          "field": "preserved.path"
+        }
+      }
+    },
+    {
+      "id": "preserved-reserved-collision-40",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "/root/.agents/AGENTS.md",
+            "text": "keep"
+          }
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "path_collision",
+          "field": "preserved.path"
+        }
+      }
+    },
+    {
+      "id": "override-shadow-refused-41",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "file",
+            "text": ""
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instruction_override"
+        }
+      }
+    },
+    {
+      "id": "override-shadow-refused-42",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instruction_override"
+        }
+      }
+    },
+    {
+      "id": "override-shadow-refused-43",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "unsupported",
+            "reason": "directory"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instruction_override"
+        }
+      }
+    },
+    {
+      "id": "codex-regular-file-never-adopted",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "file",
+            "text": "unowned"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-link-foreign-target",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/other/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "link-invalid-syntax-46",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": ""
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "codex.instructions.target"
+        }
+      }
+    },
+    {
+      "id": "link-invalid-syntax-47",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "codex.instructions.target"
+        }
+      }
+    },
+    {
+      "id": "link-invalid-syntax-48",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "../bad//target"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "codex.instructions.target"
+        }
+      }
+    },
+    {
+      "id": "link-invalid-syntax-49",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "../bad/target/"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "codex.instructions.target"
+        }
+      }
+    },
+    {
+      "id": "link-invalid-syntax-50",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "${HOME}/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "codex.instructions.target"
+        }
+      }
+    },
+    {
+      "id": "link-invalid-syntax-51",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "../a b/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "codex.instructions.target"
+        }
+      }
+    },
+    {
+      "id": "link-root-escape-or-root-52",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "../../../AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "link-root-escape-or-root-53",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "../.."
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-directory",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "directory"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-directory",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "directory"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-dangling_symlink",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "dangling_symlink"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-dangling_symlink",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "dangling_symlink"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-symlink_chain",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "symlink_chain"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-symlink_chain",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "symlink_chain"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-non_utf8",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "non_utf8"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-non_utf8",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "non_utf8"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-special_file",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "special_file"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-special_file",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "special_file"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-symlink-preserved-by-refusal",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_target",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-nul",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "keep\u0000"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_text",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-lone-cr",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "keep\r"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_text",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-mixed-eol",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "a\r\nb\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_text",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-duplicate",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "@/root/.agents/AGENTS.md\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-indented",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": " @/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-quoted",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "@\"/root/.agents/AGENTS.md\"\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-prose",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# See /root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-inline",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "x @/root/.agents/AGENTS.md y\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-fenced",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "```\n@/root/.agents/AGENTS.md\n```\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-tilde-fenced",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "~~~text\n@/root/.agents/AGENTS.md\n~~~\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-exact-plus-ambiguous",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "@/root/.agents/AGENTS.md\n# /root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "path-before-override",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "file",
+            "text": ""
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "bad",
+            "text": ""
+          }
+        ]
+      },
+      "expected": {
+        "error": {
+          "code": "invalid_path",
+          "field": "preserved.path"
+        }
+      }
+    },
+    {
+      "id": "codex-before-claude",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "file",
+            "text": ""
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "unsupported",
+            "reason": "directory"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-indented-fence",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "  ```\n@/root/.agents/AGENTS.md\n  ```\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "explicit-alternate-canonical-no-hardcoded-root",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/srv/shared/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "missing"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "missing"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "missing"
+              },
+              "after": {
+                "kind": "file",
+                "text": "@/srv/shared/AGENTS.md\n"
+              },
+              "changed": true
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "missing"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/srv/shared/AGENTS.md"
+              },
+              "changed": true
+            }
+          ],
+          "preserved": []
+        }
+      }
+    },
+    {
+      "id": "opaque-native-text-not-parsed-or-repaired",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": [
+          {
+            "path": "/root/.claude/settings.json",
+            "text": "{future native syntax is opaque to render\n"
+          }
+        ]
+      },
+      "expected": {
+        "plan": {
+          "schema_version": 1,
+          "artifacts": [
+            {
+              "path": "/root/.claude/CLAUDE.md",
+              "selector": "claude_canonical_import",
+              "before": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "after": {
+                "kind": "file",
+                "text": "# User instructions (Claude Code)\n\n@/root/.agents/AGENTS.md\n"
+              },
+              "changed": false
+            },
+            {
+              "path": "/root/.codex/AGENTS.md",
+              "selector": "codex_instruction_link",
+              "before": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "after": {
+                "kind": "symlink",
+                "target": "/root/.agents/AGENTS.md"
+              },
+              "changed": false
+            }
+          ],
+          "preserved": [
+            {
+              "path": "/root/.claude/settings.json",
+              "text": "{future native syntax is opaque to render\n"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "claude-fence-no-canonical-closed",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "```text\nopaque\n```\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-fence-no-canonical-open",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "~~~text\nopaque\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-fence-import-outside",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "```text\nopaque\n```\n@/root/.agents/AGENTS.md\n"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "claude-crlf-with-lone-cr",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "/root/.agents/AGENTS.md"
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "file",
+            "text": "# Personal\r\nopaque\rtrailing"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "unsupported_text",
+          "field": "claude.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-relative-target-dot",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": "."
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "missing"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instructions"
+        }
+      }
+    },
+    {
+      "id": "codex-relative-target-dotdot",
+      "request": {
+        "schema_version": 1,
+        "canonical_path": "/root/.agents/AGENTS.md",
+        "codex": {
+          "config_dir": "/root/.codex",
+          "instructions": {
+            "kind": "symlink",
+            "target": ".."
+          },
+          "instruction_override": {
+            "kind": "missing"
+          }
+        },
+        "claude": {
+          "config_dir": "/root/.claude",
+          "instructions": {
+            "kind": "missing"
+          }
+        },
+        "preserved": []
+      },
+      "expected": {
+        "error": {
+          "code": "instruction_conflict",
+          "field": "codex.instructions"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,244 @@
+{
+  "classification": "source-only static results; no compiled Rust proof",
+  "observed_at_utc": "2026-11-02T17:31:12.501494+00:00",
+  "base": "2d4269e87533f3ef7c26fbe2347448cbff08163d",
+  "preimplementation_contract_commit": "fad77584f9356f31c8cd5c681e1e0343b9c31a3f",
+  "branch": "rust/s03-scoped-install-20261102",
+  "common_git": "/home/palantirkc/platforms/agent-platform/.git",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": ""
+    },
+    {
+      "command": [
+        "cargo",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--no-deps"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout_summary": "valid Cargo metadata JSON; --no-deps; no compilation"
+    },
+    {
+      "command": [
+        "python3",
+        "crates/ap/conformance/verify.py",
+        "--self-check"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "self-check: 10 negative controls rejected\nfrozen corpus: 87 renderer cases; 13 CLI admission cases\n"
+    },
+    {
+      "command": [
+        "python3",
+        "crates/ap/s03/conformance/verify-v1.py",
+        "--self-check"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "S03 literal self-check: 41 filesystem cases, 8 internal fault obligations, 13 controls rejected\n"
+    },
+    {
+      "command": [
+        "python3",
+        "crates/ap/s03/conformance/verify-v2.py",
+        "--self-check"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "S03 literal self-check: 41 filesystem cases, 8 internal fault obligations, 13 controls rejected\n"
+    },
+    {
+      "command": [
+        "python3",
+        "crates/ap/s03/conformance/verify-commands-v1.py",
+        "--self-check"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "S03 additive CLI: 17 literals; 4 transcript controls rejected\n"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": ""
+    }
+  ],
+  "s02_bytes_unchanged": {
+    "crates/ap/DESIGN.md": "b7dc640a0aa2360d1906328df638653fdb03c4f8917b5758bd492b452809b4ea",
+    "crates/ap/FOUNDATION-CORRECTION.md": "739b90c0ae8a0bd8379d93b99895b4fe36f696454e804e658ab177481c0c3fbd",
+    "crates/ap/FOUNDATION-RESULT.md": "a63ce9b3158438fad88cdf6c32bb4103d9bacdefa2dc9a21d2b9c61b082903f4",
+    "crates/ap/TERRA-HANDOFF.md": "0ab8db1546782a708352ac75d3ad2f0725bf1472c779295cf7421a1208f55fdc",
+    "crates/ap/conformance/cases.json": "96d0cf2a37eb08524c4e98728ba11016fade83179c95b90ab75e086807c4e10e",
+    "crates/ap/conformance/cli-cases.json": "07f0c80912f453aa0f136535c972d609fb8f812b87718e990fdac75c325ba7de",
+    "crates/ap/conformance/verify.py": "d29e4bbf6da9de36a6bba828ba5a758dd74711fad313db2032e62976d6a51f21",
+    "crates/ap/src/renderer.rs": "a44ab612fcbce2982b7b7bc97358b19efa8f771a41ae6ad7b15f1bef2b7c5c81",
+    "crates/ap/src/types.rs": "7eb0aecf5bb7dc929a35c0375254c2b876b74232a03bf1d5dafb308970e2f079",
+    "crates/ap/tests/conformance.rs": "b411cf5237581911ae18d75e86986108140094aa35e2b81a3d8f07453db75d48"
+  },
+  "s02_locked_package_versions_preserved": true,
+  "v1_foundation_bytes_unchanged": true,
+  "v2_change": {
+    "all_41_cli_cases_unchanged": true,
+    "only_internal_fault_changed": [
+      "recovery-killed-after-rename"
+    ],
+    "independent_review_required": true
+  },
+  "pin_file_sha256": {
+    "pins-v1.json": "2a57262655e547d9e65802d6fc049dfd8b3734c3fd05430639ab16fb987d8b52",
+    "pins-v2.json": "5599b013802d5af42e4f2e1a0e3317a4e5c67d0e48248cc0af70bf52917dfbac",
+    "commands-pins-v1.json": "0c670bbf4047316a4bf3cf2a1a56d590d090189a26321cd03273dedca9b25da9"
+  },
+  "source_sha256": {
+    "Cargo.lock": "8a2582e151587106e74f51f883d812cf2e7d3e4f424bc915288347ee1a0395db",
+    "Cargo.toml": "7fa200ec3c51d1d5dbe8c2c65dc0d8fe82c04c67cd0aac898d678ba368999424",
+    "crates/ap/Cargo.toml": "74e4b27035ab320a852771feeac84fe2d59c5d8ca11a542de5d64d04e755ee9b",
+    "crates/ap/src/lib.rs": "2160a7168623735b19e594d339a9cf1f728d99a9904c4e73ac76be5a929bc340",
+    "crates/ap/src/main.rs": "6fbdd9f546ae7dcb6ceba563f53f951cf603129db4989813ee2e2b28de70aa75",
+    "crates/ap/src/native/cli.rs": "d0fe8ce005105601b42dda4dec4c57c740334ec0838df1b73824cfe8d5a59247",
+    "crates/ap/src/native/doctor.rs": "17c9e96ecea0d986001763e137947205e31e5fc212ccd88f390f2edfe50a6ba4",
+    "crates/ap/src/native/filesystem.rs": "e26f7ecd65708d1ddd40d9886e0a5628516282efc50262f62f7c048429d8ece3",
+    "crates/ap/src/native/install.rs": "e6b558ecc833ee2851ccc76a756e58bbff29b7c013dcee5364e58422afb28528",
+    "crates/ap/src/native/mod.rs": "a15efcf9dd794431fd7e6842cc87965bf0cc4f689da77603cf84cfd50a8f7d99",
+    "crates/ap/src/native/recovery.rs": "a20d4753bf2d31e6d2b29dafac3e0bd4615b964eab53588be6d673660d77b48f",
+    "crates/ap/src/native/tests.rs": "617bf2f34006d5c17ae20e89d914a581d07b759a710bb825e37a70884e0ef036",
+    "crates/ap/src/native/types.rs": "67adc427d79a42a817f4a15a75df5e797202aca008f5609335eb28cb4780e41e"
+  },
+  "native_read_only_metadata": {
+    "/root/.agents/AGENTS.md": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o644",
+      "kind": "file",
+      "sha256": "6ec5a4b961c3bf34a4ff8c2d2667ff9d7af45483445b025d4b6b04842a7578ba"
+    },
+    "/root/.codex/AGENTS.md": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o777",
+      "kind": "symlink",
+      "target": "/root/.agents/AGENTS.md"
+    },
+    "/root/.codex/AGENTS.override.md": {
+      "exists": false
+    },
+    "/root/.claude/CLAUDE.md": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o644",
+      "kind": "file",
+      "sha256": "994d8a6c3e278f093dfdae3893ad8c3afd9982b5a3d0869370672b20ecffba56"
+    },
+    "/root/.gemini/AGENTS.md": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o777",
+      "kind": "symlink",
+      "target": "/root/.agents/AGENTS.md"
+    },
+    "/root/.gemini/GEMINI.md": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o777",
+      "kind": "symlink",
+      "target": "/root/.agents/AGENTS.md"
+    },
+    "/root/.config/muse/settings.json": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "kind": "file",
+      "sha256": "10d8948b19c74dd5d4363ff74699c7ff43afc1e576d9f9be8548d601e3502b2d"
+    },
+    "/root/.gemini/antigravity-cli/settings.json": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "kind": "file",
+      "sha256": "75bd935c35a97d5d03bd0beb4d8cbc36d96dc3202703eaf49ee80ba6d9242cf6"
+    }
+  },
+  "native_codex_input": {
+    "session_id": "01a19d38-b422-7b42-9532-206db3286be8",
+    "log_path": "/root/.codex/sessions/2026/11/02/rollout-2026-11-02T17-05-01-01a19d38-b422-7b42-9532-206db3286be8.jsonl",
+    "canonical_sha256": "6ec5a4b961c3bf34a4ff8c2d2667ff9d7af45483445b025d4b6b04842a7578ba",
+    "records": [
+      {
+        "line": 8,
+        "kind": "native_startup_user_input",
+        "canonical_full_bytes_present": true,
+        "record_sha256": "a9503fcdf228d7072768f08d5c07489a480a3790d05230555d1d18c89972c96f"
+      },
+      {
+        "line": 9,
+        "kind": "native_agents_md",
+        "canonical_full_bytes_present": true,
+        "record_sha256": "60b7eb96703c5e2d5830b08212314a2d16f6607538b7298644a200f828fee6b3"
+      },
+      {
+        "line": 10,
+        "kind": "native_turn_context",
+        "model": "gpt-6.1-sol",
+        "effort": "high",
+        "cwd": "/home/palantirkc/work/ws-replan/wt/agent-platform"
+      }
+    ],
+    "scope": "fresh task session with unchanged canonical/pointer; no S03 apply proof"
+  },
+  "agy_drift": {
+    "author": "unknown",
+    "content": "unknown; not inspected",
+    "reset": false
+  },
+  "not_run": [
+    "cargo check",
+    "cargo test",
+    "cargo build",
+    "cargo clippy",
+    "Rust candidate integration",
+    "native config application",
+    "child model/runtime sessions",
+    "event hooks",
+    "live source or business effects"
+  ],
+  "running_task_spawned_children": [],
+  "pending": [
+    "independent Wonder exact-candidate/contract review",
+    "Lead serialized native compilation and staged conformance",
+    "Lead reviewed actual native apply/no-op/readback and affected loading qualification",
+    "Muse/agy retained mechanism loading evidence",
+    "P6 completion decision"
+  ],
+  "static_failures": [],
+  "resolved_static_findings": [
+    "v1 internal recovery order contradiction corrected additively in v2 before candidate execution",
+    "Cargo generate-lockfile initially advanced unicode-ident; restored accepted S02 version1.0.24 before candidate delivery"
+  ]
+}

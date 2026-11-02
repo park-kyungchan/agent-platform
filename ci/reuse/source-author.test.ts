@@ -65,7 +65,7 @@ test("CI, absent or unsafe native identity cannot capture an original source aut
     expect(() => captureCodexSourceAuthor(selection, base, invalid, at)).toThrow();
 });
 
-test("the new shared action and common workflow require author metadata without an opt-out", async () => {
+test("the retained shared Bun action requires author metadata without an opt-out", async () => {
   const action = Bun.YAML.parse(
     await readFile(join(import.meta.dir, "../../.github/actions/bun-source/action.yml"), "utf8"),
   ) as {
@@ -85,24 +85,6 @@ test("the new shared action and common workflow require author metadata without 
   expect(
     Object.keys(action.inputs).filter((key) => /skip.*author|require.*author/i.test(key)),
   ).toEqual([]);
-  const workflow = Bun.YAML.parse(
-    await readFile(join(import.meta.dir, "../../.github/workflows/source.yml"), "utf8"),
-  ) as {
-    jobs: Record<
-      string,
-      { steps: { run?: string; uses?: string; with?: Record<string, unknown> }[] }
-    >;
-  };
-  for (const name of ["source", "quality", "merge-integration", "native-review"]) {
-    const steps = workflow.jobs[name]!.steps;
-    expect(
-      steps.find((step) => step.uses?.startsWith("actions/checkout@"))?.with?.["fetch-depth"],
-    ).toBe(0);
-    const commands = steps.flatMap((step) => (step.run ? [step.run] : []));
-    expect(commands.findIndex((command) => command.includes("source-author-cli.ts verify"))).toBe(
-      0,
-    );
-  }
 });
 
 test("missing, ambiguous, private or logical-as-native fields refuse", () => {

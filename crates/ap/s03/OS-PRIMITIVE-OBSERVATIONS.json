@@ -1,0 +1,10 @@
+{
+  "classification": "finite disposable Python OS primitive observations; NOT compiled Rust proof",
+  "directory_flock_blocks_participant": true,
+  "advisory_lock_does_not_block_editor": true,
+  "nofollow_refuses_directory_alias": true,
+  "symlink_mode": "0o777",
+  "direct_symlink_owner": true,
+  "descriptor_survives_ancestor_rename": true,
+  "logical_recheck_detects_ancestor_change": true
+}
