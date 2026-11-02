@@ -11,9 +11,8 @@ inputs:
     description: Exact caller checkout commit; caller chooses authored head or prospective merge
     required: true
   source-author-metadata:
-    description: Required committed native source-author record; missing or mismatched metadata refuses before owner commands
-    required: true
-    default: .github/source-author.json
+    description: Deprecated and IGNORED compatibility input; confers no authority and is never read
+    required: false
   bun-version:
     description: Exact owner-selected Bun version
     required: false
@@ -47,7 +46,6 @@ runs:
         COMMON_CI_PROJECT_ID: ${{ inputs.project-id }}
         COMMON_CI_REPOSITORY: ${{ inputs.repository }}
         COMMON_CI_SOURCE_SHA: ${{ inputs.source-sha }}
-        COMMON_CI_SOURCE_AUTHOR_METADATA: ${{ inputs.source-author-metadata }}
         COMMON_CI_BUN_VERSION: ${{ steps.runtime.outputs.bun-version }}
         COMMON_CI_SCRIPTS: ${{ inputs.scripts }}
         COMMON_CI_INSTALL: ${{ inputs.install-dependencies }}

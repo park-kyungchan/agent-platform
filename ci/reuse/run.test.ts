@@ -2,7 +2,6 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { captureCodexSourceAuthor, sourceAuthorGit } from "./source-author";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -87,43 +86,24 @@ async function fixture(install = false) {
     if ((await git.exited) !== 0) throw Error("Fixture source identity failed");
     return head;
   };
-  const metadata = captureCodexSourceAuthor(
-    {
-      sourceOwner: {
-        repository: "fixture/owner",
-        projectId: "fixture-owner",
-        domainId: "fixture-domain",
-      },
-      logicalWork: {
-        domainId: "fixture-domain",
-        projectId: "fixture-owner",
-        workId: "fictional-work",
-        taskId: "fictional-task",
-      },
-    },
-    await readHead(),
-    { CODEX_THREAD_ID: "00000000-0000-4000-8000-000000000001" },
-  );
-  await mkdir(join(owner, ".github"));
-  await writeFile(
-    join(owner, ".github/source-author.json"),
-    JSON.stringify(metadata, null, 2) + "\n",
-  );
-  for (const args of [
-    ["add", ".github/source-author.json"],
-    [
-      "-c",
-      "user.name=Fixture",
-      "-c",
-      "user.email=fixture@example.invalid",
-      "commit",
-      "-qm",
-      "Fictional native-author source record",
-    ],
-  ]) {
-    const child = Bun.spawn(["git", "-C", owner, ...args], { stdout: "ignore", stderr: "pipe" });
-    if ((await child.exited) !== 0) throw Error("Fixture metadata commit failed");
-  }
+  const commit = async () => {
+    for (const args of [
+      ["add", "."],
+      [
+        "-c",
+        "user.name=Fixture",
+        "-c",
+        "user.email=fixture@example.invalid",
+        "commit",
+        "-qm",
+        "Synthetic caller source update",
+      ],
+    ]) {
+      const child = Bun.spawn(["git", "-C", owner, ...args], { stdout: "pipe", stderr: "pipe" });
+      if ((await child.exited) !== 0) throw Error("Fixture source commit failed");
+    }
+    return readHead();
+  };
   const head = await readHead();
   const env = {
     ...process.env,
@@ -148,11 +128,12 @@ async function fixture(install = false) {
     ]);
     return { stdout, stderr, exitCode };
   }
-  return { base, owner, decoy, run };
+  return { base, owner, decoy, run, commit };
 }
 
 test("downloaded common runner executes the caller's script in its exact Git root", async () => {
   const f = await fixture();
+  expect(await Bun.file(join(f.owner, ".github/source-author.json")).exists()).toBe(false);
   expect((await f.run()).exitCode).toBe(0);
   expect(JSON.parse(await readFile(join(f.owner, ".result.json"), "utf8"))).toEqual({
     cwd: f.owner,
@@ -201,38 +182,60 @@ test("owner failure keeps its exit code and does not run a later script", async 
   expect(await Bun.file(join(f.owner, ".result.json")).exists()).toBe(false);
 });
 
-test("missing or unsafe required author metadata refuses before the caller script", async () => {
+test("historical metadata inputs are ignored while caller identity checks still run", async () => {
   const f = await fixture();
-  for (const path of [".github/missing.json", "../source-author.json", ""]) {
-    expect((await f.run({ COMMON_CI_SOURCE_AUTHOR_METADATA: path })).exitCode).toBe(1);
+  for (const path of [
+    ".github/missing.json",
+    "../source-author.json",
+    ".git/config",
+    "/missing.json",
+    "",
+  ]) {
+    const result = await f.run({ COMMON_CI_SOURCE_AUTHOR_METADATA: path });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).not.toContain("source-author");
+    await rm(join(f.owner, ".result.json"));
+    const refused = await f.run({
+      COMMON_CI_SOURCE_AUTHOR_METADATA: path,
+      COMMON_CI_SOURCE_SHA: "a".repeat(40),
+    });
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stderr.trim()).toMatch(/^caller_source_refused@ci\/reuse\/run\.ts:\d+$/);
     expect(await Bun.file(join(f.owner, ".result.json")).exists()).toBe(false);
   }
 });
 
-test("stale author metadata refuses before dependency installation or any owner script", async () => {
+test("stale historical bytes do not gate frozen setup, scripts or post-command source checks", async () => {
   const f = await fixture(true);
-  await writeFile(join(f.owner, "later.ts"), "export const anotherNativeAttempt = true;\n");
-  await sourceAuthorGit(f.owner, ["add", "."]);
-  await sourceAuthorGit(f.owner, [
-    "-c",
-    "user.name=Fixture",
-    "-c",
-    "user.email=fixture@example.invalid",
-    "commit",
-    "-qm",
-    "Fictional later native author without recapture",
-  ]);
-  const sourceHead = await sourceAuthorGit(f.owner, ["rev-parse", "HEAD"]);
-  const result = await f.run({ COMMON_CI_SOURCE_SHA: sourceHead, COMMON_CI_INSTALL: "true" });
-  expect({
-    exitCode: result.exitCode,
-    installed: await Bun.file(
-      join(f.owner, "node_modules/fixture-dependency/package.json"),
-    ).exists(),
-    ownerExecuted: await Bun.file(join(f.owner, ".result.json")).exists(),
-  }).toEqual({ exitCode: 1, installed: false, ownerExecuted: false });
-  // The real child boundary preserves the precise throw site without exposing error payloads.
-  expect(result.stderr.trim()).toMatch(/^caller_source_refused@ci\/reuse\/source-author\.ts:\d+$/);
+  await mkdir(join(f.owner, ".github"));
+  // Deliberately obsolete, unparsable bytes: ordinary callers do not capture author records.
+  await writeFile(join(f.owner, ".github/source-author.json"), "stale historical metadata\n");
+  const sourceHead = await f.commit();
+  await writeFile(join(f.owner, "later.ts"), "export const later = true;\n");
+  const laterHead = await f.commit();
+  expect(laterHead).not.toBe(sourceHead);
+  const extra = {
+    COMMON_CI_SOURCE_SHA: laterHead,
+    COMMON_CI_SOURCE_AUTHOR_METADATA: ".github/source-author.json",
+    COMMON_CI_INSTALL: "true",
+  };
+  const result = await f.run(extra);
+  expect(result.exitCode).toBe(0);
+  expect(result.stdout).not.toContain("source-author");
+  expect(
+    await Bun.file(join(f.owner, "node_modules/fixture-dependency/package.json")).exists(),
+  ).toBe(true);
+  expect(await Bun.file(join(f.owner, ".postinstall.json")).exists()).toBe(false);
+  expect(await Bun.file(join(f.owner, ".result.json")).exists()).toBe(true);
+  await rm(join(f.owner, ".result.json"));
+  const before = await readFile(join(f.owner, "project.json"), "utf8");
+  const refused = await f.run({ ...extra, COMMON_CI_SCRIPTS: '["mutate","check"]' });
+  expect(refused.exitCode).toBe(1);
+  expect(refused.stderr.trim()).toMatch(
+    /^\$ bun mutate\.ts\ncaller_source_refused@ci\/reuse\/run\.ts:\d+$/,
+  );
+  expect(await readFile(join(f.owner, "project.json"), "utf8")).toBe(before + "\n");
+  expect(await Bun.file(join(f.owner, ".result.json")).exists()).toBe(false);
 });
 
 test("tracked source mutation refuses continuation and preserves the changed bytes", async () => {
@@ -241,4 +244,14 @@ test("tracked source mutation refuses continuation and preserves the changed byt
   expect((await f.run({ COMMON_CI_SCRIPTS: '["mutate","check"]' })).exitCode).toBe(1);
   expect(await readFile(join(f.owner, "project.json"), "utf8")).toBe(before + "\n");
   expect(await Bun.file(join(f.owner, ".result.json")).exists()).toBe(false);
+});
+
+test("dirty tracked caller source refuses before any owner script", async () => {
+  const f = await fixture();
+  await writeFile(join(f.owner, "fail.ts"), "process.exit(8);\n");
+  const result = await f.run();
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.trim()).toMatch(/^caller_source_refused@ci\/reuse\/run\.ts:\d+$/);
+  expect(await Bun.file(join(f.owner, ".result.json")).exists()).toBe(false);
+  expect(await readFile(join(f.owner, "fail.ts"), "utf8")).toBe("process.exit(8);\n");
 });
