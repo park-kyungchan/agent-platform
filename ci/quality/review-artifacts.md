@@ -1,85 +1,19 @@
-# Native independent review artifacts
+# Historical native independent review artifacts
 
-Consumer target: agent-platform's exact-head native review job and owner-scoped
-source-projected gates, including education-platform. Baseline is AP
-`f6649663fb78261de2499f0920306c32f5e22f1f`: immutable repository receipt/result
-files, with the owner consumer requiring source/raw/evidence/receipt ancestry.
+The native review publisher/controller CLI is retired. Its artifact dispatch,
+authenticated pending/status publication and bootstrap procedures are historical;
+they are no longer a current review or publication workflow.
 
-Goal: preserve a real independent native review and exact source/publisher
-bindings while allowing unchanged raw output to travel as one CI artifact.
-CI transports and verifies evidence; it cannot create native review observations.
-No automatic merge, credential provisioning, native activation or Acceptance.
+For exact protocol interpretation, use the preserved Git bytes at
+`87b5cd62b89b8e8d550104f5bf037793f6b89e86:ci/quality/review-artifacts.md` and
+`ci/reuse/publish-review-artifact.ts` at that same revision. Those bytes describe
+the raw native output, source and reviewer bindings, artifact/run identity,
+digests, pending-attempt fence and historical receipt compatibility. Remaining
+artifact and receipt validators, helper tests and manual workflows retain their
+existing behavior until their own consumers are dispositioned.
 
-Validation: valid externally produced zero-finding raw output must pass; wrong
-source, author/reviewer identity, publisher, run, attempt, repository, workflow,
-artifact, digest, archive member, current hold and changed latest status must
-refuse. Existing receipt controls continue to pass. Focused tests and complete
-source/quality checks precede a fresh read-only native exact-head review under the user-approved reviewer policy.
-Current user policy requires fresh sol/terra judgment and distinct native author/reviewer contexts. The command selects gpt-6.1-sol/high; Claude/Opus judgment is prohibited. Per-run settings change no active/global model configuration.
-Hosted transport must be observed before claiming operational completion.
-
-Allowed treatment: CI review transport, source policy/tests/projections, shared
-action runtime resolution and source CI Bun pins. Preserve domain source,
-qualified generations, releases and the protected trusted-ci-v1 policy. That
-historical policy's bootstrap version is independent of the active source CI.
-
-Limits and decision: one source candidate per independent review round; repair
-located defects without replaying uncertain external effects. Missing hosted
-permissions or native originals defer the affected adoption, never weaken trust.
-Propose delivery only after the declared controls pass; the Lead merges an
-explicit expected head and P8 remains the user's Acceptance gate.
-
-## Publication
-
-A fresh independent native reviewer emits `native-independent-review-output.v1`
-(AP) or `owner-scoped-native-review-output.v1` (owner projection), with complete
-review status, exact binding/head/tree/manifest, distinct author/reviewer task
-identities, `conclusion: pass`, `unresolvedFindings: 0` and `findings: []`.
-The native parent keeps those bytes unchanged. AP's native publisher runs:
-
-```sh
-bash <trusted-common>/ci/reuse/review-pr.sh <repository> <head> <reviewer-runtime> <controller-sha>
-```
-
-The helper checks existing publisher authentication, committed source-author
-identity and actual GitHub source. It dispatches the evidence-only workflow,
-dispatches only the default main workflow, checks the successful external run
-and requires its artifact bytes to equal the native original before status
-publication and on final readback, then posts
-its authenticated status with the artifact's immutable ID and archive digest.
-Formal attempts publish authenticated pending before launching the reviewer.
-The invocation captures actual child events in bounded controller-owned memory.
-A closed one-turn parser requires successful terminal completion and exact
-equality between the raw report and its actual final-message event. Event and raw
-pathnames are audit copies, never authority for initially minting an observation.
-Correctly bound completed findings publish failure. Success requires the native raw pending-status ID to match its preceding authenticated pending status; an
-intervening hold/failure/other attempt refuses even if a late old success wins
-an API write race. Crashed/malformed reviews retain pending. Status writes are
-not retried under uncertainty; reconcile the printed attempt/head/state first.
-No model runs in Actions and no CI token receives status or dispatch permission.
-Uncertain dispatch/publication is reconciled by the printed request/run/artifact
-IDs before any further action. Artifact expiry/deletion fails closed; retain the native raw file for audit. Reconcile existing effects before starting a fresh native invocation if the in-memory completed observation is lost.
-
-Bootstrap the workflow through a reviewed legacy-receipt PR first: GitHub must
-know the workflow on the default branch before dispatch. Existing immutable
-receipt and explicit identical-tree successor paths remain supported. Owner
-consumers project these shared validators and retain their fixed owner policy.
-ID-less historical compatibility requires a short, complete status page. A full
-100-status page cannot prove absence of an older formal hold and fails closed.
-Fresh pending-ID-bound evidence remains admissible on a full page when its actual
-pending status and intervening states are present and valid.
-
-GitHub documents artifact IDs, archive digests and ZIP downloads in its
-[artifact REST API](https://docs.github.com/en/rest/actions/artifacts), and run
-actors/attempts in its [workflow run API](https://docs.github.com/en/rest/actions/workflow-runs).
-Sources retrieved with verified TLS on 2026-10-28; bounded extracts are retained
-in the operations lane-B source directory.
-
-The native controller is selected from a separate immutable reviewed checkout.
-An owner-created draft may establish authenticated PR provenance before review;
-all real review/evidence/CI/thread gates are required before ready-for-review.
-The pinned private-owner policy refuses untrusted contributor/head-repository
-provenance and unsupported unassociated heads before subject data or native
-review. Its temporary native bypass has no OS credential-isolation claim. Source
-checkouts, config, hooks, JavaScript and package scripts are never executed by
-the controller; subjects enter through a fresh Git-object data view.
+Current source changes receive ordinary independent native review of the exact
+candidate revision. The Lead evaluates findings and actual check evidence before
+separately authorized expected-head integration. This closure creates no new
+receipt, controller, metadata or status gate and grants no runtime activation or
+user Acceptance.

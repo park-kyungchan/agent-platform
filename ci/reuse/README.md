@@ -168,68 +168,16 @@ symlinks, other filenames and non-release strings before runtime setup. The
 pinned trusted-ci-v1 controller retains its independently reviewed historical
 bootstrap; changing that release requires a successor policy, not a moving tag.
 
-Native review remains separate from this action. The additive
-[artifact transport](../quality/review-artifacts.md) accepts unchanged externally
-produced native output under the fixed publisher's authenticated exact-head
-status. The source action cannot dispatch that workflow or post that status.
+## Retired native review publisher
 
-## Native review and publication command
+The native review publisher/controller CLI is retired. Its launcher, controller
+invocation, artifact dispatch and status-publication instructions are historical.
+For the preserved implementation and protocol, read the Git bytes at
+`87b5cd62b89b8e8d550104f5bf037793f6b89e86:ci/reuse/review-pr.sh`,
+`ci/reuse/review-pr.ts` and `ci/reuse/publish-review-artifact.ts` at that same
+revision, and [historical artifact interpretation](../quality/review-artifacts.md).
 
-Keep the controller in a **separate detached checkout of an already reviewed,
-immutable common commit**, chosen through the native owner's trusted channel.
-Never use a contributor's proposed checkout/controller as that trust anchor.
-The launcher enters the trusted controller directory before starting Bun, so
-subject Bun/project configuration cannot run at startup. No subject path is an
-executable input: the subject is fetched as Git objects into a fresh data view.
-
-```sh
-bash <trusted-common>/ci/reuse/review-pr.sh <repository> <head> <reviewer-runtime> <controller-sha>
-```
-
-The currently authorized judgment adapter is
-`native-codex` (`gpt-6.1-sol/high`, per-run bypass/ephemeral flags). Full judgment never invokes Claude/Opus; historical runtime descriptors remain readable. The actual native session/thread must match the report and be
-distinct from the native source author. Raw final output, events and stderr are
-retained unchanged. Neither global model/configuration nor authentication changes.
-
-The pinned policy is `trusted-review-policy.json`: it admits only the listed
-private repository IDs owned by the authenticated publisher. GitHub metadata
-must show an open owner-created same-repository PR at the exact head and allowed
-base, or the exact authenticated protected-main head. Public repositories, forks,
-external PR authors, unrelated repositories and unassociated heads refuse before
-subject fetch or native review. Git author strings and trust booleans grant no
-admission. Owner-created drafts are allowed solely to obtain this authenticated
-provenance; genuine native review/evidence, CI and current-thread gates must pass
-before ready-for-review and explicit expected-head merge.
-
-This is the user's **trusted-root, first-party source operating profile**. The
-temporary native bypass provides **no OS credential isolation**; arbitrary
-contributor/untrusted-source review is unsupported and refused. Subject text is
-review data, not operational instructions. The controller never imports subject
-JavaScript, checkout configuration, hooks or package scripts. Existing native
-CLIs retain their authentication ownership; there is no credential broker.
-
-Every formal attempt posts an authenticated pending hold before the native child
-launches. A correctly source/session-bound negative posts failure; malformed or
-crashed review output leaves the hold. Only the actual native invocation can create an opaque completed observation, backed by a private copy of its raw bytes; both failure and success publication require it. Only verified unchanged positive raw can publish success. The actual pending status ID is bound to native raw and immutable evidence. The same existing status context fences artifact, legacy and successor reads, so a late old success cannot mask a newer hold.
-Uncertain status writes print the exact attempt/head/state for readback and are
-never automatically replayed. Mechanical `--smoke` and passive `--check` post no
-review status.
-
-Native observations capture child output in bounded private memory before
-post-exit callbacks. A closed single-turn Codex event parser binds the actual
-terminal agent message byte-for-byte to the raw report; replacing either output
-pathname cannot replace judgment. The shared legacy fence permits ID-less
-historical compatibility only on a short complete page, refusing the ambiguous
-100-status boundary for AP, owner, successor and controller consumers. Fresh
-pending-ID-bound full-page evidence remains supported.
-
-A second actual native caller invokes the same command with `--check` to verify
-the existing source, runtime, artifact and authenticated status without issuing a
-new judgment. `--smoke` is mechanical only and cannot publish review status.
-
-Bootstrap a new controller release with a fresh independent installed native CLI
-from outside the subject, then the existing immutable receipt/status gate; never
-execute the proposed controller to qualify itself. Once qualified, select its
-full commit in the separate controller checkout. A formal subject head must differ from that controller pin: its pending hold must not invalidate its own trust anchor. Passive `--check` remains available for the controller head. The initial evidence workflow
-must reach default main before real artifact publication is possible. Legacy
-receipts remain supported during that bootstrap. Fresh bootstrap raw, normalized result and receipt bind `nativeReviewPendingStatusId` from the authenticated pending status; owner-scoped raw/Evidence/Verification retain the same field. Historical receipts remain readable until a newer formal hold supersedes them. Ordinary reviews then use the one-command artifact path.
+Use ordinary independent native review of the exact candidate revision and Lead
+assessment of its source and actual check results. This retirement adds no
+replacement receipt, controller or status gate. Remaining shared-action, helper
+and manual-workflow consumers require their own bounded disposition.
