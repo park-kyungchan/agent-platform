@@ -30,7 +30,6 @@ export async function captureQualitySources(scope: QualityScope): Promise<Qualit
       "bun.lock",
       ".bun-version",
       "ci/reuse/trusted-review-policy.json",
-      "ci/reuse/review-pr.sh",
       "ci/reuse/resolve-bun-version.sh",
       ".editorconfig",
       ".prettierignore",
