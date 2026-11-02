@@ -1,6 +1,6 @@
 # Runtime Index and official content
 
-Use the existing `@palantirkc/work-continuity` runtime-docs reader or `bun run harness docs`. Do not create another router/index. Canonical implementation is agent-platform/packages/work-continuity/src/runtime-docs; work-continuity semantics and the documentation registry provenance remain codex-harness-engineering. Native Hermes owns its execution adapter/runtime; original capture and immutable blob custody remain scrapling-research/evidence-foundry.
+Use the existing @palantirkc/work-continuity/runtime-docs reader directly. Do not create another router/index. Canonical implementation is agent-platform/packages/work-continuity/src/runtime-docs; work-continuity semantics and the documentation registry provenance remain codex-harness-engineering. Native Hermes owns its execution adapter/runtime; original capture and immutable blob custody remain scrapling-research/evidence-foundry.
 
 Explicitly name `hermes.agent`, `codex.cli` or `muse.code`; execution host is separate. A host label cannot resolve an ambiguous subject. `SELECTED` chooses a route and can still have `route-body-not-fully-reviewed`. Read actual selected content within the returned limits, then compare installed source/release. Do not promote documentation or a source-provider proof into a command or native permission.
 

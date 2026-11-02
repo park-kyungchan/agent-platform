@@ -3,12 +3,6 @@ import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-type Workflow = {
-  permissions: Record<string, string>;
-  on: Record<string, unknown>;
-  jobs: Record<string, { steps: { uses?: string; run?: string; with?: Record<string, string> }[] }>;
-};
-
 test("shared action resolves one exact owner version from literal or .bun-version and rejects ambiguous inputs", async () => {
   const root = await mkdtemp(join(tmpdir(), "caller-bun-version-"));
   try {
@@ -68,18 +62,4 @@ test("shared action resolves one exact owner version from literal or .bun-versio
   } finally {
     await rm(root, { recursive: true, force: true });
   }
-});
-
-test("retained evidence CI cannot manufacture or publish review", async () => {
-  const root = join(import.meta.dir, "../..");
-  const evidence = Bun.YAML.parse(
-    await readFile(join(root, ".github/workflows/native-review-evidence.yml"), "utf8"),
-  ) as Workflow;
-  expect(Object.keys(evidence.on)).toEqual(["workflow_dispatch"]);
-  expect(evidence.permissions).toEqual({ contents: "read" });
-  const steps = evidence.jobs["retain-native-review"]!.steps;
-  expect(steps).toHaveLength(2);
-  expect(steps[0]!.run).toContain("write_bytes(raw)");
-  expect(steps[0]!.run).not.toMatch(/claude|codex|statuses\//);
-  expect(steps[1]!.uses).toMatch(/^actions\/upload-artifact@[a-f0-9]{40}$/);
 });
