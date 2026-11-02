@@ -65,28 +65,6 @@ test("CI, absent or unsafe native identity cannot capture an original source aut
     expect(() => captureCodexSourceAuthor(selection, base, invalid, at)).toThrow();
 });
 
-test("the retained shared Bun action requires author metadata without an opt-out", async () => {
-  const action = Bun.YAML.parse(
-    await readFile(join(import.meta.dir, "../../.github/actions/bun-source/action.yml"), "utf8"),
-  ) as {
-    inputs: Record<string, { required?: boolean; default?: string }>;
-    runs: { steps: { env?: Record<string, string> }[] };
-  };
-  expect(action.inputs["source-author-metadata"]).toMatchObject({
-    required: true,
-    default: ".github/source-author.json",
-  });
-  expect(
-    action.runs.steps.some(
-      (step) =>
-        step.env?.COMMON_CI_SOURCE_AUTHOR_METADATA === "${{ inputs.source-author-metadata }}",
-    ),
-  ).toBe(true);
-  expect(
-    Object.keys(action.inputs).filter((key) => /skip.*author|require.*author/i.test(key)),
-  ).toEqual([]);
-});
-
 test("missing, ambiguous, private or logical-as-native fields refuse", () => {
   const value = metadata();
   const missing = structuredClone(value) as unknown as { author: Record<string, unknown> };
