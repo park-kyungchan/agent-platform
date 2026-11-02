@@ -16,7 +16,6 @@ test("owned v3 runtime, generator and synthetic consumers satisfy strict TypeScr
     "packages/work-continuity/src/git-work/fixtures/v3-owner.ts",
     "packages/work-continuity/src/git-work/fixtures/v3-worker.ts",
     "packages/ontology/scripts/generate.ts",
-    "scripts/harness.ts",
   ];
   const config = ts.readConfigFile(join(root, "ci/quality/tsconfig.json"), ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, root);

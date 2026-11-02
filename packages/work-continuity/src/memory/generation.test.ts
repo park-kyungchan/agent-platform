@@ -36,7 +36,6 @@ test("Memory production, native-owner consumers and Academy source satisfy stric
     [
       ...owned,
       join(root, "packages/operational-context/src/academy/context-admission.ts"),
-      join(root, "scripts/harness.ts"),
     ],
     parsed.options,
   );

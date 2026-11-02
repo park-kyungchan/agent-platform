@@ -25,7 +25,6 @@ import {
   fixtureOwner,
   seedFixture,
 } from "./fixtures/v3-owner.ts";
-import { runHarness } from "../../../../scripts/harness.ts";
 
 const roots: string[] = [];
 afterEach(async () => {
@@ -558,18 +557,13 @@ describe("durable authenticated Git owner allocation", () => {
       ),
     ).rejects.toThrow("EFFECTIVE_CONTRACT");
   });
-  test("bounded CLI dry-run cannot claim native authority or accept an authority JSON substitute", async () => {
+  test("direct preview cannot claim native authority; allocation requires its native owner", async () => {
     const { root, target } = await repository();
     const request = fixtureTaskRequest();
     const preview = await previewGitWorkV3Allocation(request, target);
     expect(preview.id).toBeNull();
     expect(preview.publication).toBe("none");
-    const path = join(root, "cli.json");
-    await writeFile(path, JSON.stringify({ mode: "dry-run", request, target }));
-    const result = (await runHarness(["allocate-v3", path])) as { id: unknown };
-    expect(result.id).toBeNull();
-    await writeFile(path, JSON.stringify({ mode: "apply", request, target }));
-    await expect(runHarness(["allocate-v3", path])).rejects.toThrow(
+    await expect(allocateGitWorkIdentity(request, target, undefined!)).rejects.toThrow(
       "NATIVE_OWNER_ADAPTER_REQUIRED",
     );
     expect(fixtureGit(root, "rev-parse", fixtureRef)).toBe(target.expectedHead);

@@ -1,5 +1,7 @@
 # Constrained improvement
 
+Historical common-harness method and review protocol: retained for interpretation of existing source and evidence. Current task state and the adopted Rust plan govern execution. This document does not renew generic Work allocation, a controller or native activation. The pure comparison helpers remain available pending their own consumer closure.
+
 Use this method for substantial optimization of an actual consumer workflow: a context reader,
 prompt, implementation, model choice or delivery step. Routine fixes do not need another process.
 This is a local design transfer from dated AIP Evolve/Evals knowledge, not a Foundry integration,
@@ -42,8 +44,9 @@ are insufficient. Synthetic injected failures, source/adapter tests and actual n
 remain distinct. In particular, this method does not establish a causal Ponytail instruction
 benefit without separately admitted native task observations.
 
-Use `quality-preflight` and `quality-compare` through the existing `bun run harness` entrypoint for
-this quality path. The existing `improvement-*` commands preserve the v1 scalar efficiency contract.
+The former `quality-preflight`, `quality-compare` and `improvement-*` root commands are retired;
+their [predecessor source](https://github.com/park-kyungchan/agent-platform/blob/01fe80a5a40bdca30aa8ab7c954bbac33d58e2f2/scripts/harness.ts) preserves the historical transport. Existing `preflightQualityImprovement` / `compareQualityImprovement`
+and `preflightImprovement` / `compareImprovement` APIs retain their quality and v1 scalar contracts.
 Quality observations remain caller-supplied evidence; a valid envelope does not authenticate its
 producer, authorize dispatch or establish Acceptance. Both paths preserve unknowns and limits.
 
@@ -115,21 +118,16 @@ Use `@palantirkc/work-continuity/git-work` for committed Work inputs and evidenc
 `preflightImprovement` and `compareImprovement` belong to the canonical evidence-foundry evaluation
 module. They inspect supplied contracts and captured results; they open no store and launch no run.
 
-The read-only harness commands accept prepared JSON requests:
+The existing pure APIs accept prepared values directly; their [historical root transport](https://github.com/park-kyungchan/agent-platform/blob/01fe80a5a40bdca30aa8ab7c954bbac33d58e2f2/scripts/harness.ts) is no longer an entrypoint.
 
-```bash
-bun run harness improvement-preflight <request.json>
-bun run harness improvement-compare <request.json>
-```
-
-Use preflight before spending on a candidate, then compare captured evidence. The commands do not
+Use preflight before spending on a candidate, then compare captured evidence. The helpers do not
 execute the candidate, authenticate native authorship, persist a decision or activate a change.
 Keep request files with the owning Work's inputs and reference exact observed outputs through
 Evidence; do not replace canonical Work records with an optimization-specific ledger.
 
 Preflight accepts an `ImprovementProtocol`; compare accepts
 `{ protocol, baseline, candidate, changedPaths, usage }`. The exported types in
-`packages/evidence-foundry/src/modules/evals/improvement.ts` define these transport inputs.
+`packages/evidence-foundry/src/modules/evals/improvement.ts` define these API inputs.
 When the protocol is an existing Work Input's `content`, extract that selected content into the
 request; a whole Work Input record is not a protocol. Pins remain caller declarations, not
 authenticated source reads or an evaluation grant.

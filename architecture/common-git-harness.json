@@ -5,7 +5,6 @@
   "nativeEngineeringOwner": "codex-harness-engineering",
   "canonicalRepository": "park-kyungchan/agent-platform",
   "workRoot": "work/<project-key>/<work-key>",
-  "entrypoint": "scripts/harness.ts",
   "publicApis": [
     "@palantirkc/work-continuity/git-work",
     "@palantirkc/work-continuity/runtime-docs"

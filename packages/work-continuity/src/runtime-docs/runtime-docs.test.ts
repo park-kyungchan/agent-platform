@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   createDocumentationReader,
   readDocumentationRegistry,
@@ -21,81 +20,122 @@ const path = new URL(
 const registry = (await Bun.file(path).json()) as DocumentationRegistry;
 const digest = "a".repeat(64);
 
-async function runDocsCli(body: string) {
-  const dir = await mkdtemp(join(tmpdir(), "runtime-docs-cli-"));
-  try {
-    const file = join(dir, "request.json");
-    await writeFile(file, body);
-    const child = Bun.spawn(
-      [
-        process.execPath,
-        "--no-env-file",
-        "--no-install",
-        fileURLToPath(new URL("../../../../scripts/harness.ts", import.meta.url)),
-        "docs",
-        file,
-      ],
-      {
-        cwd: fileURLToPath(new URL("../../../../", import.meta.url)),
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(child.stdout).text(),
-      new Response(child.stderr).text(),
-      child.exited,
-    ]);
-    return { stdout, stderr, exitCode };
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-}
-async function expectDocsCli(
-  input: unknown,
+function selectDocumentation(
   request: unknown,
   observations?: DocumentationObservations,
-): Promise<DocumentationPlan> {
-  const expected = createDocumentationReader(registry).select(request, observations);
-  const result = await runDocsCli(JSON.stringify(input));
-  expect(result.exitCode).toBe(0);
-  expect(result.stderr).toBe("");
-  expect(result.stdout).toBe(JSON.stringify(expected, null, 2) + "\n");
-  const plan = JSON.parse(result.stdout) as DocumentationPlan;
-  expect(plan.limits).toEqual({ maxPages: 3, maxExcerptChars: 6000, maxDiscoveryRequests: 2 });
+): DocumentationPlan {
+  const plan = createDocumentationReader(registry).select(request, observations);
+  expect(plan.limits).toEqual({
+    maxPages: 3,
+    maxExcerptChars: 6000,
+    maxDiscoveryRequests: 2,
+  });
   expect(plan.executionAuthority).toBe("none");
   expect(plan.nativePermissionGranted).toBe(false);
   expect(Object.hasOwn(plan, "execution")).toBe(false);
   return plan;
 }
 
-describe("real docs CLI transport", () => {
-  test("preserves flat output bytes, aliases, discovery and optional observations", async () => {
-    for (const request of [
-      { surface: "codex.cli", topic: "hooks" },
-      {
-        surface: " CODEX.CLI ",
-        topic: "훅".normalize("NFD"),
-        freshness: "installed",
-        executionHost: "github.actions.hosted",
-        targetVersion: "0.162.1",
-      },
-      { surface: "hermes.agent", topic: "슬래시명령".normalize("NFD"), freshness: "general" },
-      { surface: "github", topic: "permissions" },
-      { surface: "codex.cli", topic: "unknown topic" },
-      { surface: "codex.cli", topic: "😀".repeat(250), targetVersion: "😀".repeat(120) },
-    ]) {
-      await expectDocsCli(request, request);
-      await expectDocsCli({ request }, request);
-      await expectDocsCli({ request, observations: {} }, request, {});
+describe("public docs reader selection matrices", () => {
+  test("preserves aliases, discovery and optional observations", () => {
+    for (const [request, expected] of [
+      [
+        { surface: "codex.cli", topic: "hooks" },
+        {
+          status: "SELECTED",
+          retrieval: "READ_SELECTED_PAGE",
+          id: "codex.cli.hooks",
+          secondary: [],
+          discovery: [],
+          gaps: ["route-body-not-fully-reviewed"],
+        },
+      ],
+      [
+        {
+          surface: " CODEX.CLI ",
+          topic: "훅".normalize("NFD"),
+          freshness: "installed",
+          executionHost: "github.actions.hosted",
+          targetVersion: "0.162.1",
+        },
+        {
+          status: "SELECTED",
+          retrieval: "VERIFY_INSTALLED_VERSION_AND_READ",
+          id: "codex.cli.hooks",
+          secondary: ["github.actions.workflow", "github.actions.security"],
+          discovery: [],
+          gaps: [
+            "route-body-not-fully-reviewed",
+            "installed-version-unverified-or-conflicting; documentation-is-not-deployed-availability-proof",
+          ],
+        },
+      ],
+      [
+        {
+          surface: "hermes.agent",
+          topic: "슬래시명령".normalize("NFD"),
+          freshness: "general",
+        },
+        {
+          status: "SELECTED",
+          retrieval: "REVALIDATE_SELECTED_PAGE",
+          id: "hermes.agent.slash-commands",
+          secondary: [],
+          discovery: [],
+          gaps: ["route-body-not-fully-reviewed"],
+        },
+      ],
+      [
+        { surface: "github", topic: "permissions" },
+        {
+          status: "NEEDS_DISAMBIGUATION",
+          retrieval: "DISCOVER",
+          id: null,
+          secondary: [],
+          discovery: ["github.repo", "github.actions", "github.codespaces", "github.copilot"],
+          gaps: ["subject-surface-unresolved; do-not-infer-subject-from-execution-host"],
+        },
+      ],
+      [
+        { surface: "codex.cli", topic: "unknown topic" },
+        {
+          status: "NEEDS_DISCOVERY",
+          retrieval: "DISCOVER",
+          id: null,
+          secondary: [],
+          discovery: ["https://learn.chatgpt.com/docs/llms.txt"],
+          gaps: ["topic-not-covered; bounded-official-discovery-only"],
+        },
+      ],
+      [
+        { surface: "codex.cli", topic: "😀".repeat(250), targetVersion: "😀".repeat(120) },
+        {
+          status: "NEEDS_DISCOVERY",
+          retrieval: "DISCOVER",
+          id: null,
+          secondary: [],
+          discovery: ["https://learn.chatgpt.com/docs/llms.txt"],
+          gaps: ["topic-not-covered; bounded-official-discovery-only"],
+        },
+      ],
+    ] as const) {
+      for (const observations of [undefined, {}]) {
+        const plan = selectDocumentation(request, observations);
+        expect(plan.status).toBe(expected.status);
+        expect(plan.retrieval).toBe(expected.retrieval);
+        expect(plan.primary?.id ?? null).toBe(expected.id);
+        expect(plan.secondary.map((route) => route.id)).toEqual(expected.secondary);
+        expect(plan.discovery).toEqual(expected.discovery);
+        expect(plan.evidenceGaps).toEqual(expected.gaps);
+      }
     }
-  }, 20_000);
-  test("passes installedVersion without certifying installation or compatibility", async () => {
+  });
+  test("passes installedVersion without certifying installation or compatibility", () => {
     const request = { surface: "hermes.agent", topic: "tui", freshness: "installed" };
-    const missing = await expectDocsCli({ request }, request);
+    const missing = selectDocumentation(request);
     expect(missing.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
     const observations = { installedVersion: "0.22.0" };
-    const installed = await expectDocsCli({ request, observations }, request, observations);
+    const installed = selectDocumentation(request, observations);
     expect(installed.retrieval).toBe("REVALIDATE_SELECTED_PAGE");
     expect(installed.evidenceGaps).not.toContain(
       "installed-version-unverified-or-conflicting; documentation-is-not-deployed-availability-proof",
@@ -107,27 +147,27 @@ describe("real docs CLI transport", () => {
     expect(installed.primary?.evidenceStatus).toBe("page-opened-limited-content");
     expect(installed.primary?.documentationVersion).toBeUndefined();
     const conflictRequest = { ...request, targetVersion: "0.21.0" };
-    const conflict = await expectDocsCli(
-      { request: conflictRequest, observations },
-      conflictRequest,
-      observations,
-    );
+    const conflict = selectDocumentation(conflictRequest, observations);
     expect(conflict.retrieval).toBe("VERIFY_INSTALLED_VERSION_AND_READ");
-    expect(conflict.evidenceGaps).toContain("requested-version-differs-from-installed-version");
-    const versionRequest = { surface: "muse.code", topic: "protocol", freshness: "installed" };
-    const versionObservations = { installedVersion: "1.4.7" };
-    const version = await expectDocsCli(
-      { request: versionRequest, observations: versionObservations },
-      versionRequest,
-      versionObservations,
+    expect(conflict.evidenceGaps).toContain(
+      "requested-version-differs-from-installed-version",
     );
+    const versionRequest = {
+      surface: "muse.code",
+      topic: "protocol",
+      freshness: "installed",
+    };
+    const versionObservations = { installedVersion: "1.4.7" };
+    const version = selectDocumentation(versionRequest, versionObservations);
     expect(version.retrieval).toBe("READ_VERSION_MATCHED_SOURCE");
-    expect(version.evidenceGaps).toContain("documentation-version-differs-from-applicable-version");
+    expect(version.evidenceGaps).toContain(
+      "documentation-version-differs-from-applicable-version",
+    );
   });
-  test("delegates exact page/version/hash cache matching to the canonical reader", async () => {
+  test("requires exact page/version/hash cache matching", () => {
     const request = { surface: "codex.cli", topic: "hooks", freshness: "installed" };
     const cache = {
-      canonicalUrl: createDocumentationReader(registry).select(request).primary!.canonicalUrl,
+      canonicalUrl: "https://learn.chatgpt.com/docs/hooks",
       bodySha256: digest,
       independentlyConfirmedBodySha256: digest,
       revalidatedInCurrentTask: false,
@@ -166,17 +206,27 @@ describe("real docs CLI transport", () => {
         "READ_SELECTED_PAGE",
       ],
     ] as const) {
-      const plan = await expectDocsCli({ request, observations }, request, observations);
+      const plan = selectDocumentation(request, observations);
       expect(plan.retrieval).toBe(retrieval);
     }
   }, 20_000);
-  test("requires canonical current-task revalidation and retains partial evidence", async () => {
-    for (const request of [
-      { surface: "hermes.agent", topic: "tui", freshness: "latest" },
-      { surface: "codex.cli", topic: "permissions", freshness: "general" },
+  test("requires canonical current-task revalidation and retains partial evidence", () => {
+    for (const { canonicalUrl, ...request } of [
+      {
+        surface: "hermes.agent",
+        topic: "tui",
+        freshness: "latest",
+        canonicalUrl: "https://hermes-agent.nousresearch.com/docs/user-guide/tui",
+      },
+      {
+        surface: "codex.cli",
+        topic: "permissions",
+        freshness: "general",
+        canonicalUrl: "https://learn.chatgpt.com/docs/agent-approvals-security",
+      },
     ]) {
       const cache = {
-        canonicalUrl: createDocumentationReader(registry).select(request).primary!.canonicalUrl,
+        canonicalUrl,
         bodySha256: digest,
         independentlyConfirmedBodySha256: digest,
         revalidatedInCurrentTask: false,
@@ -193,7 +243,7 @@ describe("real docs CLI transport", () => {
             independentlyConfirmedBodySha256: confirmed,
           },
         };
-        const plan = await expectDocsCli({ request, observations }, request, observations);
+        const plan = selectDocumentation(request, observations);
         expect(plan.retrieval).toBe(retrieval);
         expect(plan.evidenceGaps).toContain("route-body-not-fully-reviewed");
         if (request.surface === "hermes.agent")
@@ -201,121 +251,6 @@ describe("real docs CLI transport", () => {
       }
     }
   }, 20_000);
-  const request = { surface: "codex.cli", topic: "hooks" };
-  const cache = {
-    canonicalUrl: "https://developers.openai.com/codex/hooks",
-    bodySha256: digest,
-    independentlyConfirmedBodySha256: digest,
-    revalidatedInCurrentTask: true,
-  };
-  const malformed: [string, unknown, string][] = [
-    ["null input", null, "Request must be a JSON object"],
-    ["array input", [], "Request must be a JSON object"],
-    ["scalar input", true, "Request must be a JSON object"],
-    ["missing request", { observations: {} }, "Request must be a JSON object"],
-    ...[null, [], true, "request"].map((value): [string, unknown, string] => [
-      `non-object request ${JSON.stringify(value)}`,
-      { request: value },
-      "Request must be a JSON object",
-    ]),
-    ["unknown envelope field", { request, trusted: true }, "UNTRUSTED_OR_UNKNOWN_FIELD"],
-    ["mixed flat/envelope", { ...request, observations: {} }, "UNTRUSTED_OR_UNKNOWN_FIELD"],
-    [
-      "unknown request field",
-      { request: { ...request, nativePermissionGranted: true } },
-      "UNTRUSTED_OR_UNKNOWN_FIELD",
-    ],
-    [
-      "unknown flat field",
-      { ...request, authenticationVerified: true },
-      "UNTRUSTED_OR_UNKNOWN_FIELD",
-    ],
-    ["invalid request scalar", { request: { ...request, topic: 1 } }, "INVALID_TOPIC"],
-    [
-      "oversized request topic",
-      { request: { ...request, topic: "x".repeat(251) } },
-      "INVALID_TOPIC",
-    ],
-    ["invalid freshness", { request: { ...request, freshness: [] } }, "INVALID_FRESHNESS"],
-    [
-      "unknown observations field",
-      { request, observations: { trusted: true } },
-      "UNTRUSTED_OR_UNKNOWN_FIELD",
-    ],
-    ...[null, [], true, "observations"].map((value): [string, unknown, string] => [
-      `non-object observations ${JSON.stringify(value)}`,
-      { request, observations: value },
-      "Request must be a JSON object",
-    ]),
-    ...[null, 22, true, "", "0.22\n", "x".repeat(121)].map((value): [string, unknown, string] => [
-      `invalid installedVersion ${JSON.stringify(value).slice(0, 80)}`,
-      { request, observations: { installedVersion: value } },
-      "INVALID_DOCUMENTATION_OBSERVATION",
-    ]),
-    ...[null, [], true, "cache"].map((value): [string, unknown, string] => [
-      `non-object cache ${JSON.stringify(value)}`,
-      { request, observations: { cache: value } },
-      "Request must be a JSON object",
-    ]),
-    [
-      "missing cache fields",
-      { request, observations: { cache: {} } },
-      "INVALID_DOCUMENTATION_OBSERVATION",
-    ],
-    [
-      "unknown cache field",
-      { request, observations: { cache: { ...cache, trusted: true } } },
-      "UNTRUSTED_OR_UNKNOWN_FIELD",
-    ],
-    ...[
-      ["canonicalUrl", 1],
-      ["canonicalUrl", "x".repeat(2001)],
-      ["bodySha256", true],
-      ["bodySha256", "a".repeat(65)],
-      ["independentlyConfirmedBodySha256", []],
-      ["revalidatedInCurrentTask", "true"],
-      ["revalidatedInCurrentTask", 1],
-      ["revalidatedInCurrentTask", null],
-      ["targetVersion", null],
-      ["targetVersion", "x".repeat(121)],
-    ].map(([key, value]): [string, unknown, string] => [
-      `invalid cache ${key} ${JSON.stringify(value).slice(0, 80)}`,
-      { request, observations: { cache: { ...cache, [key as string]: value } } },
-      "INVALID_DOCUMENTATION_OBSERVATION",
-    ]),
-    [
-      "invalid observation before discovery",
-      {
-        request: { surface: "unknown", topic: "unknown" },
-        observations: { installedVersion: 22 },
-      },
-      "INVALID_DOCUMENTATION_OBSERVATION",
-    ],
-  ];
-  test.each(malformed)(
-    "rejects %s at the process boundary",
-    async (_name: string, input: unknown, error: string) => {
-      const result = await runDocsCli(JSON.stringify(input));
-      expect(result.exitCode).toBe(1);
-      expect(result.stdout).toBe("");
-      expect(result.stderr).toContain(error);
-    },
-  );
-  test("rejects malformed JSON and enforces the existing whole-file byte budget", async () => {
-    const invalid = await runDocsCli("{");
-    expect(invalid.exitCode).toBe(1);
-    expect(invalid.stdout).toBe("");
-    expect(invalid.stderr.length).toBeGreaterThan(0);
-    const body = JSON.stringify({ request, observations: {} });
-    const bounded = body.padEnd(1_048_576, " ");
-    const accepted = await runDocsCli(bounded);
-    expect(accepted.exitCode).toBe(0);
-    expect(accepted.stderr).toBe("");
-    const oversized = await runDocsCli(bounded + " ");
-    expect(oversized.exitCode).toBe(1);
-    expect(oversized.stdout).toBe("");
-    expect(oversized.stderr).toBe("Request exceeds the bounded input size\n");
-  });
 });
 
 describe("portable docs-only Runtime Index", () => {
