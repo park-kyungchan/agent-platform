@@ -56,8 +56,9 @@ git show 475e8a9171c9bafeaca99e589f0a50af4bb21ca5:ci/reuse/README.md
 
 Historical full-SHA action references retain their historical behavior; adopting
 a reviewed successor is an explicit caller change. The separately retained
-`source-author.ts`, `source-author-cli.ts`, trusted controller and other consumers
-are outside this bounded action retirement. Their presence does not impose an
+`source-author.ts` library and other helper consumers are outside this bounded
+action retirement. The uncalled `source-author-cli.ts` entrypoint is retired in
+a later, separately documented source closure; its historical bytes remain in Git. Their presence does not impose an
 author gate here. This change proves neither foreign-consumer adoption nor full
 S04/P6 completion, and grants no native/domain activation or human Acceptance.
 

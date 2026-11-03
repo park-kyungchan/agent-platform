@@ -24,21 +24,6 @@ test("non-errors and absent stacks locate the boundary without serializing the t
     );
 });
 
-test("the actual author CLI boundary reports its refusal location", async () => {
-  const child = Bun.spawn(
-    [process.execPath, "--no-env-file", `${import.meta.dir}/source-author-cli.ts`],
-    { env: { PATH: process.env.PATH }, stdout: "pipe", stderr: "pipe" },
-  );
-  const [exitCode, stderr, stdout] = await Promise.all([
-    child.exited,
-    new Response(child.stderr).text(),
-    new Response(child.stdout).text(),
-  ]);
-  expect(exitCode).toBe(1);
-  expect(stdout).toBe("");
-  expect(stderr.trim()).toMatch(/^source_author_refused@ci\/reuse\/source-author-cli\.ts:\d+$/);
-});
-
 test("native publisher diagnostics retain actual admitted quality throw sites", () => {
   try {
     reviewArtifactTarget("https://foreign.invalid/", "fixture/owner");

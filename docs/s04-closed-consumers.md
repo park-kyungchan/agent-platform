@@ -185,3 +185,28 @@ Whole Work/Memory/context packages, native Codex/Hermes wrappers, foreign instal
 ## Native review evidence endpoint
 
 The current YAML endpoint and its sole selected current-YAML test are retired; the earlier publisher was removed by PR83. The version resolver and direct runtime-docs reader are preserved. `review-artifact.ts` compares historical `run.path` strings and is not a current-YAML reader. Artifact and receipt validators, source-author, ordinary process helpers and native owners remain attached and unchanged. Source recovery is available from commit `6b5e3d5e3dde4b2366447220e1b6174aa269b529` and workflow blob `0b6292cb9fa9b5f28bcdd8de1e83f93986ee03ad`. This bounded source deletion does not prove universal external or immutable-ref dispatch deactivation, native rollback, or full S04, P6, P8 or P9 completion.
+
+## Source-author CLI leaf retirement (2026-11-03)
+
+At source baseline `578b427fb21fb8a2632e35c8ded7745314e7e4ee`, the current AP
+entrypoints, workflows, package scripts and selected Codex/Hermes public owner
+source have no executable caller of `ci/reuse/source-author-cli.ts`. The direct
+current-file consumer is the located-error test named "the actual author CLI
+boundary reports its refusal location". Retire the 45-line CLI, that one test,
+and only its diagnostic path allowlist entry together. The three other diagnostic
+tests and the `source-author.ts` library remain intact.
+
+This is a bounded source closure. It adds no author capture, replacement gate,
+receipt, policy release or native authority. `trusted/source.ts` and
+`trusted-review-source.ts` still import `verifyCommittedSourceAuthor`; the native
+installed-source guard explicitly requires the library. Codex/Hermes context
+loaders, first-import/source guards and the direct runtime-docs API retain their
+separate callers and owners. An old policy union can still demand a removed
+source path; this closure neither renews that policy nor weakens its reader.
+
+Recovery: `git show 578b427fb21fb8a2632e35c8ded7745314e7e4ee:ci/reuse/source-author-cli.ts`,
+Git blob `edfda488c691b844b13f696db3d750f17012403a`, SHA256
+`8b3c1d2607ff5d7dff3a2d105838d70e96b4220113970f4f6820a4797bdab1ac`.
+Earlier dated retention statements describe earlier boundaries. No claim is made
+about every external caller, immutable ref, installed release, remote dispatch,
+fresh native loading, full S04/P6 completion, P8 verdict or P9 activation/deletion.
