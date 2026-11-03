@@ -493,20 +493,6 @@ async function currentFullParentProof(
 }
 
 /** No caller-supplied boolean or scope declaration can admit a merge. */
-export async function deriveMergeCorrespondenceAssignment(
-  inputPolicy: ReviewArtifactPolicy,
-  head: string,
-  inputReader: ReviewArtifactReader,
-): Promise<MergeCorrespondenceAssignment> {
-  const policy = structuredClone(inputPolicy),
-    reader = {
-      json: inputReader.json.bind(inputReader),
-      archive: inputReader.archive.bind(inputReader),
-    };
-  const consumed = await consumeMergeCorrespondenceEvidence(policy, head, reader);
-  await checkConsumedMergeEvidence(policy, head, consumed.parent, reader);
-  return consumed.assignment;
-}
 async function consumeMergeCorrespondenceEvidence(
   inputPolicy: ReviewArtifactPolicy,
   head: string,
@@ -558,32 +544,6 @@ async function consumeMergeCorrespondenceEvidence(
     parentReview: parent.review,
   });
   return { assignment, parent };
-}
-
-export async function validateMergeCorrespondenceAssignment(
-  policy: ReviewArtifactPolicy,
-  head: string,
-  value: unknown,
-  reader: ReviewArtifactReader,
-  pendingStatus?: unknown,
-): Promise<MergeCorrespondenceAssignment> {
-  policy = structuredClone(policy);
-  reader = { json: reader.json.bind(reader), archive: reader.archive.bind(reader) };
-  const pending = pendingStatus === undefined ? undefined : structuredClone(object(pendingStatus));
-  const assignment = parseMergeCorrespondenceAssignment(value),
-    consumed = await consumeMergeCorrespondenceEvidence(policy, head, reader);
-  need(
-    sameMergeCorrespondenceAssignment(assignment, consumed.assignment),
-    "MERGE_ASSIGNMENT_SUPERSEDED_OR_SUBSTITUTED",
-  );
-  await checkConsumedMergeEvidence(
-    policy,
-    head,
-    consumed.parent,
-    reader,
-    pending ? { status: pending } : undefined,
-  );
-  return assignment;
 }
 
 /** USER contract: T0 starts this ONE short REST batch after proof consumption.
