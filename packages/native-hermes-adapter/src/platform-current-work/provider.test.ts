@@ -516,7 +516,6 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     for (const name of [
       "native-hook.js",
       "read-current-work.js",
-      "current-work-native-hook.js",
       "read-memory.js",
       "read-work-method.js",
     ]) {
@@ -560,64 +559,8 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
           stage: "input",
           reason: "REQUEST_UNAVAILABLE_OR_INVALID",
         });
-      } else {
-        expect(code).toBe(0);
-        expect(JSON.parse(out)).toEqual({});
-        expect(JSON.parse(error)).toEqual({
-          error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
-          stage: "input",
-          reason: "REQUEST_UNAVAILABLE_OR_INVALID",
-        });
       }
     }
-    const invokeNative = async (payloadOverride: Record<string, unknown> = {}) => {
-      const p = Bun.spawn(
-        [compiler, "--no-env-file", join(f.root, "current-work-native-hook.js")],
-        {
-          stdin: new Blob([
-            JSON.stringify({
-              hook_event_name: "pre_llm_call",
-              profile: "synthetic-profile",
-              session_id: "synthetic-session",
-              cwd: "/synthetic/cwd",
-              extra: { task_id: "actual-native-task", user_message: marker },
-              ...payloadOverride,
-            }),
-          ]),
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      );
-      return {
-        code: await p.exited,
-        stdout: await new Response(p.stdout).text(),
-        stderr: await new Response(p.stderr).text(),
-      };
-    };
-    const unselected = await invokeNative();
-    expect(unselected.code).toBe(0);
-    expect(JSON.parse(unselected.stdout)).toEqual({});
-    expect(unselected.stderr).toBe("");
-    const invalidProtocol = await invokeNative({ profile: "", session_id: marker });
-    expect(invalidProtocol.code).toBe(0);
-    expect(JSON.parse(invalidProtocol.stdout)).toEqual({});
-    expect(JSON.parse(invalidProtocol.stderr)).toEqual({
-      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
-      stage: "context",
-      reason: "CONTEXT_PROJECTION_FAILED",
-    });
-    expect(invalidProtocol.stdout + invalidProtocol.stderr).not.toContain(marker);
-    await writeFile(bindingsPath, bindingsBytes + "\n");
-    const mutatedBindings = await invokeNative();
-    expect(mutatedBindings.code).toBe(0);
-    expect(JSON.parse(mutatedBindings.stdout)).toEqual({});
-    expect(JSON.parse(mutatedBindings.stderr)).toEqual({
-      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
-      stage: "bindings",
-      reason: "BINDINGS_UNAVAILABLE_OR_INVALID",
-    });
-    expect(mutatedBindings.stdout + mutatedBindings.stderr).not.toContain(marker);
-    await writeFile(bindingsPath, bindingsBytes);
     const held = Bun.spawn([compiler, "--no-env-file", join(f.root, "read-current-work.js")], {
       stdin: new Blob([JSON.stringify({ event: null, selection: null, runtimeIndex: null })]),
       stdout: "pipe",
@@ -682,14 +625,6 @@ test("finite bundle compiler covers actual metafile inputs and emits no PC-speci
     expect(staleMemory.out).toBe("");
     expect(JSON.parse(staleMemory.error)).toEqual({
       error: "MEMORY_INPUT_OR_SOURCE_FAILED",
-      stage: "source",
-      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
-    });
-    const staleNative = await invokeNative();
-    expect(staleNative.code).toBe(0);
-    expect(JSON.parse(staleNative.stdout)).toEqual({});
-    expect(JSON.parse(staleNative.stderr)).toEqual({
-      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
       stage: "source",
       reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
     });
@@ -801,102 +736,6 @@ test("compiled stable session reader and callback preserve identity without esta
     expect(JSON.parse(sessionOut).chunk.text).toBe(original);
     expect(JSON.parse(sessionOut).ownerAdmissionEstablishedByDelivery).toBe(false);
     expect(sessionBuilt.nativeActivation).toBe(false);
-    const native = sessionBuilt.bundles.find(
-      (item) => item.name === "current-work-native-hook.js",
-    )!;
-    const hookPath = join(f.root, native.name);
-    await writeFile(hookPath, native.bytes);
-    const payload = {
-      hook_event_name: "pre_llm_call",
-      profile: hookBindings.shellSelection.profileName,
-      session_id: hookBindings.shellSelection.sessionId,
-      cwd: hookBindings.shellSelection.cwd,
-      tool_input: "PRIVATE-TOOL-INPUT",
-      extra: {
-        task_id: "observed-native-task",
-        run_id: "observed-native-run",
-        turn_id: "observed-native-turn",
-        user_message: "PRIVATE-CALLBACK-PROMPT",
-        conversation_history: ["PRIVATE-CALLBACK-HISTORY"],
-      },
-    };
-    const invokeHook = async (wire: unknown = payload) => {
-      const child = Bun.spawn([compiler, "--no-env-file", hookPath], {
-        stdin: new Blob([JSON.stringify(wire)]),
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      const [code, out, error] = await Promise.all([
-        child.exited,
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-      ]);
-      return { code, out, error };
-    };
-    const projected = await invokeHook();
-    expect(projected.code).toBe(0);
-    expect(projected.error).toBe("");
-    const value = JSON.parse(JSON.parse(projected.out).context);
-    expect(value.schema).toBe("hermes.real-callback-identity-context.v1");
-    expect(value.wireEvent.extra).toEqual({
-      agent_id: null,
-      project_id: null,
-      task_id: "observed-native-task",
-      run_id: "observed-native-run",
-      turn_id: "observed-native-turn",
-    });
-    expect(value.wireEvent.profile).not.toBe(value.declaredSourceScope.profileId);
-    expect(value.sourceProvenance).toEqual({
-      compiledRegistrationSha256: sessionBuilt.nativeRegistration.sha256,
-      bindingsSha256: sourceDigest(hookBindingsBytes),
-      sourceMapSha256: sourceDigest(sessionMapBytes),
-    });
-    for (const key of [
-      "nativeInvocationVerified",
-      "ownerProfileMappingVerified",
-      "nativeAuthenticationEstablished",
-      "receivedOrUsedEstablishedByProjection",
-      "ownerAdmissionEstablished",
-      "nativePermissionGranted",
-      "executionAuthorityGranted",
-    ])
-      expect(value[key]).toBe(false);
-    expect(projected.out.length).toBeLessThanOrEqual(12001); // stdout includes the final newline.
-    for (const privateText of [
-      "PRIVATE-TOOL-INPUT",
-      "PRIVATE-CALLBACK-PROMPT",
-      "PRIVATE-CALLBACK-HISTORY",
-    ])
-      expect(projected.out + projected.error).not.toContain(privateText);
-    expect(await Bun.file(f.markerPath).exists()).toBe(true);
-    const foreign = await invokeHook({ ...payload, profile: "foreign" });
-    expect(foreign.code).toBe(0);
-    expect(JSON.parse(foreign.out)).toEqual({});
-    expect(foreign.error).toBe("");
-    await writeFile(runtimeMapPath, "PRIVATE-MAP-DRIFT");
-    const mapDrift = await invokeHook();
-    expect(mapDrift.code).toBe(0);
-    expect(JSON.parse(mapDrift.out)).toEqual({});
-    expect(JSON.parse(mapDrift.error).error).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD");
-    expect(mapDrift.out + mapDrift.error).not.toContain("PRIVATE-MAP-DRIFT");
-    await writeFile(runtimeMapPath, sessionMapBytes);
-    await writeFile(hookBindingsPath, hookBindingsBytes + "\n");
-    await rm(f.markerPath);
-    const bindingDrift = await invokeHook();
-    expect(bindingDrift.code).toBe(0);
-    expect(JSON.parse(bindingDrift.out)).toEqual({});
-    expect(JSON.parse(bindingDrift.error).stage).toBe("bindings");
-    expect(await Bun.file(f.markerPath).exists()).toBe(false);
-    await writeFile(hookBindingsPath, hookBindingsBytes);
-    await writeFile(
-      runtimeRegistrationPath,
-      Buffer.from(sessionBuilt.nativeRegistration.bytes).toString() + "\n",
-    );
-    const registrationDrift = await invokeHook();
-    expect(registrationDrift.code).toBe(0);
-    expect(JSON.parse(registrationDrift.out)).toEqual({});
-    expect(JSON.parse(registrationDrift.error).stage).toBe("source");
-    expect(await Bun.file(f.markerPath).exists()).toBe(false);
   } finally {
     await f.cleanup();
   }
@@ -956,96 +795,6 @@ test("compiled Memory caller brackets implementation import and query with exact
   }
 }, 300_000);
 
-test("compiled native hook refuses a changed registration before the current Work implementation executes", async () => {
-  const f = await fixture(true);
-  try {
-    const method = methodFixture();
-    const compiler = await realpath(process.execPath),
-      bindingsPath = join(f.root, "native-bindings.json"),
-      bindingsBytes = JSON.stringify({
-        schema: "hermes.real-callback-source-hook-bindings.v1",
-        kind: "stableSessionSource",
-        shellSelection: { profileName: "synthetic", sessionId: "synthetic", cwd: "/synthetic" },
-        sourceSelection: {
-          scope: {
-            kind: "session-source",
-            runtime: "native-hermes",
-            profileId: "canonical",
-            sessionId: "synthetic",
-          },
-          logical: method.admission.packet.logical,
-          actorId: method.selection.actorId,
-          routeId: method.selection.routeId,
-        },
-      });
-    await writeFile(bindingsPath, bindingsBytes);
-    const runtimeRegistrationPath = join(f.root, "native-registration.json");
-    const built = await buildHermesPlatformSource({
-      registrationPath: f.path,
-      registrationSha256: f.sha256,
-      providerRoot: f.root,
-      compiler: { path: compiler, sha256: sourceDigest(await readFile(compiler)) },
-      legacyManifestSha256: "1".repeat(64),
-      runtimeProviderRoot: f.root,
-      runtimeRegistrationPath,
-      currentWorkBindings: { runtimePath: bindingsPath, sha256: sourceDigest(bindingsBytes) },
-      currentWorkOutputVersion: "v2",
-    });
-    const native = built.bundles.find((bundle) => bundle.name === "current-work-native-hook.js")!;
-    const path = join(f.root, native.name);
-    await writeFile(path, native.bytes);
-    await writeFile(
-      runtimeRegistrationPath,
-      Buffer.from(built.nativeRegistration.bytes).toString() + "\n",
-    );
-    const p = Bun.spawn([compiler, "--no-env-file", path], {
-      stdin: new Blob([
-        JSON.stringify({
-          hook_event_name: "pre_llm_call",
-          profile: "synthetic",
-          session_id: "synthetic",
-          cwd: "/synthetic",
-        }),
-      ]),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    expect(await p.exited).toBe(0);
-    expect(JSON.parse(await new Response(p.stdout).text())).toEqual({});
-    expect(JSON.parse(await new Response(p.stderr).text())).toEqual({
-      error: "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
-      stage: "source",
-      reason: "SOURCE_CLOSURE_UNAVAILABLE_OR_DRIFTED",
-    });
-    expect(await Bun.file(f.markerPath).exists()).toBe(false);
-    // Valid registration cannot compensate for the separately missing compiled source-map binding.
-    await writeFile(runtimeRegistrationPath, built.nativeRegistration.bytes);
-    const missing = Bun.spawn([compiler, "--no-env-file", path], {
-      stdin: new Blob([
-        JSON.stringify({
-          hook_event_name: "pre_llm_call",
-          profile: "synthetic",
-          session_id: "synthetic",
-          cwd: "/synthetic",
-        }),
-      ]),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    const [missingCode, missingOut, missingError] = await Promise.all([
-      missing.exited,
-      new Response(missing.stdout).text(),
-      new Response(missing.stderr).text(),
-    ]);
-    expect(missingCode).toBe(0);
-    expect(JSON.parse(missingOut)).toEqual({});
-    expect(JSON.parse(missingError).error).toBe("NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD");
-    expect(JSON.parse(missingError).stage).toBe("context");
-    expect(await Bun.file(f.markerPath).exists()).toBe(true);
-  } finally {
-    await f.cleanup();
-  }
-}, 300_000);
 
 test("actual native Work importer rejects a stale same-export projection before compiler inspection", async () => {
   const f = await fixture();

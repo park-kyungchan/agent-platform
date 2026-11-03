@@ -265,3 +265,74 @@ remain separate. No replacement Work mechanism, hook, controller, policy,
 coverage, receipt or source-author pin is introduced. This closes this selected
 dead source island; it does not establish full S03/S04/P6, native activation,
 installed or external consumer absence, or any live Education effect.
+
+
+## 2026-11-03 — bounded S03 automatic Work event source retirement
+
+This authored source cut starts at AP
+`fe6a0eb68b5b8d01fb4476922521ee1bb8c4eaa0` (PR90 already integrated) and
+public Codex `22e9e556cd027d6b2d748bcdd47eef044cf69768`.
+The companion Codex candidate is `1061f3de99387f928b84bda0095aa439df3f30d6`; the AP candidate is the
+containing Git revision, recorded with both exact heads and patch hashes in the
+task's `native-events-v1/HANDOFF.md`. Independent review and Root acceptance
+remain separate. This is deliberate retirement, not equivalent old Work output.
+
+The Codex `src/native/hook-cli.ts` event route now ignores input, bindings and
+mode arguments and returns an empty object response. Its command emits exactly
+`{}` plus a newline, exits zero, and does not import the provider closure or
+hooks implementation. The two retained admission predicate bodies remain
+byte-for-byte unchanged for the actual `src/promotion.ts` caller; their required
+builtin and type imports remain. Private event-only helpers are removed.
+The AP current-work `native-hook.ts` similarly emits only the empty response,
+without imports, native payload parsing, bindings, implementation dispatch,
+prompt capture or checkpoint/boundary effects.
+
+These are temporary source-only compatibility responses for old explicit
+callers. **Do not install, register, generate for promotion, or promote them.**
+Existing native canonical instructions and explicit task STATE/selected-contract
+reads provide the successor. No generic ap loader, administrative Work identity,
+controller, session store or new runtime is introduced. Existing immutable
+bundles, registrations, journals, locks, receipts and recovery originals remain.
+PR90 already deleted the three dead namespace-delivery files; this cut does not
+replay that deletion or alter the separate source-provider delivery module.
+
+Only the retired current-work hook subcases are detached from mixed provider
+tests; direct current-work, memory and work-method readers, the stable session
+source reader, first-import/source/dependency/currentness guards and their
+assertions remain. The diagnostics change removes only its retired hook row.
+New finite conformance tests use the independently frozen five inputs per owner,
+missing/poisoned legacy modules, exact channels, callable Codex compatibility,
+admission hashes and fictional filesystem controls. Negative controls challenge
+added context, legacy import, data reads, prompt/boundary writes, exit/stderr and
+newline drift. They are effect/import boundary evidence, not native CLI/model
+execution or universal proof of external caller absence.
+
+Remaining source/API/recovery obligations are finite and retain their owners:
+
+- Public Codex manual context/checkpoint/memory/admission, prepare/qualification
+  dispatch, promotion and recovery callers still use context-owner and its
+  wrappers. Their first-import guards and reviewed-input/recovery state remain.
+  Stop each selected new administrative dispatch and reconcile verify/restore
+  recovery before deleting its shared loader or API.
+- Public Codex provider-closure observes current `hook-cli.ts` bytes. An already
+  observing process must refuse this source change; immutable candidate pins
+  are not renewed to admit the retired response. Preserving the admission API
+  grants no promotion or native activation permission.
+- Hermes `read-current-work.ts`, `read-memory.ts`, `read-work-method.ts`, builder
+  maps, context/hook-context/work-method-source exports and the v1 facade have
+  separate retained consumers. Current-work event retirement alone does not
+  establish that these modules, GitWork or either whole package are unused.
+- Existing source-check/projection, owner fixtures, source-provider generation,
+  package exports and optional scripts remain current-byte readers. Close each
+  with its corresponding later API retirement; do not regenerate old coverage,
+  policy, source pins, receipts or a controller to conceal a source change.
+
+The exact affected native Codex session and Hermes profile/selector/bundle
+selection still require their separately authorized owner proof. Source editing
+has not changed installed settings, trust, native hooks, profiles, aliases or
+services, and does not prove native loading, full S03/S04/P6 or P9 cutover.
+Unchanged Claude/Muse mechanisms and vendor Herdr/Hindsight hooks remain owned
+by their native runtimes. The outstanding agy raw-input/alias-dedup proof and
+actual Hermes selection are not resolved by this source cut. P8 scenario verdicts,
+S11's complete host/Hermes graph and specific P9 activation/recovery/stability/
+retained-original deletion conditions keep their independent scope.

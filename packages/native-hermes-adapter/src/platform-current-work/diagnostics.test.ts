@@ -5,13 +5,6 @@ test("unregistered entrypoints preserve fail-closed protocol and report registra
   const marker = "PRIVATE_SYNTHETIC_UNREGISTERED_INPUT";
   for (const [entry, payload, code, stdout, error] of [
     [
-      "native-hook.ts",
-      { hook_event_name: "pre_llm_call", user_message: marker },
-      0,
-      "{}\n",
-      "NATIVE_CURRENT_WORK_INPUT_OR_SOURCE_HELD",
-    ],
-    [
       "read-current-work.ts",
       { event: { private: marker } },
       1,
