@@ -210,3 +210,33 @@ Git blob `edfda488c691b844b13f696db3d750f17012403a`, SHA256
 Earlier dated retention statements describe earlier boundaries. No claim is made
 about every external caller, immutable ref, installed release, remote dispatch,
 fresh native loading, full S04/P6 completion, P8 verdict or P9 activation/deletion.
+
+## 2026-11-03: uncalled review-attempt/context producer island
+
+The source-only successor retires `ci/reuse/review-attempt.ts`,
+`trusted-review-source.ts` and their exclusive `review-runtimes.ts` adapter.
+At pre-change source `40ac73319d75b3caeba2cbd9f918dc6c2f64a8d8`, bounded
+current-source and selected public Codex/Hermes owner searches found no selected
+production entrypoint importing or executing that island. Test imports and
+current-byte readers, diagnostic filename strings and self-qualification did
+not establish native or business liveness.
+
+The successor removes the island's exclusive tests and the two attempt-only
+producer wrappers `deriveMergeCorrespondenceAssignment` and
+`validateMergeCorrespondenceAssignment` from `ci/quality/review-artifact.ts`.
+It preserves that module's actual artifact/legacy receipt interpretation,
+including `consumeMergeCorrespondenceEvidence`, `checkConsumedMergeEvidence`,
+assignment parsing and their retained tests. The independent `sourceAuthorGit`
+filesystem-monitor refusal test remains verbatim in `review-pr.test.ts`;
+`review-gate.test.ts` loses only its retired controller-qualification case.
+Generic process/error/source binding and `trusted-review-policy.json`'s fixed
+snapshot input remain. No source-author, policy, coverage, receipt or registry
+is renewed to make this retirement pass.
+
+Source recovery is native Git at the pre-change revision/path or the recorded
+Git blob. Existing immutable releases, original evidence and native owners are
+unchanged. Selected Codex context-owner loading, Hermes native-hook/context,
+and the installed trusted-release first-import guard require their own exact
+source replacement and owner evidence. This bounded source closure establishes
+neither installed/external absence nor full S04/P6, S11/S13 activation or human
+Acceptance. Earlier dated dispositions above remain historical.
