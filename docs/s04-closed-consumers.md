@@ -240,3 +240,28 @@ and the installed trusted-release first-import guard require their own exact
 source replacement and owner evidence. This bounded source closure establishes
 neither installed/external absence nor full S04/P6, S11/S13 activation or human
 Acceptance. Earlier dated dispositions above remain historical.
+
+## 2026-11-03: uncalled namespace-delivery source island
+
+Source baseline: `22a66303866ff30eb1c207702f35658a8ef86ab3`. Retire only
+`packages/native-hermes-adapter/src/platform-current-work/delivery.ts`,
+`native-delivery.ts` and their exclusive `delivery.test.ts`. The selected
+production importer of delivery is native-delivery, whose only selected
+invoker is that exclusive test. No selected package export, builder entry,
+script or default native registration selects native-delivery. Historical
+coverage and registry descriptions do not establish an executable consumer.
+
+The source-only assessment, exact preimage hashes and retained recovery copies
+are in the Rust migration task's `preparation/slices/S03/native-context-02/`;
+the prescribed four-path change and its verification are in
+`preparation/slices/S04/dead-delivery-15/`. Native Git retains the baseline
+objects. No installed bundle, delivery claim, namespace, journal or receipt is
+deleted by this source change.
+
+The current-work native hook, provider/diagnostic tests, real reader and builder
+entrypoints, source guards, manual recovery and public Codex/Hermes facades
+retain their behavior. Their exact source and native-owner closure obligations
+remain separate. No replacement Work mechanism, hook, controller, policy,
+coverage, receipt or source-author pin is introduced. This closes this selected
+dead source island; it does not establish full S03/S04/P6, native activation,
+installed or external consumer absence, or any live Education effect.
