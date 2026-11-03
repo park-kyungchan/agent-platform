@@ -4,7 +4,6 @@ const root = resolve(import.meta.dir, "../..");
 const sourceFiles = new Set([
   "ci/reuse/run.ts",
   "ci/reuse/source-author.ts",
-  "ci/reuse/source-author-cli.ts",
   "ci/reuse/publish-review-artifact.ts",
   "ci/reuse/review-pr.ts",
   "ci/reuse/review-runtimes.ts",
