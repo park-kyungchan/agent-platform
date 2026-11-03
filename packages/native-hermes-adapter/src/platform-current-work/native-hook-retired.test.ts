@@ -135,7 +135,7 @@ for (const c of cases) {
       const f = await fixture(await readFile(sourcePath, "utf8"), canaries);
       try {
         expect(await invoke(f, c.input)).toEqual({ code: 0, stdout: "{}\n", stderr: "", effects: false });
-        
+
       } finally { await f.cleanup(); }
     }
   });
@@ -169,5 +169,3 @@ test(owner + " effect/import/channel judge rejects deliberate negative controls"
     expect(conforms(r)).toBe(false);
   } finally { await f.cleanup(); }
 });
-
-
