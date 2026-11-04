@@ -1,23 +1,27 @@
 # Agent platform
 
-The current Rust migration replaces obsolete harness machinery with a small `ap` tool, builds an operational Ontology and preserves retained Education behavior. It follows the user-adopted [final review ZIP](https://drive.google.com/file/d/12fcl2fkBZGopdrGkCbsrrHGnNOYFyv_W/view), dated 2026-11-02. Rust is the destination for retained owned implementation; vendor runtimes and content keep their existing roles.
+A small Rust workspace for deterministic public instruction rendering, scoped
+installation/recovery and on-demand diagnosis. Native Muse, Claude Code, Codex,
+Antigravity CLI (`agy`) and Hermes own their sessions, tools and lifecycle.
 
-On this host, start with [current task state](/home/palantirkc/work/ws-replan/STATE.md), [orchestration](/home/palantirkc/work/ws-replan/ORCHESTRATION.md) and [the adopted plan entry](/home/palantirkc/work/ws-replan/CURRENT-PLAN.md). The user approved execution at 2026-11-02T15:28Z, superseding former WAIT snapshots and earlier WP ordering. The Lead releases slices after independent review and exact-source acceptance; consult the current task state for the active assignment. S01 remains the guidance-only foundation.
+`crates/ap` implements `ap render`, `ap install plan|apply|recover` and
+`ap doctor inspect`. Requests name explicit source/profile paths. Rendering is
+pure; installation owns only the selected instruction links/import, preserves
+unrelated native files, and requires explicit writer coordination. Doctor does
+not execute hooks or establish native loading.
 
-| Repository | Destination and boundary |
-| --- | --- |
-| `agent-platform` | One small `ap` crate initially: deterministic render, scoped owned-entry install/recovery, on-demand doctor and only a necessary pane hook. No dependency on a running Ontology. |
-| `ontology-platform` | Operational source-qualified objects/links, logic, permissions, lineage, local transactions and action recovery; separate from Hindsight's database and Academy's journal. |
-| `education-platform` | Behavior-preserving Rust ports of retained Academy parsers, scoped reads, reviews, saves/reconciliation and relevant mathematics functions, with compatible native/MCP tools and durable state. |
+Run `bash ci/check-rust-source.sh` in a disposable environment or the task's
+assigned build slot. It runs pinned Cargo formatting, tests, Clippy and the
+frozen finite S02/S03 conformance judges. Python is retained only for those
+independent verification tools; the product implementation is Rust.
 
-Muse, Claude Code, Codex, Antigravity CLI (`agy`) and Hermes retain native runtime ownership. Hindsight remains an official external integration. A short state file and handoff replace generic Work/Task/Run administration; business identity, evidence, reviewed-input bindings and uncertain-effect state remain with their domain owner. `ap` is not another model loop, scheduler, memory store or business write ledger.
+See [migration dispositions](docs/rust-migration-dispositions.md),
+[active CLI coverage](docs/ap-08-dispositions.md) and the
+[scoped installation contract](crates/ap/s03/CONTRACT-v1.md).
+Source changes require independent review and Lead integration. Real-host
+installation and runtime activation require their separately authorized evidence.
 
-[Selected migration dispositions](docs/rust-migration-dispositions.md) records source anchors, observed callers, all four active CLI dispositions and pending closure. Codex/Claude are the first renderer adapters, subject to their actual supported surfaces. Muse/agy retain their native mechanisms pending qualification; two adapters alone do not complete P6 or permit deleting another consumer's support.
-
-S01 changed guidance only. The bounded S04 [consumer closure note](docs/s04-closed-consumers.md) records the automatic source CI replacement and remaining retirement holds. It does not claim overall S04/P6 completion or runtime activation. Retained ports require an independently frozen reference, a qualified comparator and independent exact-candidate review. Recorded response bytes are the default; GET is not a read-only guarantee. Preserve one participating Academy account lock domain, compatible old journals and physical-field uncertainty through restart and rollback; never replay ambiguous effects. P8 remains actual user judgment and P9 retains its separate live-switch/deletion conditions.
-
-The existing Bun workspace, packages, immutable releases and CI remain present while consumers are reconciled. [project.json](project.json) and [the ownership registry](architecture/capability-source-owners.json) remain reference descriptions of that source, including historical paths and pins. They do not authorize new Rust work, revive the retired trusted review/controller protocol or prove current native consumption. Source integrations and native activation are separate decisions.
-
-The pre-migration package/build instructions remain in Git at `1e6b771729366955cc48aa4fa48d35e6de6fe00c:README.md`. Existing [Git Work](docs/git-work.md), [constrained improvement](docs/constrained-improvement.md) and [Runtime Index](architecture/runtime-documentation-routing/registry.json) documents describe legacy mechanisms; they are preserved as source history, not the current Rust execution procedure. Use the assigned slice's checks. S01 used documentation/link checks and `git diff --check`. Automatic source CI now runs ordinary pinned Rust checks and the unchanged finite S02/S03 conformance judges through `bash ci/check-rust-source.sh`; local compilation still requires the Lead-owned build slot. The former source-author, receipt and controller prerequisites are retired from that workflow.
-
-The root `bun run check:source` and `bun run check:quality` aliases now run that same Rust check script. They require the same disposable environment or Lead-owned build slot as automatic CI. They no longer invoke the retired author/receipt/controller source or aggregate quality prerequisites. Specific TypeScript format, lint, architecture and workflow commands remain available for their separately retained source consumers; this alias change does not qualify those legacy suites or complete S04/P6. The predecessor aliases remain readable at `a3b1ea8a96df6bdb47098c840e5ed068a81f175f:package.json`.
+Legacy TypeScript packages and administrative tooling are retired by the
+user-approved 2026-11-04 repository reorganization. Their source remains in Git
+at `57813009fdde43f99bb1798d031a1c88dabe5358`. Historical custody archives remain
+under `history/` until the Lead verifies the required Drive recovery copy.

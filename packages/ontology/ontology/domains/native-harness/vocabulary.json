@@ -1,8 +1,0 @@
-{
-  "schemaVersion": "1.0.0",
-  "id": "native-harness",
-  "dependsOn": ["upper"],
-  "terms": ["context", "capability", "native-session", "tool", "profile", "evaluation", "input-fingerprint"],
-  "capabilityStates": ["configured", "injected", "callable", "authenticated", "behaviorally-verified"],
-  "executionOwnership": "Native Codex owns the agent execution loop."
-}

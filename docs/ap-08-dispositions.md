@@ -89,3 +89,13 @@ in ws-replan `preparation/closure/ap08-v1/{ACTUAL-EVIDENCE.json,HANDOFF.md}`.
 This establishes source-level consumer dispositions pending independent review.
 Live install, fresh-session loading, binary PATH placement, support deletion,
 publication/merge and whole-P6 acceptance remain outside this assignment.
+
+## Final source retirement disposition — 2026-11-04
+
+The user-approved repo-reorg-v2 retires legacy adapter/recovery libraries and
+external agent-harness-engineering tooling. The retained Rust instruction
+adapters above do not import those libraries. Native vendor hooks, sessions,
+configuration and services remain separately owned. The user accepted agy's
+fresh-session loading gap as a disclosed limit; this source task performs no
+new native loading or installation. Historical retention holds in the original
+S03/S04 notes are superseded by this decision.
