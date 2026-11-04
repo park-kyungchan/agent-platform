@@ -70,3 +70,60 @@ Education preserves scoped student/textbook/progress reads, missing/null/empty/z
 Freeze sanitized recorded inputs and expected outputs/refusals independently before implementation. Qualify comparators against relevant wrong values, missing evidence, protocol/status contamination and unintended fake dispatch. Candidate authors cannot change the oracle to pass. New `ap`/Ontology behavior needs conformance requirements; retired machinery needs closure. The Lead obtains independent exact-candidate review and keeps proposals, implementation, verification and user Acceptance distinct.
 
 Evidence ends at local source/configuration observations and this documentation diff. No whole-package deletion readiness, fresh loading, business parity or Rust implementation is established. First P8 scenario: student/textbook/progress lookup using recorded responses; actual user verdict remains pending. P9 live switches, stability/recovery and retained-original disposal retain their conditions and weekday 14:00–22:00 KST protection. S01 does not advance those gates.
+
+
+## S04 leftover source audit — 2026-11-04
+
+This section is the bounded B2 source disposition at base
+`744295cdd026580ae55c9f2a9ae53e1f0d70ec0e`, authorized by
+`preparation/closure/s04-leftovers-v1/TASK.md` in the ws-replan task. It is
+separate from the dated S01 observations above. All five roots have a concrete
+remaining source consumer, so none has a whole-root deletion in this candidate.
+`RETAINED_LIVE_CONSUMER` means a callable source entrypoint or an attached
+manual check/recovery reader remains; it does not assert observed execution,
+endorse new administrative use, or declare every file in that root necessary.
+This is not S04's no-retained-consumer exit or S14 acceptance.
+
+| S04 root / tracked files | Verdict and concrete consumer at this base | Required closure |
+| --- | --- | --- |
+| `packages/work-continuity/` / 118 | `RETAINED_LIVE_CONSUMER`. `package.json:10-11,21-22` selects handoff/import/Git Work/common-work checks; `verification/package-import-check.ts:1-13` compares the compatibility forwarder with its canonical handoff module. `packages/native-hermes-adapter/package.json:37` retains the dependency. External agent `src/cli.ts:61-72,152-155` reaches provider verification, promotion and qualification; its `src/native/context-owner.ts:22-39` resolves the context provider. | Close the selected manual APIs/checks and transitive Hermes dependency. Stop new administrative dispatch separately from reconciliation of existing verify/restore state; preserve reviewed bindings and records. |
+| `packages/native-codex-adapter/` / 22 | `RETAINED_LIVE_CONSUMER`. External agent `src/cli.ts:61-66` calls `readNativeAdapterSourceClosure`; `src/native/provider-closure.ts:95-111` reads the package's exact pinned files and verifies all three module resolutions. Its `src/native/hooks.ts:2-5`, `home-context.ts:1` and `evaluation-ledger.ts:1` also import/re-export the adapter. AP `ci/source-check.ts:197-201,691,843-847` retains fixture/probe readers. | External owner must reconcile and close recovery/source-closure readers, wrapper exports, manifests and tests, then close AP fixture/probe references. An empty automatic hook response does not close source-byte verification or recovery. |
+| `packages/native-hermes-adapter/` / 83 | `RETAINED_LIVE_CONSUMER`. AP `ci/source-check.ts:18` directly imports dependency-closure, and `:521-523` loads its source generator. The external Hermes facade `src/ontology-driven/work-context.ts:1` forwards the package; external agent exports the callable Work reader at `src/native/profile-context.ts:109-123`, which loads that facade via the registered provider; no active CLI dispatch to that export was established. The mounted native Hermes service's selection is unproved. | Close source fixture/generator/projection checks and external facade/readers with their owner; independently reconcile installed Hermes selections before any installed-original deletion. No native service/runtime authority follows from this source audit. |
+| `ci/quality/trusted/` / 55 | `RETAINED_LIVE_CONSUMER`. `package.json:15-19` still selects `ci/quality/run.ts`, whose lines 1-2 import `driver-failure` and `process`; `ci/quality/native-tools.ts:1` also imports `process`. `ci/source-check.ts:3,375` uses `process` and `qa-inputs`. | Retire or replace the remaining manual Bun check callers and their tests before removing these modules. The rest of this directory needs a separate reachable-subgraph assessment; do not reactivate its retired controller or fabricate attestation state. |
+| `architecture/capability-source-owners.json` / 1 | `RETAINED_LIVE_CONSUMER`. `package.json:18` selects architecture quality; `ci/quality/run.ts:483-496` calls `readArchitectureSnapshot`, which reads the registry at `ci/quality/architecture-quality.ts:649`. `ci/quality/scope.ts:233`, `ci/quality/source-snapshot.ts:16`, `ci/quality/run.ts:454`, `ci/source-check.ts:214,866` and `ci/verify-runtime-layout.ts:357` are additional current-byte readers. | Close/replace those manual checks and runtime-layout/project-contract readers together. Do not infer liveness from registry entries or refresh the registry to prolong the retired protocol. Sibling contracts also have readers; they are not dead merely because automatic CI is Rust. |
+
+External agent paths above are relative to
+`/home/palantirkc/projects/agent-harness-engineering`; external Hermes paths are
+relative to `/home/palantirkc/projects/hermes-harness-engineering`. The former's
+checked-out `main` and local `origin/main` both resolve to `22e9e556cd027d6b2d748bcdd47eef044cf69768`;
+no fetch occurred. The latter is a generated source-only facade without a Git
+root or the inventory's claimed `cli.ts`, `runtime.ts`, `mcp-server.ts` and
+`index.ts` entrypoints. Do not describe it as the running native Hermes service.
+
+The local external retirement candidate `2114388` has a stricter CLI:
+`src/cli.ts:9-14` refuses new administrative dispatch, while `:49-70` still
+reads the Codex adapter/context closure for host and legacy verify/restore.
+The local `c9e13de` guidance candidate preserves those recovery routes too.
+Thus even applying the recorded event/manual retirement does not justify deleting
+these libraries. The automatic AP Hermes event is already the no-op at
+`packages/native-hermes-adapter/src/platform-current-work/native-hook.ts:1-4`.
+
+Inventory corrections: `verification/package-import-check.ts:32-33` contains
+report fields, not Codex/Hermes imports; its only package import is handoff.
+`ci/quality/run.ts`, `ci/source-check.ts`, `ci/verify-runtime-layout.ts` and
+`ci/reuse/run.ts` have no first import of `trusted/native.ts` at this base.
+Preserve real guards; the inventory's obsolete guard assertion is not deletion
+proof. The registry has an additional concrete reader in
+`ci/quality/architecture-quality.ts`, independent of `ci/source-check.ts`.
+
+Host-visible `/docker/hermes-agent-2q3y/docker-compose.yml:44-46` mounts
+`./data:/opt/data` and `/root/.agents:/opt/host-agents:ro`. This observation and
+the historical S03 metadata do not prove the currently loaded service graph.
+No container command, live Academy call, credential/account-lock access, native
+configuration edit or external-repository write occurred.
+
+Detailed consumer indexes, selected line readbacks, local retirement-branch
+readbacks, check outputs and limitations are in ws-replan
+`preparation/closure/s04-leftovers-v1/{CONSUMER-CLOSURE.md,ACTUAL-EVIDENCE.json,HANDOFF.md}`.
+These are review evidence, not a new runtime registry. Independent review and
+Lead expected-head integration remain required.
