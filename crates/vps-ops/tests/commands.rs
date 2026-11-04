@@ -25,7 +25,10 @@ impl Temp {
         let base = std::env::var_os("CARGO_TARGET_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target"));
-        let p = base.join("test-work").join(util::id());
+        let p = util::resolve(&base)
+            .expect("absolute lexical fixture directory")
+            .join("test-work")
+            .join(util::id());
         fs::create_dir_all(&p).unwrap();
         Self(p)
     }
@@ -844,12 +847,19 @@ fn rejected_launch_evidence_is_bounded_regular_and_lexically_resolved() {
     let temp = Temp::new();
     let real = temp.0.join("real");
     fs::create_dir(&real).unwrap();
-    let alias = temp.0.join("alias");
+    // Exercise dot segments even when the target directory is already absolute and normalized.
+    let alias = temp.0.join("real/../alias");
     symlink(&real, &alias).unwrap();
     // Node resolve() collapses '..' without resolving the directory symlink.
     let directory = alias.join("unused/../.");
     let resolved = util::resolve(&directory).unwrap();
-    assert_eq!(resolved, alias);
+    assert_eq!(resolved, util::resolve(&alias).unwrap());
+    assert!(
+        fs::symlink_metadata(&resolved)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
     let f = &fixture("rejected-proof")[0];
     let id = f["request"]["operationId"].as_str().unwrap();
     let request = real.join(format!("desktop-native-request-{id}.json"));
@@ -863,8 +873,8 @@ fn rejected_launch_evidence_is_bounded_regular_and_lexically_resolved() {
     let mut bytes = serde_json::to_vec(&f["request"]).unwrap();
     bytes.resize(2 * 1024 * 1024, b' ');
     fs::write(&request, &bytes).unwrap();
-    // A nonexistent lexical component must not require canonicalization or filesystem traversal.
-    let nominated = retry::rejected(&resolved, "fixture").unwrap();
+    // The inspector must normalize its input while keeping the symlink's lexical identity.
+    let nominated = retry::rejected(&alias, "fixture").unwrap();
     assert_eq!(nominated["candidate"]["operationId"], id);
     assert_eq!(
         nominated["candidate"]["proofRef"],
