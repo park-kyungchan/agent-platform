@@ -25,5 +25,11 @@ pub fn doctor(spec: &Spec) -> Result<DoctorReport> {
         native_loading: "unverified".into(),
         hooks_executed: 0,
         p6_complete: false,
+        muse: (spec.scope == Scope::Agy).then(|| MuseDisposition {
+            disposition: "retained_native_mechanism".into(),
+            canonical_path: spec.canonical_path.clone(),
+            handoff_requires_task_state: true,
+            native_loading: "unverified".into(),
+        }),
     })
 }

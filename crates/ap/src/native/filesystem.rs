@@ -315,7 +315,13 @@ pub(super) fn source(spec: &Spec) -> Result<SourceFingerprint> {
 }
 
 /// Verify link resolution component-by-component without following an ancestor.
-pub(super) fn direct_link(dir: &Dir, name: &str, spec: &Spec, snap: &Snapshot) -> Result<()> {
+pub(super) fn direct_link(
+    dir: &Dir,
+    name: &str,
+    spec: &Spec,
+    snap: &Snapshot,
+    field: &str,
+) -> Result<()> {
     if let Entry::Symlink { target } = &snap.entry {
         let base = &dir
             .topology
@@ -357,7 +363,7 @@ pub(super) fn direct_link(dir: &Dir, name: &str, spec: &Spec, snap: &Snapshot) -
             return Err(err("unsupported_target", "target"));
         }
         if path != spec.canonical_path {
-            return Err(err("instruction_conflict", "codex.instructions"));
+            return Err(err("instruction_conflict", field));
         }
         if dir.snapshot(name, spec.uid)? != *snap {
             return Err(err("expected_before_conflict", "target"));

@@ -10,7 +10,9 @@ fn rollback(entry: &PlannedEntry, current: &Snapshot, canonical: &str) -> Result
         return Ok(current.entry.clone());
     }
     match entry.selector {
-        Selector::CodexInstructionLink => {
+        Selector::CodexInstructionLink
+        | Selector::AgyInstructionLink
+        | Selector::AgyGeminiAlias => {
             if current.entry == Entry::Missing {
                 return Ok(Entry::Missing);
             }
@@ -46,6 +48,7 @@ fn rollback(entry: &PlannedEntry, current: &Snapshot, canonical: &str) -> Result
                     instructions: current.entry.clone(),
                 },
                 preserved: vec![],
+                agy: None,
             };
             // Avoid synthetic path collision for all admitted canonical paths.
             if canonical.starts_with("/ap-recovery-") {
