@@ -1,6 +1,26 @@
 # S01: selected Rust migration dispositions
 
-Status: local documentation candidate, not independently accepted, installed or retired. This bounded migration note expires at completion; it is not a runtime registry. Observation date: 2026-11-02, approximately 15:36–15:41 UTC.
+## B3-1 manual check retirement — 2026-11-04
+
+The [B3-1 closure disposition](s04-closed-consumers.md#b3-1-manual-check-retirement--2026-11-04)
+supersedes the manual-check retention rows below. AP's five manual TS quality
+scripts and their check-only chain are removed. Zero-reader checks precede
+deletion of all 55 trusted files and the capability-source-owners, quality-policy
+and Hermes semantic-projection JSON files. Total: 103 deleted files.
+
+All three retained packages remain byte-exact. Three quality support files,
+owner snapshots, runtime documentation and Hermes lineage remain for their
+consumers. The external agent CLI's source-provider candidate still reads
+`architecture/runtime-filesystem-contract.json`, so that contract stays.
+The retained consumers fixture still imports native-hermes-adapter; it is
+not AP-importer-free. Historical project/contract/navigation pointers remain
+metadata, without a remaining reader of the deleted registry bytes.
+
+The Rust check is unchanged and does not replace the retired manual TS,
+workflow, secret-scan, architecture, layout and projection coverage. Detailed
+coverage losses, zero-reader logs and actual checks are recorded in ws-replan
+`preparation/closure/b3-manual-checks-v1/HANDOFF.md`. This is bounded source
+retirement pending independent Lead review, not full S04/S14 acceptance.
 
 ## Authority and evidence boundary
 
@@ -12,13 +32,13 @@ Evidence is bounded local source/configuration metadata readback. No credentials
 
 ## Selected AP mechanisms
 
-Links identify AP source at the baseline; external paths identify host observations. The [source registry](../architecture/capability-source-owners.json) supplies reference leads, not live-consumer assertions.
+Links identify AP source at the baseline; external paths identify host observations. The [source registry](https://github.com/park-kyungchan/agent-platform/blob/ff4a55d71975bbd0aaa95ab8f50b940c3ab31a90/architecture/capability-source-owners.json) supplies reference leads, not live-consumer assertions.
 
 | Mechanism / source | Disposition and retained owner | Actual selected caller evidence | Pending closure |
 | --- | --- | --- | --- |
 | [Generic allocation](../packages/work-continuity/src/git-work/allocation.ts), [logical identity](../packages/work-continuity/src/logical-identity.ts), effective contracts and Work codecs | Retire generic Domain/Project/Work/Task/Run machinery; no Rust allocator counterpart. Use short work/state files. | The [root facade at the predecessor](https://github.com/park-kyungchan/agent-platform/blob/01fe80a5a40bdca30aa8ab7c954bbac33d58e2f2/scripts/harness.ts) imported Git Work/v3 allocation. Its command/export and package `harness` script are now retired; existing direct APIs and Work check aliases remain. | Source/CI consumers require removal in their slice; do not create new records through these APIs. |
 | [Context/handoff/Memory](../packages/work-continuity/src/context/index.ts), [generic effect fences](../packages/work-continuity/src/git-work/context.ts) | Retire owned harness; retain native CLI context, official Hindsight and domain-owned business effects. | Agent-harness `src/native/context-owner.ts` refers to `@palantirkc/work-continuity/context` and `/git-work`; its manifest retains the file dependency. | Selected hook detachment below does not close owner scripts, loaded sessions or durable business-state compatibility. |
-| [Review/receipt CI](../ci/source-check.ts), [trusted workflow at the retained predecessor](https://github.com/park-kyungchan/agent-platform/blob/00ff3eefb3948ba669031ca08789f118eea30d87/.github/workflows/trusted-source.yml) | Retire after CI replacement; retain independent review, findings and explicit Lead integration through ordinary tools. | [source.yml](../.github/workflows/source.yml) invokes source-author verification and source-check; trusted workflow invokes its controller. | Hosted workflow/branch requirements are unverified. Do not run, restore or redesign the retired controller/registry protocol for S01. |
+| [Review/receipt CI](https://github.com/park-kyungchan/agent-platform/blob/ff4a55d71975bbd0aaa95ab8f50b940c3ab31a90/ci/source-check.ts), [trusted workflow at the retained predecessor](https://github.com/park-kyungchan/agent-platform/blob/00ff3eefb3948ba669031ca08789f118eea30d87/.github/workflows/trusted-source.yml) | Retire after CI replacement; retain independent review, findings and explicit Lead integration through ordinary tools. | [source.yml](../.github/workflows/source.yml) invokes source-author verification and source-check; trusted workflow invokes its controller. | Hosted workflow/branch requirements are unverified. Do not run, restore or redesign the retired controller/registry protocol for S01. |
 | [Codex adapter](../packages/native-codex-adapter/src/native/source-v1.ts) and provider registrations | Replace retained configuration behavior with minimal `ap`; retire adapter after actual closure. | Agent-harness `src/native/hooks.ts` imports the adapter; `hook-cli.ts` reads provider closure. Two owner registration JSON files still name the former `/home/palantirkc/projects/agent-platform` root. | Six old project hook selectors are disabled, but remaining source calls, stale-path registrations and loaded clients are not closed. Preserve guards; do not renew obsolete pins speculatively. |
 | [Hermes adapter](../packages/native-hermes-adapter) | Retire owned harness after closure; preserve native Hermes/container authority, profiles, sessions, data, official integrations and Academy relay. | Hermes engineering manifest retains the adapter; seven `src/ontology-driven/*.ts` forwarders import its subpaths; `provider-source.ts` and registration remain. | Registry-listed owner `src/ontology-driven/native-package.ts` is absent. Remote/container loaded graph was not probed; one absent file does not close the adapter. |
 | [Artifact Ontology](../packages/ontology/src/generated/contracts.ts), [releases](../releases) | New operational `ontology-platform` replaces product meaning; freeze required immutable 0.1.0/0.2.0 bytes/pins until closure. No universal Work-schema port. | Education root manifest uses vendored Ontology 0.2.0; Academy `scripts/agent-platform.ts` verifies/loads pinned Ontology and Work context, while `scripts/generate-ci.ts` packages immutable bytes. | Pilot/build callers and copied source remain pending closure. A vendored archive is not a live import from AP main. |
