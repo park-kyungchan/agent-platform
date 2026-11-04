@@ -1,0 +1,65 @@
+networks:
+  frontend:
+    driver: bridge
+services:
+  traefik:
+    image: docker.io/library/traefik:v3.7.15@sha256:10cc4f33663c9d71049b71775d0b2ac67c18f7ade489ce9d826acc292d7eb82a
+    restart: unless-stopped
+    command:
+    - --log.level=INFO
+    - --accesslog=true
+    - --api.dashboard=false
+    - --providers.file.filename=/etc/traefik/dynamic.yml
+    - --providers.file.watch=true
+    - --entrypoints.web.address=:80
+    - --entrypoints.websecure.address=:443
+    - --entrypoints.web.http.redirections.entrypoint.to=websecure
+    - --entrypoints.web.http.redirections.entrypoint.scheme=https
+    - --entrypoints.websecure.http.tls=true
+    ports:
+    - 127.0.0.1:8443:443
+    volumes:
+    - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    - ./traefik/certs:/certs:ro
+    networks:
+    - frontend
+    security_opt:
+    - no-new-privileges:true
+  hermes-serve:
+    image: hermes-agent:main-349e4f7e620ea1be6a8b5703d7152cf1e5ed9998-desktop
+    pull_policy: never
+    restart: unless-stopped
+    command:
+    - serve
+    - --host
+    - 0.0.0.0
+    - --port=9120
+    - --skip-build
+    env_file:
+    - .env
+    - ./hermes-oidc.env
+    expose:
+    - '9119'
+    - 9120/tcp
+    volumes:
+    - ./data:/opt/data
+    - /root/.agents:/opt/host-agents:ro
+    shm_size: 1gb
+    environment:
+      HERMES_DASHBOARD: '1'
+      HERMES_DASHBOARD_HOST: 0.0.0.0
+      HERMES_DASHBOARD_PORT: '9119'
+      HERMES_DASHBOARD_BASIC_AUTH_USERNAME: ${ADMIN_USERNAME}
+      HERMES_DASHBOARD_BASIC_AUTH_PASSWORD: ${ADMIN_PASSWORD}
+      HERMES_DASHBOARD_BASIC_AUTH_SECRET: ${HERMES_DASHBOARD_BASIC_AUTH_SECRET}
+    networks:
+    - frontend
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://127.0.0.1:9120/api/status >/dev/null || exit 1
+      interval: 10s
+      start_interval: 2s
+      timeout: 5s
+      retries: 12
+      start_period: 30s

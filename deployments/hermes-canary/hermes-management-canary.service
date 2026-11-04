@@ -1,0 +1,24 @@
+[Unit]
+Description=Hermes management isolated inert canary
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sleep infinity
+Restart=no
+DynamicUser=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+MemoryMax=16M
+TasksMax=4
+CPUQuota=1%
+TimeoutStopSec=5s

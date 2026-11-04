@@ -1,0 +1,56 @@
+[
+  {
+    "source": "/etc/ssh/sshd_config.d/90-tailscale-only.conf",
+    "destination": "deployments/ssh/90-tailscale-only.conf",
+    "sha256": "b814188133213986b5707033fc1f2488d34c62d0f60e5d3419970004c3333a81",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/systemd/system/ssh.socket.d/override.conf",
+    "destination": "deployments/ssh/ssh.socket.d/override.conf",
+    "sha256": "498869329befd222f141ba3ac88acc29171861cafa2d4b0d330119342462aa16",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/docker/hermes-agent-2q3y/docker-compose.yml",
+    "destination": "deployments/hermes-agent/docker-compose.yml",
+    "sha256": "0ee48e4183ed8ac172029f94d1c5d0b914f5365d4020d5bde8521b01fca211be",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/docker/hermes-agent-2q3y/traefik/dynamic.yml",
+    "destination": "deployments/hermes-agent/traefik/dynamic.yml",
+    "sha256": "72d2c4616f934df18392c50d785c3a2bd9ac1bd0642d2b3cc4240d04dbee775f",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/docker/hindsight/compose.yaml",
+    "destination": "deployments/hindsight/compose.yaml",
+    "sha256": "6868cd55e24f0a1e47a8fde8237ddce5376b706e1a42a9f2c2e781032cf9d249",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/docker/tsidp/compose.yaml",
+    "destination": "deployments/tsidp/compose.yaml",
+    "sha256": "e443d39ade6d9c247a7aca24cd59e68d1b7e00fa7c5eefebc77755ddf2d1f006",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/cron.d/docker-builder-prune",
+    "destination": "deployments/host-cron/docker-builder-prune",
+    "sha256": "fa1d1b036998ea50948d9f17baa2a12ff7bdc9f155f47be01f74cb1ae58247c7",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/cron.d/docker-image-prune",
+    "destination": "deployments/host-cron/docker-image-prune",
+    "sha256": "14b4efd4e22f39e53f1660dc81e40835d4ee1adcb41a5cd3f066bcab1c9b5b11",
+    "sanitization": "none; existing environment placeholders preserved"
+  },
+  {
+    "source": "/etc/systemd/system/hermes-management-canary.service",
+    "destination": "deployments/hermes-canary/hermes-management-canary.service",
+    "sha256": "c9faba725e2798a42d9dd07933e91b66cb4403faf99964ae675e78a76b29e9e6",
+    "sanitization": "none; existing environment placeholders preserved"
+  }
+]

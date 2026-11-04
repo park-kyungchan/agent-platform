@@ -2,7 +2,6 @@
 Description=Owned public VXLAN ingress restriction for srv1873899
 Wants=network-online.target
 After=network-online.target tailscaled.service docker.service
-Before=herdr-runtime.service
 
 [Service]
 Type=oneshot

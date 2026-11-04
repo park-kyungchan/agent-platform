@@ -1,7 +1,7 @@
 {
   "schema": "vps.herdr-network-policy.v1",
   "ownerProject": "vps-operations",
-  "status": "local-candidate-awaiting-independent-review-and-root-application",
+  "status": "tracked-source-policy-live-application-not-implied",
   "hostId": "srv1873899",
   "workContinuation": "prepare-only-manual-resume",
   "nativeModelCalls": 0,
@@ -10,40 +10,8 @@
     "Existing Windows Desktop installation path and HTTPS/API/WebSocket route",
     "Tailscale SSH22 and Serve443",
     "Host OpenSSH listen/socket/boot routing",
-    "Hermes native owner, current containers, profiles and session data",
-    "All persistent Herdr home and SSH host-key binds",
-    "Docker, Tailscale, Kubernetes and Flannel rules outside the owned chain and jump"
+    "Hermes native owner, current containers, profiles and session data"
   ],
-  "herdrEndpoint": {
-    "publication": "127.0.0.1:2222:22/tcp",
-    "clientAlias": "srv1873899",
-    "compatibleClientAlias": "srv1873899-herdr",
-    "clientHostName": "127.0.0.1",
-    "transport": "Existing Tailscale SSH22 ProxyCommand to VPS loopback",
-    "bridgeSubnet": "172.16.4.0/24",
-    "bridgeGateway": "172.16.4.1",
-    "containerIpv4": "172.16.4.2",
-    "recreationGate": [
-      "Finish admitted artifact transfer and inspect fresh actual pane, agent and process state",
-      "Only the owned Herdr container is a member of herdr-runtime_default",
-      "No active job, model turn or authentication flow will be interrupted",
-      "Never remove persistent binds or another Compose project"
-    ]
-  },
-  "independentSsh": {
-    "existingVerifiedEndpoint": "root@100.95.133.99:22",
-    "server": "host OpenSSH for container-origin traffic",
-    "sourceIpv4": "172.16.4.2",
-    "identityFingerprint": "SHA256:Ldr0Fx8mBbSxRJuK2W46wZLRMPCmRoNloQtb9K8C9Ss",
-    "hostEd25519Fingerprint": "SHA256:UdCSDc3uPy5xd4wy/aiyJoqy/ega46Q4zP27whF+JVQ",
-    "registeredKeyOptions": ["from=172.16.4.2", "restrict", "pty"],
-    "privateKeyCopied": false,
-    "keyOrHostKeyRotationInThisPolicy": false,
-    "originalReceipts": [
-      "runs/herdr-session-handoff-20261015/ssh-auth-apply-receipt.json",
-      "runs/herdr-session-handoff-20261015/ssh-client-apply-receipt.json"
-    ]
-  },
   "hostSshPolicy": {
     "sourceTemplate": "00-herdr-runtime-key-only.conf",
     "installedTemplate": "/usr/local/share/herdr-network/00-herdr-runtime-key-only.conf",
@@ -56,21 +24,33 @@
       "authenticationmethods": "publickey",
       "permitrootlogin": "prohibit-password-or-without-password"
     },
-    "validation": ["sshd -t", "Real sshd -T for global configuration", "Real sshd -T -C for root from 172.16.4.2 to 100.95.133.99:22"],
+    "validation": [
+      "sshd -t",
+      "Real sshd -T for global configuration"
+    ],
     "lifecycle": "Reload ssh.service only after syntax and effective policy pass; never restart or change ssh.socket here.",
     "failure": "An unvalidated newly created include is removed without reloading. After reload is attempted, preserve validated source and inspect native state before any retry."
   },
   "firewallPolicy": {
     "installedHelper": "/usr/local/sbin/herdr-network-firewall",
     "installedUnit": "/etc/systemd/system/herdr-network-firewall.service",
-    "tables": ["IPv4 filter", "IPv6 filter"],
+    "tables": [
+      "IPv4 filter",
+      "IPv6 filter"
+    ],
     "chain": "HERDR-NET-PUBLIC",
     "comment": "herdr-network-public-vxlan",
     "jump": "First INPUT rule: incoming eth0, UDP destination 8472 -> owned chain",
     "ownedChainRule": "Commented DROP",
     "globalFlush": false,
     "legacyNetworkRemoval": false,
-    "allowedByNonMatch": ["Loopback", "Tailscale interfaces", "Docker bridge interfaces", "TCP SSH/HTTPS", "UDP41641"],
+    "allowedByNonMatch": [
+      "Loopback",
+      "Tailscale interfaces",
+      "Docker bridge interfaces",
+      "TCP SSH/HTTPS",
+      "UDP41641"
+    ],
     "persistence": "Native systemd oneshot reasserts only this rule and chain after network-online.target and the native Tailscale/Docker startup ordering.",
     "unitStop": "Does not withdraw packet filtering; explicit helper remove is required for reversal.",
     "unexpectedOwnership": "Refuse unexpected owned-chain contents or references; never flush or replace foreign rules.",
@@ -78,9 +58,12 @@
   },
   "verificationLimits": [
     "Local syntax and source review do not establish host application.",
-    "sshd -T reads disk configuration; a fresh container-origin SSH connection verifies authentication after reload.",
     "Firewall rule checks establish the configured narrow INPUT block, not Hostinger control-plane firewall state or external packet arrival.",
-    "Docker healthy means SSH bootstrap readiness, not Herdr/Codex running.",
     "No automatic native Work resume is part of the network policy."
-  ]
+  ],
+  "nativeHerdr": {
+    "mechanism": "herdr server",
+    "deployment": "native host process",
+    "containerRuntimeRetired": true
+  }
 }
