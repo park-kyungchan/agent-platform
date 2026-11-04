@@ -25,6 +25,9 @@ fn frozen_library_cases_and_pure_projection() {
                     Selector::ClaudeCanonicalImport => {
                         projected.claude.instructions = artifact.after.clone();
                     }
+                    Selector::AgyInstructionLink | Selector::AgyGeminiAlias => {
+                        panic!("{id}: frozen S02 must not emit an agy selector");
+                    }
                 }
             }
             let repeated = render(&projected).unwrap_or_else(|error| {

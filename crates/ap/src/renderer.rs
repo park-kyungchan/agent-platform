@@ -106,7 +106,33 @@ fn claude_file(text: &str, canonical: &str) -> Result<String, RenderError> {
     Ok(result)
 }
 
-/// Propose the two owned native instruction entries without external effects.
+fn instruction_link(
+    entry: &Entry,
+    config_dir: &str,
+    canonical: &str,
+    field: &str,
+    target_field: &str,
+) -> Result<Entry, RenderError> {
+    match entry {
+        Entry::Missing => Ok(Entry::Symlink {
+            target: canonical.into(),
+        }),
+        Entry::File { .. } => Err(error(ErrorCode::InstructionConflict, field)),
+        Entry::Unsupported { .. } => Err(error(ErrorCode::UnsupportedTarget, field)),
+        Entry::Symlink { target } => {
+            if !link_target_syntax(target) {
+                return Err(error(ErrorCode::InvalidPath, target_field));
+            }
+            match link_matches(target, config_dir, canonical) {
+                None => Err(error(ErrorCode::UnsupportedTarget, field)),
+                Some(false) => Err(error(ErrorCode::InstructionConflict, field)),
+                Some(true) => Ok(entry.clone()),
+            }
+        }
+    }
+}
+
+/// Propose explicit owned native instruction entries without external effects.
 pub fn render(request: &RenderRequest) -> Result<RenderPlan, RenderError> {
     if request.schema_version != 1 {
         return Err(error(ErrorCode::UnsupportedSchema, "schema_version"));
@@ -120,6 +146,11 @@ pub fn render(request: &RenderRequest) -> Result<RenderPlan, RenderError> {
             return Err(error(ErrorCode::InvalidPath, field));
         }
     }
+    if let Some(agy) = &request.agy
+        && !absolute_path(&agy.config_dir)
+    {
+        return Err(error(ErrorCode::InvalidPath, "agy.config_dir"));
+    }
     for entry in &request.preserved {
         if !absolute_path(&entry.path) {
             return Err(error(ErrorCode::InvalidPath, "preserved.path"));
@@ -129,8 +160,21 @@ pub fn render(request: &RenderRequest) -> Result<RenderPlan, RenderError> {
     let codex_path = format!("{}/AGENTS.md", request.codex.config_dir);
     let override_path = format!("{}/AGENTS.override.md", request.codex.config_dir);
     let claude_path = format!("{}/CLAUDE.md", request.claude.config_dir);
-    let owned_paths = [&codex_path, &override_path, &claude_path];
+    let agy_paths = request.agy.as_ref().map(|agy| {
+        [
+            format!("{}/AGENTS.md", agy.config_dir),
+            format!("{}/GEMINI.md", agy.config_dir),
+        ]
+    });
+    let mut owned_paths = vec![&codex_path, &override_path, &claude_path];
+    if let Some(paths) = &agy_paths {
+        owned_paths.extend(paths);
+    }
     if request.codex.config_dir == request.claude.config_dir
+        || request.agy.as_ref().is_some_and(|agy| {
+            agy.config_dir == request.codex.config_dir
+                || agy.config_dir == request.claude.config_dir
+        })
         || owned_paths.contains(&&request.canonical_path)
     {
         return Err(error(ErrorCode::PathCollision, "profiles"));
@@ -152,29 +196,13 @@ pub fn render(request: &RenderRequest) -> Result<RenderPlan, RenderError> {
             "codex.instruction_override",
         ));
     }
-    let codex_after = match &request.codex.instructions {
-        Entry::Missing => Entry::Symlink {
-            target: request.canonical_path.clone(),
-        },
-        Entry::File { .. } => {
-            return Err(error(ErrorCode::InstructionConflict, "codex.instructions"));
-        }
-        Entry::Unsupported { .. } => {
-            return Err(error(ErrorCode::UnsupportedTarget, "codex.instructions"));
-        }
-        Entry::Symlink { target } => {
-            if !link_target_syntax(target) {
-                return Err(error(ErrorCode::InvalidPath, "codex.instructions.target"));
-            }
-            match link_matches(target, &request.codex.config_dir, &request.canonical_path) {
-                None => return Err(error(ErrorCode::UnsupportedTarget, "codex.instructions")),
-                Some(false) => {
-                    return Err(error(ErrorCode::InstructionConflict, "codex.instructions"));
-                }
-                Some(true) => request.codex.instructions.clone(),
-            }
-        }
-    };
+    let codex_after = instruction_link(
+        &request.codex.instructions,
+        &request.codex.config_dir,
+        &request.canonical_path,
+        "codex.instructions",
+        "codex.instructions.target",
+    )?;
     let claude_after = match &request.claude.instructions {
         Entry::Missing => Entry::File {
             text: format!("@{}\n", request.canonical_path),
@@ -202,6 +230,39 @@ pub fn render(request: &RenderRequest) -> Result<RenderPlan, RenderError> {
             after: claude_after,
         },
     ];
+    if let Some(agy) = &request.agy {
+        for (name, selector, before, field, target_field) in [
+            (
+                "AGENTS.md",
+                Selector::AgyInstructionLink,
+                &agy.instructions,
+                "agy.instructions",
+                "agy.instructions.target",
+            ),
+            (
+                "GEMINI.md",
+                Selector::AgyGeminiAlias,
+                &agy.gemini_alias,
+                "agy.gemini_alias",
+                "agy.gemini_alias.target",
+            ),
+        ] {
+            let after = instruction_link(
+                before,
+                &agy.config_dir,
+                &request.canonical_path,
+                field,
+                target_field,
+            )?;
+            artifacts.push(Artifact {
+                path: format!("{}/{name}", agy.config_dir),
+                selector,
+                before: before.clone(),
+                changed: *before != after,
+                after,
+            });
+        }
+    }
     artifacts.sort_by(|a, b| a.path.as_bytes().cmp(b.path.as_bytes()));
     let mut preserved = request.preserved.clone();
     preserved.sort_by(|a, b| a.path.as_bytes().cmp(b.path.as_bytes()));

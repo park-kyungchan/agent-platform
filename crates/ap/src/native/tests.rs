@@ -13,6 +13,15 @@ struct Fixture {
     spec: Spec,
 }
 impl Fixture {
+    fn agy() -> Self {
+        let mut f = Self::new();
+        let dir = f.root.join("c-agy");
+        fs::create_dir(&dir).unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+        f.spec.agy_dir = Some(dir.to_str().unwrap().into());
+        f.spec.scope = Scope::Agy;
+        f
+    }
     fn new() -> Self {
         let parent = PathBuf::from(
             std::env::var_os("AP_S03_TEST_ROOT").expect("explicit AP_S03_TEST_ROOT required"),
@@ -51,6 +60,7 @@ impl Fixture {
             environment: Environment::Disposable {
                 root: root.to_str().unwrap().into(),
             },
+            agy_dir: None,
         };
         Self { root, spec }
     }
@@ -366,5 +376,90 @@ fn lexical_dotdot_must_not_hide_a_traversed_symlink_or_missing_directory() {
             plan(&f.spec).unwrap_err(),
             err("unsupported_target", "target")
         );
+    }
+}
+
+#[test]
+fn agy_partial_apply_preserves_unattempted_foreign_alias() {
+    let f = Fixture::agy();
+    let request = f.request();
+    let alias = f.root.join("c-agy/GEMINI.md");
+    let mut hook = |point, index| {
+        if point == Point::BeforeRecheck && index == 1 {
+            fs::write(&alias, "# Foreign concurrent edit\n").unwrap();
+        }
+        Ok(())
+    };
+    let result = apply_observed(&request, &mut hook).unwrap();
+    assert_eq!(result.outcome, "partial");
+    assert_eq!(phases(&result), [Phase::Applied, Phase::Conflicted]);
+    assert_eq!(
+        result.error,
+        Some(err("expected_before_conflict", "target"))
+    );
+    assert_eq!(recover(&f.recovery()).unwrap().outcome, "recovered");
+    assert!(fs::symlink_metadata(f.root.join("c-agy/AGENTS.md")).is_err());
+    assert_eq!(fs::read(alias).unwrap(), b"# Foreign concurrent edit\n");
+}
+
+#[test]
+fn agy_rechecks_ancestors_and_shares_one_profile_lock() {
+    let f = Fixture::agy();
+    let request = f.request();
+    let dir = Dir::open(f.spec.agy_dir.as_ref().unwrap(), f.spec.uid).unwrap();
+    let lock = dir.lock(f.spec.uid).unwrap();
+    assert_eq!(apply(&request).unwrap_err(), err("lock_busy", "lock"));
+    drop(lock);
+    let mut hook = |point, index| {
+        if point == Point::BeforeRecheck && index == 1 {
+            fs::rename(f.root.join("c-agy"), f.root.join("displaced-agy")).unwrap();
+            fs::create_dir(f.root.join("c-agy")).unwrap();
+        }
+        Ok(())
+    };
+    let r = apply_observed(&request, &mut hook).unwrap();
+    assert_eq!(phases(&r), [Phase::Applied, Phase::Conflicted]);
+    assert_eq!(
+        r.error,
+        Some(err("expected_before_conflict", "dependencies"))
+    );
+    assert!(fs::symlink_metadata(f.root.join("displaced-agy/AGENTS.md")).is_ok());
+    assert!(fs::symlink_metadata(f.root.join("displaced-agy/GEMINI.md")).is_err());
+    assert!(fs::symlink_metadata(f.root.join("c-agy/GEMINI.md")).is_err());
+}
+
+#[test]
+fn agy_process_death_install_and_recovery_reconcile_without_reapply() {
+    for mode in ["install", "recover"] {
+        let f = Fixture::agy();
+        fs::write(
+            f.root.join("spec.json"),
+            serde_json::to_vec(&f.spec).unwrap(),
+        )
+        .unwrap();
+        if mode == "recover" {
+            apply(&f.request()).unwrap();
+        }
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "native::install::tests::crash_worker",
+                "--nocapture",
+            ])
+            .env("AP_S03_CRASH_ROOT", &f.root)
+            .env("AP_S03_CRASH_MODE", mode)
+            .status()
+            .unwrap();
+        assert_eq!(status.code(), Some(77));
+        let expected = if mode == "install" {
+            vec![Phase::Prepared, Phase::Pending]
+        } else {
+            vec![Phase::Applied, Phase::Recovering]
+        };
+        assert_eq!(f.state().phases, expected);
+        assert_eq!(recover(&f.recovery()).unwrap().outcome, "recovered");
+        for name in ["AGENTS.md", "GEMINI.md"] {
+            assert!(fs::symlink_metadata(f.root.join("c-agy").join(name)).is_err());
+        }
     }
 }

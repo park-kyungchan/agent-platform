@@ -31,6 +31,14 @@ Agent-harness above is `/home/palantirkc/projects/agent-harness-engineering`; `c
 
 ## Four active CLI dispositions (AP-08)
 
+2026-11-04 source update: [AP-08 dispositions](ap-08-dispositions.md) records the
+new agy two-link adapter and explicit Muse `retained_native_mechanism` disposition.
+It supersedes the pending-adapter wording in this dated S01 table. Muse's foreign
+Claude import is literal; supply canonical and task STATE explicitly in handoffs.
+New agy-scope doctor reports that disposition while legacy report bytes remain
+unchanged. Live install and fresh affected-session proof remain user-gated;
+this source update does not establish whole-P6 completion or support deletion.
+
 All four are user-confirmed in use and have executables on PATH. Preparation's version observations are dated evidence: Codex 0.165.0, Claude Code 2.1.316, Muse 1.4.14-R7309.1 and agy 1.4.12. S01 rechecked configuration/pointer metadata, not versions or fresh-session loading. Native surfaces are documented in `/root/.agents/runtime-references/RUNTIME-LOADING.md` and preparation's installed-help snapshots; adapter qualification remains S02/S03.
 
 | Runtime | Observed instruction/configuration surface | Disposition / candidate ownership | Preserved behavior and required proof |

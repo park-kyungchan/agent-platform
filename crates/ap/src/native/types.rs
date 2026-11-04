@@ -12,6 +12,12 @@ pub struct Spec {
     pub scope: Scope,
     pub uid: u32,
     pub environment: Environment,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::types::optional_profile"
+    )]
+    pub agy_dir: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -20,6 +26,7 @@ pub enum Scope {
     Codex,
     Claude,
     Both,
+    Agy,
 }
 impl Scope {
     pub(crate) fn codex(self) -> bool {
@@ -208,4 +215,16 @@ pub struct DoctorReport {
     pub native_loading: String,
     pub hooks_executed: u32,
     pub p6_complete: bool,
+    /// New agy-scope consumer coverage; legacy reports retain their frozen bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub muse: Option<MuseDisposition>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct MuseDisposition {
+    pub disposition: String,
+    pub canonical_path: String,
+    pub handoff_requires_task_state: bool,
+    pub native_loading: String,
 }

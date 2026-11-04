@@ -2,7 +2,7 @@ use std::fs::File;
 
 use super::filesystem::{self as io, Dir, Stage};
 use super::types::*;
-use crate::{ClaudeProfile, CodexProfile, Entry, RenderRequest, Selector};
+use crate::{AgyProfile, ClaudeProfile, CodexProfile, Entry, RenderRequest, Selector};
 
 pub(super) fn validate_spec(spec: &Spec) -> Result<()> {
     if spec.schema_version != 1 {
@@ -11,25 +11,32 @@ pub(super) fn validate_spec(spec: &Spec) -> Result<()> {
     if spec.uid != rustix::process::geteuid().as_raw() {
         return Err(err("uid_mismatch", "uid"));
     }
-    for path in [&spec.canonical_path, &spec.codex_dir, &spec.claude_dir] {
+    if (spec.scope == Scope::Agy) != spec.agy_dir.is_some() {
+        return Err(err("invalid_profile", "agy_dir"));
+    }
+    let mut profile_dirs = vec![&spec.codex_dir, &spec.claude_dir];
+    profile_dirs.extend(spec.agy_dir.iter());
+    for path in std::iter::once(&spec.canonical_path).chain(profile_dirs.iter().copied()) {
         if !io::valid_path(path) {
             return Err(err("invalid_path", "profiles"));
         }
     }
-    if spec.codex_dir == spec.claude_dir
-        || io::beneath(&spec.codex_dir, &spec.claude_dir)
-        || io::beneath(&spec.claude_dir, &spec.codex_dir)
-        || [&spec.codex_dir, &spec.claude_dir]
+    if profile_dirs.iter().enumerate().any(|(i, a)| {
+        profile_dirs
             .iter()
-            .any(|p| spec.canonical_path == **p || io::beneath(&spec.canonical_path, p))
+            .skip(i + 1)
+            .any(|b| a == b || io::beneath(a, b) || io::beneath(b, a))
+    }) || profile_dirs
+        .iter()
+        .any(|p| spec.canonical_path == **p || io::beneath(&spec.canonical_path, p))
     {
         return Err(err("path_collision", "profiles"));
     }
     match &spec.environment {
         Environment::Disposable { root } => {
             if !io::valid_path(root)
-                || ![&spec.canonical_path, &spec.codex_dir, &spec.claude_dir]
-                    .iter()
+                || !std::iter::once(&spec.canonical_path)
+                    .chain(profile_dirs.iter().copied())
                     .all(|p| io::beneath(p, root))
             {
                 return Err(err("invalid_path", "environment"));
@@ -56,13 +63,27 @@ pub(super) fn profiles(spec: &Spec) -> Vec<(&str, Selector)> {
     if spec.scope.claude() {
         paths.push((spec.claude_dir.as_str(), Selector::ClaudeCanonicalImport));
     }
-    paths.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
+    if spec.scope == Scope::Agy
+        && let Some(path) = &spec.agy_dir
+    {
+        paths.push((path.as_str(), Selector::AgyInstructionLink));
+        paths.push((path.as_str(), Selector::AgyGeminiAlias));
+    }
+    // Preserve legacy profile ordering; only the new same-directory pair needs
+    // a filename tie-breaker. Sorting full paths changes prefix-named profiles.
+    paths.sort_by(|a, b| {
+        a.0.as_bytes()
+            .cmp(b.0.as_bytes())
+            .then_with(|| filename(&a.1).as_bytes().cmp(filename(&b.1).as_bytes()))
+    });
     paths
 }
 fn filename(selector: &Selector) -> &'static str {
     match selector {
         Selector::CodexInstructionLink => "AGENTS.md",
         Selector::ClaudeCanonicalImport => "CLAUDE.md",
+        Selector::AgyInstructionLink => "AGENTS.md",
+        Selector::AgyGeminiAlias => "GEMINI.md",
     }
 }
 pub(super) fn topology(spec: &Spec) -> Result<Vec<DirectoryIdentity>> {
@@ -71,6 +92,7 @@ pub(super) fn topology(spec: &Spec) -> Result<Vec<DirectoryIdentity>> {
         .map(|(p, _)| p)
         .collect::<Vec<_>>();
     paths.push(io::split(&spec.canonical_path)?.0);
+    paths.dedup();
     let mut all = Vec::new();
     for path in paths {
         all.extend(Dir::open(path, spec.uid)?.topology);
@@ -87,6 +109,7 @@ pub(super) fn topology(spec: &Spec) -> Result<Vec<DirectoryIdentity>> {
         .map(|(p, _)| p)
         .collect::<Vec<_>>();
     roots.push(io::split(&spec.canonical_path)?.0);
+    roots.dedup();
     let mut identities = std::collections::HashSet::new();
     for path in roots {
         let id = all
@@ -108,6 +131,11 @@ pub(super) fn override_absent(spec: &Spec) -> Result<()> {
 fn render_entries(spec: &Spec, snapshots: &[Snapshot]) -> Result<Vec<PlannedEntry>> {
     let mut codex = Entry::Missing;
     let mut claude = Entry::Missing;
+    let mut agy = spec.agy_dir.as_ref().map(|dir| AgyProfile {
+        config_dir: dir.clone(),
+        instructions: Entry::Missing,
+        gemini_alias: Entry::Missing,
+    });
     let paths = profiles(spec);
     if snapshots.len() != paths.len() {
         return Err(err("invalid_plan", "entries"));
@@ -116,6 +144,16 @@ fn render_entries(spec: &Spec, snapshots: &[Snapshot]) -> Result<Vec<PlannedEntr
         match selector {
             Selector::CodexInstructionLink => codex = snap.entry.clone(),
             Selector::ClaudeCanonicalImport => claude = snap.entry.clone(),
+            Selector::AgyInstructionLink => {
+                agy.as_mut()
+                    .ok_or_else(|| err("invalid_plan", "entries"))?
+                    .instructions = snap.entry.clone();
+            }
+            Selector::AgyGeminiAlias => {
+                agy.as_mut()
+                    .ok_or_else(|| err("invalid_plan", "entries"))?
+                    .gemini_alias = snap.entry.clone();
+            }
         }
     }
     let request = RenderRequest {
@@ -131,6 +169,7 @@ fn render_entries(spec: &Spec, snapshots: &[Snapshot]) -> Result<Vec<PlannedEntr
             instructions: claude,
         },
         preserved: vec![],
+        agy,
     };
     let rendered = crate::render(&request).map_err(|e| {
         let code = serde_json::to_value(e.code)
@@ -170,7 +209,15 @@ pub fn plan(spec: &Spec) -> Result<InstallPlan> {
         let name = filename(&selector);
         let snap = dir.snapshot(name, spec.uid)?;
         match selector {
-            Selector::CodexInstructionLink => io::direct_link(&dir, name, spec, &snap)?,
+            Selector::CodexInstructionLink => {
+                io::direct_link(&dir, name, spec, &snap, "codex.instructions")?
+            }
+            Selector::AgyInstructionLink => {
+                io::direct_link(&dir, name, spec, &snap, "agy.instructions")?
+            }
+            Selector::AgyGeminiAlias => {
+                io::direct_link(&dir, name, spec, &snap, "agy.gemini_alias")?
+            }
             Selector::ClaudeCanonicalImport => {
                 if matches!(snap.entry, Entry::Symlink { .. }) {
                     return Err(err("unsupported_target", "claude.instructions"));
@@ -248,7 +295,10 @@ pub(super) fn command_dir(path: &str, spec: &Spec) -> Result<Dir> {
     if !io::valid_path(path) {
         return Err(err("invalid_path", "command_dir"));
     }
-    for protected in [&spec.codex_dir, &spec.claude_dir, &spec.canonical_path] {
+    for protected in [&spec.codex_dir, &spec.claude_dir, &spec.canonical_path]
+        .into_iter()
+        .chain(spec.agy_dir.iter())
+    {
         if path == protected || io::beneath(path, protected) || io::beneath(protected, path) {
             return Err(err("path_collision", "command_dir"));
         }
@@ -273,7 +323,10 @@ pub(super) fn command_dir(path: &str, spec: &Spec) -> Result<Dir> {
 }
 pub(super) fn locks(spec: &Spec) -> Result<Vec<File>> {
     let mut held = Vec::new();
-    for (path, _) in profiles(spec) {
+    let mut paths: Vec<_> = profiles(spec).into_iter().map(|(path, _)| path).collect();
+    paths.sort_unstable();
+    paths.dedup();
+    for path in paths {
         let dir = Dir::open(path, spec.uid)?;
         held.push(dir.lock(spec.uid)?);
         dir.recheck(spec.uid)?;
