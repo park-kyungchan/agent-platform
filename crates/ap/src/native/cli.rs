@@ -46,6 +46,24 @@ pub fn dispatch(args: &[std::ffi::OsString]) -> Option<ExitCode> {
     if args.len() != 2 {
         return None;
     }
+    if args[0] == "render" && args[1] == "content" {
+        return Some(match read::<super::content::RenderContentRequest>() {
+            Err(code) => code,
+            Ok(request) => match super::content::render(&request) {
+                Ok(value) => write(&value, 0),
+                Err(e) => fail(&e.code, &e.field, 3),
+            },
+        });
+    }
+    if args[0] == "doctor" && args[1] == "content" {
+        return Some(match read::<super::content::ContentSpec>() {
+            Err(code) => code,
+            Ok(spec) => match super::content::doctor(&spec) {
+                Ok(value) => write(&value, 0),
+                Err(e) => fail(&e.code, &e.field, 3),
+            },
+        });
+    }
     if args[0] == "install" && args[1] == "--help" {
         return Some(if io::stdout().lock().write_all(HELP.as_bytes()).is_ok() {
             ExitCode::SUCCESS

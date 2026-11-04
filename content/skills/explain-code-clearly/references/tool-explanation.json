@@ -1,0 +1,105 @@
+{
+  "schema": "explain-code-clearly.tool-explanation-reference.v1",
+  "purpose": [
+    "Collaborative work design and control with an agent",
+    "Understanding sufficient for implementation and debugging"
+  ],
+  "progression": {
+    "newTopic": "Brief actual component topology, then the selected action",
+    "followUp": "Resolve the specific confusion without restarting the whole catalog",
+    "defaultDetail": "Core causal flow",
+    "expandWhen": "User requests parameters, exhaustive lists, failure cases, implementation detail or a material condition requires explanation"
+  },
+  "terms": [
+    {
+      "id": "tool",
+      "meaning": "Named callable interface offered to the model; accepts arguments and returns a result."
+    },
+    {
+      "id": "action",
+      "meaning": "Operation selector inside one tool, when the schema uses a discriminator."
+    },
+    {
+      "id": "argument",
+      "meaning": "Value supplied to a tool or function; distinguish required, optional and default values only as relevant."
+    },
+    {
+      "id": "helper-function",
+      "meaning": "Function executed inside submitted code; not automatically a separate model-facing tool."
+    },
+    {
+      "id": "executor",
+      "meaning": "Concrete process/runtime interpreting the submitted code or sending the operation."
+    },
+    {
+      "id": "target",
+      "meaning": "Actual browser/window/service/file affected by the operation."
+    },
+    {
+      "id": "state",
+      "meaning": "Value or resource retained, changed or recreated across operations/calls."
+    },
+    {
+      "id": "result",
+      "meaning": "Returned data or observable effect; distinguish transport success from the intended outcome."
+    }
+  ],
+  "conditionalChecks": [
+    {
+      "when": "Comparing modes",
+      "questions": [
+        "Which named tools are exposed?",
+        "Where does the same operation run?",
+        "Can the capability be used under another interface?",
+        "Does changing mode affect only newly created agents?"
+      ]
+    },
+    {
+      "when": "Explaining submitted code",
+      "questions": [
+        "Which exact field contains the code?",
+        "Which language executes it?",
+        "Which helpers are already provided?",
+        "Which statements execute in one call?",
+        "What is returned to the model?"
+      ]
+    },
+    {
+      "when": "Explaining reuse",
+      "questions": [
+        "Is the code saved?",
+        "Which inputs are parameters?",
+        "What output contract and start state are required?",
+        "Which boundaries and failures were actually verified?"
+      ]
+    },
+    {
+      "when": "Explaining a result",
+      "questions": [
+        "Is this an example, expected output or actual observation?",
+        "Did the tool run in the intended session and target?",
+        "Which part is still unverified?"
+      ]
+    }
+  ],
+  "evidenceStates": [
+    "official-guidance",
+    "installed-source",
+    "effective-configuration",
+    "live-tool-exposure",
+    "actual-call",
+    "observed-target-result",
+    "model-behavior"
+  ],
+  "boundaries": [
+    "This reference does not select tools, grant execution permission, register a runtime, call a model or own retries.",
+    "During ongoing work, a local explanation preserves the active objective, plan, ownership and completion criteria; it creates no new prerequisite and does not change native Goal state.",
+    "Default progressive detail does not suppress a material condition that changes the meaning or side effects of the selected operation."
+  ],
+  "exampleFormat": {
+    "toolCall": "Use the actual native tool name and argument field from the applicable schema.",
+    "code": "A minimal supported-language program using verified helper names.",
+    "narration": "Read/change/return in execution order.",
+    "output": "Clearly label illustrative output separately from actual captured evidence."
+  }
+}

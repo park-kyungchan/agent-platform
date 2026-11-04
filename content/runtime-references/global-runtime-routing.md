@@ -1,0 +1,31 @@
+# Runtime routing (on demand)
+
+Start from the active runner's instructions and the selected task's rules/STATE.md. If the work location is unknown, use `codebase-orientation.md`. Approved layout and old-to-new dispositions are under `/home/palantirkc/work/ws-layout-standard/`. Do not re-discover all host repositories to locate one task.
+
+For a specific runner operation, consult its installed help or relevant skill. Herdr control uses the installed Herdr skill and genuine caller context; coordinating several CLIs through Herdr is summarized in `HERDR-ORCHESTRATION.md`, what each CLI loads and when in `RUNTIME-LOADING.md`, and each runtime's official documentation route in `OFFICIAL-DOCS.md`. Host, container, shared daemon and remote executor may have different paths and identities; never infer a Codex pane from tool-shell environment. Preserve SSH host-key checking and the Tailscale boundary. Efficiency rule for a Lead: hand over goal, exact targets, allowed effects, expected output and the task STATE.md path — never a transcript — and verify through returned output or readback, not submission claims.
+
+Instruction/MCP registrations are in `runtime-wiring.md`. Registration, filesystem pointer and a running session's loaded context are separate observations. Use the active Academy release.json rather than assuming the bridge server directory names its current endpoint generation.
+
+Do not alter credentials, global configuration, services or unrelated work merely to orient. Reconcile uncertain real effects before retrying; obey task holds. Credentials never enter output. For Hindsight migration/evaluation, directly inspect relevant user data only within explicit canonical-instruction authorization; other work retains its narrower data boundary.
+
+After a reset re-read task rules and state. Failures locate their cause as `code@path:line` without secrets/private payloads. Current Rust authority is `/home/palantirkc/work/ws-replan/CURRENT-PLAN.md` and its STATE.md, routing to the user-adopted final review ZIP. Previous Rust PLAN v1/WPs/memories are legacy; preserving a live transition consumer does not restore old policy authority.
+
+## Concurrent work across Muse, Claude, Codex and Antigravity CLI
+
+This is operational detail for the canonical runtime core, not a second instruction source or a new work controller. Use existing task STATE and native Git; do not add a global agent registry, lease database, polling watcher or replacement scheduler.
+
+Before dispatch, put each writable boundary and its owner in the existing task state or ordinary work note. Identify exact checkout/branch/base, writable files, forbidden shared targets and needed producer revision. Separate read-only review, isolated implementation and integration. Two agents may share a checkout for read-only work; concurrent mutation needs genuinely disjoint ownership or separate native Git worktrees. A worktree does not isolate global settings, databases, ports, source accounts or shared build targets.
+
+For Rust migration, the Lead integrates shared interfaces, Cargo.lock/manifests, public schemas, generated outputs and global/native configuration. Leaf owners propose shared changes to the integrator instead of editing them independently. One expensive build slot begins at `-j1`; independent source inspection/editing may continue. Use a separate target/output path per independent checkout when concurrent cheap checks need it; do not delete a cache or lock to bypass a live builder. Recheck capacity before increasing concurrency.
+
+Use the existing five-part handoff: goal; exact targets (checkout, base/candidate and writable files); allowed effects; expected output/checks; current STATE path. Within those fields name prerequisites, the oracle that the implementer cannot weaken, who integrates, and the exact next action. A child must receive this explicitly because runtimes differ in inherited history, rules, tools and skills. Do not hand over the transcript or ask every worker to reread every platform/history document.
+
+Before writing, verify actual cwd, Git common directory, branch/HEAD and current dirty state in the assigned checkout; preserve unexpected edits and resolve overlapping ownership at that boundary. On return, report the exact diff/revision, independently observed checks, unresolved findings and any running child/build. The Lead integrates only the returned reviewed revision and its prerequisites; do not silently fetch/reset another owner's tree or cherry-pick an unbounded branch history. Commit/merge/deploy remain distinct effects under task authority.
+
+Resume the exact saved session ID and the same assigned checkout, rather than `--last` when several sessions exist. After resume/compaction reread the short task state and selected contract before effects; a resumed process can retain older instructions/MCP code. If an active writer/build is involved, reconcile its actual state before reassigning or retrying. Native exit0/idle/done and a successful prompt submission do not prove a diff, test pass, drained child or completed business effect.
+
+Keep reference inputs immutable, bound subprocess time/output and retain full logs locally with concise result excerpts. Run the affected meaningful checks; broaden only for changed boundaries or unresolved evidence. A failed dependency stops dependent effects while unrelated read-only/disjoint work may continue. Fix repeated causes at their source rather than identical retries, model swaps or new gates.
+
+The four native launch/resume/isolation differences and official sources are in RUNTIME-LOADING.md. Herdr control, when actually requested, follows its skill and genuine caller identity; no Herdr pane is required merely to use the coordination principles above.
+
+This file is not an automatic loader and does not require reading every runtime reference on every task.
