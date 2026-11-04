@@ -1,5 +1,73 @@
 # S04 bounded source CI consumer closure
 
+## B3-1 manual check retirement — 2026-11-04
+
+This bounded source update supersedes the manual-check retention observations
+below at base `ff4a55d71975bbd0aaa95ab8f50b940c3ab31a90` (PR #93).
+It removes `check:format`, `format`, `check:lint`, `check:architecture` and
+`check:workflows`, their TS driver/validators and check-only tests/fixtures.
+`check:source` and `check:quality` continue to select `ci/check-rust-source.sh`;
+the automatic workflow and `crates/ap/**` are unchanged.
+
+After closing the callers, bounded import/rg checks found zero remaining
+executable readers of `ci/quality/trusted/**`, `architecture/capability-source-owners.json`,
+`architecture/quality-policy.json` and `architecture/hermes-semantic-projection.json`
+in AP or the two audited external `src/` trees. Those roots are deleted.
+Counts: 90 quality files (55 trusted + 35 other), eight other CI files,
+two owner-fixture check/refresh files and three architecture JSON files: 103
+deletions total. Original bytes remain in Git at the base above. No retained
+original data, immutable release, journal or installed source is deleted.
+
+The following support remains because it has concrete consumers:
+
+- All 118 work-continuity, 22 native-codex-adapter and 83 native-hermes-adapter
+  tracked files remain byte-exact. External source/recovery consumers and
+  `check:git-work`, `check:common-work`, `check:handoff`, `check:imports` remain.
+- `ci/quality/tsconfig.json` is read by three work-continuity typecheck tests.
+  `ci/quality/harness-scenarios/fixtures/{work,consumers}.ts` serve the retained
+  Hermes harness-quality test. These three are support data/helpers, with no
+  surviving quality driver or trusted import. The consumers helper still
+  imports native-hermes-adapter: it is **not** AP-importer-free.
+- `owner-fixture/manifest.json`, its eight source snapshots and the native
+  hook-bootstrap test remain. The retained Hermes generator reads the manifest
+  and snapshots; this change removes only the source-check refresh contract
+  and receipt-validator test there.
+- `architecture/runtime-filesystem-contract.json` remains byte-exact: external
+  agent `src/cli.ts:53-54` reaches `src/native/source-provider-candidate.ts:33`,
+  which reads its projection fields. This additional consumer was found by the
+  B3 scan; the prior audit did not establish that this sibling contract was dead.
+- `architecture/common-git-harness.json`, `runtime-documentation-routing/**`
+  and `hermes-new-source-successor.json` remain selected by retained checks or
+  Hermes generation/guards. The four other historical architecture policy/lineage
+  records are outside this newly dead check chain and remain unchanged.
+
+Zero readers does not mean zero historical references. `project.json` retains
+legacy registry/projection pointers; `runtime-filesystem-contract.json:6` retains
+its sourceRegistry string; README/AGENTS and dated records retain navigation.
+No remaining executable field reader dereferences those registry/projection
+pointers. The external candidate validates schema/location/projection fields,
+not sourceRegistry. Preserve its exact contract instead of changing it to clean
+up historical strings. Source navigation in the dated table below is pinned
+to the predecessor for files removed here.
+
+Coverage retired without a Rust equivalent: TS/JSON/Markdown formatting, typed
+ESLint/explicit-any debt audit, workspace ownership/import-boundary/export and
+immutable Ontology generated-output checks, actionlint/ShellCheck/zizmor workflow
+checks, Gitleaks selected-source/canary checks, finite owner snapshot/first-import
+and drift/projection probes, runtime-layout checks and trusted review/receipt
+fixtures. Useful TS and workflow coverage is lost from the manual chain; the
+Rust script covers Rust fmt/tests/clippy/build and frozen conformance only.
+The standalone `check:dependencies` Bun audit stays. Retained Bun package tests
+are not removed or reported as executed. This is retirement, not equivalent
+coverage or whole-S04/S14 acceptance.
+
+Exact commits, reader logs, actual checks and coverage limits are in ws-replan
+`preparation/closure/b3-manual-checks-v1/{HANDOFF.md,ACTUAL-EVIDENCE.json}`.
+Lead independent review, CI and expected-head integration remain required. Next:
+close the external agent's remaining CLI/source/recovery consumers with its
+owner, then reassess the three packages, retained contract and support fixtures.
+
+
 Candidate base: `5ff309f579c521c489b20f19d95b806138967cea` on
 `rust/s04-closed-consumers-20261102`. This is an author handoff, not independent
 review, Lead acceptance, hosted CI success, full S04/AP-08/P6 completion or a
