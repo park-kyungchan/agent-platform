@@ -260,5 +260,35 @@
       "bytes": 23300,
       "recoveryRevision": "470809b"
     }
+  },
+  "hostctlRetirement20261104": {
+    "authority": "Lead Part C: k3s is retired/uninstalled on 2026-11-04; remove its probes and ingress, preserve remaining Bash missing-command diagnostic/exit semantics",
+    "baseRevision": "81087b2ce2ad6d631299a2d1fb94a72fd7594ea2",
+    "legacyHostctlSha256": "441d5a248ac7355607f9469c587f600820ada7d2424cd49789ed555d07334e1e",
+    "fixture": "crates/vps-ops/tests/fixtures/hostctl-v2.json",
+    "fixtureSha256": "0ca0c0105d656098b31c4ccd77b81baf673ea4ae6e0edc7c7210bc6ee0c9e744",
+    "diagnosticOracle": {
+      "program": "/bin/bash",
+      "version": "GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)",
+      "argv": [
+        "/bin/bash",
+        "--noprofile",
+        "--norc",
+        "-c",
+        "\"$@\"",
+        "hermes-hostctl",
+        "<PROGRAM>"
+      ],
+      "environment": {
+        "PATH": "<ROOT>",
+        "LC_ALL": "C"
+      },
+      "normalization": "Remove only the Bash source-location prefix \"hermes-hostctl: line 1: \"; replace disposable root with <ROOT>. Diagnostic bodies, status and stdout are unmodified. Rust has no Bash source location.",
+      "bash_sha256": "bc5945feb8bd26203ebfafea5ce1878bb2e32cb8fb50ab7ae395cfb1e1aaaef1"
+    },
+    "inventoryExpectation": "Explicit retirement policy projection of original inventory: remove k3s service and node probes; keep remaining ordered calls and output. Not an unchanged legacy-oracle claim.",
+    "retiredIngress": "k3s.status returns the existing unsupported-command exit 64 without running a child",
+    "architectureAudit": "No k3s/kubectl/6443 entry in tracked architecture or targets at the base; no unrelated target entries removed",
+    "effects": "Only disposable local Bash failure oracles and deterministic test fixtures; no SSH, Docker, systemd, canary or update actions"
   }
 }

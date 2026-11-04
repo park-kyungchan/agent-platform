@@ -120,7 +120,26 @@ impl Runner for ProcessRunner {
         }
         let mut child = match command.spawn() {
             Ok(c) => c,
-            Err(_) => return Ok(out),
+            Err(error) => {
+                // Preserve the shell diagnostic body without fabricating a
+                // Bash source filename/line. These are local spawn errors,
+                // not observed child stderr or a transport exit status.
+                let diagnostic = match error.kind() {
+                    std::io::ErrorKind::NotFound if spec.program.contains('/') => {
+                        Some("No such file or directory")
+                    }
+                    std::io::ErrorKind::NotFound => Some("command not found"),
+                    std::io::ErrorKind::PermissionDenied => {
+                        out.exit_code = 126;
+                        Some("Permission denied")
+                    }
+                    _ => None,
+                };
+                if let Some(message) = diagnostic {
+                    out.stderr = format!("{}: {message}\n", spec.program);
+                }
+                return Ok(out);
+            }
         };
         out.created = true;
         let mut input = child.stdin.take();
