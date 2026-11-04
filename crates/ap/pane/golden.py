@@ -7,6 +7,7 @@ import builtins
 import contextlib
 import copy
 import io
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,7 @@ import tempfile
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent
+assert hashlib.sha256((ROOT/'reference-pane.sh').read_bytes()).hexdigest() == 'c58948fc590fe1d30c14b0c6e2e069f36f8b2979f808253200d42d0cfe1aaa4b'
 REFERENCE = (ROOT / 'reference-pane.sh').read_text().split("<<'PY'\n", 1)[1].rsplit('\nPY\n', 1)[0]
 
 def oracle(case):

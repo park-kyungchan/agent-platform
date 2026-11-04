@@ -1994,6 +1994,112 @@
     }
   },
   {
+    "name": "bad-resume-['/bin/codex/', 'resume', '01234567-89ab-cdef-0123-456789abcdef']",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex/",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "bad-resume-['/bin/codex/.', 'resume', '01234567-89ab-cdef-0123-456789abcdef']",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex/.",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
     "name": "terminal",
     "args": [],
     "proc": {

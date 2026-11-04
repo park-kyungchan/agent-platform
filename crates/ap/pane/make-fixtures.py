@@ -57,7 +57,7 @@ cases.append(scenario('resume-exports-refused',[P],[resume],mode='none',session=
 cases.append(scenario('resume-pid-changed',[P],[resume],mode='resume',session=SID,latest=inf(procs=[dict(pid=56,argv=['codex','resume',SID])])))
 cases.append(scenario('resume-reported-refused',[reported],[resume],mode='none',session=SID,args=['--resume-candidate']))
 cases.append(scenario('ambiguous-resume',[P,p('wA:p2')],[resume,resume],mode='ambiguous',session=SID,args=['--resume-candidate']))
-for argv in [['codex','resume'],['codex','resume','other'],['not-codex','resume',SID],[1,'resume',SID]]:
+for argv in [['codex','resume'],['codex','resume','other'],['not-codex','resume',SID],[1,'resume',SID],['/bin/codex/','resume',SID],['/bin/codex/.','resume',SID]]:
  cases.append(scenario('bad-resume-'+str(argv),[P],[inf(procs=[dict(pid=55,argv=argv)])],mode='none',session=SID))
 cases.append(scenario('terminal',[P,p('wA:p2')],[inf(20),inf(30)],mode='terminal',ttys=[7],shell_ttys={'20':7,'30':8}))
 cases.append(scenario('terminal-lost',[P],[inf(20)],mode='terminal',ttys=[7],shell_ttys={'20':7},latest=inf(30)))

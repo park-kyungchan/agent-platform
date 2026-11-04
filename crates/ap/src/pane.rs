@@ -80,11 +80,10 @@ fn has_session(p: &Value) -> bool {
     }
 }
 fn is_codex(value: &Value) -> bool {
-    value
-        .as_str()
-        .and_then(|s| Path::new(s).file_name())
-        .is_some_and(|s| s == "codex")
+    // Match os.path.basename literally; Path::file_name normalizes trailing / and /.
+    value.as_str().and_then(|s| s.rsplit('/').next()) == Some("codex")
 }
+
 fn resumed(info: &Value, session: &str) -> Pids {
     if session.is_empty() {
         return Pids::new();
