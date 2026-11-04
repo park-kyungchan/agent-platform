@@ -14,3 +14,7 @@ Content documents describe native integration and existing host paths; copying
 them does not execute a skill, install a runtime or authorize any described
 operation. Update canonical source content deliberately in a reviewed change.
 No generated registry or watcher synchronizes the host.
+
+The Nov4 layout synchronization updates final platform/module names and retired
+repository dispositions. `SHA256SUMS` records the same 19 captured source files;
+it is repository evidence, outside the fixed owned host inventory.

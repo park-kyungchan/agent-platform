@@ -344,6 +344,51 @@ fn command_directory_lock_refuses_cross_scope_reuse() {
 }
 
 #[test]
+fn completed_command_releases_lock_while_inherited_descriptor_remains_open() {
+    let f = Fixture::new();
+    let dir = Dir::private(&f.recovery().command_dir, f.spec.uid).unwrap();
+    let lock = dir.command_lock(f.spec.uid).unwrap();
+    // A concurrent fork inherits this same open file description until exec,
+    // even though the descriptor has CLOEXEC. Duplication makes that lifetime
+    // deterministic without a timing-sensitive fork or production fault hook.
+    let inherited = rustix::io::fcntl_dupfd_cloexec(&lock, 0).unwrap();
+    assert_eq!(
+        dir.command_lock(f.spec.uid).err().unwrap(),
+        err("lock_busy", "command_dir")
+    );
+    drop(lock);
+    let next = dir.command_lock(f.spec.uid).unwrap();
+    drop(inherited);
+    assert_eq!(
+        dir.command_lock(f.spec.uid).err().unwrap(),
+        err("lock_busy", "command_dir")
+    );
+    drop(next);
+    dir.command_lock(f.spec.uid).unwrap();
+}
+
+#[test]
+fn completed_command_releases_profile_lock_while_inherited_descriptor_remains_open() {
+    let f = Fixture::new();
+    let dir = Dir::open(&f.spec.codex_dir, f.spec.uid).unwrap();
+    let lock = dir.lock(f.spec.uid).unwrap();
+    let inherited = rustix::io::fcntl_dupfd_cloexec(&lock, 0).unwrap();
+    assert_eq!(
+        dir.lock(f.spec.uid).err().unwrap(),
+        err("lock_busy", "lock")
+    );
+    drop(lock);
+    let next = dir.lock(f.spec.uid).unwrap();
+    drop(inherited);
+    assert_eq!(
+        dir.lock(f.spec.uid).err().unwrap(),
+        err("lock_busy", "lock")
+    );
+    drop(next);
+    dir.lock(f.spec.uid).unwrap();
+}
+
+#[test]
 fn fixed_refusal_identity_is_not_only_a_status() {
     let f = Fixture::new();
     let mut wrong = f.spec.clone();
