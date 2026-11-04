@@ -113,7 +113,8 @@ pub fn dispatch(r: &mut dyn Runner, args: &[String], root: &Path) -> Result<Outp
             let v: Value = util::json(file)?;
             let observation = v
                 .get("observation")
-                .or_else(|| v["properties"].get("observation"))
+                .filter(|v| !v.is_null())
+                .or_else(|| v["properties"].get("observation").filter(|v| !v.is_null()))
                 .unwrap_or(&v);
             let e = domain::evaluate(observation, &util::now(), 60., 60.)?;
             return output(

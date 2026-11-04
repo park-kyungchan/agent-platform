@@ -145,6 +145,21 @@ fn cli_doctor_inventory_plan_and_verify_injected() {
     )
     .unwrap();
     assert_eq!(out.code, 0);
+    util::save(
+        &file,
+        &json!({"observation":null,"properties":{"observation":observation.clone()}}),
+    )
+    .unwrap();
+    assert_eq!(
+        cli::dispatch(
+            &mut r,
+            &["verify".into(), file.to_string_lossy().into()],
+            &d.0
+        )
+        .unwrap()
+        .code,
+        0
+    );
     observation["runtimes"][1]["native"]["adapters"][0]["credentialRejected"] = json!(true);
     util::save(&file, &observation).unwrap();
     let out = cli::dispatch(

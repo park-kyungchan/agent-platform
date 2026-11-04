@@ -71,6 +71,12 @@ pub fn parse(args: &[String]) -> Result<(String, Options)> {
         Some("Desktop CDP belongs only to coordinated mode")
     } else if o.apply && o.authorization.as_deref().unwrap_or("").trim().is_empty() {
         Some("Record the current explicit update instruction with --authorization")
+    } else if ["verify", "stage-overlay"].contains(&command) && o.sha.is_none() {
+        Some(if command == "verify" {
+            "verify requires --sha"
+        } else {
+            "stage-overlay requires --sha"
+        })
     } else if command == "stage-overlay" && (o.patch.is_none() || !o.apply) {
         Some("stage-overlay requires --patch and --apply")
     } else if command != "stage-overlay" && o.patch.is_some() {
@@ -84,9 +90,6 @@ pub fn parse(args: &[String]) -> Result<(String, Options)> {
     };
     if let Some(e) = error {
         return Err(e.into());
-    }
-    if ["verify", "stage-overlay"].contains(&command) && o.sha.is_none() {
-        return Err(format!("{command} requires --sha").into());
     }
     Ok((command.into(), o))
 }

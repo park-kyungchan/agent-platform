@@ -371,3 +371,17 @@ fn schema_integer_numbers_match_json_number_semantics() {
     v["lock"]["device"] = json!(2049.0);
     assert!(domain::validate_observation(&v).is_ok());
 }
+
+#[test]
+fn update_error_order_matches_original_parser() {
+    for (args, message) in [
+        (vec!["stage-overlay"], "stage-overlay requires --sha"),
+        (
+            vec!["verify", "--apply", "--authorization", "fixture"],
+            "verify requires --sha",
+        ),
+    ] {
+        let args = args.into_iter().map(str::to_owned).collect::<Vec<_>>();
+        assert_eq!(arguments::parse(&args).unwrap_err().to_string(), message);
+    }
+}
