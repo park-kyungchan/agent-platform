@@ -336,3 +336,38 @@ by their native runtimes. The outstanding agy raw-input/alias-dedup proof and
 actual Hermes selection are not resolved by this source cut. P8 scenario verdicts,
 S11's complete host/Hermes graph and specific P9 activation/recovery/stability/
 retained-original deletion conditions keep their independent scope.
+
+
+## S04 leftovers B2 disposition — 2026-11-04
+
+At base `744295cdd026580ae55c9f2a9ae53e1f0d70ec0e`, the bounded
+[per-root audit](rust-migration-dispositions.md#s04-leftover-source-audit--2026-11-04)
+records `RETAINED_LIVE_CONSUMER` for all five remaining ZIP S04 roots:
+`work-continuity`, `native-codex-adapter`, `native-hermes-adapter`,
+`ci/quality/trusted` and `architecture/capability-source-owners.json`.
+The concrete blockers are external recovery/source-closure readers and AP's
+remaining manual Bun quality/fixture/import checks. No whole root has a proven
+no-retained-consumer result, so this candidate deletes none. This bounded audit
+is complete; S04's deletion exit and S14 Rust-only closure remain open for Lead
+review. Retained source is not permission for new administrative dispatch.
+
+The external agent checkout/local remote-tracking ref is still `22e9e556`;
+its separate local manual-retirement candidate `2114388` closes new dispatch
+but keeps verify/restore attached to both the Codex adapter and context provider
+(`src/cli.ts:49-70`). This remains true in the local `c9e13de` guidance candidate.
+No network read or external edit was performed. The external Hermes path is a
+generated source-only facade, not an observed running service entrypoint.
+AP's `ci/source-check.ts:18,521-523` independently consumes its implementation.
+The host compose mount observation does not prove the live service import graph.
+
+The audit also corrects two stale inventory claims: AP's import check imports
+only canonical handoff, and the cited CI files do not first-import
+`trusted/native.ts`. Actual trusted imports are `driver-failure`/`process`
+(`ci/quality/run.ts:1-2`) and `qa-inputs` (`ci/source-check.ts:375`). The architecture
+registry is directly read by `ci/quality/architecture-quality.ts:649` through
+`check:architecture`, so retiring only `ci/source-check.ts` would leave a caller.
+
+See ws-replan `preparation/closure/s04-leftovers-v1/CONSUMER-CLOSURE.md` for the
+per-path verdicts and all indexed references, and `HANDOFF.md` for exact revision,
+checks and proposed external-owner changes. No pins, source guards, runtime
+configuration, native sessions, service data or retained originals were changed.
