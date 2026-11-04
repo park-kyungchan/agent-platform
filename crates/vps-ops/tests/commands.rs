@@ -78,6 +78,9 @@ impl Fake {
     }
 }
 impl Runner for Fake {
+    fn command_available(&mut self, _program: &str) -> Result<bool> {
+        Ok(true)
+    }
     fn run(&mut self, s: CommandSpec) -> Result<CommandOutput> {
         self.calls.push(s);
         self.outputs
@@ -779,4 +782,217 @@ fn installed_basename_aliases_preserve_denial_and_usage() {
     assert_eq!(v["reason"], "UNSUPPORTED_INGRESS");
     assert_eq!(v["invocation_attempted"], false);
     assert!(!d.0.join("runs").exists());
+}
+
+#[test]
+fn hostctl_preserves_child_stderr_and_explicit_shell_suppression() {
+    let mut first = ok("partial docker rows\n");
+    first.exit_code = 23;
+    first.stderr = "docker diagnostic\n".into();
+    let mut runner = Fake::new(vec![first]);
+    let output = hostctl::dispatch(&mut runner, "docker.status").unwrap();
+    assert_eq!(output.code, 23);
+    assert_eq!(
+        output.stdout,
+        "=== DOCKER STATUS ===\npartial docker rows\n"
+    );
+    assert_eq!(output.stderr, "docker diagnostic\n");
+    assert_eq!(runner.calls.len(), 1);
+
+    let mut uptime = ok("uptime rows\n");
+    uptime.stderr = "uptime warning\n".into();
+    let mut free = ok("memory rows\n");
+    free.stderr = "free warning\n".into();
+    let mut df = ok("disk rows\n");
+    df.exit_code = 1;
+    df.stderr = "suppressed df diagnostic\n".into();
+    let mut runner = Fake::new(vec![uptime, free, df]);
+    let output = hostctl::dispatch(&mut runner, "resources").unwrap();
+    assert_eq!(output.code, 0);
+    assert_eq!(output.stderr, "uptime warning\nfree warning\n");
+    assert_eq!(
+        output.stdout,
+        "=== RESOURCES ===\nuptime rows\nmemory rows\ndisk rows\n"
+    );
+}
+
+#[test]
+fn hostctl_ssh_pipefail_prints_sorted_matches_before_failure() {
+    for (stdout, expected, code) in [
+        (
+            "port 22\naddressfamily inet\nother value\n",
+            "addressfamily inet\nport 22\n",
+            7,
+        ),
+        ("other value\n", "", 1),
+    ] {
+        let mut sshd = ok(stdout);
+        sshd.exit_code = 7;
+        sshd.stderr = "sshd diagnostic\n".into();
+        let mut runner = Fake::new(vec![sshd]);
+        let output = hostctl::dispatch(&mut runner, "ssh.status").unwrap();
+        assert_eq!(output.code, code);
+        assert_eq!(output.stdout, format!("=== SSH STATUS ===\n{expected}"));
+        assert_eq!(output.stderr, "sshd diagnostic\n");
+        assert_eq!(runner.calls.len(), 1);
+    }
+}
+
+#[test]
+fn rejected_launch_evidence_is_bounded_regular_and_lexically_resolved() {
+    use std::os::unix::fs::symlink;
+    let temp = Temp::new();
+    let real = temp.0.join("real");
+    fs::create_dir(&real).unwrap();
+    let alias = temp.0.join("alias");
+    symlink(&real, &alias).unwrap();
+    // Node resolve() collapses '..' without resolving the directory symlink.
+    let directory = alias.join("unused/../.");
+    let resolved = util::resolve(&directory).unwrap();
+    assert_eq!(resolved, alias);
+    let f = &fixture("rejected-proof")[0];
+    let id = f["request"]["operationId"].as_str().unwrap();
+    let request = real.join(format!("desktop-native-request-{id}.json"));
+    let result_name = format!("desktop-update-result-{id}.json");
+    let prior = util::bytes(&f["prior"]).unwrap();
+    fs::write(real.join(&result_name), &prior).unwrap();
+    let mut proof = f["proof"].clone();
+    proof["failedResult"] = json!({"path":resolved.join(&result_name)});
+    proof["failedNativeResultSha256"] = json!(util::hash(&prior));
+    util::save(&real.join("native-launch-rejection-proof.json"), &proof).unwrap();
+    let mut bytes = serde_json::to_vec(&f["request"]).unwrap();
+    bytes.resize(2 * 1024 * 1024, b' ');
+    fs::write(&request, &bytes).unwrap();
+    // A nonexistent lexical component must not require canonicalization or filesystem traversal.
+    let nominated = retry::rejected(&resolved, "fixture").unwrap();
+    assert_eq!(nominated["candidate"]["operationId"], id);
+    assert_eq!(
+        nominated["candidate"]["proofRef"],
+        json!(resolved.join("native-launch-rejection-proof.json"))
+    );
+    bytes.push(b' ');
+    fs::write(&request, &bytes).unwrap();
+    assert!(retry::rejected(&resolved, "fixture").unwrap()["candidate"].is_null());
+    bytes.pop();
+    let outside = temp.0.join("request-copy.json");
+    fs::write(&outside, &bytes).unwrap();
+    fs::remove_file(&request).unwrap();
+    symlink(&outside, &request).unwrap();
+    assert!(retry::rejected(&resolved, "fixture").unwrap()["candidate"].is_null());
+    fs::remove_file(&request).unwrap();
+    fs::create_dir(&request).unwrap();
+    assert!(retry::rejected(&resolved, "fixture").unwrap()["candidate"].is_null());
+}
+
+struct ReleaseFixtureRunner {
+    inner: Fake,
+    missing: Option<&'static str>,
+    probes: Vec<String>,
+    validation_failure: Option<&'static str>,
+    project: PathBuf,
+}
+impl Runner for ReleaseFixtureRunner {
+    fn command_available(&mut self, program: &str) -> Result<bool> {
+        self.probes.push(program.into());
+        Ok(self.missing != Some(program))
+    }
+    fn run(&mut self, spec: CommandSpec) -> Result<CommandOutput> {
+        if spec.args.ends_with(&["config".into(), "--quiet".into()]) {
+            match self.validation_failure {
+                Some("runner") => return Err("fixture validation runner failure".into()),
+                Some("backup") => {
+                    let backups = self.project.join(".update-backups");
+                    fs::remove_dir(&backups)?;
+                    fs::write(backups, "fixture prevents backup copy")?;
+                }
+                _ => {}
+            }
+        }
+        self.inner.run(spec)
+    }
+    fn pause(&mut self, _ms: u64) {}
+}
+fn release_fixture(project: &Path) -> release_update::ReleasePaths {
+    fs::write(
+        project.join("docker-compose.yml"),
+        "services:\n  hermes-agent:\n    image: fixture:old\n",
+    )
+    .unwrap();
+    fs::write(project.join(".env"), "FIXTURE=placeholder\n").unwrap();
+    release_update::ReleasePaths {
+        project: project.to_owned(),
+        lock: project.join("lock"),
+    }
+}
+#[test]
+fn release_update_prechecks_keep_original_messages_and_order() {
+    for (index, program) in ["curl", "docker", "python3"].into_iter().enumerate() {
+        let temp = Temp::new();
+        let paths = release_fixture(&temp.0);
+        let mut runner = ReleaseFixtureRunner {
+            inner: Fake::default(),
+            missing: Some(program),
+            probes: vec![],
+            validation_failure: None,
+            project: temp.0.clone(),
+        };
+        let error = release_update::run_with_uid(&mut runner, &paths, 0).unwrap_err();
+        assert_eq!(error.to_string(), format!("{program} is required."));
+        assert_eq!(runner.probes, ["curl", "docker", "python3"][..=index]);
+        assert!(runner.inner.calls.is_empty());
+        assert!(!paths.lock.exists());
+        assert!(!temp.0.join(".update-backups").exists());
+    }
+}
+#[test]
+fn release_update_cleans_staged_compose_on_every_failure_boundary() {
+    for boundary in ["validation", "runner", "backup", "deploy"] {
+        let temp = Temp::new();
+        let paths = release_fixture(&temp.0);
+        let original = fs::read(temp.0.join("docker-compose.yml")).unwrap();
+        let mut failure = ok("");
+        failure.exit_code = 1;
+        let mut outputs = vec![
+            ok("{\"tag_name\":\"v0.22.0\"}"),
+            ok(""),
+            ok("nousresearch/hermes-agent@sha256:fixture"),
+        ];
+        outputs.push(if boundary == "validation" {
+            failure.clone()
+        } else {
+            ok("")
+        });
+        if boundary == "deploy" {
+            outputs.extend([failure, ok("")]);
+        }
+        let mut runner = ReleaseFixtureRunner {
+            inner: Fake::new(outputs),
+            missing: None,
+            probes: vec![],
+            validation_failure: Some(boundary),
+            project: temp.0.clone(),
+        };
+        let error = release_update::run_with_uid(&mut runner, &paths, 0).unwrap_err();
+        match boundary {
+            "validation" => assert_eq!(
+                error.to_string(),
+                "the generated Compose configuration is invalid."
+            ),
+            "runner" => assert_eq!(error.to_string(), "fixture validation runner failure"),
+            "backup" => assert!(error.to_string().contains("Not a directory")),
+            "deploy" => assert!(error.to_string().contains("rolled back")),
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            fs::read(temp.0.join("docker-compose.yml")).unwrap(),
+            original
+        );
+        assert!(
+            util::names(&temp.0)
+                .unwrap()
+                .iter()
+                .all(|name| !name.starts_with("docker-compose.yml.new.")),
+            "candidate leaked at {boundary}"
+        );
+    }
 }

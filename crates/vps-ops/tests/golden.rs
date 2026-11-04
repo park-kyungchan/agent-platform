@@ -385,3 +385,17 @@ fn update_error_order_matches_original_parser() {
         assert_eq!(arguments::parse(&args).unwrap_err().to_string(), message);
     }
 }
+
+#[test]
+fn stringify_normalizes_negative_integral_floats_recursively() {
+    let mut value: serde_json::Value = serde_json::from_str(
+        r#"{"values":[-1.0,-0.0,-9007199254740991.0,1.0,-1.25],"nested":{"number":-42.0}}"#,
+    )
+    .unwrap();
+    vps_ops::util::normalize_integers(&mut value);
+    // Exact JSON.stringify(JSON.parse(input)) result from the legacy JS boundary.
+    assert_eq!(
+        serde_json::to_string(&value).unwrap(),
+        r#"{"values":[-1,0,-9007199254740991,1,-1.25],"nested":{"number":-42}}"#
+    );
+}

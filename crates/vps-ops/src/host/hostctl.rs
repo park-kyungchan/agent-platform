@@ -7,26 +7,33 @@ pub struct HostOutput {
     pub stdout: String,
     pub stderr: String,
 }
-fn call(r: &mut dyn Runner, program: &str, args: &[&str]) -> Result<(i32, String)> {
+fn call(
+    r: &mut dyn Runner,
+    program: &str,
+    args: &[&str],
+    stderr: &mut String,
+) -> Result<(i32, String)> {
     let v = r.run(CommandSpec::new(
         program,
         args.iter().map(|s| s.to_string()).collect(),
     ))?;
+    stderr.push_str(&v.stderr);
     Ok((v.exit_code, v.stdout))
 }
 /// Exact installed hostctl command vocabulary; inventory retains the retired k3s diagnostic failure.
 pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
     let mut out = String::new();
+    let mut err = String::new();
     let mut code = 0;
     macro_rules! run {
         ($p:expr,$a:expr) => {{
-            let (c, s) = call(r, $p, $a)?;
+            let (c, s) = call(r, $p, $a, &mut err)?;
             out.push_str(&s);
             if c != 0 {
                 return Ok(HostOutput {
                     code: c,
                     stdout: out,
-                    stderr: String::new(),
+                    stderr: err,
                 });
             }
         }};
@@ -38,12 +45,12 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
             out.push_str("kernel=");
             run!("uname", &["-sr"]);
             out.push_str("os=");
-            let (c, s) = call(r, "cat", &["/etc/os-release"])?;
+            let (c, s) = call(r, "cat", &["/etc/os-release"], &mut err)?;
             if c != 0 {
                 return Ok(HostOutput {
                     code: c,
                     stdout: out,
-                    stderr: String::new(),
+                    stderr: err,
                 });
             }
             let get = |k: &str| {
@@ -60,12 +67,12 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
             out.push_str("cpu=");
             run!("nproc", &[]);
             out.push_str("memory=");
-            let (c, s) = call(r, "free", &["-h"])?;
+            let (c, s) = call(r, "free", &["-h"], &mut err)?;
             if c != 0 {
                 return Ok(HostOutput {
                     code: c,
                     stdout: out,
-                    stderr: String::new(),
+                    stderr: err,
                 });
             }
             if let Some(l) = s.lines().find(|l| l.starts_with("Mem:")) {
@@ -75,12 +82,12 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
                 }
             }
             out.push_str("disk=");
-            let (c, s) = call(r, "df", &["-hT", "/"])?;
+            let (c, s) = call(r, "df", &["-hT", "/"], &mut err)?;
             if c != 0 {
                 return Ok(HostOutput {
                     code: c,
                     stdout: out,
-                    stderr: String::new(),
+                    stderr: err,
                 });
             }
             if let Some(l) = s.lines().nth(1) {
@@ -95,7 +102,7 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
             out.push_str("--- SERVICES ---\n");
             for name in ["ssh.socket", "docker", "k3s"] {
                 out.push_str(&format!("{name}="));
-                let (_, s) = call(r, "systemctl", &["is-active", name])?;
+                let (_, s) = call(r, "systemctl", &["is-active", name], &mut String::new())?;
                 out.push_str(&s)
             }
             out.push_str("--- DOCKER ---\n");
@@ -117,7 +124,7 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
             out.push_str("=== RESOURCES ===\n");
             run!("uptime", &[]);
             run!("free", &["-h"]);
-            let (_, s) = call(r, "df", &["-hT", "/", "/docker"])?;
+            let (_, s) = call(r, "df", &["-hT", "/", "/docker"], &mut String::new())?;
             out.push_str(&s)
         }
         "docker.status" => {
@@ -154,7 +161,7 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
         }
         "ssh.status" => {
             out.push_str("=== SSH STATUS ===\n");
-            let (c, s) = call(r, "sshd", &["-T"])?;
+            let (c, s) = call(r, "sshd", &["-T"], &mut err)?;
             let mut lines: Vec<_> = s
                 .lines()
                 .filter(|l| {
@@ -170,18 +177,20 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
                 })
                 .collect();
             lines.sort();
-            if c != 0 || lines.is_empty() {
-                return Ok(HostOutput {
-                    code: if c != 0 { c } else { 1 },
-                    stdout: out,
-                    stderr: String::new(),
-                });
-            }
+            let empty = lines.is_empty();
             for l in lines {
                 out.push_str(l);
                 out.push('\n')
             }
-            let (_, s) = call(r, "ss", &["-lntp"])?;
+            // grep and sort finish writing before Bash observes the pipefail status.
+            if c != 0 || empty {
+                return Ok(HostOutput {
+                    code: if empty { 1 } else { c },
+                    stdout: out,
+                    stderr: err,
+                });
+            }
+            let (_, s) = call(r, "ss", &["-lntp"], &mut err)?;
             for l in s.lines().filter(|l| l.contains(":22")) {
                 out.push_str(l);
                 out.push('\n')
@@ -199,6 +208,6 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
     Ok(HostOutput {
         code,
         stdout: out,
-        stderr: String::new(),
+        stderr: err,
     })
 }

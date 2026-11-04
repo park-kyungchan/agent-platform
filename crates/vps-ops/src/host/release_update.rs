@@ -7,6 +7,7 @@ use crate::{
 use serde_json::Value;
 use std::{
     fs::{self, OpenOptions},
+    io::Write,
     os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
 };
@@ -86,6 +87,26 @@ pub fn run_with_uid(r: &mut dyn Runner, p: &ReleasePaths, uid: u32) -> Result<St
         })),
     }
 }
+// Own only a successfully created candidate; cleanup also covers write/sync and runner errors.
+struct StagedCompose(PathBuf);
+impl StagedCompose {
+    fn write(path: PathBuf, bytes: &[u8]) -> Result<Self> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)?;
+        let staged = Self(path);
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        Ok(staged)
+    }
+}
+impl Drop for StagedCompose {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
 fn execute_release(r: &mut dyn Runner, p: &ReleasePaths, uid: u32, out: &mut String) -> Result<()> {
     if uid != 0 {
         return Err("root privileges are required; run with sudo.".into());
@@ -100,6 +121,11 @@ fn execute_release(r: &mut dyn Runner, p: &ReleasePaths, uid: u32, out: &mut Str
             p.project.join(".env").display()
         )
         .into());
+    }
+    for program in ["curl", "docker", "python3"] {
+        if !r.command_available(program)? {
+            return Err(format!("{program} is required.").into());
+        }
     }
     fs::create_dir_all(p.project.join(".update-backups"))?;
     let lock = OpenOptions::new()
@@ -168,13 +194,12 @@ fn execute_release(r: &mut dyn Runner, p: &ReleasePaths, uid: u32, out: &mut Str
     let temporary = p
         .project
         .join(format!("docker-compose.yml.new.{}", util::id()));
-    util::write_new(&temporary, candidate.as_bytes())?;
+    let staged = StagedCompose::write(temporary, candidate.as_bytes())?;
     let validate = command(
         r,
-        with(compose(&p.project, &temporary), &["config", "--quiet"]),
+        with(compose(&p.project, &staged.0), &["config", "--quiet"]),
     )?;
     if validate.exit_code != 0 {
-        fs::remove_file(temporary)?;
         return Err("the generated Compose configuration is invalid.".into());
     }
     let backup = p.project.join(".update-backups").join(format!(
@@ -183,7 +208,7 @@ fn execute_release(r: &mut dyn Runner, p: &ReleasePaths, uid: u32, out: &mut Str
     ));
     fs::copy(&file, &backup)?;
     fs::set_permissions(&backup, fs::metadata(&file)?.permissions())?;
-    fs::rename(&temporary, &file)?;
+    fs::rename(&staged.0, &file)?;
     let deploy = command(
         r,
         with(

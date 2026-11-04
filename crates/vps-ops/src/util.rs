@@ -6,7 +6,7 @@ use std::{
     fs::{self, File, OpenOptions},
     io::{Read, Write},
     os::unix::fs::OpenOptionsExt,
-    path::Path,
+    path::{Component, Path, PathBuf},
 };
 pub fn now() -> String {
     Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true)
@@ -176,11 +176,14 @@ pub fn normalize_integers(v: &mut serde_json::Value) {
         serde_json::Value::Number(n) => {
             if n.is_f64()
                 && let Some(f) = n.as_f64()
-                && f >= 0.
                 && f.fract() == 0.
-                && f <= 9007199254740991.
+                && f.abs() <= 9007199254740991.
             {
-                *n = serde_json::Number::from(f as u64);
+                *n = if f < 0. {
+                    serde_json::Number::from(f as i64)
+                } else {
+                    serde_json::Number::from(f as u64)
+                };
             }
         }
         serde_json::Value::Array(a) => {
@@ -195,4 +198,20 @@ pub fn normalize_integers(v: &mut serde_json::Value) {
         }
         _ => {}
     }
+}
+
+/// Node path.resolve semantics: absolute lexical normalization, without resolving symlinks.
+pub fn resolve(p: &Path) -> Result<PathBuf> {
+    let absolute = std::path::absolute(p)?;
+    let mut resolved = PathBuf::new();
+    for component in absolute.components() {
+        match component {
+            Component::ParentDir => {
+                resolved.pop();
+            }
+            Component::CurDir => {}
+            other => resolved.push(other.as_os_str()),
+        }
+    }
+    Ok(resolved)
 }

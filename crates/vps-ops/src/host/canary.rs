@@ -314,34 +314,42 @@ pub fn dispatch(
     })();
     match work {
         Ok(v) => v,
-        Err(e) => {
-            let s = e.to_string();
-            let allowed = [
-                "HOST_BOUNDARY_REQUIRED",
-                "UNSAFE_INSTALL_DIRECTORY",
-                "UNSAFE_INSTALL_FILE",
-                "UNSAFE_LOCK",
-                "TARGET_IDENTITY_UNVERIFIED",
-                "SYSTEMD_READ_FAILED",
-                "SYSTEMD_OUTPUT_INVALID",
-                "UNSUPPORTED_ACTION",
-                "INVALID_OBSERVATION",
-            ];
-            reason(
-                &base,
-                "UNKNOWN",
-                if allowed.contains(&s.as_str()) {
-                    &s
-                } else {
-                    "OBSERVATION_OR_EXECUTION_FAILED"
-                },
-                3,
-            )
-        }
+        Err(e) => observation_failure(&base, &e.to_string()),
     }
 }
+fn observation_failure(base: &Value, error: &str) -> (Value, i32) {
+    let allowed = [
+        "HOST_BOUNDARY_REQUIRED",
+        "UNSAFE_INSTALL_DIRECTORY",
+        "UNSAFE_INSTALL_FILE",
+        "UNSAFE_LOCK",
+        "TARGET_IDENTITY_UNVERIFIED",
+        "SYSTEMD_READ_FAILED",
+        "SYSTEMD_OUTPUT_INVALID",
+        "UNSUPPORTED_ACTION",
+        "INVALID_OBSERVATION",
+    ];
+    reason(
+        base,
+        "UNKNOWN",
+        if allowed.contains(&error) {
+            error
+        } else {
+            "OBSERVATION_OR_EXECUTION_FAILED"
+        },
+        3,
+    )
+}
+fn python_timestamp(time: chrono::DateTime<chrono::Utc>) -> String {
+    let precision = if time.timestamp_subsec_micros() == 0 {
+        chrono::SecondsFormat::Secs
+    } else {
+        chrono::SecondsFormat::Micros
+    };
+    time.to_rfc3339_opts(precision, false)
+}
 pub fn live(r: &mut dyn Runner, args: &[String]) -> (Value, i32) {
-    let time = util::now();
+    let time = python_timestamp(chrono::Utc::now());
     let execution = util::id().replace('-', "");
     let valid = (args.len() == 1 && ["capabilities", "status"].contains(&args[0].as_str()))
         || (args.len() == 2
@@ -381,8 +389,44 @@ pub fn live(r: &mut dyn Runner, args: &[String]) -> (Value, i32) {
     })();
     let result = match setup {
         Ok(()) => dispatch(args, &mut SystemdBackend { runner: r }, &time, &execution),
-        Err(_) => reason(&base, "UNKNOWN", "OBSERVATION_OR_EXECUTION_FAILED", 3),
+        Err(e) => observation_failure(&base, &e.to_string()),
     };
     drop(lock);
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn live_setup_preserves_python_error_reasons() {
+        for expected in [
+            "HOST_BOUNDARY_REQUIRED",
+            "UNSAFE_INSTALL_DIRECTORY",
+            "UNSAFE_INSTALL_FILE",
+        ] {
+            let (value, code) =
+                observation_failure(&json!({"invocation_attempted":false}), expected);
+            assert_eq!(value["reason"], expected);
+            assert_eq!(value["status"], "UNKNOWN");
+            assert_eq!(value["invocation_attempted"], false);
+            assert_eq!(code, 3);
+        }
+        assert_eq!(
+            observation_failure(&json!({}), "private OS detail").0["reason"],
+            "OBSERVATION_OR_EXECUTION_FAILED"
+        );
+    }
+    #[test]
+    fn live_timestamp_matches_python_isoformat() {
+        for (input, expected) in [
+            ("2026-11-04T01:02:03Z", "2026-11-04T01:02:03+00:00"),
+            (
+                "2026-11-04T01:02:03.123456789Z",
+                "2026-11-04T01:02:03.123456+00:00",
+            ),
+        ] {
+            assert_eq!(python_timestamp(input.parse().unwrap()), expected);
+        }
+    }
 }

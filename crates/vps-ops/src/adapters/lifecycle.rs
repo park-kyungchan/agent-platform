@@ -1,7 +1,12 @@
 use super::ssh::{self, HermesTarget};
 use crate::{Result, domain, runner::Runner, util};
 use serde_json::{Value, json};
-use std::{fs, path::Path};
+use std::{
+    fs::{self, File, OpenOptions},
+    io::{ErrorKind, Write},
+    os::unix::fs::OpenOptionsExt,
+    path::Path,
+};
 pub fn apply(
     r: &mut dyn Runner,
     t: &HermesTarget,
@@ -41,7 +46,10 @@ pub fn apply(
     }
     let lock = state.join(format!("{key}.lock"));
     let pointer = run_dir.join("native-operation-execution.json");
-    util::record(&lock,&json!({"schemaVersion":1,"requestHash":req_hash,"idempotencyKey":request["idempotencyKey"],"status":"uncertain","receiptPath":pointer,"automaticReplayPermitted":false,"verificationStillRequired":true})).map_err(|_|"Previous request unresolved; inspect original receipt pointer; automatic replay prohibited")?;
+    let _fence = create_request_fence(
+        &lock,
+        &json!({"schemaVersion":1,"requestHash":req_hash,"idempotencyKey":request["idempotencyKey"],"status":"uncertain","receiptPath":pointer,"automaticReplayPermitted":false,"verificationStillRequired":true}),
+    )?;
     let source = include_str!("../../protocol/lifecycle-source.py")
         .replace(
             "__REQUEST__",
@@ -87,4 +95,55 @@ pub fn apply(
         return Err(format!("Native action completion unresolved; original receipt retained at {}; automatic replay prohibited",path.display()).into());
     }
     Ok(result)
+}
+
+fn create_request_fence(path: &Path, value: &Value) -> Result<File> {
+    let mut file = match OpenOptions::new().write(true).create_new(true).mode(0o600).open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == ErrorKind::AlreadyExists => return Err(format!(
+            "Previous request unresolved; inspect original receipt pointer in {}; automatic replay prohibited", path.display()
+        ).into()),
+        Err(e) => return Err(e.into()),
+    };
+    file.write_all(&util::bytes(value)?)?;
+    file.sync_all()?;
+    util::sync_dir(path.parent().ok_or("Missing parent")?)?;
+    Ok(file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn lock_creation_distinguishes_existing_fence_from_io_failure() {
+        let root = std::env::var_os("CARGO_TARGET_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../target")
+            })
+            .join("test-work")
+            .join(util::id());
+        fs::create_dir_all(&root).unwrap();
+        let lock = root.join("request.lock");
+        let fence = json!({"status":"uncertain","receiptPath":"fixture-receipt"});
+        let file = create_request_fence(&lock, &fence).unwrap();
+        drop(file);
+        let before = fs::read(&lock).unwrap();
+        let error = create_request_fence(&lock, &fence).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "Previous request unresolved; inspect original receipt pointer in {}; automatic replay prohibited",
+                lock.display()
+            )
+        );
+        assert_eq!(fs::read(&lock).unwrap(), before);
+        let error = create_request_fence(&lock.join("child.lock"), &fence).unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<std::io::Error>().unwrap().kind(),
+            ErrorKind::NotADirectory
+        );
+        assert!(!error.to_string().contains("Previous request unresolved"));
+        fs::remove_dir_all(root).unwrap();
+    }
 }

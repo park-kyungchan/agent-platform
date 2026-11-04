@@ -75,7 +75,8 @@ pub fn preflight(d: &Path, target: &str) -> Result<Value> {
 }
 pub fn rejected(d: &Path, target: &str) -> Result<Value> {
     let names = util::names(d)?;
-    let proof = d.canonicalize()?.join("native-launch-rejection-proof.json");
+    let directory = util::resolve(d)?;
+    let proof = directory.join("native-launch-rejection-proof.json");
     let mut reasons = vec![];
     let mut candidate = Value::Null;
     if !names
@@ -106,11 +107,10 @@ pub fn rejected(d: &Path, target: &str) -> Result<Value> {
             let check = (|| -> Result<Value> {
                 let b = util::bounded(&proof, 2 * 1024 * 1024)?;
                 let p: Value = serde_json::from_slice(&b)?;
-                let req: Value = util::json(d.join(requests[0]))?;
+                let request_bytes = util::bounded(directory.join(requests[0]), 2 * 1024 * 1024)?;
+                let req: Value = serde_json::from_slice(&request_bytes)?;
                 let id = req["operationId"].as_str().unwrap_or("");
-                let result = d
-                    .canonicalize()?
-                    .join(format!("desktop-update-result-{id}.json"));
+                let result = directory.join(format!("desktop-update-result-{id}.json"));
                 if !util::run_id(id)
                     || **requests[0] != format!("desktop-native-request-{id}.json")
                     || req["schemaVersion"] != 1

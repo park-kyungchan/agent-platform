@@ -61,6 +61,9 @@ pub struct CommandOutput {
     pub transport_signal: Option<String>,
 }
 pub trait Runner {
+    fn command_available(&mut self, _program: &str) -> Result<bool> {
+        Err("Command availability probe unavailable in this runner".into())
+    }
     fn start_native(&mut self, _spec: CommandSpec) -> Result<Box<dyn NativeJob>> {
         Err("Native launch unavailable in this runner".into())
     }
@@ -72,6 +75,15 @@ pub trait Runner {
 #[derive(Default)]
 pub struct ProcessRunner;
 impl Runner for ProcessRunner {
+    fn command_available(&mut self, program: &str) -> Result<bool> {
+        use std::os::unix::fs::PermissionsExt;
+        Ok(
+            std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()).any(|directory| {
+                std::fs::metadata(directory.join(program))
+                    .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+            }),
+        )
+    }
     fn start_native(&mut self, spec: CommandSpec) -> Result<Box<dyn NativeJob>> {
         start_native_process(spec)
     }
