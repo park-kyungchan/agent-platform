@@ -3,7 +3,7 @@
   "projectId": "vps-operations",
   "ontologyPin": "0.2.0",
   "agentLoop": "Native Codex",
-  "implementation": "TypeScript/Bun orchestration of installed native updaters",
+  "implementation": "Rust orchestration of installed native updaters",
   "backendPolicy": "backend-update-policy.json",
   "desktopTarget": "desktop-update-target.json",
   "modes": {
@@ -18,7 +18,7 @@
         "Native deploy",
         "Verify every declared target service image ID and gateway serving SHA"
       ],
-      "command": "bun run cli update backend-only --apply --authorization 'User requested backend update'"
+      "command": "vps-ops update backend-only --apply --authorization 'User requested backend update'"
     },
     "coordinated": {
       "target": "Completed native Desktop SHA becomes the shared target; an explicit already-installed release may use a freshly native-verified existing clean artifact without a new update",
@@ -35,9 +35,9 @@
       "runningDesktop": "Use existing native updates.apply IPC through an explicit CDP endpoint; do not force-kill the app",
       "closedDesktop": "Use the official windows.ps1 pipeline with verified roots, correlation ID, NoUi and NoGateway; release mode passes -Channel stable instead of -Branch main",
       "noGatewayBoundary": "NoGateway does not suppress every native fleet pause/resume; inspect the native plan first",
-      "command": "bun run cli update coordinated --apply --authorization 'User requested Desktop and backend update'",
+      "command": "vps-ops update coordinated --apply --authorization 'User requested Desktop and backend update'",
       "releaseTarget": "--release vMAJOR.MINOR.PATCH resolves the peeled official Git tag once, selects native stable delivery, and requires the correlated completed Desktop artifact to match that exact release SHA before Backend prepare/deploy",
-      "releaseCommand": "bun run update:release v0.22.0 --apply --authorization 'User requested Desktop and Backend release v0.22.0'",
+      "releaseCommand": "vps-ops update coordinated --release v0.22.0 --apply --authorization 'User requested Desktop and Backend release v0.22.0'",
       "releaseRunningDesktop": "Stable release mode requires Desktop closed before native handoff until the existing IPC bridge can prove explicit stable target selection",
       "preUpdateLocalChanges": "Only the configured exact tracked diff SHA256 and path set may enter native --keep-stash preservation; terminal verification independently proves the immutable stash base and diff, and all completed artifacts remain clean and release-pinned",
       "existingReleaseFastPath": {

@@ -11,7 +11,7 @@
   ],
   "telegram": { "state": "removed", "scope": "All six Hermes profiles", "credentialsRemoved": true, "explicitlyDisabled": true, "userBasis": "The user uses the Web Dashboard from iPhone and explicitly requested removing every Telegram integration" },
   "runtimeMutations": { "broadContainerRestart": false, "sourceImageOrComposeChanged": false, "nativeDatabaseRewritten": false, "lockInodeReplaced": false },
-  "bootBoundary": { "currentDuplicateRootSlot": "hermes-agent gateway-default stopped and parked", "downMarkerPersistence": "Current /run/service runtime only", "automaticPermanentBootRoleChange": false, "requiredCheckAfterFutureRestart": "bun run cli doctor" },
+  "bootBoundary": { "currentDuplicateRootSlot": "hermes-agent gateway-default stopped and parked", "downMarkerPersistence": "Current /run/service runtime only", "automaticPermanentBootRoleChange": false, "requiredCheckAfterFutureRestart": "vps-ops doctor" },
   "dependencies": { "apiServerRequirement": "aiohttp from the native PM selected environment", "nativeExtra": "messaging", "integrationRemovalDoesNotRequireMutatingVendoredTelegramSDKFiles": true },
   "authority": "This policy records observed topology and current user decisions; it does not authorize future destructive or broad actions"
 }

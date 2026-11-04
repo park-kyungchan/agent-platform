@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "project": "vps-operations",
-  "repository": "/home/palantirkc/code/shared/vps-operations",
+  "repository": "park-kyungchan/vps-operations (private module)",
   "role": "VPS container infrastructure operator using Native Codex",
   "commands": {
-    "inventory": "bun run cli inventory",
-    "doctor": "bun run cli doctor",
-    "verifySaved": "bun run cli verify <observation.json>",
-    "proposeLifecycle": "bun run cli plan <start|stop|restart>",
-    "applyAuthorizedLifecycle": "bun run cli apply <authorized-operation-payload.json> --confirm-exact-target <full-container-id>",
-    "browserVerification": "bun scripts/verify-hermes-ui.ts",
-    "check": "bun run check"
+    "inventory": "vps-ops inventory",
+    "doctor": "vps-ops doctor",
+    "verifySaved": "vps-ops verify <observation.json>",
+    "proposeLifecycle": "vps-ops plan <start|stop|restart>",
+    "applyAuthorizedLifecycle": "vps-ops apply <authorized-operation-payload.json> --confirm-exact-target <full-container-id>",
+    "browserVerification": "Explicit authenticated browser verification by the native operator",
+    "check": "cargo test --locked"
   },
   "exitCodes": { "0": "Current native control plane and active adapters are healthy", "1": "Execution or shape validation failed", "2": "Native control-plane verification failed", "3": "Control plane passed but active adapter health is degraded" },
   "workflow": [
@@ -33,5 +33,5 @@
     "The duplicate gateway park marker is current-runtime state; durable boot-role convergence remains separate work",
     "Disabled historical adapter errors remain evidence and cannot count as active failures only when current native configuration proves them disabled"
   ],
-  "ontology": { "package": "@palantirkc/ontology", "version": "0.2.0", "domain": "infrastructure", "registry": "src/domain/registry.ts" }
+  "ontology": { "package": "@palantirkc/ontology", "version": "0.2.0", "domain": "infrastructure", "registry": "crates/vps-ops/src/domain/registry.json" }
 }

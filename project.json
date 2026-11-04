@@ -9,33 +9,32 @@
     "name": "VPS operations",
     "status": "active",
     "scope": "Evidence-aware VPS host, container, shared-volume, native gateway operations and bounded Hermes backend-only or native Desktop/backend version promotion. Infrastructure only; ministry and academy business effects, unsolicited credential changes, and automatic broad restarts or deletion are excluded.",
-    "ontologyPackage": {
-      "name": "@palantirkc/ontology",
-      "version": "0.2.0"
-    },
     "commands": {
-      "install": "bun install --frozen-lockfile",
-      "check": "bun run check",
-      "cli": "bun run cli",
-      "backendUpdate": "bun run update:backend",
-      "coordinatedUpdate": "bun run update:coordinated",
-      "releaseUpdate": "bun run update:release <vMAJOR.MINOR.PATCH>"
+      "build": "cargo build --release --locked",
+      "check": "cargo fmt --all --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked",
+      "cli": "cargo run --locked -p vps-ops --",
+      "backendUpdate": "vps-ops update backend-only",
+      "coordinatedUpdate": "vps-ops update coordinated",
+      "releaseUpdate": "vps-ops update coordinated --release <vMAJOR.MINOR.PATCH>"
     },
     "details": {
       "implementation": {
-        "language": "TypeScript",
-        "runtime": "Bun",
-        "baselineBun": "1.4.3",
-        "typeScript": "5.9.3"
+        "language": "Rust",
+        "edition": 2024,
+        "toolchain": "1.95.0",
+        "binary": "vps-ops",
+        "unsafeCode": "forbid"
       },
       "ownership": {
         "repository": "independent",
         "agentLoop": "native-codex",
-        "registryPublication": false
+        "registryPublication": false,
+        "visibility": "private"
       },
       "ontologyPin": {
-        "distribution": "copied-immutable-local-tarball",
-        "path": "releases/palantirkc-ontology-0.2.0.tgz"
+        "operationalContractOrigin": "@palantirkc/ontology 0.2.0",
+        "implementation": "owned typed Rust domain; frozen JSON schema and registry",
+        "source": "architecture/rust-port-provenance.json"
       },
       "domain": {
         "id": "infrastructure",
@@ -58,7 +57,6 @@
         "Verification and acceptance are separate records.",
         "Runtime shape validation does not establish authority, evidence truth, or freshness."
       ],
-      "evidenceWorkflow": "/home/palantirkc/code/shared/evidence-foundry/architecture/native-agent-workflow.json",
       "nativeLifecycle": "Use the installed native lifecycle; preserve active sessions and unrelated services.",
       "versionPromotionWorkflow": "architecture/update-workflow.json",
       "excludedEffects": [
