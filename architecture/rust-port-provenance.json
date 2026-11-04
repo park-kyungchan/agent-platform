@@ -1,0 +1,264 @@
+{
+  "schemaVersion": 1,
+  "baseRevision": "470809b",
+  "capturedAtUtc": "2026-11-04",
+  "sources": {
+    "src/cli.ts": {
+      "sha256": "1cb2e014f1d5207e88baec26283cab27d57ae97da001f7bd91dbf1b3666d1c19",
+      "bytes": 6223,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/domain/schemas.ts": {
+      "sha256": "d7eb9f381dc59783466bb358e75801bf0ab6e86ee3f0f6fa372f581c52ac5673",
+      "bytes": 70,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/domain/evaluate.ts": {
+      "sha256": "09f3ecd89f4033f7112366f6b5e8bc15bb171e37b5719f368b754b7a1773a4e6",
+      "bytes": 71,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/domain/validation.ts": {
+      "sha256": "3298c635f4a5b29f418170b528b0ff8a363241e53ffef5667364b3a877fab607",
+      "bytes": 73,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/domain/types.ts": {
+      "sha256": "3af4a98ea2889acdeea3fa6c5681ad47671be2be1fef5f5abac22aefa5dbbdb9",
+      "bytes": 68,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/domain/registry.ts": {
+      "sha256": "142ddab6ffc9ef3a95d503ab93705d8b51e0e9eaf0aac6f93f76fbf5288df899",
+      "bytes": 71,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/domain/index.ts": {
+      "sha256": "75fdbb1d622dd15084d049bd7cef7ab25e6581fc4a40d6d56f409b2266eaf059",
+      "bytes": 68,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/adapters/lifecycle.ts": {
+      "sha256": "bf4f1597ab648a9393e415c436a4dd666844b5447d6cb8d2c3d83b1ae50fa95a",
+      "bytes": 9018,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/adapters/gateway-owner-handoff.ts": {
+      "sha256": "3aa019b525eb8ce261c881810c8280d984fc5bf35df03e262b202729b7372ef2",
+      "bytes": 16703,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/adapters/ssh.ts": {
+      "sha256": "911a08dfc3d8535ec3bcf576f2219bb8e86c41e3b124bd96fc79c7dd5083d07b",
+      "bytes": 8608,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/adapters/hermes.ts": {
+      "sha256": "36f6ab8dcc554346462694264a11f0d2bda9c3ea40c854a6db2d2a2a55dcae20",
+      "bytes": 11057,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/adapters/backend-update.ts": {
+      "sha256": "005b537c410682da8af94a73e211a7042e8e88896ae8c099403dade8256a0b13",
+      "bytes": 55593,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/adapters/desktop-update.ts": {
+      "sha256": "b139f30f9c0e960553ee8369bd8e18399c2c483e6ed146c45c41b5f6a2acf096",
+      "bytes": 75094,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/update/cli.ts": {
+      "sha256": "5bdde5faa3a70f090df2247452e4a2cb08e25bcac36e1a33fdb260a1450dbbdc",
+      "bytes": 14705,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/update/workflow.ts": {
+      "sha256": "20c75a8624ed9620b88f5cf8790d657c8db61abc3504dbbdb70ae499a1ff9f51",
+      "bytes": 9693,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/update/preflight-retry.ts": {
+      "sha256": "efbeacce2c8ba55424ed3deccf569077964e6c7b7c1f109d10dc85ea774ac1ea",
+      "bytes": 3588,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/update/checkpoints.ts": {
+      "sha256": "33ae57a057f707fa49fb7f2bdb77fd87df4c0d974443d4e3e02fc1f6546e2278",
+      "bytes": 2553,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/update/rejected-launch-retry.ts": {
+      "sha256": "0b162462fe8b28338e0493cbb2ee6526d86405d2dbedb1006c15ece54a7a5827",
+      "bytes": 4018,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "src/update/release-target.ts": {
+      "sha256": "aee0b767ad2792789e8a3ab7d320498f6e069281cb466cdf740096cb608bb456",
+      "bytes": 6185,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/domain.fixtures.ts": {
+      "sha256": "bb77c8c1ab85a2f22bf1f59bf683c6b5a01c89ed61dd7bf4d2021efdd340b931",
+      "bytes": 6796,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/ssh.test.ts": {
+      "sha256": "b4849aa34338506f8b7820719b08a13248dee31cf0a0980c0aac24cf89ecc183",
+      "bytes": 17042,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/rejected-launch-retry.test.ts": {
+      "sha256": "a96db309b91d0186575acb5ecf671d7143d007fe0b1f624b5c7e568d7992d70f",
+      "bytes": 3643,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/backend-update.test.ts": {
+      "sha256": "f9c0fe37b032e6e33611d46657ba1c26d497a88b8a28bf10ba054de5e6fed665",
+      "bytes": 37101,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/release-target.test.ts": {
+      "sha256": "4f1b65ff8f78cc4600c85a4cbe69fef509a2f5ae18c26827c1be11d05e701f96",
+      "bytes": 3678,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/gateway-owner-handoff.test.ts": {
+      "sha256": "cd79315bdb20bf16396cc53ea7e65f3e35c6ba18bbcb1d491b3d80327166253c",
+      "bytes": 11247,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/desktop-update.test.ts": {
+      "sha256": "270e59ffdb58ce54fc3fa5ff3d9955fa5900c7d5b9cc30dc8fd8b3f8b426f5d8",
+      "bytes": 36560,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/update-cli.test.ts": {
+      "sha256": "20f49336fcd4dc3a2761a295fdcb43783535acba16fdc07456c393422d6d4aec",
+      "bytes": 3435,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/native-updater-bot-desktop.test.ts": {
+      "sha256": "1e257e1791a8e3287ac524651cc5035dd213c906b4d9ce656d7c30bbb0949fb0",
+      "bytes": 27942,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/native-updater-canary.test.ts": {
+      "sha256": "21720632b59d10595771e5d5945f2cc44deabc82ae31811bf2eeebc2df312ab6",
+      "bytes": 12053,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/update-checkpoints.test.ts": {
+      "sha256": "c0c2874241048b2b797c1e3670079c204ff95d5975851c8d33d1a9c10f709f0b",
+      "bytes": 2149,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/update-workflow.test.ts": {
+      "sha256": "83f045373ded453ac60415fae473abbd90fcd87094b69dc257eec6633b528a9e",
+      "bytes": 18097,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/domain.contracts.test.ts": {
+      "sha256": "1ea7eb52b78343329ed25940fa60047e645d3b209f08599be68bf13e20ec27e1",
+      "bytes": 6719,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/domain.evaluate.test.ts": {
+      "sha256": "5b1f6bf9a84e35150a6190e00cbb5e1c6714d81095ab0a62fbc6f3c9d71d27f3",
+      "bytes": 9079,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "tests/preflight-retry.test.ts": {
+      "sha256": "ad69c5ba7e731bc7bd7ab47b0bf0b2e32da14cd3b34a6d45157df5dc2af70b82",
+      "bytes": 3432,
+      "revision": "470809bbfe5b0f4bc251de28198c44386b3ddd56"
+    },
+    "/usr/local/sbin/hermes-hostctl": {
+      "sha256": "441d5a248ac7355607f9469c587f600820ada7d2424cd49789ed555d07334e1e",
+      "bytes": 1726,
+      "access": "read-only; original remains installed"
+    },
+    "/usr/local/sbin/hermes-canary-control": {
+      "sha256": "48ca146b124ec361074025fbf760ca2c23a8aacfaa827fa05a96d82fd390111d",
+      "bytes": 11527,
+      "access": "read-only; original remains installed"
+    },
+    "/usr/local/sbin/hermes-agent-auto-update": {
+      "sha256": "cb246b1cc8c0e65adfce72a4ea5bd5486b599e64923d9a2942e082acc1cd2a88",
+      "bytes": 4148,
+      "access": "read-only; original remains installed"
+    },
+    "/usr/local/sbin/hermes-agent-update-latest": {
+      "sha256": "cb246b1cc8c0e65adfce72a4ea5bd5486b599e64923d9a2942e082acc1cd2a88",
+      "bytes": 4148,
+      "access": "read-only; original remains installed"
+    },
+    "/docker/hermes-agent-2q3y/bin/hermes-main-report": {
+      "sha256": "df5e7ed1c0448ed66816117bc98bb73b9881349b32a5348c659e4a367d876e48",
+      "bytes": 4383,
+      "access": "read-only; original remains installed"
+    },
+    "/docker/hermes-agent-2q3y/bin/hermes-main-update": {
+      "sha256": "3f36e01b72bbdbcc1bb9b7f78965f769497819a96e0ba51123194395f96bedd8",
+      "bytes": 109169,
+      "access": "read-only; original remains installed"
+    },
+    "infrastructure-domain": {
+      "repository": "agent-platform",
+      "tag": "archive/agent-platform-pre-strip-20261104",
+      "revision": "57813009fdde43f99bb1798d031a1c88dabe5358",
+      "path": "packages/infrastructure-operations/src/domain"
+    }
+  },
+  "goldenGeneration": "Pure original TS functions executed with fixture values; host Python dispatched with injected backend, lock, Git and clock. No SSH, network or host lifecycle in oracle generation.",
+  "nativeProtocol": "Embedded source adapters are retained to invoke installed Python Hermes APIs and Windows native PowerShell. Rust owns local commands, validation, sequencing, durable fences and transport; no TS/Bun runtime.",
+  "oracleDomainArchiveComparison": {
+    "types": {
+      "archiveSha256": "74e4a782d7c910096c71aa47b1c48afe1b12e763b269ac8e968caf8012f20dbd",
+      "oracleReleaseSha256": "74e4a782d7c910096c71aa47b1c48afe1b12e763b269ac8e968caf8012f20dbd",
+      "equal": true
+    },
+    "evaluate": {
+      "archiveSha256": "edbe4fccf83ee71c5af160f1643be843fd3afb00854f4213c579e2e2c487edf0",
+      "oracleReleaseSha256": "edbe4fccf83ee71c5af160f1643be843fd3afb00854f4213c579e2e2c487edf0",
+      "equal": true
+    },
+    "registry": {
+      "archiveSha256": "a8eeae2e3b73c01ea17baf09c1acf2b3704fc40468b6e080590a9420d87f3ade",
+      "oracleReleaseSha256": "a8eeae2e3b73c01ea17baf09c1acf2b3704fc40468b6e080590a9420d87f3ade",
+      "equal": true
+    },
+    "schemas": {
+      "archiveSha256": "d12b0e54312dfb51465a2ab8d53a2bdde3ffb9db980cc30e5f6de37f90d0e50a",
+      "oracleReleaseSha256": "d12b0e54312dfb51465a2ab8d53a2bdde3ffb9db980cc30e5f6de37f90d0e50a",
+      "equal": true
+    },
+    "validation": {
+      "archiveSha256": "11cc861f4e3b749fcb89fcb6685132acb62728f0cb7e1d7532026e77af31e44e",
+      "oracleReleaseSha256": "11cc861f4e3b749fcb89fcb6685132acb62728f0cb7e1d7532026e77af31e44e",
+      "equal": true
+    }
+  },
+  "retiredArtifacts": {
+    "releases/palantirkc-infrastructure-operations-0.0.0-2f8ca5da92d1.tgz": {
+      "sha256": "33cd9ae664f68acc7d4d3ac5c5478b58375a4ae5320bf9395a582a5739d1becf",
+      "bytes": 36605,
+      "recoveryRevision": "470809b"
+    },
+    "releases/palantirkc-infrastructure-operations-0.0.0-2f8ca5da92d1.json": {
+      "sha256": "0c99c1535d57c52332fb95bf09e19ad1dbd7e41b27868718b35c92203d270099",
+      "bytes": 3828,
+      "recoveryRevision": "470809b"
+    },
+    "releases/palantirkc-ontology-0.2.0.json": {
+      "sha256": "57ffeee33117e5cfac8ed97a68039354aaf40e43fa1c9d6be1c4f6bf51214f3f",
+      "bytes": 1199,
+      "recoveryRevision": "470809b"
+    },
+    "releases/palantirkc-ontology-0.2.0.tgz": {
+      "sha256": "3f9995d0b91d2ad39dfc7cedbb6e35b1cb9d29c2e57223ca0c076d2030319406",
+      "bytes": 23300,
+      "recoveryRevision": "470809b"
+    }
+  }
+}

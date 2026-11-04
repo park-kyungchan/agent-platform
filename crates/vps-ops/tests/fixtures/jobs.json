@@ -1,0 +1,296 @@
+[
+  {
+    "kind": "complete",
+    "job": {
+      "schema": 1,
+      "job_id": "fixture",
+      "unit": "fixture",
+      "action": "prepare",
+      "launched_at": "2026-10-08T00:00:00.000Z",
+      "requested_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mainPid": 2001
+    },
+    "tx": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "complete",
+      "result": "passed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "correlated": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "complete",
+      "result": "passed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "complete": true,
+    "retry": false
+  },
+  {
+    "kind": "failed",
+    "job": {
+      "schema": 1,
+      "job_id": "fixture",
+      "unit": "fixture",
+      "action": "prepare",
+      "launched_at": "2026-10-08T00:00:00.000Z",
+      "requested_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mainPid": 2001
+    },
+    "tx": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "complete",
+      "result": "failed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "correlated": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "complete",
+      "result": "failed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "complete": false,
+    "retry": true
+  },
+  {
+    "kind": "wrong-pid",
+    "job": {
+      "schema": 1,
+      "job_id": "fixture",
+      "unit": "fixture",
+      "action": "prepare",
+      "launched_at": "2026-10-08T00:00:00.000Z",
+      "requested_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mainPid": 2001
+    },
+    "tx": {
+      "run_id": "fixture",
+      "pid": 2002,
+      "last_phase": "complete",
+      "result": "passed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "correlated": null,
+    "complete": false,
+    "retry": false
+  },
+  {
+    "kind": "wrong-sha",
+    "job": {
+      "schema": 1,
+      "job_id": "fixture",
+      "unit": "fixture",
+      "action": "prepare",
+      "launched_at": "2026-10-08T00:00:00.000Z",
+      "requested_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mainPid": 2001
+    },
+    "tx": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "complete",
+      "result": "passed",
+      "candidate": {
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "correlated": null,
+    "complete": false,
+    "retry": false
+  },
+  {
+    "kind": "old",
+    "job": {
+      "schema": 1,
+      "job_id": "fixture",
+      "unit": "fixture",
+      "action": "prepare",
+      "launched_at": "2026-10-08T00:00:00.000Z",
+      "requested_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mainPid": 2001
+    },
+    "tx": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "complete",
+      "result": "passed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-07T00:00:00Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "correlated": null,
+    "complete": false,
+    "retry": false
+  },
+  {
+    "kind": "not-terminal",
+    "job": {
+      "schema": 1,
+      "job_id": "fixture",
+      "unit": "fixture",
+      "action": "prepare",
+      "launched_at": "2026-10-08T00:00:00.000Z",
+      "requested_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "mainPid": 2001
+    },
+    "tx": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "build",
+      "result": "passed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "correlated": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "build",
+      "result": "passed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "complete": false,
+    "retry": false
+  },
+  {
+    "kind": "native-no-overlay-empty-transaction",
+    "job": {
+      "schema": 1,
+      "job_id": "fixture",
+      "unit": "fixture",
+      "action": "prepare",
+      "launched_at": "2026-10-08T00:00:00.000Z",
+      "requested_sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "mainPid": 2001
+    },
+    "tx": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "complete",
+      "result": "passed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": ""
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "correlated": {
+      "run_id": "fixture",
+      "pid": 2001,
+      "last_phase": "complete",
+      "result": "passed",
+      "candidate": {
+        "sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "overlay_sha256": ""
+      },
+      "history": [
+        {
+          "at": "2026-10-08T00:00:01.000Z",
+          "phase": "preflight",
+          "result": "running"
+        }
+      ]
+    },
+    "complete": true,
+    "retry": false
+  }
+]

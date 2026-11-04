@@ -1,0 +1,9 @@
+{
+  "old": "1111111111111111111111111111111111111111",
+  "new": "2222222222222222222222222222222222222222",
+  "commits": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\tfix gateway race\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\tsecurity auth cleanup\ncccccccccccccccccccccccccccccccccccccccc\tbreaking schema migration\ndddddddddddddddddddddddddddddddddddddddd\tdocs improve README",
+  "changed": "gateway/run.py\nDockerfile\nhermes_cli/main.py\ngateway/status.py",
+  "shortstat": "4 files changed, 42 insertions(+)",
+  "count": 4,
+  "time": "2026-10-08T00:00:00+00:00"
+}

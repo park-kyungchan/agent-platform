@@ -1,0 +1,2850 @@
+[
+  {
+    "kind": "success",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": true,
+      "canonicalSha": "2222222222222222222222222222222222222222",
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": []
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "wrong-correlation",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "wrong",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "wrong",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "correlation-mismatch"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "wrong-pre",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "2222222222222222222222222222222222222222",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "pre-update-sha-mismatch"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "old",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-07T00:00:00Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-07T00:00:00Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "nonterminal-or-stale-receipt"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "unfinished",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": null,
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": null,
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "nonterminal-or-stale-receipt"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "failed",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "failed",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "failed",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "native-outcome:failed"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "partial",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "partial",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "partial",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "native-outcome:partial"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "followup",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [
+        {
+          "step": "desktop_build"
+        }
+      ],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [
+        "followup:desktop_build"
+      ],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "followup:desktop_build"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "user-action",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {},
+      "user_action": {
+        "step": "desktop"
+      }
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [
+        "user-action"
+      ],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "user-action"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "failed-stage",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "failed"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [
+        "stage:build"
+      ],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "stage:build"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "restart-owed",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {
+        "incomplete": true,
+        "failed_units": [
+          "one"
+        ],
+        "phase_error": "error",
+        "fresh_recovery": {
+          "failed": [
+            "x"
+          ],
+          "stale_runtimes": [
+            "x"
+          ],
+          "serve_units": {
+            "failed": [
+              "x"
+            ]
+          }
+        }
+      }
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [
+        "gateway-restart-incomplete",
+        "gateway-failed-units",
+        "gateway-phase-error",
+        "native-recovery-failed",
+        "stale-runtimes",
+        "serve-unit-failed"
+      ],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "gateway-restart-incomplete",
+        "gateway-failed-units",
+        "gateway-phase-error",
+        "native-recovery-failed",
+        "stale-runtimes",
+        "serve-unit-failed"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "fleet-owed",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [
+        {
+          "state": "down"
+        }
+      ],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [
+        "fleet:down"
+      ],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "fleet:down"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": true
+    }
+  },
+  {
+    "kind": "dirty",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": true,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": false,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "installed-artifact-identity-mismatch"
+      ]
+    },
+    "eligibility": {
+      "eligible": false,
+      "reasons": [
+        "unreviewed-dirty-checkout"
+      ]
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": false
+    }
+  },
+  {
+    "kind": "wrong-stamp",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "1111111111111111111111111111111111111111",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "1111111111111111111111111111111111111111",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": false,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "installed-artifact-identity-mismatch"
+      ]
+    },
+    "eligibility": {
+      "eligible": false,
+      "reasons": [
+        "native-install-identity-mismatch"
+      ]
+    },
+    "identity": {
+      "installedSha": "1111111111111111111111111111111111111111",
+      "runningSha": null,
+      "running": false,
+      "verified": false
+    }
+  },
+  {
+    "kind": "fallback",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "fallback",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "fallback",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": false,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "installed-artifact-identity-mismatch"
+      ]
+    },
+    "eligibility": {
+      "eligible": false,
+      "reasons": [
+        "native-install-identity-mismatch"
+      ]
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": false
+    }
+  },
+  {
+    "kind": "wrong-home",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": false,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": false,
+      "runningVerified": false,
+      "runningState": "not-running",
+      "reasons": [
+        "installed-artifact-identity-mismatch"
+      ]
+    },
+    "eligibility": {
+      "eligible": false,
+      "reasons": [
+        "native-install-identity-mismatch"
+      ]
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": false,
+      "verified": false
+    }
+  },
+  {
+    "kind": "running-unknown",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [
+        {
+          "pid": 10,
+          "executablePath": "C:\\Hermes.exe",
+          "createdAtUtc": "2026-10-08T00:00:00.000Z"
+        }
+      ],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": null
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": true,
+      "canonicalSha": "2222222222222222222222222222222222222222",
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "unverified",
+      "reasons": []
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": null,
+      "running": true,
+      "verified": true
+    }
+  },
+  {
+    "kind": "running-good",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [
+        {
+          "pid": 10,
+          "executablePath": "C:\\Hermes.exe",
+          "createdAtUtc": "2026-10-08T00:00:00.000Z"
+        }
+      ],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "bundleSwapPending": false,
+        "bundleOutOfSync": false
+      }
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": true,
+      "canonicalSha": "2222222222222222222222222222222222222222",
+      "installedAligned": true,
+      "runningVerified": true,
+      "runningState": "verified",
+      "reasons": []
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": "2222222222222222222222222222222222222222",
+      "running": true,
+      "verified": true
+    }
+  },
+  {
+    "kind": "running-old",
+    "target": {
+      "schemaVersion": 1,
+      "id": "fixture",
+      "installRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "installRootWindows": "C:\\Users\\packr\\AppData\\Local\\hermes\\hermes-agent",
+      "nativeHomeWsl": "/mnt/c/Users/packr/AppData/Local/hermes",
+      "nativeHomeWindows": "C:\\Users\\packr\\AppData\\Local\\hermes",
+      "nativeUserHomeWindows": "C:\\Users\\packr",
+      "powershellExecutable": "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+      "nativeGitExecutableWindows": "C:\\Program Files\\Git\\cmd\\git.exe",
+      "playwrightProjectRootWsl": "/mnt/c/Users/packr/AppData/Local/hermes/hermes-agent",
+      "branch": "main",
+      "receiptTimeoutMs": 3600000,
+      "allowedNativeRuntimes": [
+        {
+          "kind": "serve",
+          "supervisor": "desktop"
+        }
+      ],
+      "policy": {
+        "noArbitraryShaInput": true,
+        "canonicalBackendSha": "Verified terminal Desktop receipt post_update.sha",
+        "runningAppRequiresExplicitCdp": true,
+        "missingStrongNativeCorrelation": "Recoverable refusal before mutation",
+        "noGatewayMeaning": "Skips explicit local gateway startup; native existing-fleet lifecycle still requires preflight",
+        "automaticKillOrLockReplacement": false,
+        "executionAuthority": "Current explicit user update instruction; configuration alone grants no native authority"
+      }
+    },
+    "raw": {
+      "schema": 1,
+      "update_id": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlation_id": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "action_id": null,
+      "started_at": "2026-10-08T00:00:01.000Z",
+      "finished_at": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "pre_update": {
+        "sha": "1111111111111111111111111111111111111111"
+      },
+      "post_update": {
+        "sha": "2222222222222222222222222222222222222222"
+      },
+      "stages": [
+        {
+          "name": "build",
+          "outcome": "success"
+        },
+        {
+          "name": "restart",
+          "outcome": "success"
+        }
+      ],
+      "followups": [],
+      "fleet": [],
+      "gateway_restart": {}
+    },
+    "provenance": {
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "snapshot": {
+      "schemaVersion": 1,
+      "targetId": "fixture",
+      "observedAtUtc": "2026-10-08T00:00:04.000Z",
+      "checkoutSha": "2222222222222222222222222222222222222222",
+      "checkoutDirty": false,
+      "checkoutStamp": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "installedArtifact": {
+        "commit": "2222222222222222222222222222222222222222",
+        "builtAt": "2026-10-08T00:00:02.000Z",
+        "dirty": false,
+        "source": "local",
+        "updateMechanism": "self",
+        "payload": "bootstrap",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "path": "/fixture/stamp.json"
+      },
+      "processes": [
+        {
+          "pid": 10,
+          "executablePath": "C:\\Hermes.exe",
+          "createdAtUtc": "2026-10-08T00:00:00.000Z"
+        }
+      ],
+      "nativeUserHomeWindows": "C:\\Users\\fixture",
+      "nativeHomeWindows": "C:\\Users\\fixture\\hermes",
+      "nativeHomeVerified": true,
+      "nativeScript": {
+        "path": "/fixture/windows.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "automaticCorrelation": true
+      },
+      "marker": {
+        "present": false,
+        "runId": null
+      },
+      "runningArtifact": {
+        "commit": "1111111111111111111111111111111111111111",
+        "bundleSwapPending": false,
+        "bundleOutOfSync": false
+      }
+    },
+    "expected": {
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "startedAtUtc": "2026-10-08T00:00:00.000Z",
+      "preSha": "1111111111111111111111111111111111111111"
+    },
+    "normalized": {
+      "schema": 1,
+      "updateId": "045b24c2e9b247d79b36e68d01f1ca16",
+      "correlationId": "5db16921-1a27-4dc9-ac98-6f223f7b2098",
+      "actionId": null,
+      "startedAtUtc": "2026-10-08T00:00:01.000Z",
+      "finishedAtUtc": "2026-10-08T00:00:03.000Z",
+      "outcome": "success",
+      "preSha": "1111111111111111111111111111111111111111",
+      "postSha": "2222222222222222222222222222222222222222",
+      "owed": [],
+      "archivePath": "/root/logs/update_receipts/update_20261008_000001_123_045b24c2e9b247d79b36e68d01f1ca16.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "byteLength": 400
+    },
+    "verification": {
+      "eligibleForBackend": false,
+      "canonicalSha": null,
+      "installedAligned": true,
+      "runningVerified": false,
+      "runningState": "unverified",
+      "reasons": [
+        "running-artifact-identity-mismatch"
+      ]
+    },
+    "eligibility": {
+      "eligible": true,
+      "reasons": []
+    },
+    "identity": {
+      "installedSha": "2222222222222222222222222222222222222222",
+      "runningSha": "1111111111111111111111111111111111111111",
+      "running": true,
+      "verified": true
+    }
+  }
+]
