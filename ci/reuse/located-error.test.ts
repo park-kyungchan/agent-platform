@@ -1,4 +1,3 @@
-import { reviewArtifactTarget } from "../quality/review-artifact";
 import { expect, test } from "bun:test";
 import { locatedError } from "./located-error";
 
@@ -22,15 +21,4 @@ test("non-errors and absent stacks locate the boundary without serializing the t
     expect(locatedError(value, "caller_source_refused")).toMatch(
       /^caller_source_refused@ci\/reuse\/located-error\.ts:\d+$/,
     );
-});
-
-test("native publisher diagnostics retain actual admitted quality throw sites", () => {
-  try {
-    reviewArtifactTarget("https://foreign.invalid/", "fixture/owner");
-    throw Error("expected refusal");
-  } catch (error) {
-    expect(locatedError(error, "review_artifact_refused")).toMatch(
-      /^review_artifact_refused@ci\/quality\/review-artifact\.ts:[1-9][0-9]*$/,
-    );
-  }
 });

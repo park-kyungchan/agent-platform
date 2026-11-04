@@ -7,11 +7,6 @@ const sourceFiles = new Set([
   "ci/reuse/publish-review-artifact.ts",
   "ci/reuse/review-pr.ts",
   "ci/reuse/located-error.ts",
-  "ci/quality/review-artifact.ts",
-  "ci/quality/artifact-archive.ts",
-  "ci/quality/receipt-validator.ts",
-  "ci/quality/receipt-validation-gate.ts",
-  "ci/source-check.ts",
 ]);
 
 function sourceLocation(stack: string): string | undefined {
