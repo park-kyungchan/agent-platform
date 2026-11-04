@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use super::filesystem::{self as io, Dir, Stage};
 use super::types::*;
 use crate::{AgyProfile, ClaudeProfile, CodexProfile, Entry, RenderRequest, Selector};
@@ -321,7 +319,7 @@ pub(super) fn command_dir(path: &str, spec: &Spec) -> Result<Dir> {
     }
     Ok(command)
 }
-pub(super) fn locks(spec: &Spec) -> Result<Vec<File>> {
+pub(super) fn locks(spec: &Spec) -> Result<Vec<io::Lock>> {
     let mut held = Vec::new();
     let mut paths: Vec<_> = profiles(spec).into_iter().map(|(path, _)| path).collect();
     paths.sort_unstable();

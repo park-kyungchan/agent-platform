@@ -1,7 +1,7 @@
 //! Descriptor-relative operations; no traversal through caller-controlled links.
 use std::fs::File;
 use std::io::{Read, Write};
-use std::os::fd::OwnedFd;
+use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
 
 use rustix::fs::{self, AtFlags, FileType, Mode, OFlags};
 use rustix::io::Errno;
@@ -82,6 +82,24 @@ pub(super) struct Dir {
     pub fd: OwnedFd,
     pub topology: Vec<DirectoryIdentity>,
 }
+
+pub(super) struct Lock(File);
+
+impl AsFd for Lock {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        self.0.as_fd()
+    }
+}
+
+impl Drop for Lock {
+    fn drop(&mut self) {
+        // A concurrent fork can inherit this open file description until exec.
+        // Closing only our descriptor leaves its flock held by the child.
+        // Release ownership at the end of the command even if a duplicate lives.
+        let _ = self.0.unlock();
+    }
+}
+
 impl Dir {
     pub fn open(path: &str, uid: u32) -> Result<Self> {
         if path != "/" && !valid_path(path) {
@@ -123,15 +141,16 @@ impl Dir {
         }
         Ok(())
     }
-    pub fn command_lock(&self, uid: u32) -> Result<File> {
+    pub fn command_lock(&self, uid: u32) -> Result<Lock> {
         // Lock the directory inode without adding another persistent artifact.
         let fd = fs::openat(&self.fd, ".", OPEN | OFlags::DIRECTORY, Mode::empty())
             .map_err(|_| err("io_error", "command_dir"))?;
         let file = File::from(fd);
         file.try_lock()
             .map_err(|_| err("lock_busy", "command_dir"))?;
+        let lock = Lock(file);
         self.recheck(uid)?;
-        Ok(file)
+        Ok(lock)
     }
     pub fn empty(&self) -> Result<bool> {
         let entries = fs::Dir::read_from(&self.fd).map_err(|_| err("io_error", "command_dir"))?;
@@ -217,7 +236,7 @@ impl Dir {
             sha256: Some(digest),
         })
     }
-    pub fn lock(&self, uid: u32) -> Result<File> {
+    pub fn lock(&self, uid: u32) -> Result<Lock> {
         let name = ".ap-install.lock";
         let fd = match fs::openat(
             &self.fd,
@@ -248,12 +267,13 @@ impl Dir {
         }
         let file = File::from(fd);
         file.try_lock().map_err(|_| err("lock_busy", "lock"))?;
+        let lock = Lock(file);
         let now = fs::statat(&self.fd, name, AtFlags::SYMLINK_NOFOLLOW)
             .map_err(|_| err("expected_before_conflict", "lock"))?;
         if stamp(&s) != stamp(&now) {
             return Err(err("expected_before_conflict", "lock"));
         }
-        Ok(file)
+        Ok(lock)
     }
     pub fn read_state(&self, uid: u32) -> Result<State> {
         let snap = self.snapshot("state.json", uid)?;
