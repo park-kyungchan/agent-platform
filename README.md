@@ -5,7 +5,10 @@ installation/recovery and on-demand diagnosis. Native Muse, Claude Code, Codex,
 Antigravity CLI (`agy`) and Hermes own their sessions, tools and lifecycle.
 
 `crates/ap` implements `ap render`, `ap install plan|apply|recover` and
-`ap doctor inspect`. Requests name explicit source/profile paths. Rendering is
+`ap doctor inspect`. `ap pane` resolves the caller's Herdr pane;
+`--focused` explicitly selects UI focus, `--exports` emits validated caller
+variables and `--resume-candidate` returns an unverified Codex candidate.
+See [pane compatibility](crates/ap/pane/README.md). Requests name explicit source/profile paths. Rendering is
 pure; installation owns only the selected instruction links/import, preserves
 unrelated native files, and requires explicit writer coordination. Doctor does
 not execute hooks or establish native loading.

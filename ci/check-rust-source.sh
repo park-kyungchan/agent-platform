@@ -46,3 +46,7 @@ else
   sudo -n -- python3 -I -B "$PWD/crates/ap/s03/conformance/verify-v2.py" --binary "$binary" --scratch-parent "$matrix_scratch"
 fi
 python3 -I -B crates/ap/s03/conformance/verify-commands-v1.py --binary "$binary"
+
+# Frozen host pane oracle, using only disposable fake proc/Herdr/TTY/SQLite inputs.
+cargo build --locked -j1 -p ap --example pane_fixture
+python3 -I -B crates/ap/pane/golden.py --binary "$(dirname -- "$binary")/examples/pane_fixture"

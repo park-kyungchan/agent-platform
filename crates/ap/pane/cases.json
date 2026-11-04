@@ -1,0 +1,2913 @@
+[
+  {
+    "name": "help---help",
+    "args": [
+      "--help"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [],
+    "expected": {
+      "stdout": "Usage: pane [--exports | --focused | --resume-candidate]\n  default    Print the caller pane; warn for an unverified session match.\n  --exports  Print shell exports for the containing pane.\n  --focused  Print the UI-focused pane (not caller identity).\n  --resume-candidate  Print a unique Codex launch-time resume match (unverified current session).\n",
+      "stderr": "",
+      "status": 0
+    }
+  },
+  {
+    "name": "help--h",
+    "args": [
+      "-h"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [],
+    "expected": {
+      "stdout": "Usage: pane [--exports | --focused | --resume-candidate]\n  default    Print the caller pane; warn for an unverified session match.\n  --exports  Print shell exports for the containing pane.\n  --focused  Print the UI-focused pane (not caller identity).\n  --resume-candidate  Print a unique Codex launch-time resume match (unverified current session).\n",
+      "stderr": "",
+      "status": 0
+    }
+  },
+  {
+    "name": "invalid-flag",
+    "args": [
+      "--bad"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [],
+    "expected": {
+      "stdout": "",
+      "stderr": "invalid_arguments@pane:1: use pane --help\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "combined-flags",
+    "args": [
+      "--focused",
+      "--exports"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [],
+    "expected": {
+      "stdout": "",
+      "stderr": "invalid_arguments@pane:1: use pane --help\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "missing-env",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [],
+    "herdr_env": false,
+    "expected": {
+      "stdout": "",
+      "stderr": "herdr_environment_missing@pane:1: run inside a Herdr-managed environment\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "query-status",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "error": "status"
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "herdr_query_failed@pane:1: could not query the current Herdr session\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "query-parse",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "error": "parse"
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "herdr_query_failed@pane:1: could not parse the current Herdr session\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "query-missing",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "error": "missing"
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "herdr_query_failed@pane:1: could not parse the current Herdr session\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "query-timeout",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "error": "timeout"
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "herdr_query_failed@pane:1: could not parse the current Herdr session\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "query-missing-result",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "error": "missing-result"
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "herdr_query_failed@pane:1: could not parse the current Herdr session\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "focused",
+    "args": [
+      "--focused"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1",
+              "focused": true
+            },
+            {
+              "pane_id": "wA:p2",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "",
+      "status": 0
+    }
+  },
+  {
+    "name": "focused-count-0",
+    "args": [
+      "--focused"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": []
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "focused_pane_unresolved@pane:1: matches=0\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "focused-count-2",
+    "args": [
+      "--focused"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p0",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1",
+              "focused": true
+            },
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1",
+              "focused": true
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "focused_pane_unresolved@pane:1: matches=2\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "ancestry",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "",
+      "status": 0
+    }
+  },
+  {
+    "name": "exports",
+    "args": [
+      "--exports"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "export HERDR_PANE_ID=wA:p1\nexport HERDR_WORKSPACE_ID=wA\nexport HERDR_TAB_ID=wA:t1\n",
+      "stderr": "",
+      "status": 0
+    }
+  },
+  {
+    "name": "parent-ancestry",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 42 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n",
+      "42": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 42,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 42,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "",
+      "status": 0
+    }
+  },
+  {
+    "name": "unresolved",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "broken-proc",
+    "args": [],
+    "proc": {
+      "900": "broken"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "cycle-proc",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 901 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n",
+      "901": "900 (name with ) spaces) S 900 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "ambiguous-ancestry",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            },
+            {
+              "pane_id": "wA:p2",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p2"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=2; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "pane-closed",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": []
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_changed_during_lookup@pane:1: pane moved or closed\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "pane-moved",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t2"
+            }
+          ]
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_changed_during_lookup@pane:1: pane moved or closed\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "association-changed",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 40,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_changed_during_lookup@pane:1: process association changed\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "exports-invalid-workspace_id",
+    "args": [
+      "--exports"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "bad",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "bad",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_metadata_invalid@pane:1: workspace_id\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "exports-invalid-pane_id",
+    "args": [
+      "--exports"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wB:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wB:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wB:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wB:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_metadata_invalid@pane:1: pane_id\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "exports-invalid-tab_id",
+    "args": [
+      "--exports"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wB:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wB:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_metadata_invalid@pane:1: tab_id\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "reported-session",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1",
+              "agent": "codex",
+              "agent_session": {
+                "source": "herdr:codex",
+                "kind": "id",
+                "value": "01234567-89ab-cdef-0123-456789abcdef"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1",
+              "agent": "codex",
+              "agent_session": {
+                "source": "herdr:codex",
+                "kind": "id",
+                "value": "01234567-89ab-cdef-0123-456789abcdef"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "",
+      "status": 0
+    }
+  },
+  {
+    "name": "reported-session-changed",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1",
+              "agent": "codex",
+              "agent_session": {
+                "source": "herdr:codex",
+                "kind": "id",
+                "value": "01234567-89ab-cdef-0123-456789abcdef"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_changed_during_lookup@pane:1: process association changed\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "invalid-session",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1",
+              "agent": "codex",
+              "agent_session": {
+                "source": "herdr:codex",
+                "kind": "id",
+                "value": "01234567-89ab-cdef-0123-456789abcdef"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "session": "bad",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "resume-[]",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "unverified_session_candidate@pane:1: frontend may have changed sessions\n",
+      "status": 0
+    }
+  },
+  {
+    "name": "resume-['--resume-candidate']",
+    "args": [
+      "--resume-candidate"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "unverified_session_candidate@pane:1: frontend may have changed sessions\n",
+      "status": 0
+    }
+  },
+  {
+    "name": "resume-exports-refused",
+    "args": [
+      "--exports"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "resume-pid-changed",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 56,
+                "argv": [
+                  "codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_changed_during_lookup@pane:1: process association changed\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "resume-reported-refused",
+    "args": [
+      "--resume-candidate"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1",
+              "agent": "codex",
+              "agent_session": {
+                "source": "herdr:codex",
+                "kind": "id",
+                "value": "01234567-89ab-cdef-0123-456789abcdef"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "ambiguous-resume",
+    "args": [
+      "--resume-candidate"
+    ],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            },
+            {
+              "pane_id": "wA:p2",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p2"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=2; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "bad-resume-['codex', 'resume']",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex",
+                  "resume"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "bad-resume-['codex', 'resume', 'other']",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex",
+                  "resume",
+                  "other"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "bad-resume-['not-codex', 'resume', '01234567-89ab-cdef-0123-456789abcdef']",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "not-codex",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "bad-resume-[1, 'resume', '01234567-89ab-cdef-0123-456789abcdef']",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  1,
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "bad-resume-['/bin/codex/', 'resume', '01234567-89ab-cdef-0123-456789abcdef']",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex/",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "bad-resume-['/bin/codex/.', 'resume', '01234567-89ab-cdef-0123-456789abcdef']",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "/bin/codex/.",
+                  "resume",
+                  "01234567-89ab-cdef-0123-456789abcdef"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "terminal",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            },
+            {
+              "pane_id": "wA:p2",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p2"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 30,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            },
+            {
+              "pane_id": "wA:p2",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p2"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 30,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "ttys": [
+      7
+    ],
+    "shell_ttys": {
+      "20": 7,
+      "30": 8
+    },
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "",
+      "status": 0
+    }
+  },
+  {
+    "name": "terminal-lost",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 30,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "ttys": [
+      7
+    ],
+    "shell_ttys": {
+      "20": 7
+    },
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_changed_during_lookup@pane:1: process association changed\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "ambiguous-terminal",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            },
+            {
+              "pane_id": "wA:p2",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p2"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 30,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "ttys": [
+      7
+    ],
+    "shell_ttys": {
+      "20": 7,
+      "30": 7
+    },
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=2; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "new",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n",
+      "55": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex"
+                ],
+                "cwd": "/workspace"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex"
+                ],
+                "cwd": "/workspace"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "origin": [
+      1005000,
+      "/workspace"
+    ],
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "unverified_session_candidate@pane:1: frontend may have changed sessions\n",
+      "status": 0
+    }
+  },
+  {
+    "name": "new-edge",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n",
+      "55": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex"
+                ],
+                "cwd": "/workspace"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex"
+                ],
+                "cwd": "/workspace"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "origin": [
+      1016000,
+      "/workspace"
+    ],
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "unverified_session_candidate@pane:1: frontend may have changed sessions\n",
+      "status": 0
+    }
+  },
+  {
+    "name": "new-too-late",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n",
+      "55": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex"
+                ],
+                "cwd": "/workspace"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "origin": [
+      1016001,
+      "/workspace"
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "new-before-start",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n",
+      "55": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex"
+                ],
+                "cwd": "/workspace"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "origin": [
+      1000999,
+      "/workspace"
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "new-pid-lost",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n",
+      "55": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex"
+                ],
+                "cwd": "/workspace"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "origin": [
+      1005000,
+      "/workspace"
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "pane_changed_during_lookup@pane:1: process association changed\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "new-wrong-cwd",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n",
+      "55": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": [
+              {
+                "pid": 55,
+                "argv": [
+                  "codex"
+                ],
+                "cwd": "/workspace"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "session": "01234567-89ab-cdef-0123-456789abcdef",
+    "origin": [
+      1005000,
+      "/elsewhere"
+    ],
+    "expected": {
+      "stdout": "",
+      "stderr": "caller_pane_unresolved@pane:1: matches=0; no verified caller binding\n",
+      "status": 1
+    }
+  },
+  {
+    "name": "priority-ancestry-over-terminal",
+    "args": [],
+    "proc": {
+      "900": "900 (name with ) spaces) S 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 100\n"
+    },
+    "queries": [
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            },
+            {
+              "pane_id": "wA:p2",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p2"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 20,
+            "foreground_processes": []
+          }
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "list"
+        ],
+        "result": {
+          "panes": [
+            {
+              "pane_id": "wA:p1",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            },
+            {
+              "pane_id": "wA:p2",
+              "workspace_id": "wA",
+              "tab_id": "wA:t1"
+            }
+          ]
+        }
+      },
+      {
+        "args": [
+          "pane",
+          "process-info",
+          "--pane",
+          "wA:p1"
+        ],
+        "result": {
+          "process_info": {
+            "shell_pid": 900,
+            "foreground_processes": []
+          }
+        }
+      }
+    ],
+    "ttys": [
+      7
+    ],
+    "shell_ttys": {
+      "20": 7
+    },
+    "expected": {
+      "stdout": "wA:p1\n",
+      "stderr": "",
+      "status": 0
+    }
+  }
+]

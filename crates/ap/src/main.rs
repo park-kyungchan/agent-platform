@@ -34,6 +34,10 @@ fn fail(code: &str, field: &str, status: u8) -> ExitCode {
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     #[cfg(target_os = "linux")]
+    if args.first().is_some_and(|arg| arg == "pane") {
+        return ap::pane::cli(&args[1..]);
+    }
+    #[cfg(target_os = "linux")]
     if let Some(result) = ap::native::cli::dispatch(&args) {
         return result;
     }
