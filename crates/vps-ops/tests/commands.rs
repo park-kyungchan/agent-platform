@@ -449,9 +449,8 @@ fn hostctl_command_output_goldens() {
     );
 }
 #[test]
-fn hostctl_inventory_and_retired_k3s_exit_preserved() {
-    let mut missing = ok("");
-    missing.exit_code = 127;
+fn hostctl_inventory_without_retired_k3s() {
+    let golden = fixture("hostctl-v2");
     let mut r = Fake::new(vec![
         ok("fixture\n"),
         ok("Linux fixture\n"),
@@ -462,16 +461,90 @@ fn hostctl_inventory_and_retired_k3s_exit_preserved() {
         ok("Filesystem Type Size Used Avail Use% Mounted\n/dev/vda1 ext4 100G 20G 80G 20% /\n"),
         ok("active\n"),
         ok("active\n"),
-        ok("inactive\n"),
         ok("container rows\n"),
-        missing,
     ]);
     let o = hostctl::dispatch(&mut r, "inventory").unwrap();
-    assert_eq!(o.code, 127);
-    assert_eq!(
-        o.stdout,
-        "=== HOST INVENTORY ===\nhostname=fixture\nkernel=Linux fixture\nos=fixture 1\nuptime=up 1 day\ncpu=8\nmemory=16G total, 14G available\ndisk=100G total, 80G used, 20G available\n--- SERVICES ---\nssh.socket=active\ndocker=active\nk3s=inactive\n--- DOCKER ---\ncontainer rows\n--- K3S NODE ---\n"
-    );
+    assert_eq!(o.code, golden["inventory"]["exit"]);
+    assert_eq!(o.stdout, golden["inventory"]["stdout"]);
+    assert_eq!(o.stderr, golden["inventory"]["stderr"]);
+    let calls: Vec<Vec<String>> = r
+        .calls
+        .iter()
+        .map(|c| {
+            std::iter::once(c.program.clone())
+                .chain(c.args.clone())
+                .collect()
+        })
+        .collect();
+    assert_eq!(json!(calls), golden["inventory"]["calls"]);
+    assert!(r.outputs.is_empty());
+}
+
+#[test]
+fn hostctl_retired_k3s_ingress_is_denied_without_a_probe() {
+    let golden = fixture("hostctl-v2");
+    let case = &golden["retired_ingress"];
+    let mut runner = Fake::default();
+    let output = hostctl::dispatch(&mut runner, case["command"].as_str().unwrap()).unwrap();
+    assert_eq!(output.code, case["exit"]);
+    assert_eq!(output.stdout, case["stdout"]);
+    assert_eq!(output.stderr, case["stderr"]);
+    assert!(runner.calls.is_empty());
+}
+
+#[test]
+fn hostctl_bash_missing_binary_goldens() {
+    use std::os::unix::fs::PermissionsExt;
+    use vps_ops::runner::ProcessRunner;
+
+    let d = Temp::new();
+    let blocked = d.0.join("blocked");
+    fs::write(&blocked, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&blocked, fs::Permissions::from_mode(0o600)).unwrap();
+    let golden = fixture("hostctl-v2");
+    for case in golden["spawn_failures"].as_array().unwrap() {
+        let program = case["program"]
+            .as_str()
+            .unwrap()
+            .replace("<ROOT>", d.0.to_str().unwrap());
+        let mut spec = CommandSpec::new(program, vec![]);
+        spec.clear_environment = true;
+        spec.environment
+            .insert("PATH".into(), d.0.display().to_string());
+        spec.environment.insert("LC_ALL".into(), "C".into());
+        let output = ProcessRunner.run(spec).unwrap();
+        assert_eq!(output.exit_code, case["exit"], "{}", case["id"]);
+        assert_eq!(output.stdout, case["stdout"]);
+        assert_eq!(
+            output.stderr.replace(d.0.to_str().unwrap(), "<ROOT>"),
+            case["stderr"],
+            "{}",
+            case["id"]
+        );
+        assert_eq!(output.reason, "spawn-failed");
+        assert!(!output.created && !output.reaped);
+        assert_eq!(output.transport_exit_code, None);
+        assert_eq!(output.stderr_bytes_observed, 0);
+    }
+
+    // Exercise the basename routes with an empty fixture PATH. Missing sshd
+    // retains the Bash grep/pipefail exit 1 rather than inventing a 127 for
+    // the whole pipeline. No host executable can be found through this PATH.
+    let alias = d.0.join("hermes-hostctl");
+    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_vps-ops"), &alias).unwrap();
+    for case in golden["alias_missing_path"].as_array().unwrap() {
+        let output = std::process::Command::new(&alias)
+            .arg(case["command"].as_str().unwrap())
+            .env("PATH", &d.0)
+            .env("LC_ALL", "C")
+            .env("VPS_OPS_ROOT", &d.0)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code().unwrap(), case["exit"]);
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), case["stdout"]);
+        assert_eq!(String::from_utf8(output.stderr).unwrap(), case["stderr"]);
+    }
+    assert!(!d.0.join("runs").exists());
 }
 #[test]
 fn legacy_release_update_injected_success_and_rollback() {

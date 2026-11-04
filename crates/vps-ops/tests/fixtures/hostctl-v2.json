@@ -1,0 +1,131 @@
+{
+  "schema": "vps.hostctl-golden.v2",
+  "authority": "Lead Part C, 2026-11-04: k3s retired; remove probes and retain Bash missing-command diagnostic/exit semantics",
+  "oracle": {
+    "program": "/bin/bash",
+    "version": "GNU bash, version 5.2.21(1)-release (x86_64-pc-linux-gnu)",
+    "argv": [
+      "/bin/bash",
+      "--noprofile",
+      "--norc",
+      "-c",
+      "\"$@\"",
+      "hermes-hostctl",
+      "<PROGRAM>"
+    ],
+    "environment": {
+      "PATH": "<ROOT>",
+      "LC_ALL": "C"
+    },
+    "normalization": "Remove only the Bash source-location prefix \"hermes-hostctl: line 1: \"; replace disposable root with <ROOT>. Diagnostic bodies, status and stdout are unmodified. Rust has no Bash source location.",
+    "bash_sha256": "bc5945feb8bd26203ebfafea5ce1878bb2e32cb8fb50ab7ae395cfb1e1aaaef1"
+  },
+  "spawn_failures": [
+    {
+      "id": "path-missing",
+      "program": "fixture-hostctl-missing",
+      "exit": 127,
+      "stdout": "",
+      "stderr": "fixture-hostctl-missing: command not found\n",
+      "bash_stderr": "hermes-hostctl: line 1: fixture-hostctl-missing: command not found\n"
+    },
+    {
+      "id": "absolute-missing",
+      "program": "<ROOT>/missing",
+      "exit": 127,
+      "stdout": "",
+      "stderr": "<ROOT>/missing: No such file or directory\n",
+      "bash_stderr": "hermes-hostctl: line 1: <ROOT>/missing: No such file or directory\n"
+    },
+    {
+      "id": "permission-denied",
+      "program": "<ROOT>/blocked",
+      "exit": 126,
+      "stdout": "",
+      "stderr": "<ROOT>/blocked: Permission denied\n",
+      "bash_stderr": "hermes-hostctl: line 1: <ROOT>/blocked: Permission denied\n"
+    }
+  ],
+  "inventory": {
+    "stdout": "=== HOST INVENTORY ===\nhostname=fixture\nkernel=Linux fixture\nos=fixture 1\nuptime=up 1 day\ncpu=8\nmemory=16G total, 14G available\ndisk=100G total, 80G used, 20G available\n--- SERVICES ---\nssh.socket=active\ndocker=active\n--- DOCKER ---\ncontainer rows\n",
+    "exit": 0,
+    "stderr": "",
+    "calls": [
+      [
+        "hostname"
+      ],
+      [
+        "uname",
+        "-sr"
+      ],
+      [
+        "cat",
+        "/etc/os-release"
+      ],
+      [
+        "uptime",
+        "-p"
+      ],
+      [
+        "nproc"
+      ],
+      [
+        "free",
+        "-h"
+      ],
+      [
+        "df",
+        "-hT",
+        "/"
+      ],
+      [
+        "systemctl",
+        "is-active",
+        "ssh.socket"
+      ],
+      [
+        "systemctl",
+        "is-active",
+        "docker"
+      ],
+      [
+        "/usr/bin/docker",
+        "ps",
+        "--format",
+        "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+      ]
+    ]
+  },
+  "retired_ingress": {
+    "command": "k3s.status",
+    "exit": 64,
+    "stdout": "",
+    "stderr": "DENIED: unsupported hostctl command\n"
+  },
+  "alias_missing_path": [
+    {
+      "command": "inventory",
+      "bash_script": "printf '=== HOST INVENTORY ===\\nhostname='; hostname",
+      "exit": 127,
+      "stdout": "=== HOST INVENTORY ===\nhostname=",
+      "stderr": "hostname: command not found\n",
+      "bash_stderr": "hermes-hostctl: line 1: hostname: command not found\n"
+    },
+    {
+      "command": "resources",
+      "bash_script": "printf '=== RESOURCES ===\\n'; uptime",
+      "exit": 127,
+      "stdout": "=== RESOURCES ===\n",
+      "stderr": "uptime: command not found\n",
+      "bash_stderr": "hermes-hostctl: line 1: uptime: command not found\n"
+    },
+    {
+      "command": "ssh.status",
+      "bash_script": "set -o pipefail; printf '=== SSH STATUS ===\\n'; sshd -T | /usr/bin/grep -E '^port' | /usr/bin/sort",
+      "exit": 1,
+      "stdout": "=== SSH STATUS ===\n",
+      "stderr": "sshd: command not found\n",
+      "bash_stderr": "hermes-hostctl: line 1: sshd: command not found\n"
+    }
+  ]
+}

@@ -40,13 +40,15 @@ aliases or explicit subcommands:
 
 | Host alias | Explicit subcommand |
 | --- | --- |
-| `hermes-hostctl` | `hostctl inventory|resources|docker.status|k3s.status|ssh.status` |
+| `hermes-hostctl` | `hostctl inventory|resources|docker.status|ssh.status` |
 | `hermes-canary-control` | `canary capabilities|status|start HASH|stop HASH` |
 | `hermes-agent-auto-update`, `hermes-agent-update-latest` | `release-update` |
 | `hermes-main-report` | `main-report REPO OLD_SHA NEW_SHA OUTPUT` |
 
-The installed hostctl vocabulary is preserved, including its diagnostic failure
-when the retired k3s executable is absent. The legacy release helper preserves its
+Hostctl inventory observes SSH and Docker; retired k3s probes and ingress are
+removed. Missing executables retain Bash diagnostic bodies and exit 127 (126 for
+permission denial), without inventing a Bash source-location prefix. The legacy
+release helper preserves its
 first-image-line replacement and compose rollback behavior; main promotion remains
 exclusively through `scripts/hermes-main-update` and the installed helper's native
 one-shot path. Installing a binary or a symlink is a separate Lead-owned action.

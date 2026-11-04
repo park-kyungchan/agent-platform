@@ -20,7 +20,7 @@ fn call(
     stderr.push_str(&v.stderr);
     Ok((v.exit_code, v.stdout))
 }
-/// Exact installed hostctl command vocabulary; inventory retains the retired k3s diagnostic failure.
+/// Host diagnostics for the retained SSH and Docker services.
 pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
     let mut out = String::new();
     let mut err = String::new();
@@ -100,7 +100,7 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
                 }
             }
             out.push_str("--- SERVICES ---\n");
-            for name in ["ssh.socket", "docker", "k3s"] {
+            for name in ["ssh.socket", "docker"] {
                 out.push_str(&format!("{name}="));
                 let (_, s) = call(r, "systemctl", &["is-active", name], &mut String::new())?;
                 out.push_str(&s)
@@ -113,11 +113,6 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
                     "--format",
                     "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
                 ]
-            );
-            out.push_str("--- K3S NODE ---\n");
-            run!(
-                "/usr/local/bin/k3s",
-                &["kubectl", "get", "nodes", "-o", "wide"]
             );
         }
         "resources" => {
@@ -146,18 +141,6 @@ pub fn dispatch(r: &mut dyn Runner, cmd: &str) -> Result<HostOutput> {
                     "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"
                 ]
             );
-        }
-        "k3s.status" => {
-            out.push_str("=== K3S STATUS ===\n");
-            run!(
-                "/usr/local/bin/k3s",
-                &["kubectl", "get", "nodes", "-o", "wide"]
-            );
-            run!(
-                "/usr/local/bin/k3s",
-                &["kubectl", "get", "pods", "-A", "-o", "wide"]
-            );
-            run!("/usr/local/bin/k3s", &["kubectl", "get", "svc", "-A"]);
         }
         "ssh.status" => {
             out.push_str("=== SSH STATUS ===\n");
