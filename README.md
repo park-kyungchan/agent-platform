@@ -29,3 +29,9 @@ user-approved 2026-11-04 repository reorganization. Their source remains in Git
 at `57813009fdde43f99bb1798d031a1c88dabe5358`. The pushed recovery tag `archive/agent-platform-pre-strip-20261104` preserves
 all retired source and the 14 historical custody files. No separate Drive copy
 is required for these Git-tracked files by the user's explicit direction.
+
+Public runtime references and three generic skill bundles are tracked in
+[content](content/README.md). `ap render content` makes a pure proposal for the
+fixed owned set; `ap doctor content` diagnoses explicit public host paths against
+those embedded bytes. See the [content contract](crates/ap/s03/CONTENT-COVERAGE-v1.md)
+for strict requests and read-only boundaries. Content installation is not exposed.

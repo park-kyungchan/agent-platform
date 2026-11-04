@@ -1,6 +1,7 @@
 //! S03 Linux public-instruction selectors. No vendor settings or runtime execution.
 #[doc(hidden)]
 pub mod cli;
+pub mod content;
 mod doctor;
 mod filesystem;
 mod install;
