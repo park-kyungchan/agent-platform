@@ -1,0 +1,69 @@
+{
+  "title": "ObjectRecord",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "kind": {
+      "type": "string",
+      "const": "object"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "objectType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "objectTypeVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[a-zA-Z0-9.-]+)?$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "projectId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "project",
+        "shared"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "properties": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "id",
+    "objectType",
+    "objectTypeVersion",
+    "version",
+    "projectId",
+    "scope",
+    "createdAt",
+    "updatedAt",
+    "properties"
+  ],
+  "additionalProperties": false
+}

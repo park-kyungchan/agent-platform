@@ -1,0 +1,665 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "vps-operations:registry:infrastructure",
+  "version": "1.0.0",
+  "objectTypes": [
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "infrastructure:VpsHost",
+      "version": "1.0.0",
+      "name": "VpsHost",
+      "domainId": "infrastructure",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true,
+        "prefix": "vps-operations:object:VpsHost:"
+      },
+      "properties": [
+        {
+          "name": "hostname",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "sshEndpoint",
+          "valueType": "object",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "platform",
+          "valueType": "json",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "excludedEffects",
+          "valueType": "array",
+          "required": true,
+          "immutable": false
+        }
+      ],
+      "additionalProperties": false,
+      "description": "Infrastructure VpsHost record; shape validation does not grant authority or prove freshness."
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "infrastructure:ContainerRuntime",
+      "version": "1.0.0",
+      "name": "ContainerRuntime",
+      "domainId": "infrastructure",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true,
+        "prefix": "vps-operations:object:ContainerRuntime:"
+      },
+      "properties": [
+        {
+          "name": "hostId",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "reference": {
+            "objectType": "infrastructure:VpsHost",
+            "many": false
+          }
+        },
+        {
+          "name": "inventory",
+          "valueType": "object",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "observedAtUtc",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "format": "date-time"
+        }
+      ],
+      "additionalProperties": false,
+      "description": "Infrastructure ContainerRuntime record; shape validation does not grant authority or prove freshness."
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "infrastructure:GatewayRuntime",
+      "version": "1.0.0",
+      "name": "GatewayRuntime",
+      "domainId": "infrastructure",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true,
+        "prefix": "vps-operations:object:GatewayRuntime:"
+      },
+      "properties": [
+        {
+          "name": "hostId",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "reference": {
+            "objectType": "infrastructure:VpsHost",
+            "many": false
+          }
+        },
+        {
+          "name": "containerId",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "sharedVolumeId",
+          "valueType": "string",
+          "required": true,
+          "immutable": false,
+          "reference": {
+            "objectType": "infrastructure:SharedVolume",
+            "many": false
+          }
+        },
+        {
+          "name": "topology",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "observedOwner",
+          "valueType": "json",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "lock",
+          "valueType": "object",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "state",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "profiles",
+          "valueType": "array",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "adapterErrors",
+          "valueType": "array",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "observedAtUtc",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "format": "date-time"
+        }
+      ],
+      "additionalProperties": false,
+      "description": "Infrastructure GatewayRuntime record; shape validation does not grant authority or prove freshness."
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "infrastructure:SharedVolume",
+      "version": "1.0.0",
+      "name": "SharedVolume",
+      "domainId": "infrastructure",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true,
+        "prefix": "vps-operations:object:SharedVolume:"
+      },
+      "properties": [
+        {
+          "name": "hostId",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "reference": {
+            "objectType": "infrastructure:VpsHost",
+            "many": false
+          }
+        },
+        {
+          "name": "backingPath",
+          "valueType": "string",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "mountDestinations",
+          "valueType": "array",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "device",
+          "valueType": "integer",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "inode",
+          "valueType": "integer",
+          "required": true,
+          "immutable": false
+        }
+      ],
+      "additionalProperties": false,
+      "description": "Infrastructure SharedVolume record; shape validation does not grant authority or prove freshness."
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "infrastructure:Observation",
+      "version": "1.0.0",
+      "name": "Observation",
+      "domainId": "infrastructure",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true,
+        "prefix": "vps-operations:object:Observation:"
+      },
+      "properties": [
+        {
+          "name": "hostId",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "reference": {
+            "objectType": "infrastructure:VpsHost",
+            "many": false
+          }
+        },
+        {
+          "name": "source",
+          "valueType": "string",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "observedAtUtc",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "format": "date-time"
+        },
+        {
+          "name": "evidence",
+          "valueType": "object",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "observation",
+          "valueType": "object",
+          "required": true,
+          "immutable": true
+        }
+      ],
+      "additionalProperties": false,
+      "description": "Infrastructure Observation record; shape validation does not grant authority or prove freshness."
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "infrastructure:VerificationResult",
+      "version": "1.0.0",
+      "name": "VerificationResult",
+      "domainId": "infrastructure",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true,
+        "prefix": "vps-operations:object:VerificationResult:"
+      },
+      "properties": [
+        {
+          "name": "hostId",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "reference": {
+            "objectType": "infrastructure:VpsHost",
+            "many": false
+          }
+        },
+        {
+          "name": "observationRefs",
+          "valueType": "array",
+          "required": true,
+          "immutable": false,
+          "reference": {
+            "objectType": "infrastructure:Observation",
+            "many": true
+          }
+        },
+        {
+          "name": "verificationClass",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "verifiedAtUtc",
+          "valueType": "string",
+          "required": true,
+          "immutable": false,
+          "format": "date-time"
+        },
+        {
+          "name": "status",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "criteria",
+          "valueType": "array",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "adapterHealth",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "limitations",
+          "valueType": "array",
+          "required": true,
+          "immutable": false
+        }
+      ],
+      "additionalProperties": false,
+      "description": "Infrastructure VerificationResult record; shape validation does not grant authority or prove freshness."
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "infrastructure:AcceptanceDecision",
+      "version": "1.0.0",
+      "name": "AcceptanceDecision",
+      "domainId": "infrastructure",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true,
+        "prefix": "vps-operations:object:AcceptanceDecision:"
+      },
+      "properties": [
+        {
+          "name": "hostId",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "reference": {
+            "objectType": "infrastructure:VpsHost",
+            "many": false
+          }
+        },
+        {
+          "name": "verificationRefs",
+          "valueType": "array",
+          "required": true,
+          "immutable": false,
+          "reference": {
+            "objectType": "infrastructure:VerificationResult",
+            "many": true
+          }
+        },
+        {
+          "name": "status",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "decidedAtUtc",
+          "valueType": "string",
+          "required": true,
+          "immutable": false,
+          "format": "date-time"
+        },
+        {
+          "name": "authority",
+          "valueType": "json",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "rationale",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "conditions",
+          "valueType": "array",
+          "required": true,
+          "immutable": false
+        }
+      ],
+      "additionalProperties": false,
+      "description": "Infrastructure AcceptanceDecision record; shape validation does not grant authority or prove freshness."
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "object-type",
+      "id": "infrastructure:OperationRequest",
+      "version": "1.0.0",
+      "name": "OperationRequest",
+      "domainId": "infrastructure",
+      "identity": {
+        "property": "id",
+        "strategy": "provided",
+        "immutable": true,
+        "prefix": "vps-operations:object:OperationRequest:"
+      },
+      "properties": [
+        {
+          "name": "hostId",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "reference": {
+            "objectType": "infrastructure:VpsHost",
+            "many": false
+          }
+        },
+        {
+          "name": "kind",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "target",
+          "valueType": "object",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "preserveProcesses",
+          "valueType": "array",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "scope",
+          "valueType": "json",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "reason",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "status",
+          "valueType": "string",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "authority",
+          "valueType": "json",
+          "required": true,
+          "immutable": false
+        },
+        {
+          "name": "requestedAtUtc",
+          "valueType": "string",
+          "required": true,
+          "immutable": true,
+          "format": "date-time"
+        },
+        {
+          "name": "idempotencyKey",
+          "valueType": "string",
+          "required": true,
+          "immutable": true
+        },
+        {
+          "name": "constraints",
+          "valueType": "object",
+          "required": true,
+          "immutable": false
+        }
+      ],
+      "additionalProperties": false,
+      "description": "Infrastructure OperationRequest record; shape validation does not grant authority or prove freshness."
+    }
+  ],
+  "linkTypes": [
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "infrastructure:host-has-container",
+      "version": "1.0.0",
+      "name": "host-has-container",
+      "from": {
+        "objectType": "infrastructure:VpsHost",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "infrastructure:ContainerRuntime",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "infrastructure:container-mounts-volume",
+      "version": "1.0.0",
+      "name": "container-mounts-volume",
+      "from": {
+        "objectType": "infrastructure:ContainerRuntime",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "infrastructure:SharedVolume",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "infrastructure:container-runs-gateway",
+      "version": "1.0.0",
+      "name": "container-runs-gateway",
+      "from": {
+        "objectType": "infrastructure:ContainerRuntime",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "infrastructure:GatewayRuntime",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "infrastructure:observation-describes-host",
+      "version": "1.0.0",
+      "name": "observation-describes-host",
+      "from": {
+        "objectType": "infrastructure:Observation",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "to": {
+        "objectType": "infrastructure:VpsHost",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "infrastructure:verification-uses-observation",
+      "version": "1.0.0",
+      "name": "verification-uses-observation",
+      "from": {
+        "objectType": "infrastructure:VerificationResult",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "infrastructure:Observation",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "infrastructure:acceptance-evaluates-verification",
+      "version": "1.0.0",
+      "name": "acceptance-evaluates-verification",
+      "from": {
+        "objectType": "infrastructure:AcceptanceDecision",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      },
+      "to": {
+        "objectType": "infrastructure:VerificationResult",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0.0",
+      "kind": "link-type",
+      "id": "infrastructure:operation-targets-container",
+      "version": "1.0.0",
+      "name": "operation-targets-container",
+      "from": {
+        "objectType": "infrastructure:OperationRequest",
+        "cardinality": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      "to": {
+        "objectType": "infrastructure:ContainerRuntime",
+        "cardinality": {
+          "min": 0,
+          "max": null
+        }
+      }
+    }
+  ],
+  "actionTypes": []
+}
