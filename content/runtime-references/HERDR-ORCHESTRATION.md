@@ -33,8 +33,12 @@ agent guide is in OFFICIAL-DOCS.md.
    Kinds are listed by `herdr agent` (claude, codex, gemini, agy, muse, and
    others); pass only native args after `--`.
 3. Hand work over as a handoff, not a transcript: goal, exact targets, allowed
-   effects, expected output, and the task's `STATE.md` path. The receiving
-   agent reads current state from files; nobody reconstructs a conversation.
+   effects, expected output, and exact `TASK.md`, `STATE.md` and canonical
+   `/root/.agents/AGENTS.md` paths. Launch source work at its assigned Git
+   worktree, and have the receiving agent explicitly read those files before
+   effects. Without a Git root, Codex project discovery checks cwd only;
+   ancestor task guidance is not guaranteed. Do not create fake repositories
+   or copy guidance to make discovery work; nobody reconstructs a conversation.
 4. Submit with `herdr agent prompt <name> "..." --wait`. Submission alone does
    not prove a turn started; `--wait` settles on the first `idle`, `done`, or
    `blocked`. A timeout or stalled result does not prove the prompt was never

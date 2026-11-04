@@ -1,6 +1,6 @@
 # Custom skills — on demand
 
-Current custom source: `/root/.agents/skills/<skill>/SKILL.md`. Five retained skills: academy-student-context, academy-runtime-routing, explain-code-clearly, herdr and herdr-hermes. Load the relevant skill only; native catalogs expose their scope. Full reports use conditional references; short requests stay concise.
+Current custom source: `/root/.agents/skills/<skill>/SKILL.md`. Five retained custom skills: academy-student-context, academy-runtime-routing, explain-code-clearly, herdr and herdr-hermes. Hindsight and Scrapling are separately managed; the 2026-11-04 audit counted seven shared skill directories in total. Load the relevant skill only; native catalogs expose their scope. Full reports use conditional references; short requests stay concise.
 
 Codex/Gemini/Muse catalog checks from November1 are historical observations. Current user-confirmed coding runtimes are Muse, Claude, Codex and Antigravity CLI; Gemini CLI is absent. Claude personal and Antigravity config/skills links use the shared source; a symlink/catalog does not prove a fresh child/session loaded the body. Keep supported per-CLI metadata in the skill folder. Hermes' read-only host-agents mount does not prove native catalog registration; no profile migration was applied.
 
