@@ -17,4 +17,6 @@ No generated registry or watcher synchronizes the host.
 
 The Nov4 layout synchronization updates final platform/module names and retired
 repository dispositions. `SHA256SUMS` records the same 19 captured source files;
-it is repository evidence, outside the fixed owned host inventory.
+it is repository evidence, outside the fixed owned host inventory. Subsequent
+reviewed content corrections regenerate hashes for those same 19 paths; they
+do not imply that host files or an installed binary have been synchronized.
