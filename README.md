@@ -23,5 +23,6 @@ installation and runtime activation require their separately authorized evidence
 
 Legacy TypeScript packages and administrative tooling are retired by the
 user-approved 2026-11-04 repository reorganization. Their source remains in Git
-at `57813009fdde43f99bb1798d031a1c88dabe5358`. Historical custody archives remain
-under `history/` until the Lead verifies the required Drive recovery copy.
+at `57813009fdde43f99bb1798d031a1c88dabe5358`. The pushed recovery tag `archive/agent-platform-pre-strip-20261104` preserves
+all retired source and the 14 historical custody files. No separate Drive copy
+is required for these Git-tracked files by the user's explicit direction.

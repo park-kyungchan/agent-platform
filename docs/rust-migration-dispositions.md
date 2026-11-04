@@ -11,7 +11,7 @@ retention tables at `57813009fdde43f99bb1798d031a1c88dabe5358`.
 | agent-harness-engineering recovery consumers | User decided RETIRE; external repository bundling/deletion belongs to Lead. No external edits here. |
 | Infrastructure TypeScript domain | AP copy retired. Private vps-operations owns its vendored tarball copy until its Rust port; it does not read current AP package bytes. |
 | Bun reusable action | Retired from HEAD. External immutable SHA-pinned actions remain available through Git history. |
-| Historical custody archives | Retained pending verification of the proposal's Drive recovery copy. Not a live runtime dependency. |
+| Historical custody archives | Removed from HEAD after local/origin tag verification and byte-for-byte comparison of all 14 files against `archive/agent-platform-pre-strip-20261104` (= base). User explicitly accepted pushed Git history as the recovery copy. |
 
 Deletion proof and exact commands/results are in ws-replan
 `preparation/repo-reorg-v2/ap-strip-v1/`. Frozen Rust conformance corpora and

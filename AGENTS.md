@@ -19,6 +19,6 @@ Source verification does not establish native loading, activation or acceptance.
 No automatic merge; return exact candidate revisions and actual evidence to Lead.
 
 Do not install into real homes or alter services without task authority.
-Historical `history/` custody is retained pending verified remote recovery;
-no executable uses it. Legacy guidance/source remains in Git at
+Historical custody is preserved by the pushed Git tag
+`archive/agent-platform-pre-strip-20261104`; no executable reads those archives. Legacy guidance/source remains in Git at
 `57813009fdde43f99bb1798d031a1c88dabe5358`.
