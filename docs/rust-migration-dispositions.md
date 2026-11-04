@@ -1,149 +1,23 @@
-# S01: selected Rust migration dispositions
+# Rust migration dispositions — 2026-11-04 repo reorganization
 
-## B3-1 manual check retirement — 2026-11-04
+Authority: ws-replan `preparation/repo-reorg-v2/ap-strip-v1/TASK.md` and the
+user-approved reorganization proposal. This supersedes the dated S01/S04
+retention tables at `57813009fdde43f99bb1798d031a1c88dabe5358`.
 
-The [B3-1 closure disposition](s04-closed-consumers.md#b3-1-manual-check-retirement--2026-11-04)
-supersedes the manual-check retention rows below. AP's five manual TS quality
-scripts and their check-only chain are removed. Zero-reader checks precede
-deletion of all 55 trusted files and the capability-source-owners, quality-policy
-and Hermes semantic-projection JSON files. Total: 103 deleted files.
+| Source family | Final source disposition |
+| --- | --- |
+| Rust `ap`, pinned Cargo workspace, CI and frozen judges | Retained, independently verifiable implementation/support. |
+| Legacy TypeScript libraries, compatibility forwarders and administrative work records | Retired; no Rust counterpart for generic Work/Task/Run, context gates or trusted controllers. |
+| agent-harness-engineering recovery consumers | User decided RETIRE; external repository bundling/deletion belongs to Lead. No external edits here. |
+| Infrastructure TypeScript domain | AP copy retired. Private vps-operations owns its vendored tarball copy until its Rust port; it does not read current AP package bytes. |
+| Bun reusable action | Retired from HEAD. External immutable SHA-pinned actions remain available through Git history. |
+| Historical custody archives | Removed from HEAD after local/origin tag verification and byte-for-byte comparison of all 14 files against `archive/agent-platform-pre-strip-20261104` (= base). User explicitly accepted pushed Git history as the recovery copy. |
 
-All three retained packages remain byte-exact. Three quality support files,
-owner snapshots, runtime documentation and Hermes lineage remain for their
-consumers. The external agent CLI's source-provider candidate still reads
-`architecture/runtime-filesystem-contract.json`, so that contract stays.
-The retained consumers fixture still imports native-hermes-adapter; it is
-not AP-importer-free. Historical project/contract/navigation pointers remain
-metadata, without a remaining reader of the deleted registry bytes.
+Deletion proof and exact commands/results are in ws-replan
+`preparation/repo-reorg-v2/ap-strip-v1/`. Frozen Rust conformance corpora and
+pins are unchanged. No host installation, credential access, container effect,
+external recovery execution or Academy operation is part of this change.
 
-The Rust check is unchanged and does not replace the retired manual TS,
-workflow, secret-scan, architecture, layout and projection coverage. Detailed
-coverage losses, zero-reader logs and actual checks are recorded in ws-replan
-`preparation/closure/b3-manual-checks-v1/HANDOFF.md`. This is bounded source
-retirement pending independent Lead review, not full S04/S14 acceptance.
-
-## Authority and evidence boundary
-
-The current user assignment and `/home/palantirkc/work/ws-replan/STATE.md` authorize S01 only. The Lead owns that state and `ORCHESTRATION.md`. `CURRENT-PLAN.md` locates the adopted ZIP, SHA256 `964845e260a25350823fb42d38a60e7cba973f8af607e10b505727d3bf78915c`, extracted under `inputs/final-review-20261102/extracted/rust_migration_reassessment_2026-11-02/` in that task. References: `PROPOSAL.md` §§4–9,12; `LEAD_KICKOFF.md`; `PORTING_GUIDE.md`; `reviews/PLATFORM_PLAN_REVIEW.md` F1–F3,F5,F9 and §§4–7; `contracts/migration_slices.json` S01; `contracts/acceptance_vectors.json` AP-08. Earlier WP dispositions are historical inputs, not execution order or proof of closure.
-
-Initial Git observations matched the assignment: checkout `/home/palantirkc/work/ws-replan/wt/agent-platform`, common directory `/home/palantirkc/platforms/agent-platform/.git`, branch `rust/s01-guidance-20261102`, clean HEAD `1e6b771729366955cc48aa4fa48d35e6de6fe00c`. AP main matched that baseline; Education main at `/home/palantirkc/projects/education-platform` matched `cc6e81f1be2fcb56f011041e3d606e21edf76da3`. No fetch/reset, move or deployment occurred.
-
-Evidence is bounded local source/configuration metadata readback. No credentials, student payloads, live source calls, hook execution, model-session launches or builds were needed. A static dependency does not prove process execution. Negative results apply only to inspected selectors/paths; **no entire legacy package is proven dead by S01**.
-
-## Selected AP mechanisms
-
-Links identify AP source at the baseline; external paths identify host observations. The [source registry](https://github.com/park-kyungchan/agent-platform/blob/ff4a55d71975bbd0aaa95ab8f50b940c3ab31a90/architecture/capability-source-owners.json) supplies reference leads, not live-consumer assertions.
-
-| Mechanism / source | Disposition and retained owner | Actual selected caller evidence | Pending closure |
-| --- | --- | --- | --- |
-| [Generic allocation](../packages/work-continuity/src/git-work/allocation.ts), [logical identity](../packages/work-continuity/src/logical-identity.ts), effective contracts and Work codecs | Retire generic Domain/Project/Work/Task/Run machinery; no Rust allocator counterpart. Use short work/state files. | The [root facade at the predecessor](https://github.com/park-kyungchan/agent-platform/blob/01fe80a5a40bdca30aa8ab7c954bbac33d58e2f2/scripts/harness.ts) imported Git Work/v3 allocation. Its command/export and package `harness` script are now retired; existing direct APIs and Work check aliases remain. | Source/CI consumers require removal in their slice; do not create new records through these APIs. |
-| [Context/handoff/Memory](../packages/work-continuity/src/context/index.ts), [generic effect fences](../packages/work-continuity/src/git-work/context.ts) | Retire owned harness; retain native CLI context, official Hindsight and domain-owned business effects. | Agent-harness `src/native/context-owner.ts` refers to `@palantirkc/work-continuity/context` and `/git-work`; its manifest retains the file dependency. | Selected hook detachment below does not close owner scripts, loaded sessions or durable business-state compatibility. |
-| [Review/receipt CI](https://github.com/park-kyungchan/agent-platform/blob/ff4a55d71975bbd0aaa95ab8f50b940c3ab31a90/ci/source-check.ts), [trusted workflow at the retained predecessor](https://github.com/park-kyungchan/agent-platform/blob/00ff3eefb3948ba669031ca08789f118eea30d87/.github/workflows/trusted-source.yml) | Retire after CI replacement; retain independent review, findings and explicit Lead integration through ordinary tools. | [source.yml](../.github/workflows/source.yml) invokes source-author verification and source-check; trusted workflow invokes its controller. | Hosted workflow/branch requirements are unverified. Do not run, restore or redesign the retired controller/registry protocol for S01. |
-| [Codex adapter](../packages/native-codex-adapter/src/native/source-v1.ts) and provider registrations | Replace retained configuration behavior with minimal `ap`; retire adapter after actual closure. | Agent-harness `src/native/hooks.ts` imports the adapter; `hook-cli.ts` reads provider closure. Two owner registration JSON files still name the former `/home/palantirkc/projects/agent-platform` root. | Six old project hook selectors are disabled, but remaining source calls, stale-path registrations and loaded clients are not closed. Preserve guards; do not renew obsolete pins speculatively. |
-| [Hermes adapter](../packages/native-hermes-adapter) | Retire owned harness after closure; preserve native Hermes/container authority, profiles, sessions, data, official integrations and Academy relay. | Hermes engineering manifest retains the adapter; seven `src/ontology-driven/*.ts` forwarders import its subpaths; `provider-source.ts` and registration remain. | Registry-listed owner `src/ontology-driven/native-package.ts` is absent. Remote/container loaded graph was not probed; one absent file does not close the adapter. |
-| [Artifact Ontology](../packages/ontology/src/generated/contracts.ts), [releases](../releases) | New operational `ontology-platform` replaces product meaning; freeze required immutable 0.1.0/0.2.0 bytes/pins until closure. No universal Work-schema port. | Education root manifest uses vendored Ontology 0.2.0; Academy `scripts/agent-platform.ts` verifies/loads pinned Ontology and Work context, while `scripts/generate-ci.ts` packages immutable bytes. | Pilot/build callers and copied source remain pending closure. A vendored archive is not a live import from AP main. |
-| [Evidence Foundry](../packages/evidence-foundry) | Retire subject to closure; retained evidence/lineage belongs in the domain product. | The [predecessor root facade](https://github.com/park-kyungchan/agent-platform/blob/01fe80a5a40bdca30aa8ab7c954bbac33d58e2f2/scripts/harness.ts) imported improvement/quality comparisons; that edge is now closed. Direct comparison APIs/tests and workspace references remain. Registry's former Evidence owner root was absent at S01. | Local absence does not exclude installed/remote callers. Preserve original evidence/policy; no automatic Rust Evidence service. |
-| [Operational context](../packages/operational-context), [projection generator](../scripts/generate-hermes-semantic-context.ts) | Retire per adopted disposition after closure; preserve retained domain evidence/lineage with its owner. | Root package/check references remain. Registry names remote backend/SharedWiki query paths and a generated old-path projection. | Remote callers were not contacted; their current use is unknown. No regeneration/publication in S01. |
-| [Infrastructure validation](../packages/infrastructure-operations/src/domain/evaluate.ts) | Retire unless an observed retained caller establishes need; prefer narrow native operations/diagnosis to a broad `ap ops` framework. | `/home/palantirkc/projects/vps-operations/package.json` retains an immutable infrastructure archive dependency and Ontology 0.2.0. | Concrete packaged source dependency; active invocation unknown. Preserve unrelated operations and close exact retired behavior. |
-| [Research capture](../packages/research-capture) | Retirement candidate subject to actual caller reconciliation; preserve maintained Scrapling/native research tools. No automatic Rust counterpart. | Registry names `scrapling-research/src/cli.ts`; former `/home/palantirkc/projects/scrapling-research` root is absent. | Installed caller/location remains unknown. Do not infer dead code or take over the external tool owner. |
-
-Agent-harness above is `/home/palantirkc/projects/agent-harness-engineering`; `codex-harness-engineering` is a symlink to it, not a second owner. Hermes engineering is `/home/palantirkc/projects/hermes-harness-engineering`. Education Academy paths above are under `modules/academy-workbench/`. Stale source-provider paths are observations to reconcile, not instructions to repeat relocation or reenable hooks. Existing first-import protections remain intact.
-
-## Four active CLI dispositions (AP-08)
-
-2026-11-04 source update: [AP-08 dispositions](ap-08-dispositions.md) records the
-new agy two-link adapter and explicit Muse `retained_native_mechanism` disposition.
-It supersedes the pending-adapter wording in this dated S01 table. Muse's foreign
-Claude import is literal; supply canonical and task STATE explicitly in handoffs.
-New agy-scope doctor reports that disposition while legacy report bytes remain
-unchanged. Live install and fresh affected-session proof remain user-gated;
-this source update does not establish whole-P6 completion or support deletion.
-
-All four are user-confirmed in use and have executables on PATH. Preparation's version observations are dated evidence: Codex 0.165.0, Claude Code 2.1.316, Muse 1.4.14-R7309.1 and agy 1.4.12. S01 rechecked configuration/pointer metadata, not versions or fresh-session loading. Native surfaces are documented in `/root/.agents/runtime-references/RUNTIME-LOADING.md` and preparation's installed-help snapshots; adapter qualification remains S02/S03.
-
-| Runtime | Observed instruction/configuration surface | Disposition / candidate ownership | Preserved behavior and required proof |
-| --- | --- | --- | --- |
-| Codex | `/root/.codex/AGENTS.md` symlinks to canonical `/root/.agents/AGENTS.md`; `config.toml` and `hooks.json` exist. | First renderer adapter: supported instruction pointer/explicitly assigned owned entries only; preserve symlink topology. S01 installs no selector. | Preserve native hook trust and MCPs. SessionStart registers Herdr/Hindsight; prompt/Stop register Hindsight. S03 needs supported trust/config validation plus fresh affected native instruction-chain and necessary session-reporting evidence; model self-report alone is insufficient. |
-| Claude Code | `/root/.claude/CLAUDE.md` imports canonical text at line 3; hooks in `settings.json`, MCPs in `/root/.claude.json`. | First renderer adapter: explicitly scoped import/block, preserving other content and conditional project AGENTS/ancestor CLAUDE selection. | Preserve Herdr SessionStart and Hindsight SessionStart/prompt/Stop. Use native loading inspection such as `/memory` plus harmless fresh affected-session evidence in S03; child loading can differ. |
-| Muse | `/root/.config/muse/settings.json`, schema version 1, Academy/Hindsight MCPs; no lifecycle-hook field configured there. Personal canonical guidance may arrive via Claude foreign context. | Retain native trusted project discovery and MCP mechanisms now; qualify a later adapter against supported schema/surfaces. No invented global rule file or lifecycle hook. | Trust and foreign-personal/child flags affect discovery. Fresh affected-session loading remains pending; MCP registration does not prove automatic lifecycle injection/retention. |
-| Antigravity (`agy`) | CLI settings at `/root/.gemini/antigravity-cli/settings.json`; shared hooks/MCP at `/root/.gemini/config/{hooks.json,mcp_config.json}`. Both AGENTS/GEMINI aliases resolve to canonical. | Retain native mechanisms now; qualify later adapter against distinct CLI/shared surfaces. Preserve both aliases pending actual deduplication evidence. | Herdr PreInvocation reports conversation identity; Hindsight PreInvocation/Stop remain. Repository-bound discovery, namespaces and fresh loading need validation; event names are not Claude/Codex equivalence. |
-
-Only Codex/Claude enter the first renderer increment. Under AP-08, that increment may finish while other dispositions remain pending; **P6 completion and deletion of another consumer's support may not**. Before P6 completion, every in-use CLI needs verified support, an evidenced retained native mechanism or an explicit user scope change. This table does not claim that verification passed.
-
-Gemini CLI and Grok were absent from PATH and outside the user's four active CLIs: no support/installation is proposed. Gemini-named files remain active agy inputs. Hermes is a separate native/container consumer, not an omitted host renderer row.
-
-## Configuration and pane-hook reconciliation
-
-- Eight selected native configuration files were parsed and compared with preparation's `runtime/native-config-metadata.json`: seven hashes matched. agy CLI settings changed from `1bfa1b8518e0101b846cf7878c798e5285a0bd3f7307e890edc2ae8de7832e50` to `75bd935c35a97d5d03bd0beb4d8cbc36d96dc3202703eaf49ee80ba6d9242cf6`. Root keys were unchanged; change contents/author were not investigated. Preserve current bytes and reobserve relevant owned fields before installation.
-- All four MCP configurations select `/root/.local/share/academy-mcp-scoped-20261030/launcher.mjs` and official Hindsight. Codex also retains unrelated `daniel_prayer_operations`. Preserve integrations, unknown keys and environment references without printing values. Academy pointer still selects `main-20261102-cc6e81f`, SHA256 `b5159c1bd815b87d67a4488dd4e978c051b777686856dd542b9a5452ad9aad3b`: pointer identity only, not loaded-graph or parity proof.
-- Codex hook state disables six old `codex-harness-engineering/.codex/config.toml` selectors: pre-tool, session, prompt, subagent and two post-tool entries. Inspected host hook commands point to Herdr/Hindsight instead. Only these selectors' detachment is confirmed; source/provider closure remains pending.
-- `/root/.codex/herdr-agent-state.sh`, `/root/.claude/hooks/herdr-agent-state.sh` and `/root/.gemini/config/hooks/herdr-agent-state.sh` identify themselves as Herdr-managed. Source was read, not executed. They report native session/conversation identity through `pane.report_agent_session`; agy's script leaves lifecycle detection to Herdr. Preserve this vendor mechanism. A new `ap` hook needs a concrete unmet caller need; these files are not `ap`-owned replacements by default.
-
-Future installation owns selectors/blocks, preserves unrelated settings/comments where supported, rechecks current state under participating locks, stages/validates and atomically replaces each file, reports partial/conflicted application and rolls back only still-owned values. An installer lock cannot exclude vendor/editor writes. Prefer supported native interfaces and refuse unresolved write ownership; never manufacture trust or restore a stale whole-file backup. Freeze exact selectors/expected bytes and fresh-session observations at S02/S03.
-
-## Retained state and independent evidence
-
-Operational Ontology owns source-instance/account-qualified objects, raw native keys, stable types, links, logic, policy, lineage, transactions and action recovery. Account/class/student authorization applies to query, traversal, derived output and actions. Its core stays independent of Academy details; Education uses pinned core/API revisions. `ap` has no running Ontology dependency. Hindsight's service/database remains separate.
-
-Education preserves scoped student/textbook/progress reads, missing/null/empty/zero/unknown/refusal distinctions, original evidence, inert DOM/source offsets, UTF-16 width, exact digest families and calendars. Its source adapter owns source access, account locks and reconciliation. Keep an explicit evidence root rather than deriving it from executable placement. Old-journal readers, account-before-workflow lock ordering, shared kernel lock objects and physical-record/field uncertainty survive request/date changes and mixed TS/Rust operation. Rollback must read state already produced. Never replay ambiguous dispatches; save, PDF/print and parent send remain separate.
-
-Freeze sanitized recorded inputs and expected outputs/refusals independently before implementation. Qualify comparators against relevant wrong values, missing evidence, protocol/status contamination and unintended fake dispatch. Candidate authors cannot change the oracle to pass. New `ap`/Ontology behavior needs conformance requirements; retired machinery needs closure. The Lead obtains independent exact-candidate review and keeps proposals, implementation, verification and user Acceptance distinct.
-
-Evidence ends at local source/configuration observations and this documentation diff. No whole-package deletion readiness, fresh loading, business parity or Rust implementation is established. First P8 scenario: student/textbook/progress lookup using recorded responses; actual user verdict remains pending. P9 live switches, stability/recovery and retained-original disposal retain their conditions and weekday 14:00–22:00 KST protection. S01 does not advance those gates.
-
-
-## S04 leftover source audit — 2026-11-04
-
-This section is the bounded B2 source disposition at base
-`744295cdd026580ae55c9f2a9ae53e1f0d70ec0e`, authorized by
-`preparation/closure/s04-leftovers-v1/TASK.md` in the ws-replan task. It is
-separate from the dated S01 observations above. All five roots have a concrete
-remaining source consumer, so none has a whole-root deletion in this candidate.
-`RETAINED_LIVE_CONSUMER` means a callable source entrypoint or an attached
-manual check/recovery reader remains; it does not assert observed execution,
-endorse new administrative use, or declare every file in that root necessary.
-This is not S04's no-retained-consumer exit or S14 acceptance.
-
-| S04 root / tracked files | Verdict and concrete consumer at this base | Required closure |
-| --- | --- | --- |
-| `packages/work-continuity/` / 118 | `RETAINED_LIVE_CONSUMER`. `package.json:10-11,21-22` selects handoff/import/Git Work/common-work checks; `verification/package-import-check.ts:1-13` compares the compatibility forwarder with its canonical handoff module. `packages/native-hermes-adapter/package.json:37` retains the dependency. External agent `src/cli.ts:61-72,152-155` reaches provider verification, promotion and qualification; its `src/native/context-owner.ts:22-39` resolves the context provider. | Close the selected manual APIs/checks and transitive Hermes dependency. Stop new administrative dispatch separately from reconciliation of existing verify/restore state; preserve reviewed bindings and records. |
-| `packages/native-codex-adapter/` / 22 | `RETAINED_LIVE_CONSUMER`. External agent `src/cli.ts:61-66` calls `readNativeAdapterSourceClosure`; `src/native/provider-closure.ts:95-111` reads the package's exact pinned files and verifies all three module resolutions. Its `src/native/hooks.ts:2-5`, `home-context.ts:1` and `evaluation-ledger.ts:1` also import/re-export the adapter. AP `ci/source-check.ts:197-201,691,843-847` retains fixture/probe readers. | External owner must reconcile and close recovery/source-closure readers, wrapper exports, manifests and tests, then close AP fixture/probe references. An empty automatic hook response does not close source-byte verification or recovery. |
-| `packages/native-hermes-adapter/` / 83 | `RETAINED_LIVE_CONSUMER`. AP `ci/source-check.ts:18` directly imports dependency-closure, and `:521-523` loads its source generator. The external Hermes facade `src/ontology-driven/work-context.ts:1` forwards the package; external agent exports the callable Work reader at `src/native/profile-context.ts:109-123`, which loads that facade via the registered provider; no active CLI dispatch to that export was established. The mounted native Hermes service's selection is unproved. | Close source fixture/generator/projection checks and external facade/readers with their owner; independently reconcile installed Hermes selections before any installed-original deletion. No native service/runtime authority follows from this source audit. |
-| `ci/quality/trusted/` / 55 | `RETAINED_LIVE_CONSUMER`. `package.json:15-19` still selects `ci/quality/run.ts`, whose lines 1-2 import `driver-failure` and `process`; `ci/quality/native-tools.ts:1` also imports `process`. `ci/source-check.ts:3,375` uses `process` and `qa-inputs`. | Retire or replace the remaining manual Bun check callers and their tests before removing these modules. The rest of this directory needs a separate reachable-subgraph assessment; do not reactivate its retired controller or fabricate attestation state. |
-| `architecture/capability-source-owners.json` / 1 | `RETAINED_LIVE_CONSUMER`. `package.json:18` selects architecture quality; `ci/quality/run.ts:483-496` calls `readArchitectureSnapshot`, which reads the registry at `ci/quality/architecture-quality.ts:649`. `ci/quality/scope.ts:233`, `ci/quality/source-snapshot.ts:16`, `ci/quality/run.ts:454`, `ci/source-check.ts:214,866` and `ci/verify-runtime-layout.ts:357` are additional current-byte readers. | Close/replace those manual checks and runtime-layout/project-contract readers together. Do not infer liveness from registry entries or refresh the registry to prolong the retired protocol. Sibling contracts also have readers; they are not dead merely because automatic CI is Rust. |
-
-External agent paths above are relative to
-`/home/palantirkc/projects/agent-harness-engineering`; external Hermes paths are
-relative to `/home/palantirkc/projects/hermes-harness-engineering`. The former's
-checked-out `main` and local `origin/main` both resolve to `22e9e556cd027d6b2d748bcdd47eef044cf69768`;
-no fetch occurred. The latter is a generated source-only facade without a Git
-root or the inventory's claimed `cli.ts`, `runtime.ts`, `mcp-server.ts` and
-`index.ts` entrypoints. Do not describe it as the running native Hermes service.
-
-The local external retirement candidate `2114388` has a stricter CLI:
-`src/cli.ts:9-14` refuses new administrative dispatch, while `:49-70` still
-reads the Codex adapter/context closure for host and legacy verify/restore.
-The local `c9e13de` guidance candidate preserves those recovery routes too.
-Thus even applying the recorded event/manual retirement does not justify deleting
-these libraries. The automatic AP Hermes event is already the no-op at
-`packages/native-hermes-adapter/src/platform-current-work/native-hook.ts:1-4`.
-
-Inventory corrections: `verification/package-import-check.ts:32-33` contains
-report fields, not Codex/Hermes imports; its only package import is handoff.
-`ci/quality/run.ts`, `ci/source-check.ts`, `ci/verify-runtime-layout.ts` and
-`ci/reuse/run.ts` have no first import of `trusted/native.ts` at this base.
-Preserve real guards; the inventory's obsolete guard assertion is not deletion
-proof. The registry has an additional concrete reader in
-`ci/quality/architecture-quality.ts`, independent of `ci/source-check.ts`.
-
-Host-visible `/docker/hermes-agent-2q3y/docker-compose.yml:44-46` mounts
-`./data:/opt/data` and `/root/.agents:/opt/host-agents:ro`. This observation and
-the historical S03 metadata do not prove the currently loaded service graph.
-No container command, live Academy call, credential/account-lock access, native
-configuration edit or external-repository write occurred.
-
-Detailed consumer indexes, selected line readbacks, local retirement-branch
-readbacks, check outputs and limitations are in ws-replan
-`preparation/closure/s04-leftovers-v1/{CONSUMER-CLOSURE.md,ACTUAL-EVIDENCE.json,HANDOFF.md}`.
-These are review evidence, not a new runtime registry. Independent review and
-Lead expected-head integration remain required.
+Codex/Claude/agy instruction adapters and Muse's retained native mechanism are
+specified in [AP-08](ap-08-dispositions.md). Real runtime loading and source
+acceptance remain separate from these bounded source changes.
