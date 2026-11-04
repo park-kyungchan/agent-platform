@@ -6,8 +6,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: rust-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'pull_request' && format('rust-pr-{0}', github.ref) || format('rust-push-{0}', github.sha) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   rust:
     name: rust
