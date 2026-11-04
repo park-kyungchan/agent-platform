@@ -1,11 +1,13 @@
 # Common harness mechanism boundary
 
-**DRAFT — user approval pending.** Prepared 2026-11-04 against agent-platform
-`aaefe063dbbc83f23a4f00c397c80ce60bca2003`. This is autonomy goal 8's boundary
-proposal for a small Rust, CLI-agnostic harness on Herdr, used by Claude Code,
+**Scope approved by the user — 2026-11-04.** Initially prepared against
+`aaefe063dbbc83f23a4f00c397c80ce60bca2003`; rechecked against agent-platform main
+`42055b7b70d52e6aeb02a84136367fdc09748f45`. This is autonomy goal 8's permanent mechanism
+boundary for a small Rust, CLI-agnostic harness on Herdr, used by Claude Code,
 Codex, Muse and Antigravity CLI (`agy`). It assigns no role, priority, model or
-work category to any CLI. Review does not authorize implementation or deployment;
-the resulting PR must remain open for the user's approval.
+work category to any CLI. Scope approval does not authorize implementation,
+deployment or host configuration changes. PR #98 remains unmerged pending the
+Lead's review, CI and expected-head merge.
 
 ## Purpose and scope
 
@@ -36,6 +38,9 @@ session supervisor hidden behind those conventions. [A1][A2][A3]
 The first three rows describe existing Rust functionality. The remaining rows
 describe coordination/documentation boundaries, not new executable modules.
 Any later proposal to add code needs an actual consumer and a separate scope.
+The mechanism-only boundary is permanent: do not re-implement native CLI
+features or official Hindsight capabilities in Rust. Content application is
+deferred; no content-apply operation is requested by this approval.
 
 ## What remains native to every CLI
 
@@ -66,13 +71,20 @@ render contract. [A2][A4]
 | Codex | Canonical instruction link, with native override/project discovery preserved. Shared installation owns only its supported entry. Exact-session resume, hooks and MCP remain native. |
 | Claude Code | Exact canonical `@` import, with native instruction selection and project/child behavior preserved. The common layer does not assume loaded bytes equal source bytes. |
 | Antigravity CLI (`agy`) | Two direct canonical links, `~/.gemini/AGENTS.md` and `~/.gemini/GEMINI.md`. Keep both. Raw current input and alias deduplication are unverified; the user accepted the fresh-session loading gap as a disclosed limit. Acceptance of that limit is not proof of loading. |
-| Muse | AP-08 `retained_native_mechanism`: trusted project discovery and explicit canonical/task-STATE handoff, with no invented global adapter. Foreign-personal and child flags can change the input. |
+| Muse | AP-08 `retained_native_mechanism`: trusted project discovery and explicit canonical/task-STATE handoff, with no invented global adapter. The retained S03 qualification found Claude's foreign-personal `@import` literal, not expanded into canonical full text. Explicitly read canonical guidance when it is absent; foreign-personal and child flags can change the input. [A4] |
 
 This matrix follows [AP-08 dispositions](ap-08-dispositions.md), including its
 2026-11-04 final disposition, and the native source. The dated runtime loading
 map records installed-version observations; it is not a promise about the latest
 upstream release or every currently running process. This draft launches no
 fresh native sessions and changes no installed configuration. [A4][G3]
+
+The main recheck retains #96's pane resolver and #97's fixed 19-entry public
+content inventory. #99 adds explicit command-local lock release when a forked
+child retains a descriptor; it does not change selectors, scopes or pane lookup.
+#100 synchronizes public layout guidance and adds `content/SHA256SUMS`, which is
+repository evidence outside that owned host inventory. No content-apply selector
+or Muse install scope was added. [A1][A2][A3][A5][A6]
 
 Both instruction and content doctor reports deliberately retain
 `native_loading:"unverified"`, `hooks_executed:0` and `p6_complete:false`.
@@ -169,6 +181,7 @@ revision, including system-eval tests 01, 06 and 10. No eval was executed.
 [A3]: ../crates/ap/src/native/content.rs "Read-only content proposal/diagnosis; fixed inventory in content_inventory.rs"
 [A4]: ap-08-dispositions.md "Four CLI support dispositions and final retirement/loading limits"
 [A5]: ../crates/ap/pane/README.md "Pane resolver, heuristics, rechecks and compatibility limits; implementation in src/pane.rs"
+[A6]: ../crates/ap/src/native/filesystem.rs "Explicit command-local lock release introduced by #99"
 [G1]: ../content/AGENTS.md "Canonical runtime core and approved task/layout conventions"
 [G2]: ../content/runtime-references/HERDR-ORCHESTRATION.md "Native topology, handoffs and lifecycle meanings"
 [G3]: ../content/runtime-references/RUNTIME-LOADING.md "Native discovery, hooks, MCP, resume and isolation differences"
@@ -184,22 +197,21 @@ Hindsight policy is `/docker/hindsight/HINDSIGHT_OFFICIAL_PER_CALL.md`, with
 Repository-owned copies are reviewed distribution content, not a replacement
 loader or evidence that any currently running session consumed them.
 
-## Open questions for the user
+## Approved decisions — 2026-11-04
 
-These are deferred design choices, not requests to interrupt the current work.
+1. **Q1 — Permanent mechanism-only scope.** Keep task/handoff/layout and memory
+   routing as conventions and native integrations. Do not add Rust replacements
+   for native CLI features or Hindsight.
+2. **Q2 — Keep the accepted agy limit.** Fresh-session raw-input and alias
+   deduplication remain unverified and accepted as a disclosed limit. Keep both
+   canonical aliases; this approval neither proves loading nor requires a new
+   quota-consuming probe before merge.
+3. **Q3 — No content-apply now.** Retain pure proposal generation and explicit
+   read-only diagnosis. Any later content installation needs its own task scope.
+4. **Q4 — Pane heuristics only on real demand.** Preserve current lookup.
+   Require a concrete consumer and its actual native session surface before
+   proposing another CLI-specific heuristic.
 
-1. Is this mechanism-only boundary the desired permanent scope of the common
-   harness, including keeping task/handoff/layout and memory routing as
-   conventions and native integrations rather than new Rust subsystems?
-2. What native affected-session evidence should close the disclosed agy loading
-   and alias-deduplication limit in future adapter work, if further proof is
-   wanted? Its current accepted limitation remains in force.
-3. Is a future explicit content-apply operation useful after read-only content
-   diagnosis, or should installation of reviewed public guidance remain a
-   separate task? Such an operation does not exist today.
-4. Is there a concrete non-Codex consumer that needs more than ancestry/terminal
-   pane lookup? If so, identify that native session surface before adding another
-   CLI-specific heuristic.
-
-No answer assigns a role to a CLI. The Lead may arrange independent review and
-publish this draft PR, but must leave it open for the user's approval.
+These answers assign no role to a CLI. The Lead may apply the proposed document
+edits through worker, review and CI, then perform the authorized expected-head
+merge. This document grants no host changes or operational cutover.
