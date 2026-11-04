@@ -14,8 +14,7 @@ parent shell are unchanged. No hook or session lifecycle controller is added.
 
 Herdr queries have five-second deadlines and captured output; raw command lines
 and database contents are never printed. Native Codex metadata is opened
-read-only through SQLite (the build needs system libsqlite3 development headers;
-Ubuntu hosted CI includes them). No subprocess Python is used by the product.
+read-only through bundled SQLite; no system SQLite installation is needed. No subprocess Python is used by the product.
 
 `reference-pane.sh` is an immutable byte copy (SHA256
 `c58948fc590fe1d30c14b0c6e2e069f36f8b2979f808253200d42d0cfe1aaa4b`)
