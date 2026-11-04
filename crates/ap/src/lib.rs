@@ -9,3 +9,6 @@ mod types;
 
 pub use renderer::render;
 pub use types::*;
+
+#[cfg(target_os = "linux")]
+pub mod pane;
