@@ -1,84 +1,70 @@
 # VPS operations
 
-This native infrastructure project owns SSH, Docker, deployment projections and
-the existing Hermes update CLI. Canonical shared domain implementation remains
-in `agent-platform/packages/infrastructure-operations`; this project consumes an
-immutable release of its exact Git tree. The release verifier checks its source
-commit, members and hashes offline, so source CI needs no sibling private checkout
-or transferred credentials.
+Private Rust infrastructure module under agent-platform. The `vps-ops` binary
+owns domain validation, observations, update sequencing, durable request fences,
+SSH transport, host diagnostics, the fixed canary controller and update reports.
+It preserves separate observation, verification, authority and acceptance records.
 
 ```bash
-bun install --frozen-lockfile --ignore-scripts
-bun run check:source
-bun run check
-# Requires the native Docker Compose plugin; validates source only:
-bun run check:deployment
-# Reads the configured host and native serving state:
-bun run cli doctor
+cargo fmt --all --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo run --locked -p vps-ops -- doctor
 ```
 
-Follow `architecture/update-workflow.json` for explicitly requested Hermes
-updates. Native backend-only and coordinated Desktop/backend modes have distinct
-owners and effect boundaries. A passing source check does not activate a runtime
-or authorize an update.
+Rust 1.95.0, edition 2024, `unsafe_code = forbid`. CI keeps the existing workflow
+and `source` job names. Tests use synthetic fixtures and injected command runners;
+they make no network, SSH or host service calls. Source verification is separate
+from live serving verification and user acceptance.
 
-## Runtime layout
+`VPS_OPS_ROOT` selects the repository/configuration root for installed binaries;
+the source build defaults to its workspace root. Operational state and run receipts
+remain untracked under that root. Never publish environment files, native homes,
+conversations, credentials or databases.
 
-`architecture/runtime-path-index.json` maps deployment source, persistent native
-Home/data, credentials, Git source, launchers and operation evidence to their
-owners. Shared naming semantics and the integration Work live in `agent-platform`.
-Host Herdr deployment source is `/docker/herdr-runtime/deployment`; `build` is a
-compatibility alias. Native Hermes data/workspace paths and sealed historical
-handoff paths retain their native owners.
+Commands retain the previous CLI vocabulary:
 
-The user's WSL2 entrypoint is `herdr --remote srv1873899`. Inside the server,
-`codex-orchestrator` starts a blank native Codex TUI and `hermes-backend --profile
-PROFILE` opens the installed native Hermes TUI. Launchers are source-controlled
-in `deployments/herdr-entrypoint`; their Home copies are verified projections.
-The original paused logical Work is resumed only on an explicit user instruction.
+- `doctor`, `inventory`, `verify <observation.json>`.
+- `plan <start|stop|restart>` and `apply <request.json> --confirm-exact-target <id>`.
+- `update backend-only|coordinated [--plan|--apply] [--sha FULL_SHA|--release vX.Y.Z] [--resume DIRECTORY] [--desktop-cdp URL] [--authorization TEXT]`.
+- `update verify --sha FULL_SHA` and `update stage-overlay --sha FULL_SHA --patch FILE --apply --authorization TEXT`.
 
-## Source and CI boundary
+Apply requires the current explicit instruction. The original run and pinned SHA
+own resumption. Recover unresolved native jobs and Desktop receipts before another
+invocation. Backend-only does not load Desktop configuration. Coordinated mode uses
+the completed native Desktop artifact SHA, or a freshly verified existing release.
+Installed and running alignment remain separate results.
 
-Maintain `src`, `tests`, the native updater, explicit deployment source and the
-finite CI policy. Keep operation runs, state, historical effect helpers, native
-Homes/auth/session stores, caches and provisioning artifacts with their existing
-owners; they are excluded from Git. `scripts/ci/source-policy.ts` checks tracked
-files before publication and CI. It provides bounded path/known-secret-marker
-checks, rather than universal credential attestation.
+The binary also replaces these host-only command entrypoints through basename
+aliases or explicit subcommands:
 
-GitHub CI performs frozen installation, existing deterministic tests, immutable
-release verification, shell syntax and mandatory native Compose configuration
-validation. It performs no deployment or model evaluation. The responsible Lead
-reviews exact source and checks before any explicit merge; automatic merge is
-prohibited.
+| Host alias | Explicit subcommand |
+| --- | --- |
+| `hermes-hostctl` | `hostctl inventory|resources|docker.status|k3s.status|ssh.status` |
+| `hermes-canary-control` | `canary capabilities|status|start HASH|stop HASH` |
+| `hermes-agent-auto-update`, `hermes-agent-update-latest` | `release-update` |
+| `hermes-main-report` | `main-report REPO OLD_SHA NEW_SHA OUTPUT` |
 
+The installed hostctl vocabulary is preserved, including its diagnostic failure
+when the retired k3s executable is absent. The legacy release helper preserves its
+first-image-line replacement and compose rollback behavior; main promotion remains
+exclusively through `scripts/hermes-main-update` and the installed helper's native
+one-shot path. Installing a binary or a symlink is a separate Lead-owned action.
 
-### Opt-in v0.22.2 font-derived backend
+`deployments/` holds reviewed source configurations with README host-path mappings.
+The obsolete Herdr container/entrypoint deployment is removed; Herdr runs as the
+native `herdr server` process. `architecture/runtime-path-index.json` names retained
+runtime paths. Environment values remain in untracked host-owned files.
 
-`fontReadability` defaults to false. It admits only upstream
-`d923a5eb487a17c0a68801bba9ef0f56c81040a8`, official `v0.22.2`, Bot Desktop,
-and `deployments/hermes-font-readability.patch` SHA256
-`d9d7d4bb8f446f80ffd7402d9ad685b829f454c3fd1d91c5d1589616ae8d2ee2`
-at the updater's existing content-addressed overlay path. Source and patch
-staging, independent review, helper/policy adoption and native promotion remain
-separate authorized actions. The source default policy does not enable it.
+The native promotion helper remains unchanged at deployed SHA256
+`3f36e01b72bbdbcc1bb9b7f78965f769497819a96e0ba51123194395f96bedd8`.
+Embedded `protocol/` Python and PowerShell sources bridge existing installed native
+APIs; they are compiled into the Rust binary, not separate installed scripts or a
+second agent runtime. They retain UID/HOME, process incarnation, inode and native
+serving checks. Rust CDP uses existing targets without creating or closing pages.
 
-The native `--font-readability` flag records a **derived**
-`-desktop-overlay-<digest>` image and `dirty=true` install stamp; it cannot
-replace the pristine release/Desktop image. General Bot/release overlays remain
-rejected. The updater verifies the exact Dockerfile base and postimage, the
-Desktop build feature and overlay tree. Every candidate validation, including
-cache hits and rollback promotion, starts a fresh network-disabled UID10000
-container and opens/hashes/copies the ten fixed public font assets without live
-profile/data mounts. A repair in a running container's upper layer is not proof
-that a fresh container from that image is readable. No PM sync/GC, profile,
-credential or service action follows from checking this source.
-
-
-Typed final verification also invokes that same probe through the native
-helper's read-only `verify-font-readability` action. This action emits joined
-image/tree/patch proof on stdout and skips all updater directory/lock/receipt
-writes. Healthy same-SHA and already-deployed paths may avoid lifecycle work,
-but cannot complete verification from metadata alone when the font option is
-selected. A missing, mismatched or unreadable fresh-image proof fails the final
-verification. Ordinary default-off verification invokes no font probe.
+`architecture/rust-port-provenance.json` identifies original source hashes and the
+archived domain revision. Golden fixtures were captured from the original pure
+functions and isolated host-script adapters before removing the Bun/TS toolchain.
+No model evaluation, host install, deployment, service restart or user acceptance
+is implied by source tests.

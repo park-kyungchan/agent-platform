@@ -1,0 +1,2946 @@
+{
+  "domainPropertySchemas": {
+    "VpsHost": {
+      "type": "object",
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sshEndpoint": {
+          "type": "object",
+          "properties": {
+            "address": {
+              "type": "string",
+              "minLength": 1
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "user": {
+              "type": "string",
+              "minLength": 1
+            },
+            "hostKeyAlias": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "address",
+            "port",
+            "user",
+            "hostKeyAlias"
+          ],
+          "additionalProperties": false
+        },
+        "platform": {
+          "const": "linux"
+        },
+        "excludedEffects": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "hostname",
+        "sshEndpoint",
+        "platform",
+        "excludedEffects"
+      ],
+      "additionalProperties": false
+    },
+    "ContainerRuntime": {
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inventory": {
+          "type": "object",
+          "properties": {
+            "containerId": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "service": {
+              "type": "string",
+              "minLength": 1
+            },
+            "imageId": {
+              "type": "string",
+              "pattern": "^sha256:[a-f0-9]{64}$"
+            },
+            "imageRevision": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "created",
+                "running",
+                "paused",
+                "restarting",
+                "removing",
+                "exited",
+                "dead"
+              ]
+            },
+            "dockerHealth": {
+              "type": "string",
+              "enum": [
+                "healthy",
+                "unhealthy",
+                "starting",
+                "none"
+              ]
+            },
+            "initPid": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "pidNamespace": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^pid:\\[\\d+\\]$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "gateway-owner",
+                "backend",
+                "ingress",
+                "identity-provider",
+                "other"
+              ]
+            },
+            "mounts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "bind",
+                      "volume",
+                      "tmpfs"
+                    ]
+                  },
+                  "source": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "destination": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "readWrite": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "type",
+                  "source",
+                  "destination",
+                  "readWrite"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "publishedPorts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "containerPort": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "protocol": {
+                    "type": "string",
+                    "enum": [
+                      "tcp",
+                      "udp"
+                    ]
+                  },
+                  "hostAddress": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "hostPort": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  }
+                },
+                "required": [
+                  "containerPort",
+                  "protocol",
+                  "hostAddress",
+                  "hostPort"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "restartCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "restartPolicy": {
+              "type": "string",
+              "enum": [
+                "no",
+                "always",
+                "unless-stopped",
+                "on-failure"
+              ]
+            }
+          },
+          "required": [
+            "containerId",
+            "name",
+            "service",
+            "imageId",
+            "imageRevision",
+            "state",
+            "dockerHealth",
+            "initPid",
+            "pidNamespace",
+            "role",
+            "mounts",
+            "publishedPorts",
+            "restartCount",
+            "restartPolicy"
+          ],
+          "additionalProperties": false
+        },
+        "observedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "hostId",
+        "inventory",
+        "observedAtUtc"
+      ],
+      "additionalProperties": false
+    },
+    "GatewayRuntime": {
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "containerId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sharedVolumeId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "topology": {
+          "type": "string",
+          "enum": [
+            "shared",
+            "standalone"
+          ]
+        },
+        "observedOwner": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "hostPid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "localPid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "startTicks": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "pidNamespace": {
+                  "type": "string",
+                  "pattern": "^pid:\\[\\d+\\]$"
+                },
+                "containerId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "uid": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "hostPid",
+                "localPid",
+                "startTicks",
+                "pidNamespace",
+                "containerId",
+                "uid"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lock": {
+          "type": "object",
+          "properties": {
+            "device": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "inode": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "held": {
+              "type": "boolean"
+            },
+            "holders": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "pid": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "localPid": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "startTicks": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "pattern": "^pid:\\[\\d+\\]$"
+                  },
+                  "containerId": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "command": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "matchingFdCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "pid",
+                  "localPid",
+                  "startTicks",
+                  "namespace",
+                  "command",
+                  "matchingFdCount"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "device",
+            "inode",
+            "held",
+            "holders"
+          ],
+          "additionalProperties": false
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "stopped",
+            "starting",
+            "running",
+            "degraded",
+            "draining",
+            "failed"
+          ]
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "profile": {
+                "type": "string",
+                "minLength": 1
+              },
+              "nativeOn": {
+                "type": "boolean"
+              },
+              "liveServed": {
+                "type": "boolean"
+              },
+              "nativeOwnerPid": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "profile",
+              "nativeOn",
+              "liveServed",
+              "nativeOwnerPid"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "adapterErrors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "adapter": {
+                "type": "string",
+                "minLength": 1
+              },
+              "profile": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "authentication",
+                  "configuration",
+                  "connectivity",
+                  "runtime",
+                  "unknown"
+                ]
+              },
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "observedAtUtc": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "credentialsRedacted": {
+                "const": true
+              }
+            },
+            "required": [
+              "adapter",
+              "profile",
+              "category",
+              "code",
+              "message",
+              "observedAtUtc",
+              "credentialsRedacted"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "observedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "hostId",
+        "containerId",
+        "sharedVolumeId",
+        "topology",
+        "observedOwner",
+        "lock",
+        "state",
+        "profiles",
+        "adapterErrors",
+        "observedAtUtc"
+      ],
+      "additionalProperties": false
+    },
+    "SharedVolume": {
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "backingPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mountDestinations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "containerId": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "destination": {
+                "type": "string",
+                "minLength": 1
+              },
+              "readWrite": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "containerId",
+              "destination",
+              "readWrite"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "device": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "inode": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "hostId",
+        "backingPath",
+        "mountDestinations",
+        "device",
+        "inode"
+      ],
+      "additionalProperties": false
+    },
+    "Observation": {
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "live-ssh",
+            "imported-receipt"
+          ]
+        },
+        "observedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "locator": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "byteLength": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "mediaType": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "locator",
+            "sha256",
+            "byteLength",
+            "mediaType"
+          ],
+          "additionalProperties": false
+        },
+        "observation": {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "observedAtUtc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "targetService": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profile": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expectedProfiles": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "lock": {
+              "type": "object",
+              "properties": {
+                "device": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "inode": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "held": {
+                  "type": "boolean"
+                },
+                "holders": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "pid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "localPid": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "startTicks": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "namespace": {
+                        "type": "string",
+                        "pattern": "^pid:\\[\\d+\\]$"
+                      },
+                      "containerId": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "command": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "matchingFdCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "pid",
+                      "localPid",
+                      "startTicks",
+                      "namespace",
+                      "command",
+                      "matchingFdCount"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 0
+                }
+              },
+              "required": [
+                "device",
+                "inode",
+                "held",
+                "holders"
+              ],
+              "additionalProperties": false
+            },
+            "runtimes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "containerId": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "initPid": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "pattern": "^pid:\\[\\d+\\]$"
+                  },
+                  "dataSource": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "dockerHealth": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSlot": {
+                    "type": "object",
+                    "properties": {
+                      "up": {
+                        "type": "boolean"
+                      },
+                      "localPid": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "raw": {
+                        "type": "string"
+                      },
+                      "downFileExists": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "up",
+                      "raw",
+                      "downFileExists"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "native": {
+                    "type": "object",
+                    "properties": {
+                      "identify": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "protocol": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "kind": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "pid": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "start_time": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "hermes_home": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "profile": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "supervisor": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "code_sha": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "code_version": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "served_profiles": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "minItems": 0,
+                                "uniqueItems": true
+                              }
+                            },
+                            "required": [],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "nativeServing": {
+                        "type": "boolean"
+                      },
+                      "nativeOwnerPid": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "profileOn": {
+                        "type": "boolean"
+                      },
+                      "profiles": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "profile": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "nativeOn": {
+                              "type": "boolean"
+                            },
+                            "liveServed": {
+                              "type": "boolean"
+                            },
+                            "nativeOwnerPid": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "profile",
+                            "nativeOn",
+                            "liveServed",
+                            "nativeOwnerPid"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 0
+                      },
+                      "status": {
+                        "type": "object",
+                        "properties": {
+                          "gateway_state": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "desired_state": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "answering_pid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "answered_at": {
+                            "type": "number",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [],
+                        "additionalProperties": false
+                      },
+                      "adapters": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "state": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "errorCode": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "credentialRejected": {
+                              "type": "boolean"
+                            },
+                            "configured": {
+                              "type": "boolean"
+                            },
+                            "writerPid": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "credentialRejected"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 0
+                      },
+                      "adapterErrors": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "adapter": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "profile": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "category": {
+                              "type": "string",
+                              "enum": [
+                                "authentication",
+                                "configuration",
+                                "connectivity",
+                                "runtime",
+                                "unknown"
+                              ]
+                            },
+                            "code": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "observedAtUtc": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "credentialsRedacted": {
+                              "const": true
+                            }
+                          },
+                          "required": [
+                            "adapter",
+                            "profile",
+                            "category",
+                            "code",
+                            "message",
+                            "observedAtUtc",
+                            "credentialsRedacted"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 0
+                      },
+                      "http": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 599
+                          },
+                          "gateway_running": {
+                            "type": "boolean"
+                          },
+                          "gateway_state": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "gateway_mode": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "code"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "error": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "identify",
+                      "nativeServing",
+                      "profileOn",
+                      "status",
+                      "adapters"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "service",
+                  "containerId",
+                  "initPid",
+                  "namespace",
+                  "dataSource",
+                  "rootSlot",
+                  "native"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1
+            },
+            "inventory": {
+              "type": "object",
+              "properties": {
+                "hostId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "observedAtUtc": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "containers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "containerId": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "service": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "imageId": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "imageRevision": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "created",
+                          "running",
+                          "paused",
+                          "restarting",
+                          "removing",
+                          "exited",
+                          "dead"
+                        ]
+                      },
+                      "dockerHealth": {
+                        "type": "string",
+                        "enum": [
+                          "healthy",
+                          "unhealthy",
+                          "starting",
+                          "none"
+                        ]
+                      },
+                      "initPid": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "pidNamespace": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^pid:\\[\\d+\\]$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "gateway-owner",
+                          "backend",
+                          "ingress",
+                          "identity-provider",
+                          "other"
+                        ]
+                      },
+                      "mounts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "bind",
+                                "volume",
+                                "tmpfs"
+                              ]
+                            },
+                            "source": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "destination": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "readWrite": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "source",
+                            "destination",
+                            "readWrite"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 0
+                      },
+                      "publishedPorts": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "containerPort": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 65535
+                            },
+                            "protocol": {
+                              "type": "string",
+                              "enum": [
+                                "tcp",
+                                "udp"
+                              ]
+                            },
+                            "hostAddress": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "hostPort": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 65535
+                            }
+                          },
+                          "required": [
+                            "containerPort",
+                            "protocol",
+                            "hostAddress",
+                            "hostPort"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "minItems": 0
+                      },
+                      "restartCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "restartPolicy": {
+                        "type": "string",
+                        "enum": [
+                          "no",
+                          "always",
+                          "unless-stopped",
+                          "on-failure"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "containerId",
+                      "name",
+                      "service",
+                      "imageId",
+                      "imageRevision",
+                      "state",
+                      "dockerHealth",
+                      "initPid",
+                      "pidNamespace",
+                      "role",
+                      "mounts",
+                      "publishedPorts",
+                      "restartCount",
+                      "restartPolicy"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 0
+                }
+              },
+              "required": [
+                "hostId",
+                "observedAtUtc",
+                "containers"
+              ],
+              "additionalProperties": false
+            },
+            "ports": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "string",
+                    "enum": [
+                      "tcp",
+                      "udp"
+                    ]
+                  },
+                  "address": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535
+                  },
+                  "pidNamespace": {
+                    "type": "string",
+                    "pattern": "^pid:\\[\\d+\\]$"
+                  },
+                  "owner": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "hostPid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "localPid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "startTicks": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "pidNamespace": {
+                            "type": "string",
+                            "pattern": "^pid:\\[\\d+\\]$"
+                          },
+                          "containerId": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^[a-f0-9]{64}$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "uid": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "hostPid",
+                          "localPid",
+                          "startTicks",
+                          "pidNamespace",
+                          "containerId",
+                          "uid"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "containerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": [
+                      "dashboard",
+                      "native-backend",
+                      "ingress",
+                      "identity-provider",
+                      "ssh",
+                      "other"
+                    ]
+                  },
+                  "exposure": {
+                    "type": "string",
+                    "enum": [
+                      "loopback",
+                      "tailnet",
+                      "container-network",
+                      "public",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "address",
+                  "port",
+                  "pidNamespace",
+                  "owner",
+                  "containerId",
+                  "purpose",
+                  "exposure"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            },
+            "preservedSession": {
+              "type": "object",
+              "properties": {
+                "pid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "startTicks": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "namespace": {
+                  "type": "string",
+                  "pattern": "^pid:\\[\\d+\\]$"
+                },
+                "alive": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "pid",
+                "startTicks",
+                "namespace",
+                "alive"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "observedAtUtc",
+            "targetService",
+            "profile",
+            "lock",
+            "runtimes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "hostId",
+        "source",
+        "observedAtUtc",
+        "evidence",
+        "observation"
+      ],
+      "additionalProperties": false
+    },
+    "VerificationResult": {
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observationRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "verificationClass": {
+          "type": "string",
+          "enum": [
+            "current-runtime",
+            "deterministic-contract",
+            "historical-receipt"
+          ]
+        },
+        "verifiedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed",
+            "unverified"
+          ]
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "fail",
+                  "unverified"
+                ]
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "observationRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "description",
+              "observationRefs"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "adapterHealth": {
+          "type": "string",
+          "enum": [
+            "healthy",
+            "degraded",
+            "unverified"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "hostId",
+        "observationRefs",
+        "verificationClass",
+        "verifiedAtUtc",
+        "status",
+        "criteria",
+        "adapterHealth",
+        "limitations"
+      ],
+      "additionalProperties": false
+    },
+    "AcceptanceDecision": {
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verificationRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "rejected",
+            "deferred",
+            "superseded"
+          ]
+        },
+        "decidedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "actorType": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "policy"
+                  ]
+                },
+                "actorId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "scope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sourceEvidenceRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "actorType",
+                "actorId",
+                "scope",
+                "sourceEvidenceRef"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "hostId",
+        "verificationRefs",
+        "status",
+        "decidedAtUtc",
+        "authority",
+        "rationale",
+        "conditions"
+      ],
+      "additionalProperties": false
+    },
+    "OperationRequest": {
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "inspect",
+            "native-gateway-start",
+            "native-gateway-stop",
+            "native-gateway-restart"
+          ]
+        },
+        "target": {
+          "type": "object",
+          "properties": {
+            "containerId": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "service": {
+              "type": "string",
+              "minLength": 1
+            },
+            "processIdentity": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "hostPid": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "localPid": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "startTicks": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "pidNamespace": {
+                      "type": "string",
+                      "pattern": "^pid:\\[\\d+\\]$"
+                    },
+                    "containerId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "uid": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "hostPid",
+                    "localPid",
+                    "startTicks",
+                    "pidNamespace",
+                    "containerId",
+                    "uid"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "lockIdentity": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "device": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "inode": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "held": {
+                      "type": "boolean"
+                    },
+                    "holders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "pid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "localPid": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "startTicks": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "namespace": {
+                            "type": "string",
+                            "pattern": "^pid:\\[\\d+\\]$"
+                          },
+                          "containerId": {
+                            "type": "string",
+                            "pattern": "^[a-f0-9]{64}$"
+                          },
+                          "command": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "matchingFdCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "pid",
+                          "localPid",
+                          "startTicks",
+                          "namespace",
+                          "command",
+                          "matchingFdCount"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "minItems": 0
+                    }
+                  },
+                  "required": [
+                    "device",
+                    "inode",
+                    "held",
+                    "holders"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "containerId",
+            "service",
+            "processIdentity",
+            "lockIdentity"
+          ],
+          "additionalProperties": false
+        },
+        "preserveProcesses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "hostPid": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "localPid": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "startTicks": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "pidNamespace": {
+                "type": "string",
+                "pattern": "^pid:\\[\\d+\\]$"
+              },
+              "containerId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "uid": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "hostPid",
+              "localPid",
+              "startTicks",
+              "pidNamespace",
+              "containerId",
+              "uid"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "scope": {
+          "const": "infrastructure"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "proposed",
+            "authorized",
+            "executed",
+            "cancelled"
+          ]
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "actorType": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "policy"
+                  ]
+                },
+                "actorId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "scope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sourceEvidenceRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "actorType",
+                "actorId",
+                "scope",
+                "sourceEvidenceRef"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requestedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "idempotencyKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraints": {
+          "type": "object",
+          "properties": {
+            "revalidateProcessIdentity": {
+              "const": true
+            },
+            "exactLockInodeRequired": {
+              "type": "boolean"
+            },
+            "installedNativeLifecycle": {
+              "const": true
+            },
+            "broadContainerRestart": {
+              "const": false
+            },
+            "destructiveDeletion": {
+              "const": false
+            },
+            "exposeCredentials": {
+              "const": false
+            }
+          },
+          "required": [
+            "revalidateProcessIdentity",
+            "exactLockInodeRequired",
+            "installedNativeLifecycle",
+            "broadContainerRestart",
+            "destructiveDeletion",
+            "exposeCredentials"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "hostId",
+        "kind",
+        "target",
+        "preserveProcesses",
+        "scope",
+        "reason",
+        "status",
+        "authority",
+        "requestedAtUtc",
+        "idempotencyKey",
+        "constraints"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "observationSchema": {
+    "type": "object",
+    "properties": {
+      "schemaVersion": {
+        "const": 1
+      },
+      "observedAtUtc": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "targetService": {
+        "type": "string",
+        "minLength": 1
+      },
+      "profile": {
+        "type": "string",
+        "minLength": 1
+      },
+      "expectedProfiles": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minItems": 1,
+        "uniqueItems": true
+      },
+      "lock": {
+        "type": "object",
+        "properties": {
+          "device": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "inode": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "held": {
+            "type": "boolean"
+          },
+          "holders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "localPid": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "startTicks": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "namespace": {
+                  "type": "string",
+                  "pattern": "^pid:\\[\\d+\\]$"
+                },
+                "containerId": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "command": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "matchingFdCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "pid",
+                "localPid",
+                "startTicks",
+                "namespace",
+                "command",
+                "matchingFdCount"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "device",
+          "inode",
+          "held",
+          "holders"
+        ],
+        "additionalProperties": false
+      },
+      "runtimes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "service": {
+              "type": "string",
+              "minLength": 1
+            },
+            "containerId": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "initPid": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "namespace": {
+              "type": "string",
+              "pattern": "^pid:\\[\\d+\\]$"
+            },
+            "dataSource": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dockerHealth": {
+              "type": "string",
+              "minLength": 1
+            },
+            "rootSlot": {
+              "type": "object",
+              "properties": {
+                "up": {
+                  "type": "boolean"
+                },
+                "localPid": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "raw": {
+                  "type": "string"
+                },
+                "downFileExists": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "up",
+                "raw",
+                "downFileExists"
+              ],
+              "additionalProperties": false
+            },
+            "native": {
+              "type": "object",
+              "properties": {
+                "identify": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "protocol": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "pid": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "start_time": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "hermes_home": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "profile": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "supervisor": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "code_sha": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "code_version": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "served_profiles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "minItems": 0,
+                          "uniqueItems": true
+                        }
+                      },
+                      "required": [],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "nativeServing": {
+                  "type": "boolean"
+                },
+                "nativeOwnerPid": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "profileOn": {
+                  "type": "boolean"
+                },
+                "profiles": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "profile": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "nativeOn": {
+                        "type": "boolean"
+                      },
+                      "liveServed": {
+                        "type": "boolean"
+                      },
+                      "nativeOwnerPid": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "profile",
+                      "nativeOn",
+                      "liveServed",
+                      "nativeOwnerPid"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 0
+                },
+                "status": {
+                  "type": "object",
+                  "properties": {
+                    "gateway_state": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "desired_state": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "answering_pid": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "answered_at": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                },
+                "adapters": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "errorCode": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "credentialRejected": {
+                        "type": "boolean"
+                      },
+                      "configured": {
+                        "type": "boolean"
+                      },
+                      "writerPid": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "credentialRejected"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 0
+                },
+                "adapterErrors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "adapter": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "profile": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "category": {
+                        "type": "string",
+                        "enum": [
+                          "authentication",
+                          "configuration",
+                          "connectivity",
+                          "runtime",
+                          "unknown"
+                        ]
+                      },
+                      "code": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "observedAtUtc": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "credentialsRedacted": {
+                        "const": true
+                      }
+                    },
+                    "required": [
+                      "adapter",
+                      "profile",
+                      "category",
+                      "code",
+                      "message",
+                      "observedAtUtc",
+                      "credentialsRedacted"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 0
+                },
+                "http": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 599
+                    },
+                    "gateway_running": {
+                      "type": "boolean"
+                    },
+                    "gateway_state": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "gateway_mode": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ],
+                  "additionalProperties": false
+                },
+                "error": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "identify",
+                "nativeServing",
+                "profileOn",
+                "status",
+                "adapters"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "service",
+            "containerId",
+            "initPid",
+            "namespace",
+            "dataSource",
+            "rootSlot",
+            "native"
+          ],
+          "additionalProperties": false
+        },
+        "minItems": 1
+      },
+      "inventory": {
+        "type": "object",
+        "properties": {
+          "hostId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "containers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "containerId": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "service": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "imageId": {
+                  "type": "string",
+                  "pattern": "^sha256:[a-f0-9]{64}$"
+                },
+                "imageRevision": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "created",
+                    "running",
+                    "paused",
+                    "restarting",
+                    "removing",
+                    "exited",
+                    "dead"
+                  ]
+                },
+                "dockerHealth": {
+                  "type": "string",
+                  "enum": [
+                    "healthy",
+                    "unhealthy",
+                    "starting",
+                    "none"
+                  ]
+                },
+                "initPid": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "pidNamespace": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^pid:\\[\\d+\\]$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "gateway-owner",
+                    "backend",
+                    "ingress",
+                    "identity-provider",
+                    "other"
+                  ]
+                },
+                "mounts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "bind",
+                          "volume",
+                          "tmpfs"
+                        ]
+                      },
+                      "source": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "destination": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "readWrite": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "source",
+                      "destination",
+                      "readWrite"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 0
+                },
+                "publishedPorts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "containerPort": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      },
+                      "protocol": {
+                        "type": "string",
+                        "enum": [
+                          "tcp",
+                          "udp"
+                        ]
+                      },
+                      "hostAddress": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "hostPort": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 65535
+                      }
+                    },
+                    "required": [
+                      "containerPort",
+                      "protocol",
+                      "hostAddress",
+                      "hostPort"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 0
+                },
+                "restartCount": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "restartPolicy": {
+                  "type": "string",
+                  "enum": [
+                    "no",
+                    "always",
+                    "unless-stopped",
+                    "on-failure"
+                  ]
+                }
+              },
+              "required": [
+                "containerId",
+                "name",
+                "service",
+                "imageId",
+                "imageRevision",
+                "state",
+                "dockerHealth",
+                "initPid",
+                "pidNamespace",
+                "role",
+                "mounts",
+                "publishedPorts",
+                "restartCount",
+                "restartPolicy"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "hostId",
+          "observedAtUtc",
+          "containers"
+        ],
+        "additionalProperties": false
+      },
+      "ports": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "protocol": {
+              "type": "string",
+              "enum": [
+                "tcp",
+                "udp"
+              ]
+            },
+            "address": {
+              "type": "string",
+              "minLength": 1
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "pidNamespace": {
+              "type": "string",
+              "pattern": "^pid:\\[\\d+\\]$"
+            },
+            "owner": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "hostPid": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "localPid": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "startTicks": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "pidNamespace": {
+                      "type": "string",
+                      "pattern": "^pid:\\[\\d+\\]$"
+                    },
+                    "containerId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "uid": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "hostPid",
+                    "localPid",
+                    "startTicks",
+                    "pidNamespace",
+                    "containerId",
+                    "uid"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "containerId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "purpose": {
+              "type": "string",
+              "enum": [
+                "dashboard",
+                "native-backend",
+                "ingress",
+                "identity-provider",
+                "ssh",
+                "other"
+              ]
+            },
+            "exposure": {
+              "type": "string",
+              "enum": [
+                "loopback",
+                "tailnet",
+                "container-network",
+                "public",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "protocol",
+            "address",
+            "port",
+            "pidNamespace",
+            "owner",
+            "containerId",
+            "purpose",
+            "exposure"
+          ],
+          "additionalProperties": false
+        },
+        "minItems": 0
+      },
+      "preservedSession": {
+        "type": "object",
+        "properties": {
+          "pid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "startTicks": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "namespace": {
+            "type": "string",
+            "pattern": "^pid:\\[\\d+\\]$"
+          },
+          "alive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pid",
+          "startTicks",
+          "namespace",
+          "alive"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "schemaVersion",
+      "observedAtUtc",
+      "targetService",
+      "profile",
+      "lock",
+      "runtimes"
+    ],
+    "additionalProperties": false
+  }
+}

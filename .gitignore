@@ -49,9 +49,12 @@ ssh_host_*
 Thumbs.db
 patches/
 architecture/authorization*.json
-deployments/herdr-entrypoint/facts.json
 # Historical effect/run helpers are not maintained source. Keep the native updater.
 scripts/*
 !scripts/hermes-main-update
-!scripts/ci/
-!scripts/ci/**
+
+# Rust outputs and host environment files
+/target/
+**/target/
+*.env
+**/*.env

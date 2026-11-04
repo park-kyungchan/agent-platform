@@ -1,0 +1,1 @@
+0 0 * * * root sleep $(shuf -i 0-21600 -n 1) && docker image prune -af --filter "until=24h" > /dev/null 2>&1

@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-hermes_script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-source "$hermes_script_dir/hermes-backend.lib.sh"
-if [[ $# -ne 0 ]]; then
-  printf '%s\n' 'Usage: hermes-backend-shell' >&2
-  exit 2
-fi
-hermes_backend_exec yes /usr/bin/bash --noprofile --norc

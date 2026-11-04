@@ -1,0 +1,15 @@
+name: srv1873899-tsidp
+services:
+  tsidp:
+    container_name: srv1873899-tsidp
+    image: ghcr.io/tailscale/tsidp:v0.0.17@sha256:374535aca5bf1b8a5afff16acad84d159834c37f52b72beee73b781c8fd933da
+    restart: unless-stopped
+    environment:
+      TAILSCALE_USE_WIP_CODE: "1"
+      TS_STATE_DIR: /data
+      TS_HOSTNAME: idp
+      TS_ADVERTISE_TAGS: tag:tsidp
+    volumes:
+      - tsidp-state:/data
+volumes:
+  tsidp-state:
