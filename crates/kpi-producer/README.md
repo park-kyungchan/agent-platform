@@ -192,8 +192,11 @@ PR attribution from this capture or subtract values across algorithms.
 The journal uses descriptor-relative no-follow regular-file opening and a native
 nonblocking exclusive advisory lock. Another active writer returns journal_busy.
 The producer validates bounded prior rows and LF before appending/syncing and
-reading back bytes. Same measurement ID + same bytes is a no-op; changed bytes
-are a conflict. Truncated tails stop further writes. Native locking coordinates
+reading back bytes. Same measurement ID + same bytes preserves the exact file
+bytes, but still syncs the journal and its parent before returning a receipt;
+cached bytes after an earlier append_unknown are not sufficient. A failed sync
+continues to return append_unknown. Changed bytes are a conflict. Truncated
+tails stop further writes. Native locking coordinates
 cooperating producers; trusted owners must not replace the journal concurrently.
 
 A receipt binds measurement ID, line number, byte offset, row length/hash and
