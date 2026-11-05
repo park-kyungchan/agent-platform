@@ -101,9 +101,11 @@ Both installations must support machine API forwarding, and the remote server mu
 
 ## Start and coordinate an agent
 
-Default to a sibling pane in the current tab and the current working directory. Do not create a workspace, tab, worktree, or different cwd unless the user explicitly requests that topology or location.
+Follow the exact topology, worktree and cwd assigned by the current TASK/STATE before using any example below. An assigned Lead follows [lead-orchestration](../../lead-orchestration/SKILL.md): one tab per worker, with the task-owned checkout and disjoint write set. Do not replace an assigned tab/worktree with a sibling in the caller's checkout. Only when task topology/location are unspecified may ordinary authorized pane work default to a sibling in the current tab and cwd. Discover creation syntax through native help and use returned IDs; preserve user focus.
 
-Honor a direction requested by the user. Otherwise inspect the caller pane:
+Use [Context Governance](../../../runtime-references/CONTEXT-GOVERNANCE.md) for isolation versus same-task continuity, and [strategy-dialogue](../../strategy-dialogue/SKILL.md) for strategy/report rules; do not copy their protocols or infer delegation authority from these links.
+
+For an authorized sibling split only, honor the requested direction. Otherwise inspect the caller pane:
 
 ```bash
 herdr pane layout --pane "$HERDR_PANE_ID"
@@ -131,7 +133,8 @@ herdr agent start reviewer --kind codex --pane <returned-pane-id> -- <agent-args
 
 A successful `agent start` returns only after Herdr detects the expected agent in the same pane and considers it ready for interactive input. If the agent is blocked during startup, the command returns `agent_not_ready` immediately but keeps the name available for `agent read` and `agent send-keys`. Wait until the agent becomes idle before prompting it. Startup defaults to a 30-second timeout.
 
-Submit work through the agent surface:
+Submit work through the agent surface. Replace the brief example prompt below with the actual bounded handoff: goal, exact TASK/STATE/canonical paths, branch/base/candidate, allowed files/effects, expected output/checks, Strategy link, KPI/guardrail moved and shared-build owner when applicable. A generic review request alone is insufficient for an assigned worker.
+
 
 ```bash
 herdr agent prompt reviewer "Review the current diff and report only actionable findings." --wait --timeout 120000
@@ -167,7 +170,7 @@ If a wait fails or returns `blocked`, inspect `agent get` and `agent read` befor
 
 ## Run an ordinary command in another pane
 
-Create a sibling pane with the same geometry rule, preserve the caller's working directory, and keep user focus unchanged:
+Use the task-assigned command pane/tab and cwd first. Only when unspecified, create a sibling pane with the same geometry rule, preserve the caller's working directory, and keep user focus unchanged:
 
 ```bash
 herdr pane split --current --direction right --cwd "$PWD" --no-focus
@@ -195,6 +198,10 @@ Use `--format ansi` when colors and terminal styling are evidence. Otherwise use
 `--lines` asks Herdr for more rows from the pane's available screen and host scrollback. Alternate-screen rows do not enter ordinary host scrollback. For supported idle agents, Herdr can collect application-owned history and restore the viewport afterward, but not every application or response can be recovered this way.
 
 If a larger recent read still does not reveal the completed response, ask the agent to write it as Markdown in a temporary directory and reply only with the file path, then read that file on the same machine. Use this only as a fallback; do not request file output in the initial prompt.
+
+## Result and closure
+
+Read the actual output/artifact and reconcile owned processes and uncertain effects using [worker closure](../../lessons-loop/references/worker-closure.md). A DONE marker, successful submission or idle state is only a signal to inspect. Preserve native session identity/results within task authority; do not import another transcript or require a lesson for routine success.
 
 ## Safety and coordination rules
 

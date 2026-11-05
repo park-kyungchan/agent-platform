@@ -1,6 +1,6 @@
 ---
 name: herdr
-description: Control the Herdr terminal multiplexer when the user explicitly requests Herdr or pane/agent control. Requires a genuine Herdr caller; do not invoke merely to add background work or delegation.
+description: Use for explicitly requested Herdr pane or agent control from a genuine Herdr caller; delegation requires task authority.
 ---
 
 # Herdr
@@ -13,4 +13,6 @@ A pane, a recognized agent and a stored session are different identities. Inspec
 
 Control only task-authorized resources, preserve user focus and active sessions, and use returned opaque IDs after topology changes. Local and remote server IDs can collide; keep the selected machine consistent. Native SSH owns authentication and host keys.
 
-Launching agents or delegating requires the task's actual authorization. Pass goal, exact targets, allowed effects, expected output and state path; do not invent role machinery, receipt ledgers or a scheduler. Verify submitted work through its result. After uncertain input, read existing state before retrying.
+Launching agents or delegating requires the task's actual authorization. Assigned tab, worktree and cwd take precedence over examples. An assigned Lead follows [lead-orchestration](../lead-orchestration/SKILL.md), including one tab per worker; this link does not require delegation. Use [Context Governance](../../runtime-references/CONTEXT-GOVERNANCE.md) for isolation/continuity and [strategy-dialogue](../strategy-dialogue/SKILL.md) for the existing Strategy/KPI contract.
+
+Pass goal, exact targets, allowed effects, expected output and state path, including Strategy link, KPI/guardrail moved, source revision, write set and shared-build owner when applicable. Do not invent role machinery, receipt ledgers or a scheduler. Verify returned artifacts/effects using [worker closure](../lessons-loop/references/worker-closure.md); a DONE marker or idle state alone proves no outcome. After uncertain input, read existing state before retrying.

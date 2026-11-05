@@ -6,8 +6,7 @@
 boundary for a small Rust, CLI-agnostic harness on Herdr, used by Claude Code,
 Codex, Muse and Antigravity CLI (`agy`). It assigns no role, priority, model or
 work category to any CLI. Scope approval does not authorize implementation,
-deployment or host configuration changes. PR #98 remains unmerged pending the
-Lead's review, CI and expected-head merge.
+deployment or host configuration changes. PR #98 merged on 2026-11-05 at `2dd51af`; the current task STATE records acceptance and deployment. This milestone grants no new host effects.
 
 ## Purpose and scope
 
@@ -79,8 +78,10 @@ map records installed-version observations; it is not a promise about the latest
 upstream release or every currently running process. This draft launches no
 fresh native sessions and changes no installed configuration. [A4][G3]
 
-The main recheck retains #96's pane resolver and #97's fixed 19-entry public
-content inventory. #99 adds explicit command-local lock release when a forked
+The historical main recheck retained #96's pane resolver and #97's fixed 19-entry
+public content inventory. PR #104 subsequently supplied 25 owned entries; PR02
+adds the worker-closure reference for 26. The Rust inventory and SHA256SUMS
+define current source bytes; these counts do not prove host synchronization. #99 adds explicit command-local lock release when a forked
 child retains a descriptor; it does not change selectors, scopes or pane lookup.
 #100 synchronizes public layout guidance and adds `content/SHA256SUMS`, which is
 repository evidence outside that owned host inventory. No content-apply selector
@@ -147,6 +148,14 @@ has MCP with no configured Hindsight lifecycle injection hook; do not claim all
 four runtimes inject or retain identically. Tagged models can miss shared
 untagged observations, so platform scope requires actual readback, not just a
 tag name. No retention or refresh operation is performed here. [G3][H1][H2]
+
+Current [Context Governance](../content/runtime-references/CONTEXT-GOVERNANCE.md)
+owns isolation/continuity and source authority. Task handoffs include the Strategy
+link and KPI/guardrail fields from [strategy-dialogue](../content/skills/strategy-dialogue/SKILL.md).
+Task topology/worktrees win over generic pane examples; assigned Leads use one tab
+per worker. Use [worker closure](../content/skills/lessons-loop/references/worker-closure.md)
+for task-local output/effect reconciliation and optional curator candidates.
+These are references to existing conventions, not new executable mechanisms.
 
 ## Rules preserving agent autonomy
 

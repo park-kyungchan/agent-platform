@@ -8,8 +8,10 @@ byte-for-byte from
 The fixed Rust inventory is `crates/ap/src/native/content_inventory.rs`. This
 README is repository documentation, not an owned host entry.
 
-The academy-runtime-routing and academy-student-context skills belong to
-education-platform and are excluded. Native Herdr hooks, per-CLI pointer files,
+Generic Academy routing belongs to education-platform; private teaching/reporting
+ownership is planned for education-dc-gang-a after verified source/consumer transfer.
+Both Academy skills are excluded here; their retained education-platform copies
+do not release the disabled-tool hold or authorize direct fallback. Native Herdr hooks, per-CLI pointer files,
 third-party skills and Hindsight integrations are not copied or owned. Skills
 assign no permanent role to a CLI and add no instruction loader.
 
@@ -23,3 +25,10 @@ manifest itself is repository evidence outside that inventory. Changed paths
 and bytes require an inventory/test/hash update. Neither source acceptance nor
 a rebuilt binary proves host synchronization, native discovery or execution.
 The task owner separately authorizes and verifies any host installation.
+
+The inventory now has 26 files, including lessons-loop's worker-closure reference;
+the generic custom catalogue remains six skills. On-demand links connect Herdr
+and Hermes to Context Governance, strategy-dialogue and lessons-loop without
+copying those protocols or creating another global skill. Assigned topology/cwd
+wins over generic examples; assigned Leads use one tab per worker. Historical
+19-entry and skills-v1 25-entry inventories are dated milestones only.
