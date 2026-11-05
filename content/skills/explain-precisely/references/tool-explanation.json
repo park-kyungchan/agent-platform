@@ -1,0 +1,35 @@
+{
+  "schema": "explain-precisely.tool-explanation-reference.v1",
+  "flow": [
+    "input and arguments",
+    "actual executor",
+    "operation and target",
+    "returned result and observed effect"
+  ],
+  "questions": {
+    "interface": [
+      "Which tool is exposed?",
+      "Is the operation a tool name, an argument, or a helper inside submitted code?"
+    ],
+    "execution": [
+      "Which language and process interpret the input?",
+      "Which statements, conditions and repetitions run in this call?"
+    ],
+    "state": [
+      "Which files, values or services are read or changed?",
+      "What persists between calls?"
+    ],
+    "evidence": [
+      "Is this actual output or an illustrative example?",
+      "Did the intended target change?",
+      "What remains unverified?"
+    ]
+  },
+  "rules": [
+    "Define each new term in Korean with its components, concrete operation and an environment example; preserve English programming terms.",
+    "Never explain through metaphor or analogy.",
+    "Use actual native schemas and supported arguments; do not assume any particular CLI or tool runtime.",
+    "Do not equate official support, effective configuration, tool exposure, execution and observed target effect.",
+    "Read only the relevant questions; a short answer does not require this whole checklist."
+  ]
+}

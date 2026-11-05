@@ -1,6 +1,23 @@
 # Custom skills — on demand
 
-Current custom source: `/root/.agents/skills/<skill>/SKILL.md`. Five retained custom skills: academy-student-context, academy-runtime-routing, explain-code-clearly, herdr and herdr-hermes. Hindsight and Scrapling are separately managed; the 2026-11-04 audit counted seven shared skill directories in total. Load the relevant skill only; native catalogs expose their scope. Full reports use conditional references; short requests stay concise.
+Reviewed generic skill source is `agent-platform/content/skills/`; deployed shared
+custom source is `/root/.agents/skills/<skill>/SKILL.md`. Load only the relevant
+skill; native catalogs expose its scope. Source publication does not establish
+host installation or native discovery.
+
+| Skill | Use |
+| --- | --- |
+| explain-precisely | Every user-facing explanation: Korean prose, original English programming terms, concrete first-use definitions and no metaphor. Replaces explain-code-clearly. |
+| lead-orchestration | The role assigned as Lead in task STATE: bounded dispatch, independent isolated review, PR/CI and verified closure. No CLI has a permanent role. |
+| strategy-dialogue | User–Lead Strategy Brief, KPI-first reporting, guardrails and work threads; any CLI assigned Lead. |
+| lessons-loop | Authorized closure capture and curation of L0–L3 lessons, structural issues and direction proposals through official Hindsight surfaces. |
+| herdr | Explicitly authorized native Herdr terminal/pane/agent control. |
+| herdr-hermes | Native Hermes sessions through Herdr when requested. |
+
+The domain skills `academy-student-context` and `academy-runtime-routing` belong
+to education-platform and retain their own authority. Hindsight and Scrapling
+are separately managed. The November4 audit's directory count is historical;
+this source change does not install skills or update per-CLI links.
 
 Codex/Gemini/Muse catalog checks from November1 are historical observations. Current user-confirmed coding runtimes are Muse, Claude, Codex and Antigravity CLI; Gemini CLI is absent. Claude personal and Antigravity config/skills links use the shared source; a symlink/catalog does not prove a fresh child/session loaded the body. Keep supported per-CLI metadata in the skill folder. Hermes' read-only host-agents mount does not prove native catalog registration; no profile migration was applied.
 
@@ -11,3 +28,6 @@ Official Hindsight companion skills remain vendor-generated and native-sync-owne
 Work and recovery: `/home/palantirkc/work/ws-skill-standard/STATE.md`, `SELECTION.md`, `evidence/archive-remote-restore.json`. This reference is navigation, not a skill loader or execution authority.
 
 For large work, pass only required skill names and selected source/STATE paths in the handoff. Load a skill body when needed rather than every runtime reference or plugin skill. Runtime-specific discovery boundaries and trust are in RUNTIME-LOADING.md; do not copy shared skill bodies into per-CLI instructions or assume a child inherits a parent-activated skill.
+
+Memory tiers and glossary/lessons ownership are in `CONTEXT-GOVERNANCE.md` on
+demand; skill instructions do not authorize otherwise forbidden memory writes.

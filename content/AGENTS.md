@@ -36,10 +36,11 @@ After context reset, read the task's current rules and state before effects. Reu
 
 - Hindsight is wired per runner by `/root/.hindsight/coding-agents` (hooks + MCP server `hindsight`); the tools and protocol are the same in every runner. Search knowledge pages before acting on a new task; credit what you use.
 - Runner-specific hook/MCP wiring lives in each runner's own config, never in this file.
+- For memory tiers, source authority, isolation/continuity and anti-duplication, consult `/root/.agents/runtime-references/CONTEXT-GOVERNANCE.md` on demand.
 
-## Codex-only addenda (other runners: ignore)
+## All-runner communication and access boundaries
 
-- Explain progress and results to the user in Korean; write code, runtime instructions and technical records in English.
+- Use `explain-precisely` for all user-facing explanations, including progress and decisions: Korean prose, original English programming terms, concrete first-use definitions and no metaphor or analogy. Write code, runtime instructions and technical records in English.
 - Do not print credential values. For Hindsight work, directly inspect actual user data when needed for the authorized migration and evaluation; access only relevant data. For other tasks, retain the prior metadata-and-hash-only restriction unless the user authorizes otherwise.
 - Remote work: keep SSH host-key checking and the Tailscale boundary. Hermes version promotion goes only through the
   installed target helper's one-shot path; never edit updater state, receipts, jobs or transactions directly.
