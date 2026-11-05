@@ -23,9 +23,9 @@ cleanup() {
 trap cleanup EXIT
 
 cargo fmt --all -- --check
-cargo test --locked -j1 -p ap
-cargo clippy --locked -j1 -p ap --all-targets -- -D warnings
-cargo build --locked -j1 -p ap
+cargo test --locked -j1 --workspace
+cargo clippy --locked -j1 --workspace --all-targets -- -D warnings
+cargo build --locked -j1 --workspace
 
 # Existing independent judges and negative controls; no expected outputs are regenerated.
 python3 -I -B crates/ap/conformance/verify.py --self-check
