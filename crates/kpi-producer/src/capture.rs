@@ -344,7 +344,7 @@ fn parity(
     };
     let result = (|| -> Result<ToolRecording> {
         let bytes = filesystem::read(path, guardrails::RECORDING_LIMIT)?;
-        let record: ToolRecording = strict::parse(&bytes, guardrails::RECORDING_LIMIT)?;
+        let mut record: ToolRecording = strict::parse(&bytes, guardrails::RECORDING_LIMIT)?;
         if !text(&record.source_revision)
             || !record.population_complete
             || record.tools.len() != tool_ids.len()
@@ -352,22 +352,24 @@ fn parity(
             return Err(Error("incomplete_source"));
         }
         let mut ids = BTreeSet::new();
-        for t in &record.tools {
+        let mut bindings = Vec::new();
+        for t in &mut record.tools {
             if !ids.insert(t.id.clone()) || !tool_ids.contains(&t.id) {
                 return Err(Error("invalid_source"));
             }
             if t.production_qualified {
                 let mut candidate = None;
                 for (kind, gate) in [
-                    ("parity", &t.parity),
-                    ("synthetic_tests", &t.synthetic_tests),
-                    ("independent_review", &t.independent_review),
-                    ("ci", &t.ci),
-                    ("rollback", &t.rollback),
+                    ("parity", &mut t.parity),
+                    ("synthetic_tests", &mut t.synthetic_tests),
+                    ("independent_review", &mut t.independent_review),
+                    ("ci", &mut t.ci),
+                    ("rollback", &mut t.rollback),
                 ] {
                     let a = gate
                         .get()
                         .filter(|a| a.valid())
+                        .cloned()
                         .ok_or(Error("incomplete_source"))?;
                     let dir = Path::new(path)
                         .parent()
@@ -387,13 +389,33 @@ fn parity(
                         return Err(Error("invalid_source"));
                     }
                     candidate = Some(g.candidate_commit);
-                    if !evidence.references.iter().any(|r| r == a) {
-                        evidence.retain(&a.path, &b)?;
+                    let retained = ArtifactRef::new(&format!("owner-gate-{}.json", a.sha256), &b);
+                    if !evidence.references.contains(&retained) {
+                        evidence.retain(&retained.path, &b)?;
+                    }
+                    bindings.push(serde_json::json!({"owner":a,"retained":retained}));
+                    *gate = K::Value(retained);
+                }
+            } else {
+                // Only checked gate evidence enters the retained projection.
+                // The exact original owner recording preserves unchecked claims.
+                for gate in [
+                    &mut t.parity,
+                    &mut t.synthetic_tests,
+                    &mut t.independent_review,
+                    &mut t.ci,
+                    &mut t.rollback,
+                ] {
+                    if matches!(gate, K::Value(_)) {
+                        *gate = K::Unknown;
                     }
                 }
             }
         }
-        source.artifact = K::Value(evidence.retain("parity-recording.json", &bytes)?);
+        let owner = evidence.retain("parity-owner-recording.json", &bytes)?;
+        let projected = evidence.retain("parity-recording.json", &strict::bytes(&record)?)?;
+        evidence.retain("parity-gate-bindings.json",&strict::bytes(&serde_json::json!({"owner_recording":owner,"projected_recording":projected,"bindings":bindings}))?)?;
+        source.artifact = K::Value(projected);
         Ok(record)
     })();
     match result {
@@ -425,6 +447,7 @@ fn parity(
             };
             out.qualification = q;
         }
+        Err(e) if e.0.starts_with("evidence_") => return Err(e),
         Err(e) => {
             out.value = K::Unknown;
             out.qualification = match e.0 {

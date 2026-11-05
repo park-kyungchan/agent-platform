@@ -127,6 +127,12 @@ Baseline assertions remain unverified. Parity uses `capture::ToolRecording` and
 the full adopted tool population. Each production-qualified tool requires five
 hashed owner gate artifacts, with `{gate,candidate_commit,passed,owner_revision}`,
 all passed and bound to the same candidate. Planning booleans alone do not count.
+Retained gates use the producer's `owner-gate-<sha256>.json` namespace, regardless
+of owner basenames. Preserve exact `parity-owner-recording.json`, a rewritten
+`parity-recording.json` projection and `parity-gate-bindings.json` linking both
+recording hashes and each original/retained gate reference. Unchecked gates of
+unqualified tools remain in the original; their projected Value claims become
+Unknown. Owner filenames never reserve or overwrite producer artifacts.
 
 Disk uses statvfs `f_bfree * f_frsize`, matching v1's unallocated-space basis,
 including reserved blocks. Exact bytes are primary; `free_gib` is the exact
@@ -151,8 +157,11 @@ exit/signal states. Primary values use K wrappers; no rounded pct or old gb fiel
 
 The root definition pins the retained external manifest by source_id/hash/bytes;
 all other references are hashed relative artifact basenames in the new private
-capture directory. Immutable artifacts precede the row append. Sources use UTC
-Unix seconds with start/end intervals, immutable repository IDs and full OIDs.
+capture directory. Immutable artifacts precede the row append.
+The producer syncs artifact files, the capture directory and its evidence-root
+parent before a journal append; a parent-sync failure prevents verification.
+Sources use UTC Unix seconds with start/end intervals, immutable repository
+IDs and full OIDs.
 JSON object keys are sorted, one bounded row plus LF, <=64 KiB. Journal limits
 are 4 MiB/4096 rows. No automatic rotation/deletion/repair rewrites history.
 

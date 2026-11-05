@@ -1126,3 +1126,57 @@ fn concurrent_native_lock_writers_keep_whole_rows() {
             .unwrap();
     }
 }
+
+#[test]
+fn owner_gate_names_cannot_collide_with_producer_artifacts() {
+    for name in [
+        "build.json",
+        "billing-contract.json",
+        "parity-recording.json",
+        "repo-0-ref.json",
+    ] {
+        let s = Scratch::new();
+        let owner = Scratch::new();
+        let mut p = prepared(&s, "capture-a");
+        let path = tool_recording(&owner, true);
+        let mut record: ToolRecording =
+            strict::parse(&std::fs::read(&path).unwrap(), 1 << 20).unwrap();
+        let original = record.tools[0].parity.get().unwrap().clone();
+        let bytes = std::fs::read(owner.path(&original.path)).unwrap();
+        owner.write(name, &bytes);
+        record.tools[0].parity = K::Value(ArtifactRef::new(name, &bytes));
+        std::fs::write(&path, strict::bytes(&record).unwrap()).unwrap();
+        p.request.parity_recording_path = RecordingInput::Path(path);
+        p.request_bytes = strict::bytes(&p.request).unwrap();
+        let (v, e) = pipeline(p);
+        assert!(v.kpi_mcp_parity.source_qualified, "owner basename: {name}");
+        let original_ref = v
+            .artifacts
+            .iter()
+            .find(|a| a.path == "parity-owner-recording.json")
+            .unwrap();
+        let original: ToolRecording =
+            strict::parse(&e.read(original_ref).unwrap(), 1 << 20).unwrap();
+        assert_eq!(original.tools[0].parity.get().unwrap().path, name);
+        let projection_ref = v.kpi_mcp_parity.source.artifact.get().unwrap();
+        let projected: ToolRecording =
+            strict::parse(&e.read(projection_ref).unwrap(), 1 << 20).unwrap();
+        let gate = projected.tools[0].parity.get().unwrap();
+        assert!(gate.path.starts_with("owner-gate-"));
+        assert_eq!(e.read(gate).unwrap(), bytes);
+        let binding_ref = v
+            .artifacts
+            .iter()
+            .find(|a| a.path == "parity-gate-bindings.json")
+            .unwrap();
+        let binding: Value = strict::value(&e.read(binding_ref).unwrap(), 1 << 20).unwrap();
+        assert_eq!(binding["owner_recording"]["sha256"], original_ref.sha256);
+        assert_eq!(
+            binding["projected_recording"]["sha256"],
+            projection_ref.sha256
+        );
+        assert_eq!(binding["bindings"].as_array().unwrap().len(), 5);
+        e.verify().unwrap();
+        journal::append(&s.path("snapshots-v2.jsonl"), &v).unwrap();
+    }
+}

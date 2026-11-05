@@ -161,6 +161,9 @@ impl Evidence {
         Ok(b)
     }
     pub fn verify(&self) -> Result<()> {
+        self.verify_with(&mut sync_directory)
+    }
+    fn verify_with(&self, sync: &mut impl FnMut(&OwnedFd) -> Result<()>) -> Result<()> {
         let named = openat(&self.parent, self.name.as_str(), flags(), Mode::empty())
             .map_err(|_| Error("evidence_replaced"))?;
         let a = fstat(&named).map_err(|_| Error("evidence_replaced"))?;
@@ -171,14 +174,74 @@ impl Evidence {
         for a in &self.references {
             self.read(a)?;
         }
-        // O_PATH cannot fsync. Reopen this held directory for durability.
-        let d = openat(
-            &self.dir,
-            ".",
-            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .map_err(|_| Error("evidence_sync"))?;
-        File::from(d).sync_all().map_err(|_| Error("evidence_sync"))
+        sync(&self.dir)?;
+        // The capture directory is a new entry in this *different* parent.
+        // Its own fsync cannot make that parent's entry durable.
+        sync(&self.parent)
+    }
+}
+fn sync_directory(directory: &OwnedFd) -> Result<()> {
+    // O_PATH cannot fsync. Reopen the held directory for durability.
+    let d = openat(
+        directory,
+        ".",
+        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(|_| Error("evidence_sync"))?;
+    File::from(d).sync_all().map_err(|_| Error("evidence_sync"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    struct Scratch(std::path::PathBuf);
+    impl Scratch {
+        fn new() -> Self {
+            let p = std::env::temp_dir().join(format!(
+                "kpi-sync-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::SeqCst)
+            ));
+            std::fs::create_dir(&p).unwrap();
+            Self(p)
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+    fn identity(fd: &OwnedFd) -> (u64, u64) {
+        let s = fstat(fd).unwrap();
+        (s.st_dev, s.st_ino)
+    }
+    #[test]
+    fn evidence_sync_orders_contents_before_parent_entry() {
+        let root = Scratch::new();
+        let e = Evidence::create(root.0.to_str().unwrap(), "capture-a", 100).unwrap();
+        let mut calls = vec![];
+        e.verify_with(&mut |d| {
+            calls.push(identity(d));
+            sync_directory(d)
+        })
+        .unwrap();
+        assert_eq!(calls, vec![identity(&e.dir), identity(&e.parent)]);
+    }
+    #[test]
+    fn failed_parent_sync_does_not_verify_evidence() {
+        let root = Scratch::new();
+        let e = Evidence::create(root.0.to_str().unwrap(), "capture-a", 100).unwrap();
+        let parent = identity(&e.parent);
+        assert_eq!(
+            e.verify_with(&mut |d| if identity(d) == parent {
+                Err(Error("injected_parent_sync"))
+            } else {
+                sync_directory(d)
+            }),
+            Err(Error("injected_parent_sync"))
+        );
     }
 }
