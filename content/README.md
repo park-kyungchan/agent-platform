@@ -1,22 +1,25 @@
 # Public runtime guidance content
 
-Captured byte-for-byte from `/root/.agents/` on 2026-11-04: canonical AGENTS.md,
-all nine runtime reference Markdown files, and the complete generic `herdr`,
-`herdr-hermes` and `explain-code-clearly` skill bundles (nine files). The fixed
-Rust inventory is `crates/ap/src/native/content_inventory.rs`. This README is
-repository documentation and is not an owned host entry.
+Reviewed distribution source for canonical `AGENTS.md`, runtime references and
+the generic `herdr`, `herdr-hermes`, `explain-precisely`, `lead-orchestration`,
+`lessons-loop` and `strategy-dialogue` skill bundles. The initial capture was
+byte-for-byte from
+`/root/.agents/` on 2026-11-04; subsequent reviewed edits evolve repository source.
+The fixed Rust inventory is `crates/ap/src/native/content_inventory.rs`. This
+README is repository documentation, not an owned host entry.
 
 The academy-runtime-routing and academy-student-context skills belong to
-education-platform and are excluded. Native Herdr hooks, native runtime files,
-third-party skills and Hindsight integrations are not copied or owned.
+education-platform and are excluded. Native Herdr hooks, per-CLI pointer files,
+third-party skills and Hindsight integrations are not copied or owned. Skills
+assign no permanent role to a CLI and add no instruction loader.
 
-Content documents describe native integration and existing host paths; copying
-them does not execute a skill, install a runtime or authorize any described
-operation. Update canonical source content deliberately in a reviewed change.
-No generated registry or watcher synchronizes the host.
+Content describes native integrations and existing host paths; copying it does
+not execute a skill, install a runtime or authorize any described operation.
+Update canonical source content deliberately through review. No generated
+registry or watcher synchronizes the host.
 
-The Nov4 layout synchronization updates final platform/module names and retired
-repository dispositions. `SHA256SUMS` records the same 19 captured source files;
-it is repository evidence, outside the fixed owned host inventory. Subsequent
-reviewed content corrections regenerate hashes for those same 19 paths; they
-do not imply that host files or an installed binary have been synchronized.
+`SHA256SUMS` records every fixed owned source file in inventory order; the
+manifest itself is repository evidence outside that inventory. Changed paths
+and bytes require an inventory/test/hash update. Neither source acceptance nor
+a rebuilt binary proves host synchronization, native discovery or execution.
+The task owner separately authorizes and verifies any host installation.

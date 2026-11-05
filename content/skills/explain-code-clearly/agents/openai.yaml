@@ -1,6 +1,0 @@
-interface:
-  display_name: "Explain Code Clearly"
-  short_description: "Concrete Korean explanations sized to the question"
-  default_prompt: "Use $explain-code-clearly to explain the requested tool or action in Korean: show a brief real structure, then the selected action with a small concrete example. Expand details as requested."
-policy:
-  allow_implicit_invocation: true

@@ -2,6 +2,10 @@
 pub const OWNED: &[(&str, &str)] = &[
     ("AGENTS.md", include_str!("../../../../content/AGENTS.md")),
     (
+        "runtime-references/CONTEXT-GOVERNANCE.md",
+        include_str!("../../../../content/runtime-references/CONTEXT-GOVERNANCE.md"),
+    ),
+    (
         "runtime-references/HERDR-ORCHESTRATION.md",
         include_str!("../../../../content/runtime-references/HERDR-ORCHESTRATION.md"),
     ),
@@ -58,23 +62,41 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/skills/herdr-hermes/references/documentation.md"),
     ),
     (
-        "skills/explain-code-clearly/SKILL.md",
-        include_str!("../../../../content/skills/explain-code-clearly/SKILL.md"),
+        "skills/explain-precisely/SKILL.md",
+        include_str!("../../../../content/skills/explain-precisely/SKILL.md"),
     ),
     (
-        "skills/explain-code-clearly/agents/openai.yaml",
-        include_str!("../../../../content/skills/explain-code-clearly/agents/openai.yaml"),
+        "skills/explain-precisely/references/scroll-narrative.md",
+        include_str!("../../../../content/skills/explain-precisely/references/scroll-narrative.md"),
     ),
     (
-        "skills/explain-code-clearly/references/scroll-narrative.md",
+        "skills/explain-precisely/references/tool-explanation.json",
         include_str!(
-            "../../../../content/skills/explain-code-clearly/references/scroll-narrative.md"
+            "../../../../content/skills/explain-precisely/references/tool-explanation.json"
         ),
     ),
     (
-        "skills/explain-code-clearly/references/tool-explanation.json",
-        include_str!(
-            "../../../../content/skills/explain-code-clearly/references/tool-explanation.json"
-        ),
+        "skills/lead-orchestration/SKILL.md",
+        include_str!("../../../../content/skills/lead-orchestration/SKILL.md"),
+    ),
+    (
+        "skills/lessons-loop/SKILL.md",
+        include_str!("../../../../content/skills/lessons-loop/SKILL.md"),
+    ),
+    (
+        "skills/lessons-loop/references/hindsight-api.md",
+        include_str!("../../../../content/skills/lessons-loop/references/hindsight-api.md"),
+    ),
+    (
+        "skills/lessons-loop/references/record-schema.md",
+        include_str!("../../../../content/skills/lessons-loop/references/record-schema.md"),
+    ),
+    (
+        "skills/strategy-dialogue/SKILL.md",
+        include_str!("../../../../content/skills/strategy-dialogue/SKILL.md"),
+    ),
+    (
+        "skills/strategy-dialogue/references/strategy-brief.md",
+        include_str!("../../../../content/skills/strategy-dialogue/references/strategy-brief.md"),
     ),
 ];

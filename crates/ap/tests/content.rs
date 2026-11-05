@@ -70,7 +70,7 @@ fn request() -> RenderContentRequest {
 fn pure_render_fixed_complete_inventory_and_idempotence() {
     let mut req = request();
     let plan = content::render(&req).unwrap();
-    assert_eq!(plan.artifacts.len(), 19);
+    assert_eq!(plan.artifacts.len(), 25);
     assert!(
         plan.artifacts
             .iter()
@@ -113,9 +113,15 @@ fn render_refuses_unknown_duplicate_incomplete_and_foreign_shapes() {
         content::render(&req).unwrap_err().code,
         "content_set_mismatch"
     );
-    let mut req = request();
-    req.entries[0].relative_path = "settings.json".into();
-    assert!(content::render(&req).is_err());
+    for unknown in [
+        "settings.json",
+        "skills/explain-code-clearly/SKILL.md",
+        "skills/explain-code-clearly/agents/openai.yaml",
+    ] {
+        let mut req = request();
+        req.entries[0].relative_path = unknown.into();
+        assert!(content::render(&req).is_err());
+    }
     let mut req = request();
     req.entries[0] = req.entries[1].clone();
     assert!(content::render(&req).is_err());
@@ -138,7 +144,7 @@ fn doctor_missing_ready_drift_is_read_only_and_opaque_files_are_untouched() {
     let f = Fixture::new();
     let spec = f.spec();
     let missing = content::doctor(&spec).unwrap();
-    assert_eq!(missing.entries.len(), 19);
+    assert_eq!(missing.entries.len(), 25);
     assert!(missing.entries.iter().all(|e| e.status == "missing"));
     assert!(!f.0.join("agents").exists());
     f.fill();
@@ -163,7 +169,7 @@ fn doctor_missing_ready_drift_is_read_only_and_opaque_files_are_untouched() {
     );
     assert_eq!(
         drift.entries.iter().filter(|e| e.status == "ready").count(),
-        18
+        24
     );
     assert_eq!(fs::read(&path).unwrap(), b"edited\n");
     assert_eq!(fs::read(&opaque).unwrap(), [0xff, 0x00]);
@@ -220,7 +226,7 @@ fn explicit_cli_boundary_rejects_unknown_fields_and_has_no_apply() {
     let result = cmd.wait_with_output().unwrap();
     assert!(result.status.success());
     let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
-    assert_eq!(report["entries"].as_array().unwrap().len(), 19);
+    assert_eq!(report["entries"].as_array().unwrap().len(), 25);
     let mut value = serde_json::to_value(spec).unwrap();
     value["settings_path"] = "/foreign".into();
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_ap"))
