@@ -24,12 +24,14 @@ links it and names the KPI or guardrail it affects. Repository docs own KPI
 formulas/units/sources; Hindsight may retain the decision/definition and rationale,
 never operational KPI values/time series.
 
-## Worked example — ws-replan pilot, 2026-11-05
+## Worked example — ws-replan pilot, CONFIRMED v1, 2026-11-05
 
 Source: `/home/palantirkc/work/ws-replan/STRATEGY.md`, read on 2026-11-05.
-The pilot labels the overall brief DRAFT v1 and its top-level KPIs user-confirmed.
-Keep that distinction: the following sanitized example is not a new adoption or
-live measurement. Private domain details and personal identities are omitted.
+The source is CONFIRMED v1: the user approved the Lead draft as written on
+2026-11-05. Historical note: the earlier example labeled the overall brief
+DRAFT v1 while its top-level KPIs were user-confirmed. The sanitized example
+below preserves dated baseline values; it is not a new adoption or live
+measurement. Private domain details and personal identities are omitted.
 
 ```text
 Objective: Maximize measurable quality of Rust-first, CLI-agnostic work with Context Governance; prepare future Ontology co-engineering.

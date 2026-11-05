@@ -1,6 +1,6 @@
 ---
 name: explain-precisely
-description: Explain every user-facing answer, progress report and decision question in Korean, defining new technical terms concretely without metaphor. Applies across CLIs, including code, tools and mechanisms.
+description: Explain user-facing answers, progress and decisions in Korean across CLIs; define new technical terms concretely at first use, without metaphor.
 ---
 
 # Explain precisely
@@ -26,6 +26,19 @@ Git object 저장소는 공유합니다. branch별 파일 변경을 분리할 �
 ## Answer order and depth
 
 In reports, the KPI table comes first, as defined by [strategy-dialogue](../strategy-dialogue/SKILL.md).
+
+Compact report example (invented values; define new terms in the table at first
+use, without adding a definition paragraph before it):
+
+| KPI(목표 달성 정도를 수치로 확인하는 지표) | 현재 | 지난 보고 대비 변화 | 목표 |
+| --- | --- | --- | --- |
+| CI(변경한 코드를 자동으로 검사하는 작업) 검사 통과 수 | GitHub Actions의 `rust`: 1/1 | 0/1 → 1/1 | 1/1 |
+| recall(질문에 필요한 현재 근거를 기억 검색으로 찾는 동작) 정답 수 | 질문 33개 중 15개 | 이전 값 미측정 | 33/33 |
+
+`rust` 통과는 해당 코드 검사가 성공했다는 뜻입니다. 기억 검색 정답 수의
+개선은 아직 측정하지 않았습니다. 예시 근거는 `gh pr checks <PR번호>`의 검사
+결과와 recall 평가 파일 `recall-results.json`이며, 실제 보고에는 관측한 파일과
+측정 시각을 적습니다. 이미 설명한 용어는 다시 풀어 쓰지 않습니다.
 
 For other explanations, default to this order, using connected prose and only useful structure:
 1. One-line conclusion.
