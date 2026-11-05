@@ -33,7 +33,7 @@ live measurement. Private domain details and personal identities are omitted.
 
 ```text
 Objective: Maximize measurable quality of Rust-first, CLI-agnostic work with Context Governance; prepare future Ontology co-engineering.
-Diagnosis: Legacy code and stale memory pull agents toward outdated paths; the pilot reports 513/930 memory documents as state snapshots and recall supported for 15/33 questions.
+Diagnosis: Agents select outdated paths because legacy code and stale memory records remain reachable; the pilot reports 513/930 memory documents as state snapshots and recall supported for 15/33 questions.
 KPI: Legacy removal 306/5,124 (6.0%) → 100%; full-gate Rust tool parity 0/44 → 44/44 (pilot baseline 2026-11-05T00:21Z; 13 bounded handlers are not full parity).
 Guardrails: Linux CI ≤3,000 min/month; disk free ≥15 GB; escaped defects target 0; recall must not regress from 15/33 (target 33/33); no live domain calls, secrets, force-push or partial cutover.
 Domain: User supplies real workflow semantics and tool importance; those facts determine port order and the later domain model.
