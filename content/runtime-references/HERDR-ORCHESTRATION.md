@@ -36,8 +36,14 @@ agent guide is in OFFICIAL-DOCS.md.
 3. Hand work over as a handoff, not a transcript: goal, exact targets, allowed
    effects, expected output, and exact `TASK.md`, `STATE.md` and canonical
    `/root/.agents/AGENTS.md` paths. Launch source work at its assigned Git
-   worktree, and have the receiving agent explicitly read those files before
-   effects. Include Strategy link, KPI/guardrail moved, source revision, write
+   worktree, and name the needed skill bodies by absolute path too. Require the
+   receiver to read these exact files first with native tools, before effects,
+   and list the files read in its first output after reading. Verify native read
+   calls and readback: a canonical path, catalogue entry or literal `@import`
+   alone proves no read. Muse personal/project `@/root/.agents/AGENTS.md` stays
+   literal; Codex outside Git does not discover ancestor AGENTS.md. Use existing
+   handoff verification, without an instruction copy, loader or new gate.
+   Include Strategy link, KPI/guardrail moved, source revision, write
    set and shared-build owner where applicable; [strategy-dialogue](../skills/strategy-dialogue/SKILL.md)
    owns their reporting conventions. Without a Git root, Codex project discovery checks cwd only;
    ancestor task guidance is not guaranteed. Do not create fake repositories

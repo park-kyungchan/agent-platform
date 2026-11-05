@@ -29,6 +29,8 @@ Use this TASK.md template, with exact values rather than transcript references:
 # TASK: <bounded goal>
 Owner: <Lead>; Worker: <assigned runtime/model/effort>
 State: <absolute STATE.md>; Canonical rules: <absolute AGENTS.md>
+Read first: /root/.agents/AGENTS.md, <absolute TASK.md>, <absolute STATE.md>, <needed skill SKILL.md absolute paths>
+First output after reading: <one-line list of the exact files read>
 Authority: <user decision and current task scope>
 Exact targets: <repo, worktree, branch, base/head, files and selected contracts>
 Strategy link: <confirmed STATE/STRATEGY.md and relevant KPI definition>
@@ -46,6 +48,18 @@ do not silently rewrite an accepted task's authority. Update STATE at each
 milestone with current owner, authority/holds, exact revisions, actual evidence
 and one next action. Handoffs transfer goal, exact targets, allowed effects,
 expected output and state path; never make a worker reconstruct a transcript.
+
+Make handoff readback explicit. A canonical path in a prompt, a skill in the
+native catalogue, or a literal `@import` does not prove the receiver read rules.
+When the native loader cannot expand a pointer, name the exact files to read
+first: `/root/.agents/AGENTS.md`, the absolute TASK and STATE, and each needed
+skill body (for example `/root/.agents/skills/explain-precisely/SKILL.md`).
+Known cases: Muse personal/project `@/root/.agents/AGENTS.md` stays literal;
+Codex outside Git does not discover ancestor AGENTS.md. The receiver must read
+these files with native tools before effects and show a one-line list of files
+read in its first output after those reads. Lead verifies the native read calls
+and readback; a claimed list alone is not proof. This uses existing handoff
+verification, not a new gate, instruction copy or loader (PR #98 boundary).
 
 ## Herdr mechanics
 

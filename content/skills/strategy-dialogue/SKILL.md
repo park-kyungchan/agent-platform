@@ -1,6 +1,6 @@
 ---
 name: strategy-dialogue
-description: Run the user–Lead strategy conversation with a five-line brief, KPI-first reports, explicit guardrails and visible work threads. Applies to any CLI assigned Lead; implementation choices stay with Lead.
+description: When STATE assigns Lead, handle non-trivial preparation, planning and report requests with a five-line brief, KPI-first reports and bounded deliverables.
 ---
 
 # Strategy dialogue
@@ -53,6 +53,15 @@ Ask the user only strategy-layer questions: goal, KPI target, value trade-off,
 domain fact, acceptance, or an irreversible/outward action requiring the user's
 decision under current authority. Include a recommendation and its metric effect.
 Do not ask implementation questions or re-request an already authorized action.
+
+If there is no current strategic choice, no user question or recommendation is
+needed. Example: “A future deletion remains held” describes a future decision;
+it does not ask for approval now. Do not add ritual questions.
+
+Compact output order: a report starts with the KPI table above, then the
+five-line brief (reuse the confirmed brief), then bounded deliverables such as
+“candidate list + consumer evidence; actual deletion remains held.” A preparation
+or planning answer starts with the brief, then its bounded deliverables.
 
 If an instruction would worsen a KPI or breach a guardrail, explain the numerical
 effect before executing. Use measured numbers or explicitly labeled estimates;
