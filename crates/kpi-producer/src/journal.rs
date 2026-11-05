@@ -32,6 +32,21 @@ fn same_inode(a: &File, b: &File) -> Result<bool> {
     let b = fstat(b).map_err(|_| Error("journal_read"))?;
     Ok(a.st_dev == b.st_dev && a.st_ino == b.st_ino)
 }
+fn check_binding(parent: &filesystem::DirectoryChain, name: &str, f: &File) -> Result<()> {
+    parent.verify().map_err(|_| Error("journal_replaced"))?;
+    let fd = openat(
+        parent,
+        name,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+        Mode::empty(),
+    )
+    .map_err(|_| Error("journal_replaced"))?;
+    let named = filesystem::regular(fd).map_err(|_| Error("journal_replaced"))?;
+    if !same_inode(f, &named)? {
+        return Err(Error("journal_replaced"));
+    }
+    Ok(())
+}
 pub fn append(path: &str, snapshot: &Snapshot) -> Result<Receipt> {
     append_with_sync(path, snapshot, &mut |f, _| {
         f.sync_all().map_err(|_| Error("append_unknown"))
@@ -55,7 +70,7 @@ fn append_with_sync(
         return Err(Error("invalid_journal_name"));
     }
     let bytes = row(snapshot)?;
-    let (parent, name) = filesystem::parent(path)?;
+    let (parent, name) = filesystem::parent(path).map_err(|_| Error("journal_open"))?;
     let fd = openat(
         &parent,
         name.as_str(),
@@ -68,24 +83,11 @@ fn append_with_sync(
         Mode::RUSR | Mode::WUSR,
     )
     .map_err(|_| Error("journal_open"))?;
-    let mut f = filesystem::regular(fd)?;
+    let mut f = filesystem::regular(fd).map_err(|_| Error("journal_open"))?;
     // Nonblocking native lock: a caller can reconcile/retry a busy journal;
     // there is no unbounded wait or custom coordination file.
     flock(&f, FlockOperation::NonBlockingLockExclusive).map_err(|_| Error("journal_busy"))?;
-    let check = || -> Result<()> {
-        let fd = openat(
-            &parent,
-            name.as_str(),
-            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .map_err(|_| Error("journal_replaced"))?;
-        if !same_inode(&f, &filesystem::regular(fd)?)? {
-            return Err(Error("journal_replaced"));
-        }
-        Ok(())
-    };
-    check()?;
+    check_binding(&parent, &name, &f)?;
     if f.metadata().map_err(|_| Error("journal_read"))?.len() > JOURNAL_LIMIT as u64 {
         return Err(Error("journal_bounds"));
     }
@@ -106,74 +108,63 @@ fn append_with_sync(
         if line > 4096 || b.len() > LINE_LIMIT {
             return Err(Error("journal_bounds"));
         }
-        let prior: Snapshot = strict::parse(b, LINE_LIMIT)?;
-        prior.validate()?;
+        let prior: Snapshot =
+            strict::parse(b, LINE_LIMIT).map_err(|_| Error("journal_invalid_row"))?;
+        prior.validate().map_err(|_| Error("journal_invalid_row"))?;
         if !ids.insert(prior.measurement_id.clone()) {
-            return Err(Error("duplicate_measurement_id"));
+            return Err(Error("journal_duplicate_measurement_id"));
         }
         if prior.measurement_id == snapshot.measurement_id {
             if b != bytes {
-                return Err(Error("measurement_id_conflict"));
+                return Err(Error("journal_measurement_id_conflict"));
             }
             existing = Some((line, offset, b.len()));
         }
         offset += b.len();
     }
+    // Validate all ancestors again after prior-row parsing, immediately before
+    // either a new append or the persistence attempt for an existing row.
+    check_binding(&parent, &name, &f)?;
     let (line_number, byte_offset, prefix_len) = if let Some((n, o, len)) = existing {
         (n, o, o + len)
     } else {
         if line >= 4096 || before.len().saturating_add(bytes.len()) > JOURNAL_LIMIT {
             return Err(Error("journal_bounds"));
         }
-        // The held parent descriptor prevents ancestor redirection; verify the
-        // final name again immediately before the trusted append operation.
-        let fd = openat(
-            &parent,
-            name.as_str(),
-            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
-            Mode::empty(),
-        )
-        .map_err(|_| Error("journal_replaced"))?;
-        if !same_inode(&f, &filesystem::regular(fd)?)? {
-            return Err(Error("journal_replaced"));
-        }
         f.write_all(&bytes).map_err(|_| Error("append_unknown"))?;
         (line + 1, before.len(), before.len() + bytes.len())
     };
-    // Both new writes and already-readable retries must cross the same
-    // persistence boundary. Cached bytes after append_unknown are insufficient.
-    sync(&f, SyncTarget::Journal)?;
-    let dir = openat(
-        &parent,
-        ".",
-        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
-        Mode::empty(),
-    )
+    // Once write_all may have run (or an existing row is being persisted), every
+    // failure is uncertain append. Keep this mapping outside the whole boundary
+    // so future fallible checks cannot leak request/schema error exit codes.
+    let after = (|| -> Result<Vec<u8>> {
+        sync(&f, SyncTarget::Journal)?;
+        let dir = openat(
+            &parent,
+            ".",
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .map_err(|_| Error("journal_sync"))?;
+        sync(&File::from(dir), SyncTarget::Parent)?;
+        check_binding(&parent, &name, &f)?;
+        f.seek(SeekFrom::Start(0))
+            .map_err(|_| Error("journal_read"))?;
+        let mut after = Vec::new();
+        (&mut f)
+            .take(JOURNAL_LIMIT as u64 + 1)
+            .read_to_end(&mut after)
+            .map_err(|_| Error("journal_read"))?;
+        if after.len() > JOURNAL_LIMIT
+            || after.get(byte_offset..byte_offset + bytes.len()) != Some(bytes.as_slice())
+            || !after.starts_with(&before)
+        {
+            return Err(Error("journal_readback"));
+        }
+        check_binding(&parent, &name, &f)?;
+        Ok(after)
+    })()
     .map_err(|_| Error("append_unknown"))?;
-    sync(&File::from(dir), SyncTarget::Parent)?;
-    f.seek(SeekFrom::Start(0))
-        .map_err(|_| Error("append_unknown"))?;
-    let mut after = Vec::new();
-    (&mut f)
-        .take(JOURNAL_LIMIT as u64 + 1)
-        .read_to_end(&mut after)
-        .map_err(|_| Error("append_unknown"))?;
-    if after.len() > JOURNAL_LIMIT
-        || after.get(byte_offset..byte_offset + bytes.len()) != Some(bytes.as_slice())
-        || !after.starts_with(&before)
-    {
-        return Err(Error("append_unknown"));
-    }
-    let fd = openat(
-        &parent,
-        name.as_str(),
-        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
-        Mode::empty(),
-    )
-    .map_err(|_| Error("append_unknown"))?;
-    if !same_inode(&f, &filesystem::regular(fd)?)? {
-        return Err(Error("append_unknown"));
-    }
     Ok(Receipt {
         measurement_id: snapshot.measurement_id.clone(),
         journal_path: path.into(),
@@ -346,6 +337,70 @@ mod tests {
             });
             assert_eq!(result.err(), Some(Error("append_unknown")));
             assert_eq!(std::fs::read(&path).unwrap(), before);
+        }
+    }
+    #[test]
+    fn post_append_special_file_and_parent_replacement_are_append_unknown() {
+        for parent_swap in [false, true] {
+            for phase in [SyncTarget::Journal, SyncTarget::Parent] {
+                let root = Scratch::new();
+                let parent = root.0.join("parent");
+                let old = root.0.join("saved");
+                std::fs::create_dir(&parent).unwrap();
+                let path = parent.join("snapshots-v2.jsonl");
+                let saved = root.0.join("saved-row");
+                let s = snapshot();
+                let result = append_with_sync(path.to_str().unwrap(), &s, &mut |f, target| {
+                    if target == phase {
+                        if parent_swap {
+                            std::fs::rename(&parent, &old).unwrap();
+                            std::fs::create_dir(&parent).unwrap();
+                        } else {
+                            std::fs::rename(&path, &saved).unwrap();
+                            std::fs::create_dir(&path).unwrap();
+                        }
+                    }
+                    f.sync_all().map_err(|_| Error("injected_sync_error"))
+                });
+                let err = result.err().unwrap();
+                assert_eq!(err, Error("append_unknown"));
+                assert_eq!(err.exit_code(), 4);
+                let saved = if parent_swap {
+                    old.join("snapshots-v2.jsonl")
+                } else {
+                    saved
+                };
+                assert_eq!(std::fs::read(saved).unwrap(), row(&s).unwrap());
+            }
+        }
+    }
+    #[test]
+    fn all_persistence_failures_use_uncertain_append_namespace() {
+        let root = Scratch::new();
+        for target in [SyncTarget::Journal, SyncTarget::Parent] {
+            let result = append_with_sync(&root.path(), &snapshot(), &mut |_, phase| {
+                if phase == target {
+                    Err(Error("not_regular_file"))
+                } else {
+                    Ok(())
+                }
+            });
+            assert_eq!(result.err(), Some(Error("append_unknown")));
+        }
+    }
+    #[test]
+    fn invalid_prior_json_and_schema_are_journal_errors_without_writes() {
+        let root = Scratch::new();
+        let mut invalid = serde_json::to_value(snapshot()).unwrap();
+        invalid["capture_status"] = serde_json::json!("invalid");
+        let mut bytes = serde_json::to_vec(&invalid).unwrap();
+        bytes.push(b'\n');
+        for before in [b"not-json\n".to_vec(), b"{}\n".to_vec(), bytes] {
+            std::fs::write(root.path(), &before).unwrap();
+            let err = append(&root.path(), &snapshot()).err().unwrap();
+            assert_eq!(err, Error("journal_invalid_row"));
+            assert_eq!(err.exit_code(), 4);
+            assert_eq!(std::fs::read(root.path()).unwrap(), before);
         }
     }
 }

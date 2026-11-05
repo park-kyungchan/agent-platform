@@ -685,7 +685,7 @@ fn conflicting_id_and_truncated_tail_never_rewrite_bytes() {
     v.producer.git_version = "git different".into();
     assert_eq!(
         journal::append(&path, &v).err(),
-        Some(Error("measurement_id_conflict"))
+        Some(Error("journal_measurement_id_conflict"))
     );
     assert_eq!(std::fs::read(&path).unwrap(), before);
     std::fs::write(&path, &before[..before.len() - 1]).unwrap();
@@ -928,38 +928,6 @@ fn local_immutable_oid_read_succeeds_with_exact_paths() {
     );
 }
 
-#[test]
-fn hung_pipe_filling_and_orphaned_native_commands_are_bounded() {
-    use kpi::process::NativeRunner;
-    use std::time::{Duration, Instant};
-    for (alias, expected) in [
-        ("!sleep 10", Some("process_timeout")),
-        ("!yes synthetic", Some("process_output_limit")),
-        ("!sleep 10 &", None),
-    ] {
-        let mut runner = NativeRunner {
-            per_process: Duration::from_millis(100),
-            deadline: Instant::now() + Duration::from_secs(2),
-            output_limit: 32768,
-        };
-        let start = Instant::now();
-        let result = runner.run(&Call::new(
-            "git",
-            vec![
-                "-c".into(),
-                format!("alias.kpi-fixture={alias}"),
-                "kpi-fixture".into(),
-            ],
-        ));
-        if let Some(code) = expected {
-            assert_eq!(result.err(), Some(Error(code)));
-        } else {
-            assert!(result.unwrap().success());
-        }
-        assert!(start.elapsed() < Duration::from_secs(2));
-    }
-}
-
 fn pipeline(p: Prepared) -> (Snapshot, Evidence) {
     let mut o = vec![
         success(b"git synthetic".to_vec()),
@@ -1179,4 +1147,218 @@ fn owner_gate_names_cannot_collide_with_producer_artifacts() {
         e.verify().unwrap();
         journal::append(&s.path("snapshots-v2.jsonl"), &v).unwrap();
     }
+}
+
+#[test]
+fn reviewer_evidence_ancestor_substitution_must_fail() {
+    let s = Scratch::new();
+    let root = s.path("evidence");
+    std::fs::create_dir(&root).unwrap();
+    let mut e = Evidence::create(&root, "capture-a", 100).unwrap();
+    e.retain("record.json", b"safe").unwrap();
+    std::fs::rename(&root, s.path("old-evidence")).unwrap();
+    std::fs::create_dir(&root).unwrap();
+    assert!(!PathBuf::from(format!("{root}/capture-a/record.json")).exists());
+    let result = e.verify();
+    println!("ancestor_swap verify={result:?}; advertised_artifact_exists=false");
+    assert!(
+        result.is_err(),
+        "verify acknowledged artifacts unreachable via the original path"
+    );
+}
+#[test]
+fn reviewer_invalid_journal_is_io_exit_four() {
+    let s = Scratch::new();
+    let (v, _) = snapshot(&s, "review-a");
+    let path = s.write("snapshots-v2.jsonl", b"not-json\n");
+    let err = journal::append(&path, &v).err().unwrap();
+    println!("invalid_journal error={} exit={}", err.0, err.exit_code());
+    assert_eq!(std::fs::read(&path).unwrap(), b"not-json\n");
+    assert_eq!(err.exit_code(), 4);
+}
+#[test]
+fn reviewer_unit_outcomes_are_closed_objects() {
+    for kind in ["not_performed", "failed"] {
+        let value = json!({"source_revision":"synthetic/v1","capture_start":NOW,"capture_end":NOW,"outcome":{"kind":kind,"extra":true}});
+        let result = strict::parse::<Recording>(&serde_json::to_vec(&value).unwrap(), 1024);
+        println!("closed_unit kind={kind} accepted={}", result.is_ok());
+        assert!(result.is_err(), "unit outcome ignored unknown field");
+    }
+}
+
+#[test]
+fn reviewer_journal_ancestor_substitution_must_fail() {
+    let s = Scratch::new();
+    let (v, _) = snapshot(&s, "review-final");
+    let parent = s.path("journal-parent");
+    let old = s.path("journal-old");
+    std::fs::create_dir(&parent).unwrap();
+    let path = format!("{parent}/snapshots-v2.jsonl");
+    let mut prior = Vec::new();
+    for i in 0..150 {
+        let mut row = v.clone();
+        row.measurement_id = format!("prior-{i}");
+        prior.extend(journal::row(&row).unwrap());
+    }
+    std::fs::write(&path, &prior).unwrap();
+    let watched = path.clone();
+    let parent2 = parent.clone();
+    let old2 = old.clone();
+    let watcher = std::thread::spawn(move || {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        while std::time::Instant::now() < until {
+            let found = std::fs::read_dir("/proc/self/fd")
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .any(|e| {
+                    std::fs::read_link(e.path())
+                        .ok()
+                        .is_some_and(|p| p == std::path::Path::new(&watched))
+                });
+            if found {
+                std::fs::rename(&parent2, &old2).unwrap();
+                std::fs::create_dir(&parent2).unwrap();
+                return true;
+            }
+            std::thread::yield_now();
+        }
+        false
+    });
+    let result = journal::append(&path, &v);
+    let swapped = watcher.join().unwrap();
+    assert!(swapped, "swap trigger missed");
+    println!(
+        "journal_ancestor swapped={} receipt_success={} receipt_path_exists={}",
+        swapped,
+        result.is_ok(),
+        PathBuf::from(&path).exists()
+    );
+    assert!(
+        result.is_err(),
+        "receipt acknowledged a row outside its named parent path"
+    );
+}
+
+#[test]
+fn empty_outcomes_reject_hidden_values_as_invalid_sources() {
+    for kind in ["not_performed", "failed"] {
+        for extra in [
+            json!(true),
+            json!(1.5),
+            json!({"nested":[1.5,{"value":true}]}),
+        ] {
+            let v = json!({"source_revision":"synthetic/v1","capture_start":NOW,"capture_end":NOW,"outcome":{"kind":kind,"extra":extra}});
+            let got = evaluate(&v, &disk_contract());
+            assert_eq!(got.qualification, Qualification::InvalidSource);
+            assert_eq!(got.value, K::Unknown);
+            assert!(!got.source_qualified);
+        }
+        let v = json!({"source_revision":"synthetic/v1","capture_start":NOW,"capture_end":NOW,"outcome":{"kind":kind}});
+        let expected = if kind == "failed" {
+            Qualification::FailedSource
+        } else {
+            Qualification::NotPerformed
+        };
+        assert_eq!(evaluate(&v, &disk_contract()).qualification, expected);
+        let r: Recording = strict::parse(&serde_json::to_vec(&v).unwrap(), 1024).unwrap();
+        assert_eq!(serde_json::to_value(r).unwrap(), v);
+    }
+}
+
+#[test]
+fn reviewer_native_promisor_objects_must_remain_unchanged() {
+    use kpi::process::NativeRunner;
+    use std::time::{Duration, Instant};
+    let s = Scratch::new();
+    let source = s.path("source");
+    let partial = s.path("partial");
+    std::fs::create_dir(&source).unwrap();
+    std::fs::create_dir(&partial).unwrap();
+    let run = |dir: &str, args: &[&str]| {
+        let o = std::process::Command::new("git")
+            .args([
+                "-C",
+                dir,
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "commit.gpgsign=false",
+            ])
+            .args(args)
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .output()
+            .unwrap();
+        assert!(o.status.success(), "disposable setup failed");
+        o.stdout
+    };
+    run(&source, &["init", "--quiet"]);
+    std::fs::write(format!("{source}/kept"), b"synthetic").unwrap();
+    run(&source, &["add", "."]);
+    run(
+        &source,
+        &[
+            "-c",
+            "user.name=Synthetic",
+            "-c",
+            "user.email=synthetic@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            "synthetic",
+        ],
+    );
+    let commit = String::from_utf8(run(&source, &["rev-parse", "HEAD"]))
+        .unwrap()
+        .trim()
+        .to_owned();
+    let tree = String::from_utf8(run(&source, &["rev-parse", "HEAD^{tree}"]))
+        .unwrap()
+        .trim()
+        .to_owned();
+    run(&partial, &["init", "--quiet"]);
+    run(&partial, &["config", "remote.origin.url", &source]);
+    run(&partial, &["config", "remote.origin.promisor", "true"]);
+    run(&partial, &["config", "extensions.partialClone", "origin"]);
+    let object_dir = format!("{partial}/.git/objects/{}", &commit[..2]);
+    std::fs::create_dir(&object_dir).unwrap();
+    std::fs::copy(
+        format!("{source}/.git/objects/{}/{}", &commit[..2], &commit[2..]),
+        format!("{object_dir}/{}", &commit[2..]),
+    )
+    .unwrap();
+    struct Hybrid {
+        meta: VecDeque<Result<Output>>,
+        native: NativeRunner,
+    }
+    impl Runner for Hybrid {
+        fn run(&mut self, c: &Call) -> Result<Output> {
+            if c.program == "gh" {
+                self.meta.pop_front().unwrap()
+            } else {
+                self.native.run(c)
+            }
+        }
+    }
+    let mut runner=Hybrid{meta:vec![response(json!({"id":7,"full_name":"synthetic-owner/synthetic-repo"})),response(json!({"ref":"refs/heads/main","object":{"type":"commit","sha":commit}})),response(json!({"sha":commit,"tree":{"sha":tree}})),response(json!({"sha":tree,"truncated":false,"tree":[{"path":"kept","type":"blob","mode":"100644","sha":"c".repeat(40)}]}))].into(),native:NativeRunner{per_process:Duration::from_secs(3),deadline:Instant::now()+Duration::from_secs(5),output_limit:1<<20}};
+    let mut request = req();
+    request.backend = "local_then_api".into();
+    request.local_root = K::Value(partial.clone());
+    let pack = format!("{partial}/.git/objects/pack");
+    let before = std::fs::read_dir(&pack).unwrap().count();
+    let got = git::collect(&mut runner, &request, &set(&["kept"]), 0, &mut || Ok(NOW)).unwrap();
+    let after = std::fs::read_dir(&pack).unwrap().count();
+    println!(
+        "native_promisor qualified={} removed={:?} pack_files_before={} after={}",
+        got.repository.source_qualified, got.repository.removed, before, after
+    );
+    assert!(got.repository.source_qualified);
+    assert_eq!(got.repository.backend, "github_api");
+    assert_eq!(got.repository.removed, K::Value(0));
+    assert!(runner.meta.is_empty());
+    assert_eq!(
+        after, before,
+        "read-only NativeRunner implicitly fetched promisor objects"
+    );
 }

@@ -188,8 +188,8 @@ pub struct Recording {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Outcome {
-    NotPerformed,
-    Failed,
+    NotPerformed {},
+    Failed {},
     Baseline {
         observed_at: u64,
         value: u64,
@@ -308,10 +308,10 @@ pub fn evaluate(bytes: Option<&[u8]>, contract: &Contract, now: u64) -> Result<E
 fn evaluate_inner(r: &Recording, c: &Contract) -> Result<Evaluation> {
     let mut e = Evaluation::unresolved(Qualification::InvalidSource);
     match (&r.outcome, c) {
-        (Outcome::NotPerformed, _) => {
+        (Outcome::NotPerformed {}, _) => {
             return Ok(Evaluation::unresolved(Qualification::NotPerformed));
         }
-        (Outcome::Failed, _) => return Ok(Evaluation::unresolved(Qualification::FailedSource)),
+        (Outcome::Failed {}, _) => return Ok(Evaluation::unresolved(Qualification::FailedSource)),
         (
             Outcome::Baseline {
                 observed_at,

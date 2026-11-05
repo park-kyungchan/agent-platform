@@ -207,7 +207,7 @@ fn read_recording(i: &RecordingInput, start: u64, end: u64) -> Result<Option<Vec
             source_revision: "explicit-not-performed/v2".into(),
             capture_start: start,
             capture_end: end,
-            outcome: Outcome::NotPerformed,
+            outcome: Outcome::NotPerformed {},
         })?)),
         RecordingInput::Path(p) => match filesystem::read(p, guardrails::RECORDING_LIMIT) {
             Ok(b) => Ok(Some(b)),
@@ -528,7 +528,7 @@ pub fn collect(
                 denominator: 1,
                 unit: DiskUnit::Bytes,
             },
-            Err(_) => Outcome::Failed,
+            Err(_) => Outcome::Failed {},
         },
     };
     let input_start = clock()?;

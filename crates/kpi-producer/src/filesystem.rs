@@ -31,14 +31,63 @@ pub fn directory(path: &str) -> Result<OwnedFd> {
     }
     Ok(d)
 }
-pub fn parent(path: &str) -> Result<(OwnedFd, String)> {
+/// Hold every ancestor, not just the final directory: replacing any pathname
+/// component must invalidate acceptance even when old descriptors still work.
+pub struct DirectoryChain {
+    descriptors: Vec<OwnedFd>,
+    names: Vec<std::ffi::OsString>,
+}
+impl std::os::fd::AsFd for DirectoryChain {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        std::os::fd::AsFd::as_fd(self.fd())
+    }
+}
+impl DirectoryChain {
+    pub fn open(path: &str) -> Result<Self> {
+        let mut descriptors =
+            vec![open("/", flags(), Mode::empty()).map_err(|_| Error("source_unavailable"))?];
+        let mut components = Vec::new();
+        for name in names(path)? {
+            let fd = openat(descriptors.last().unwrap(), name, flags(), Mode::empty())
+                .map_err(|_| Error("source_unavailable"))?;
+            descriptors.push(fd);
+            components.push(name.to_owned());
+        }
+        let chain = Self {
+            descriptors,
+            names: components,
+        };
+        chain.verify()?;
+        Ok(chain)
+    }
+    fn fd(&self) -> &OwnedFd {
+        self.descriptors.last().unwrap()
+    }
+    pub fn verify(&self) -> Result<()> {
+        let mut current =
+            open("/", flags(), Mode::empty()).map_err(|_| Error("source_replaced"))?;
+        for (i, held) in self.descriptors.iter().enumerate() {
+            if i > 0 {
+                current = openat(&current, &self.names[i - 1], flags(), Mode::empty())
+                    .map_err(|_| Error("source_replaced"))?;
+            }
+            let a = fstat(&current).map_err(|_| Error("source_replaced"))?;
+            let b = fstat(held).map_err(|_| Error("source_replaced"))?;
+            if a.st_dev != b.st_dev || a.st_ino != b.st_ino {
+                return Err(Error("source_replaced"));
+            }
+        }
+        Ok(())
+    }
+}
+pub fn parent(path: &str) -> Result<(DirectoryChain, String)> {
     names(path)?;
     let p = Path::new(path);
     let name = p
         .file_name()
         .and_then(|s| s.to_str())
         .ok_or(Error("invalid_path"))?;
-    let d = directory(
+    let d = DirectoryChain::open(
         p.parent()
             .and_then(|s| s.to_str())
             .ok_or(Error("invalid_path"))?,
@@ -61,7 +110,9 @@ pub fn read(path: &str, limit: usize) -> Result<Vec<u8>> {
         Mode::empty(),
     )
     .map_err(|_| Error("source_unavailable"))?;
-    bounded(regular(fd)?, limit)
+    let bytes = bounded(regular(fd)?, limit)?;
+    d.verify()?;
+    Ok(bytes)
 }
 pub fn bounded(mut f: File, limit: usize) -> Result<Vec<u8>> {
     let before = f.metadata().map_err(|_| Error("source_unavailable"))?;
@@ -85,7 +136,7 @@ pub fn bounded(mut f: File, limit: usize) -> Result<Vec<u8>> {
 }
 pub struct Evidence {
     dir: OwnedFd,
-    parent: OwnedFd,
+    parent: DirectoryChain,
     name: String,
     pub references: Vec<ArtifactRef>,
     bytes: u64,
@@ -97,11 +148,12 @@ impl Evidence {
         if !crate::model::measurement_id(id) {
             return Err(Error("invalid_measurement_id"));
         }
-        let parent = directory(root)?;
+        let parent = DirectoryChain::open(root)?;
         mkdirat(&parent, id, Mode::RUSR | Mode::WUSR | Mode::XUSR)
             .map_err(|_| Error("evidence_exists_or_unavailable"))?;
         let dir = openat(&parent, id, flags(), Mode::empty())
             .map_err(|_| Error("evidence_unavailable"))?;
+        parent.verify()?;
         Ok(Self {
             dir,
             parent,
@@ -112,6 +164,7 @@ impl Evidence {
         })
     }
     pub fn retain(&mut self, name: &str, bytes: &[u8]) -> Result<ArtifactRef> {
+        self.verify_binding()?;
         let a = ArtifactRef::new(name, bytes);
         if !a.valid() || self.references.iter().any(|r| r.path == name) {
             return Err(Error("invalid_artifact"));
@@ -139,11 +192,13 @@ impl Evidence {
         f.write_all(bytes)
             .and_then(|_| f.sync_all())
             .map_err(|_| Error("evidence_write"))?;
+        self.verify_binding()?;
         self.bytes = count;
         self.references.push(a.clone());
         Ok(a)
     }
     pub fn read(&self, a: &ArtifactRef) -> Result<Vec<u8>> {
+        self.verify_binding()?;
         if !a.valid() || a.bytes > self.limit {
             return Err(Error("invalid_artifact"));
         }
@@ -158,12 +213,16 @@ impl Evidence {
         if b.len() as u64 != a.bytes || digest(&b) != a.sha256 {
             return Err(Error("evidence_mismatch"));
         }
+        self.verify_binding()?;
         Ok(b)
     }
     pub fn verify(&self) -> Result<()> {
         self.verify_with(&mut sync_directory)
     }
-    fn verify_with(&self, sync: &mut impl FnMut(&OwnedFd) -> Result<()>) -> Result<()> {
+    fn verify_binding(&self) -> Result<()> {
+        self.parent
+            .verify()
+            .map_err(|_| Error("evidence_replaced"))?;
         let named = openat(&self.parent, self.name.as_str(), flags(), Mode::empty())
             .map_err(|_| Error("evidence_replaced"))?;
         let a = fstat(&named).map_err(|_| Error("evidence_replaced"))?;
@@ -171,13 +230,18 @@ impl Evidence {
         if a.st_dev != b.st_dev || a.st_ino != b.st_ino {
             return Err(Error("evidence_replaced"));
         }
+        Ok(())
+    }
+    fn verify_with(&self, sync: &mut impl FnMut(&OwnedFd) -> Result<()>) -> Result<()> {
+        self.verify_binding()?;
         for a in &self.references {
             self.read(a)?;
         }
         sync(&self.dir)?;
         // The capture directory is a new entry in this *different* parent.
         // Its own fsync cannot make that parent's entry durable.
-        sync(&self.parent)
+        sync(self.parent.fd())?;
+        self.verify_binding()
     }
 }
 fn sync_directory(directory: &OwnedFd) -> Result<()> {
@@ -228,13 +292,13 @@ mod tests {
             sync_directory(d)
         })
         .unwrap();
-        assert_eq!(calls, vec![identity(&e.dir), identity(&e.parent)]);
+        assert_eq!(calls, vec![identity(&e.dir), identity(e.parent.fd())]);
     }
     #[test]
     fn failed_parent_sync_does_not_verify_evidence() {
         let root = Scratch::new();
         let e = Evidence::create(root.0.to_str().unwrap(), "capture-a", 100).unwrap();
-        let parent = identity(&e.parent);
+        let parent = identity(e.parent.fd());
         assert_eq!(
             e.verify_with(&mut |d| if identity(d) == parent {
                 Err(Error("injected_parent_sync"))
@@ -243,5 +307,32 @@ mod tests {
             }),
             Err(Error("injected_parent_sync"))
         );
+    }
+    #[test]
+    fn full_ancestor_replacement_invalidates_evidence_reads_and_final_acceptance() {
+        for replace_root in [false, true] {
+            let root = Scratch::new();
+            let top = root.0.join("top");
+            let evidence = top.join("evidence");
+            std::fs::create_dir_all(&evidence).unwrap();
+            let mut e = Evidence::create(evidence.to_str().unwrap(), "capture-a", 100).unwrap();
+            let a = e.retain("safe.json", b"safe").unwrap();
+            let replaced = if replace_root { &evidence } else { &top };
+            let old = root.0.join("old");
+            // Swap at the last persistence hook to require a final path readback.
+            let result = e.verify_with(&mut |_| {
+                if replaced.exists() && !old.exists() {
+                    std::fs::rename(replaced, &old).unwrap();
+                    std::fs::create_dir(replaced).unwrap();
+                }
+                Ok(())
+            });
+            assert_eq!(result, Err(Error("evidence_replaced")));
+            assert_eq!(e.read(&a).err(), Some(Error("evidence_replaced")));
+            assert_eq!(
+                e.retain("later.json", b"later").err(),
+                Some(Error("evidence_replaced"))
+            );
+        }
     }
 }

@@ -32,8 +32,11 @@ fn run() -> ap_kpi_producer::Result<u8> {
     let (snapshot, evidence) = capture::collect(p, &mut runner, &mut now, &mut capture::disk_free)?;
     evidence.verify()?;
     let receipt = journal::append(&path, &snapshot)?;
+    // Evidence can be replaced while prior journal rows are validated. Never
+    // acknowledge an append whose advertised artifacts no longer read back.
+    evidence.verify().map_err(|_| Error("append_unknown"))?;
     use std::io::Write;
-    let mut bytes = strict::bytes(&receipt)?;
+    let mut bytes = strict::bytes(&receipt).map_err(|_| Error("append_unknown"))?;
     bytes.push(b'\n');
     std::io::stdout()
         .lock()
