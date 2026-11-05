@@ -24,10 +24,11 @@ agent guide is in OFFICIAL-DOCS.md.
 
 ## Starting and steering (the efficient path)
 
-1. Default layout: a sibling pane in the current tab, same working directory,
-   `--no-focus` so the user keeps their place. Split right on a wide pane,
-   down on a narrow/tall one. Do not create a workspace, tab, or worktree
-   unless the task asks for that topology.
+1. Use the TASK/STATE-assigned tab, worktree and cwd before layout examples.
+   An assigned Lead follows [lead-orchestration](../skills/lead-orchestration/SKILL.md):
+   one tab per worker, with its assigned checkout. Only when topology/location
+   are unspecified may ordinary authorized pane work use a same-tab/cwd sibling.
+   Keep `--no-focus`; split right on wide panes, down on narrow/tall panes.
 2. Start with `herdr agent start <name> --kind <kind> --pane <new-pane-id> -- <native-args...>`.
    It returns only when Herdr detects the expected agent ready for input.
    Kinds are listed by `herdr agent` (claude, codex, gemini, agy, muse, and
@@ -36,7 +37,9 @@ agent guide is in OFFICIAL-DOCS.md.
    effects, expected output, and exact `TASK.md`, `STATE.md` and canonical
    `/root/.agents/AGENTS.md` paths. Launch source work at its assigned Git
    worktree, and have the receiving agent explicitly read those files before
-   effects. Without a Git root, Codex project discovery checks cwd only;
+   effects. Include Strategy link, KPI/guardrail moved, source revision, write
+   set and shared-build owner where applicable; [strategy-dialogue](../skills/strategy-dialogue/SKILL.md)
+   owns their reporting conventions. Without a Git root, Codex project discovery checks cwd only;
    ancestor task guidance is not guaranteed. Do not create fake repositories
    or copy guidance to make discovery work; nobody reconstructs a conversation.
 4. Submit with `herdr agent prompt <name> "..." --wait`. Submission alone does
@@ -76,3 +79,8 @@ agent guide is in OFFICIAL-DOCS.md.
 - Remote machines: discover IDs on that machine with the same `--machine`
   prefix for every command; a connection failure does not prove a mutation
   was not applied — inspect remote state before retrying.
+
+For isolation versus justified continuity use [Context Governance](CONTEXT-GOVERNANCE.md).
+For acceptance readback, owned-resource reconciliation and optional student-free
+lesson candidates use [worker closure](../skills/lessons-loop/references/worker-closure.md).
+No success marker or native idle state substitutes for the actual result.

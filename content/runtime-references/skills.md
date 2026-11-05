@@ -14,8 +14,13 @@ host installation or native discovery.
 | herdr | Explicitly authorized native Herdr terminal/pane/agent control. |
 | herdr-hermes | Native Hermes sessions through Herdr when requested. |
 
-The domain skills `academy-student-context` and `academy-runtime-routing` belong
-to education-platform and retain their own authority. Hindsight and Scrapling
+Generic Academy routing belongs to education-platform; teacher reporting is
+planned for the private education-dc-gang-a owner, with its current distribution
+copy retained in education-platform until verified transfer/recovery and consumer
+checks. TASK names the selected owning skill path; do not assume repo-native links
+or global-alias removal are already deployed. `academy_operations` is disabled in
+all CLIs until full-surface Rust cutover: no live calls or direct fallback.
+Hindsight and Scrapling
 are separately managed. The November4 audit's directory count is historical;
 this source change does not install skills or update per-CLI links.
 
@@ -31,3 +36,9 @@ For large work, pass only required skill names and selected source/STATE paths i
 
 Memory tiers and glossary/lessons ownership are in `CONTEXT-GOVERNANCE.md` on
 demand; skill instructions do not authorize otherwise forbidden memory writes.
+
+Herdr topology/cwd follows TASK/STATE; assigned Leads use one tab per worker.
+Use [worker closure](../skills/lessons-loop/references/worker-closure.md) for
+returned evidence/holds and optional lesson candidates, and
+[strategy-dialogue](../skills/strategy-dialogue/SKILL.md) for Strategy/KPI rules.
+These links add no loader, delegation requirement or memory-write authority.

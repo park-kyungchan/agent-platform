@@ -1,6 +1,6 @@
 ---
 name: lead-orchestration
-description: Coordinate authorized workers, isolated independent review, PR delivery and verified closure when task STATE assigns the Lead role. CLI-agnostic; no CLI has a permanent role.
+description: When task STATE assigns Lead, coordinate authorized workers, isolated review, PR delivery and verified closure across CLIs.
 ---
 
 # Lead orchestration
@@ -107,6 +107,8 @@ sessions. Record unsupported retention or evidence gaps explicitly.
 Closure is attested by an independent verifier using the exact roster,
 artifacts and native readback; the Lead's own success claim is insufficient.
 Keep a context only for the concrete unfinished continuation below.
+
+Use [worker closure](../lessons-loop/references/worker-closure.md) for the accepting Lead's task-local evidence/readback and optional curator handoff; completion signals never substitute for acceptance evidence.
 
 ## Context Governance
 

@@ -1,6 +1,6 @@
 ---
 name: lessons-loop
-description: Capture and curate source-backed L0–L3 engineering lessons at task or pane closure, detect recurring structural problems and route direction proposals through Lead. Uses authorized official Hindsight APIs across CLIs.
+description: At task closure or assigned curation, capture authorized L0–L3 engineering lessons and route structural proposals through Lead; no mandatory lesson.
 ---
 
 # Lessons loop
@@ -8,6 +8,8 @@ description: Capture and curate source-backed L0–L3 engineering lessons at tas
 ## Skill contract
 
 At task/pane closure, read current TASK/STATE and the relevant primary evidence. Record workers, review findings by severity, rework rounds and CI minutes; leave unknown values unknown. Capture only durable, student-free incidents/lessons through authorized official Hindsight HTTP API/client. Respect explicit no-write tasks: draft a local handoff and do not ingest, retag, refresh or delete. Preserve source IDs/content pins and distinguish user decisions, agent reports and verified output. Use the L0 Incident -> L1 Lesson -> L2 Pattern -> L3 Structural issue/direction-proposal schema and exact tags in the approved memory design; never promote by document count. Preserve independent occurrence identity, cause confidence, scope, counterevidence, status and codified_in. A curator may promote only with verified evidence; preserve pinned originals and use scoped Corrections. Send L3 proposals through Lead to current STATE `DIRECTION PROPOSALS`; do not enact them. Use official recall/readback and refresh only within actual authority; no database, custom ledger, watcher, grader or transcript pipeline.
+
+Use [worker-closure.md](references/worker-closure.md) for task-local closure evidence, metrics, holds and optional lesson candidates; the reference grants no memory write or new approval step.
 
 ## Capture and official ingestion
 

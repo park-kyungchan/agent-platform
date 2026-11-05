@@ -60,3 +60,13 @@ Gemini CLI and Grok are absent from PATH; they are not members of the user's con
 Before an affected live instruction/config installation in S03, observe its supported native loading/trust surface and then a fresh affected session. Preserve already-running sessions. Do not restart every CLI to verify an unrelated adapter, ask a model to prove loading by self-report alone, or reuse old answers about absent platforms/unfinished relocation. Current filesystem/source facts come from task STATE and native readback.
 
 For ownership, shared build serialization, handoff and failure propagation read global-runtime-routing.md's concurrency section only when coordinating work. Current Rust entry is work/ws-replan/CURRENT-PLAN.md and STATE.md; prior WP plans and Rust memory are legacy.
+
+For selecting a small source packet, independent review and justified same-scope
+continuity, use [Context Governance](CONTEXT-GOVERNANCE.md). Launch topology/cwd
+comes from TASK/STATE; an assigned Lead uses one tab per worker under
+[lead-orchestration](../skills/lead-orchestration/SKILL.md), before generic sibling
+examples. Include the Strategy/KPI fields defined by
+[strategy-dialogue](../skills/strategy-dialogue/SKILL.md) in the handoff.
+Use [worker closure](../skills/lessons-loop/references/worker-closure.md) for native
+session/result gaps and owned-resource reconciliation; loading, task completion
+and lesson capture remain separate observations/effects.
