@@ -3,8 +3,10 @@
 Read only for authorized structured capture/update. No-write tasks leave a local
 curator handoff instead. These are official API operations, not a custom client,
 server extension or permission grant. Verify the installed OpenAPI/client before
-version-dependent use; the reviewed baseline is server 1.1.0, coding-agents 0.8.2,
-upstream `a5a619b5ca59c5c39e0f96be6f7a31fabd136bd5`.
+version-dependent use; this text was reviewed against server 1.1.0, coding-agents 0.8.2,
+upstream `a5a619b5ca59c5c39e0f96be6f7a31fabd136bd5`. The host runs server 1.2.0
+(revision `34a138684a899b6ec34175f7a2b633860466d289`) and coding-agents 0.8.5 as observed on
+2026-11-06; read [HINDSIGHT-RUNTIME.md](../../../runtime-references/HINDSIGHT-RUNTIME.md) for 1.2.0 routes.
 
 ## Connection and credentials
 

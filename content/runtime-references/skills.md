@@ -18,8 +18,9 @@ Generic Academy routing belongs to education-platform; teacher reporting is
 planned for the private education-dc-gang-a owner, with its current distribution
 copy retained in education-platform until verified transfer/recovery and consumer
 checks. TASK names the selected owning skill path; do not assume repo-native links
-or global-alias removal are already deployed. `academy_operations` is disabled in
-all CLIs until full-surface Rust cutover: no live calls or direct fallback.
+or global-alias removal are already deployed. `academy_operations` is enabled in Muse
+and Claude Code (2026-11-06); Codex and agy stay disabled until full-surface Rust
+cutover. No direct fallback.
 Hindsight and Scrapling
 are separately managed. The November4 audit's directory count is historical;
 this source change does not install skills or update per-CLI links.

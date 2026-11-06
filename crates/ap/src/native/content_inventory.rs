@@ -2,6 +2,10 @@
 pub const OWNED: &[(&str, &str)] = &[
     ("AGENTS.md", include_str!("../../../../content/AGENTS.md")),
     (
+        "runtime-references/CLI-LAUNCH.md",
+        include_str!("../../../../content/runtime-references/CLI-LAUNCH.md"),
+    ),
+    (
         "runtime-references/CONTEXT-GOVERNANCE.md",
         include_str!("../../../../content/runtime-references/CONTEXT-GOVERNANCE.md"),
     ),
@@ -28,6 +32,10 @@ pub const OWNED: &[(&str, &str)] = &[
     (
         "runtime-references/global-runtime-routing.md",
         include_str!("../../../../content/runtime-references/global-runtime-routing.md"),
+    ),
+    (
+        "runtime-references/llms.txt",
+        include_str!("../../../../content/runtime-references/llms.txt"),
     ),
     (
         "runtime-references/runtime-bootstrap.md",
