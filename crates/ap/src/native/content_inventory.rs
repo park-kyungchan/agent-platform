@@ -10,6 +10,10 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/runtime-references/HERDR-ORCHESTRATION.md"),
     ),
     (
+        "runtime-references/HINDSIGHT-RUNTIME.md",
+        include_str!("../../../../content/runtime-references/HINDSIGHT-RUNTIME.md"),
+    ),
+    (
         "runtime-references/OFFICIAL-DOCS.md",
         include_str!("../../../../content/runtime-references/OFFICIAL-DOCS.md"),
     ),
