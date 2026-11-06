@@ -15,7 +15,7 @@ content changes, not Hindsight migration, configuration or deployment.
 | Owner, authority, holds, next action, task metrics and verification | Current TASK/STATE; task STRATEGY.md for its brief | Assigned owner edits task files and dates changed decisions/addenda | Read on entry/reset/handoff and before effects when changed |
 | Implemented behavior, schemas, APIs, tests, build instructions and KPI definitions | Owning repository source/docs and native observations | Authorized implementation owner, reviewed source/tests | Read the selected current revision and contract; do not rely on a remembered implementation |
 | Durable decisions, rationale, lessons, corrections, scoped preferences, explained terms and strategy decisions | One shared Hindsight bank, `coding-agent::shared` | Authorized owner/curator through official HTTP/client for structured records; MCP only for simple notes/initiatives | Search/read selected pages first; recall exact evidence; reflect only for unresolved reasoning |
-| Current operational objects, observations, KPI time series, policies, actions and recovery | Domain/task owner today; future Ontology boundary | Trusted domain owner under current admission and task authority | Fresh authorized owner read with revision, scope, coverage and freshness; memory is only a citation |
+| Current operational objects, observations, KPI time series, policies, actions and recovery | Domain/task owner today; future Ontology boundary. Exception: the Academy lesson archive in Hindsight (user decision 2026-11-06; education-platform `academy-student-context/references/lesson-archive.md`) | Trusted domain owner under current admission and task authority | Fresh authorized owner read with revision, scope, coverage and freshness; memory is only a citation |
 
 A confirmed Strategy Brief lives in task STATE/STRATEGY.md. Hindsight may retain
 its strategy decision and an authorized KPI definition/rationale linked to repo
@@ -127,7 +127,13 @@ Write once at the proper owner. Codebase docs define contracts; Hindsight stores
 why, selected durable knowledge and the source locator. The glossary links the
 scoped profile instead of copying it. Never re-ingest a generated page as source.
 
-Do not retain credentials, raw student/exam/lesson records, operational rows,
+Academy lesson records are the one exception (user decision 2026-11-06): the academy
+server removes old rows, so Hindsight archives dated teacher statements and source
+observations under real student names, as education-platform
+`content/skills/academy-student-context/references/lesson-archive.md` specifies.
+An archived observation is a dated snapshot, not live state; a fresh owner read
+wins while the server still shows the row. Otherwise do not retain credentials,
+raw student/exam/lesson records, operational rows,
 action receipts/journals, KPI measurements/time series, full STATE copies,
 pane/model/quota assignments, CI logs, repeated transcripts, executable schema
 copies or a second current-state table in Hindsight. Keep detailed artifacts at
