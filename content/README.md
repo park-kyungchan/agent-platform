@@ -26,7 +26,8 @@ and bytes require an inventory/test/hash update. Neither source acceptance nor
 a rebuilt binary proves host synchronization, native discovery or execution.
 The task owner separately authorizes and verifies any host installation.
 
-The inventory now has 26 files, including lessons-loop's worker-closure reference;
+The inventory now has 27 files, including lessons-loop's worker-closure reference and
+the Hindsight runtime reference;
 the generic custom catalogue remains six skills. On-demand links connect Herdr
 and Hermes to Context Governance, strategy-dialogue and lessons-loop without
 copying those protocols or creating another global skill. Assigned topology/cwd

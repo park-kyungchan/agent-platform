@@ -12,7 +12,7 @@ Routes checked2026-11-02 for the user-confirmed Muse/Claude/Codex/Antigravity CL
 | Antigravity settings/hooks/children | https://antigravity.google/docs/cli/using ; https://antigravity.google/docs/hooks ; https://antigravity.google/docs/subagents | Distinguish CLI settings, customizations, lifecycle names and share/branch modes |
 | Muse context/config | https://dev.meta.ai/docs/muse-code/configuration | Muse1.4.14-R7309.1; trust-gated project rules, separate TUI/exec flags; host `session_retention_days=30` read back, fresh-session behavior unprobed |
 | Muse children/headless/recovery | https://dev.meta.ai/docs/muse-code/extending | Request isolation per child, preserve resumable sessions, inspect actual outcome |
-| Hindsight | https://hindsight.vectorize.io/ ; pinned official sources/tests in /docker/hindsight/HINDSIGHT_OFFICIAL_PER_CALL.md | Installed1.1.0/a5a619b5; matching source wins where the current site differs |
+| Hindsight | https://hindsight.vectorize.io/llms.txt (index) ; https://hindsight.vectorize.io/llms-full.txt (about 1 MB, grep a topic) ; installed `GET /openapi.json` ; pinned sources in /docker/hindsight/HINDSIGHT_OFFICIAL_PER_CALL.md ; internals in [HINDSIGHT-RUNTIME.md](HINDSIGHT-RUNTIME.md) | Installed 1.2.0/34a1386 and coding-agents 0.8.5 since 2026-11-06; installed OpenAPI and container source win where the site differs |
 
 Current Codex broad manual cache: /private/tmp/openai-docs-cache/codex-manual.md with its outline; temporary lookup evidence, not a permanent instruction source. Public pages above were fetched/read; bounded native help and configuration metadata are recorded under /home/palantirkc/work/ws-replan/preparation/final-review/runtime/.
 
