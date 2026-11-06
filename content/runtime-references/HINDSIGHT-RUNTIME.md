@@ -10,7 +10,7 @@ diagnosing "memory returns old/irrelevant facts". Verified 2026-11-06 against th
 | Need | Route |
 | --- | --- |
 | Endpoint and field contract of THIS install | `GET http://127.0.0.1:8888/openapi.json` (authoritative over the website) |
-| Exact behaviour (ranking, scopes, refresh) | container source `/app/api/hindsight_api/` via `docker exec hindsight-hindsight-1 …`: `engine/memory_engine.py` (`search_knowledge_pages`, mental-model writes), `engine/memories/pg/recall.py`, `engine/memories/pg/consolidation.py`, `engine/mental_model_refresh.py`, `config.py` (every tunable with comments) |
+| Exact behaviour (ranking, scopes, refresh) | container source `/app/api/hindsight_api/` via `docker exec hindsight-hindsight-1 …`: `engine/memory_engine.py` (`search_knowledge_pages`, mental-model writes), `engine/memories/pg/recall.py`, `engine/consolidation/consolidator.py` (observation scopes), `api/http.py` (endpoint descriptions), `engine/mental_model_refresh.py`, `config.py` (every tunable with comments) |
 | Official docs, short index | https://hindsight.vectorize.io/llms.txt (about 4 KB) |
 | Official docs, full dump | https://hindsight.vectorize.io/llms-full.txt (about 1 MB; never load whole, fetch and grep a topic). Topic pages: `/developer/retrieval`, `/developer/api/recall`, `/developer/retain`, `/developer/observations`, `/developer/mental-models`, `/developer/knowledge-pages`, `/developer/api/documents`, `/sdks/integrations/coding-agents` |
 | Host operation and pins | `/docker/hindsight/HINDSIGHT_OFFICIAL_PER_CALL.md`, `/docker/hindsight/AGENTS.md` |
@@ -19,13 +19,16 @@ diagnosing "memory returns old/irrelevant facts". Verified 2026-11-06 against th
 
 ## Data model
 
+Endpoint paths below are relative to `/v1/default/banks/{bank_id}`.
+
 - A **document** (`document_id`) is retained text. Extraction turns it into **memory units**: `world`
   and `experience` facts, each with `mentioned_at`, optional `occurred_start`, tags and entities.
 - **Observations** are consolidated beliefs built from several facts. Consolidation only merges facts
-  inside the same resolved **observation scope** (`observation_scopes`: `combined` default = the full
-  tag set, `per_tag`, `all_combinations`, `shared` = one global untagged scope). A correcting fact in a
+  inside the same resolved **observation scope** (`observation_scopes`: `combined` = the full tag set, default unless the bank sets
+  `default_observation_scopes`; `per_tag`, `all_combinations`, `shared` = one global untagged scope; or
+  explicit tag lists). A correcting fact in a
   different scope cannot update a stale observation. Fix: `PATCH /documents/{id}` with
-  `observation_scopes` (re-consolidates without re-extraction).
+  `observation_scopes` (re-consolidates, without re-extraction, only memories whose resolved scopes change).
 - **Mental models** hold synthesized content. A **knowledge page** (`kp-…`) wraps a mental model
   (`mm-…`); create pages with `POST /knowledge-base/pages` (`name`, `source_query`, `tags`,
   `max_tokens`, `trigger`). A page's `tags` SCOPE which memories it reads (`tags_match` defaults to `all_strict` when tags
@@ -66,15 +69,17 @@ that later compete with corrections.
   Save the GET body first; document history is not a recoverable text archive.
 - `PATCH /documents/{id}` `tags` replaces the complete tag set; it can invalidate observations and
   requeue co-sources. An unchanged set needs no PATCH.
-- `PATCH /mental-models/{id}` changes `name`/`source_query`/`tags`/`trigger`. Refresh:
-  `POST /mental-models/{id}/refresh` with `{"mode": "full"}` regenerates from scratch, or `null` to use
-  the trigger mode (`delta` edits). Full refresh can drop content (observed 70,131 to 13,857
+- `PATCH /mental-models/{id}` changes `name`/`source_query`/`max_tokens`/`tags`/`trigger`. Refresh:
+  `POST /mental-models/{id}/refresh` with `{"mode": "full"}` regenerates from scratch, or no body to run the model's own
+  `trigger.mode` (default `full`; `delta` edits sections and falls back to full when there is no
+  baseline or `source_query` changed). Full refresh can drop content (observed 70,131 to 13,857
   characters), so save the model GET first. `POST …/dry-run-refresh` previews diff and usage without
-  writing.
-- Bank levers (`GET/PATCH /banks/{id}/config`): `llm_output_language` (forces facts, observations and
-  reflect output into one language), `retain_mission`, `retain_extraction_mode` (`concise`),
-  `retain_custom_instructions`, `observations_mission`, `reflect_mission`, `enable_*` flags. They
-  affect future processing only.
+  writing, but costs the same LLM tokens as a real refresh.
+- Bank levers (`GET/PATCH /config`, body `{"updates": {...}}`): `retain_mission`,
+  `retain_extraction_mode` (`concise`), `retain_custom_instructions`, `observations_mission`,
+  `reflect_mission`, `enable_*` flags. They affect future processing only. Output language is
+  server-level only (`HINDSIGHT_API_LLM_OUTPUT_LANGUAGE`, forces facts, observations and reflect output
+  into one language); a bank PATCH of `llm_output_language` is rejected.
 - LLM: provider `chatgpt` (subscription, `gpt-6.1-terra`). It shares the ChatGPT/Codex weekly limit
   (user-confirmed 2026-11-06). Observed refresh cost: 90 to 210 seconds per page. Per-model monthly
   input ceiling: 5,000,000 tokens (user 2026-11-06).
