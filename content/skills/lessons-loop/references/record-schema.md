@@ -6,7 +6,7 @@ field. Verify original-document GET and recall/readback. It does not authorize
 writes, configure the server or establish a validator/loader/runtime gate.
 Official API behavior here was verified against server 1.1.0 / coding-agents
 0.8.2 at upstream revision `a5a619b5ca59c5c39e0f96be6f7a31fabd136bd5`; the host
-runs 1.2.0 / 0.8.5 since 2026-11-06. Check installed source before a
+runs 1.2.0 / 0.8.5 as observed on 2026-11-06. Check installed source before a
 version-dependent operation.
 
 ## Exact tag vocabulary

@@ -73,8 +73,9 @@ Workers keep native Hindsight (hooks and MCP); do not export `HINDSIGHT_DISABLE_
 or disable the MCP to isolate them (user decision 2026-11-06: never block a native
 feature). When a task needs isolation, such as an eval or an independent review,
 run it in a directory covered by a native coding-agents `paths.<prefix>` override
-(for example `{"disabled": true}` or a separate bank) and verify that override.
-Verify native model, effort, cwd and readiness without changing global configuration.
+(for example `{"disabled": true}` or a separate bank) and verify that override; adding an override is a host configuration effect that
+needs task authority. Verify native model, effort, cwd and readiness without
+changing other global configuration. Launch syntax: [CLI-LAUNCH.md](../../runtime-references/CLI-LAUNCH.md).
 
 Submit the exact task packet and verify that the prompt was submitted and the
 worker began its turn. A send acknowledgement, `idle` or `done` alone is not
@@ -134,8 +135,9 @@ the same scope/files, reuses the loaded context and has enough context remaining
 Record why in STATE; otherwise save/close and start fresh. Reviews are always
 isolated, including follow-up review of a repaired candidate.
 
-Workers keep Hindsight hooks/MCP disabled unless doing authorized memory work.
-The Lead supplies needed verified memory conclusions with source provenance.
+Workers keep native Hindsight hooks and MCP; isolate only through a verified
+native `paths.<prefix>` override (see above). The Lead supplies needed verified
+memory conclusions with source provenance.
 Native resume is not renewed authority; reread current STATE and addenda.
 
 ## Memory contract
