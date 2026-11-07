@@ -4,13 +4,13 @@ Start from the active runner's instructions and the selected task's rules/STATE.
 
 For a specific runner operation, consult its installed help or relevant skill. Herdr control uses the installed Herdr skill and genuine caller context; coordinating several CLIs through Herdr is summarized in `HERDR-ORCHESTRATION.md`, what each CLI loads and when in `RUNTIME-LOADING.md`, and each runtime's official documentation route in `OFFICIAL-DOCS.md`. Host, container, shared daemon and remote executor may have different paths and identities; never infer a Codex pane from tool-shell environment. Preserve SSH host-key checking and the Tailscale boundary. Efficiency rule for a Lead: hand over goal, exact targets, allowed effects, expected output and the task STATE.md path — never a transcript — and verify through returned output or readback, not submission claims.
 
-Instruction/MCP registrations are in `runtime-wiring.md`. Registration, filesystem pointer and a running session's loaded context are separate observations. `academy_operations` is disabled in all CLIs until full-surface Rust cutover; no Academy calls or direct fallback are allowed. Historical TS deployment navigation belongs to education-platform's Academy cutover reference, not a probe of the retained bundle.
+Instruction/MCP registrations are in `runtime-wiring.md`. Registration, filesystem pointer and a running session's loaded context are separate observations. `academy_operations` is directly registered in all five native CLIs under the user's 2026-11-07 custom-MCP requirement, using one current TS backend and one account/lock. Client availability is separate from task effects and the full-surface Stage 2 Rust cutover gate; no direct HTTP/browser/shell fallback is allowed. Historical TS deployment navigation belongs to education-platform's Academy cutover reference, not a probe of the retained bundle.
 
 Do not alter credentials, global configuration, services or unrelated work merely to orient. Reconcile uncertain real effects before retrying; obey task holds. Credentials never enter output. For Hindsight migration/evaluation, directly inspect relevant user data only within explicit canonical-instruction authorization; other work retains its narrower data boundary.
 
 After a reset re-read task rules and state. Failures locate their cause as `code@path:line` without secrets/private payloads. Current Rust authority is `/home/palantirkc/work/ws-replan/CURRENT-PLAN.md` and its STATE.md, routing to the user-adopted final review ZIP. Previous Rust PLAN v1/WPs/memories are legacy; preserving a live transition consumer does not restore old policy authority.
 
-## Concurrent work across Muse, Claude, Codex and Antigravity CLI
+## Concurrent work across Muse, Claude, Codex, Antigravity CLI and Grok Build
 
 This is operational detail for the canonical runtime core, not a second instruction source or a new work controller. Use existing task STATE and native Git; do not add a global agent registry, lease database, polling watcher or replacement scheduler.
 
@@ -26,7 +26,13 @@ Resume the exact saved session ID and the same assigned checkout, rather than `-
 
 Keep reference inputs immutable, bound subprocess time/output and retain full logs locally with concise result excerpts. Run the affected meaningful checks; broaden only for changed boundaries or unresolved evidence. A failed dependency stops dependent effects while unrelated read-only/disjoint work may continue. Fix repeated causes at their source rather than identical retries, model swaps or new gates.
 
-The four native launch/resume/isolation differences and official sources are in RUNTIME-LOADING.md. Herdr control, when actually requested, follows its skill and genuine caller identity; no Herdr pane is required merely to use the coordination principles above.
+The five native launch/resume/isolation differences and official sources are in RUNTIME-LOADING.md. Herdr control, when actually requested, follows its skill and genuine caller identity; no Herdr pane is required merely to use the coordination principles above.
+
+## Shared custom services and future-compatible preparation
+
+Custom MCPs are shared backend implementations, directly declared in every native CLI. Keep built-in/marketplace/plugin installations with their native CLI owner; do not turn another CLI's personal configuration into a shared registry. Task-scoped data/effect rules and evaluation tool selection apply consistently across clients. Global availability is not permission to use every server on every task. Use supported native per-task controls and Hindsight path/bank selection; do not block native features globally or patch vendor integrations.
+
+Recent checkpoint routing: `/home/palantirkc/work/ws-replan/STATE.md` and its latest checkpoint, with named sub-task STATE files. Preserve existing candidate/session ownership and pinned evaluator evidence. A plan-complete assumption may inform interfaces, portable client wiring and documentation now; actual K1/K2 acceptance, source review/CI/merge, qualified Rust release, visibility changes, archive ingestion and legacy removal require their real conditions. Do not update a KPI, repoint a live service, delete its retained implementation or clear a task hold merely because the target design assumes completion.
 
 This file is not an automatic loader and does not require reading every runtime reference on every task.
 

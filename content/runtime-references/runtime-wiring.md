@@ -1,38 +1,54 @@
-# Runtime wiring (current, on demand)
+# Runtime wiring — native clients, shared custom servers
 
-Historical wiring readback: 2026-11-02 by Codex across Muse, Claude, Codex and Antigravity CLI. Current settings below reflect the completed 2026-11-04 host-config task (backup label 20261105); its report is `/home/palantirkc/work/ws-replan/preparation/host-config-v1/REPORT.md`. The November1 wiring remains historical installation evidence. Current Rust authority: `/home/palantirkc/work/ws-replan/CURRENT-PLAN.md` and STATE.md; Rust `ap` render/install/doctor is now implemented and `/usr/local/bin/ap` is installed (2026-11-04). Layout/current exceptions: `/home/palantirkc/work/ws-layout-standard/LAYOUT.md`. These are dated source/configuration observations; this documentation change applies no host configuration or service changes. MCP/settings changes apply to new sessions; existing sessions were not restarted and can retain older registrations.
+## Current policy and scope — 2026-11-07
 
-## Instructions: one canonical text, pointer files
-- Canonical: `/root/.agents/AGENTS.md` (user-approved runtime core v2 + unchanged Hindsight section + Codex-only addenda). Native pointer files remain pointers. The exact approved core source is runtime-core.v2.md here; preserve it as an immutable version and fix forward for later wording changes.
-- agy: `~/.gemini/AGENTS.md` is a symlink to it. Codex: `~/.codex/AGENTS.md` is a symlink to it.
-- Claude Code: `~/.claude/CLAUDE.md` holds only `@/root/.agents/AGENTS.md` (import).
-- Muse: no separately maintained global instruction copy; the retained S03 qualification saw Claude's foreign-personal `@import` literally, without expanding the canonical full text. Native trusted project rules and flags can differ; use explicit canonical/STATE paths in handoffs. See RUNTIME-LOADING.md.
-- Gemini CLI and Grok are absent from PATH and outside the user's confirmed four-CLI matrix. Both `~/.gemini/AGENTS.md` and `~/.gemini/GEMINI.md` still resolve to canonical and are documented Antigravity inputs; their presence is not proof of an installed Gemini CLI, and deduplicated injection is unverified. No pointer was removed. This preparation does not claim fresh-session loading for all four active CLIs.
-- Hermes (container `hermes-agent-2q3y-hermes-serve-1`): `/root/.agents` is mounted read-only at `/opt/host-agents` (compose line added 2026-11-01). Hermes `SOUL.md`, memory and profiles are untouched; Hermes is used by the VPS host on demand, no separate owner.
+The user requires custom MCPs to be CLI-agnostic. Their server implementation, credential-file owner, account and domain behavior belong to the service; each CLI directly registers that same server using its supported native schema. Another CLI's personal config is not a shared source. This is documented configuration ownership, not a new runtime registry, loader or wrapper.
 
-## MCP configuration after the approved host-config task
-| Runtime | hindsight (`HINDSIGHT_MCP_HARNESS`) | academy_operations |
+Built-in tools and MCPs installed through a particular CLI's marketplace/plugin/native integration remain with that CLI. Do not copy vendor plugin definitions into the custom set, disable their native loading, or rewrite plugin caches. A native plugin may legitimately use its own runtime or bundled server; it is not a competing coding CLI installation.
+
+Shared availability grants no task effects. Evaluation, implementation and lesson tasks select tools and data through their current rules, native controls and domain admission. Do not reintroduce permanent CLI-brand roles or exclusions.
+
+## Native user registrations
+
+| CLI | Native configuration | Shared custom MCP entries | Hindsight client attribution |
+|---|---|---|---|
+| Claude Code | `~/.claude.json` / `mcpServers` | `hindsight`, `academy_operations`, `daniel_prayer_operations` | `claude-code` |
+| Muse | `~/.config/muse/settings.json` / `mcpServers` | Same three, enabled and optional | `muse` |
+| Codex | `~/.codex/config.toml` / `mcp_servers` | Same three, enabled | `codex` |
+| Antigravity | `~/.gemini/config/mcp_config.json` / `mcpServers` | Same three, `disabled=false` | `antigravity-cli` |
+| Grok Build | `~/.grok/config.toml` / `mcp_servers` | Same three, enabled | `grok-build` |
+
+For all five clients, each server's command and arguments match exactly; Academy/Daniel environment references also match. Hindsight's client attribution differs deliberately, while its implementation and configured shared bank are the same. Credentials stay with their existing file owner; no secret is copied into native configuration.
+
+| Custom server | Shared implementation / launch contract | State and authority |
 |---|---|---|
-| Claude Code (`~/.claude.json`) | claude-code | enabled 2026-11-06: user scope, same TS launcher as Muse (CLI-LAUNCH.md) |
-| Codex (`~/.codex/config.toml`) | codex | disabled: `enabled=false` |
-| agy (`~/.gemini/config/mcp_config.json`) | antigravity-cli | disabled: `disabled=true` |
-| Muse (`~/.config/muse/settings.json`) | muse (MCP tools only; no configured lifecycle injection hooks) | enabled 2026-11-06: `mode: optional`, TS host-restore launcher (education-platform cutover-status.md) |
+| Hindsight | Installed Node.js executable runs `/root/.hindsight/coding-agents/dist/mcp-server.js` | `/root/.hindsight/coding-agent.json`; current bank, routing and path overrides remain native Hindsight settings |
+| Academy | `/usr/bin/env ACADEMY_MCP_INSTALL_DIR=/root/.local/share/academy-mcp-host-20261106 /usr/local/bin/bun --no-env-file /root/.local/share/academy-mcp-host-20261106/launcher.mjs` | One existing account/lock and domain-owned `release.json`; current TS backend remains until separately qualified Rust cutover |
+| Daniel operations | Installed Node.js executable runs the same existing `/opt/daniel-prayer/operations/releases/release-20261102-e0d8f02/mcp/server.mjs` | The existing `DANIEL_SESSION_COOKIE_FILE` reference is reused; no cookie values read/copied by the configuration task |
 
-- Server: `node /root/.hindsight/coding-agents/dist/mcp-server.js`; the harness id is a free string. Hooks exist only for Claude, Codex and agy.
-- academy_operations (user decisions 2026-11-06) is enabled in Muse and in Claude Code (user scope, same TS launcher; see CLI-LAUNCH.md) and disabled or unregistered in Codex and agy until the Rust cutover. The rest of this bullet is the earlier dated readback. Muse user-settings JSON/readback passed, but its enterprise-only validator cannot establish user-loader acceptance; fresh-session MCP behavior remains unprobed. Existing loaded sessions are not revoked by these edits. The Academy bundle/socket/service were left untouched. The private academy operations server provides lesson history, DailyRecord authoring and homework/test preparation. Install `/root/.local/share/academy-mcp-scoped-20261030`. On 2026-11-04 education source moved to `/home/palantirkc/platforms/education-platform` without a compatibility symlink. By user decision (Academy is not in use), immutable pilot `releases/*/endpoints.json` still name `/home/palantirkc/projects/education-platform`; those saved endpoints will not resolve until Academy redesign rebuilds and repoints the pilot. Codex used to point at `academy-mcp-yoo-20261030`; that install was deleted on 2026-11-01 (user decision).
-- Historical 2026-11-02 registration readback: all four host selectors invoked `/root/.local/share/academy-mcp-scoped-20261030/launcher.mjs`. This historical launcher observation does not authorize reconnecting it; the current per-CLI state is in the table above. Codex's unrelated daniel_prayer_operations registration remains present. Hermes keeps its existing same-owner relay/socket/native boundary. Historical observation only: at2026-11-02T14:28Z, `release.json` selected `main-20261102-cc6e81f`, schema academy.mcp-release/1, pointer SHA256b5159c1bd815b87d67a4488dd4e978c051b777686856dd542b9a5452ad9aad3b. Use `/root/.local/share/academy-mcp-host-20261106/release.json` for the current selection; the scoped-20261030 `release.json` is historical (the 2026-11-04 audit observed `parent-renderer-restore-20261104-v1` there). Earlier path-relocation/b0865d1 generations and loaded-digest snapshots below are historical. Pointer/registration readback is not a fresh model-session, complete graph or semantic parity check. Existing sessions are not hot-replaced.
-- The retained shared-lock/config task is now `/home/palantirkc/work/edu-class-operations`. On2026-11-02 the user authorized the full path cutover after work stopped: all three live endpoint lock arguments moved together in forward generation `path-relocation-20261102-b0865d1`, holding the same lock inode across directory/pointer replacement. The original b0865d1 bridge bytes, owner/admission, common launcher and Hermes socket were preserved; host/Hermes42tools, native endpoint inventories and one actual read were verified. Old immutable release definitions retain historical paths and require coordinated directory/pointer rollback before reuse. Host and container artifact paths are separate; never pin a recreated container's old ID.
+Absolute Node.js resolution avoids shell PATH differences across native clients. The server process cwd was not fixed globally, preserving Hindsight's project/path selection. Do not replace a domain-owned launcher or point at a future Rust binary before the owning release actually exists and passes its gate.
 
-## Current cadence and retention
+## Grok compatibility correction
 
-The completed host-config task set Hindsight global `pageRefreshEveryTurns=5` and Muse user `session_retention_days=30`. Other Hindsight settings and per-path overrides were preserved. Short-lived hooks reread configuration per invocation; persistent MCP clients generally read it at startup. Muse retention has documentary/key-readback evidence, not a fresh behavioral probe or an executed cleanup sweep. Worker-only hook suppression and remaining limits are in RUNTIME-LOADING.md.
+Grok defaults to reading Claude/Cursor MCP config. The initial install left those defaults in place, so it discovered custom entries from `~/.claude.json` and inherited Hindsight's `claude-code` attribution. This was a default compatibility path, not a shared-MCP design.
 
-## Removed on 2026-11-01 (legacy)
-`academy-mcp-dailytest-20261030`, `academy-mcp-guidance-20261030`, Muse `academy-runtime-20261023-{backup,retired}-*`, `.agents/skills-archive`, `runtime-references/backup-20261029`, dated `.bak-*`/`.before-*` copies of instruction, settings and hook files, the `/tmp/hindsight-native-install-wSQAJVAx/pilot` entries in Codex `[projects]` and `~/.hindsight/coding-agent.json`. Kept: this session's `*.bak-20261101*` rollback copies and the installer's `*.hindsight-backup` files.
+Current `~/.grok/config.toml` explicitly sets `[compat.claude] mcps=false` and `[compat.cursor] mcps=false`, while defining all three custom servers natively. `grok inspect --json` reports their source as `configToml`, not `claudeJson`. Other compatibility surfaces and native plugin settings were preserved; this change is not a blanket foreign-skill or native-feature suppression.
 
-## Not verified yet
-Fresh model sessions for every remaining CLI were not launched during relocation. The fresh shared host launcher and Hermes relay passed identity/42-tool/preflight checks; all four native endpoint inventories and one actual DailyRecord read passed. These checks do not prove universal instruction injection or that every existing client loaded new code. Earlier Muse/lesson-successor model-session evidence belongs to its dated task reports. Official documentation routes for every runtime: OFFICIAL-DOCS.md; Herdr coordination: HERDR-ORCHESTRATION.md.
+`~/.grok/AGENTS.md` now links directly to `/root/.agents/AGENTS.md`. Inspection lists its full canonical byte size, so guidance no longer depends on Claude `@import` expansion. The separate 60-byte Claude-compatible pointer may still be discovered; duplicate/turn-level expansion remains a distinct native loading question.
 
-## Custom skills (on demand)
+## Shared instructions, skills and lifecycle hooks
 
-Shared custom source and verified native discovery: [skills.md](skills.md). This does not change native hook/MCP wiring or claim fresh-session injection.
+- Canonical guidance is `/root/.agents/AGENTS.md`; Codex, Antigravity and Grok use native aliases to it. Claude's global `CLAUDE.md` imports it. Muse trusted project discovery and its earlier literal foreign-import limit are documented in RUNTIME-LOADING.md.
+- Shared custom skills live under `/root/.agents/skills/`, with source ownership in agent-platform or education-platform. CLI-native plugin and account-synced skills retain their owners; they are not custom MCP definitions.
+- Hindsight hooks are configured for Claude/Codex (`SessionStart`, `UserPromptSubmit`, `Stop`) and agy (`PreInvocation`, `Stop`). Muse/Grok have their own directly registered MCP client but no configured Hindsight lifecycle hooks. Do not copy Claude hook code into another runtime or claim identical auto-injection/retention.
+- Existing Herdr hooks, model/permission/trust settings and native plugins were preserved. Codex work uses `codex --no-daemon` in Herdr terminals. Existing sessions were not restarted; new registration does not hot-replace their loaded tool catalogs.
+
+## Verification and current-plan boundary
+
+Evidence: `/home/palantirkc/work/agent-custom-mcp-audit/STATE.md`. Fifteen enabled native declarations passed configuration equivalence checks. Grok native inspection proves direct source discovery and disabled foreign MCP scanners; native MCP doctor passed command/start/handshake/tools-list for all three shared servers (Academy 44 tools, Daniel 5). This is protocol connectivity, not live domain reads, write acceptance, full five-model-session qualification, or Academy Rust parity.
+
+The earlier Nov6 Muse/Claude-only Academy registration decision is superseded at the client-registration layer by the user's Nov7 all-custom CLI-agnostic requirement. Account serialization, missing save backend, domain permissions and the full Rust cutover gate remain unchanged. The TS install base, immutable releases and service pointers were not modified.
+
+Recent broader checkpoints remain separate authority: `/home/palantirkc/work/ws-replan/STATE.md`, `preparation/lead-checkpoint-20261107/CHECKPOINT.md`, `/home/palantirkc/work/ontology-coengineering/STATE.md`, the Hindsight task STATE files and `/home/palantirkc/work/problem-edit-rust/STATE.md`. Apply durable interfaces and task-scoped boundaries now; do not pre-declare K1/K2 acceptance, 44/44 Rust qualification, PRIVATE visibility, archive ingestion or legacy deletion from a completion assumption.
+
+Historical install/relocation details remain in their dated task states. Current filesystem and native discovery take precedence over old version, missing-CLI or registration snapshots.

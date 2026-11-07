@@ -18,14 +18,12 @@ Generic Academy routing belongs to education-platform; teacher reporting is
 planned for the private education-dc-gang-a owner, with its current distribution
 copy retained in education-platform until verified transfer/recovery and consumer
 checks. TASK names the selected owning skill path; do not assume repo-native links
-or global-alias removal are already deployed. `academy_operations` is enabled in Muse
-and Claude Code (2026-11-06); Codex and agy stay disabled until full-surface Rust
-cutover. No direct fallback.
+or global-alias removal are already deployed. `academy_operations` is directly registered in all five native CLIs under the user's 2026-11-07 CLI-agnostic custom-MCP requirement. Current TS backend ownership, single-account serialization, unconfigured saves and Rust cutover qualification remain domain conditions. No direct fallback.
 Hindsight and Scrapling
 are separately managed. The November4 audit's directory count is historical;
 this source change does not install skills or update per-CLI links.
 
-Codex/Gemini/Muse catalog checks from November1 are historical observations. Current user-confirmed coding runtimes are Muse, Claude, Codex and Antigravity CLI; Gemini CLI is absent. Claude personal and Antigravity config/skills links use the shared source; a symlink/catalog does not prove a fresh child/session loaded the body. Keep supported per-CLI metadata in the skill folder. Hermes' read-only host-agents mount does not prove native catalog registration; no profile migration was applied.
+Codex/Gemini/Muse catalog checks from November1 are historical observations. Current user-confirmed coding runtimes are Muse, Claude, Codex, Antigravity CLI and Grok Build (2026-11-07); Gemini CLI is absent. Claude personal and Antigravity config/skills links use the shared source; a symlink/catalog does not prove a fresh child/session loaded the body. Grok native inspection discovers shared skills and Claude-compatible skills without a Grok skills directory; its custom MCPs are independently registered and its global AGENTS pointer links canonical guidance; discovery does not prove fresh model use. Keep supported per-CLI metadata in the skill folder. Hermes' read-only host-agents mount does not prove native catalog registration; no profile migration was applied.
 
 Custom ai-gateway and typesafe-ai were user-selected and removed after a complete verified Drive restore. Do not recreate them from archived legacy instructions; if needed later, use current official capabilities and the improved memory. Vendor plugins are separate; the official Vercel gateway plugin was preserved.
 

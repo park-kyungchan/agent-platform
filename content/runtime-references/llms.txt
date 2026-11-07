@@ -1,6 +1,6 @@
 # Agent runtime references
 
-> Index of /root/.agents/runtime-references for every coding CLI on this host: Muse Code, Claude Code, Codex and Antigravity CLI (agy). Read this index first. Then open only the one reference or official page that the next decision needs. Source: agent-platform `content/runtime-references/`, deployed byte-identical to /root/.agents/runtime-references/. Upstream routes were checked on 2026-11-06 (HTTP 200).
+> Index of /root/.agents/runtime-references for every coding CLI on this host: Muse Code, Claude Code, Codex, Antigravity CLI (agy) and Grok Build (grok). Read this index first. Then open only the one reference or official page that the next decision needs. Source: agent-platform `content/runtime-references/`, deployed byte-identical to /root/.agents/runtime-references/. Grok Build was added on 2026-11-07; its official index returned HTTP 200. Earlier route checks are dated 2026-11-06.
 
 ## Local references (on demand)
 
@@ -8,7 +8,7 @@
 - [codebase-orientation.md](codebase-orientation.md): how to orient in a codebase and workspace without scanning everything.
 - [RUNTIME-LOADING.md](RUNTIME-LOADING.md): what each CLI loads at session start and per turn; Hindsight loading versus retention.
 - [CLI-LAUNCH.md](CLI-LAUNCH.md): verified launch flags (model, context window, effort, permissions), Herdr tab/agent start, and per-CLI MCP registration, including academy_operations.
-- [runtime-wiring.md](runtime-wiring.md): current per-CLI configuration and MCP wiring.
+- [runtime-wiring.md](runtime-wiring.md): shared custom MCP policy, direct native registrations, vendor-owned exclusions and verified wiring.
 - [global-runtime-routing.md](global-runtime-routing.md): coordination of concurrent writers, shared builds and compact handoffs.
 - [HERDR-ORCHESTRATION.md](HERDR-ORCHESTRATION.md): a Lead running several CLIs through Herdr.
 - [CONTEXT-GOVERNANCE.md](CONTEXT-GOVERNANCE.md): which store owns which information (task STATE, repository, Hindsight, domain owner); the Academy lesson archive exception.
@@ -24,6 +24,7 @@
 - [Codex](https://learn.chatgpt.com/llms.txt): Codex CLI, configuration and hooks (the same index is at developers.openai.com/codex/llms.txt). Full text: https://learn.chatgpt.com/llms-full.txt (about 2.8 MB).
 - [Antigravity](https://antigravity.google/llms.txt): Antigravity and agy. No llms-full.txt (404 on 2026-11-06).
 - [Meta Model API and Muse Code](https://dev.meta.ai/llms.txt): Muse Code pages are listed there and can be fetched as `.md`, for example https://dev.meta.ai/docs/muse-code/configuration.md. No llms-full.txt.
+- [Grok Build](https://docs.x.ai/llms.txt): use the `Grok Build` section, including `build/overview.md`, `build/features/project-rules.md`, `build/settings/reference.md` and `build/cli/reference.md`. Native Linux installer: https://x.ai/cli/install.sh. `grok inspect --json` reports discovery; `grok update` owns updates. Foreign MCP imports are disabled on this host; custom servers register directly in `~/.grok/config.toml` (see runtime-wiring.md).
 - [Herdr](https://herdr.dev/llms.txt): Herdr terminal multiplexer docs; also https://herdr.dev/agent-guide.md.
 - [Hindsight](https://hindsight.vectorize.io/llms.txt): Hindsight memory server. Full text: https://hindsight.vectorize.io/llms-full.txt (about 1 MB). The installed API is `GET /openapi.json` on the local server.
 
