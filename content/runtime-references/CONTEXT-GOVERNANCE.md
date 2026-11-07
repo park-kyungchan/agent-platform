@@ -155,3 +155,5 @@ recovery; Hindsight owns contextual decisions/lessons. Operational facts remain
 Do not assume a production Ontology endpoint. There is no shared DB, state replica,
 automatic prose-to-object promotion, provenance service or ingestion pipeline
 created by this reference. `ap` does not require a running Ontology.
+
+Grok Build is the fifth runtime as of 2026-11-07. Its native MCP registrations and canonical guidance pointer are qualified separately in runtime-wiring.md. Do not infer a Grok compaction ceiling from another CLI's flags; qualify the installed native control before claiming the same threshold. The shared task/data/authority boundaries apply to all five.

@@ -55,6 +55,10 @@ snippet is the first 280 characters of the content. Consequences:
   Identical boilerplate openings ("Scope and authority …") make pages indistinguishable.
 - A broad multi-topic page has one vector and loses to focused pages on specific questions.
 
+## Native client ownership — 2026-11-07
+
+All five native CLI configurations directly declare the same coding-agents MCP implementation; the client harness IDs are `muse`, `claude-code`, `codex`, `antigravity-cli` and `grok-build`. Grok foreign MCP imports are off. Backend bank/routing is shared through native Hindsight configuration, not through another CLI's user config. Existing credential-file references, path overrides and integration code are preserved. Native hooks exist only where configured/supported; a direct MCP entry does not create lifecycle injection or retention for Muse/Grok. See runtime-wiring.md for the custom/vendor boundary and native evidence.
+
 ## Session path on this host
 
 `autoInject: "pages"`: on a session's first prompt the plugin runs a page search with that prompt and
