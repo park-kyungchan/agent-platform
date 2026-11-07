@@ -23,13 +23,10 @@ before relying on a flag. This page records what was verified across all five in
 ## 2. Muse Code (`1.4.14-R7309.1`)
 
 - **Headless launch (`muse exec`):**
-  `muse exec --yolo --model <muse-wonder-1.0|muse-spark-1.3> --reasoning-effort <high|medium> --context-compaction-soft-threshold 0.35 --context-compaction-hard-threshold 0.38 --session-id <uuid> --cd <dir> "<prompt>"`
+  `cd <dir>` followed by `muse exec --yolo --model <model> --reasoning-effort <effort> --context-compaction-soft-threshold <soft_fraction> --context-compaction-hard-threshold <hard_fraction> --session-id <uuid> "<prompt>"`
   - **Important flag note:** `muse exec` requires long flags `--model` and `--reasoning-effort` (or `--effort`);
     short flags `-m` and `-t` are rejected (`unexpected argument '-m' found`).
-- **~400k auto-compaction window:** Muse models expose a `1,048,576`-token window (`1M`). Setting
-  `--context-compaction-soft-threshold 0.35 --context-compaction-hard-threshold 0.38` triggers soft
-  compaction at `~367k` tokens and hard compaction at `~398.5k` tokens (`≤ 400k`). In interactive TUI
-  (`muse --yolo -m <model> -t <effort> -C <dir>`), monitor the status bar and run `/compact` at `38%`.
+- **Compaction:** The 2026-11-07 approved checkpoint targets an approximately 400k-token ceiling. Read the selected model's actual catalog window and choose supported headless fractions with soft below hard for that window. For a reported window of 1,048,576 tokens, `0.35` and `0.38` are an example corresponding to approximately 367k and 398.5k tokens; do not assume every model has that window. Installed `muse exec --help` lists these flags; behavioral enforcement remains a separate observation. The earlier 2026-11-04 `0.85/0.9` preference is historical for this later task target; see RUNTIME-LOADING.md. Interactive TUI does not accept these threshold flags. Run `cd <dir>` followed by `muse --yolo --model <model> --reasoning-effort <effort>` and monitor context; manual `/compact` is not an enforced automatic ceiling.
 - **Persistent defaults:** `/root/.config/muse/settings.json` stores `model_reasoning_efforts`
   (`{"muse-wonder-1.0": "high", "muse-spark-1.3": "medium"}`).
 - **Session log path:** `/root/.local/share/muse/sessions/YYYY/MM/DD/<session-uuid>/session.jsonl`
