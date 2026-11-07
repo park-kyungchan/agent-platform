@@ -48,9 +48,11 @@ semantics merely because the same bank is configured.
   and verify the effective override. Do not enable clients/configuration to
   overcome a deliberately disabled interface.
 - **CLI-agnostic model reasoning tiers & ~400k compaction (user decision 2026-11-07):**
-  assign open-ended reasoning, architecture, authoring and semantic review only to
-  high-reasoning models (`muse-wonder-1.0/high`, `gpt-6.1-sol/high`,
-  `claude-opus-5-5/high`, `Gemini 4 Argon`); restrict `muse-spark-1.3/medium` and
+  assign open-ended reasoning, architecture, authoring and semantic review according
+  to current user/task authority and actual runtime support, using a suitable
+  high-reasoning model. Examples include `muse-wonder-1.0/high`,
+  `gpt-6.1-sol/high`, `claude-opus-5-5/high` and `Gemini 4 Argon`; this is not an
+  exhaustive allowlist. Restrict `muse-spark-1.3/medium` and
   `gemini-3.8-flash-medium` strictly to deterministic, closed-spec tasks (fixed
   checklists, hash/count/diff verification, structured table/JSON projection).
   Target ~400k tokens for the original four CLIs using supported native controls;
@@ -66,8 +68,10 @@ semantics merely because the same bank is configured.
      halt immediately and adjust `paths.<prefix>` or knowledge-page scope.
   3. *Post-run Session JSONL Audit*: inspect the worker's native session log
      (`muse` `session.jsonl`, `agy` `transcript.jsonl`, `claude` project `.jsonl`,
-     `codex` `rollout-*.jsonl`) to verify actual `read_file`/tool targets and zero
-     unauthorized reads or leaks.
+     `codex` `rollout-*.jsonl`) to inspect recorded tool calls and targets. Logs
+     cannot establish absence of unrecorded subprocess, service, read or transmission
+     effects. Use separate isolation and access controls, plus appropriate independent
+     evidence, when an absence claim matters.
   4. *Leading Indicator `C` Recording*: classify injected context items at worker
      closure as `useful / irrelevant / misleading` (`misleading = 0` guardrail)
      and feed any `irrelevant`/`misleading` hit back into page/path refinement.
