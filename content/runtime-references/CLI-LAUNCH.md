@@ -1,21 +1,22 @@
-# CLI launch and MCP registration — verified facts (on demand)
+# CLI launch, ~400k compaction and MCP registration — verified facts (on demand)
 
 Dated host observations from 2026-11-06 and 2026-11-07. Re-check `--help` and the installed version
 before relying on a flag. This page records what was verified across all five installed CLIs (`Muse Code`,
 `Claude Code`, `Codex`, `Antigravity CLI (agy)`, `Grok Build (grok)`), so the next agent does not have to rediscover it.
 
-## Claude Code (2.1.319 after an in-session update on 2026-11-06)
+## 1. Claude Code (2.1.319 after an in-session update on 2026-11-06)
 
-- **Model:** `--model claude-sonnet-5-5` (or `opus`, `sonnet`, `fable` aliases). Append `[1m]` to
+- **Model:** `--model claude-sonnet-5-5` (or `claude-opus-5-5`, `opus`, `sonnet`, `fable` aliases). Append `[1m]` to
   the model name for the 1M-token context window, for example `--model 'claude-sonnet-5-5[1m]'`.
-- **Context window other than the default:** set `CLAUDE_CODE_AUTO_COMPACT_WINDOW=400k` (also
-  `400000`) in the launch environment together with the `[1m]` model. Auto-compaction then holds
-  the session at that size. Verified with `/context`: `65.1k/400k tokens`. A setting
-  `autoCompactWindow` exists as the settings-file equivalent. `CLAUDE_CODE_MAX_CONTEXT_TOKENS` is
+- **~400k auto-compaction window:** set `CLAUDE_CODE_AUTO_COMPACT_WINDOW=400000` (persisted in
+  `/root/.claude/settings.json` `env`, or `400k` in the launch environment together with the `[1m]` model).
+  Auto-compaction then holds the session at that size. Verified with `/context`: `65.1k/400k tokens`.
+  A setting `autoCompactWindow` exists as the settings-file equivalent. `CLAUDE_CODE_MAX_CONTEXT_TOKENS` is
   for models that Claude Code does not recognize.
-- **Effort:** `--effort high`. **Permissions:** `--permission-mode bypassPermissions` (matches
-  the Lead's mode). **Name:** `-n <display-name>`.
-- **Usage:** sessions on one Claude subscription share one weekly limit; a fresh session displayed
+- **Effort:** `--effort high`. **Permissions:** `--permission-mode bypassPermissions` (or
+  `--dangerously-skip-permissions`). **Name:** `-n <display-name>`.
+- **Session log path:** `/root/.claude/projects/<project-slug>/<session-uuid>.jsonl` (`type: "tool_use"` entries).
+- **Usage:** sessions on one Claude subscription share one weekly limit; a fresh session displays
   the remaining share at start.
 - Docs: https://code.claude.com/docs/llms.txt (model and context pages: `model-config`,
   `context-window`, `settings`).
@@ -75,12 +76,19 @@ These are native update checks, not model-inference acceptance. Preserve active 
 1. `herdr tab create --workspace <ws> --cwd <dir> --label <label> --env KEY=VALUE --no-focus`
    returns `.result.tab.tab_id` and `.result.root_pane.pane_id`. Set the environment here, because
    `herdr agent start` has no `--env`.
-2. `herdr agent start <name> --kind claude --pane <pane> --timeout 120000 -- <claude args>`
-   returns after the agent is ready for input.
+   To rename an existing tab or pane, use positional arguments:
+   `herdr tab rename <tab_id> <label>` and `herdr pane rename <pane_id> <label>`.
+2. `herdr agent start <name> --kind <claude|muse|agy|codex> --pane <pane> --timeout 120000 -- <cli args>`
+   returns after the agent is ready for input. For headless commands (`muse exec`, `codex exec`, bounded
+   scripts), use `herdr pane run <pane> "<command>"`.
 3. `herdr agent prompt <name> "<handoff pointer>" --wait --timeout 60000`, then read the pane and
-   verify the agent's own report (`/context`, visible tools). An idle state is not completion.
+   verify the agent's own report (`First output after reading: ...; Context-Injected: ...`, `/context`,
+   visible tools). An idle state is not completion.
 
-Do not export `HINDSIGHT_DISABLE_HOOKS` (native-first; see RUNTIME-LOADING.md).
+Do not export `HINDSIGHT_DISABLE_HOOKS` (native-first; see RUNTIME-LOADING.md). When a benchmark or
+isolated evaluation requires zero Hindsight injection, place the working directory under a declarative
+`paths.<prefix>` entry in `/root/.hindsight/coding-agent.json` (for example
+`"/home/palantirkc/work/eval-isolated": {"disabled": true}`).
 
 ## Shared custom MCP registration — user requirement 2026-11-07
 
