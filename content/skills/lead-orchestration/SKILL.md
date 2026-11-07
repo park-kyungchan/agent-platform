@@ -30,7 +30,7 @@ Use this TASK.md template, with exact values rather than transcript references:
 Owner: <Lead>; Worker: <assigned runtime/model/effort>
 State: <absolute STATE.md>; Canonical rules: <absolute AGENTS.md>
 Read first: /root/.agents/AGENTS.md, <absolute TASK.md>, <absolute STATE.md>, <needed skill SKILL.md absolute paths>
-First output after reading: <one-line list of the exact files read>
+First output after reading: <one-line list of the exact files read>; Context-Injected: <none | injected knowledge-page titles>
 Authority: <user decision and current task scope>
 Exact targets: <repo, worktree, branch, base/head, files and selected contracts>
 Strategy link: <confirmed STATE/STRATEGY.md and relevant KPI definition>
@@ -170,15 +170,23 @@ the task's free-space floor and unrelated build roots. Keep SSH host-key checkin
 Tailscale and target-owned remote update boundaries. Failure reports use
 `snake_case_code@path:line`, one short cause and no private payloads.
 
-## Dated worker defaults — 2026-11-05
+## Dated worker defaults — 2026-11-05 (updated 2026-11-07)
 
 These are task-scoped defaults, not permanent CLI roles or model availability
 claims. The actual assignment and permitted effects always come from task STATE.
+Target ~400k tokens using each runtime's supported native controls; verify actual
+enforcement, and qualify Grok separately. Manual compaction is not an automatic
+ceiling. Execute the 4-step Context Governance Optimization Loop (`Pre-spawn Parameter & Path
+Pinning` -> `First-Line Readback Gate` -> `Post-run Session JSONL Audit` ->
+`Leading Indicator C: useful / irrelevant / misleading` recording) per
+[CONTEXT-GOVERNANCE.md](../../runtime-references/CONTEXT-GOVERNANCE.md) and
+[CLI-LAUNCH.md](../../runtime-references/CLI-LAUNCH.md).
 
 | Runtime / model / effort | Default assignment |
 | --- | --- |
-| Codex `gpt-6.1-sol` / high | Implementation |
-| `gpt-6.1-terra` / high | Mechanical work with fixed inputs and checks |
-| Muse `muse-wonder-1.0` / high | Independent semantic review |
-| `muse-spark-1.3` | Fixed checks |
-| agy `Argon` only | Only the task assignment in STATE; do not substitute a model |
+| Codex `gpt-6.1-sol` / high | Design, source implementation, shared contracts and complex diagnosis |
+| Codex `gpt-6.1-terra` / high | Mechanical work with fixed inputs and checks |
+| Muse `muse-wonder-1.0` / high | High-reasoning authoring, complex implementation/diagnosis and independent semantic review |
+| Muse `muse-spark-1.3` / medium | Strictly deterministic, closed-spec tasks only (fixed checks, hash/count/diff verification, structured projection; zero open-ended reasoning) |
+| agy `Gemini 4 Argon (Medium)` / Claude `claude-opus-5-5` / high | Only the task assignment in STATE (e.g. Lead orchestration and acceptance) |
+| agy `gemini-3.8-flash-medium` | Strictly deterministic, closed-spec tasks and isolated benchmark candidate execution only |

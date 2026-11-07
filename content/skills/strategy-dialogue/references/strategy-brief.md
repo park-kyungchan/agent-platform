@@ -26,7 +26,13 @@ never operational KPI values/time series.
 
 ## Worked example — ws-replan pilot, CONFIRMED v1, 2026-11-05
 
-Source: `/home/palantirkc/work/ws-replan/STRATEGY.md`, read on 2026-11-05.
+Source: `/home/palantirkc/work/ws-replan/STRATEGY.md`, read on 2026-11-05 (note:
+on 2026-11-07 the user adopted v2 KPI refinements in `STRATEGY.md` — PR-qualified
+primary removal rate alongside raw file absence, 2-stage Academy MCP parity
+`Stage 1 Read-chain 4/8` + `Stage 2 Cutover 0/44`, Hindsight `24/35` guardrail
+with worker-level Leading Indicator `C` `useful/irrelevant/misleading`, and ~400k
+auto-compaction / deterministic model-tier boundaries; read `STRATEGY.md` for
+live program targets).
 The source is CONFIRMED v1: the user approved the Lead draft as written on
 2026-11-05. Historical note: the earlier example labeled the overall brief
 DRAFT v1 while its top-level KPIs were user-confirmed. The sanitized example

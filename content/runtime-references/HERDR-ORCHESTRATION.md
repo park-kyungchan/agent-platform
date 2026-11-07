@@ -29,10 +29,13 @@ agent guide is in OFFICIAL-DOCS.md.
    one tab per worker, with its assigned checkout. Only when topology/location
    are unspecified may ordinary authorized pane work use a same-tab/cwd sibling.
    Keep `--no-focus`; split right on wide panes, down on narrow/tall panes.
-2. Start with `herdr agent start <name> --kind <kind> --pane <new-pane-id> -- <native-args...>`.
+   To rename a tab or pane, pass positional arguments:
+   `herdr tab rename <tab_id> <label>` and `herdr pane rename <pane_id> <label>`.
+2. Start interactive agents with `herdr agent start <name> --kind <kind> --pane <new-pane-id> -- <native-args...>`.
    It returns only when Herdr detects the expected agent ready for input.
    Kinds are listed by `herdr agent` (claude, codex, gemini, agy, muse, and
-   others); pass only native args after `--`.
+   others); pass only native args after `--`. For headless CLI runs (`muse exec`,
+   `codex exec`, bounded scripts), use `herdr pane run <pane-id> "<command>"`.
 3. Hand work over as a handoff, not a transcript: goal, exact targets, allowed
    effects, expected output, and exact `TASK.md`, `STATE.md` and canonical
    `/root/.agents/AGENTS.md` paths. Launch source work at its assigned Git

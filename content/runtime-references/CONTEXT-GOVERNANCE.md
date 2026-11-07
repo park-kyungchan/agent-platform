@@ -43,9 +43,34 @@ semantics merely because the same bank is configured.
   An agent name or parallel-tools flag proves none of them.
 - Workers keep native Hindsight hooks and MCP (user decision 2026-11-06: never
   block a native feature). When a task needs memory isolation, run it under a
-  native coding-agents `paths.<prefix>` override (for example `{"disabled": true}`
-  or a separate bank) and verify the effective override. Do not enable
-  clients/configuration to overcome a deliberately disabled interface.
+  native coding-agents `paths.<prefix>` override (for example
+  `"/home/palantirkc/work/eval-isolated": {"disabled": true}` or a separate bank)
+  and verify the effective override. Do not enable clients/configuration to
+  overcome a deliberately disabled interface.
+- **CLI-agnostic model reasoning tiers & ~400k compaction (user decision 2026-11-07):**
+  assign open-ended reasoning, architecture, authoring and semantic review only to
+  high-reasoning models (`muse-wonder-1.0/high`, `gpt-6.1-sol/high`,
+  `claude-opus-5-5/high`, `Gemini 4 Argon`); restrict `muse-spark-1.3/medium` and
+  `gemini-3.8-flash-medium` strictly to deterministic, closed-spec tasks (fixed
+  checklists, hash/count/diff verification, structured table/JSON projection).
+  Target ~400k tokens for the original four CLIs using supported native controls;
+  verify actual enforcement per runtime. Manual compaction is not an automatic
+  ceiling. Qualify Grok separately (see `CLI-LAUNCH.md`).
+- **4-step Context Governance Optimization Loop (user decision 2026-11-07):**
+  1. *Pre-spawn Parameter & Path Pinning*: verify CLI launch flags, ~400k
+     compaction settings, `cwd` (`paths.<prefix>` isolation when needed) and
+     exact `Read first:` file list before spawning a worker.
+  2. *First-Line Readback Gate*: require the worker's first output line to state
+     `First output after reading: <exact paths>; Context-Injected: <none | injected knowledge-page titles>`.
+     If stale or unrequested context is injected and interferes with the task,
+     halt immediately and adjust `paths.<prefix>` or knowledge-page scope.
+  3. *Post-run Session JSONL Audit*: inspect the worker's native session log
+     (`muse` `session.jsonl`, `agy` `transcript.jsonl`, `claude` project `.jsonl`,
+     `codex` `rollout-*.jsonl`) to verify actual `read_file`/tool targets and zero
+     unauthorized reads or leaks.
+  4. *Leading Indicator `C` Recording*: classify injected context items at worker
+     closure as `useful / irrelevant / misleading` (`misleading = 0` guardrail)
+     and feed any `irrelevant`/`misleading` hit back into page/path refinement.
 - After reset/resume, reread current task rules/STATE/addenda before effects.
   A native session's retained context does not renew authority.
 
