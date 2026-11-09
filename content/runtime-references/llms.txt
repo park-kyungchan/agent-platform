@@ -1,35 +1,54 @@
-# Agent runtime references
+# Runtime and infrastructure reference index
 
-> Index of /root/.agents/runtime-references for every coding CLI on this host: Muse Code, Claude Code, Codex, Antigravity CLI (agy) and Grok Build (grok). Read this index first. Then open only the one reference or official page that the next decision needs. Source: agent-platform `content/runtime-references/`, deployed byte-identical to /root/.agents/runtime-references/. Grok Build was added on 2026-11-07; its official index returned HTTP 200. Earlier route checks are dated 2026-11-06.
+Start here; read only the local section or official page needed for the next decision. Shared authority is `/root/.agents/AGENTS.md`; task authority is its current STATE/TASK. Installed directory: `/root/.agents/runtime-references/` (plural). Do not create a singular alias, another loader, per-CLI instruction copies or a full-manual mirror. Source: agent-platform `content/runtime-references/`; installation and native consumption require separate verification.
 
-## Local references (on demand)
+## Local host contracts — on demand
 
-- [runtime-bootstrap.md](runtime-bootstrap.md): where work, repositories and task state live when a location is missing.
-- [codebase-orientation.md](codebase-orientation.md): how to orient in a codebase and workspace without scanning everything.
-- [RUNTIME-LOADING.md](RUNTIME-LOADING.md): what each CLI loads at session start and per turn; Hindsight loading versus retention.
-- [CLI-LAUNCH.md](CLI-LAUNCH.md): verified launch flags (model, context window, effort, permissions), Herdr tab/agent start, and per-CLI MCP registration, including academy_operations.
-- [runtime-wiring.md](runtime-wiring.md): shared custom MCP policy, direct native registrations, vendor-owned exclusions and verified wiring.
-- [global-runtime-routing.md](global-runtime-routing.md): coordination of concurrent writers, shared builds and compact handoffs.
-- [HERDR-ORCHESTRATION.md](HERDR-ORCHESTRATION.md): a Lead running several CLIs through Herdr.
-- [CONTEXT-GOVERNANCE.md](CONTEXT-GOVERNANCE.md): which store owns which information (task STATE, repository, Hindsight, domain owner); the Academy lesson archive exception.
-- [HINDSIGHT-RUNTIME.md](HINDSIGHT-RUNTIME.md): how the Hindsight server stores, retrieves and refreshes pages; write semantics and cost.
-- [OFFICIAL-DOCS.md](OFFICIAL-DOCS.md): verified official documentation routes per runtime, with version notes.
-- [skills.md](skills.md): the custom skills and where they are owned.
-- [runtime-core.v2.md](runtime-core.v2.md): the user-approved shared runtime core text.
+- [runtime-bootstrap.md](runtime-bootstrap.md): unknown workspace/repository location.
+- [codebase-orientation.md](codebase-orientation.md): bounded source/task orientation.
+- [RUNTIME-LOADING.md](RUNTIME-LOADING.md): instruction discovery, context construction, resume and skill/tool loading differences.
+- [CLI-LAUNCH.md](CLI-LAUNCH.md): native launch/resume/model/compaction surfaces; no launch authority.
+- [runtime-wiring.md](runtime-wiring.md): per-CLI config owners, shared custom MCP registration, hooks and account boundaries.
+- [global-runtime-routing.md](global-runtime-routing.md): concurrent writers, shared resources and handoffs.
+- [HERDR-ORCHESTRATION.md](HERDR-ORCHESTRATION.md): authorized terminal/pane coordination.
+- [CONTEXT-GOVERNANCE.md](CONTEXT-GOVERNANCE.md): short-term CLI/task state, durable Hindsight context, source/domain authority and correction protocol.
+- [HINDSIGHT-RUNTIME.md](HINDSIGHT-RUNTIME.md): memory retrieval, retention, page refresh and installed API boundaries.
+- [OFFICIAL-DOCS.md](OFFICIAL-DOCS.md): task-to-owner routing, bounded lookup and validation rules.
+- [skills.md](skills.md): repository/custom versus vendor skill ownership.
+- [runtime-core.v2.md](runtime-core.v2.md): approved shared core; not another startup include.
 
-## Official upstream indexes (llms.txt)
+## Official CLI indexes
 
-- [Claude Code](https://code.claude.com/docs/llms.txt): Claude Code docs index. Every page is also available as `.md`. The full text is https://code.claude.com/docs/llms-full.txt (about 10 MB; grep it, do not load it).
-- [Anthropic platform](https://docs.claude.com/llms.txt): Claude API and model documentation.
-- [Codex](https://learn.chatgpt.com/llms.txt): Codex CLI, configuration and hooks (the same index is at developers.openai.com/codex/llms.txt). Full text: https://learn.chatgpt.com/llms-full.txt (about 2.8 MB).
-- [Antigravity](https://antigravity.google/llms.txt): Antigravity and agy. No llms-full.txt (404 on 2026-11-06).
-- [Meta Model API and Muse Code](https://dev.meta.ai/llms.txt): Muse Code pages are listed there and can be fetched as `.md`, for example https://dev.meta.ai/docs/muse-code/configuration.md. No llms-full.txt.
-- [Grok Build](https://docs.x.ai/llms.txt): use the `Grok Build` section, including `build/overview.md`, `build/features/project-rules.md`, `build/settings/reference.md` and `build/cli/reference.md`. Native Linux installer: https://x.ai/cli/install.sh. `grok inspect --json` reports discovery; `grok update` owns updates. Foreign MCP imports are disabled on this host; custom servers register directly in `~/.grok/config.toml` (see runtime-wiring.md).
-- [Herdr](https://herdr.dev/llms.txt): Herdr terminal multiplexer docs; also https://herdr.dev/agent-guide.md.
-- [Hindsight](https://hindsight.vectorize.io/llms.txt): Hindsight memory server. Full text: https://hindsight.vectorize.io/llms-full.txt (about 1 MB). The installed API is `GET /openapi.json` on the local server.
+| Owner | Publisher index | Select within that index |
+|---|---|---|
+| Claude Code | https://code.claude.com/docs/llms.txt | CLI reference, memory, skills, MCP/tool search, settings, sub-agents |
+| Muse Code | https://dev.meta.ai/llms.txt | Muse Code configuration, extending and native CLI pages; other Meta API pages are separate |
+| Grok Build | https://docs.x.ai/llms.txt | Grok Build overview, CLI reference, project rules, settings and MCP; model API docs are separate |
+| Codex | https://learn.chatgpt.com/docs/llms.txt | Codex CLI, config reference, instructions, skills, plugins and hooks; distinguish other ChatGPT products |
+| Antigravity CLI (`agy`) | https://antigravity.google/llms.txt | CLI use, customization discovery, rules, skills, hooks, settings and subagents |
+| Anthropic API | https://docs.claude.com/llms.txt | API/tool-search protocol when the Claude Code page leaves a wire contract unresolved |
 
-## Skills (deployed to /root/.agents/skills)
+## Official infrastructure indexes
 
-- herdr, herdr-hermes, explain-precisely, lead-orchestration, lessons-loop, strategy-dialogue: owned by agent-platform `content/skills/`.
-- academy-runtime-routing, academy-student-context (with references/lesson-archive.md and references/term-map.md): owned by education-platform `content/skills/`.
-- hindsight-coding-agent: vendor-generated by the Hindsight coding-agents installer; do not edit.
+| Owner | Publisher index / primary documentation | Scope |
+|---|---|---|
+| Hostinger | https://www.hostinger.com/llms.txt ; https://www.hostinger.com/api/llms.txt ; https://www.hostinger.com/developers/llms.txt ; https://www.hostinger.com/docs/llms.txt ; https://docs.hostinger.com/llms.txt | Publisher root, API/MCP, developer and product documentation indexes; VPS API schema: https://developers.hostinger.com/openapi/openapi.json . Distinguish provider effects from guest/container operations |
+| Docker | https://docs.docker.com/llms.txt | Engine, CLI, Compose, Dockerfile/build and API documentation selected through the index |
+| Herdr | https://herdr.dev/llms.txt ; https://herdr.dev/agent-guide.md | Terminals, panes and native agent control; no domain authority or permanent model roles |
+| Tailscale | https://tailscale.com/llms.txt → https://tailscale.com/docs/llms.txt | Network identity, connectivity, SSH and access policy; docs pages advertise Markdown forms |
+| Hindsight | https://hindsight.vectorize.io/llms.txt | Memory server; API quickstart: https://hindsight.vectorize.io/developer/api/quickstart ; reference: https://hindsight.vectorize.io/api-reference . Compare installed OpenAPI/native integration before effects; the advertised `/sdks/mcp` leaf returned404 |
+
+Use publisher-advertised child indexes, Markdown pages, OpenAPI/schema or focused CLI reference when relevant. An index is navigation, not a requirement to fetch all linked text. Read a publisher's full-text manual only for a selected unresolved topic with bounded extraction. Do not guess `llms-full.txt` or treat a redirect to an HTML homepage as an index. Hostinger API `https://developers.hostinger.com/llms.txt` returned404; use the root index/API documentation rather than repeatedly trying it. Tailscale `/kb/llms.txt` redirected to HTML; use `/docs/llms.txt`.
+
+## Supporting native owners
+
+These operations may appear in infrastructure tasks but belong to their own publishers, not the hosting provider or coding CLI. Use installed `--help`/man pages first for installed syntax. When an official LLM index is not verified, use the official reference directly; do not fabricate one.
+
+- Model Context Protocol: https://modelcontextprotocol.io/llms.txt (protocol semantics; CLI configuration remains native-owned)
+- OpenSSH: https://www.openssh.com/manual.html
+- systemd: https://www.freedesktop.org/software/systemd/man/latest/
+- Git: https://git-scm.com/docs ; GitHub CLI: https://cli.github.com/manual/
+- Rust/Cargo: https://doc.rust-lang.org/cargo/ ; https://doc.rust-lang.org/rustc/
+- Node.js: https://nodejs.org/api/ ; Bun: https://bun.sh/docs
+
+Product boundaries and checked evidence live in [OFFICIAL-DOCS.md](OFFICIAL-DOCS.md). This set covers the named owners and current supporting boundaries, not every external service or future integration.

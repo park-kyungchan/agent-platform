@@ -15,7 +15,7 @@ content changes, not Hindsight migration, configuration or deployment.
 | Owner, authority, holds, next action, task metrics and verification | Current TASK/STATE; task STRATEGY.md for its brief | Assigned owner edits task files and dates changed decisions/addenda | Read on entry/reset/handoff and before effects when changed |
 | Implemented behavior, schemas, APIs, tests, build instructions and KPI definitions | Owning repository source/docs and native observations | Authorized implementation owner, reviewed source/tests | Read the selected current revision and contract; do not rely on a remembered implementation |
 | Durable decisions, rationale, lessons, corrections, scoped preferences, explained terms and strategy decisions | One shared Hindsight bank, `coding-agent::shared` | Authorized owner/curator through official HTTP/client for structured records; MCP only for simple notes/initiatives | Search/read selected pages first; recall exact evidence; reflect only for unresolved reasoning |
-| Current operational objects, observations, KPI time series, policies, actions and recovery | Domain/task owner today; future Ontology boundary. Exception: the Academy lesson archive in Hindsight (user decision 2026-11-06; education-platform `content/skills/academy-student-context/references/lesson-archive.md`), written by the lesson agent through the MCP `hindsight_ingest_document` tool with a deterministic title | Trusted domain owner under current admission and task authority | Fresh authorized owner read with revision, scope, coverage and freshness; memory is only a citation |
+| Current operational objects, observations, KPI time series, policies, actions and recovery | Domain/task owner today; future Ontology boundary. Exception: the Academy lesson archive in Hindsight (user decision 2026-11-06; education-platform `content/skills/academy-student-context/references/lesson-archive.md`), written by the designated lesson owner under the current Hindsight `academy-practical-protocol` archive-writer contract (official structured storage with deterministic IDs and explicit provenance, user-approved 2026-11-09) | Trusted domain owner under current admission and task authority | Fresh authorized owner read with revision, scope, coverage and freshness; memory is only a citation |
 
 A confirmed Strategy Brief lives in task STATE/STRATEGY.md. Hindsight may retain
 its strategy decision and an authorized KPI definition/rationale linked to repo
@@ -160,11 +160,10 @@ scoped profile instead of copying it. Never re-ingest a generated page as source
 
 Academy lesson records are the one exception (user decision 2026-11-06): the academy
 server removes old rows, so Hindsight archives dated teacher statements and source
-observations under real student names, as education-platform
-`content/skills/academy-student-context/references/lesson-archive.md` specifies,
+observations under real student names, as the Hindsight `academy-practical-protocol` owner specifies; education-platform
+`content/skills/academy-student-context/references/lesson-archive.md` is a thin locator,
 excluding credentials, answer-key literals and parent contact details. An archived
-observation is a dated snapshot, not live state; a fresh owner read wins while
-the server still shows the row. Never retain credentials. Apart from that
+observation is a dated snapshot, not live state; a fresh owner read supersedes an older archived app observation only for the same fact and stage of the same occurrence while the server still shows the row. An original source score does not reopen a later teacher-final completion. Never retain credentials. Apart from that
 archive, do not retain raw student/exam/lesson records, operational rows,
 action receipts/journals, KPI measurements/time series, full STATE copies,
 pane/model/quota assignments, CI logs, repeated transcripts, executable schema

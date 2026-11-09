@@ -1,43 +1,30 @@
-# Custom skills — on demand
+# Skill ownership and selection
 
-Reviewed generic skill source is `agent-platform/content/skills/`; deployed shared
-custom source is `/root/.agents/skills/<skill>/SKILL.md`. Load only the relevant
-skill; native catalogs expose its scope. Source publication does not establish
-host installation or native discovery.
+Native catalogs expose metadata; read a selected skill body only when relevant. Files, native discovery, activation, actual body delivery and correct application are separate evidence. Official native skill documentation is selected through [llms.txt](llms.txt); host loading differences are in [RUNTIME-LOADING.md](RUNTIME-LOADING.md).
 
-| Skill | Use |
-| --- | --- |
-| explain-precisely | Every user-facing explanation: Korean prose, original English programming terms, concrete first-use definitions and no metaphor. Replaces explain-code-clearly. |
-| lead-orchestration | The role assigned as Lead in task STATE: bounded dispatch, independent isolated review, PR/CI and verified closure. No CLI has a permanent role. |
-| strategy-dialogue | User–Lead Strategy Brief, KPI-first reporting, guardrails and work threads; any CLI assigned Lead. |
-| lessons-loop | Authorized closure capture and curation of L0–L3 lessons, structural issues and direction proposals through official Hindsight surfaces. |
-| herdr | Explicitly authorized native Herdr terminal/pane/agent control. |
-| herdr-hermes | Native Hermes sessions through Herdr when requested. |
+## Custom source owners
 
-Generic Academy routing belongs to education-platform; teacher reporting is
-planned for the private education-dc-gang-a owner, with its current distribution
-copy retained in education-platform until verified transfer/recovery and consumer
-checks. TASK names the selected owning skill path; do not assume repo-native links
-or global-alias removal are already deployed. `academy_operations` is directly registered in all five native CLIs under the user's 2026-11-07 CLI-agnostic custom-MCP requirement. Current TS backend ownership, single-account serialization, unconfigured saves and Rust cutover qualification remain domain conditions. No direct fallback.
-Hindsight and Scrapling
-are separately managed. The November4 audit's directory count is historical;
-this source change does not install skills or update per-CLI links.
+| Skill | Source owner / purpose |
+|---|---|
+| explain-precisely | agent-platform `content/skills/`; Korean user-facing explanations with concrete programming terms |
+| strategy-dialogue | agent-platform; assigned Lead strategy brief, KPI-first reports and material-choice interview |
+| lead-orchestration | agent-platform; assigned Lead bounded delegation, independent review, delivery and closure |
+| lessons-loop | agent-platform; authorized durable lessons and correction; no mandatory capture |
+| herdr | agent-platform; explicitly requested control from a genuine Herdr caller |
+| herdr-hermes | agent-platform; requested Hermes sessions and target-owned runtime/update boundary |
+| academy-runtime-routing | education-platform `content/skills/`; native Academy registration and domain/account/cutover boundaries |
+| academy-student-context | education-platform; Hindsight-first preparation/status/history protocol with authorized domain reads |
 
-Codex/Gemini/Muse catalog checks from November1 are historical observations. Current user-confirmed coding runtimes are Muse, Claude, Codex, Antigravity CLI and Grok Build (2026-11-07); Gemini CLI is absent. Claude personal and Antigravity config/skills links use the shared source; a symlink/catalog does not prove a fresh child/session loaded the body. Grok native inspection discovers shared skills and Claude-compatible skills without a Grok skills directory; its custom MCPs are independently registered and its global AGENTS pointer links canonical guidance; discovery does not prove fresh model use. Keep supported per-CLI metadata in the skill folder. Hermes' read-only host-agents mount does not prove native catalog registration; no profile migration was applied.
+Deployed shared custom path: `/root/.agents/skills/<skill>/SKILL.md`. Publication, host installation and native session consumption require separate verification. Do not change another source owner's distribution copy or infer a transfer/removal from a plan. Academy teacher reporting retains its current distribution owner until the private-module transfer/recovery and consumers are verified.
 
-Custom ai-gateway and typesafe-ai were user-selected and removed after a complete verified Drive restore. Do not recreate them from archived legacy instructions; if needed later, use current official capabilities and the improved memory. Vendor plugins are separate; the official Vercel gateway plugin was preserved.
+## Vendor and native ownership
 
-Official Hindsight companion skills remain vendor-generated and native-sync-owned, including their per-runner copies. Do not rewrite them into a custom integration. Scrapling and Claude account-synced vendor skills retain upstream provenance. Repository-owned skills remain scoped to their repository and live pilot constraints.
+Hindsight companion skills are vendor-generated/native-sync-owned. Scrapling and account-synced/marketplace skills retain upstream/native provenance; do not rewrite their caches, turn them into custom MCP definitions or create per-CLI copies. CLI-supported frontmatter/discovery/disable controls differ; do not assume one YAML field has identical behavior in all runtimes.
 
-Work and recovery: `/home/palantirkc/work/ws-skill-standard/STATE.md`, `SELECTION.md`, `evidence/archive-remote-restore.json`. This reference is navigation, not a skill loader or execution authority.
+User-selected native feature exclusions live in effective CLI config, not a second skill registry. For scope-specific exclusion inspect the exact selected package/app/skill identity and verify a fresh owned native context; retain recovery bytes and preserve unrelated features. Old mention counters, missing explicit invocations and a single neutral task are not proof a skill is useless. Do not revive retired ai-gateway/typesafe-ai integrations from historical guidance.
 
-For large work, pass only required skill names and selected source/STATE paths in the handoff. Load a skill body when needed rather than every runtime reference or plugin skill. Runtime-specific discovery boundaries and trust are in RUNTIME-LOADING.md; do not copy shared skill bodies into per-CLI instructions or assume a child inherits a parent-activated skill.
+## Handoff and memory
 
-Memory tiers and glossary/lessons ownership are in `CONTEXT-GOVERNANCE.md` on
-demand; skill instructions do not authorize otherwise forbidden memory writes.
+Pass exact task STATE, source paths and only the required skill names/bodies. A child does not necessarily inherit the parent's activated skill or expanded canonical pointer. When native import expansion is unproven, explicitly read canonical guidance and current STATE before effects. Use native runtime evidence rather than adding a loader.
 
-Herdr topology/cwd follows TASK/STATE; assigned Leads use one tab per worker.
-Use [worker closure](../skills/lessons-loop/references/worker-closure.md) for
-returned evidence/holds and optional lesson candidates, and
-[strategy-dialogue](../skills/strategy-dialogue/SKILL.md) for Strategy/KPI rules.
-These links add no loader, delegation requirement or memory-write authority.
+[CONTEXT-GOVERNANCE.md](CONTEXT-GOVERNANCE.md) owns memory tiers/provenance and isolation. Structured Hindsight record updates use the selected official procedure/owner; no skill grants memory writes or task effects. Current measurements/native session artifacts stay in the task; authorized reusable decisions/lessons belong in Hindsight. Code and executable contracts remain with their source owners.
