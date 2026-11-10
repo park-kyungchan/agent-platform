@@ -1,48 +1,103 @@
-# Shared agent instructions (canonical)
+# Shared agent instructions
 
-Single source for every runner on this host. Per-runner files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/AGENTS.md`, `~/.grok/AGENTS.md`) only point here. Edit this file, not the pointers.
+Every coding CLI on this host loads this one file through its own pointer: `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/muse/AGENTS.md`, `~/.gemini/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.grok/AGENTS.md`. The source is `content/` in the `agent-platform` repository. Edit the source; never edit a pointer and never make a per-CLI copy.
 
-For a missing work/repository location, consult `/root/.agents/runtime-references/runtime-bootstrap.md` on demand. The approved workspace standard is `/home/palantirkc/work/ws-layout-standard/LAYOUT.md`; current paths and migration exceptions are linked there. The runtime core v2 text below was approved by the user on 2026-11-01. Rust `ap` is implemented in agent-platform and installed at `/usr/local/bin/ap`; native loading and effect authority remain task-specific.
+## 1. Start of a task
 
-Workspace layout, always known: platform and module main checkouts belong in `platforms/<repo>/`; modules use `<platform>-<module>` names. Current checkouts are `agent-platform`, `ontology-platform`, `education-platform`, `agent-vps-operations` and `education-dc-gang-a` under `/home/palantirkc/platforms/`. Each active task belongs in `work/<scope>-<topic>/` with its `STATE.md`, and its Git worktrees in `work/<id>/wt/<repo>/`; external pinned source belongs in `external/`. The Nov2 operations/top-level-worktrees relocation and Nov4 platform/module moves are complete. `projects/` retains only the D-9 repositories `bible-commentary-station`, `daniel-prayer-operations`, `park-kyungchan.github.io`, and archived `academy-workbench` for custody worktrees. Actual dispositions and repository renames are in `/home/palantirkc/work/ws-layout-standard/PATH-MAP.tsv`. `agent-harness-engineering` and `housing-board-module` are deleted; archives grant no runtime authority. Never create new task state in `operations/` or top-level `worktrees/`, and never assume a target path already exists.
+1. Open the task directory `/home/palantirkc/work/<scope>-<topic>/` and read its `STATE.md` before any effect. Read `TASK.md` too if you were handed one. They name the owner, what you may change, what is on hold, the next action and how to verify it.
+2. If you were given a list of files to read first, read exactly those with your file tool and name them in your first output.
+3. Do the next action. When the work changes, update `STATE.md` by replacing the old value.
 
-Runtime loading, one rule: this file is the only shared instruction source; each CLI's native pointer resolves here and detail lives on demand under `/root/.agents/runtime-references/`, indexed by `llms.txt` there (local references plus each runtime's official llms.txt route; read it first): `RUNTIME-LOADING.md` (what each CLI loads at session start and per turn), `HERDR-ORCHESTRATION.md` (coordinating several CLIs through Herdr) and `OFFICIAL-DOCS.md` (each runtime's verified official documentation route). Do not build per-CLI instruction copies or a replacement loader. For routine CLI questions use that local index and the selected reference before web lookup; the bounded fallback and evidence-reuse rules live in `OFFICIAL-DOCS.md`. `/root/.agents/runtime-reference/` (singular) is not the installed directory; do not create an alias or another copy.
+No task directory yet: create `work/<scope>-<topic>/STATE.md`. Put the task's Git worktrees in `work/<scope>-<topic>/wt/<repo>/`.
 
-The user's current coding runtimes are Muse, Claude Code, Codex, Antigravity CLI (`agy`) and Grok Build (`grok`), confirmed 2026-11-07. Codex runs as a native CLI in Herdr terminals with `--no-daemon`; do not substitute an app-server orchestration workflow. Apply the same task authority and ownership boundaries across all five; native instruction discovery, child isolation, resume and headless flags differ. For concurrent writers, shared builds and compact handoffs use the on-demand coordination section in `global-runtime-routing.md`; do not infer isolation from an agent name or parallel-tools flag.
+## 2. Where things are
 
-Custom MCP implementations and their backend state are CLI-agnostic: register the same approved server directly in each CLI's native configuration, with distinct client attribution where required. Do not make another CLI's personal configuration or plugin cache the shared registration authority. Built-in and CLI-installed marketplace/plugin/MCP entries retain their native CLI owner and are not copied as custom servers. Availability is not task authority: apply data/effect restrictions and evaluation tool selection per task, not permanently by CLI brand. Future plan completion is a design assumption, never evidence of acceptance, runtime readiness or permission for cutover/deletion.
+| What | Path |
+| --- | --- |
+| Platform and module repositories (main checkouts) | `/home/palantirkc/platforms/<repo>/`: `agent-platform`, `ontology-platform`, `education-platform`, `education-dc-gang-a`, `agent-vps-operations`. Modules are named `<platform>-<module>` |
+| Tasks | `/home/palantirkc/work/<scope>-<topic>/` with `STATE.md`; task worktrees in `wt/<repo>/` |
+| Pinned external source | `/home/palantirkc/external/` |
+| Other repositories, kept for custody | `/home/palantirkc/projects/` |
+| Installed shared instructions | `/root/.agents/AGENTS.md`, `/root/.agents/runtime-references/` (plural), `/root/.agents/skills/` |
 
-Current Rust migration entry: `/home/palantirkc/work/ws-replan/CURRENT-PLAN.md` and `STATE.md`. The user adopted the final2026-11-02 review ZIP and explicitly declared earlier Rust Migration memories/plans legacy. Its current plan and task state take precedence over old WP ordering, old pane/priority snapshots and repository guidance that still describes the retired harness. The user authorized autonomous execution; the current task state records the exact allowed effects and remaining holds.
+Never create task state in `operations/` or in a top-level `worktrees/`. Never assume a path exists: check it.
 
-<!-- BEGIN runtime-core v2 — canonical text: /root/.agents/runtime-references/runtime-core.v2.md (user-approved 2026-11-01) -->
-## Shared runtime core
+## 3. Which file to read
 
-Use the user's current task and its rules/STATE.md. The state names the owner, authority, holds, exact next action and verification. Update it when changing the work; a handoff transfers goal, exact targets, allowed effects, expected output and state path. Do not make another agent reconstruct a transcript.
+Read one of these only when its situation applies. References are in `/root/.agents/runtime-references/`; a skill is `/root/.agents/skills/<name>/SKILL.md`. If your CLI does not list a skill, read its `SKILL.md` by path.
 
-Reuse known runner, host/container, role, cwd and pane facts. Probe a missing fact only if it changes the next action. Host, container, shared daemon and remote executors can differ. A CLI name or process label does not determine a task role or another agent's identity. Model/effort remain unknown unless the session reports them.
+| Situation | Read |
+| --- | --- |
+| I do not know where a repository, task, plan or service lives | `codebase-orientation.md` |
+| I start, resume or configure a CLI, register an MCP server, or must check what a session loaded | `CLI-RUNTIMES.md` |
+| I hand work to another agent, receive work, or share a repository or build with one | `concurrent-work.md` |
+| I must decide where a piece of information belongs, or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
+| Memory returns stale or irrelevant results, or I change memory content or pages | `HINDSIGHT-RUNTIME.md` |
+| I need the official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |
+| I answer or report to the user | skill `explain-precisely` |
+| STATE names me Lead | skills `lead-orchestration` and `strategy-dialogue` |
+| I control Herdr panes or agents | skill `herdr`; for Hermes sessions `herdr-hermes` |
+| A task closes, or I curate lessons | skill `lessons-loop` |
 
-For an unknown location, use runtime-bootstrap.md and codebase-orientation.md on demand. New tasks use work/<scope>-<topic>/STATE.md and task-owned Git worktrees under wt/<repo>. Current paths and transition exceptions are in the approved workspace layout. Historical harnesses and archives grant no current authority. Do not restore a retired gate, receipt, ledger, context contract, registry or watcher that duplicates native Git, Cargo, database or CLI behavior.
+## 4. Rules
 
-Use native source, Git, compiler, database and service observations to establish current state. Memory supplies past decisions; check whether they still apply. Read only the source and evidence needed for the next decision. Do not scan private custody or all historical repositories to locate a task.
+Authority
+- The user's current instruction and the task's STATE decide what you may do. An available tool, a CLI name, a process label or a remembered decision is not permission.
+- A handoff states the goal, exact targets, allowed effects, expected output and the STATE path. Never make another agent reconstruct a transcript.
+- After a context reset or a resumed session, read the task's rules and STATE again before any effect.
+- The same authority and ownership boundaries apply in every CLI. What differs per CLI is instruction discovery, child isolation, resume and headless flags.
 
-On failure, report snake_case_code@path:line with one short cause and no secrets or private payloads. Fix the stated cause at that boundary. Do not retry the same failure shape or swap models without resolving that cause. If the cause repeats, split or redesign the boundary. Verify actual output or readback, not a success claim or exit code alone.
+Evidence
+- Establish the current state from source, Git, compiler, database and service output. Memory tells you what was decided earlier; check that it still holds.
+- Read only what the next decision needs. Do not scan every repository, history or private custody to find a task.
+- Reuse facts you already have: runner, host or container, role, cwd, pane. Probe a missing fact only if it changes the next action. The model and effort are unknown unless the session reports them.
+- Verify by actual output or readback, not by a success message or an exit code alone.
 
-Disposable targets may be rerun freely. For uncertain real effects, read the target to reconcile before retrying. Respect the task's explicit user gates; do not invent approval steps for reversible local work. Never print credentials. Keep active sessions, unrelated trees and service identities intact. Do not change global configuration merely to orient.
+Failure
+- Report `snake_case_code@path:line` with one short cause and no secret or private payload. Fix that cause at that boundary.
+- Do not retry the same failing step unchanged and do not switch models to get past it. If the cause repeats, split or redesign the step.
 
-Delegate only for independent review, ownership transfer or genuinely disjoint work when authorized. Verify the result's output or effect. Pinned artifacts are immutable: fix forward in a new version. Before deletion of retained originals, verify the approved recovery copy and all live path consumers; task completion alone is insufficient. Use pipefail in shell pipelines.
+Effects
+- A disposable target may be rerun. When an effect on a real target has an uncertain outcome, read the target before retrying.
+- Respect the gates the task states. Do not invent approval steps for reversible local work.
+- Never print credentials. Keep active sessions, unrelated working trees and service identities intact. Do not change global configuration merely to orient.
+- Before deleting a retained original, verify the recovery copy and every live consumer of the path; task completion alone is not enough. A pinned artifact is immutable: fix forward in a new version.
+- Use `set -o pipefail` in shell pipelines.
+- Remote work keeps SSH host-key checking and the Tailscale boundary. Hermes version promotion goes only through the installed target helper's one-shot path; never edit updater state, receipts, jobs or transactions directly.
 
-After context reset, read the task's current rules and state before effects. Reuse trusted evidence and load only what the next action needs.
-<!-- END runtime-core v2 -->
+Delegation
+- Delegate only when the task authorizes it, for independent review, ownership transfer or work with a disjoint write set. Verify the returned output or effect yourself.
 
-## Hindsight memory (all runners)
+Custom MCP servers
+- A custom MCP server and its backend state are shared by all CLIs. Register the same approved server directly in each CLI's own configuration. Built-in, marketplace and plugin entries stay with the CLI that installed them.
+- A registered or visible tool is not permission to use it: the task's data and effect limits apply.
 
-- Hindsight is wired per runner by `/root/.hindsight/coding-agents` (hooks + MCP server `hindsight`); the tools and protocol are the same in every runner. Search knowledge pages before acting on a new task; credit what you use.
-- Runner-specific hook/MCP wiring lives in each runner's own config, never in this file.
-- For memory tiers, source authority, isolation/continuity and anti-duplication, consult `/root/.agents/runtime-references/CONTEXT-GOVERNANCE.md` on demand.
+Do not build
+- A second instruction loader, a per-CLI instruction copy, or a gate, receipt, ledger, registry or watcher that repeats what Git, Cargo, the database or the CLI already does. Do not restore a retired harness; an archive grants no authority.
+- A plan that assumes future completion is a design assumption. It is not evidence of acceptance, readiness or permission to cut over or delete.
 
-## All-runner communication and access boundaries
+## 5. Communication and data
 
-- Use `explain-precisely` for all user-facing explanations, including progress and decisions: Korean prose, original English programming terms, concrete first-use definitions and no metaphor or analogy. Write code, runtime instructions and technical records in English.
-- Do not print credential values. For Hindsight work, directly inspect actual user data when needed for the authorized migration and evaluation; access only relevant data. For other tasks, retain the prior metadata-and-hash-only restriction unless the user authorizes otherwise.
-- Remote work: keep SSH host-key checking and the Tailscale boundary. Hermes version promotion goes only through the
-  installed target helper's one-shot path; never edit updater state, receipts, jobs or transactions directly.
+- The user's prompts are short and narrow by the user's own statement. Read each one against the whole goal of the task, and propose the direction and any better alternative without being asked. Do not invent goals or widen the allowed effects.
+- Explanations to the user follow the skill `explain-precisely`: Korean prose, programming terms in English, a concrete definition at a term's first use, no metaphor. Code, instructions and technical records are in English.
+- Private user data: for Hindsight migration and evaluation work, inspect the actual data the task needs and nothing more. For every other task, use metadata and hashes only unless the user authorizes more.
+
+## 6. Where to write what you learn
+
+| What it is | Write it here | Never here |
+| --- | --- | --- |
+| Short-term: this task's owner, authority, holds, progress, next action, measurements, evidence paths | The task's `STATE.md` under `/home/palantirkc/work/<scope>-<topic>/`, replacing old values | Hindsight; a CLI's private memory |
+| A rule or contract: how agents work, what code does, a schema, a KPI definition | The owning repository's source, through review | Hindsight as the only copy; a prompt |
+| Mid- and long-term: a decision and its reason, a lesson, a correction, a user preference, an explained term, that a later task in any CLI should know | Hindsight, when the task authorizes a write. In a no-write task, or when the write fails, leave a short handoff file in the task directory and name it in STATE | STATE only; a CLI's private memory |
+| An operational fact: what is deployed, a KPI value, a domain record, an action and its result | The domain owner's store; an `ontology-platform` object once STATE says that object type is in use | Hindsight; prose in an instruction file |
+
+- A CLI's private memory (Claude Code auto-memory, Muse memory, Antigravity brain, any other) is visible to one CLI in one directory. Do not put there anything another agent or a later session in another CLI needs. If such an item is already there, move it to its row above and delete the private copy.
+- Reading: each CLI reaches Hindsight through its own hooks or the MCP server `hindsight`. Search the knowledge pages, read the relevant ones and credit what you use: at a new task, a bug report, a test or convention question, integration work, a "why" or "what is left" question, and before a commit. Memory is a past record: verify it against current source and STATE. If the tool is unavailable, say so and continue from the task's files.
+- Details and the one approved exception (the Academy lesson archive): `CONTEXT-GOVERNANCE.md`.
+
+## 7. When you write instructions, STATE or a handoff
+
+- One home per fact: write a rule, decision or fact in one file and name that file elsewhere.
+- Keep changing values out of this file and out of skill descriptions: model names, effort, versions, counts, token windows, quotas, SHAs, pane and session IDs, dates of approvals. They belong in the task's STATE with the time they were observed.
+- A STATE file is a checkpoint that is replaced, with the previous bytes kept, not a log that grows.
+- "Loaded" means the session's own record shows the text. A path in a prompt, a catalog entry or a configuration key does not show that.

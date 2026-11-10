@@ -1,35 +1,59 @@
-# Official documentation routing
+# Official documentation: when to look it up and where
 
-## Lookup order
+Read this when a CLI, Herdr, Docker, Tailscale, Hostinger, Hindsight or another tool behaves differently from what you expect and local evidence does not settle it.
 
-1. Read [llms.txt](llms.txt), then only the needed local host contract. Reuse unchanged evidence already in context. Correct a singular `runtime-reference` miss to the existing plural directory; do not create an alias or start a broad web search.
-2. For installed flags, discovery, schemas or a contradiction, inspect the relevant native help/config/actual output. A changed version calls for the affected fact, not a complete runtime audit. Never change trust, authentication, configuration or services merely to inspect support.
-3. If local/native evidence leaves an external contract unresolved, use that owner's official index in llms.txt and fetch the exact official page. Use narrow official-domain search only when the page cannot be located. An explicit request for current official verification or a higher-priority browsing requirement also selects this step.
-4. Stop when sufficient. Do not load whole manuals, follow every link, repeat unchanged reads or copy upstream text into local instructions. Note a reusable verified correction in its owning reference when authorized; put durable rationale in Hindsight and measurements in the task. A no-write task captures neither.
+## 1. Lookup order
 
-An official URL proves the publisher, not installed capability, current configuration, task authority or an actual effect. Verify meaningful index/page content, final redirect target and version scope; HTTP200 alone may be an HTML fallback. On a failure, report its actual cause and select the documented fallback rather than repeating the same failure shape. Do not infer that the publisher has no LLM index from one candidate404,403 or fetch-tool limitation.
+1. Use what is already in your context and the matching local reference in `/root/.agents/runtime-references/`.
+2. For an installed flag, schema or a contradiction, read the installed `--help`, the actual configuration and the actual output. Never change trust, authentication, configuration or a service just to inspect support.
+3. Only if that leaves the question open, open the owner's index below and fetch the one page that answers it.
+4. Stop when you have the answer. Do not load a whole manual, follow every link or copy upstream text into local instructions.
 
-## Select the actual owner
+An official page shows what the publisher documents. It does not show what the installed version supports, what is configured, or that an effect happened. Check that a fetched page is the real page: an HTTP 200 can be an HTML fallback. When a fetch fails, report the cause and use the next route; do not repeat the same request, and do not conclude that no index exists from one 404 or 403.
 
-| Question | First local contract / native evidence | Official owner if still needed |
-|---|---|---|
-| CLI launch/resume/model/compaction | CLI-LAUNCH; selected CLI help and observed model | That CLI's index, not the terminal multiplexer or another CLI's config |
-| AGENTS/rules/skills/context cost | RUNTIME-LOADING; native input/read calls, usage/cache components | Selected CLI discovery/skills/settings docs |
-| Tool/MCP visibility, deferral or plugin activation | runtime-wiring; native registrations plus actual tool/catalog input | Selected CLI MCP/plugins/config reference, then MCP/API contract if needed |
-| Pane creation, prompt submission or terminal state | HERDR-ORCHESTRATION; herdr skill and native help | Herdr agent guide/index; pane visibility is not worker identity or completion |
-| VPS account, provider console, snapshots or provider API | Assigned VPS task and native provider observation | Hostinger root index and developer API |
-| Container image, process, Compose, mount or daemon | Assigned host/container identity; docker/compose help and inspected target | Docker index; Hostinger account docs do not define guest/container behavior |
-| Tailnet reachability, Tailscale SSH or access policy | Selected network identity/policy and native tailscale help/status | Tailscale docs index; distinguish ordinary OpenSSH config and host firewall |
-| SSH host keys or sshd service | Assigned endpoint; installed ssh/sshd man and systemd evidence | OpenSSH and systemd references, not a provider-specific workaround |
-| Memory recall/retain/refresh or API record update | CONTEXT-GOVERNANCE, HINDSIGHT-RUNTIME, selected installed OpenAPI/client | Hindsight; native CLI hooks are separately owned by that CLI |
-| Git/PR/build/toolchain | Current task/source and installed git/gh/cargo help | Git/GitHub CLI/Rust/Cargo, not old migration memories |
+## 2. Who owns the question
 
-## Cost and compatibility traps
+| Question | Local evidence first | Official owner |
+| --- | --- | --- |
+| CLI launch, resume, model, compaction, instruction files, skills, MCP visibility, plugins | `CLI-RUNTIMES.md`; that CLI's `--help`, configuration and session record | That CLI's index. Not Herdr and not another CLI |
+| Pane creation, prompt submission, terminal state | skill `herdr`; `herdr --help` | Herdr |
+| VPS account, provider console, snapshots, provider API | The assigned VPS task | Hostinger |
+| Container image, process, Compose, mount, daemon | `docker` and `docker compose` help and inspection of the target | Docker. Hostinger documentation does not define container behaviour |
+| Tailnet reachability, Tailscale SSH, access policy | `tailscale status` and help | Tailscale |
+| SSH host keys, `sshd` | Installed `ssh` and `sshd` man pages | OpenSSH and systemd |
+| Memory recall, retain, page refresh, record update | `CONTEXT-GOVERNANCE.md`, `HINDSIGHT-RUNTIME.md`, `GET http://127.0.0.1:8888/openapi.json` | Hindsight. Hooks of a CLI belong to that CLI |
+| Git, pull requests, builds, toolchain | The task and installed `git`, `gh`, `cargo` help | Git, GitHub CLI, Rust and Cargo |
+| MCP protocol semantics | The server's own documentation | Model Context Protocol |
 
-- Claude: excluding ToolSearch from `--tools` (for example `--tools Read`) loads MCP tools upfront. A remaining deferred placeholder does not prove those MCP schemas were deferred. Preserve ToolSearch when measuring native selective loading. Official route: https://code.claude.com/docs/en/mcp#configure-tool-search . User tool-search policy, model/gateway support and actual request shape remain distinct.
-- Codex: `plugins.<plugin>.enabled` applies to local-marketplace entries and does not override workspace-managed activation. Per-client `apps.<id>.enabled` and `skills.config` are separate controls. Read the actual plugin/app manifests, effective config and fresh native input; do not equate account installation, client exclusion or cache presence. Official route: https://learn.chatgpt.com/docs/config-file/config-reference . No removal or setting change follows from a lookup.
-- Native skill catalogs, explicit activation and full-body delivery are different. Byte equality across installations does not prove equal expansion or correct routing. Cached context is not fresh input; repeated log snapshots are not repeated billed requests. A model/tool round is not another user turn.
-- Version numbers, quotas, active models, pane identities and current acceptance belong to native/task evidence, not this routing reference. A current official capability is not proof the installed version supports it. Do not refresh every version/quota at each handoff.
-- Custom MCPs register directly in each CLI's native schema; vendor plugins retain their native owner. Do not use another CLI's personal config as shared authority or invent an adapter/loader. Current task holds and account serialization apply even when a tool is visible.
+## 3. Indexes
 
-Official routes are owned once in llms.txt; host semantics are in the selected local contracts. Historical audit details and disposable manual caches are not runtime authority.
+Coding CLIs:
+
+| Owner | Index |
+| --- | --- |
+| Claude Code | https://code.claude.com/docs/llms.txt |
+| Anthropic API (wire contracts the Claude Code pages leave open) | https://docs.claude.com/llms.txt |
+| Codex | https://learn.chatgpt.com/docs/llms.txt |
+| Muse | https://dev.meta.ai/llms.txt |
+| Antigravity | https://antigravity.google/llms.txt |
+| Grok Build | https://docs.x.ai/llms.txt |
+
+Infrastructure:
+
+| Owner | Index |
+| --- | --- |
+| Herdr | https://herdr.dev/llms.txt and https://herdr.dev/agent-guide.md |
+| Hindsight | https://hindsight.vectorize.io/llms.txt ; API reference https://hindsight.vectorize.io/api-reference |
+| Docker | https://docs.docker.com/llms.txt |
+| Tailscale | https://tailscale.com/docs/llms.txt |
+| Hostinger | https://www.hostinger.com/llms.txt ; API https://www.hostinger.com/api/llms.txt ; VPS API schema https://developers.hostinger.com/openapi/openapi.json |
+| Model Context Protocol | https://modelcontextprotocol.io/llms.txt |
+| OpenSSH | https://www.openssh.com/manual.html |
+| systemd | https://www.freedesktop.org/software/systemd/man/latest/ |
+| Git and GitHub CLI | https://git-scm.com/docs ; https://cli.github.com/manual/ |
+| Rust and Cargo | https://doc.rust-lang.org/cargo/ ; https://doc.rust-lang.org/rustc/ |
+| Node.js and Bun | https://nodejs.org/api/ ; https://bun.sh/docs |
+
+Known dead routes, so nobody retries them: `https://developers.hostinger.com/llms.txt` returns 404; `https://tailscale.com/kb/llms.txt` redirects to an HTML page; the Hindsight `/sdks/mcp` page returns 404. Do not guess an `llms-full.txt` address.
+
+When you verify a correction to this file, change it in the `agent-platform` source through review.

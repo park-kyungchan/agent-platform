@@ -5,188 +5,82 @@ description: When task STATE assigns Lead, coordinate authorized workers, isolat
 
 # Lead orchestration
 
-Use when the current task STATE assigns you the Lead role. Assignment comes
-from STATE, never a CLI name. Preserve the permanent
-[common mechanism boundary](https://github.com/park-kyungchan/agent-platform/blob/main/docs/common-harness-boundary.md): native
-CLIs own loading, sessions, trust and tools; Herdr owns terminals; Hindsight owns
-memory. This is a playbook, not a loader, scheduler or authorization system.
+Use this when the task's STATE names you Lead. The assignment comes from STATE, never from a CLI name. The Lead owns sequencing, dispatch, acceptance and delivery; the CLIs own sessions and tools, Herdr owns terminals, Hindsight owns memory. This is a playbook, not a loader, scheduler or permission system.
 
-Use [strategy-dialogue](../strategy-dialogue/SKILL.md) for the strategy brief,
-user decisions, KPI-first reports and visible work threads. Existing explicit
-authorization remains valid; do not restart settled decisions.
+Strategy brief, user decisions, KPI-first reports and the work-thread list: skill `strategy-dialogue`. Wording toward the user: skill `explain-precisely`. Ownership, worktrees, the build slot and the handoff rules that every agent follows: `/root/.agents/runtime-references/concurrent-work.md`.
 
-## Dispatch and ownership
+## 1. Choosing a worker
 
-Workers implement. Independent reviewers review in a fresh, different context.
-Lead reads back actual source, output and effects before accepting their work.
-Use separate worktrees or genuinely disjoint write sets; context isolation alone
-does not isolate files, Cargo locks, interfaces or shared build resources.
-Allocate one expensive build owner at a time and record it in STATE.
+- The runtimes and models that are available now are written in the task's STATE (or in the one file STATE names for assignment). Never write a model name, an effort or a token window into a skill or into `/root/.agents/AGENTS.md`.
+- Match the worker to the reasoning the task needs. Collection, fixed checks, hashing, counting, diffing and projection into a table need no judgment: write a script when a script can do it, otherwise use the cheapest available model. Design, diagnosis and semantic review need a strong model.
+- Split a mixed task into collect, judge, review, so the expensive model reads a prepared result instead of raw material.
+- The reviewer runs in a fresh context that never saw the implementer's reasoning.
+- Keep your own context for orchestration: read reports, not raw worker output or whole diffs.
 
-Use this TASK.md template, with exact values rather than transcript references:
+## 2. The TASK packet
+
+Write one file per bounded piece of work, with exact values instead of references to a conversation:
 
 ```markdown
 # TASK: <bounded goal>
-Owner: <Lead>; Worker: <assigned runtime/model/effort>
-State: <absolute STATE.md>; Canonical rules: <absolute AGENTS.md>
-Read first: /root/.agents/AGENTS.md, <absolute TASK.md>, <absolute STATE.md>, <needed skill SKILL.md absolute paths>
-First output after reading: <one-line list of the exact files read>; Context-Injected: <none | injected knowledge-page titles>
-Authority: <user decision and current task scope>
-Exact targets: <repo, worktree, branch, base/head, files and selected contracts>
-Strategy link: <confirmed STATE/STRATEGY.md and relevant KPI definition>
-KPI this task moves: <named KPI, expected effect, native measurement or protected guardrail>
-Allowed effects: <reads/writes, local commits, push, PR, owned build resources>
-Forbidden effects: <holds, unrelated paths, host/domain/remote boundaries>
-Expected output: <absolute report path, source revision, evidence and limitations>
-Verification: <required commands and actual output/effect readback>
-Completion: <closure rule or exact same-scope continuation condition>
-DONE marker: <unique literal terminal line>
+Owner: <Lead>; State: <absolute STATE.md>
+Read first: <absolute TASK.md>, <absolute STATE.md>, <absolute path of each needed SKILL.md or reference>
+First output after reading: one line listing the exact files read
+Authority: <user decision and task scope>
+Exact targets: <repo, worktree, branch, base revision, files that may be written>
+Strategy link: <STATE or STRATEGY.md line>; KPI this task moves: <KPI or guardrail, expected effect, how it is measured>
+Allowed effects: <reads, writes, local commits, push, PR, build slot>
+Forbidden effects: <holds, other paths, host, domain and remote boundaries>
+Expected output: <absolute report path, source revision, evidence, limitations>
+Verification: <commands and the output or effect to read back>
+DONE marker: <unique literal line the worker prints last>
 ```
 
-Put changed decisions in dated/numbered ADDENDUM files and name them in STATE;
-do not silently rewrite an accepted task's authority. Update STATE at each
-milestone with current owner, authority/holds, exact revisions, actual evidence
-and one next action. Handoffs transfer goal, exact targets, allowed effects,
-expected output and state path; never make a worker reconstruct a transcript.
+- The shared instructions load through each CLI's own pointer; a packet does not list them. If a session record shows a CLI did not load them, repair the pointer (`/root/.agents/runtime-references/CLI-RUNTIMES.md`).
+- The worker, its model and the build-slot owner are recorded in STATE at dispatch, not in the packet. A dispatched packet is not edited: a changed decision gets a new packet version, and STATE names the current one.
+- One packet phase is one worker run. A later phase starts only after you accepted the earlier one.
+- Update STATE at each milestone by replacing values: owner, authority and holds, exact revisions, evidence, one next action.
 
-Make handoff readback explicit. A canonical path in a prompt, a skill in the
-native catalogue, or a literal `@import` does not prove the receiver read rules.
-When the native loader cannot expand a pointer, name the exact files to read
-first: `/root/.agents/AGENTS.md`, the absolute TASK and STATE, and each needed
-skill body (for example `/root/.agents/skills/explain-precisely/SKILL.md`).
-Known cases: Muse personal/project `@/root/.agents/AGENTS.md` stays literal;
-Codex outside Git does not discover ancestor AGENTS.md. The receiver must read
-these files with native tools before effects and show a one-line list of files
-read in its first output after those reads. Lead verifies the native read calls
-and readback; a claimed list alone is not proof. This uses existing handoff
-verification, not a new gate, instruction copy or loader (PR #98 boundary).
+## 3. Running a worker
 
-## Herdr mechanics
+Use Herdr only when pane control is authorized and `HERDR_ENV=1` holds in your pane; syntax is in skill `herdr`. One tab per worker, created without taking focus; use the IDs the commands return.
 
-Use the [Herdr skill](../herdr/SKILL.md) and native help only when pane control
-and delegation are authorized. Verify the genuine caller and selected server.
-Use one tab per worker, preserve user focus, keep unrelated panes intact and use
-returned opaque IDs. Agent names are lowercase and match
-`[a-z][a-z0-9_-]{0,31}`; keep them unique among live agents.
-
-Workers keep native Hindsight (hooks and MCP); do not export `HINDSIGHT_DISABLE_HOOKS`
-or disable the MCP to isolate them (user decision 2026-11-06: never block a native
-feature). When a task needs isolation, such as an eval or an independent review,
-run it in a directory covered by a native coding-agents `paths.<prefix>` override
-(for example `{"disabled": true}` or a separate bank) and verify that override; adding an override is a host configuration effect that
-needs task authority. Verify native model, effort, cwd and readiness without
-changing other global configuration. Launch syntax: [CLI-LAUNCH.md](../../runtime-references/CLI-LAUNCH.md).
-
-Submit the exact task packet and verify that the prompt was submitted and the
-worker began its turn. A send acknowledgement, `idle` or `done` alone is not
-completion proof. After uncertain submission, read existing state before any
-retry. Keep startup/trust questions for the user's native interaction.
-
-Use task-owned background `until` waiters that require BOTH the exact DONE line
-and a nonempty expected output file. For example, with a fresh task-owned
-`terminal_output` file supplied by the authorized output capture:
+Headless worker (one prompt, then exit), the default for bounded packets:
 
 ```bash
-set -euo pipefail
-until [[ -s "$report" ]] && rg -qxF -- "$done_marker" "$terminal_output"; do
-  sleep 10
-done
+herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd <launch cwd> --label <label> --no-focus
+herdr pane run <pane-id> "<headless command of that CLI with the TASK file as the prompt>"
+herdr pane wait-output --regex "<DONE marker>" --source recent-unwrapped --timeout <ms> <pane-id>
+herdr tab close <tab-id>    # after acceptance
 ```
 
-Set those variables to the task's exact paths/marker. A TASK file containing the
-marker is not terminal completion evidence. Do not infer success from file
-existence alone, repeatedly block the Lead's foreground, or build a resident
-watcher. Record waiter ownership/PID; end it when the task ends or changes.
+Headless and interactive commands per CLI are in `CLI-RUNTIMES.md`. An interactive worker uses `herdr agent start` and `herdr agent prompt`; a subagent of your own CLI needs no pane.
 
-## Review, delivery and closure
+- Always give a waiter a timeout, and run it in the background so it does not block your turn. Do not build a resident watcher.
+- Completion needs both the DONE line in the pane and a nonempty report file; having the worker print the report's SHA-256 in the DONE line lets you check that the file is the one it finished. A TASK file that contains the marker text is not completion.
+- A send acknowledgement, `idle`, `done` or exit code 0 is not completion. After an uncertain submission, read the pane before sending again.
+- A trust or approval dialog in a worker pane belongs to the user: report it, do not answer it.
+- Workers keep native Hindsight. Memory isolation for an evaluation or a review uses the path override described in `concurrent-work.md`.
 
-Freeze an exact candidate revision for independent review. Give reviewers the
-request, contracts, raw artifacts and source revision, not the implementation
-worker's reasoning, transcript or suggested verdict. Review and closure report the observed KPI/guardrail effect, its evidence and
-any expected effect still unmeasured; estimates remain labeled. Lead checks each finding
-against source, sends concrete repairs, and gets the changed candidate reviewed.
+## 4. Acceptance, review and delivery
 
-Use PR → CI → thread resolution → expected-head merge. Required checks must
-pass for the exact reviewed head. Before an authorized merge, read the live head,
-review threads and check results, then use the provider's expected-head guard.
-Never force-push. A task that permits only a PR stops before merge. When changing
-required checks, inspect BOTH classic branch protection AND repository rulesets;
-back up and read back each changed surface.
+1. Read the report, then read back the actual source, output or effect yourself. Check each finding against source.
+2. Freeze the exact candidate revision. Give the independent reviewer the request, the contracts, the raw artifacts and that revision; not the implementer's reasoning or a suggested verdict.
+3. Send concrete repairs. A changed candidate is reviewed again.
+4. Deliver source through pull request, CI on the exact reviewed head, resolved review threads, then a merge guarded by the expected head. Never force-push. A task that permits only a pull request stops before the merge.
+5. When changing required checks, inspect both classic branch protection and repository rulesets; save and read back each surface you change.
+6. Report the observed KPI or guardrail effect with its evidence; label an effect that is expected but not measured.
 
-For each completed worker: save its native session (or supported redacted
-export), verify the saved artifact/session identity, record the roster (worker,
-role, runtime/model/effort if known, pane/tab/session, task, head, output),
-reconcile child processes/builds/uncertain effects, close its owned pane and
-confirm zero remaining owned worker panes/processes/waiters. Preserve unrelated
-sessions. Record unsupported retention or evidence gaps explicitly.
+## 5. Closure
 
-Closure is attested by an independent verifier using the exact roster,
-artifacts and native readback; the Lead's own success claim is insufficient.
-Keep a context only for the concrete unfinished continuation below.
+For each finished worker: record in STATE the worker, role, runtime, session ID, packet, revision and output; reconcile its child processes, builds and uncertain effects; close the tab you created for it; confirm that no pane, process or waiter owned by the task remains. Leave every other session untouched. Record the review findings by severity, rework rounds and CI minutes; an unknown value stays unknown.
 
-Use [worker closure](../lessons-loop/references/worker-closure.md) for the accepting Lead's task-local evidence/readback and optional curator handoff; completion signals never substitute for acceptance evidence.
+Details and the optional lesson candidate: `/root/.agents/skills/lessons-loop/references/worker-closure.md`. Successful routine work needs no lesson.
 
-## Context Governance
+## 6. Safety
 
-Isolation is the default: give a fresh worker a small context packet containing
-exact TASK/STATE/canonical paths, source revision and selected raw evidence,
-never a transcript. Continuity is allowed only when the follow-up remains in
-the same scope/files, reuses the loaded context and has enough context remaining.
-Record why in STATE; otherwise save/close and start fresh. Reviews are always
-isolated, including follow-up review of a repaired candidate.
-
-Workers keep native Hindsight hooks and MCP; isolate only through a verified
-native `paths.<prefix>` override (see above). The Lead supplies needed verified
-memory conclusions with source provenance.
-Native resume is not renewed authority; reread current STATE and addenda.
-
-## Memory contract
-
-Apply Context Governance across all CLIs: isolate by default and continue a native session only when its context is needed. Hand off goal, exact targets, allowed effects, expected output and current STATE path; the receiver reads current rules/STATE before effects. Native sessions/STATE hold short-term execution, codebase docs own executable contracts, Hindsight owns durable contextual decisions/lessons, and domain owners/future Ontology own operational facts/actions/recovery. Search relevant pages before new work, bugs, tests/conventions, integration, why/remaining-work questions and commits; read selected pages, recall exact evidence and reflect only for unresolved reasoning. Verify current native truth and credit useful memory. Use the one shared bank with platform/repository provenance through official Hindsight features; tags are not privacy or authority. Respect each CLI's actual hooks/MCP/retention and explicit no-write scope. Do not copy STATE, operational records or another agent's transcript into Hindsight, infer isolation from an agent name, build a loader/registry/watcher, or reimplement native CLI/Hindsight mechanisms. Route verified L3 proposals to current STATE `DIRECTION PROPOSALS` and the user through Lead.
-
-Read [CONTEXT-GOVERNANCE.md](../../runtime-references/CONTEXT-GOVERNANCE.md) on
-demand for source authority, provenance, official retrieval/update boundaries
-and anti-duplication. At each task/pane closure record workers, review findings
-by severity, rework rounds and CI minutes in STATE; unknown stays unknown. Use
-[lessons-loop](../lessons-loop/SKILL.md) for a durable candidate or local no-write
-handoff, without inventing an incident for successful routine work.
-
-## User interaction and safety
-
-Use [explain-precisely](../explain-precisely/SKILL.md) for progress, answers and
-decision questions. Ask only decisions belonging to the user, with a concrete
-recommendation and consequences. Quality takes precedence over speed. End turns
-with a concise status line naming completion or the remaining hold/next action.
-
-Before an authorized host-config edit, save the exact prior bytes and provide a
-rollback script; read back the resulting configuration. Before deletion, create
-and verify the approved recovery copy (archive tag or Drive copy), then check all
-live path consumers. A recovery copy does not authorize deletion by itself.
-Keep custody boundaries and retained originals intact. Never print secrets.
-
-Use task-owned Cargo target and fixture roots, bound disk use before builds and
-delete those disposable roots after preserving required logs/evidence. Preserve
-the task's free-space floor and unrelated build roots. Keep SSH host-key checking,
-Tailscale and target-owned remote update boundaries. Failure reports use
-`snake_case_code@path:line`, one short cause and no private payloads.
-
-## Dated worker defaults — 2026-11-05 (updated 2026-11-07)
-
-These are task-scoped defaults, not permanent CLI roles or model availability
-claims. The actual assignment and permitted effects always come from task STATE.
-Target ~400k tokens using each runtime's supported native controls; verify actual
-enforcement, and qualify Grok separately. Manual compaction is not an automatic
-ceiling. Execute the 4-step Context Governance Optimization Loop (`Pre-spawn Parameter & Path
-Pinning` -> `First-Line Readback Gate` -> `Post-run Session JSONL Audit` ->
-`Leading Indicator C: useful / irrelevant / misleading` recording) per
-[CONTEXT-GOVERNANCE.md](../../runtime-references/CONTEXT-GOVERNANCE.md) and
-[CLI-LAUNCH.md](../../runtime-references/CLI-LAUNCH.md).
-
-| Runtime / model / effort | Default assignment |
-| --- | --- |
-| Codex `gpt-6.1-sol` / high | Design, source implementation, shared contracts and complex diagnosis |
-| Codex `gpt-6.1-terra` / high | Mechanical work with fixed inputs and checks |
-| Muse `muse-wonder-1.0` / high | High-reasoning authoring, complex implementation/diagnosis and independent semantic review |
-| Muse `muse-spark-1.3` / medium | Strictly deterministic, closed-spec tasks only (fixed checks, hash/count/diff verification, structured projection; zero open-ended reasoning) |
-| agy `Gemini 4 Argon (Medium)` / Claude `claude-opus-5-5` / high | Only the task assignment in STATE (e.g. Lead orchestration and acceptance) |
-| agy `gemini-3.8-flash-medium` | Strictly deterministic, closed-spec tasks and isolated benchmark candidate execution only |
+- Before changing host configuration: save the exact previous bytes, write a rollback command, change, read back.
+- Before deleting: create and verify the recovery copy, then check every live consumer of the path. A recovery copy alone does not authorize deletion.
+- Builds use a Cargo target directory and fixture roots owned by the task; check free disk space before a build and delete the disposable roots after keeping the logs you need.
+- Which information goes to memory and which stays in task files: `/root/.agents/runtime-references/CONTEXT-GOVERNANCE.md`.
+- Ask the user only for decisions that belong to the user, with a recommendation and its consequences. End a turn with one status line: what is complete, or what is held and the next action.

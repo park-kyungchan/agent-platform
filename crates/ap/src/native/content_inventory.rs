@@ -2,16 +2,12 @@
 pub const OWNED: &[(&str, &str)] = &[
     ("AGENTS.md", include_str!("../../../../content/AGENTS.md")),
     (
-        "runtime-references/CLI-LAUNCH.md",
-        include_str!("../../../../content/runtime-references/CLI-LAUNCH.md"),
+        "runtime-references/CLI-RUNTIMES.md",
+        include_str!("../../../../content/runtime-references/CLI-RUNTIMES.md"),
     ),
     (
         "runtime-references/CONTEXT-GOVERNANCE.md",
         include_str!("../../../../content/runtime-references/CONTEXT-GOVERNANCE.md"),
-    ),
-    (
-        "runtime-references/HERDR-ORCHESTRATION.md",
-        include_str!("../../../../content/runtime-references/HERDR-ORCHESTRATION.md"),
     ),
     (
         "runtime-references/HINDSIGHT-RUNTIME.md",
@@ -22,36 +18,12 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/runtime-references/OFFICIAL-DOCS.md"),
     ),
     (
-        "runtime-references/RUNTIME-LOADING.md",
-        include_str!("../../../../content/runtime-references/RUNTIME-LOADING.md"),
-    ),
-    (
         "runtime-references/codebase-orientation.md",
         include_str!("../../../../content/runtime-references/codebase-orientation.md"),
     ),
     (
-        "runtime-references/global-runtime-routing.md",
-        include_str!("../../../../content/runtime-references/global-runtime-routing.md"),
-    ),
-    (
-        "runtime-references/llms.txt",
-        include_str!("../../../../content/runtime-references/llms.txt"),
-    ),
-    (
-        "runtime-references/runtime-bootstrap.md",
-        include_str!("../../../../content/runtime-references/runtime-bootstrap.md"),
-    ),
-    (
-        "runtime-references/runtime-core.v2.md",
-        include_str!("../../../../content/runtime-references/runtime-core.v2.md"),
-    ),
-    (
-        "runtime-references/runtime-wiring.md",
-        include_str!("../../../../content/runtime-references/runtime-wiring.md"),
-    ),
-    (
-        "runtime-references/skills.md",
-        include_str!("../../../../content/runtime-references/skills.md"),
+        "runtime-references/concurrent-work.md",
+        include_str!("../../../../content/runtime-references/concurrent-work.md"),
     ),
     (
         "skills/herdr/SKILL.md",

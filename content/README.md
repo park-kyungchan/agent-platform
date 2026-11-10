@@ -2,9 +2,7 @@
 
 Reviewed distribution source for canonical `AGENTS.md`, runtime references and
 the generic `herdr`, `herdr-hermes`, `explain-precisely`, `lead-orchestration`,
-`lessons-loop` and `strategy-dialogue` skill bundles. The initial capture was
-byte-for-byte from
-`/root/.agents/` on 2026-11-04; subsequent reviewed edits evolve repository source.
+`lessons-loop` and `strategy-dialogue` skill bundles. Repository source is edited through review and then installed on the host.
 The fixed Rust inventory is `crates/ap/src/native/content_inventory.rs`. This
 README is repository documentation, not an owned host entry.
 
@@ -26,10 +24,10 @@ and bytes require an inventory/test/hash update. Neither source acceptance nor
 a rebuilt binary proves host synchronization, native discovery or execution.
 The task owner separately authorizes and verifies any host installation.
 
-The inventory now has 29 files, including lessons-loop's worker-closure reference,
-the Hindsight runtime reference, the CLI launch reference and the runtime-references llms.txt index;
-the generic custom catalogue remains six skills. On-demand links connect Herdr
-and Hermes to Context Governance, strategy-dialogue and lessons-loop without
-copying those protocols or creating another global skill. Assigned topology/cwd
-wins over generic examples; assigned Leads use one tab per worker. Historical
-19-entry and skills-v1 25-entry inventories are dated milestones only.
+The inventory is the file list in `content_inventory.rs`: `AGENTS.md`, six
+runtime references (`codebase-orientation`, `CLI-RUNTIMES`, `concurrent-work`,
+`CONTEXT-GOVERNANCE`, `HINDSIGHT-RUNTIME`, `OFFICIAL-DOCS`) and the six generic
+skill bundles. `AGENTS.md` section 3 is the only routing table: each reference is
+self-contained and is read when its listed situation applies. Changing values
+(model names, efforts, versions, token windows, counts, dates of approvals) stay
+out of `AGENTS.md` and skill frontmatter; they belong in task STATE.
