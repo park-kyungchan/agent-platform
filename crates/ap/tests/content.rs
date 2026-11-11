@@ -161,7 +161,7 @@ fn doctor_missing_ready_drift_is_read_only_and_opaque_files_are_untouched() {
             .all(|e| e.status == "ready" && e.observed_sha256.as_ref() == Some(&e.expected_sha256))
     );
     let path =
-        f.0.join("agents/runtime-references/codebase-orientation.md");
+        f.0.join("agents/runtime-references/CODEBASE-ORIENTATION.md");
     fs::write(&path, "edited\n").unwrap();
     let drift = content::doctor(&spec).unwrap();
     assert_eq!(

@@ -25,7 +25,7 @@ a rebuilt binary proves host synchronization, native discovery or execution.
 The task owner separately authorizes and verifies any host installation.
 
 The inventory is the file list in `content_inventory.rs`: `AGENTS.md`, six
-runtime references (`codebase-orientation`, `CLI-RUNTIMES`, `concurrent-work`,
+runtime references (`CODEBASE-ORIENTATION`, `CLI-RUNTIMES`, `CONCURRENT-WORK`,
 `CONTEXT-GOVERNANCE`, `HINDSIGHT-RUNTIME`, `OFFICIAL-DOCS`) and the six generic
 skill bundles. `AGENTS.md` section 3 is the only routing table: each reference is
 self-contained and is read when its listed situation applies. Changing values

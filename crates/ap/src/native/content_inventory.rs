@@ -22,12 +22,12 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/runtime-references/OFFICIAL-DOCS.md"),
     ),
     (
-        "runtime-references/codebase-orientation.md",
-        include_str!("../../../../content/runtime-references/codebase-orientation.md"),
+        "runtime-references/CODEBASE-ORIENTATION.md",
+        include_str!("../../../../content/runtime-references/CODEBASE-ORIENTATION.md"),
     ),
     (
-        "runtime-references/concurrent-work.md",
-        include_str!("../../../../content/runtime-references/concurrent-work.md"),
+        "runtime-references/CONCURRENT-WORK.md",
+        include_str!("../../../../content/runtime-references/CONCURRENT-WORK.md"),
     ),
     (
         "skills/herdr/SKILL.md",
