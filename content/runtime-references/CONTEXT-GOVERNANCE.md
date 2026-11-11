@@ -14,7 +14,7 @@ The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6;
 
 - A decision another agent needs must not stay only in one CLI's private memory: write it in the repository contract or in an authorized, sourced Hindsight document.
 - Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off (reason: `HINDSIGHT-RUNTIME.md`, "Session path on this host").
-- A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy; the user corrects them. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
+- A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy, or in the store's `kpi` object when the task's STATE names that object type in use (`ONTOLOGY-USE.md`), never in both; the user corrects them. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
 
 ## 2. Which source answers a question
 

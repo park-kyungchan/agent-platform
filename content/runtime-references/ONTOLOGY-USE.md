@@ -5,7 +5,7 @@ The placement rule is `CONTEXT-GOVERNANCE.md`; the store implements these operat
 
 | Fact kind | Home |
 | --- | --- |
-| Current blocked effects, task choices, measured values/history, worker progress/results | Store `hold`, `decision`, `kpi`, `measurement`, `worker_run`, when the task's STATE names that object type in use; STATE then points to the store and does not copy it |
+| Current blocked effects, task choices, a task's KPI with its target, measured values/history, worker progress/results | Store `hold`, `decision`, `kpi`, `measurement`, `worker_run`, when the task's STATE names that object type in use; STATE then points to the store and does not copy it |
 | Task owner, authority, next action and evidence pointers; holds, decisions, measurements and worker progress of a task whose STATE does not name that object type in use | Task `STATE.md` |
 | Durable rationale, lessons, corrections, preferences and explained terms | Hindsight when the task authorizes it |
 | Schemas, action contracts, implemented behaviour and KPI definitions | Owning repository source; `kpi.definition` records the task's operational definition |
@@ -16,7 +16,7 @@ Every agent may read: `help`, `describe`, `get`, `search`, `action list`, `actio
 Only the Lead of the task owning the objects writes: `action apply` and `render --write`. A worker writes its report; the Lead records it. A reviewer never writes.
 Only a Lead authorized by the task's STATE runs `index`, `schema install`, `backup` or anything changing the installed binary. The same rules apply to the tools of `ont mcp`. An example grants no authority.
 The command authenticates nobody: every agent on this host shares the same OS user. Client, agent and session are self-reported attribution. These restrictions are rules of work.
-Run `ont help` for command forms; read `ontology/work.schema.json` and `ontology/README.md` in `agent-platform` for the contract. `describe` (standard input `{}`) reads installed object types; `action list` explains parameters and criteria. Neither lists views: view names are the keys of `views` in the schema.
+Run `ont help` for command forms; read `ontology/work.schema.json` and `ontology/README.md` in `agent-platform` for the contract. `describe` (standard input `{}`) reads installed object types; `action list` explains parameters and criteria. Neither lists views: section 4 names them.
 
 ## 3. Object Ids
 An Id is JSON with `object_type`, `namespace` and `native_key`. Use the Id returned by `search`, including its namespace; a title is not an Id.
