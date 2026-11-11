@@ -40,6 +40,76 @@
       "complete_listing": true,
       "fresh_for_s": 3600
     },
+    "packets": {
+      "kind": "markdown_fields",
+      "glob": [
+        "/home/palantirkc/work/*/TASK*.md",
+        "/home/palantirkc/work/*/*/TASK*.md",
+        "/home/palantirkc/work/*/*/*/TASK*.md"
+      ],
+      "exclude": [
+        "/home/palantirkc/work/ws-daniel-prayer-login",
+        "/home/palantirkc/work/problem-edit/context",
+        "/home/palantirkc/work/problem-edit/runs",
+        "/home/palantirkc/work/wt",
+        "/home/palantirkc/work/*private*",
+        "/home/palantirkc/work/node_modules",
+        "/home/palantirkc/work/.git",
+        "/home/palantirkc/work/target*",
+        "/home/palantirkc/work/*custody*",
+        "/home/palantirkc/work/*/wt",
+        "/home/palantirkc/work/*/*private*",
+        "/home/palantirkc/work/*/node_modules",
+        "/home/palantirkc/work/*/.git",
+        "/home/palantirkc/work/*/target*",
+        "/home/palantirkc/work/*/*custody*",
+        "/home/palantirkc/work/*/*/wt",
+        "/home/palantirkc/work/*/*/*private*",
+        "/home/palantirkc/work/*/*/node_modules",
+        "/home/palantirkc/work/*/*/.git",
+        "/home/palantirkc/work/*/*/target*",
+        "/home/palantirkc/work/*/*/*custody*",
+        "/home/palantirkc/work/ws-replan/preparation/slices"
+      ],
+      "head_lines": 40,
+      "complete_listing": true,
+      "fresh_for_s": 3600
+    },
+    "reports": {
+      "kind": "markdown_fields",
+      "glob": [
+        "/home/palantirkc/work/*/REPORT*.md",
+        "/home/palantirkc/work/*/*/REPORT*.md",
+        "/home/palantirkc/work/*/*/*/REPORT*.md"
+      ],
+      "exclude": [
+        "/home/palantirkc/work/ws-daniel-prayer-login",
+        "/home/palantirkc/work/problem-edit/context",
+        "/home/palantirkc/work/problem-edit/runs",
+        "/home/palantirkc/work/wt",
+        "/home/palantirkc/work/*private*",
+        "/home/palantirkc/work/node_modules",
+        "/home/palantirkc/work/.git",
+        "/home/palantirkc/work/target*",
+        "/home/palantirkc/work/*custody*",
+        "/home/palantirkc/work/*/wt",
+        "/home/palantirkc/work/*/*private*",
+        "/home/palantirkc/work/*/node_modules",
+        "/home/palantirkc/work/*/.git",
+        "/home/palantirkc/work/*/target*",
+        "/home/palantirkc/work/*/*custody*",
+        "/home/palantirkc/work/*/*/wt",
+        "/home/palantirkc/work/*/*/*private*",
+        "/home/palantirkc/work/*/*/node_modules",
+        "/home/palantirkc/work/*/*/.git",
+        "/home/palantirkc/work/*/*/target*",
+        "/home/palantirkc/work/*/*/*custody*",
+        "/home/palantirkc/work/ws-replan/preparation/slices"
+      ],
+      "head_lines": 40,
+      "complete_listing": true,
+      "fresh_for_s": 3600
+    },
     "installed_binaries": {
       "kind": "file_digest",
       "paths": [
@@ -95,6 +165,120 @@
           "type": "string",
           "required": false,
           "from": "/fields/Owner"
+        }
+      }
+    },
+    "packet": {
+      "description": "One TASK*.md file under /home/palantirkc/work at directory depth 1 to 3; the key is the path below the work root.",
+      "owner": {
+        "source": "packets"
+      },
+      "primary_key": {
+        "from": "/path",
+        "transform": {
+          "replace_prefix": [
+            "/home/palantirkc/work/",
+            ""
+          ]
+        }
+      },
+      "title": "title_line",
+      "properties": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "from": "/path"
+        },
+        "sha256": {
+          "type": "string",
+          "required": true,
+          "from": "/sha256"
+        },
+        "title_line": {
+          "type": "string",
+          "required": true,
+          "from": "/line1"
+        },
+        "owner_line": {
+          "type": "string",
+          "required": false,
+          "from": "/fields/Owner"
+        },
+        "state_line": {
+          "type": "string",
+          "required": false,
+          "from": "/fields/State"
+        },
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": false,
+          "from": "/path",
+          "transform": {
+            "segment_after": "/home/palantirkc/work/"
+          }
+        }
+      }
+    },
+    "report": {
+      "description": "One REPORT*.md file under /home/palantirkc/work at directory depth 1 to 3; the key is the path below the work root.",
+      "owner": {
+        "source": "reports"
+      },
+      "primary_key": {
+        "from": "/path",
+        "transform": {
+          "replace_prefix": [
+            "/home/palantirkc/work/",
+            ""
+          ]
+        }
+      },
+      "title": "title_line",
+      "properties": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "from": "/path"
+        },
+        "sha256": {
+          "type": "string",
+          "required": true,
+          "from": "/sha256"
+        },
+        "title_line": {
+          "type": "string",
+          "required": true,
+          "from": "/line1"
+        },
+        "status_line": {
+          "type": "string",
+          "required": false,
+          "from": "/fields/Status"
+        },
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": false,
+          "from": "/path",
+          "transform": {
+            "segment_after": "/home/palantirkc/work/"
+          }
+        },
+        "packet": {
+          "type": {
+            "ref": "packet"
+          },
+          "required": false,
+          "template": "{dir_path}/TASK-{stem_id}.md",
+          "transform": {
+            "replace_prefix": [
+              "/home/palantirkc/work/",
+              ""
+            ]
+          }
         }
       }
     },
@@ -169,11 +353,65 @@
           "type": "integer",
           "required": true,
           "from": "/mode"
+        },
+        "source_copy": {
+          "type": {
+            "ref": "instruction_file"
+          },
+          "required": false,
+          "from": "/path",
+          "transform": {
+            "replace_prefix": [
+              "/root/.agents/",
+              "/home/palantirkc/platforms/agent-platform/content/"
+            ]
+          }
         }
       }
     }
   },
-  "link_types": {},
+  "link_types": {
+    "packet_task": {
+      "from": "packet",
+      "via": "task",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "task",
+        "reverse": "packets"
+      }
+    },
+    "report_task": {
+      "from": "report",
+      "via": "task",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "report_task",
+        "reverse": "reports"
+      }
+    },
+    "report_packet": {
+      "from": "report",
+      "via": "packet",
+      "to": "packet",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "packet",
+        "reverse": "packet_reports"
+      }
+    },
+    "source_copy": {
+      "from": "instruction_file",
+      "via": "source_copy",
+      "to": "instruction_file",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "source_copy",
+        "reverse": "installed_copies"
+      }
+    }
+  },
   "action_types": {},
   "functions": {},
   "grants": [
@@ -182,6 +420,8 @@
       "scope": {},
       "read": [
         "task",
+        "packet",
+        "report",
         "installed_artifact",
         "instruction_file"
       ],

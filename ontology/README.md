@@ -4,10 +4,21 @@
 `ontology-platform` repository: object types built from files of this host's
 daily work. The files stay the home of the facts; `ont index` rebuilds the objects.
 
-Declared in version 1: `task` (STATE.md files), `installed_artifact` (the four
-files under `/usr/local/bin`), `instruction_file` (shared instructions installed
-under `/root/.agents` and their sources under `content/`). A file that is absent
-has no object (`complete_listing` retracts it). No action type, no function.
+Declared in version 1: `task` (STATE.md files), `packet` (TASK*.md at directory
+depth 1 to 3), `report` (REPORT*.md at the same depths), `installed_artifact`
+(the four files under `/usr/local/bin`) and `instruction_file` (shared
+instructions installed under `/root/.agents` and their sources under `content/`).
+A file that is absent has no object (`complete_listing` retracts it). No action
+type, no function. A packet and a report are keyed by their path below the work root.
+
+Links: `packet_task` and `report_task` (the first directory below the work root
+equals the task key), `report_packet` (`REPORT-<id>.md` points to
+`TASK-<id>.md` in the same directory) and the reference `source_copy` (an
+installed instruction file points to its source under `content/`).
+"dangling": the reference is stored but its target object does not exist (for
+example an installed skill whose source is in another repository). "No link":
+the reference has no value (a report named `REPORT.md` has no id; a source file has no
+source copy). Neither is an error of the source.
 
 ## Who may change it
 Only a pull request to this repository, reviewed and merged like any source.
