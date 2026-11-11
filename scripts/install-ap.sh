@@ -4,7 +4,7 @@ set -euo pipefail
 INSTALL_DIR="${AP_INSTALL_DIR:-/usr/local/bin}"
 INSTALLED="$INSTALL_DIR/ap"
 LOCK_FILE="/home/palantirkc/work/ws-replan/wt/.host-cargo.lock"
-INSTALL_LOCK_FILE="/run/lock/ap-install.lock"
+INSTALL_LOCK_FILE="${AP_INSTALL_LOCK:-/run/lock/ap-install.lock}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 WORKTREE_DIR=""
@@ -23,9 +23,17 @@ cleanup_worktree() {
 }
 
 acquire_install_lock() {
-  exec 9>"$INSTALL_LOCK_FILE"
+  if ! { exec 9>"$INSTALL_LOCK_FILE"; } 2>/dev/null; then
+    refuse "install_lock_unavailable" "$LINENO"
+  fi
   if ! flock -n 9; then
     refuse "install_busy" "$LINENO"
+  fi
+}
+
+check_install_dir_usable() {
+  if [[ ! -d "$INSTALL_DIR" || ! -w "$INSTALL_DIR" ]]; then
+    refuse "install_dir_unusable" "$LINENO"
   fi
 }
 
@@ -71,7 +79,6 @@ do_check() {
 }
 
 do_install() {
-  acquire_install_lock
   if [[ $# -ne 1 ]]; then
     refuse "install_requires_expected_commit" "$LINENO"
   fi
@@ -92,6 +99,9 @@ do_install() {
   if [[ "$target_norm" == "$repo_norm" || "$target_norm" == "$repo_norm"/* ]]; then
     refuse "cargo_target_dir_inside_repo" "$LINENO"
   fi
+  check_install_dir_usable
+  acquire_install_lock
+  git -C "$REPO_ROOT" worktree prune
   local origin_main=""
   origin_main="$(git -C "$REPO_ROOT" rev-parse origin/main 2>/dev/null || true)"
   if [[ -z "$origin_main" ]]; then
@@ -158,14 +168,31 @@ do_install() {
   new_commit="$(version_commit "$new_version")"
   if [[ "$new_commit" != "$expected" ]]; then
     if [[ "$had_previous" -eq 1 && -n "$backup" && -f "$backup" ]]; then
-      printf '%s\n' "$backup" >&2
+      local restored=0
       local restore_tmp=""
       restore_tmp="$(mktemp "$INSTALL_DIR/.ap.restore.XXXXXX" || true)"
-      if [[ -n "$restore_tmp" ]] && install -m 0755 "$backup" "$restore_tmp"; then
-        mv "$restore_tmp" "$INSTALLED" || rm -f "$restore_tmp"
+      if [[ -n "$restore_tmp" && -f "$restore_tmp" ]] && install -m 0755 "$backup" "$restore_tmp"; then
+        if mv "$restore_tmp" "$INSTALLED"; then
+          restored=1
+        else
+          rm -f "$restore_tmp"
+        fi
       else
         [[ -n "$restore_tmp" ]] && rm -f "$restore_tmp"
       fi
+      if [[ "$restored" -eq 1 ]]; then
+        local restored_sha=""
+        restored_sha="$(sha256sum "$INSTALLED" 2>/dev/null | awk '{print $1}' || true)"
+        local backup_sha=""
+        backup_sha="$(sha256sum "$backup" 2>/dev/null | awk '{print $1}' || true)"
+        if [[ -n "$restored_sha" && "$restored_sha" == "$backup_sha" ]]; then
+          printf '%s\n' "$backup" >&2
+          refuse "installed_version_mismatch_restored" "$LINENO"
+        fi
+      fi
+      printf '%s\n' "$backup" >&2
+      printf '%s\n' "$INSTALLED" >&2
+      refuse "restore_failed" "$LINENO"
     else
       rm -f "$INSTALLED"
     fi
@@ -177,7 +204,7 @@ do_install() {
 }
 
 do_rollback() {
-  acquire_install_lock
+  check_install_dir_usable
   if [[ $# -ne 1 ]]; then
     refuse "rollback_requires_before_file" "$LINENO"
   fi
@@ -197,6 +224,12 @@ do_rollback() {
   if [[ "$before_dir" != "$install_dir_norm" ]]; then
     refuse "rollback_invalid_before_file" "$LINENO"
   fi
+  local before_sha=""
+  before_sha="$(sha256sum "$before" | awk '{print $1}')"
+  if [[ "${base#ap.before-}" != "${before_sha:0:7}" ]]; then
+    refuse "rollback_backup_hash_mismatch" "$LINENO"
+  fi
+  acquire_install_lock
   local tmp=""
   tmp="$(mktemp "$INSTALL_DIR/.ap.rollback.XXXXXX")"
   if ! install -m 0755 "$before" "$tmp"; then
