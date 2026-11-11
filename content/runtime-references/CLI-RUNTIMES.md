@@ -77,7 +77,7 @@ The target window is a task decision and is written in the task's STATE. A confi
 
 Hook wiring differs per CLI and changes with CLI and plugin versions, so read the actual configuration instead of assuming it: Claude Code `~/.claude/settings.json` `hooks` plus its installed plugins, Codex `~/.codex/hooks.json`, Muse `~/.config/muse/settings.json` `hooks`, Antigravity `~/.gemini/config/hooks.json`, Grok `~/.grok/hooks/`. A CLI with the `hindsight` MCP server but no Hindsight hook gets no automatic memory injection and no automatic session retention; the agent calls the tools itself. A hook name does not show that injection or retention happened.
 
-Do not export a hook-disable variable and do not remove an MCP server to isolate a worker. Memory isolation uses the Hindsight path override described in `concurrent-work.md`.
+Do not export a hook-disable variable and do not remove an MCP server to isolate a worker. Memory isolation uses the Hindsight path override described in `CONCURRENT-WORK.md`.
 
 ## 7. Skills
 

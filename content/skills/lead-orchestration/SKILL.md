@@ -7,7 +7,7 @@ description: When STATE names you Lead, decide what to delegate, shape each task
 
 Use this when the task's STATE names you Lead. The assignment comes from STATE, never from a CLI name. It covers the Lead and its workers, and one Lead handing a task to the next. The Lead and the user: skill `strategy-dialogue`. Terms: `/root/.agents/runtime-references/GLOSSARY.md`.
 
-The rules every agent follows for ownership, handoff, receiving work, accepting it and using Herdr are in `/root/.agents/runtime-references/concurrent-work.md`. This skill adds only what the Lead decides. It is a playbook, not a loader, a scheduler or a permission system.
+The rules every agent follows for ownership, handoff, receiving work, accepting it and using Herdr are in `/root/.agents/runtime-references/CONCURRENT-WORK.md`. This skill adds only what the Lead decides. It is a playbook, not a loader, a scheduler or a permission system.
 
 ## 1. What the Lead does itself
 
@@ -45,18 +45,18 @@ Template and the three shapes: `references/task-packet.md`.
 
 ## 3. Running a worker
 
-Mechanics: `concurrent-work.md` section 5 and skill `herdr`; the commands of each CLI: `/root/.agents/runtime-references/CLI-RUNTIMES.md` section 2. The Lead adds:
+Mechanics: `CONCURRENT-WORK.md` section 5 and skill `herdr`; the commands of each CLI: `/root/.agents/runtime-references/CLI-RUNTIMES.md` section 2. The Lead adds:
 
-- Default to an interactive session (commands: `concurrent-work.md` section 5): open the CLI in a new tab with as few flags as it needs (the model), then type the prompt, which names the packet file. The user can watch it and the session can take a follow-up. Use a headless run only where an interactive session cannot work.
+- Default to an interactive session (commands: `CONCURRENT-WORK.md` section 5): open the CLI in a new tab with as few flags as it needs (the model), then type the prompt, which names the packet file. The user can watch it and the session can take a follow-up. Use a headless run only where an interactive session cannot work.
 - A workspace trust dialog in a pane you started for a worker is answered by the Lead: trust and continue. A dialog that asks to approve one effect is answered by the packet: approve an effect the packet allows, decline any other. A login or a payment stays with the user.
 - At dispatch, record in the board or STATE: worker, tier, runtime, session, pane, packet, start time read from the clock, and the build-slot owner. Before a build, check free disk space against the floor STATE states.
 - Wait in the background with a timeout. Completion needs both the DONE line and a nonempty report; a DONE line that carries the report's SHA-256 shows the file is the finished one. Do not build a resident watcher.
-- Liveness: set the packet's quiet limit from the expected length of the run, never below the time a comparable run took. A worker whose session record and pane did not change for that long has stalled. Read the pane; end the worker by closing the tab you created or by process ID (a name pattern can match your own shell); reconcile what it already changed (`concurrent-work.md` section 4); record the cause, or "unknown". Do not rerun it unchanged: change the packet, split the step, or change the way it is run. Moving to another model needs a reason other than getting past the failure.
+- Liveness: set the packet's quiet limit from the expected length of the run, never below the time a comparable run took. A worker whose session record and pane did not change for that long has stalled. Read the pane; end the worker by closing the tab you created or by process ID (a name pattern can match your own shell); reconcile what it already changed (`CONCURRENT-WORK.md` section 4); record the cause, or "unknown". Do not rerun it unchanged: change the packet, split the step, or change the way it is run. Moving to another model needs a reason other than getting past the failure.
 - Give a worker the memory conclusions it needs, already verified, with their source.
 
 ## 4. Accepting
 
-`concurrent-work.md` section 4, and:
+`CONCURRENT-WORK.md` section 4, and:
 
 - A worker's finding is a pointer. Check it against source before acting on it.
 - Accept, send concrete repairs, or reject, and record which. Repairs in the same scope may go to the same worker session.

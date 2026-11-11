@@ -14,7 +14,7 @@ No task directory yet: create `work/<scope>-<topic>/STATE.md`. Put the task's Gi
 
 | What | Path |
 | --- | --- |
-| Platform and module repositories (main checkouts) | `/home/palantirkc/platforms/<repo>/`. Modules are named `<platform>-<module>`. The list is in `codebase-orientation.md` |
+| Platform and module repositories (main checkouts) | `/home/palantirkc/platforms/<repo>/`. Modules are named `<platform>-<module>`. The list is in `CODEBASE-ORIENTATION.md` |
 | Tasks | `/home/palantirkc/work/<scope>-<topic>/` with `STATE.md`; task worktrees in `wt/<repo>/` |
 | Pinned external source | `/home/palantirkc/external/` |
 | Other repositories, kept for custody | `/home/palantirkc/projects/` |
@@ -28,9 +28,9 @@ Read one of these only when its situation applies. References are in `/root/.age
 
 | Situation | Read |
 | --- | --- |
-| I do not know where a repository, task, plan or service lives | `codebase-orientation.md` |
+| I do not know where a repository, task, plan or service lives | `CODEBASE-ORIENTATION.md` |
 | I start, resume or configure a CLI, register an MCP server, or must check what a session loaded | `CLI-RUNTIMES.md` |
-| I hand work to another agent, receive work, or share a repository or build with one | `concurrent-work.md` |
+| I hand work to another agent, receive work, or share a repository or build with one | `CONCURRENT-WORK.md` |
 | I must decide where a piece of information belongs, or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
 | Memory returns stale or irrelevant results, or I change memory content or pages | `HINDSIGHT-RUNTIME.md` |
 | I need the official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |

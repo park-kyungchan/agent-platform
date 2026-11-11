@@ -1,6 +1,6 @@
 # Task packet
 
-One file per bounded piece of work, with exact values instead of references to a conversation, written in the terms of `/root/.agents/runtime-references/GLOSSARY.md` and never in the user's wording. What a packet must contain and how a worker treats it: `/root/.agents/runtime-references/concurrent-work.md` sections 2 and 3. The worker, its model and the build-slot owner are recorded in STATE at dispatch, not in the packet.
+One file per bounded piece of work, with exact values instead of references to a conversation, written in the terms of `/root/.agents/runtime-references/GLOSSARY.md` and never in the user's wording. What a packet must contain and how a worker treats it: `/root/.agents/runtime-references/CONCURRENT-WORK.md` sections 2 and 3. The worker, its model and the build-slot owner are recorded in STATE at dispatch, not in the packet.
 
 ## Common part
 

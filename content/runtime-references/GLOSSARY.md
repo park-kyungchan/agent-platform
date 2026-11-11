@@ -25,7 +25,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | acceptance | The Lead reading back the actual output or effect of a worker and deciding to use it | Reading the diff and rerunning the check | `sign-off` |
 | review | A second agent, in a fresh context, judging a frozen candidate against the request and the contracts | A reviewer subagent that writes findings by severity | — |
 | candidate | The exact revision that is offered for review or merge | A commit on a task branch | — |
-| handoff | Passing a piece of work, with a packet, to another agent; also one Lead passing a task to the next Lead | `concurrent-work.md` section 2 | `hand-off`, `handover` |
+| handoff | Passing a piece of work, with a packet, to another agent; also one Lead passing a task to the next Lead | `CONCURRENT-WORK.md` section 2 | `hand-off`, `handover` |
 | closure | Ending a worker run or a task: record, reconcile, close what the task created | `lessons-loop/references/worker-closure.md` | — |
 | write set | The files one writer may change | `Exact targets` line of a packet | — |
 | build slot | The right to run the one expensive build at a time | Named in STATE at dispatch | — |
@@ -62,7 +62,7 @@ Metric, baseline, target, leading and lagging indicator, output and outcome, pro
 
 ## 6. Repositories and paths
 
-Names and locations of platforms, modules, tasks and services: `codebase-orientation.md`. Use the repository names written there.
+Names and locations of platforms, modules, tasks and services: `CODEBASE-ORIENTATION.md`. Use the repository names written there.
 
 ## 7. How the user refers to things
 
@@ -77,7 +77,7 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 메모리 | One of three: the task's STATE and board, long-term memory, private memory | "단기" is the task's STATE and board, "중장기" is long-term memory, "CLI의 메모리" is private memory |
 | 하인드사이트, HindSight | Hindsight: the long-term memory server and its MCP tools | — |
 | 온톨로지, Ontology | Ontology in Palantir's sense: object types, links and actions in `ontology-platform` | Not a general word list or taxonomy |
-| REA, Ghidra Framework | REA, the reverse-engineering tool cloned at `/home/palantirkc/tools/rea`, with Ghidra beside it as its backend for native binaries | `codebase-orientation.md` section External tools: static or dynamic use, and whether it is built |
+| REA, Ghidra Framework | REA, the reverse-engineering tool cloned at `/home/palantirkc/tools/rea`, with Ghidra beside it as its backend for native binaries | `CODEBASE-ORIENTATION.md` section External tools: static or dynamic use, and whether it is built |
 | Rust 전환, 마이그레이션 | Moving an implementation to Rust in the platform repositories | Which repository and which consumer |
 | 컷오버, cutover | Switching the live consumers of a service from the old implementation to the new one | Which service and which consumers; the rollback route |
 | 수업 세션 | A CLI session the user runs while teaching | Never send input to it or close it |
@@ -85,7 +85,7 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 새 Lead, 새 세션 | The Lead session that takes the task over next | — |
 | 라우팅 | Either which file an agent opens for a situation, or which model gets which work | The first is the table in `AGENTS.md` section 3; the second is the assignment file |
 | 지표, 메트릭, KPI | A number the user wants watched; often a metric that is not yet a KPI | Define it with the measurement reference of section 5 before using it |
-| VPS, 코드베이스 전체 | This host: the platform repositories, the task directories and the shared instructions | Scope it with `codebase-orientation.md` |
+| VPS, 코드베이스 전체 | This host: the platform repositories, the task directories and the shared instructions | Scope it with `CODEBASE-ORIENTATION.md` |
 | CI | The required checks that run on a pull request in the platform repositories | Which repository |
 | 보드 | The board of the current task | — |
 | 정리, 손봐, 개선 | A request whose target and extent are open | State what you will change and what you will leave before starting |

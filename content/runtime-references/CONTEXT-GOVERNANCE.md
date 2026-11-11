@@ -1,6 +1,6 @@
 # Where information belongs
 
-The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6; this file is its detail. Read this when you must decide where a piece of information is written, which source answers a question, or whether something may go to memory. This is a convention shared by all CLIs. It is not a loader, a memory engine, a scheduler or a permission system. How to hand context to another agent is in `concurrent-work.md`; how the memory server ranks and refreshes is in `HINDSIGHT-RUNTIME.md`.
+The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6; this file is its detail. Read this when you must decide where a piece of information is written, which source answers a question, or whether something may go to memory. This is a convention shared by all CLIs. It is not a loader, a memory engine, a scheduler or a permission system. How to hand context to another agent is in `CONCURRENT-WORK.md`; how the memory server ranks and refreshes is in `HINDSIGHT-RUNTIME.md`.
 
 ## 1. Owner of each kind of information
 
