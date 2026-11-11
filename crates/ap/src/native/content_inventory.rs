@@ -18,6 +18,10 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/runtime-references/HINDSIGHT-RUNTIME.md"),
     ),
     (
+        "runtime-references/ONTOLOGY-USE.md",
+        include_str!("../../../../content/runtime-references/ONTOLOGY-USE.md"),
+    ),
+    (
         "runtime-references/OFFICIAL-DOCS.md",
         include_str!("../../../../content/runtime-references/OFFICIAL-DOCS.md"),
     ),

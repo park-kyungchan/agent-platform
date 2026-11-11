@@ -14,7 +14,7 @@ The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6;
 
 - A decision another agent needs must not stay only in one CLI's private memory: write it in the repository contract or in an authorized, sourced Hindsight document.
 - Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off (reason: `HINDSIGHT-RUNTIME.md`, "Session path on this host").
-- A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy; the user corrects them. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
+- A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy, or in the store's `kpi` object when the task's STATE names that object type in use (`ONTOLOGY-USE.md`), never in both; the user corrects them. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
 
 ## 2. Which source answers a question
 
@@ -23,7 +23,7 @@ The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6;
 | What may I do now, and what is next? | The user's current instruction, `/root/.agents/AGENTS.md`, the task's STATE. Memory is history |
 | What did the user decide, and why? | The dated source decision, newer corrections and the current task authority. A generated page is navigation |
 | What does the program implement? | Current source at a Git revision, compiler and runtime output, tests |
-| What does a KPI mean? | The definition in the owning repository or the task's strategy; the target in the task's strategy; values from the native measurement. What the words KPI, metric and guardrail mean: `/root/.agents/skills/strategy-dialogue/references/measurement.md` |
+| What does a KPI mean? | The definition in the owning repository or the task's strategy; the target in the task's strategy; values from the native measurement. When the task's STATE names the store's `kpi` object type in use, that object holds the task's definition, target and latest value (`ONTOLOGY-USE.md`). What the words KPI, metric and guardrail mean: `/root/.agents/skills/strategy-dialogue/references/measurement.md` |
 | What does a word in an instruction or in the user's message mean? | `/root/.agents/AGENTS.md` section 8, then `GLOSSARY.md` |
 | What does an operational object say now? | A fresh authorized domain read |
 | May a caller read, derive or act? | The domain's authenticated policy and the task grant. Neither memory nor a tag grants access |
