@@ -1797,25 +1797,12 @@
         },
         {
           "code": "memory_record_has_successor",
-          "message": "Complete or withdraw the current successor before making its predecessor ready.",
+          "message": "Complete or withdraw the linked successor before making its predecessor ready.",
           "none": [
             {
               "linked": {
                 "from": "$record",
-                "link": "memory_successors",
-                "where": {
-                  "all": [
-                    {
-                      "in": [
-                        "status",
-                        [
-                          "pending",
-                          "ready"
-                        ]
-                      ]
-                    }
-                  ]
-                }
+                "link": "memory_successors"
               }
             }
           ]
@@ -1908,7 +1895,7 @@
       ]
     },
     "withdraw_memory_record": {
-      "description": "Record withdrawal after the original was removed or reverted on main; supersede a pending or ready record without a successor.",
+      "description": "Record withdrawal after the original was removed or reverted on main; supersede a pending or ready record and clear its predecessor reference.",
       "parameters": {
         "record": {
           "type": {
@@ -1940,6 +1927,12 @@
           "modify_object": "memory_record",
           "set": {
             "status": "superseded"
+          }
+        },
+        {
+          "clear_reference": {
+            "object_type": "memory_record",
+            "property": "supersedes"
           }
         }
       ]
