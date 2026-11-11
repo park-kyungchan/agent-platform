@@ -62,6 +62,11 @@ printf 'wrong\n' >"$INSTALL_DIR2/not-a-backup"
 expect_refusal rollback_wrong_name rollback_invalid_before_file \
   env AP_INSTALL_DIR="$INSTALL_DIR2" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" rollback "$INSTALL_DIR2/not-a-backup"
 
+# A staged backup is never an accepted rollback source.
+printf 'staged backup\n' >"$BACKUP_DIR/.ap.backup.abcdef"
+expect_refusal rollback_temporary_backup rollback_invalid_before_file \
+  env AP_INSTALL_DIR="$INSTALL_DIR2" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" rollback "$BACKUP_DIR/.ap.backup.abcdef"
+
 # install_busy: another process holds the lock
 HOLDER_READY="$TMP_ROOT/holder.ready"
 ( exec 8>"$LOCK_FILE"; flock 8; printf 'ready\n' >"$HOLDER_READY"; sleep 5 ) &

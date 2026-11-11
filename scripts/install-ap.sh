@@ -13,6 +13,7 @@ INSTALL_LOCK_FILE="${AP_INSTALL_LOCK:-/run/lock/ap-install.lock}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 WORKTREE_DIR=""
+BACKUP_TMP=""
 
 refuse() {
   local code="$1"
@@ -22,6 +23,9 @@ refuse() {
 }
 
 cleanup_worktree() {
+  if [[ -n "$BACKUP_TMP" ]]; then
+    rm -f -- "$BACKUP_TMP"
+  fi
   if [[ -n "$WORKTREE_DIR" && -d "$WORKTREE_DIR" ]]; then
     git -C "$REPO_ROOT" worktree remove --force "$WORKTREE_DIR" >/dev/null 2>&1 || rm -rf "$WORKTREE_DIR"
   fi
@@ -159,14 +163,24 @@ do_install() {
       refuse "installed_sha_unavailable" "$LINENO"
     fi
     backup="$BACKUP_DIR/ap.before-${current_sha:0:7}"
-    if ! cp "$INSTALLED" "$backup"; then
+    if ! BACKUP_TMP="$(mktemp "$BACKUP_DIR/.ap.backup.XXXXXX")"; then
+      refuse "backup_failed" "$LINENO"
+    fi
+    if ! cp "$INSTALLED" "$BACKUP_TMP"; then
+      rm -f -- "$BACKUP_TMP"
       refuse "backup_failed" "$LINENO"
     fi
     local backup_sha=""
-    backup_sha="$(sha256sum "$backup" 2>/dev/null | awk '{print $1}' || true)"
+    backup_sha="$(sha256sum "$BACKUP_TMP" 2>/dev/null | awk '{print $1}' || true)"
     if [[ "$backup_sha" != "$current_sha" ]]; then
+      rm -f -- "$BACKUP_TMP"
       refuse "backup_failed" "$LINENO"
     fi
+    if ! mv -T -- "$BACKUP_TMP" "$backup"; then
+      rm -f -- "$BACKUP_TMP"
+      refuse "backup_failed" "$LINENO"
+    fi
+    BACKUP_TMP=""
   fi
   local tmp=""
   tmp="$(mktemp "$INSTALL_DIR/.ap.install.XXXXXX")"
