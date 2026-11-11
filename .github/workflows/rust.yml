@@ -39,6 +39,11 @@ jobs:
       - name: Content check
         shell: bash
         run: python3 -I -B ci/check-content.py
+      - name: Memory record check and tests
+        shell: bash
+        run: |
+          python3 -I -B ci/check-memory-records.py
+          python3 -I -B -m unittest discover -s ci -p test_check_memory_records.py
       - name: Install repository-pinned Rust
         if: steps.scope.outputs.run_rust == 'true'
         shell: bash

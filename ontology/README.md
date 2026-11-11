@@ -190,7 +190,7 @@ fetch this repository, then use `ont --store <authorized-store> schema install
 The temporary-store check establishes neither deployment nor native CLI loading.
 
 ### Generated views and remaining limits
-Every view takes `task` as the task's native key, for example
+Every program-state view takes `task` as the task's native key, for example
 `workspace-strategy-reassessment-20261109`, and filters directly on the `task`
 reference with `{"eq":["task","$task"]}`. Render through stdin:
 
@@ -219,3 +219,48 @@ arguments, conversions and property comparison would enable KPI progress or
 observation-age filtering, elapsed worker time and closed-date windows. A
 hold's `until` is intentionally prose; expiry comparisons need a separate typed
 expiry field. `current_decisions` needs no numeric/date comparison.
+
+## Version 3: memory retrieval index
+Version 2 remains pinned in Git at
+`2b9417c8bc96b0cbeb4ab7913aa44cb49ad8d604:ontology/work.schema.json`,
+sha256 `27de5fd02c20299897720ab34543e04e6db685438c3dd7409691cb8ddae11f24`.
+Version 3 preserves every version 2 definition and adds only the index type,
+value types, link, actions, views and grants. Install by the same reviewed,
+commit-pinned route above; merging installs nothing.
+
+`memory_record` is Ontology-owned and keyed by the stable Git record id, taken
+from the `/native_key` pointer inside its `record` Id parameter. Its only
+properties are `document_id`, `status` (`pending`, `ready`, `superseded`), optional
+`supersedes` (predecessor reference), and `body_hash` (64 lowercase hex SHA-256).
+There is no title, subject, kind or body copy. Git originals are described in
+[../memory/README.md](../memory/README.md). No real record is populated yet.
+The caller supplies `document_id` equal to the record's native key. Like the
+file's selection from `main` and remote readback, this equality is the writer's
+contract; the schema cannot compare a reference's native key with a parameter.
+The reverse reference link is `memory_successors`; forward is `memory_predecessor`.
+
+| Action | Parameters and effect | Submission refusals |
+| --- | --- | --- |
+| `mark_memory_record_pending` | `record` full Id (may be absent on first use), `document_id`, `body_hash`, optional `supersedes`; creates or modifies the same key, sets pending and the hash; omitted predecessor preserves its existing value | `memory_record_has_successor` when any linked successor exists; continue that replacement batch instead of reopening its predecessor |
+| `mark_memory_record_ready` | `record`, `body_hash`; sets ready after document/fact/page readback | `memory_record_not_pending`; `memory_body_hash_mismatch` |
+| `mark_memory_record_superseded` | `record` predecessor, `successor`; marks only the predecessor superseded | `memory_record_already_superseded` unless predecessor is pending/ready; `memory_successor_not_ready`; `memory_successor_not_linked` unless successor.supersedes equals record; `memory_successor_is_self` |
+
+The named refusals appear inside `submission_criteria` answers; unknown parameters
+(including a supplied status) and malformed hashes refuse `invalid_parameter`.
+On distinct replacement, mark the predecessor pending first, create its pending
+successor with `supersedes` pointing back, then ready the successor after readback
+and supersede the predecessor. Same-record corrections use pending with a new
+hash, then ready with exactly that hash. A record with a successor cannot reopen.
+These actions record the publication order; they do not contact a memory server.
+
+`ready_memory_records` and `pending_memory_records` take no arguments. Both show
+Record id (`$key`), Document id and Body hash, ordered by document_id, filtered
+on their respective status. For example, send
+`{"view":"ready_memory_records","args":{}}` to `ont render` through stdin.
+One view read supplies its set within the native 200-row default/10,000-head
+bound; a consumer must treat `truncated` as incomplete, not a complete ready set.
+`agent` receives the same read/action grants as for other Lead-written types.
+`scope_keys` stays empty; namespace stays `vps://palantirkc` / `root`, with no task
+reference or task-specific scope. A record can therefore span multiple tasks.
+The rehearsal upgrades frozen v1 to v2 to v3, preserves an existing v2 object,
+and exercises synthetic transitions, refusals and both index views offline.

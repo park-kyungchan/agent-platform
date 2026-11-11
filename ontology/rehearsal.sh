@@ -34,7 +34,15 @@ assert hashlib.sha256(v1).hexdigest() == '4573ab180f63889029ae98c892c996e810f9d8
 first = pathlib.Path(store).with_name('v1.json'); first.write_bytes(v1)
 call(['schema', 'install', str(first)]); call(['index', '--source', 'task_states', '--source', 'packets', '--source', 'reports'])
 revision = obj(task)['observations'][-1]['revision']; obj(packet); obj(report)
+v2 = subprocess.check_output(['git', '-C', repo, 'show', '2b9417c8bc96b0cbeb4ab7913aa44cb49ad8d604:ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v2).hexdigest() == '27de5fd02c20299897720ab34543e04e6db685438c3dd7409691cb8ddae11f24'
+second = pathlib.Path(store).with_name('v2.json'); second.write_bytes(v2)
+call(['schema', 'install', str(second)])
+probe = created(apply('set_hold', 'v2-probe', dict(task=task, effect='upgrade probe', until='schema v3')), 'hold')
+apply('lift_hold', 'v2-probe-lift', dict(hold=probe))
+probe_revision = obj(probe)['head']
 call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+assert obj(probe)['head'] == probe_revision
 assert obj(task)['observations'][-1]['revision'] == revision
 call(['describe'], {})
 hp = dict(task=task, effect='publish', until='review accepted')
@@ -101,6 +109,30 @@ apply('note_worker_run', 'live-note', dict(worker_run=live, note='check | next\n
 apply('start_worker_run', 'live-pending', dict(wp, name='live-pending', packet=pending_packet))
 assert fields(w)['started_at'] == '2026-11-11T02:00:02Z' and fields(w)['closed_at'] == '2026-11-11T02:01:01Z'
 assert fields(successor)['decided_at'] == '2026-11-11T02:00:01Z' and all(fields(m['id'])['recorded_at'] == '2026-11-11T02:00:01Z' for m in measurements)
+# Cross-task memory index: only invented ids and hashes, never a server call.
+mr = oid('memory_record', 'rehearsal-original'); ms = oid('memory_record', 'rehearsal-successor')
+mpending, mready, msup = 'mark_memory_record_pending', 'mark_memory_record_ready', 'mark_memory_record_superseded'
+def pending(record, digest, **extra): return dict(record=record, document_id=record['native_key'], body_hash=digest, **extra)
+def memory_view(name): return call(['render'], dict(view=name, args={}))
+apply(mpending, 'memory-start', pending(mr, 'a' * 64)); assert fields(mr)['status'] == 'pending'
+assert memory_view('pending_memory_records')['rows'] == 1 and memory_view('ready_memory_records')['rows'] == 0
+unchanged = fingerprint(); apply(mready, 'memory-wrong-hash', dict(record=mr, body_hash='b' * 64), 'memory_body_hash_mismatch'); assert fingerprint() == unchanged
+apply(mready, 'memory-ready', dict(record=mr, body_hash='a' * 64))
+unchanged = fingerprint(); apply(mready, 'memory-not-pending', dict(record=mr, body_hash='a' * 64), 'memory_record_not_pending'); assert fingerprint() == unchanged
+apply(mpending, 'memory-correct', pending(mr, 'b' * 64)); assert fields(mr)['body_hash'] == 'b' * 64
+apply(mready, 'memory-correct-ready', dict(record=mr, body_hash='b' * 64))
+apply(mpending, 'memory-replace', pending(mr, 'b' * 64))
+apply(mpending, 'memory-successor', pending(ms, 'c' * 64, supersedes=mr))
+unchanged = fingerprint(); apply(msup, 'memory-not-ready-successor', dict(record=mr, successor=ms), 'memory_successor_not_ready'); assert fingerprint() == unchanged
+unchanged = fingerprint(); apply(mpending, 'memory-bad-status', pending(ms, 'c' * 64, status='unknown'), 'invalid_parameter'); assert fingerprint() == unchanged
+apply(mready, 'memory-successor-ready', dict(record=ms, body_hash='c' * 64))
+apply(msup, 'memory-supersede', dict(record=mr, successor=ms))
+assert fields(mr)['status'] == 'superseded' and fields(ms)['supersedes'] == mr
+unchanged = fingerprint(); apply(mpending, 'memory-reopen', pending(mr, 'd' * 64), 'memory_record_has_successor'); assert fingerprint() == unchanged
+assert memory_view('pending_memory_records')['rows'] == 0
+memory_rows = memory_view('ready_memory_records')
+assert memory_rows['rows'] == 1 and not memory_rows['truncated'] and ms['native_key'] in memory_rows['markdown'] and 'c' * 64 in memory_rows['markdown']
+print(memory_rows['markdown'])
 requests = [dict(jsonrpc='2.0', id=i, method='tools/call', params=dict(name=n, arguments={})) for i, n in enumerate(['ont_describe', 'ont_action_list'], 1)]
 wire = subprocess.run([binary, '--store', store, 'mcp'], input='\n'.join(map(json.dumps, requests))+'\n', text=True, capture_output=True, timeout=60); assert wire.returncode == 0, wire.stderr
 for request, line in zip(requests, wire.stdout.splitlines(), strict=True):
