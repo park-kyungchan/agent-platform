@@ -31,6 +31,20 @@ Edit source in a task worktree, `work/<scope>-<topic>/wt/<repo>/`, not in a main
 | Installed first-party binaries | `/usr/local/bin/ap`, `/usr/local/bin/vps-ops` |
 | Recovery archives | `/home/palantirkc/archive/INDEX.md`. An archive is for recovery; it carries no current rule |
 
+## External tools
+
+Third-party tools kept under `/home/palantirkc/tools/`. They are not first-party source: do not edit them, and read the version and build state from the directory, not from memory.
+
+| Tool | Path | What it is and how it is used here |
+| --- | --- | --- |
+| REA | `/home/palantirkc/tools/rea` (clone of `https://github.com/morluto/rea`, package `rea-agents`) | "Reverse Engineer Anything": a local command and MCP server with which an agent inspects binaries, JavaScript applications and web bundles, saved captures and running processes, and gets findings with evidence. Started with `node scripts/rea.mjs mcp` in the clone; it runs only when the clone is built (`dist/` exists) |
+| Ghidra | `/home/palantirkc/tools/ghidra_12.1.4_PUBLIC` | The analysis backend REA uses for native binaries; REA finds it through the environment variable `GHIDRA_INSTALL_DIR`. It is not used on its own here |
+
+- REA is not ReVa or any other tool with a similar name.
+- Static analysis reads files the task names and runs nothing: allowed when the task names the target. Building REA, installing its dependencies or registering it in a CLI is an installation: it needs the task's authority.
+- Dynamic use needs the user's word each time: attaching to a process, instrumenting an application or a device, capturing or intercepting traffic, sending a request to a live service.
+- The Academy server the teacher uses (the LMS) is a web application without a native client: its contracts were derived from a pinned client script as text, without Ghidra. Earlier results: `education-platform` `modules/academy-workbench/tools/academy-mcp/docs/rea-name-search-contract-20261026.md`; `/home/palantirkc/work/edu-prestudy-section-mcp/evidence/`.
+
 ## Searching
 
 - Search the named repository or task first with `rg` or `git grep`. Do not scan the whole host.

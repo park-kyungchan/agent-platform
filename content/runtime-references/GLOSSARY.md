@@ -77,6 +77,7 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 메모리 | One of three: the task's STATE and board, long-term memory, private memory | "단기" is the task's STATE and board, "중장기" is long-term memory, "CLI의 메모리" is private memory |
 | 하인드사이트, HindSight | Hindsight: the long-term memory server and its MCP tools | — |
 | 온톨로지, Ontology | Ontology in Palantir's sense: object types, links and actions in `ontology-platform` | Not a general word list or taxonomy |
+| REA, Ghidra Framework | REA, the reverse-engineering tool cloned at `/home/palantirkc/tools/rea`, with Ghidra beside it as its backend for native binaries | `codebase-orientation.md` section External tools: static or dynamic use, and whether it is built |
 | Rust 전환, 마이그레이션 | Moving an implementation to Rust in the platform repositories | Which repository and which consumer |
 | 컷오버, cutover | Switching the live consumers of a service from the old implementation to the new one | Which service and which consumers; the rollback route |
 | 수업 세션 | A CLI session the user runs while teaching | Never send input to it or close it |
