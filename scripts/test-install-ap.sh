@@ -7,6 +7,9 @@ TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 FAILURES=0
 LOCK_FILE="$TMP_ROOT/ap-install.lock"
+BACKUP_DIR="$TMP_ROOT/backups"
+export AP_BACKUP_DIR="$BACKUP_DIR"
+mkdir -m 0755 "$BACKUP_DIR"
 
 report() {
   local status="$1"
@@ -86,9 +89,9 @@ WRONG_PREFIX="0000000"
 if [[ "${HASH_SHA:0:7}" == "$WRONG_PREFIX" ]]; then
   WRONG_PREFIX="1111111"
 fi
-cp "$TMP_ROOT/hash-source" "$INSTALL_DIR_HASH/ap.before-$WRONG_PREFIX"
+cp "$TMP_ROOT/hash-source" "$BACKUP_DIR/ap.before-$WRONG_PREFIX"
 expect_refusal rollback_backup_hash_mismatch rollback_backup_hash_mismatch \
-  env AP_INSTALL_DIR="$INSTALL_DIR_HASH" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" rollback "$INSTALL_DIR_HASH/ap.before-$WRONG_PREFIX"
+  env AP_INSTALL_DIR="$INSTALL_DIR_HASH" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" rollback "$BACKUP_DIR/ap.before-$WRONG_PREFIX"
 
 # rollback round trip: backup name must be the file's own sha256 prefix
 INSTALL_DIR3="$TMP_ROOT/install3"
@@ -96,9 +99,18 @@ mkdir -p "$INSTALL_DIR3"
 make_fake_ap "$TMP_ROOT/roundtrip-source" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 BEFORE_SHA="$(sha256sum "$TMP_ROOT/roundtrip-source" | awk '{print $1}')"
 BACKUP_NAME="ap.before-${BEFORE_SHA:0:7}"
+cp "$TMP_ROOT/roundtrip-source" "$BACKUP_DIR/$BACKUP_NAME"
 cp "$TMP_ROOT/roundtrip-source" "$INSTALL_DIR3/$BACKUP_NAME"
+expect_refusal rollback_install_dir rollback_invalid_before_file \
+  env AP_INSTALL_DIR="$INSTALL_DIR3" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" rollback "$INSTALL_DIR3/$BACKUP_NAME"
+if grep -Fq "accepted directory: $BACKUP_DIR" "$TMP_ROOT/rollback_install_dir.err"; then
+  report ok rollback_accepted_directory_message
+else
+  report FAIL rollback_accepted_directory_message
+fi
+
 make_fake_ap "$INSTALL_DIR3/ap" bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-if env AP_INSTALL_DIR="$INSTALL_DIR3" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" rollback "$INSTALL_DIR3/$BACKUP_NAME" >"$TMP_ROOT/rollback_round_trip.out" 2>"$TMP_ROOT/rollback_round_trip.err"; then
+if env AP_INSTALL_DIR="$INSTALL_DIR3" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" rollback "$BACKUP_DIR/$BACKUP_NAME" >"$TMP_ROOT/rollback_round_trip.out" 2>"$TMP_ROOT/rollback_round_trip.err"; then
   AFTER_SHA="$(sha256sum "$INSTALL_DIR3/ap" | awk '{print $1}')"
   if [[ "$BEFORE_SHA" == "$AFTER_SHA" ]]; then
     report ok rollback_round_trip
@@ -113,9 +125,9 @@ fi
 INSTALL_DIR4="$TMP_ROOT/install4"
 mkdir -p "$INSTALL_DIR4"
 make_fake_ap "$INSTALL_DIR4/ap" cccccccccccccccccccccccccccccccccccccccc
-SNAP_BEFORE="$(find "$INSTALL_DIR4" -type f -exec sha256sum {} + | sort)"
+SNAP_BEFORE="$(find "$INSTALL_DIR4" "$BACKUP_DIR" -type f -exec sha256sum {} + | sort)"
 if env AP_INSTALL_DIR="$INSTALL_DIR4" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" check >"$TMP_ROOT/check_writes_nothing.out" 2>"$TMP_ROOT/check_writes_nothing.err"; then
-  SNAP_AFTER="$(find "$INSTALL_DIR4" -type f -exec sha256sum {} + | sort)"
+  SNAP_AFTER="$(find "$INSTALL_DIR4" "$BACKUP_DIR" -type f -exec sha256sum {} + | sort)"
   if [[ "$SNAP_BEFORE" == "$SNAP_AFTER" ]]; then
     report ok check_writes_nothing
   else
@@ -123,6 +135,29 @@ if env AP_INSTALL_DIR="$INSTALL_DIR4" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTAL
   fi
 else
   report FAIL check_writes_nothing
+fi
+
+# check must not create an absent backup directory.
+MISSING_BACKUP="$TMP_ROOT/missing-backups"
+if env AP_BACKUP_DIR="$MISSING_BACKUP" AP_INSTALL_DIR="$INSTALL_DIR4" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" check >"$TMP_ROOT/check_missing.out" 2>"$TMP_ROOT/check_missing.err" && [[ ! -e "$MISSING_BACKUP" ]]; then
+  report ok check_missing_backup_directory
+else
+  report FAIL check_missing_backup_directory
+fi
+
+# Invalid backup directories refuse before any build or replacement.
+EXPECTED_SHA="$(sha256sum "$INSTALL_DIR4/ap" | awk '{print $1}')"
+ln -s "$BACKUP_DIR" "$TMP_ROOT/backup-link"
+printf 'not a directory\n' >"$TMP_ROOT/backup-file"
+for bad_backup in "$TMP_ROOT/backup-link" "$TMP_ROOT/backup-link/" "$TMP_ROOT/backup-file"; do
+  expect_refusal "backup_dir_unusable_$(basename "$bad_backup")" backup_dir_unusable \
+    env AP_BACKUP_DIR="$bad_backup" AP_INSTALL_DIR="$INSTALL_DIR4" AP_INSTALL_LOCK="$LOCK_FILE" CARGO_TARGET_DIR="$TMP_ROOT/target" bash "$INSTALL_SCRIPT" install 0000000000000000000000000000000000000000
+done
+AFTER_SHA="$(sha256sum "$INSTALL_DIR4/ap" | awk '{print $1}')"
+if [[ "$AFTER_SHA" == "$EXPECTED_SHA" ]]; then
+  report ok backup_refusal_preserves_installed
+else
+  report FAIL backup_refusal_preserves_installed
 fi
 
 if [[ "$FAILURES" -ne 0 ]]; then
