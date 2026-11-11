@@ -22,6 +22,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Shared instruction content: checksums, no changing values in always-loaded text, no dead routes.
+python3 -I -B ci/check-content.py
+
 cargo fmt --all -- --check
 cargo test --locked -j1 --workspace
 cargo clippy --locked -j1 --workspace --all-targets -- -D warnings

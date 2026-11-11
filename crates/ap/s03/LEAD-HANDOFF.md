@@ -86,7 +86,7 @@ backup. No command here edits native trust or official Herdr/Hindsight hooks.
 The prepared installed help and native-surface report are under
 `preparation/final-review/runtime/` (codex[-exec]-help.txt, claude-help.txt,
 muse[-exec]-help.txt, agy-help.txt); current canonical reference is
-`/root/.agents/runtime-references/RUNTIME-LOADING.md`. Consult current supported
+`/root/.agents/runtime-references/CLI-RUNTIMES.md`. Consult current supported
 surfaces, preserve approval posture, model/effort, exact new IDs and logs. The
 commands below are invocation templates for Lead, not executions by this worker:
 

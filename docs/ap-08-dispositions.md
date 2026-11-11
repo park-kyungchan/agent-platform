@@ -13,8 +13,8 @@ remain historical evidence; this document is their bounded successor.
 | Muse | `retained_native_mechanism`: trusted project discovery and explicit canonical/task STATE handoff; no global file adapter | S03 `MUSE-NATIVE-LOADING-QUALIFICATION.json`, session `01a19d68-6066-7eb1-af62-89a26ddcdd62`: foreign Claude `@import` is literal; canonical full text was not auto-injected | No invented Muse installation. Fresh affected-session proof must verify explicit handoff/project reads under the chosen trust/foreign-personal/child flags. Preserve native support. |
 
 S03 paths are relative to `/home/palantirkc/work/ws-replan/preparation/slices/S03/`.
-Runtime references are `/root/.agents/runtime-references/RUNTIME-LOADING.md` and
-`runtime-wiring.md`. No current native session or real-home inspection is performed
+The runtime reference is `/root/.agents/runtime-references/CLI-RUNTIMES.md`
+(formerly `RUNTIME-LOADING.md` and `runtime-wiring.md`). No current native session or real-home inspection is performed
 by this source assignment. Settings, hooks, MCP, vendor trust, profiles and account
 state are outside the adapter's ownership.
 

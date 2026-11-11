@@ -1,187 +1,62 @@
-# Context Governance — on demand
+# Where information belongs
 
-Context Governance routes each question to its owning source and gives each
-agent only the context its authorized task needs. This is a cross-CLI convention,
-not a common instruction loader, memory engine, scheduler or permission system.
-Source basis: Hindsight architecture design of 2026-11-05, its Skill contract and
-the approved strategy/structured-ingestion addenda. These documents authorize
-content changes, not Hindsight migration, configuration or deployment.
+The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6; this file is its detail. Read this when you must decide where a piece of information is written, which source answers a question, or whether something may go to memory. This is a convention shared by all CLIs. It is not a loader, a memory engine, a scheduler or a permission system. How to hand context to another agent is in `concurrent-work.md`; how the memory server ranks and refreshes is in `HINDSIGHT-RUNTIME.md`.
 
-## Memory tiers and write ownership
+## 1. Owner of each kind of information
 
-| Information | Owner store | Writer / path | Read rule |
+| Information | Where it lives | Who writes it | How to read it |
 | --- | --- | --- | --- |
-| Active conversation, reasoning and resumable session | CLI-native session/memory: Claude auto-memory, Codex native facilities, Muse and agy sessions | Native CLI/user; preserve vendor formats, trust, resume and retention | Resume only the exact needed session; do not import another transcript for convenience |
-| Owner, authority, holds, next action, task metrics and verification | Current TASK/STATE; task STRATEGY.md for its brief | Assigned owner edits task files and dates changed decisions/addenda | Read on entry/reset/handoff and before effects when changed |
-| Implemented behavior, schemas, APIs, tests, build instructions and KPI definitions | Owning repository source/docs and native observations | Authorized implementation owner, reviewed source/tests | Read the selected current revision and contract; do not rely on a remembered implementation |
-| Durable decisions, rationale, lessons, corrections, scoped preferences, explained terms and strategy decisions | One shared Hindsight bank, `coding-agent::shared` | Authorized owner/curator through official HTTP/client for structured records; MCP only for simple notes/initiatives | Search/read selected pages first; recall exact evidence; reflect only for unresolved reasoning |
-| Current operational objects, observations, KPI time series, policies, actions and recovery | Domain/task owner today; future Ontology boundary. Exception: the Academy lesson archive in Hindsight (user decision 2026-11-06; education-platform `content/skills/academy-student-context/references/lesson-archive.md`), written by the designated lesson owner under the current Hindsight `academy-practical-protocol` archive-writer contract (official structured storage with deterministic IDs and explicit provenance, user-approved 2026-11-09) | Trusted domain owner under current admission and task authority | Fresh authorized owner read with revision, scope, coverage and freshness; memory is only a citation |
+| The active conversation, reasoning, a resumable session, and notes that matter only to that one CLI | The CLI's own session store and private memory | The CLI | Resume only the exact session you need. Never import another agent's transcript |
+| Owner, authority, holds, next action, task metrics, verification, the Strategy Brief | The task's `STATE.md`, `TASK.md`, `STRATEGY.md` | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
+| Implemented behaviour, schemas, APIs, tests, build instructions, KPI definitions | The owning repository's source and docs | The implementation owner, through review | Read the current revision. Do not rely on a remembered implementation |
+| Durable decisions and their reasons, lessons, corrections, scoped user preferences, explained terms | The shared Hindsight bank `coding-agent::shared` | An authorized owner or curator through the official HTTP API or client; the MCP tools only for simple notes and initiatives | Search pages, read the selected ones, recall exact evidence. Reflect only when those leave reasoning unresolved |
+| Current operational objects, observations, KPI values and time series, policies, actions, recovery state | The domain or task owner today; `ontology-platform` when its admission is implemented | The trusted domain owner under the task's authority | A fresh authorized read with revision, scope, coverage and freshness. Memory is only a pointer to it |
 
-A confirmed Strategy Brief lives in task STATE/STRATEGY.md. Hindsight may retain
-its strategy decision and an authorized KPI definition/rationale linked to repo
-docs. Measured KPI values/time series stay with their current task/domain owner,
-then Ontology when implemented. Targets are strategy decisions; observations are
-operational facts. Do not turn a strategy document into a second execution table.
+- A decision another agent needs must not stay only in one CLI's personal memory: write it in the repository contract or in an authorized, sourced Hindsight document.
+- Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off (reason: `HINDSIGHT-RUNTIME.md`, "Session path on this host").
+- A KPI target is a strategy decision. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
 
-A durable decision another agent needs must not remain solely in a CLI's personal
-memory: put it in the authoritative repository contract or an authorized,
-source-backed Hindsight document. Native memory never gains cross-runner loading
-semantics merely because the same bank is configured.
+## 2. Which source answers a question
 
-## Isolation and continuity
-
-- Default: a fresh worker receives a small context packet: goal, exact targets,
-  allowed effects, expected output, current STATE path, exact TASK/canonical paths,
-  source revision and selected raw evidence. Never transfer a transcript.
-- Continue a session only when the follow-up stays in the same scope/files,
-  reuses needed loaded context and has enough context remaining. Record the
-  concrete unfinished continuation in STATE; otherwise save/close and start fresh.
-- Reviews are always isolated from implementation reasoning. Give the reviewer
-  the request/contracts and frozen candidate/raw evidence, not an intended verdict.
-- Context isolation is not filesystem, build, service or authority isolation.
-  Verify worktree, disjoint write set, shared-resource ownership and actual runtime.
-  An agent name or parallel-tools flag proves none of them.
-- Workers keep native Hindsight hooks and MCP (user decision 2026-11-06: never
-  block a native feature). When a task needs memory isolation, run it under a
-  native coding-agents `paths.<prefix>` override (for example
-  `"/home/palantirkc/work/eval-isolated": {"disabled": true}` or a separate bank)
-  and verify the effective override. Do not enable clients/configuration to
-  overcome a deliberately disabled interface.
-- **CLI-agnostic model reasoning tiers & ~400k compaction (user decision 2026-11-07):**
-  assign open-ended reasoning, architecture, authoring and semantic review according
-  to current user/task authority and actual runtime support, using a suitable
-  high-reasoning model. Examples include `muse-wonder-1.0/high`,
-  `gpt-6.1-sol/high`, `claude-opus-5-5/high` and `Gemini 4 Argon`; this is not an
-  exhaustive allowlist. Restrict `muse-spark-1.3/medium` and
-  `gemini-3.8-flash-medium` strictly to deterministic, closed-spec tasks (fixed
-  checklists, hash/count/diff verification, structured table/JSON projection).
-  Target ~400k tokens for the original four CLIs using supported native controls;
-  verify actual enforcement per runtime. Manual compaction is not an automatic
-  ceiling. Qualify Grok separately (see `CLI-LAUNCH.md`).
-- **4-step Context Governance Optimization Loop (user decision 2026-11-07):**
-  1. *Pre-spawn Parameter & Path Pinning*: verify CLI launch flags, ~400k
-     compaction settings, `cwd` (`paths.<prefix>` isolation when needed) and
-     exact `Read first:` file list before spawning a worker.
-  2. *First-Line Readback Gate*: require the worker's first output line to state
-     `First output after reading: <exact paths>; Context-Injected: <none | injected knowledge-page titles>`.
-     If stale or unrequested context is injected and interferes with the task,
-     halt immediately and adjust `paths.<prefix>` or knowledge-page scope.
-  3. *Post-run Session JSONL Audit*: inspect the worker's native session log
-     (`muse` `session.jsonl`, `agy` `transcript.jsonl`, `claude` project `.jsonl`,
-     `codex` `rollout-*.jsonl`) to inspect recorded tool calls and targets. Logs
-     cannot establish absence of unrecorded subprocess, service, read or transmission
-     effects. Use separate isolation and access controls, plus appropriate independent
-     evidence, when an absence claim matters.
-  4. *Leading Indicator `C` Recording*: classify injected context items at worker
-     closure as `useful / irrelevant / misleading` (`misleading = 0` guardrail)
-     and feed any `irrelevant`/`misleading` hit back into page/path refinement.
-- After reset/resume, reread current task rules/STATE/addenda before effects.
-  A native session's retained context does not renew authority.
-
-## Source of truth per question
-
-| Question | Authority / verification |
+| Question | Authority |
 | --- | --- |
-| What may I do now, and what is next? | Current user instructions, canonical AGENTS and task rules/STATE; memory is historical context |
-| What did the user decide and why? | Dated source decision and provenance, newer corrections and current task authority; a generated page is navigation |
-| What does the program implement? | Current native source/Git revision, compiler/runtime output and relevant tests |
-| What KPI means what? | Owning repo/docs definition and adopted strategy target; measured values come from native owner evidence |
-| What does an operational object currently say? | Fresh authorized domain read; future Ontology read under current admission, with source revision/coverage/freshness |
-| May a caller read, derive or act? | Authenticated domain policy and actual task grant; neither memory nor tags grant access |
-| Did an effect happen, and is retry safe? | Authoritative target reconciliation and durable domain effect state; neither prose nor binary rollback settles it |
-| What was explained to the user? | Dated glossary evidence and feedback; an explanation does not establish mastery |
+| What may I do now, and what is next? | The user's current instruction, `/root/.agents/AGENTS.md`, the task's STATE. Memory is history |
+| What did the user decide, and why? | The dated source decision, newer corrections and the current task authority. A generated page is navigation |
+| What does the program implement? | Current source at a Git revision, compiler and runtime output, tests |
+| What does a KPI mean? | The definition in the owning repository; the target in the adopted strategy; values from the native measurement |
+| What does an operational object say now? | A fresh authorized domain read |
+| May a caller read, derive or act? | The domain's authenticated policy and the task grant. Neither memory nor a tag grants access |
+| Did an effect happen, and is a retry safe? | Reconciliation against the authoritative target. Neither prose nor a rollback settles it |
+| What was explained to the user? | Dated glossary evidence. An explanation does not show that the user mastered the term |
 
-When memory and current source disagree, preserve dated history and use an
-authorized scoped Correction; do not rewrite one store to make it agree with the
-other. Unknown/stale evidence remains unknown/stale. Current truth still needs
-native readback even when a page reports `is_stale:false`.
+When memory and current source disagree, the source wins for current truth. Keep the dated history and write a scoped Correction; do not rewrite one store to match the other. Unknown or stale evidence stays labelled unknown or stale, even when a page reports `is_stale:false`.
 
-## Read and official write routes
+## 3. Reading memory
 
-Search relevant pages before new work, bugs, tests/conventions, integrations,
-why/remaining-work questions and commits. Read only selected pages, then recall
-exact evidence if needed. Reflect only when pages/recall cannot resolve reasoning
-or conflicts. Credit useful retrieved memory. Do not search on every tool call.
-If the interface is unavailable or disabled, disclose the gap and use the task's
-source packet; do not start a client or change global configuration to orient.
+- When to search is in `/root/.agents/AGENTS.md` section 6. Do not search on every tool call; read only the selected pages.
+- If the memory tool is unavailable or disabled for your task, say so and work from the task's files. Do not start a client or change global configuration to get it back.
 
-Structured incidents/lessons, decisions, Corrections, profiles/glossary, strategy
-and KPI-definition records use official HTTP/client with explicit stable
-`document_id`, then complete-tag-set PATCH and document GET readback. MCP
-`ingest_document(title,content)` derives its ID from title and has no arbitrary
-ID/tag/frontmatter arguments; use it only for simple unstructured notes.
-`capture_initiative` is for approved initiatives, reusing the existing page on
-material change. The endpoint/token-file locations and exact safe sequence are
-in [hindsight-api.md](../skills/lessons-loop/references/hindsight-api.md).
-No-write tasks leave an allowed local handoff; they do not ingest, PATCH, refresh
-or delete. A skill is not a write grant.
+## 4. Writing memory
 
-Preserve pinned originals and their content/source pins. Version mutable new
-records through same-ID complete-body replacement with a recoverable preimage;
-use linked Corrections/new versions for pinned sources. Complete-tag-set PATCH
-replaces tags and may requeue co-sources. Document history is not a text backup.
-Read original document, extraction/consolidation, page scope/content and recall
-separately; acknowledgement or a queued refresh proves none of those outcomes.
-Reconcile uncertain effects before retrying through supported official surfaces.
+- A skill or a visible tool is not a write grant. Writing needs the task's authority. A no-write task does not ingest, PATCH, refresh or delete.
+- Structured records (incidents, lessons, decisions, Corrections, profile, glossary, strategy, KPI definition) go through the official HTTP API or client with an explicit stable `document_id`, then a complete-tag-set PATCH, then a GET readback. The exact sequence, endpoint and token-file location: `/root/.agents/skills/lessons-loop/references/hindsight-api.md`.
+- MCP `ingest_document(title, content)` derives its ID from the title and takes no ID, tags or frontmatter: use it only for simple unstructured notes. `capture_initiative` is for an approved initiative and reuses its page when the scope changes.
+- A pinned original is never rewritten: link a Correction or a new version. A mutable record is replaced under the same ID with its complete body, after saving the previous body. A complete-tag-set PATCH replaces all tags and can requeue related sources. Document history is not a text backup.
+- An acknowledgement or a queued refresh shows nothing about the outcome. Read back the document, the extraction, the page content and the recall separately. Reconcile an uncertain write before retrying.
 
-## Shared provenance and derived views
+## 5. Tags and derived pages
 
-Use genuine repository and platform provenance. Platform values are `agent`,
-`education`, `ontology`; modules carry their owner's platform plus repository.
-Cross-platform work may carry several applicable tags. Preserve genuine
-`source:*`, `harness:*`, `project:*` and historical tags; never impersonate plugin
-attribution. Direct retain callers supply expanded tags; client `retainTags`
-templates are not server defaults. Keep bank routing under its actual owner.
+- Use real provenance: platform `agent`, `education` or `ontology`, plus the repository. A module carries its owner's platform. Keep genuine `source:*`, `harness:*`, `project:*` and historical tags; never imitate a plugin's attribution.
+- A tag routes a topic. It is not privacy and not permission. A strict tagged scope can miss shared untagged observations.
+- The pages Lessons ledger, Structural risk review, User glossary, and Conventions and patterns are proposed views; do not assume they are installed. A curator changes them through the official page configuration. Never ingest a generated page as new evidence.
 
-Tags/source queries route topics, not privacy or permission. Strict tagged scopes
-can omit shared untagged observations. Where authorized, non-strict `all`
-includes them; verify actual coverage/readback before claiming source scope.
-Do not change consolidation/routing simply to make a query appear successful.
+## 6. What never goes to memory
 
-Lessons ledger, Structural risk review, User glossary and Conventions and patterns
-are proposed official derived views, not assumed installed. Authorized curators
-use official page/model configuration and affected refreshes; plugin-managed
-queries belong in official `pages`/`customPages` because sync can overwrite API-only
-edits. Do not seed duplicates or synthesize new evidence from sibling views.
+Write each fact once, at its owner. Do not retain in Hindsight: raw student, exam or lesson records; operational rows; action receipts or journals; KPI measurements or time series; full STATE copies; pane, model or quota assignments; CI logs; transcripts; copies of executable schemas; a second current-state table. Keep the detailed artifact at its owner and retain only a permitted locator or hash and a reusable lesson without student data. Never retain credentials. Never infer a user's ability or a broad permission.
 
-Keep retrieval, retention, extraction, server synthesis and loaded agent context
-separate. `pageRefreshEveryTurns:5` is client roster/tool-guide refetch/reinjection,
-not server synthesis cadence. A page refresh does not rewrite a running agent's
-context. Native hook settings are read per invocation; persistent MCP settings
-normally apply at process startup. Codex/Claude hooks, agy PreInvocation/Stop and
-Muse's MCP-only wiring differ; registration is not proof of injection/retention.
-Use current native wiring, not a CLI-name assumption.
+One exception, by the user's decision of 2026-11-06: the Academy lesson archive. The academy server removes old rows, so the designated lesson owner archives dated teacher statements and source observations in Hindsight under the `academy-practical-protocol` archive-writer contract. The locator is `education-platform` `content/skills/academy-student-context/references/lesson-archive.md`. The archive excludes credentials, answer-key literals and parent contact details. An archived observation is a dated snapshot, not live state: a fresh owner read replaces it only for the same fact and stage of the same occurrence while the server still shows the row, and an original source score does not reopen a later teacher-final completion.
 
-## Anti-duplication and domain boundary
+## 7. Lessons and Ontology
 
-Write once at the proper owner. Codebase docs define contracts; Hindsight stores
-why, selected durable knowledge and the source locator. The glossary links the
-scoped profile instead of copying it. Never re-ingest a generated page as source.
-
-Academy lesson records are the one exception (user decision 2026-11-06): the academy
-server removes old rows, so Hindsight archives dated teacher statements and source
-observations under real student names, as the Hindsight `academy-practical-protocol` owner specifies; education-platform
-`content/skills/academy-student-context/references/lesson-archive.md` is a thin locator,
-excluding credentials, answer-key literals and parent contact details. An archived
-observation is a dated snapshot, not live state; a fresh owner read supersedes an older archived app observation only for the same fact and stage of the same occurrence while the server still shows the row. An original source score does not reopen a later teacher-final completion. Never retain credentials. Apart from that
-archive, do not retain raw student/exam/lesson records, operational rows,
-action receipts/journals, KPI measurements/time series, full STATE copies,
-pane/model/quota assignments, CI logs, repeated transcripts, executable schema
-copies or a second current-state table in Hindsight. Keep detailed artifacts at
-their owner; retain only permitted locators/hashes and a reusable student-free
-lesson. Historical aggregate engineering closure metrics are allowed evidence,
-not a live operational replica. Never infer user ability or broad permission.
-
-Promote lessons by independent occurrence/mechanism evidence, not document count.
-Route verified L3 proposals through Lead to STATE `DIRECTION PROPOSALS` and the
-user; no promotion or memory write enacts architecture or policy.
-
-Respect [ontology-platform's Hindsight boundary](https://github.com/park-kyungchan/ontology-platform/blob/main/docs/hindsight-boundary.md):
-Ontology owns source-qualified operational state, admission, named actions and
-recovery; Hindsight owns contextual decisions/lessons. Operational facts remain
-(except the dated Academy lesson archive above) with their domain owner until a separately authorized implementation/cutover.
-Do not assume a production Ontology endpoint. There is no shared DB, state replica,
-automatic prose-to-object promotion, provenance service or ingestion pipeline
-created by this reference. `ap` does not require a running Ontology.
-
-Grok Build is the fifth runtime as of 2026-11-07. Its native MCP registrations and canonical guidance pointer are qualified separately in runtime-wiring.md. Do not infer a Grok compaction ceiling from another CLI's flags; qualify the installed native control before claiming the same threshold. The shared task/data/authority boundaries apply to all five.
+- Lessons are promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes through the Lead to the task STATE's `DIRECTION PROPOSALS` and to the user; no memory write enacts architecture or policy. Procedure: skill `lessons-loop`.
+- `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Hindsight owns contextual decisions and lessons. Boundary document: `/home/palantirkc/platforms/ontology-platform/docs/hindsight-boundary.md`. There is no shared database, state replica or automatic promotion of prose into objects between them. Check what `ontology-platform` actually provides at its current revision before relying on it.

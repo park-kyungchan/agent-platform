@@ -70,7 +70,7 @@ fn request() -> RenderContentRequest {
 fn pure_render_fixed_complete_inventory_and_idempotence() {
     let mut req = request();
     let plan = content::render(&req).unwrap();
-    assert_eq!(plan.artifacts.len(), 29);
+    assert_eq!(plan.artifacts.len(), 22);
     assert!(
         plan.artifacts
             .iter()
@@ -144,7 +144,7 @@ fn doctor_missing_ready_drift_is_read_only_and_opaque_files_are_untouched() {
     let f = Fixture::new();
     let spec = f.spec();
     let missing = content::doctor(&spec).unwrap();
-    assert_eq!(missing.entries.len(), 29);
+    assert_eq!(missing.entries.len(), 22);
     assert!(missing.entries.iter().all(|e| e.status == "missing"));
     assert!(!f.0.join("agents").exists());
     f.fill();
@@ -160,7 +160,8 @@ fn doctor_missing_ready_drift_is_read_only_and_opaque_files_are_untouched() {
             .iter()
             .all(|e| e.status == "ready" && e.observed_sha256.as_ref() == Some(&e.expected_sha256))
     );
-    let path = f.0.join("agents/runtime-references/skills.md");
+    let path =
+        f.0.join("agents/runtime-references/codebase-orientation.md");
     fs::write(&path, "edited\n").unwrap();
     let drift = content::doctor(&spec).unwrap();
     assert_eq!(
@@ -169,7 +170,7 @@ fn doctor_missing_ready_drift_is_read_only_and_opaque_files_are_untouched() {
     );
     assert_eq!(
         drift.entries.iter().filter(|e| e.status == "ready").count(),
-        28
+        21
     );
     assert_eq!(fs::read(&path).unwrap(), b"edited\n");
     assert_eq!(fs::read(&opaque).unwrap(), [0xff, 0x00]);
@@ -226,7 +227,7 @@ fn explicit_cli_boundary_rejects_unknown_fields_and_has_no_apply() {
     let result = cmd.wait_with_output().unwrap();
     assert!(result.status.success());
     let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
-    assert_eq!(report["entries"].as_array().unwrap().len(), 29);
+    assert_eq!(report["entries"].as_array().unwrap().len(), 22);
     let mut value = serde_json::to_value(spec).unwrap();
     value["settings_path"] = "/foreign".into();
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_ap"))

@@ -55,10 +55,6 @@ snippet is the first 280 characters of the content. Consequences:
   Identical boilerplate openings ("Scope and authority …") make pages indistinguishable.
 - A broad multi-topic page has one vector and loses to focused pages on specific questions.
 
-## Native client ownership — 2026-11-07
-
-All five native CLI configurations directly declare the same coding-agents MCP implementation; the client harness IDs are `muse`, `claude-code`, `codex`, `antigravity-cli` and `grok-build`. Grok foreign MCP imports are off. Backend bank/routing is shared through native Hindsight configuration, not through another CLI's user config. Existing credential-file references, path overrides and integration code are preserved. Native hooks exist only where configured/supported; a direct MCP entry does not create lifecycle injection or retention for Muse/Grok. See runtime-wiring.md for the custom/vendor boundary and native evidence.
-
 ## Session path on this host
 
 `autoInject: "pages"`: on a session's first prompt the plugin runs a page search with that prompt and
@@ -66,6 +62,7 @@ injects the hits; `pageRefreshEveryTurns: 5` refetches the page roster and tool 
 turns. `paths.<prefix>` overrides apply per directory (`{"disabled": true}` makes memory inert there).
 `retainSessions` controls transcript write-back; retained transcripts carry dated status snapshots
 that later compete with corrections.
+Which CLIs have hooks and which have only the MCP server: `CLI-RUNTIMES.md` section 6.
 
 ## Write semantics and costs
 
@@ -84,9 +81,11 @@ that later compete with corrections.
   `reflect_mission`, `enable_*` flags. They affect future processing only. Output language is
   server-level only (`HINDSIGHT_API_LLM_OUTPUT_LANGUAGE`, forces facts, observations and reflect output
   into one language); a bank PATCH of `llm_output_language` is rejected.
-- LLM: provider `chatgpt` (subscription, `gpt-6.1-terra`). It shares the ChatGPT/Codex weekly limit
-  (user-confirmed 2026-11-06). Observed refresh cost: 90 to 210 seconds per page. Per-model monthly
-  input ceiling: 5,000,000 tokens (user 2026-11-06).
+- LLM: provider `chatgpt` (subscription); the model is set in the server configuration. It shares the
+  ChatGPT/Codex weekly limit. When that limit is reached, extraction, consolidation, reflect and page
+  refresh fail; page search and page read still work. In that state do not retry a failed write or
+  refresh and do not make a task's acceptance depend on one. Observed refresh cost: 90 to 210 seconds
+  per page.
 
 ## Checks before claiming an effect
 

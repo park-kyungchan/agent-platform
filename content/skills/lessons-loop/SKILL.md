@@ -44,10 +44,9 @@ not a second task tracker or authority grant.
 
 ## Promotion, curation and structural proposals
 
-An explicitly assigned periodic curator (CLI and cadence assigned in task STATE;
-the 2026-11-05 default assignment is Codex) reviews closure candidates weekly
-and after repeated/material incidents. That is a dated task assignment, not a
-permanent CLI privilege. Verify primary evidence and privacy, deduplicate by
+An explicitly assigned curator (CLI and cadence named in the task STATE) reviews
+closure candidates weekly and after repeated/material incidents. No CLI is the
+curator by default. Verify primary evidence and privacy, deduplicate by
 occurrence identity, link scoped Corrections and promote only verified chains:
 
 - L0 → L1: cause/mitigation evidence and a bounded prevention rule.
