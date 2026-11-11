@@ -34,7 +34,25 @@
         "/home/palantirkc/work/*/*/.git",
         "/home/palantirkc/work/*/*/target*",
         "/home/palantirkc/work/*/*/*custody*",
-        "/home/palantirkc/work/ws-replan/preparation/slices"
+        "/home/palantirkc/work/ws-replan/preparation/slices",
+        "/home/palantirkc/work/*student*",
+        "/home/palantirkc/work/*/*student*",
+        "/home/palantirkc/work/*/*/*student*",
+        "/home/palantirkc/work/*/*/*/*student*",
+        "/home/palantirkc/work/*oracle*",
+        "/home/palantirkc/work/*/*oracle*",
+        "/home/palantirkc/work/*/*/*oracle*",
+        "/home/palantirkc/work/*/*/*/*oracle*",
+        "/home/palantirkc/work/*secret*",
+        "/home/palantirkc/work/*/*secret*",
+        "/home/palantirkc/work/*/*/*secret*",
+        "/home/palantirkc/work/*/*/*/*secret*",
+        "/home/palantirkc/work/*credential*",
+        "/home/palantirkc/work/*/*credential*",
+        "/home/palantirkc/work/*/*/*credential*",
+        "/home/palantirkc/work/*/*/*/*credential*",
+        "/home/palantirkc/work/*/*/*/*private*",
+        "/home/palantirkc/work/*/*/*/*custody*"
       ],
       "head_lines": 40,
       "complete_listing": true,
@@ -69,7 +87,25 @@
         "/home/palantirkc/work/*/*/.git",
         "/home/palantirkc/work/*/*/target*",
         "/home/palantirkc/work/*/*/*custody*",
-        "/home/palantirkc/work/ws-replan/preparation/slices"
+        "/home/palantirkc/work/ws-replan/preparation/slices",
+        "/home/palantirkc/work/*student*",
+        "/home/palantirkc/work/*/*student*",
+        "/home/palantirkc/work/*/*/*student*",
+        "/home/palantirkc/work/*/*/*/*student*",
+        "/home/palantirkc/work/*oracle*",
+        "/home/palantirkc/work/*/*oracle*",
+        "/home/palantirkc/work/*/*/*oracle*",
+        "/home/palantirkc/work/*/*/*/*oracle*",
+        "/home/palantirkc/work/*secret*",
+        "/home/palantirkc/work/*/*secret*",
+        "/home/palantirkc/work/*/*/*secret*",
+        "/home/palantirkc/work/*/*/*/*secret*",
+        "/home/palantirkc/work/*credential*",
+        "/home/palantirkc/work/*/*credential*",
+        "/home/palantirkc/work/*/*/*credential*",
+        "/home/palantirkc/work/*/*/*/*credential*",
+        "/home/palantirkc/work/*/*/*/*private*",
+        "/home/palantirkc/work/*/*/*/*custody*"
       ],
       "head_lines": 40,
       "complete_listing": true,
@@ -104,7 +140,25 @@
         "/home/palantirkc/work/*/*/.git",
         "/home/palantirkc/work/*/*/target*",
         "/home/palantirkc/work/*/*/*custody*",
-        "/home/palantirkc/work/ws-replan/preparation/slices"
+        "/home/palantirkc/work/ws-replan/preparation/slices",
+        "/home/palantirkc/work/*student*",
+        "/home/palantirkc/work/*/*student*",
+        "/home/palantirkc/work/*/*/*student*",
+        "/home/palantirkc/work/*/*/*/*student*",
+        "/home/palantirkc/work/*oracle*",
+        "/home/palantirkc/work/*/*oracle*",
+        "/home/palantirkc/work/*/*/*oracle*",
+        "/home/palantirkc/work/*/*/*/*oracle*",
+        "/home/palantirkc/work/*secret*",
+        "/home/palantirkc/work/*/*secret*",
+        "/home/palantirkc/work/*/*/*secret*",
+        "/home/palantirkc/work/*/*/*/*secret*",
+        "/home/palantirkc/work/*credential*",
+        "/home/palantirkc/work/*/*credential*",
+        "/home/palantirkc/work/*/*/*credential*",
+        "/home/palantirkc/work/*/*/*/*credential*",
+        "/home/palantirkc/work/*/*/*/*private*",
+        "/home/palantirkc/work/*/*/*/*custody*"
       ],
       "head_lines": 40,
       "complete_listing": true,
@@ -137,7 +191,7 @@
   },
   "object_types": {
     "task": {
-      "description": "One task directory under /home/palantirkc/work with its STATE.md.",
+      "description": "One task directory under /home/palantirkc/work with its STATE.md; key is the directory name. Properties (property descriptions are not supported by the schema language): directory is the full path of the directory; state_sha256 is the sha256 of STATE.md; title_line is the first line of STATE.md and owner_line the text after Owner: in its first 40 lines (both copied as written, may be long, owner_line may have no value).",
       "owner": {
         "source": "task_states"
       },
@@ -169,7 +223,7 @@
       }
     },
     "packet": {
-      "description": "One TASK*.md file under /home/palantirkc/work at directory depth 1 to 3; the key is the path below the work root.",
+      "description": "One TASK*.md file under /home/palantirkc/work at directory depth 1 to 3; key is the path below the work root. Properties: path is the full path, sha256 the file digest, title_line the first line and owner_line / state_line the text after Owner: / State: in the first 40 lines (copied as written, may be long, may have no value); task points to the task whose directory name is the first directory below the work root. A reference has two special states. No value: the rule could not build a key (for example a report named REPORT.md has no packet id). The target may not exist as an object: the packet file has another name, or the directory has no STATE.md.",
       "owner": {
         "source": "packets"
       },
@@ -222,7 +276,7 @@
       }
     },
     "report": {
-      "description": "One REPORT*.md file under /home/palantirkc/work at directory depth 1 to 3; the key is the path below the work root.",
+      "description": "One REPORT*.md file under /home/palantirkc/work at directory depth 1 to 3; key is the path below the work root. Properties: path is the full path, sha256 the file digest, title_line the first line and status_line the text after Status: in the first 40 lines (copied as written, may be long, may have no value); task points to the task of the first directory below the work root; packet points to TASK-<id>.md in the same directory for a file named REPORT-<id>.md (exact, no fallback in version 1). A reference has two special states. No value: the rule could not build a key (for example a report named REPORT.md has no packet id). The target may not exist as an object: the packet file has another name, or the directory has no STATE.md.",
       "owner": {
         "source": "reports"
       },
@@ -283,7 +337,7 @@
       }
     },
     "installed_artifact": {
-      "description": "One installed binary under /usr/local/bin; an absent file has no object.",
+      "description": "One installed binary under /usr/local/bin; four paths are declared and only those that exist become objects. Properties: path, sha256, size in bytes, mtime in seconds and mode (permission bits) of the file.",
       "owner": {
         "source": "installed_binaries"
       },
@@ -320,7 +374,7 @@
       }
     },
     "instruction_file": {
-      "description": "One shared instruction file: installed under /root/.agents or its source under agent-platform/content.",
+      "description": "One shared instruction file, installed under /root/.agents or its source under agent-platform/content. Properties: path, sha256, size, mtime, mode of the file; source_copy points, for an installed file, to the file with the same relative path under agent-platform/content. A reference has two special states. No value: the rule could not build a key (for example a report named REPORT.md has no packet id). The target may not exist as an object: the packet file has another name, or the directory has no STATE.md.",
       "owner": {
         "source": "instructions"
       },
