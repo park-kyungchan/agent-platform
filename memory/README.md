@@ -7,7 +7,8 @@ Checks neither authorize effects nor adopt proposed rules.
 
 ## Header grammar
 `records/<record_id>.md` is UTF-8 without BOM: first line `---`, a JSON object,
-a line `---`, then Markdown. Use unique JSON keys and exactly these fields:
+a line `---`, then Markdown. Split on line feed only; no carriage returns anywhere.
+Use unique JSON keys and exactly these fields:
 `schema_version` (integer 1), `record_id`, `kind`, `title`, `subject`, `scope`,
 `owner_ref`, `sources`. `title` and `scope` are nonempty strings.
 `record_id` matches the filename: lowercase ASCII letters/digits separated by

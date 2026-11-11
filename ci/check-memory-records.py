@@ -76,7 +76,10 @@ def check(root):
         except (OSError, UnicodeError):
             fail("record_encoding", "file must be readable UTF-8 without a byte order mark")
             continue
-        lines = text.splitlines()
+        if "\r" in text:
+            fail("record_carriage_return", "use line feed only; carriage returns are forbidden anywhere")
+            continue
+        lines = text.split("\n")
         try:
             if not lines or lines[0] != "---":
                 raise ValueError("missing opening delimiter")
@@ -93,11 +96,13 @@ def check(root):
             fail("record_fields", "supply exactly the documented header fields (reason only with none)")
             continue
         rid, kind, subject, owner = (header[k] for k in ("record_id", "kind", "subject", "owner_ref"))
-        if not isinstance(rid, str) or not ID.fullmatch(rid) or rid != path.stem:
+        if isinstance(rid, str) and rid in seen:
+            # A duplicate necessarily also has a different filename; report its
+            # identity collision once rather than adding that secondary error.
+            fail("duplicate_record_id", "record_id must be unique across files")
+        elif not isinstance(rid, str) or not ID.fullmatch(rid) or rid != path.stem:
             fail("record_id", "record_id must match the filename and use lowercase letters, digits and hyphens")
-        if isinstance(rid, str):
-            if rid in seen:
-                fail("duplicate_record_id", "record_id must be unique across files")
+        else:
             seen.add(rid)
         valid_owner = (owner == "none" and nonempty(header.get("owner_ref_reason"))) or object_id(owner)
         if exact_object(owner, ("repository", "path")):

@@ -26,7 +26,22 @@ class MemoryRecords(unittest.TestCase):
         for directory in (FIXTURES / "invalid").iterdir():
             with self.subTest(code=directory.name):
                 _, errors = CHECK.check(directory)
-                self.assertIn(directory.name, {e.split("@")[0] for e in errors})
+                self.assertEqual({e.split("@")[0] for e in errors}, {directory.name})
+
+    def test_readme_section_table_matches_checker(self):
+        rows = {}
+        for line in (HERE.parent / "memory/README.md").read_text().split("\n"):
+            cells = [cell.strip() for cell in line.split("|")]
+            if len(cells) == 5 and cells[1] in CHECK.SECTIONS:
+                rows[cells[1]] = tuple(name.strip() for name in cells[3].split(";"))
+        self.assertEqual(rows, CHECK.SECTIONS)
+
+    def test_line_feed_only(self):
+        original = (FIXTURES / "valid/example-incident.md").read_text()
+        for text in [original.replace("\n", "\r\n"), original + "\r"]:
+            self.assertEqual({e.split("@")[0] for e in self.check_text(text)}, {"record_carriage_return"})
+        text = original.replace("\n## Cause\n", "\u2028## Cause\u2028")
+        self.assertEqual({e.split("@")[0] for e in self.check_text(text)}, {"record_sections"})
 
     def check_text(self, text):
         with tempfile.TemporaryDirectory() as scratch:

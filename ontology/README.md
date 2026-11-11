@@ -173,13 +173,16 @@ ontology/rehearsal.sh /path/to/ont
 
 It creates a store under its own `mktemp -d`, checks the frozen v1 pin, installs
 v1 with `schema install <file>`, indexes `task_states`, `packets` and `reports`,
-records a task revision, installs v2 and verifies that revision is unchanged.
+records a task revision, installs v2, creates and lifts a v2 hold, then installs
+v3 and verifies the task revision and the existing v2 hold revision are unchanged.
 It exercises every action and criterion refusal, unknown-task and older-time
 refusals without store/log changes, separate no-write checks for malformed and
 impossible-calendar times, future-time refusals and boundary/later-time acceptance, retries across changed
 clocks, equal-time correction/history, decision inheritance, native-key task
 isolation, indexed/dangling file references, optional missing cells, escaping
-and descending worker order. It prints five rendered blocks and removes the
+and descending worker order. It also tests synthetic memory corrections,
+supersession ordering, refusal cases and both index views. It prints six rendered
+blocks (one ready-memory block and five program-state blocks) and removes the
 store. Its output sizes and time-comparison `validate` answers go to stderr.
 It uses fixed clocks and synthetic operational values on the indexed tasks
 `workspace-strategy-reassessment-20261109` and `ontology-operational-base`.
