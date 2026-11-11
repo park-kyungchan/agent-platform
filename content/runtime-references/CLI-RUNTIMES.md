@@ -64,12 +64,12 @@ The target window is a task decision and is written in the task's STATE. A confi
 
 ## 5. MCP servers
 
-- Custom servers shared by all CLIs: `hindsight`, `academy_operations`, `daniel_prayer_operations`. Each is registered directly in every CLI's own file from section 1, with that CLI's client name where the server asks for one.
+- Custom servers shared by all CLIs: `hindsight`, `academy_operations`. Each is registered directly in every CLI's own file from section 1, with that CLI's client name where the server asks for one.
 - Another CLI's personal configuration or plugin cache is never the registration source. Built-in, marketplace, account-synced and plugin servers stay with the CLI that installed them; do not copy them into the custom set and do not edit their caches.
 - Registered, enabled, handshake succeeded, tool visible and effect allowed are five different facts. Check the one your next action needs.
 - `academy_operations` works on one academy account with one lock: only the current lesson owner named in the Academy task STATE performs its operations. A visible write tool is not write permission. Do not reach the academy source by direct HTTP, browser or shell instead of the server.
 - The Hindsight integration is installed in `/root/.hindsight/coding-agents`; its settings file `/root/.hindsight/coding-agent.json` contains a credential: read fields inside a process, never print the file.
-- `daniel_prayer_operations` and `academy_operations` keep the launch command, release and credential files their own service defines. Do not put a not-yet-accepted Rust binary in their place.
+- `academy_operations` keeps the launch command, release and credential files its own service defines. Do not put a not-yet-accepted Rust binary in its place.
 - When the user excludes a feature for one CLI, use that CLI's own control, keep the previous bytes and read the result back in a new session of your own. That is not uninstalling it for the account.
 - When reading a configuration file to reconcile a difference, read key names and the command and arguments only. Never print credential values.
 
