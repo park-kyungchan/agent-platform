@@ -39,7 +39,7 @@ For every message, in this order:
 
 ## 3. Framing: objective, cause, measures
 
-Once per task, and again when the objective changes, write the brief: Objective, Diagnosis, KPI with baseline and target, Guardrails, Domain. It is the Lead's record of its own interpretation, kept in the task's STATE or `STRATEGY.md`; the user is shown it and corrects what is wrong, but work does not wait for a confirmation. Template: `references/strategy-brief.md`.
+Once per task, and again when the objective changes, write the brief: Objective, Diagnosis, KPI with baseline and target, Guardrails, Domain. When STATE names the Ontology store's `kpi` objects in use, the brief's KPI line names that object and does not copy its target or value. It is the Lead's record of its own interpretation, kept in the task's STATE or `STRATEGY.md`; the user is shown it and corrects what is wrong, but work does not wait for a confirmation. Template: `references/strategy-brief.md`.
 
 Terms and the steps from a wish to a KPI: `references/measurement.md`. In short: write the objective as a checkable sentence; derive at most three KPIs that measure the outcome, not the output; measure the baseline before changing anything, or write "unmeasured" and measure first; set the target yourself with a reason; give each KPI a guardrail.
 
