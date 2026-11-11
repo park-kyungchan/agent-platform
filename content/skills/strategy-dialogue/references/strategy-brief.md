@@ -1,58 +1,51 @@
-# Strategy Brief template and worked pilot
+# Brief, options, proposal and record formats
 
-Use five lines before non-trivial execution; the user corrects wrong lines.
-Preserve an existing approved decision and mark draft assumptions. Persist the
-confirmed brief in task STATE/STRATEGY.md with the actual user decision reference.
+Copy the block you need. Values in angle brackets are placeholders; a filled block lives in the task's STATE, `STRATEGY.md` or board, never in this file. Terms: `/root/.agents/skills/strategy-dialogue/references/measurement.md`.
 
-```text
-Objective: <user outcome and acceptance scope>
-Diagnosis: <observed cause/evidence; explicit assumptions or unknowns>
-KPI: <repo/docs definition + native source/time; current → adopted target>
-Guardrails: <numerical floors/ceilings, protected effects and what not to do>
-Domain: <relevant user knowledge; concrete missing domain facts>
-```
-
-For large work, accompany this with 2–3 strategic options and a recommendation:
-
-| Option | Predicted KPI effect | Guardrail effect | Risk / uncertainty |
-| --- | --- | --- | --- |
-| <recommended approach> | <estimate with basis or unknown> | <measured/predicted bound> | <material risk> |
-| <alternative> | <estimate with basis or unknown> | <measured/predicted bound> | <material risk> |
-
-The confirmed task file owns execution and measured time series. A worker TASK
-links it and names the KPI or guardrail it affects. Repository docs own KPI
-formulas/units/sources; Hindsight may retain the decision/definition and rationale,
-never operational KPI values/time series.
-
-## Worked example — ws-replan pilot, CONFIRMED v1, 2026-11-05
-
-Source: `/home/palantirkc/work/ws-replan/STRATEGY.md`, read on 2026-11-05 (note:
-on 2026-11-07 the user adopted v2 KPI refinements in `STRATEGY.md` — PR-qualified
-primary removal rate alongside raw file absence, 2-stage Academy MCP parity
-`Stage 1 Read-chain 4/8` + `Stage 2 Cutover 0/44`, Hindsight `24/35` guardrail
-with worker-level Leading Indicator `C` `useful/irrelevant/misleading`, and ~400k
-auto-compaction / deterministic model-tier boundaries; read `STRATEGY.md` for
-live program targets).
-The source is CONFIRMED v1: the user approved the Lead draft as written on
-2026-11-05. Historical note: the earlier example labeled the overall brief
-DRAFT v1 while its top-level KPIs were user-confirmed. The sanitized example
-below preserves dated baseline values; it is not a new adoption or live
-measurement. Private domain details and personal identities are omitted.
+## Brief (the Lead's record of its interpretation)
 
 ```text
-Objective: Maximize measurable quality of Rust-first, CLI-agnostic work with Context Governance; prepare future Ontology co-engineering.
-Diagnosis: Agents select outdated paths because legacy code and stale memory records remain reachable; the pilot reports 513/930 memory documents as state snapshots and recall supported for 15/33 questions.
-KPI: Legacy removal 306/5,124 (6.0%) → 100%; full-gate Rust tool parity 0/44 → 44/44 (pilot baseline 2026-11-05T00:21Z; 13 bounded handlers are not full parity).
-Guardrails: Linux CI ≤3,000 min/month; disk free ≥15 GB; escaped defects target 0; recall must not regress from 15/33 (target 33/33); no live domain calls, secrets, force-push or partial cutover.
-Domain: User supplies real workflow semantics and tool importance; those facts determine port order and the later domain model.
+The user said: "<their words>"
+Objective: <the state wanted, as a sentence that can be checked true or false>
+Diagnosis: <measured cause with its evidence; assumptions and unknowns named>
+KPI: <what it counts; formula and source> <baseline at time, or unmeasured> -> <target and why that value>
+Guardrails: <limits that must hold while the KPI moves; what must not be done>
+Domain: <facts only the user supplied; facts still missing and how the Lead proceeds without them>
 ```
 
-The pilot attributes removal to its manifest/native Git measurement, parity to
-the per-tool parity/test/independent-review/CI/rollback gate, CI to billing and
-recall to the official regression suite. The example reports those dated values;
-it does not claim to rerun the measurements. Current definitions must be in the
-owning repo/docs and current values must be remeasured from their native owner.
+## Options (only where a real choice of route exists)
 
-For this content change, the expected effect is clearer shared strategy and
-source/lesson routing. A numerical recall improvement is unknown until the
-separately authorized regression runs; publishing skills does not prove it.
+| Option | Predicted KPI effect | Guardrail effect | Risk or unknown | How it is undone |
+| --- | --- | --- | --- | --- |
+| <chosen> | <estimate and its basis, or unknown> | <bound> | <main risk> | <route> |
+| <alternative> | <estimate and its basis, or unknown> | <bound> | <main risk> | <route> |
+
+Chosen: <option>, because <the measurement that decides it>.
+
+## Proposal the user did not ask for
+
+```text
+Proposal: <what>
+Evidence: <measured value with source and time, or file and line>
+Expected effect: <estimate, labelled as an estimate>
+Cost or risk: <what it uses or could break>
+Undo: <route>
+Status: <added as a work thread of the current objective | a different objective, offered to the user>
+```
+
+## Decision record (latest per topic)
+
+```text
+<date> Lead: <decision>; reason <measurement>; undo <route>; supersedes <decision or none>
+<date> user: "<their words>" -> changes <intent | KPI or target | guardrail | way of working | fact>; reach <this task | every task>; written in <file>; supersedes <decision or none>
+```
+
+## Kept for the user
+
+```text
+Words the user used: "<expression>" -> <glossary term and path>
+Fact from the user: <fact> (<date>)
+Standing go-ahead: "<their words>" (<date>) covers <class of action>
+Waiting for a yes: <prepared irreversible outward action> | recommendation <do it | do not> | effect <on which KPI>
+Reminder owed: <what> | when <condition that triggers it> | context <file>
+```

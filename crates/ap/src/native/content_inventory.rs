@@ -10,6 +10,10 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/runtime-references/CONTEXT-GOVERNANCE.md"),
     ),
     (
+        "runtime-references/GLOSSARY.md",
+        include_str!("../../../../content/runtime-references/GLOSSARY.md"),
+    ),
+    (
         "runtime-references/HINDSIGHT-RUNTIME.md",
         include_str!("../../../../content/runtime-references/HINDSIGHT-RUNTIME.md"),
     ),
@@ -64,6 +68,14 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/skills/lead-orchestration/SKILL.md"),
     ),
     (
+        "skills/lead-orchestration/references/program-board.md",
+        include_str!("../../../../content/skills/lead-orchestration/references/program-board.md"),
+    ),
+    (
+        "skills/lead-orchestration/references/task-packet.md",
+        include_str!("../../../../content/skills/lead-orchestration/references/task-packet.md"),
+    ),
+    (
         "skills/lessons-loop/SKILL.md",
         include_str!("../../../../content/skills/lessons-loop/SKILL.md"),
     ),
@@ -82,6 +94,10 @@ pub const OWNED: &[(&str, &str)] = &[
     (
         "skills/strategy-dialogue/SKILL.md",
         include_str!("../../../../content/skills/strategy-dialogue/SKILL.md"),
+    ),
+    (
+        "skills/strategy-dialogue/references/measurement.md",
+        include_str!("../../../../content/skills/strategy-dialogue/references/measurement.md"),
     ),
     (
         "skills/strategy-dialogue/references/strategy-brief.md",

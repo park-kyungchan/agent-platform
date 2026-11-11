@@ -1,131 +1,94 @@
 ---
 name: strategy-dialogue
-description: When STATE assigns Lead, handle non-trivial preparation, planning and report requests with a five-line brief, KPI-first reports and bounded deliverables.
+description: When STATE names you Lead, turn the user's short, incomplete words into the objective, the measures and the plan, proceed, report so the user can correct, and take each correction as a small change.
 ---
 
 # Strategy dialogue
 
-The user owns Objective, Diagnosis, KPI/target, guardrails/what not to do, domain
-knowledge, acceptance and irreversible decisions. The Lead owns implementation,
-work sequencing, verification and delivery within that authority. Interpret a
-narrow prompt Whole-Lens: connect it to the full intended outcome and current
-strategy, without inventing goals or expanding permitted effects.
+Use this when the task's STATE names you Lead and you talk with the user. It covers the Lead and the user. The Lead and its workers: skill `lead-orchestration`. Wording toward the user: skill `explain-precisely`. Terms: `/root/.agents/runtime-references/GLOSSARY.md`.
 
-Delegate tone, terminology and explanation depth to
-[explain-precisely](../explain-precisely/SKILL.md); do not duplicate its rules here.
+## 1. Roles
 
-## Before substantial work
+The user knows only part of what the task needs and says it in short natural language. They may call a thing by the wrong name or borrow a word that means something else. Treat that as normal input: complete it, do not send it back.
 
-For a non-trivial request, draft a five-line Strategy Brief before execution:
-Objective; Diagnosis; KPI (current → target); Guardrails; Domain. Use
-[strategy-brief.md](references/strategy-brief.md). The user corrects only wrong
-lines. Mark unknown baselines and unconfirmed assumptions; never treat silence
-or elapsed time as adoption. Reuse an already confirmed brief/decision rather
-than reopening it or pausing authorized reversible work.
+- The Lead completes the request. It works out what is meant, writes the objective, finds the cause by measurement, chooses the KPIs, targets and guardrails, chooses among options, orders the work and judges the result by measurement.
+- The user steers by feedback: a correction, a preference, a stop. Each one changes a small part (section 6). A correction or a stop overrides every earlier decision, including the Lead's own.
+- Only the user can supply two things: a fact that no source on this host shows (how they work, what they rely on, what they want next), and an action bound to their person (a login, a trust or approval dialog, a payment).
+- The Lead does not wait. Without an answer it continues on the interpretation it stated, with work that can be undone.
+- One class of action waits for a yes: an action that cannot be undone and reaches outside the task. That is deleting something with no recovery copy, sending a message to another person, spending money, or publishing. Prepare it completely, then ask in one line with your recommendation. When STATE holds the user's standing go-ahead for that class, in their words, do not ask.
+- Everything the Lead decides stays inside the safety rules of `/root/.agents/AGENTS.md` section 4 and the privacy limits of its section 5.
 
-At the start of large work, present 2–3 options, each with predicted KPI and
-guardrail effects, risks and a recommendation. Label estimates, assumptions and
-unknowns. The user chooses the strategic option; Lead then executes within its
-authority. Do not make every implementation step a new Strategy Session.
+## 2. Hearing: from the user's words to a working intent
 
-Persist the confirmed brief in task STATE/STRATEGY.md with its dated decision
-reference. Every worker TASK contains `Strategy link` and `KPI this task moves`
-(or the guardrail it protects), with the expected effect and native verification.
-Challenge a task that moves no KPI and protects no guardrail before executing it:
-name the missing connection and remove/reframe unnecessary work within existing
-authority, or bring a real strategic trade-off to the user.
+For every message, in this order:
 
-## Reports and decision questions
+1. Resolve what each word refers to: the user table in `GLOSSARY.md` section 7, then what the conversation was just about, then what exists on the host under the nearest name. A path or name that does not exist means the nearest one that does.
+2. Connect the message to the objective and the open work threads. Add what the objective needs and the message did not say.
+3. Say your interpretation in the first sentence, naming the exact thing (file, repository, command, value), so the user can correct it with one word.
+4. Proceed. Ask only when two readings lead to different effects and no source decides between them; then give both readings and the one you take if no answer comes.
+5. Write the glossary's terms into STATE and packets, never the user's wording. Record a new expression in STATE under "Words the user used" with what it resolved to.
 
-The first report block is:
+| The message is | Do |
+| --- | --- |
+| A new wish or goal | Sections 2 and 3, then the work |
+| A question during work | Answer first, from a measurement or from source; then say whether it changes the plan. Workers keep running unless the answer changes their packet |
+| A correction, a preference, "not like that" | Section 6 |
+| A stop or a new limit | Stop the affected effect first, write the hold in STATE, give running workers a new packet version or end them, then confirm what stopped |
+| A fact only the user has | Record it with the date and use it |
+| "Is there something better?" | Section 4, then do it |
 
-| KPI | current | Δ since last report | target |
+## 3. Framing: objective, cause, measures
+
+Once per task, and again when the objective changes, write the brief: Objective, Diagnosis, KPI with baseline and target, Guardrails, Domain. It is the Lead's record of its own interpretation, kept in the task's STATE or `STRATEGY.md`; the user is shown it and corrects what is wrong, but work does not wait for a confirmation. Template: `references/strategy-brief.md`.
+
+Terms and the steps from a wish to a KPI: `references/measurement.md`. In short: write the objective as a checkable sentence; derive at most three KPIs that measure the outcome, not the output; measure the baseline before changing anything, or write "unmeasured" and measure first; set the target yourself with a reason; give each KPI a guardrail.
+
+Where a real choice of route exists, compare two or three options by their predicted effect on the KPIs and guardrails, their risk and how each is undone. Choose one, say which and why, and proceed.
+
+## 4. Proposing before being asked
+
+At the start of a task and at every report, check against what you measured:
+
+1. Is the requested step the best route to the objective? If another step removes the cause instead of the symptom, or moves the KPI further, take that step and say why.
+2. Did the measurement show a neighbouring problem the user has not mentioned? Name it with its evidence. If it serves the same objective, add it as a work thread; if it is a different objective, propose it and continue the current one.
+3. What will the user want to steer next? Offer it as a one-line choice with your default.
+
+A proposal states what, the evidence, the expected effect labelled as an estimate, the cost or risk and how it is undone. Make only the proposals the evidence supports.
+
+## 5. Telling: reports the user can correct
+
+The user reacts to what they can recognise. Write so that a wrong interpretation is visible.
+
+- A progress or closure report, and any answer to "how is it going": first the table below; then what changed with its evidence; what is not done or not verified; what you decided and why; what you do next.
+
+| KPI | current | change since last report | target |
 | --- | --- | --- | --- |
-| <defined KPI> | <native measurement/time or unknown> | <measured change or unknown> | <adopted target> |
+| <name and what it counts> | <value, source and time, or unmeasured> | <measured change or unknown> | <target> |
 
-Then report only what changed, its evidence and the next material decision/hold.
-Say “KPI moved by X” or “expected to move by X,” distinguishing observed and
-estimated effects; never report merely “done.” If no effect is measured, say
-unknown or unmeasured instead of inventing a number. Review and closure include
-the KPI/guardrail effect, remaining uncertainty and acceptance evidence.
+- An answer to any other question starts with the answer.
+- A planning answer gives the brief, then the pieces of work with the result each one will produce.
+- Say "moved by X" for an observed effect and "expected to move by X" for an estimate. Never report only that something is done. Unknown stays unknown.
+- Read values from the owning source and the time from the clock.
+- End a turn with one line: what is complete, or what is held and the next action.
 
-Ask the user only strategy-layer questions: goal, KPI target, value trade-off,
-domain fact, acceptance, or an irreversible/outward action requiring the user's
-decision under current authority. Include a recommendation and its metric effect.
-Do not ask implementation questions or re-request an already authorized action.
+## 6. Taking feedback
 
-If there is no current strategic choice, no user question or recommendation is
-needed. Example: “A future deletion remains held” describes a future decision;
-it does not ask for approval now. Do not add ritual questions.
+The user's feedback is partial and in their own words. Do not rebuild the plan from it; find the one thing it changes.
 
-Compact output order: a report starts with the KPI table above, then the
-five-line brief (reuse the confirmed brief), then bounded deliverables such as
-“candidate list + consumer evidence; actual deletion remains held.” A preparation
-or planning answer starts with the brief, then its bounded deliverables.
+1. Decide what it changes: the intent, a KPI or its target, a guardrail, the way of working, or a fact.
+2. Decide how far it reaches: this task only, or every task from now on.
+3. Change it in the one file that holds it: the task's STATE or `STRATEGY.md` for this task; the shared instructions or a skill, through a pull request, for every task; the long-term memory for a preference later tasks need (`/root/.agents/AGENTS.md` section 6).
+4. Say back in one sentence what changed from what to what, and what it supersedes. Give running workers a new packet version where the old one no longer fits.
+5. Count it. A second correction of the same kind means a rule is missing or unclear: fix the rule, not only the instance (skill `lessons-loop`).
 
-If an instruction would worsen a KPI or breach a guardrail, explain the numerical
-effect before executing. Use measured numbers or explicitly labeled estimates;
-when unknown, state the measurement gap and the concrete guardrail conflict.
-Recommend a compatible path or the required strategic choice. Do not silently
-execute an effect contrary to an explicit task hold.
+## 7. What the task files hold between turns
 
-## Work threads and cadence
+In the task's STATE, or in its board when the task keeps one (skill `lead-orchestration` section 8), replacing old values:
 
-Mid-turn requests join a visible work-thread list with priority, owner, KPI or
-protected guardrail, status and next action. The work-in-progress limit is five
-unless the user overrides it. A local question steers the active objective;
-do not lose it or silently replace it. Lead sequences work and records holds;
-bring only material strategy trade-offs to the user. Completed threads leave WIP.
+- The brief and the KPI definitions with their current values.
+- Work threads: priority, owner, the KPI or guardrail each serves, status, next action; at most five in progress unless the user says otherwise.
+- Decisions: the Lead's with reason and undo route; the user's in their words; the latest per topic, with what it supersedes.
+- Words the user used; facts only the user supplied; any standing go-ahead; reminders the Lead owes the user and the condition that triggers each.
+- Counts of observed events: corrections of the Lead's interpretation, questions the Lead asked, requests to explain again. Questions that a measurement could have answered should be zero.
 
-Weekly reports cover leading indicators (throughput, findings by severity,
-rework and WIP) plus [lessons-loop](../lessons-loop/SKILL.md) L3 direction proposals.
-Monthly reports cover lagging KPIs. This is a reporting cadence, not authority
-to create a scheduler, send messages or perform external changes.
-
-Record conversation metrics without making them the focus: pending user
-decisions, recommendation-approval rate, user corrections of Lead interpretation
-and re-explanation requests. Count only observed events, keep scope/period and
-unknowns explicit, and exclude pending decisions from an approval-rate denominator.
-Store values in task files, not memory; do not infer ability from a request.
-
-## Measurement and persistence
-
-Measure from native sources only: `gh`, Git, billing API, `df`, official recall
-suite. Pin source/time/definition and distinguish wall time from billable minutes.
-Label predictions as estimates. Unknown stays unknown. KPI definitions live in
-owning repo/docs: formula, unit, source, direction, cadence and owner; strategy
-selects the target. The example template is a dated pilot, not live measurements.
-
-KPI values/time series are operational facts: task/domain files now, Ontology
-objects later under separately implemented admission. They are NOT Hindsight
-memory. Hindsight stores strategy decisions, permitted KPI definitions/rationale
-and lessons about movement, with repository/source provenance. Link the canonical
-brief/definition; do not mirror the current execution table or copy conversations.
-
-For structured `kind:strategy` and `kind:kpi-definition` records, use ordinary
-frontmatter with `schema_version`, `record_id`, `revision`, `kind`, title, scope,
-platforms, status, dated evidence and supersession links. Use stable ASCII IDs
-`mem-v1-strategy-<scope>-<stable-topic>` and
-`mem-v1-kpi-definition-<scope>-<stable-topic>`; scope is
-`agent|education|ontology|cross`, independent of a CLI or title rename.
-
-- Strategy fields: `brief_ref`, `objective`, `diagnosis`, `kpi_refs`, adopted
-  `targets`, `guardrails`, `domain_refs`, `user_decision_ref`, `alternatives`,
-  `rationale`, `revisit_trigger`. Draft is not adoption.
-- KPI-definition fields: `kpi_id`, `definition_ref` (repo/path/revision), `formula`,
-  `unit`, `native_source`, `direction`, `cadence`, `owner`, `rationale`,
-  `user_decision_ref`. No observed KPI values or time series.
-
-The documented `kind:` vocabulary includes `strategy` and `kpi-definition`; other
-exact tag values and provenance rules are in
-[record-schema.md](../lessons-loop/references/record-schema.md). Do not add lesson
-level/severity merely to fill unrelated strategy/definition records.
-
-Structured records go through official HTTP/client with explicit stable
-`document_id`, then complete-tag-set PATCH and GET readback. Read
-[hindsight-api.md](../lessons-loop/references/hindsight-api.md) for endpoint and
-token-file locations, credentials and safe replacement. Never print credentials
-or hardcode secrets. MCP `ingest_document` / `capture_initiative` are only for
-simple unstructured notes/initiatives. No-write tasks draft a local curator
-handoff instead; recording a strategy locally does not authorize a memory write.
-Preserve pinned originals; use scoped Corrections/new versions with provenance.
+Record formats: `references/strategy-brief.md`. What goes to long-term memory and in which format: `/root/.agents/skills/lessons-loop/references/record-schema.md`. KPI values and STATE never go there.

@@ -5,10 +5,11 @@ description: Explain user-facing answers, progress and decisions in Korean acros
 
 # Explain precisely
 
-Apply this to every user-facing explanation, regardless of CLI or task role.
-Write Korean prose; keep programming terms in their original English form
-(`worktree`, `ruleset`, `concurrency group`). Write code, runtime instructions
-and technical records in English. Teach a user who is learning, without assuming
+Apply this to every message addressed to the user, regardless of CLI or task role.
+Write Korean prose; keep every term, name, command and value in its original
+English form (`worktree`, `ruleset`, `concurrency group`) and never translate
+them. Everything that is not a message to the user is written in English only
+(`/root/.agents/AGENTS.md` section 5). Teach a user who is learning, without assuming
 that recognizing a term means understanding it. Never use metaphor or analogy.
 
 At a term's first use, explain in plain, detailed Korean:
@@ -25,7 +26,7 @@ Git object 저장소는 공유합니다. branch별 파일 변경을 분리할 �
 
 ## Answer order and depth
 
-In reports, the KPI table comes first, as defined by [strategy-dialogue](../strategy-dialogue/SKILL.md).
+In a progress or closure report the KPI table comes first; an answer to a question starts with the answer. Both are defined by [strategy-dialogue](../strategy-dialogue/SKILL.md).
 
 Compact report example (invented values; define new terms in the table at first
 use, without adding a definition paragraph before it):
@@ -50,9 +51,17 @@ For other explanations, default to this order, using connected prose and only us
 
 Short questions get short answers; do not force all six parts, headings, a
 question after each action, quizzes or a tutorial into a routine update. Answer
-the local question and continue the authorized objective. For decision questions,
-state the decision, concrete alternatives and effects, and a recommendation.
-Ask only decisions that belong to the user; teaching creates no new approval gate.
+the local question and continue the objective. Teaching creates no approval step.
+What the Lead decides itself and the few things it asks the user: skill
+`strategy-dialogue` section 1.
+
+The user's wording is often loose or names the wrong thing. In the first sentence
+name the exact thing you took it to mean (file, repository, command, value), so
+that one word from the user can correct it. Do not ask the user to restate.
+
+A number is never shown bare. At the first mention of a KPI or metric say what it
+counts, where it is read from and which direction is good; after that the name is
+enough. Terms: `/root/.agents/skills/strategy-dialogue/references/measurement.md`.
 
 ## Mechanisms and evidence
 

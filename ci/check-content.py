@@ -90,6 +90,20 @@ for name in [n for n in texts if n.endswith(".md")]:
         if token not in references:
             fail("route_to_missing_reference", name, f"`{token}` is not in content/runtime-references")
 
+# One word for one thing: a word the glossary lists under "Do not write" fails anywhere else.
+GLOSSARY = "runtime-references/GLOSSARY.md"
+banned = {}
+for row in re.findall(r"^\| ([^|\n]+) \| [^|\n]+ \| [^|\n]+ \| ([^|\n]*) \|$", texts.get(GLOSSARY, ""), re.M):  # four-column term tables only
+    for word in re.findall(r"`([^`]+)`", row[1]):
+        banned[word.lower()] = row[0].strip()
+for name, text in texts.items():
+    if name == GLOSSARY:
+        continue
+    low = text.lower()
+    for word, term in banned.items():
+        if re.search(r"(?<![\w-])" + re.escape(word) + r"(?![\w-])", low):
+            fail("word_the_glossary_replaces", name, f"'{word}': write '{term}' ({GLOSSARY})")
+
 for e in errors:
     print(e)
 print(f"content check: {len(owned)} files, {len(errors)} errors")
