@@ -36,6 +36,9 @@ jobs:
             fi
           fi
           echo "run_rust=$run_rust" >> "$GITHUB_OUTPUT"
+      - name: Content check
+        shell: bash
+        run: python3 -I -B ci/check-content.py
       - name: Install repository-pinned Rust
         if: steps.scope.outputs.run_rust == 'true'
         shell: bash
