@@ -30,7 +30,6 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | write set | The files one writer may change | `Exact targets` line of a packet | — |
 | build slot | The right to run the one expensive build at a time | Named in STATE at dispatch | — |
 | delegation | Giving a piece of work to a worker | A dispatch | — |
-| standing go-ahead | The user's recorded words that let the Lead carry out one class of irreversible outward action without asking each time; kept in STATE only | A quoted line in STATE with its date | `blanket approval` |
 
 ## 3. Instructions and loading
 
@@ -79,7 +78,7 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 하인드사이트, HindSight | Hindsight: the long-term memory server and its MCP tools | — |
 | 온톨로지, Ontology | Ontology in Palantir's sense: object types, links and actions in `ontology-platform` | Not a general word list or taxonomy |
 | Rust 전환, 마이그레이션 | Moving an implementation to Rust in the platform repositories | Which repository and which consumer |
-| 컷오버, cutover | Switching the live consumers of a service from the old implementation to the new one | Which service; whether a standing go-ahead is recorded |
+| 컷오버, cutover | Switching the live consumers of a service from the old implementation to the new one | Which service and which consumers; the rollback route |
 | 수업 세션 | A CLI session the user runs while teaching | Never send input to it or close it |
 | 워커, 서브에이전트, 에이전트들 | Workers; sometimes every agent on the host including Leads | — |
 | 새 Lead, 새 세션 | The Lead session that takes the task over next | — |
