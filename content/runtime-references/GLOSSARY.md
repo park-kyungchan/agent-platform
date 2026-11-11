@@ -9,6 +9,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 - A term that is not here and not in `AGENTS.md` gets a definition at its first use in the file that needs it. Add it here when a second file needs it.
 - Packets, STATE files and reports use these terms. The user's own wording stays in the conversation and in the decision record that quotes it.
 - Vocabulary of a domain (lessons, students, papers, churches) belongs to the repository that owns the domain, and to the object types of `ontology-platform` once STATE says they are in use. It is not copied here.
+- This is a closed set with a budget, not a list that grows. The content check fails when a term here is used in no other shared file, when the core list, this file or the user table passes its limit (the limits are constants in `agent-platform` `ci/check-content.py`), so adding a row at the limit means removing or moving one first. A term enters only when a second file needs it; a user expression enters only when it appears in a second task; a row leaves when its term is no longer used or the user stopped using the expression.
 
 ## 2. Work coordination
 
@@ -39,7 +40,6 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | pointer file | The file through which one CLI finds the shared instructions | `~/.claude/CLAUDE.md` | `loader file` |
 | reference | A file under `runtime-references/` that is read only when its situation applies | This file | — |
 | skill | A directory with a `SKILL.md` whose short description is always listed and whose body is read when it applies | `/root/.agents/skills/herdr/SKILL.md` | — |
-| always-loaded text | Text every session receives before the first user message: the shared instruction file and the skill descriptions | `AGENTS.md` | — |
 | source | The repository files a change is made in, as opposed to the installed copy | `agent-platform` `content/` | — |
 | session record | The file a CLI writes about one session, with its messages and tool calls | A `session.jsonl` | `transcript log` |
 | headless run | A CLI started with one prompt that exits when the prompt is done | `CLI-RUNTIMES.md` section 2 | — |
@@ -49,7 +49,6 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 
 | Term | Meaning | Example on this host | Do not write |
 | --- | --- | --- | --- |
-| short-term memory | What one task needs to continue: its STATE, board and packets | `/home/palantirkc/work/<scope>-<topic>/` | — |
 | long-term memory | Decisions with their reasons, lessons, corrections, preferences and explained terms that later tasks need | The Hindsight bank, reached through the MCP server `hindsight` | — |
 | private memory | A store that one CLI keeps for itself and no other CLI reads | `CLI-RUNTIMES.md` section 8 | `personal memory` |
 | knowledge page | A page Hindsight derives from stored documents; a way to find evidence, not evidence itself | A result of the page search tool | — |
@@ -76,7 +75,7 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 지침, 인스트럭션 | The shared instructions; sometimes one skill or one packet | Which file: `AGENTS.md`, a reference, a skill, or a task's packet |
 | 런타임 레퍼런스, runtime-reference | `/root/.agents/runtime-references/` (plural) | — |
 | 스킬 | A shared skill under `/root/.agents/skills/`; sometimes a skill a single CLI installed | A misspelled skill name means the nearest existing one |
-| 메모리 | One of three: short-term memory, long-term memory, private memory | "단기" is short-term, "중장기" is long-term, "CLI의 메모리" is private memory |
+| 메모리 | One of three: the task's STATE and board, long-term memory, private memory | "단기" is the task's STATE and board, "중장기" is long-term memory, "CLI의 메모리" is private memory |
 | 하인드사이트, HindSight | Hindsight: the long-term memory server and its MCP tools | — |
 | 온톨로지, Ontology | Ontology in Palantir's sense: object types, links and actions in `ontology-platform` | Not a general word list or taxonomy |
 | Rust 전환, 마이그레이션 | Moving an implementation to Rust in the platform repositories | Which repository and which consumer |
@@ -91,4 +90,4 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 보드 | The board of the current task | — |
 | 정리, 손봐, 개선 | A request whose target and extent are open | State what you will change and what you will leave before starting |
 
-A new expression is written in the task's STATE under "Words the user used" with what it resolved to. When the same expression appears in a second task, add a row here through a pull request (skill `lessons-loop`).
+A new expression is written in the task's STATE under "Words the user used" with what it resolved to. When the same expression appears in a second task, add a row here through a pull request (skill `lessons-loop`); most expressions never need a row, because the three-step resolution above already finds them.

@@ -93,6 +93,7 @@ for name in [n for n in texts if n.endswith(".md")]:
 # One word for one thing: a word the glossary lists under "Do not write" fails anywhere else.
 GLOSSARY = "runtime-references/GLOSSARY.md"
 banned = {}
+terms = []
 if GLOSSARY not in texts:
     fail("glossary_missing", GLOSSARY, "the word check needs the glossary")
 in_terms = False
@@ -111,6 +112,7 @@ for line in texts.get(GLOSSARY, "").splitlines():
         continue
     for word in re.findall(r"`([^`]+)`", cells[3]):
         banned[word.lower()] = cells[0]
+    terms.append(cells[0])
 for name, text in texts.items():
     if name == GLOSSARY:
         continue
@@ -118,6 +120,23 @@ for name, text in texts.items():
     for word, term in banned.items():
         if re.search(r"(?<![\w-])" + re.escape(word) + r"(?![\w-])", low):
             fail("word_the_glossary_replaces", name, f"'{word}': write '{term}' ({GLOSSARY})")
+
+# The vocabulary is a closed set with a budget, not a list that grows: a term must be used, and the files have limits.
+CORE_TERM_LIMIT, GLOSSARY_BYTE_LIMIT, USER_ROW_LIMIT = 14, 12000, 30
+others = " ".join(text.lower() for name, text in texts.items() if name != GLOSSARY)
+for cell in terms:
+    for term in [w.strip().lower() for w in cell.split(",")]:
+        if not re.search(r"(?<![\w-])" + re.escape(term) + r"s?(?![\w-])", others):
+            fail("glossary_term_unused", GLOSSARY, f"'{term}' is used in no other file: remove the row")
+core = len(re.findall(r"^- \*\*", texts.get("AGENTS.md", "").split("## 8. ")[-1], re.M))
+if core > CORE_TERM_LIMIT:
+    fail("core_terms_over_limit", "AGENTS.md", f"{core} entries, limit {CORE_TERM_LIMIT}: move one to the glossary before adding one")
+size = len(texts.get(GLOSSARY, "").encode())
+if size > GLOSSARY_BYTE_LIMIT:
+    fail("glossary_over_limit", GLOSSARY, f"{size} bytes, limit {GLOSSARY_BYTE_LIMIT}: remove or move rows before adding")
+user_rows = [l for l in texts.get(GLOSSARY, "").split("## 7. ")[-1].splitlines() if l.startswith("| ") and not set(l) <= set("|- ")]
+if len(user_rows) - 1 > USER_ROW_LIMIT:
+    fail("user_table_over_limit", GLOSSARY, f"{len(user_rows) - 1} rows, limit {USER_ROW_LIMIT}")
 
 for e in errors:
     print(e)
