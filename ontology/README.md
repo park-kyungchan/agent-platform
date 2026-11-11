@@ -171,24 +171,15 @@ Bash, Python 3 and Git and takes one binary path:
 ontology/rehearsal.sh /path/to/ont
 ```
 
-It creates a store under its own `mktemp -d`, checks the frozen v1 pin, installs
-v1 with `schema install <file>`, indexes `task_states`, `packets` and `reports`,
-records a task revision, installs v2, creates and lifts a v2 hold, then installs
-v3 and verifies the task revision and the existing v2 hold revision are unchanged.
-It exercises every action and criterion refusal, unknown-task and older-time
-refusals without store/log changes, separate no-write checks for malformed and
-impossible-calendar times, future-time refusals and boundary/later-time acceptance, retries across changed
-clocks, equal-time correction/history, decision inheritance, native-key task
-isolation, indexed/dangling file references, optional missing cells, escaping
-and descending worker order. It also tests synthetic memory corrections,
-correction after supersession, withdrawal and predecessor restoration, refusal
-cases and the combined current-memory view. It asserts each chain has at most
-one ready record after every transition, including
-a chain of three and recovery from a self-reference. It prints six rendered blocks
-(one current-memory block and five program-state blocks) and removes the
-store. Its output sizes and time-comparison `validate` answers go to stderr.
-It uses fixed clocks and synthetic operational values on the indexed tasks
-`workspace-strategy-reassessment-20261109` and `ontology-operational-base`.
+It creates a store under `mktemp -d` (set `TMPDIR` to the authorized scratch
+root), checks the frozen v1 pin, installs v1, indexes task/packet/report files,
+installs v2, creates and lifts a v2 hold, then installs v3 and verifies the task
+and v2 hold revisions are unchanged. It exercises the version 2 action/time,
+retry, reference, escaping and optional-cell cases; prints six rendered blocks
+(one memory-index block and five program-state blocks); and invokes the
+exhaustive memory-index walk with two records. Its private stores are removed
+on exit. Output sizes and time-comparison answers go to stderr. A walk failure
+fails the rehearsal. Native calls must use the authorized disposable wrapper.
 
 Host installation is a separate authorized operation after review and merge:
 fetch this repository, then use `ont --store <authorized-store> schema install
@@ -227,59 +218,77 @@ hold's `until` is intentionally prose; expiry comparisons need a separate typed
 expiry field. `current_decisions` needs no numeric/date comparison.
 
 ## Version 3: memory retrieval index
-Version 2 remains pinned in Git at
+Version 2 remains pinned at
 `2b9417c8bc96b0cbeb4ab7913aa44cb49ad8d604:ontology/work.schema.json`,
 sha256 `27de5fd02c20299897720ab34543e04e6db685438c3dd7409691cb8ddae11f24`.
-Version 3 preserves every version 2 definition and adds only the index type,
-value types, link, actions, views and grants. Install by the same reviewed,
-commit-pinned route above; merging installs nothing.
+Every existing definition is byte-equal; grants gain only additive entries.
+Version 3 adds a cross-task `memory_record` keyed by the stable record id.
+Its only properties are `document_id`, `status`, optional `supersedes` and
+`body_hash` (64 lowercase hex SHA-256). Git owns all title/kind/subject/body
+and provenance; see [../memory/README.md](../memory/README.md). No real record
+is populated yet. The writer supplies document_id equal to the record key and
+only selects originals from `main`; these are writer contracts.
+`scope_keys` remains empty in namespace `vps://palantirkc` / `root`, with no task
+reference. `agent` has the same read/action grants as other Lead-written types.
 
-`memory_record` is Ontology-owned and keyed by the stable Git record id, taken
-from the `/native_key` pointer inside its `record` Id parameter. Its only
-properties are `document_id`, `status` (`pending`, `ready`, `superseded`), optional
-`supersedes` (predecessor reference), and `body_hash` (64 lowercase hex SHA-256).
-There is no title, subject, kind or body copy. Git originals are described in
-[../memory/README.md](../memory/README.md). No real record is populated yet.
-The caller supplies `document_id` equal to the record's native key. Like the
-file's selection from `main` and remote readback, this equality is the writer's
-contract; the schema cannot compare a reference's native key with a parameter.
-The reverse reference link is `memory_successors`; forward is `memory_predecessor`.
+### Transitions (amendment A1)
+`superseded` is final: never reuse that record id. A wanted-again text needs a
+new original file/id. No action clears a predecessor reference. The links are
+`memory_predecessor` and reverse `memory_successors`.
 
-| Action | Parameters and effect | Submission refusals |
+| Action | Parameters | Admitted transition / refusals |
 | --- | --- | --- |
-| `mark_memory_record_pending` | `record` full Id (may be absent on first use), `document_id`, `body_hash`, optional `supersedes`; creates or modifies the same key, sets pending and the hash; omitted predecessor preserves its existing value | `memory_record_has_ready_successor` while a linked successor is ready; continue that successor instead of reopening its predecessor |
-| `mark_memory_record_ready` | `record`, `body_hash`; sets ready after document/fact/page readback | `memory_record_not_pending`; `memory_body_hash_mismatch`; `memory_predecessor_not_pending` only while its linked predecessor is ready; `memory_record_has_successor` while any successor remains linked |
-| `mark_memory_record_superseded` | `record` predecessor, `successor`; marks only the predecessor superseded | `memory_record_already_superseded` unless predecessor is pending; `memory_successor_not_ready`; `memory_successor_not_linked` unless successor.supersedes equals record; `memory_successor_is_self` |
-| `withdraw_memory_record` | `record` full Id; marks a pending or ready record superseded and atomically clears its `supersedes` reference after its file was removed or reverted on `main` | `memory_record_already_superseded` if already superseded |
+| `mark_memory_record_pending` | `record`, `document_id`, `body_hash`, optional `supersedes` | Creates a record or returns pending/ready to pending with a new hash; refuses superseded as `memory_record_already_superseded` and self-supersession as `memory_successor_is_self`. Omitted predecessor preserves its value. |
+| `mark_memory_record_ready` | `record` | Pending to ready; refuses a ready predecessor (`memory_predecessor_ready`) or a pending/ready successor (`memory_record_has_successor`). |
+| `mark_memory_record_superseded` | `record`, `successor` | Pending/ready to superseded only when successor is ready and its supersedes is record. |
+| `withdraw_memory_record` | `record` | Pending/ready to superseded without requiring a successor; preserves every reference. |
 
-The named refusals appear inside `submission_criteria` answers; unknown parameters
-(including a supplied status) and malformed hashes refuse `invalid_parameter`.
-On distinct replacement, mark the predecessor pending first, create its pending
-successor with `supersedes` pointing back, then ready the successor after readback
-and supersede the predecessor. Same-record corrections use pending with a new
-hash, then ready with exactly that hash, including a record that superseded
-another: its superseded predecessor stays superseded during correction. A
-predecessor cannot become ready while any successor remains linked, including
-a successor that was itself superseded by a third record. Withdrawal clears
-the withdrawn record's predecessor reference; its predecessor can then enter
-pending and ready again if no other successor is linked. If a
-successor was linked prematurely, ready refuses while the predecessor is ready;
-pending the predecessor recovers the sequence. Thus the pair cannot both be ready.
-These actions record the publication order; they do not contact a memory server.
+The criteria use ordered `all`: existence guards precede status/reference reads.
+The pending self guard is `none(all(exists($supersedes),eq($record,$supersedes)))`.
+**Known admission gap:** native `exists` tests target existence, not just optional
+parameter presence. A new record can therefore self-supersede when its target
+is absent; the exhaustive walk currently stops on I3 with this one-action
+counterexample. Omitted supersedes applies and an existing self reference refuses.
+The candidate is blocked until this native admission boundary can express the
+required guard. No engine workaround or extra action is introduced here.
 
-`current_memory_records` takes no arguments and selects every pending or ready
-record in one read. It shows Record id (`$key`), Document id, Body hash and Status,
-ordered by document_id. Send `{"view":"current_memory_records","args":{}}` to
-`ont render` through stdin. Within the native 200-row default/10,000-head bound,
-a reader must treat a `truncated` answer as **current memory unavailable**.
-`agent` receives the same read/action grants as for other Lead-written types.
-`scope_keys` stays empty; namespace stays `vps://palantirkc` / `root`, with no task
-reference or task-specific scope. A record can therefore span multiple tasks.
-The rehearsal upgrades frozen v1 to v2 to v3, preserves an existing v2 object,
-and exercises synthetic transitions, corrections after supersession, withdrawal,
-restoration, chain-of-three and self-reference recovery, refusals and the
-current-memory view offline.
+`current_memory_records` takes no arguments and selects pending/ready records,
+showing Record id (`$key`), Document id, Body hash and Status in one read.
+A truncated answer means **current memory unavailable**. The native default
+is 200 rows with a 10,000-head bound; paging/complete reads belong to P1b.
+A successor withdrawn before its predecessor becomes superseded no longer
+blocks that still-current predecessor. An already superseded id stays final.
+“At most one ready record per chain” assumes one current successor per
+predecessor: two successors of one predecessor are the writer's duty (A1).
+The store permits such a fork; the walk does not impose that writer restriction.
 
-The store does not refuse a `supersedes` equal to the record itself; the writer must not send one, and `withdraw_memory_record` recovers the record.
+### Exhaustive native-store walk
+Run only through an approved disposable wrapper, with a scratch root:
 
-A pending record that cannot become ready because it still has a linked successor can be withdrawn to remove it from `current_memory_records`.
+```sh
+python3 -I -B ontology/memory-index-walk.py /path/to/wrapper /path/to/scratch
+python3 -I -B ontology/memory-index-walk.py /path/to/wrapper /path/to/scratch --records 2
+python3 -I -B ontology/memory-index-walk.py /path/to/wrapper /path/to/scratch --records 3 --depth 4
+```
+
+The breadth-first walk explores every action/record/predecessor/successor choice,
+including omitted/self predecessors and absent targets. Each action runs on a
+copy of its source store; each new abstract state retains its shortest history.
+States contain every record's status and predecessor. Document ids equal keys;
+one fixed valid hash represents all hashes because no criterion reads them.
+The script checks that abstraction premise against the schema. Bounds are
+2,000 states, 100,000 native calls and 1,150 seconds, with 20-second call timeouts.
+A bound stops with its own message. If three records exceed 20 minutes, report a
+complete two-record walk and a stated-depth three-record walk instead.
+
+- I1: superseded in a source state remains superseded in every outgoing state.
+- I2: a record and its predecessor are never both ready.
+- I3: a pending/ready record never names itself as predecessor.
+- I4: every pending record can reach ready or superseded; reverse graph search
+  checks this, with actual withdrawal witnesses at a bounded-depth frontier.
+- I5: the view equals exactly all pending/ready records, including id/hash/status.
+
+A failure prints the shortest action sequence and exits nonzero; I4 runs after
+graph closure, so an earlier violation leaves I4 unverified. Artifacts include
+states, native requests/answers, transitions and a summary with applied/refused
+counts, bounds, elapsed time and exit. No operational store is selected by default.

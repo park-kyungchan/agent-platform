@@ -1662,7 +1662,7 @@
       ]
     },
     "mark_memory_record_pending": {
-      "description": "Mark a committed record pending before server replacement/readback; creates the cross-task index on first use. Supply document_id equal to record.native_key.",
+      "description": "Create a pending record or return a pending/ready record to pending with a new hash; superseded is final.",
       "parameters": {
         "record": {
           "type": {
@@ -1695,24 +1695,40 @@
       },
       "submission_criteria": [
         {
-          "code": "memory_record_has_ready_successor",
-          "message": "Continue the ready successor; a predecessor cannot become pending while its successor is ready.",
+          "code": "memory_record_already_superseded",
+          "message": "A superseded record id is final; use a new record id.",
           "none": [
             {
-              "linked": {
-                "from": "$record",
-                "link": "memory_successors",
-                "where": {
-                  "all": [
-                    {
-                      "eq": [
-                        "status",
-                        "ready"
-                      ]
-                    }
+              "all": [
+                {
+                  "exists": "$record"
+                },
+                {
+                  "eq": [
+                    "$record.status",
+                    "superseded"
                   ]
                 }
-              }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "memory_successor_is_self",
+          "message": "A record cannot name itself as predecessor.",
+          "none": [
+            {
+              "all": [
+                {
+                  "exists": "$supersedes"
+                },
+                {
+                  "eq": [
+                    "$record",
+                    "$supersedes"
+                  ]
+                }
+              ]
             }
           ]
         }
@@ -1730,7 +1746,7 @@
       ]
     },
     "mark_memory_record_ready": {
-      "description": "Record completed server document/fact/page readback for the pending hash; this action alone does not perform that readback.",
+      "description": "Record completed document/fact/page readback for the current pending record; does not perform remote readback.",
       "parameters": {
         "record": {
           "type": {
@@ -1738,21 +1754,16 @@
           },
           "required": true,
           "description": "Full Id in the work namespace; native_key is the stable record id. May be absent on first pending publication."
-        },
-        "body_hash": {
-          "type": {
-            "value_type": "memory_body_hash"
-          },
-          "required": true,
-          "description": "SHA-256 of the exact Git original bytes selected from a commit on main.",
-          "max_bytes": 64
         }
       },
       "submission_criteria": [
         {
           "code": "memory_record_not_pending",
-          "message": "Mark the record pending before finalizing its readback.",
+          "message": "Ready requires an existing pending record.",
           "all": [
+            {
+              "exists": "$record"
+            },
             {
               "eq": [
                 "$record.status",
@@ -1762,20 +1773,8 @@
           ]
         },
         {
-          "code": "memory_body_hash_mismatch",
-          "message": "Read back the stored pending hash; do not finalize another revision.",
-          "all": [
-            {
-              "eq": [
-                "$record.body_hash",
-                "$body_hash"
-              ]
-            }
-          ]
-        },
-        {
-          "code": "memory_predecessor_not_pending",
-          "message": "Mark a ready predecessor pending before completing its successor; superseded predecessors need no reopening.",
+          "code": "memory_predecessor_ready",
+          "message": "Mark the ready predecessor pending before completing its successor.",
           "none": [
             {
               "linked": {
@@ -1797,12 +1796,25 @@
         },
         {
           "code": "memory_record_has_successor",
-          "message": "Complete or withdraw the linked successor before making its predecessor ready.",
+          "message": "Complete or withdraw its current successor before making this record ready.",
           "none": [
             {
               "linked": {
                 "from": "$record",
-                "link": "memory_successors"
+                "link": "memory_successors",
+                "where": {
+                  "all": [
+                    {
+                      "in": [
+                        "status",
+                        [
+                          "pending",
+                          "ready"
+                        ]
+                      ]
+                    }
+                  ]
+                }
               }
             }
           ]
@@ -1838,20 +1850,29 @@
       "submission_criteria": [
         {
           "code": "memory_record_already_superseded",
-          "message": "Choose a pending predecessor.",
+          "message": "Supersede only a pending or ready record.",
           "all": [
             {
-              "eq": [
+              "exists": "$record"
+            },
+            {
+              "in": [
                 "$record.status",
-                "pending"
+                [
+                  "pending",
+                  "ready"
+                ]
               ]
             }
           ]
         },
         {
           "code": "memory_successor_not_ready",
-          "message": "Complete the successor readback and mark it ready first.",
+          "message": "The named successor must be ready.",
           "all": [
+            {
+              "exists": "$successor"
+            },
             {
               "eq": [
                 "$successor.status",
@@ -1862,24 +1883,18 @@
         },
         {
           "code": "memory_successor_not_linked",
-          "message": "Create a distinct successor with supersedes pointing to this predecessor.",
+          "message": "The named successor must link back to this record.",
           "all": [
+            {
+              "exists": "$record"
+            },
+            {
+              "exists": "$successor"
+            },
             {
               "eq": [
                 "$successor.supersedes",
                 "$record"
-              ]
-            }
-          ]
-        },
-        {
-          "code": "memory_successor_is_self",
-          "message": "A distinct successor must have its own record id.",
-          "all": [
-            {
-              "ne": [
-                "$record",
-                "$successor"
               ]
             }
           ]
@@ -1895,7 +1910,7 @@
       ]
     },
     "withdraw_memory_record": {
-      "description": "Record withdrawal after the original was removed or reverted on main; supersede a pending or ready record and clear its predecessor reference.",
+      "description": "Withdraw a pending or ready record to final superseded status; preserve every predecessor reference.",
       "parameters": {
         "record": {
           "type": {
@@ -1910,6 +1925,9 @@
           "code": "memory_record_already_superseded",
           "message": "Withdraw only a pending or ready record.",
           "all": [
+            {
+              "exists": "$record"
+            },
             {
               "in": [
                 "$record.status",
@@ -1927,12 +1945,6 @@
           "modify_object": "memory_record",
           "set": {
             "status": "superseded"
-          }
-        },
-        {
-          "clear_reference": {
-            "object_type": "memory_record",
-            "property": "supersedes"
           }
         }
       ]
