@@ -7,14 +7,14 @@ The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6;
 | Information | Where it lives | Who writes it | How to read it |
 | --- | --- | --- | --- |
 | The active conversation, reasoning, a resumable session, and notes that matter only to that one CLI | The CLI's own session store and private memory | The CLI | Resume only the exact session you need. Never import another agent's transcript |
-| Owner, authority, holds, next action, task metrics, verification, the Strategy Brief | The task's `STATE.md`, `TASK.md`, `STRATEGY.md` | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
+| Owner, authority, holds, next action, task metrics, verification, the brief, and for a task with several work threads the board | The task's `STATE.md`, `TASK.md`, `STRATEGY.md`, and the board file STATE names | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
 | Implemented behaviour, schemas, APIs, tests, build instructions, KPI definitions | The owning repository's source and docs | The implementation owner, through review | Read the current revision. Do not rely on a remembered implementation |
 | Durable decisions and their reasons, lessons, corrections, scoped user preferences, explained terms | The shared Hindsight bank `coding-agent::shared` | An authorized owner or curator through the official HTTP API or client; the MCP tools only for simple notes and initiatives | Search pages, read the selected ones, recall exact evidence. Reflect only when those leave reasoning unresolved |
 | Current operational objects, observations, KPI values and time series, policies, actions, recovery state | The domain or task owner today; `ontology-platform` when its admission is implemented | The trusted domain owner under the task's authority | A fresh authorized read with revision, scope, coverage and freshness. Memory is only a pointer to it |
 
-- A decision another agent needs must not stay only in one CLI's personal memory: write it in the repository contract or in an authorized, sourced Hindsight document.
+- A decision another agent needs must not stay only in one CLI's private memory: write it in the repository contract or in an authorized, sourced Hindsight document.
 - Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off (reason: `HINDSIGHT-RUNTIME.md`, "Session path on this host").
-- A KPI target is a strategy decision. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
+- A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy; the user corrects them. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
 
 ## 2. Which source answers a question
 
@@ -23,7 +23,8 @@ The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6;
 | What may I do now, and what is next? | The user's current instruction, `/root/.agents/AGENTS.md`, the task's STATE. Memory is history |
 | What did the user decide, and why? | The dated source decision, newer corrections and the current task authority. A generated page is navigation |
 | What does the program implement? | Current source at a Git revision, compiler and runtime output, tests |
-| What does a KPI mean? | The definition in the owning repository; the target in the adopted strategy; values from the native measurement |
+| What does a KPI mean? | The definition in the owning repository or the task's strategy; the target in the task's strategy; values from the native measurement. What the words KPI, metric and guardrail mean: `/root/.agents/skills/strategy-dialogue/references/measurement.md` |
+| What does a word in an instruction or in the user's message mean? | `/root/.agents/AGENTS.md` section 8, then `GLOSSARY.md` |
 | What does an operational object say now? | A fresh authorized domain read |
 | May a caller read, derive or act? | The domain's authenticated policy and the task grant. Neither memory nor a tag grants access |
 | Did an effect happen, and is a retry safe? | Reconciliation against the authoritative target. Neither prose nor a rollback settles it |

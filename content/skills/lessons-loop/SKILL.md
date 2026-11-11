@@ -1,13 +1,22 @@
 ---
 name: lessons-loop
-description: At task closure or assigned curation, capture authorized L0–L3 engineering lessons and route structural proposals through Lead; no mandatory lesson.
+description: At task closure, on a repeated user correction, or as assigned curator, capture L0–L3 lessons, turn repeats into rule changes and route structural proposals to the Lead; no mandatory lesson.
 ---
 
 # Lessons loop
 
-## Skill contract
+## When to use, and the short form
 
-At task/pane closure, read current TASK/STATE and the relevant primary evidence. Record workers, review findings by severity, rework rounds and CI minutes; leave unknown values unknown. Capture only durable, student-free incidents/lessons through authorized official Hindsight HTTP API/client. Respect explicit no-write tasks: draft a local handoff and do not ingest, retag, refresh or delete. Preserve source IDs/content pins and distinguish user decisions, agent reports and verified output. Use the L0 Incident -> L1 Lesson -> L2 Pattern -> L3 Structural issue/direction-proposal schema and exact tags in the approved memory design; never promote by document count. Preserve independent occurrence identity, cause confidence, scope, counterevidence, status and codified_in. A curator may promote only with verified evidence; preserve pinned originals and use scoped Corrections. Send L3 proposals through Lead to current STATE `DIRECTION PROPOSALS`; do not enact them. Use official recall/readback and refresh only within actual authority; no database, custom ledger, watcher, grader or transcript pipeline.
+Use at the closure of a task or a worker run, when the user corrects the Lead, and when STATE names you curator.
+
+1. At closure, record in the task's files: workers, review findings by severity, rework rounds, CI minutes. An unknown value stays unknown.
+2. Capture a lesson only when something durable was learned. Levels: L0 incident, L1 lesson, L2 pattern, L3 structural issue with a direction proposal. Promotion needs independent occurrences of a verified mechanism, never a document count.
+3. A correction from the user is an occurrence. The first one changes the instance (skill `strategy-dialogue` section 6). A second correction of the same kind is a missing or unclear rule: the Lead changes the rule in the file that holds it, through a pull request, and reports the change.
+4. An expression of the user that appears in a second task is added to `/root/.agents/runtime-references/GLOSSARY.md` section 7 the same way.
+5. Write to long-term memory only when the task authorizes a write, through the official Hindsight HTTP API or client, without student, lesson or operational payloads. In a no-write task leave a short handoff file in the task directory and name it in STATE.
+6. An L3 direction proposal goes to the Lead and into the current STATE under `DIRECTION PROPOSALS`. The Lead decides it by the measure it would move, carries it out as a reversible trial where one exists, and reports the decision and the result to the user.
+
+The sections below give the details. They build no database, ledger, watcher, grader or transcript pipeline.
 
 Use [worker-closure.md](references/worker-closure.md) for task-local closure evidence, metrics, holds and optional lesson candidates; the reference grants no memory write or new approval step.
 
@@ -59,8 +68,9 @@ Create a new linked higher-level record, preserving each incident's identity.
 Review recurring failure classes, contradicted assumptions and failed
 codifications. An L3 proposal reaches Lead → current STATE `DIRECTION PROPOSALS`
 with its ID/pin, evidence, alternatives (including keeping the design), expected
-quality/cost effect, reversible trial, success/stop criteria and decision owner.
-Lead presents the concrete decision to the user; no proposal enacts itself.
+quality/cost effect, reversible trial and success/stop criteria. The Lead decides
+it and reports the decision and its result to the user; an irreversible outward
+action inside a proposal waits as skill `strategy-dialogue` section 1 says.
 
 ## Readback and derived views
 

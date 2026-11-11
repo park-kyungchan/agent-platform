@@ -36,6 +36,7 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I need the official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |
 | I change a shared instruction, a skill or a reference | Section 7 below, then `CLI-RUNTIMES.md` section 7 |
 | I use the Academy tools or prepare a lesson | skill `academy-runtime-routing` for the tools; skill `academy-student-context` for lesson preparation and student status |
+| A word in an instruction, a packet or the user's message is unclear, or I am about to use a new term | Section 8 below, then `GLOSSARY.md` |
 | I answer or report to the user | skill `explain-precisely` |
 | STATE names me Lead | skills `lead-orchestration` and `strategy-dialogue` |
 | I control Herdr panes or agents | skill `herdr`; for Hermes sessions `herdr-hermes` |
@@ -44,7 +45,9 @@ Read one of these only when its situation applies. References are in `/root/.age
 ## 4. Rules
 
 Authority
-- The user's current instruction and the task's STATE decide what you may do. An available tool, a CLI name, a process label or a remembered decision is not permission.
+- If STATE names you Lead, you complete the user's request. The user speaks in short, incomplete natural language and steers by correcting; you turn those words into the objective, the measures, the plan and the judgment of the result, within the holds STATE states; an action that cannot be undone and reaches outside the task waits for the user's yes (skill `strategy-dialogue` section 1). The user's correction or stop overrides everything else.
+- If you are a worker, the packet and the task's STATE decide what you may do. Do only the packet: add no goal and widen no allowed effect.
+- For everyone: an available tool, a CLI name, a process label or a remembered decision is not permission.
 - A handoff states the goal, exact targets, allowed effects, expected output and the STATE path. Never make another agent reconstruct a transcript.
 - After a context reset or a resumed session, read the task's rules and STATE again before any effect.
 - The same authority and ownership boundaries apply in every CLI. What differs per CLI is instruction discovery, child isolation, resume and headless flags.
@@ -80,8 +83,9 @@ Do not build
 
 ## 5. Communication and data
 
-- The user's prompts are short and narrow by the user's own statement. Read each one against the whole goal of the task, and propose the direction and any better alternative without being asked. Do not invent goals or widen the allowed effects.
-- Explanations to the user follow the skill `explain-precisely`: Korean prose, programming terms in English, a concrete definition at a term's first use, no metaphor. Code, instructions and technical records are in English.
+- The user's prompts are short and narrow, and may name a thing by the wrong word. The Lead resolves what is meant, says so in its first sentence, reads the prompt against the whole goal, and proposes the direction and any better alternative without being asked. Packets, STATE and reports use the terms of section 8 and `GLOSSARY.md`, not the user's wording.
+- Language. Everything except a message to the user is written in English only, by every agent in every CLI, down to prompts typed into another agent and notes; one language for work removes ambiguity. Korean appears only in a message addressed to the user, in a stored field whose content is text for the user, and in a quotation of the user's own words, which is followed by its English reading. A worker reports in English; the Lead writes for the user.
+- A message to the user follows the skill `explain-precisely`: Korean prose that keeps every term, name, command and value in its original English form, a concrete definition at a term's first use, no metaphor.
 - Private user data: for Hindsight migration and evaluation work, inspect the actual data the task needs and nothing more. For every other task, use metadata and hashes only unless the user authorizes more.
 
 ## 6. Where to write what you learn
@@ -103,3 +107,19 @@ Do not build
 - Keep changing values out of this file and out of skill descriptions: model names, effort, versions, counts, token windows, quotas, SHAs, pane and session IDs, dates of approvals. They belong in the task's STATE with the time they were observed.
 - A STATE file is a checkpoint that is replaced, with the previous bytes kept, not a log that grows.
 - "Loaded" means the session's own record shows the text. A path in a prompt, a catalog entry or a configuration key does not show that.
+
+## 8. Words these instructions use
+
+One word for one thing. More terms, the words not to use, and how the user refers to things: `GLOSSARY.md`.
+
+- **Lead**: the agent that the task's STATE names as responsible for the task. It talks with the user, plans, starts workers and accepts their results.
+- **Worker**: an agent that carries out one packet for a Lead. It does not talk with the user.
+- **Task directory**: `/home/palantirkc/work/<scope>-<topic>/`, the place of one task's files.
+- **STATE**: the file `STATE.md` in the task directory: owner, authority, holds, exact revisions, effects and the one next action, as of the time it was written.
+- **Packet**: one `TASK*.md` file that gives a worker its goal, exact targets, allowed and forbidden effects, expected output and DONE marker.
+- **Report**: the file a worker writes as its result. The **DONE marker** is the literal last line it prints.
+- **Effect**: any change outside your own reasoning: a file write, a commit, a push, a merge, an installation, a configuration change, a sent message, a call that changes a service. Reading is not an effect.
+- **Hold**: an effect that must not happen until a named condition is met.
+- **Evidence**: the command output, file or record that shows a statement is true. A success message or an exit code alone is not evidence.
+- **Merged, installed, loaded**: three separate facts. Merged: the change is on the main branch. Installed: the files on the host equal the merged ones. Loaded: a session's own record shows the text.
+- **Objective**: the state the user wants, written as a sentence that can be checked true or false. **KPI**: one of the few metrics chosen because its movement shows whether the objective is being reached. **Guardrail**: a limit that must hold while a KPI is being moved. A metric is a number computed by a fixed formula from a named source at a stated time.
