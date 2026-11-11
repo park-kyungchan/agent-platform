@@ -41,7 +41,7 @@ Third-party tools kept under `/home/palantirkc/tools/`. They are not first-party
 | Ghidra | `/home/palantirkc/tools/ghidra_12.1.4_PUBLIC` | The analysis backend REA uses for native binaries; REA finds it through the environment variable `GHIDRA_INSTALL_DIR`. It is not used on its own here |
 
 - REA is not ReVa or any other tool with a similar name.
-- Static analysis reads files the task names and runs nothing: allowed when the task names the target. Building REA, installing its dependencies or registering it in a CLI is an installation: it needs the task's authority.
+- Static analysis reads files the task names and does not run the target or attach to a process: allowed when the task names the target. Building REA, installing its dependencies or registering it in a CLI is an installation: it needs the task's authority.
 - Dynamic use needs the user's word each time: attaching to a process, instrumenting an application or a device, capturing or intercepting traffic, sending a request to a live service.
 - The Academy server the teacher uses (the LMS) is a web application without a native client: its contracts were derived from a pinned client script as text, without Ghidra. Earlier results: `education-platform` `modules/academy-workbench/tools/academy-mcp/docs/rea-name-search-contract-20261026.md`; `/home/palantirkc/work/edu-prestudy-section-mcp/evidence/`.
 
