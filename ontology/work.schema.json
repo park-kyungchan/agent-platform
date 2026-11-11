@@ -1,13 +1,51 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 1,
+  "version": 2,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
   },
   "scope_keys": [],
-  "value_types": {},
+  "value_types": {
+    "hold_status": {
+      "base": "string",
+      "enum": [
+        "active",
+        "lifted"
+      ]
+    },
+    "decision_status": {
+      "base": "string",
+      "enum": [
+        "current",
+        "superseded"
+      ]
+    },
+    "decision_actor": {
+      "base": "string",
+      "enum": [
+        "user",
+        "lead"
+      ]
+    },
+    "worker_tier": {
+      "base": "string",
+      "enum": [
+        "mechanical",
+        "bounded",
+        "open",
+        "review"
+      ]
+    },
+    "worker_status": {
+      "base": "string",
+      "enum": [
+        "running",
+        "closed"
+      ]
+    }
+  },
   "sources": {
     "task_states": {
       "kind": "markdown_fields",
@@ -422,6 +460,262 @@
           }
         }
       }
+    },
+    "hold": {
+      "description": "Ontology-owned hold, written only by actions. task_directory mirrors task.directory for string-only view arguments and is checked by actions. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "owner": "ontology",
+      "primary_key": {
+        "from": "$action_id"
+      },
+      "title": "effect",
+      "properties": {
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "effect": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "until": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "status": {
+          "type": {
+            "value_type": "hold_status"
+          },
+          "required": true
+        },
+        "lift_reason": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 300
+        }
+      }
+    },
+    "decision": {
+      "description": "Ontology-owned decision, written only by actions. task_directory mirrors task.directory for string-only view arguments and is checked by actions. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "owner": "ontology",
+      "primary_key": {
+        "from": "$action_id"
+      },
+      "title": "topic",
+      "properties": {
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "topic": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 120
+        },
+        "text": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 1000
+        },
+        "decided_by": {
+          "type": {
+            "value_type": "decision_actor"
+          },
+          "required": true
+        },
+        "reason": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 600
+        },
+        "undo": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 300
+        },
+        "status": {
+          "type": {
+            "value_type": "decision_status"
+          },
+          "required": true
+        },
+        "supersedes": {
+          "type": {
+            "ref": "decision"
+          },
+          "required": false
+        }
+      }
+    },
+    "kpi": {
+      "description": "Ontology-owned kpi, written only by actions. task_directory mirrors task.directory for string-only view arguments and is checked by actions. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "owner": "ontology",
+      "primary_key": {
+        "from": "$action_id"
+      },
+      "title": "name",
+      "properties": {
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 120
+        },
+        "definition": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 600
+        },
+        "target": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 200
+        },
+        "value": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 200
+        },
+        "observed_at": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 40
+        },
+        "evidence": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 300
+        }
+      }
+    },
+    "measurement": {
+      "description": "Ontology-owned measurement, written only by actions. One immutable history entry per recorded value. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "owner": "ontology",
+      "primary_key": {
+        "from": "$action_id"
+      },
+      "title": "value",
+      "properties": {
+        "kpi": {
+          "type": {
+            "ref": "kpi"
+          },
+          "required": true
+        },
+        "value": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 200
+        },
+        "observed_at": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 40
+        },
+        "evidence": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        }
+      }
+    },
+    "worker_run": {
+      "description": "Ontology-owned worker_run, written only by actions. task_directory mirrors task.directory for string-only view arguments and is checked by actions. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "owner": "ontology",
+      "primary_key": {
+        "from": "$action_id"
+      },
+      "title": "name",
+      "properties": {
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 80
+        },
+        "tier": {
+          "type": {
+            "value_type": "worker_tier"
+          },
+          "required": true
+        },
+        "runtime": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 120
+        },
+        "session": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 200
+        },
+        "packet_path": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "report_path": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 300
+        },
+        "started_at": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 40
+        },
+        "status": {
+          "type": {
+            "value_type": "worker_status"
+          },
+          "required": true
+        },
+        "result": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 600
+        },
+        "closed_at": {
+          "type": "string",
+          "required": false,
+          "max_bytes": 40
+        }
+      }
     }
   },
   "link_types": {
@@ -464,9 +758,767 @@
         "forward": "source_copy",
         "reverse": "installed_copies"
       }
+    },
+    "hold_task": {
+      "from": "hold",
+      "via": "task",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "hold_task",
+        "reverse": "holds"
+      }
+    },
+    "decision_task": {
+      "from": "decision",
+      "via": "task",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "decision_task",
+        "reverse": "decisions"
+      }
+    },
+    "kpi_task": {
+      "from": "kpi",
+      "via": "task",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "kpi_task",
+        "reverse": "kpis"
+      }
+    },
+    "worker_run_task": {
+      "from": "worker_run",
+      "via": "task",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "worker_run_task",
+        "reverse": "worker_runs"
+      }
+    },
+    "measurement_kpi": {
+      "from": "measurement",
+      "via": "kpi",
+      "to": "kpi",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "measurement_kpi",
+        "reverse": "measurements"
+      }
+    },
+    "decision_supersedes": {
+      "from": "decision",
+      "via": "supersedes",
+      "to": "decision",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "supersedes",
+        "reverse": "successors"
+      }
     }
   },
-  "action_types": {},
+  "action_types": {
+    "set_hold": {
+      "description": "Record a hold: task is the task reference, task_directory its directory, effect the blocked change and until the condition for lifting it.",
+      "parameters": {
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "effect": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "until": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "task_directory_mismatch",
+          "message": "Read task and pass task_directory equal to task.directory.",
+          "all": [
+            {
+              "exists": "$task"
+            },
+            {
+              "eq": [
+                "$task.directory",
+                "$task_directory"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "duplicate_active_hold",
+          "message": "Lift the existing active hold on this effect before recording another.",
+          "none": [
+            {
+              "linked": {
+                "from": "$task",
+                "link": "holds",
+                "where": {
+                  "all": [
+                    {
+                      "eq": [
+                        "effect",
+                        "$effect"
+                      ]
+                    },
+                    {
+                      "eq": [
+                        "status",
+                        "active"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "create_object": "hold",
+          "set": {
+            "task": "$task",
+            "task_directory": "$task_directory",
+            "effect": "$effect",
+            "until": "$until",
+            "status": "active"
+          }
+        }
+      ]
+    },
+    "lift_hold": {
+      "description": "Lift hold (a hold reference); reason explains why its condition is satisfied.",
+      "parameters": {
+        "hold": {
+          "type": {
+            "ref": "hold"
+          },
+          "required": true
+        },
+        "reason": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "hold_not_active",
+          "message": "Read hold and choose one whose status is active.",
+          "all": [
+            {
+              "eq": [
+                "$hold.status",
+                "active"
+              ]
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "modify_object": "hold",
+          "set": {
+            "status": "lifted",
+            "lift_reason": "$reason"
+          }
+        }
+      ]
+    },
+    "record_decision": {
+      "description": "Record a decision: task and task_directory identify its task, topic names the current decision, text states it, decided_by is user or lead, reason explains it and undo states its reversal.",
+      "parameters": {
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "topic": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 120
+        },
+        "text": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 1000
+        },
+        "decided_by": {
+          "type": {
+            "value_type": "decision_actor"
+          },
+          "required": true
+        },
+        "reason": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 600
+        },
+        "undo": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "task_directory_mismatch",
+          "message": "Read task and pass task_directory equal to task.directory.",
+          "all": [
+            {
+              "exists": "$task"
+            },
+            {
+              "eq": [
+                "$task.directory",
+                "$task_directory"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "decision_already_current",
+          "message": "Use supersede_decision with the current decision reference for this topic.",
+          "none": [
+            {
+              "linked": {
+                "from": "$task",
+                "link": "decisions",
+                "where": {
+                  "all": [
+                    {
+                      "eq": [
+                        "topic",
+                        "$topic"
+                      ]
+                    },
+                    {
+                      "eq": [
+                        "status",
+                        "current"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "create_object": "decision",
+          "set": {
+            "task": "$task",
+            "task_directory": "$task_directory",
+            "topic": "$topic",
+            "text": "$text",
+            "decided_by": "$decided_by",
+            "reason": "$reason",
+            "undo": "$undo",
+            "status": "current"
+          }
+        }
+      ]
+    },
+    "supersede_decision": {
+      "description": "Replace decision (a current decision reference): task, task_directory and topic must repeat its values; text is the new decision, decided_by its user or lead author, reason its basis and undo its reversal.",
+      "parameters": {
+        "decision": {
+          "type": {
+            "ref": "decision"
+          },
+          "required": true
+        },
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "topic": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 120
+        },
+        "text": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 1000
+        },
+        "decided_by": {
+          "type": {
+            "value_type": "decision_actor"
+          },
+          "required": true
+        },
+        "reason": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 600
+        },
+        "undo": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "decision_not_current",
+          "message": "Read decision and choose one whose status is current.",
+          "all": [
+            {
+              "eq": [
+                "$decision.status",
+                "current"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "task_directory_mismatch",
+          "message": "Read task and pass task_directory equal to task.directory.",
+          "all": [
+            {
+              "exists": "$task"
+            },
+            {
+              "eq": [
+                "$task.directory",
+                "$task_directory"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "decision_context_mismatch",
+          "message": "Read decision and pass its task, task_directory and topic unchanged.",
+          "all": [
+            {
+              "eq": [
+                "$decision.task",
+                "$task"
+              ]
+            },
+            {
+              "eq": [
+                "$decision.topic",
+                "$topic"
+              ]
+            },
+            {
+              "eq": [
+                "$decision.task_directory",
+                "$task_directory"
+              ]
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "modify_object": "decision",
+          "set": {
+            "status": "superseded"
+          }
+        },
+        {
+          "create_object": "decision",
+          "set": {
+            "task": "$task",
+            "task_directory": "$task_directory",
+            "topic": "$topic",
+            "text": "$text",
+            "decided_by": "$decided_by",
+            "reason": "$reason",
+            "undo": "$undo",
+            "status": "current",
+            "supersedes": "$decision"
+          }
+        }
+      ]
+    },
+    "define_kpi": {
+      "description": "Define a KPI: task and task_directory identify its task, name is unique there, definition states what is counted and from which source, and target is the desired value.",
+      "parameters": {
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 120
+        },
+        "definition": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 600
+        },
+        "target": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 200
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "task_directory_mismatch",
+          "message": "Read task and pass task_directory equal to task.directory.",
+          "all": [
+            {
+              "exists": "$task"
+            },
+            {
+              "eq": [
+                "$task.directory",
+                "$task_directory"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "duplicate_kpi",
+          "message": "Use the existing KPI; change its target with set_kpi_target or record a value with record_measurement.",
+          "none": [
+            {
+              "linked": {
+                "from": "$task",
+                "link": "kpis",
+                "where": {
+                  "all": [
+                    {
+                      "eq": [
+                        "name",
+                        "$name"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "create_object": "kpi",
+          "set": {
+            "task": "$task",
+            "task_directory": "$task_directory",
+            "name": "$name",
+            "definition": "$definition",
+            "target": "$target"
+          }
+        }
+      ]
+    },
+    "record_measurement": {
+      "description": "Record a value: kpi is its KPI reference, value the measured text, observed_at its observation time and evidence the path or command proving it; also update the current KPI fields.",
+      "parameters": {
+        "kpi": {
+          "type": {
+            "ref": "kpi"
+          },
+          "required": true
+        },
+        "value": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 200
+        },
+        "observed_at": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 40
+        },
+        "evidence": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        }
+      },
+      "submission_criteria": [],
+      "rules": [
+        {
+          "create_object": "measurement",
+          "set": {
+            "kpi": "$kpi",
+            "value": "$value",
+            "observed_at": "$observed_at",
+            "evidence": "$evidence"
+          }
+        },
+        {
+          "modify_object": "kpi",
+          "set": {
+            "value": "$value",
+            "observed_at": "$observed_at",
+            "evidence": "$evidence"
+          }
+        }
+      ]
+    },
+    "set_kpi_target": {
+      "description": "Set target (the desired value text) on kpi (a KPI reference).",
+      "parameters": {
+        "kpi": {
+          "type": {
+            "ref": "kpi"
+          },
+          "required": true
+        },
+        "target": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 200
+        }
+      },
+      "submission_criteria": [],
+      "rules": [
+        {
+          "modify_object": "kpi",
+          "set": {
+            "target": "$target"
+          }
+        }
+      ]
+    },
+    "start_worker_run": {
+      "description": "Start a worker: task and task_directory identify its task, name identifies the run, tier its judgment level, runtime the CLI, session its session id, packet_path its assignment and started_at its start time.",
+      "parameters": {
+        "task": {
+          "type": {
+            "ref": "task"
+          },
+          "required": true
+        },
+        "task_directory": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 80
+        },
+        "tier": {
+          "type": {
+            "value_type": "worker_tier"
+          },
+          "required": true
+        },
+        "runtime": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 120
+        },
+        "session": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 200
+        },
+        "packet_path": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "started_at": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 40
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "task_directory_mismatch",
+          "message": "Read task and pass task_directory equal to task.directory.",
+          "all": [
+            {
+              "exists": "$task"
+            },
+            {
+              "eq": [
+                "$task.directory",
+                "$task_directory"
+              ]
+            }
+          ]
+        },
+        {
+          "code": "duplicate_running_worker",
+          "message": "Close the running worker of this name before starting another.",
+          "none": [
+            {
+              "linked": {
+                "from": "$task",
+                "link": "worker_runs",
+                "where": {
+                  "all": [
+                    {
+                      "eq": [
+                        "name",
+                        "$name"
+                      ]
+                    },
+                    {
+                      "eq": [
+                        "status",
+                        "running"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "create_object": "worker_run",
+          "set": {
+            "task": "$task",
+            "task_directory": "$task_directory",
+            "name": "$name",
+            "tier": "$tier",
+            "runtime": "$runtime",
+            "session": "$session",
+            "packet_path": "$packet_path",
+            "started_at": "$started_at",
+            "status": "running"
+          }
+        }
+      ]
+    },
+    "note_worker_run": {
+      "description": "Record result (a progress note) on worker_run (a running worker reference).",
+      "parameters": {
+        "worker_run": {
+          "type": {
+            "ref": "worker_run"
+          },
+          "required": true
+        },
+        "result": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 600
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "worker_run_not_running",
+          "message": "Read worker_run and choose one whose status is running.",
+          "all": [
+            {
+              "eq": [
+                "$worker_run.status",
+                "running"
+              ]
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "modify_object": "worker_run",
+          "set": {
+            "result": "$result"
+          }
+        }
+      ]
+    },
+    "close_worker_run": {
+      "description": "Close worker_run (a running worker reference): result states its outcome, report_path names its report and closed_at its closing time.",
+      "parameters": {
+        "worker_run": {
+          "type": {
+            "ref": "worker_run"
+          },
+          "required": true
+        },
+        "result": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 600
+        },
+        "report_path": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 300
+        },
+        "closed_at": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 40
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "worker_run_not_running",
+          "message": "Read worker_run and choose one whose status is running.",
+          "all": [
+            {
+              "eq": [
+                "$worker_run.status",
+                "running"
+              ]
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "modify_object": "worker_run",
+          "set": {
+            "result": "$result",
+            "report_path": "$report_path",
+            "closed_at": "$closed_at",
+            "status": "closed"
+          }
+        }
+      ]
+    }
+  },
   "functions": {},
   "grants": [
     {
@@ -477,10 +1529,260 @@
         "packet",
         "report",
         "installed_artifact",
-        "instruction_file"
+        "instruction_file",
+        "hold",
+        "decision",
+        "kpi",
+        "measurement",
+        "worker_run"
       ],
       "derive": [],
-      "actions": []
+      "actions": [
+        "set_hold",
+        "lift_hold",
+        "record_decision",
+        "supersede_decision",
+        "define_kpi",
+        "record_measurement",
+        "set_kpi_target",
+        "start_worker_run",
+        "note_worker_run",
+        "close_worker_run"
+      ]
     }
-  ]
+  ],
+  "views": {
+    "kpi_board": {
+      "object_type": "kpi",
+      "args": [
+        "task"
+      ],
+      "filter": {
+        "all": [
+          {
+            "eq": [
+              "task_directory",
+              "$task"
+            ]
+          }
+        ]
+      },
+      "order": [
+        {
+          "property": "name",
+          "direction": "asc"
+        }
+      ],
+      "columns": [
+        {
+          "header": "KPI",
+          "property": "name"
+        },
+        {
+          "header": "Current",
+          "property": "value"
+        },
+        {
+          "header": "Observed",
+          "property": "observed_at"
+        },
+        {
+          "header": "Target",
+          "property": "target"
+        },
+        {
+          "header": "Evidence",
+          "property": "evidence"
+        }
+      ]
+    },
+    "active_holds": {
+      "object_type": "hold",
+      "args": [
+        "task"
+      ],
+      "filter": {
+        "all": [
+          {
+            "eq": [
+              "task_directory",
+              "$task"
+            ]
+          },
+          {
+            "eq": [
+              "status",
+              "active"
+            ]
+          }
+        ]
+      },
+      "order": [
+        {
+          "property": "effect",
+          "direction": "asc"
+        }
+      ],
+      "columns": [
+        {
+          "header": "Effect",
+          "property": "effect"
+        },
+        {
+          "header": "Until",
+          "property": "until"
+        }
+      ]
+    },
+    "current_decisions": {
+      "object_type": "decision",
+      "args": [
+        "task"
+      ],
+      "filter": {
+        "all": [
+          {
+            "eq": [
+              "task_directory",
+              "$task"
+            ]
+          },
+          {
+            "eq": [
+              "status",
+              "current"
+            ]
+          }
+        ]
+      },
+      "order": [
+        {
+          "property": "topic",
+          "direction": "asc"
+        }
+      ],
+      "columns": [
+        {
+          "header": "Topic",
+          "property": "topic"
+        },
+        {
+          "header": "Decision",
+          "property": "text"
+        },
+        {
+          "header": "By",
+          "property": "decided_by"
+        },
+        {
+          "header": "Undo",
+          "property": "undo"
+        }
+      ]
+    },
+    "live_workers": {
+      "object_type": "worker_run",
+      "args": [
+        "task"
+      ],
+      "filter": {
+        "all": [
+          {
+            "eq": [
+              "task_directory",
+              "$task"
+            ]
+          },
+          {
+            "eq": [
+              "status",
+              "running"
+            ]
+          }
+        ]
+      },
+      "order": [
+        {
+          "property": "started_at",
+          "direction": "asc"
+        }
+      ],
+      "columns": [
+        {
+          "header": "Worker",
+          "property": "name"
+        },
+        {
+          "header": "Tier",
+          "property": "tier"
+        },
+        {
+          "header": "Runtime",
+          "property": "runtime"
+        },
+        {
+          "header": "Session",
+          "property": "session"
+        },
+        {
+          "header": "Packet",
+          "property": "packet_path"
+        },
+        {
+          "header": "Started",
+          "property": "started_at"
+        }
+      ]
+    },
+    "closed_workers": {
+      "object_type": "worker_run",
+      "args": [
+        "task"
+      ],
+      "filter": {
+        "all": [
+          {
+            "eq": [
+              "task_directory",
+              "$task"
+            ]
+          },
+          {
+            "eq": [
+              "status",
+              "closed"
+            ]
+          }
+        ]
+      },
+      "order": [
+        {
+          "property": "closed_at",
+          "direction": "asc"
+        }
+      ],
+      "columns": [
+        {
+          "header": "Worker",
+          "property": "name"
+        },
+        {
+          "header": "Packet",
+          "property": "packet_path"
+        },
+        {
+          "header": "Report",
+          "property": "report_path"
+        },
+        {
+          "header": "Closed",
+          "property": "closed_at"
+        },
+        {
+          "header": "Result",
+          "property": "result"
+        }
+      ]
+    }
+  }
 }
