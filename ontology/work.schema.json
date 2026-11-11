@@ -1720,7 +1720,7 @@
             {
               "all": [
                 {
-                  "exists": "$supersedes"
+                  "present": "$supersedes"
                 },
                 {
                   "eq": [
@@ -1774,7 +1774,7 @@
         },
         {
           "code": "memory_predecessor_ready",
-          "message": "Mark the ready predecessor pending before completing its successor.",
+          "message": "Withdraw the ready predecessor before completing its successor.",
           "none": [
             {
               "linked": {
@@ -1886,10 +1886,10 @@
           "message": "The named successor must link back to this record.",
           "all": [
             {
-              "exists": "$record"
+              "exists": "$successor"
             },
             {
-              "exists": "$successor"
+              "present": "$successor.supersedes"
             },
             {
               "eq": [

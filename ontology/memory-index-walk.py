@@ -7,7 +7,7 @@ Each edge runs on a complete copy of its source store. Snapshots retain the
 first (shortest) history for each state; fresh request ids avoid replay effects.
 """
 import argparse
-from collections import deque
+from collections import Counter, deque
 import hashlib
 import json
 from pathlib import Path
@@ -43,6 +43,13 @@ class Walk:
         self.failure = None
         self.i4_checked = False
         self.frontier_witnesses = 0
+        self.refused_codes = Counter()
+        self.refused_code_sets = Counter()
+        self.unexpected_codes = 0
+        self.current_sequence = []
+        self.action_edges = {}
+        self.expanded = set()
+        self.asserted_paths = {}
 
     def append(self, name, value):
         with (self.root / name).open("a", encoding="utf-8") as stream:
@@ -70,8 +77,10 @@ class Walk:
             raise Stop("walk_engine_error: non-JSON native answer") from None
         self.append("calls.jsonl", dict(call=self.calls, store=str(folder / "store.sqlite"),
                                        argv=argv, request=request, exit=result.returncode, answer=answer))
-        if result.returncode not in (0, 2) or answer.get("status") not in ("ok", "refused"):
-            raise Stop("walk_engine_error: " + str(answer.get("code", result.returncode)))
+        if (result.returncode, answer.get("status")) not in ((0, "ok"), (2, "refused")):
+            self.unexpected_codes += 1
+            self.fail("unexpected_exit_envelope:" + str(answer.get("code", result.returncode)),
+                      self.current_sequence)
         return result.returncode, answer.get("result", answer)
 
     def oid(self, index):
@@ -147,30 +156,45 @@ class Walk:
                 self.fail("I3", sequence)
 
     def contract(self, state, action):
-        """Admission and resulting fields from A1, independent of schema criteria."""
+        """Expected failed-code set and fields from A1/A2, independent of schema."""
         params = action["parameters"]
         record = self.keys.index(params["record"]["native_key"])
         status, predecessor = state[record]
         kind = action["action_type"]
         after = list(state)
+        failed = set()
         if kind == "mark_memory_record_pending":
             if "supersedes" in params:
                 predecessor = self.keys.index(params["supersedes"]["native_key"])
-            admitted = status != "superseded" and predecessor != record
+                if predecessor == record:
+                    failed.add("memory_successor_is_self")
+            if status == "superseded":
+                failed.add("memory_record_already_superseded")
             after[record] = ("pending", predecessor)
         elif kind == "mark_memory_record_ready":
-            admitted = (status == "pending"
-                        and (predecessor is None or state[predecessor][0] != "ready")
-                        and not any(s in ("pending", "ready") and p == record for s, p in state))
+            if status != "pending":
+                failed.add("memory_record_not_pending")
+            if predecessor is not None and state[predecessor][0] == "ready":
+                failed.add("memory_predecessor_ready")
+            # Native links originate at an existing source head. A dangling
+            # incoming reference does not give an absent record a reverse link.
+            if status is not None and any(s in ("pending", "ready") and p == record for s, p in state):
+                failed.add("memory_record_has_successor")
             after[record] = ("ready", predecessor)
         elif kind == "mark_memory_record_superseded":
             successor = self.keys.index(params["successor"]["native_key"])
-            admitted = status in ("pending", "ready") and state[successor] == ("ready", record)
+            if status not in ("pending", "ready"):
+                failed.add("memory_record_already_superseded")
+            if state[successor][0] != "ready":
+                failed.add("memory_successor_not_ready")
+            if state[successor][0] is None or state[successor][1] != record:
+                failed.add("memory_successor_not_linked")
             after[record] = ("superseded", predecessor)
         else:
-            admitted = status in ("pending", "ready")
+            if status not in ("pending", "ready"):
+                failed.add("memory_record_already_superseded")
             after[record] = ("superseded", predecessor)
-        return admitted, tuple(after) if admitted else state
+        return failed, state if failed else tuple(after)
 
     def snapshot(self, state, folder, parent, action):
         if state in self.seen:
@@ -204,10 +228,27 @@ class Walk:
         before = self.fingerprint(trial)
         self.attempts += 1
         request = dict(action, request_id=f"walk-edge-{self.attempts}")
-        code, answer = self.call(trial, ["action", "apply"], request)
         sequence = self.sequence(node) + [action]
+        self.current_sequence = sequence
+        expected_codes, wanted = self.contract(self.states[node], action)
+        code, answer = self.call(trial, ["action", "apply"], request)
         if code:
+            # A refusal is evidence only when the evaluated failed criteria
+            # exactly match the independent oracle. Engine errors never count.
+            actual = answer.get("failed")
+            details = answer.get("failures")
+            if (answer.get("code") != "submission_criteria" or not expected_codes
+                    or not isinstance(actual, list) or set(actual) != expected_codes
+                    or len(actual) != len(expected_codes) or not isinstance(details, list)
+                    or {item.get("code") for item in details} != expected_codes
+                    or len(details) != len(expected_codes)):
+                self.unexpected_codes += 1
+                self.fail("unexpected_refusal:" + str(answer.get("code"))
+                          + ":expected=" + repr(sorted(expected_codes))
+                          + ":actual=" + repr(actual), sequence)
             self.refused += 1
+            self.refused_codes.update(expected_codes)
+            self.refused_code_sets[",".join(sorted(expected_codes))] += 1
             if before != self.fingerprint(trial):
                 raise Stop("walk_engine_error: refused action changed store/log bytes")
             after, target, new = self.states[node], node, False
@@ -219,18 +260,56 @@ class Walk:
             target, new = (None, False) if witness else self.snapshot(after, trial, node, action)
         if not witness:
             self.edges[node].add(target)
+            self.action_edges[node, json.dumps(action, sort_keys=True)] = target
         self.append("transitions.jsonl", dict(source=node, target=target, action=action,
                     outcome="refused" if code else "applied", witness=witness,
                     records={key: dict(status=status, supersedes=None if ref is None else self.keys[ref])
                              for key, (status, ref) in zip(self.keys, after, strict=True)}))
         self.check_transition(self.states[node], after, sequence)
-        admitted, wanted = self.contract(self.states[node], action)
-        if admitted != (code == 0) or after != wanted:
-            self.failure = dict(contract=True, sequence=sequence, expected_applied=admitted)
+        if bool(expected_codes) != bool(code) or after != wanted:
+            self.failure = dict(contract=True, sequence=sequence, expected_failed=sorted(expected_codes))
             raise Stop("walk_contract: admission/result mismatch; shortest sequence=" + json.dumps(sequence, sort_keys=True))
         if not code:
             self.check_view(trial, after, sequence)
         return after, target, new
+
+    def self_test_paths(self):
+        """Assert the review example and both A2 replacements in the native graph."""
+        def action(kind, record, other=None):
+            params = dict(record=self.oid(record))
+            if kind == "pending":
+                params.update(document_id=self.keys[record], body_hash=BODY_HASH)
+                if other is not None:
+                    params["supersedes"] = self.oid(other)
+            if kind == "superseded":
+                params["successor"] = self.oid(other)
+            name = "withdraw_memory_record" if kind == "withdraw" else "mark_memory_record_" + kind
+            return dict(action_type=name, parameters=params)
+
+        paths = {
+            "ready_predecessor_replacement": [action("pending", 0), action("ready", 0),
+                action("pending", 1, 0), action("withdraw", 0), action("ready", 1)],
+            "pending_predecessor_replacement": [action("pending", 0), action("pending", 1, 0),
+                action("ready", 1), action("superseded", 0, 1)],
+        }
+        if self.args.records == 3:
+            paths["withdrawn_middle_allows_ready_endpoints"] = [action("pending", 0),
+                action("pending", 1, 0), action("pending", 2, 1), action("ready", 2),
+                action("withdraw", 1), action("ready", 0)]
+        for name, path in paths.items():
+            node = 0
+            for edge in path:
+                expected_codes, wanted = self.contract(self.states[node], edge)
+                target = self.action_edges.get((node, json.dumps(edge, sort_keys=True)))
+                if expected_codes or target is None or self.states[target] != wanted:
+                    self.fail("asserted_path:" + name, path)
+                node = target
+            expected = (("ready", "superseded", "ready") if name.startswith("withdrawn_middle")
+                        else ("superseded", "ready"))
+            if tuple(s for s, _ in self.states[node][:len(expected)]) != expected:
+                self.fail("asserted_path_result:" + name, path)
+            self.asserted_paths[name] = dict(passed=True, actions=path, final_state=node)
+        self.append("asserted-paths.jsonl", self.asserted_paths)
 
     def check_liveness(self, frontier):
         failures = []
@@ -289,12 +368,20 @@ class Walk:
                 _, target, new = self.attempt(node, action)
                 if new:
                     pending.append(target)
+            self.expanded.add(node)
+        if not frontier:
+            self.self_test_paths()
         self.check_liveness(frontier)
         return not frontier
 
     def summary(self, complete, error):
         result = dict(records=self.args.records, states=len(self.states), applied=self.applied,
                       refused=self.refused, calls=self.calls, depth_limit=self.args.depth,
+                      refused_per_expected_code=dict(sorted(self.refused_codes.items())),
+                      refused_per_expected_code_set=dict(sorted(self.refused_code_sets.items())),
+                      unexpected_codes=self.unexpected_codes, asserted_paths=self.asserted_paths,
+                      depth_completed=min((d for i, d in enumerate(self.depths)
+                                           if i not in self.expanded), default=max(self.depths, default=0) + 1) - 1,
                       maximum_depth=max(self.depths, default=0), complete=complete,
                       i4_checked=self.i4_checked, frontier_witnesses=self.frontier_witnesses,
                       bounds=dict(states=MAX_STATES, calls=MAX_CALLS, seconds=MAX_SECONDS),

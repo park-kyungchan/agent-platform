@@ -231,7 +231,7 @@ only selects originals from `main`; these are writer contracts.
 `scope_keys` remains empty in namespace `vps://palantirkc` / `root`, with no task
 reference. `agent` has the same read/action grants as other Lead-written types.
 
-### Transitions (amendment A1)
+### Transitions (amendments A1 and A2)
 `superseded` is final: never reuse that record id. A wanted-again text needs a
 new original file/id. No action clears a predecessor reference. The links are
 `memory_predecessor` and reverse `memory_successors`.
@@ -239,18 +239,19 @@ new original file/id. No action clears a predecessor reference. The links are
 | Action | Parameters | Admitted transition / refusals |
 | --- | --- | --- |
 | `mark_memory_record_pending` | `record`, `document_id`, `body_hash`, optional `supersedes` | Creates a record or returns pending/ready to pending with a new hash; refuses superseded as `memory_record_already_superseded` and self-supersession as `memory_successor_is_self`. Omitted predecessor preserves its value. |
-| `mark_memory_record_ready` | `record` | Pending to ready; refuses a ready predecessor (`memory_predecessor_ready`) or a pending/ready successor (`memory_record_has_successor`). |
-| `mark_memory_record_superseded` | `record`, `successor` | Pending/ready to superseded only when successor is ready and its supersedes is record. |
-| `withdraw_memory_record` | `record` | Pending/ready to superseded without requiring a successor; preserves every reference. |
+| `mark_memory_record_ready` | `record` | Pending to ready; refuses missing/nonpending (`memory_record_not_pending`), a ready predecessor (`memory_predecessor_ready`) or a pending/ready successor (`memory_record_has_successor`). |
+| `mark_memory_record_superseded` | `record`, `successor` | Pending/ready to superseded; refuses missing/final record (`memory_record_already_superseded`), missing/nonready successor (`memory_successor_not_ready`) or missing/unequal successor predecessor (`memory_successor_not_linked`). |
+| `withdraw_memory_record` | `record` | Pending/ready to superseded without requiring a successor; refuses missing/final record (`memory_record_already_superseded`); preserves every reference. |
 
-The criteria use ordered `all`: existence guards precede status/reference reads.
-The pending self guard is `none(all(exists($supersedes),eq($record,$supersedes)))`.
-**Known admission gap:** native `exists` tests target existence, not just optional
-parameter presence. A new record can therefore self-supersede when its target
-is absent; the exhaustive walk currently stops on I3 with this one-action
-counterexample. Omitted supersedes applies and an existing self reference refuses.
-The candidate is blocked until this native admission boundary can express the
-required guard. No engine workaround or extra action is introduced here.
+Required engine: `ontology-platform` commit
+`a1195da6ac03219cfb05a109829cc6347df7a429` or a compatible descendant.
+The criteria use ordered `all`: target-existence guards precede head reads,
+and `present` guards optional parameter/property comparisons. The pending self
+guard is `none(all(present($supersedes),eq($record,$supersedes)))`; it refuses
+a new id naming itself. The successor backlink comparison follows
+`present($successor.supersedes)` behind its target-existence guard, so a missing
+backlink is an evaluated false criterion. `any` and `none` evaluate every operand;
+each comparison needing a guard stays inside its own ordered `all`.
 
 `current_memory_records` takes no arguments and selects pending/ready records,
 showing Record id (`$key`), Document id, Body hash and Status in one read.
@@ -258,9 +259,25 @@ A truncated answer means **current memory unavailable**. The native default
 is 200 rows with a 10,000-head bound; paging/complete reads belong to P1b.
 A successor withdrawn before its predecessor becomes superseded no longer
 blocks that still-current predecessor. An already superseded id stays final.
-“At most one ready record per chain” assumes one current successor per
-predecessor: two successors of one predecessor are the writer's duty (A1).
-The store permits such a fork; the walk does not impose that writer restriction.
+The store guarantees exclusion only for an adjacent predecessor/successor pair:
+both cannot be ready. It gives no exclusion guarantee across a longer chain.
+Allowed example: pending A; pending B superseding A; pending C superseding B;
+ready C; withdraw B; ready A. A and C are both current. Withdrawal ends B only;
+A and C are judged by their own adjacent pairs, even though retained links join
+the three records.
+
+Both replacement sequences are admitted:
+
+1. Ready predecessor: create the pending successor, withdraw the predecessor,
+   then mark the successor ready. Between withdrawal and readiness neither is
+   ready; the successor remains pending and therefore remains in the view.
+2. Pending predecessor: create the pending successor, mark the successor ready,
+   then mark the predecessor superseded naming the successor.
+
+The writer must avoid a second pending/ready successor for one predecessor
+(A1). It must replace only a ready predecessor and never create a successor of
+a pending predecessor (A2). These are writer duties, not store admission rules;
+the store permits forks and the second replacement sequence above.
 
 ### Exhaustive native-store walk
 Run only through an approved disposable wrapper, with a scratch root:
@@ -292,3 +309,10 @@ A failure prints the shortest action sequence and exits nonzero; I4 runs after
 graph closure, so an earlier violation leaves I4 unverified. Artifacts include
 states, native requests/answers, transitions and a summary with applied/refused
 counts, bounds, elapsed time and exit. No operational store is selected by default.
+An edge counts as refused only with exit 2, status `refused`, code
+`submission_criteria`, and exactly the failed-code set the independent oracle
+expects. Evaluation/parameter/rule errors and every unexpected code fail with
+the shortest path. The summary includes refusal totals per expected code (one
+edge may fail several criteria), unexpected-code count and completed depth.
+At closure, the walk self-test follows native graph edges for both replacement
+sequences and, with three records, the allowed withdrawn-middle example above.
