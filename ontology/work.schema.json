@@ -1,0 +1,192 @@
+{
+  "format": "ontology-schema/v1",
+  "domain": "work",
+  "version": 1,
+  "namespace": {
+    "instance": "vps://palantirkc",
+    "account": "root"
+  },
+  "scope_keys": [],
+  "value_types": {},
+  "sources": {
+    "task_states": {
+      "kind": "markdown_fields",
+      "glob": "/home/palantirkc/work/*/STATE.md",
+      "exclude": [
+        "/home/palantirkc/work/ws-daniel-prayer-login",
+        "/home/palantirkc/work/problem-edit/context",
+        "/home/palantirkc/work/problem-edit/runs",
+        "/home/palantirkc/work/wt",
+        "/home/palantirkc/work/*private*",
+        "/home/palantirkc/work/node_modules",
+        "/home/palantirkc/work/.git",
+        "/home/palantirkc/work/target*",
+        "/home/palantirkc/work/*custody*",
+        "/home/palantirkc/work/*/wt",
+        "/home/palantirkc/work/*/*private*",
+        "/home/palantirkc/work/*/node_modules",
+        "/home/palantirkc/work/*/.git",
+        "/home/palantirkc/work/*/target*",
+        "/home/palantirkc/work/*/*custody*",
+        "/home/palantirkc/work/*/*/wt",
+        "/home/palantirkc/work/*/*/*private*",
+        "/home/palantirkc/work/*/*/node_modules",
+        "/home/palantirkc/work/*/*/.git",
+        "/home/palantirkc/work/*/*/target*",
+        "/home/palantirkc/work/*/*/*custody*",
+        "/home/palantirkc/work/ws-replan/preparation/slices"
+      ],
+      "head_lines": 40,
+      "complete_listing": true,
+      "fresh_for_s": 3600
+    },
+    "installed_binaries": {
+      "kind": "file_digest",
+      "paths": [
+        "/usr/local/bin/ap",
+        "/usr/local/bin/vps-ops",
+        "/usr/local/bin/ont",
+        "/usr/local/bin/ont-program-pilot"
+      ],
+      "complete_listing": true,
+      "fresh_for_s": 86400
+    },
+    "instructions": {
+      "kind": "file_digest",
+      "paths": [
+        "/root/.agents/AGENTS.md",
+        "/root/.agents/runtime-references/*.md",
+        "/root/.agents/skills/*/SKILL.md",
+        "/home/palantirkc/platforms/agent-platform/content/AGENTS.md",
+        "/home/palantirkc/platforms/agent-platform/content/runtime-references/*.md",
+        "/home/palantirkc/platforms/agent-platform/content/skills/*/SKILL.md"
+      ],
+      "complete_listing": true,
+      "fresh_for_s": 86400
+    }
+  },
+  "object_types": {
+    "task": {
+      "description": "One task directory under /home/palantirkc/work with its STATE.md.",
+      "owner": {
+        "source": "task_states"
+      },
+      "primary_key": {
+        "from": "/dir"
+      },
+      "title": "title_line",
+      "properties": {
+        "directory": {
+          "type": "string",
+          "required": true,
+          "from": "/dir_path"
+        },
+        "state_sha256": {
+          "type": "string",
+          "required": true,
+          "from": "/sha256"
+        },
+        "title_line": {
+          "type": "string",
+          "required": true,
+          "from": "/line1"
+        },
+        "owner_line": {
+          "type": "string",
+          "required": false,
+          "from": "/fields/Owner"
+        }
+      }
+    },
+    "installed_artifact": {
+      "description": "One installed binary under /usr/local/bin; an absent file has no object.",
+      "owner": {
+        "source": "installed_binaries"
+      },
+      "primary_key": {
+        "from": "/path"
+      },
+      "title": "path",
+      "properties": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "from": "/path"
+        },
+        "sha256": {
+          "type": "string",
+          "required": true,
+          "from": "/sha256"
+        },
+        "size": {
+          "type": "integer",
+          "required": true,
+          "from": "/size"
+        },
+        "mtime": {
+          "type": "integer",
+          "required": true,
+          "from": "/mtime"
+        },
+        "mode": {
+          "type": "integer",
+          "required": true,
+          "from": "/mode"
+        }
+      }
+    },
+    "instruction_file": {
+      "description": "One shared instruction file: installed under /root/.agents or its source under agent-platform/content.",
+      "owner": {
+        "source": "instructions"
+      },
+      "primary_key": {
+        "from": "/path"
+      },
+      "title": "path",
+      "properties": {
+        "path": {
+          "type": "string",
+          "required": true,
+          "from": "/path"
+        },
+        "sha256": {
+          "type": "string",
+          "required": true,
+          "from": "/sha256"
+        },
+        "size": {
+          "type": "integer",
+          "required": true,
+          "from": "/size"
+        },
+        "mtime": {
+          "type": "integer",
+          "required": true,
+          "from": "/mtime"
+        },
+        "mode": {
+          "type": "integer",
+          "required": true,
+          "from": "/mode"
+        }
+      }
+    }
+  },
+  "link_types": {},
+  "action_types": {},
+  "functions": {},
+  "grants": [
+    {
+      "principal": "agent",
+      "scope": {},
+      "read": [
+        "task",
+        "installed_artifact",
+        "instruction_file"
+      ],
+      "derive": [],
+      "actions": []
+    }
+  ]
+}
