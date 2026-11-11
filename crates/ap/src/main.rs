@@ -6,6 +6,10 @@ use serde::Serialize;
 
 const INPUT_LIMIT: u64 = 1_048_576;
 const HELP: &str = "Usage: ap render < request.json\nPure JSON proposal on stdout; no file access or installation.\n";
+const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
+    Some(value) => value,
+    None => "unknown",
+};
 
 #[derive(Serialize)]
 struct Failure<'a> {
@@ -33,6 +37,14 @@ fn fail(code: &str, field: &str, status: u8) -> ExitCode {
 
 fn main() -> ExitCode {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.len() == 1 && (args[0] == "--version" || args[0] == "version") {
+        let line = format!("ap {} {}\n", env!("CARGO_PKG_VERSION"), BUILD_REVISION);
+        return if io::stdout().lock().write_all(line.as_bytes()).is_ok() {
+            ExitCode::SUCCESS
+        } else {
+            fail("io_error", "stdout", 4)
+        };
+    }
     #[cfg(target_os = "linux")]
     if args.first().is_some_and(|arg| arg == "pane") {
         return ap::pane::cli(&args[1..]);
