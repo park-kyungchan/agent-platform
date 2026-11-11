@@ -2,21 +2,30 @@
 set -euo pipefail
 
 INSTALL_DIR="${AP_INSTALL_DIR:-/usr/local/bin}"
+BACKUP_DIR="${AP_BACKUP_DIR:-/var/lib/agent-platform/install}"
+# Strip trailing slashes so a symlink cannot hide behind a directory suffix.
+while [[ "$BACKUP_DIR" != / && "$BACKUP_DIR" == */ ]]; do
+  BACKUP_DIR="${BACKUP_DIR%/}"
+done
 INSTALLED="$INSTALL_DIR/ap"
 LOCK_FILE="/home/palantirkc/work/ws-replan/wt/.host-cargo.lock"
 INSTALL_LOCK_FILE="${AP_INSTALL_LOCK:-/run/lock/ap-install.lock}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 WORKTREE_DIR=""
+BACKUP_TMP=""
 
 refuse() {
   local code="$1"
   local line="$2"
-  printf '%s@install-ap.sh:%s\n' "$code" "$line" >&2
+  printf '%s@install-ap.sh:%s%s\n' "$code" "$line" "${3:+: $3}" >&2
   exit 1
 }
 
 cleanup_worktree() {
+  if [[ -n "$BACKUP_TMP" ]]; then
+    rm -f -- "$BACKUP_TMP"
+  fi
   if [[ -n "$WORKTREE_DIR" && -d "$WORKTREE_DIR" ]]; then
     git -C "$REPO_ROOT" worktree remove --force "$WORKTREE_DIR" >/dev/null 2>&1 || rm -rf "$WORKTREE_DIR"
   fi
@@ -34,6 +43,21 @@ acquire_install_lock() {
 check_install_dir_usable() {
   if [[ ! -d "$INSTALL_DIR" || ! -w "$INSTALL_DIR" ]]; then
     refuse "install_dir_unusable" "$LINENO"
+  fi
+}
+
+check_backup_dir_usable() {
+  local create="${1:-no}"
+  if [[ -L "$BACKUP_DIR" || ( -e "$BACKUP_DIR" && ! -d "$BACKUP_DIR" ) ]]; then
+    refuse "backup_dir_unusable" "$LINENO"
+  fi
+  if [[ ! -e "$BACKUP_DIR" && "$create" == yes ]]; then
+    if ! mkdir -p -m 0755 -- "$BACKUP_DIR" || ! chmod 0755 -- "$BACKUP_DIR"; then
+      refuse "backup_dir_unusable" "$LINENO"
+    fi
+  fi
+  if [[ ! -d "$BACKUP_DIR" || -L "$BACKUP_DIR" || ! -w "$BACKUP_DIR" ]]; then
+    refuse "backup_dir_unusable" "$LINENO"
   fi
 }
 
@@ -101,6 +125,7 @@ do_install() {
   fi
   check_install_dir_usable
   acquire_install_lock
+  check_backup_dir_usable yes
   git -C "$REPO_ROOT" worktree prune
   local origin_main=""
   origin_main="$(git -C "$REPO_ROOT" rev-parse origin/main 2>/dev/null || true)"
@@ -137,10 +162,25 @@ do_install() {
     if [[ -z "$current_sha" ]]; then
       refuse "installed_sha_unavailable" "$LINENO"
     fi
-    backup="$INSTALL_DIR/ap.before-${current_sha:0:7}"
-    if ! cp "$INSTALLED" "$backup"; then
+    backup="$BACKUP_DIR/ap.before-${current_sha:0:7}"
+    if ! BACKUP_TMP="$(mktemp "$BACKUP_DIR/.ap.backup.XXXXXX")"; then
       refuse "backup_failed" "$LINENO"
     fi
+    if ! cp "$INSTALLED" "$BACKUP_TMP"; then
+      rm -f -- "$BACKUP_TMP"
+      refuse "backup_failed" "$LINENO"
+    fi
+    local backup_sha=""
+    backup_sha="$(sha256sum "$BACKUP_TMP" 2>/dev/null | awk '{print $1}' || true)"
+    if [[ "$backup_sha" != "$current_sha" ]]; then
+      rm -f -- "$BACKUP_TMP"
+      refuse "backup_failed" "$LINENO"
+    fi
+    if ! mv -T -- "$BACKUP_TMP" "$backup"; then
+      rm -f -- "$BACKUP_TMP"
+      refuse "backup_failed" "$LINENO"
+    fi
+    BACKUP_TMP=""
   fi
   local tmp=""
   tmp="$(mktemp "$INSTALL_DIR/.ap.install.XXXXXX")"
@@ -215,15 +255,16 @@ do_rollback() {
   local base=""
   base="$(basename -- "$before")"
   if [[ ! "$base" =~ ^ap\.before-[0-9a-f]{7}$ ]]; then
-    refuse "rollback_invalid_before_file" "$LINENO"
+    refuse "rollback_invalid_before_file" "$LINENO" "accepted directory: $(realpath -m -- "$BACKUP_DIR")"
   fi
   local before_dir=""
-  before_dir="$(cd -- "$(dirname -- "$before")" && pwd)"
-  local install_dir_norm=""
-  install_dir_norm="$(cd -- "$INSTALL_DIR" && pwd)"
-  if [[ "$before_dir" != "$install_dir_norm" ]]; then
-    refuse "rollback_invalid_before_file" "$LINENO"
+  before_dir="$(cd -- "$(dirname -- "$before")" && pwd -P)"
+  local backup_dir_norm=""
+  backup_dir_norm="$(realpath -m -- "$BACKUP_DIR")"
+  if [[ "$before_dir" != "$backup_dir_norm" ]]; then
+    refuse "rollback_invalid_before_file" "$LINENO" "accepted directory: $backup_dir_norm"
   fi
+  check_backup_dir_usable
   local before_sha=""
   before_sha="$(sha256sum "$before" | awk '{print $1}')"
   if [[ "${base#ap.before-}" != "${before_sha:0:7}" ]]; then

@@ -39,6 +39,9 @@ jobs:
       - name: Content check
         shell: bash
         run: python3 -I -B ci/check-content.py
+      - name: Install script tests
+        if: steps.scope.outputs.run_rust == 'true'
+        run: bash scripts/test-install-ap.sh
       - name: Memory record check and tests
         shell: bash
         run: |
