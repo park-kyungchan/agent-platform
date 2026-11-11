@@ -44,17 +44,22 @@ Every platform has one long name and one short name, and no third form. The long
 | Work on the whole host | none | `ws` |
 | Long-term memory work | none | `mem` |
 
+Not used as a task scope or branch prefix: `agent-`, `ontology-`, `workspace-`, `academy/`.
+
 `academy` is the private-academy teaching domain inside `edu` (crates `edu-academy-*`, MCP server `academy`, tools `academy_*`); it is not another word for `edu`.
 
 | Kind | Pattern |
 | --- | --- |
-| Repository and main checkout | `<word>-platform`, or `<platform word>-<module>` for a module; the checkout has the repository's name under `/home/palantirkc/platforms/` |
+| Repository and main checkout | `<word>-platform`, or `<platform word>-<module>` for a module; the checkout has the repository's name under `/home/palantirkc/platforms/` (one older checkout still differs: `education-problem-edit` is at `/home/palantirkc/work/problem-edit` and is moved only on the user's word) |
 | Crate and its directory | `<short>-<role>` or `<short>-<domain>-<role>` |
 | Binary | the crate's name, or the short name alone for the platform's one command |
-| MCP server; MCP tool | the short name or the domain; `<server>_<object>_<verb>` |
-| Task directory | `<scope>-<topic>`, scope one of the short names; no date in the name |
+| MCP server; MCP tool | the short name or the domain, no suffix; `<server>_<object>_<verb>`, or `<server>_<verb>` when there is no object, lower case with underscores |
+| Task directory | `<scope>-<topic>`, scope one of `ap`, `ont`, `edu`, `ws`, `mem`; no date in the name |
 | Branch | `<short>/<topic>-<YYYYMMDD>` |
 | File of a task or an instruction | upper-case words joined by hyphens, with the extension `.md`; a packet is `TASK-<id>.md`, its report `REPORT-<id>.md`, a review `REVIEW-<what>.md` |
+| Shared skill | lower case, hyphen, no date |
+| Top-level directory of `/home/palantirkc` | one lower-case word from `/home/palantirkc/work/ws-layout-standard/LAYOUT.md`, plus `tools` |
+| Other files in a repository | that repository's own convention |
 | Installed first-party | `/usr/local/bin/<binary>`; state and previous binaries under `/var/lib/<long name>/` |
 
 A closed task directory, an archived repository and a third-party tool keep their names. Older names that break a pattern, and the order in which they are renamed: `/home/palantirkc/work/workspace-strategy-reassessment-20261109/naming-20261111/NAMING-STANDARD.md`.
