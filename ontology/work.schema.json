@@ -1344,6 +1344,18 @@
               }
             }
           ]
+        },
+        {
+          "code": "future_observation",
+          "message": "Give the time the value was observed in observed_at, no later than the current application time.",
+          "all": [
+            {
+              "le": [
+                "$observed_at",
+                "$now"
+              ]
+            }
+          ]
         }
       ],
       "rules": [

@@ -88,14 +88,21 @@ than the input. Equal times are accepted for corrections; among equal times the
 last applied value is current. Thus the board never moves to an older observation.
 The rehearsal prints `validate` answers proving string time ordering.
 
-Future-time guard remains unexpressible in this language build: the attempted
-criterion `{"le":["$observed_at","$now"]}` fails schema checking as
-`unknown_parameter` at its `$now` operand. `$now` exists only as a rule value,
-not a criterion value, and cannot be declared as an ordinary parameter. Thus
-`future_observation` is not implemented; validation still accepts a plausible
-time one hour ahead and `9999-12-31T23:59:59Z`. These inputs are validated only,
-never applied in the rehearsal, so they cannot poison its immutable history.
-Allowing the trusted UTC `$now` value as a criterion operand is the missing form.
+`record_measurement` has two independent submission guards:
+- `older_measurement` rejects an observation older than any recorded measurement,
+  preventing a late stale value from moving the board backward.
+- `future_observation` requires `{"le":["$observed_at","$now"]}`: give when the
+  value was observed, no later than the trusted application time. It prevents
+  future-dated immutable history from blocking later real observations.
+
+The input's calendar-plausible fixed-width UTC form makes the comparison
+chronological. In comparisons with `$now`, a bare word is a literal; use the
+`$observed_at` parameter reference. A missing `$` matching a parameter name
+refuses schema checking. Validation checks its own clock and does not promise
+acceptance at a later apply; apply checks its clock inside the transaction.
+Equality with application time is accepted. The rehearsal refuses both one hour
+ahead and year 9999 without changing store, log or board bytes, then applies the
+boundary time and a later real observation to show the board still advances.
 Retry with the same `request_id`, client, agent and parameters returns
 `already_applied` and preserves the original application time and object edits.
 
@@ -156,7 +163,7 @@ The rehearsal measures native `describe` output and MCP `ont_describe` and
 
 ### Install and rehearse
 Use an `ont` build with reference view arguments, reference property rule values,
-`$now`, optional-value skipping and descriptions (ontology-platform PR #33).
+`$now`, optional-value skipping and descriptions (ontology-platform PR #33), plus criterion `$now` (PR #34).
 The file install route is only for disposable stores. The rehearsal requires
 Bash, Python 3 and Git and takes one binary path:
 
@@ -169,7 +176,7 @@ v1 with `schema install <file>`, indexes `task_states`, `packets` and `reports`,
 records a task revision, installs v2 and verifies that revision is unchanged.
 It exercises every action and criterion refusal, unknown-task and older-time
 refusals without store/log changes, separate no-write checks for malformed and
-impossible-calendar times, the unsupported future-criterion probe, retries across changed
+impossible-calendar times, future-time refusals and boundary/later-time acceptance, retries across changed
 clocks, equal-time correction/history, decision inheritance, native-key task
 isolation, indexed/dangling file references, optional missing cells, escaping
 and descending worker order. It prints five rendered blocks and removes the

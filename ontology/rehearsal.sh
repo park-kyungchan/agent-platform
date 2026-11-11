@@ -14,6 +14,7 @@ def call(args, request=None, code=0):
     assert p.returncode == code, (args, p.returncode, p.stdout, p.stderr)
     if args == ['describe']: print('ont_describe_stdout_bytes=' + str(len(p.stdout.encode())), file=sys.stderr)
     if args == ['action', 'validate']: print('validate_parameters=' + json.dumps(request['parameters']) + '\nvalidate=' + p.stdout.rstrip(), file=sys.stderr)
+    if args == ['action', 'apply'] and code == 2 and 'future_observation' in p.stdout: print('future_refusal=' + p.stdout.rstrip(), file=sys.stderr)
     data = json.loads(p.stdout); assert data['status'] == ('refused' if code else 'ok'), data
     return data.get('result', data)
 def oid(kind, key): return dict(object_type=kind, namespace=dict(instance='vps://palantirkc', account='root'), native_key=key)
@@ -68,22 +69,21 @@ for i, invalid_time in enumerate(['not-a-time', '2026-13-01T00:00:00Z', '2026-02
     unchanged = fingerprint(); board = render('kpi_board')['markdown']
     apply('record_measurement', 'measure-bad-' + str(i), dict(mp, observed_at=invalid_time), 'invalid_parameter')
     assert fingerprint() == unchanged and render('kpi_board')['markdown'] == board
-# Probe unsupported future guard without installing it or poisoning measurement history.
-probe = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
-probe['action_types']['record_measurement']['submission_criteria'].append(dict(code='future_observation', message='Use observed_at no later than application time.', all=[{'le': ['$observed_at', '$now']}]))
-probe_path = pathlib.Path(store).with_name('future.schema.json'); probe_path.write_text(json.dumps(probe))
-probe_result = call(['schema', 'check', str(probe_path)], code=2); assert any(v['code'] == 'unknown_parameter' and v['pointer'].endswith('/le/1') for v in probe_result['violations'])
-print('future_guard_schema_check=' + json.dumps(probe_result), file=sys.stderr)
-future_probe_bytes = fingerprint(); future_probe_board = render('kpi_board')['markdown']
-for timestamp in [now + 3600, now]:
-    utc = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    assert call(['action', 'validate'], dict(action_type='record_measurement', parameters=dict(mp, observed_at=utc)))['valid']
-assert call(['action', 'validate'], dict(action_type='record_measurement', parameters=dict(mp, observed_at='9999-12-31T23:59:59Z')))['valid']
-assert fingerprint() == future_probe_bytes and render('kpi_board')['markdown'] == future_probe_board
 apply('record_measurement', 'measure-correction', dict(newer, value='12')); corrected = render('kpi_board')['markdown']
 apply('record_measurement', 'measure-new-id', dict(newer, value='12')); assert render('kpi_board')['markdown'] == corrected
 measurements = call(['search'], dict(object_type='measurement', where={'eq': ['kpi', k]}))['objects']; assert len(measurements) == 4 and fields(k)['value'] == '12'
-apply('set_kpi_target', 'target-absent', dict(kpi=k), 'invalid_parameter'); apply('set_kpi_target', 'target', dict(kpi=k, target='12'))
+for i, future in enumerate(['2026-11-11T03:00:01Z', '9999-12-31T23:59:59Z']):
+    unchanged = fingerprint(); board = render('kpi_board')['markdown']; params = dict(mp, observed_at=future)
+    assert not call(['action', 'validate'], dict(action_type='record_measurement', parameters=params))['valid']
+    apply('record_measurement', 'measure-future-' + str(i), params, 'future_observation')
+    assert fingerprint() == unchanged and render('kpi_board')['markdown'] == board
+boundary = dict(mp, value='13', observed_at='2026-11-11T02:00:01Z')
+assert call(['action', 'validate'], dict(action_type='record_measurement', parameters=boundary))['valid']
+apply('record_measurement', 'measure-boundary', boundary); now += 1
+later = dict(mp, value='14', observed_at='2026-11-11T02:00:02Z'); apply('record_measurement', 'measure-after-future', later)
+assert fields(k)['value'] == '14' and fields(k)['observed_at'] == later['observed_at'] and render('kpi_board')['markdown'] != board
+assert len(call(['search'], dict(object_type='measurement', where={'eq': ['kpi', k]}))['objects']) == 6
+apply('set_kpi_target', 'target-absent', dict(kpi=k), 'invalid_parameter'); apply('set_kpi_target', 'target', dict(kpi=k, target='14'))
 other_task = oid('task', 'ontology-operational-base'); apply('define_kpi', 'other-kpi', dict(kp, task=other_task))
 w = created(apply('start_worker_run', 'worker', wp), 'worker_run'); apply('start_worker_run', 'worker-duplicate', wp, 'duplicate_running_worker')
 apply('note_worker_run', 'note-absent', dict(worker_run=w), 'invalid_parameter')
@@ -99,7 +99,7 @@ now += 1; apply('close_worker_run', 'pending-close', dict(worker_run=pending, re
 live = created(apply('start_worker_run', 'live', dict(wp, name='live')), 'worker_run')
 apply('note_worker_run', 'live-note', dict(worker_run=live, note='check | next\nline'))
 apply('start_worker_run', 'live-pending', dict(wp, name='live-pending', packet=pending_packet))
-assert fields(w)['started_at'] == '2026-11-11T02:00:01Z' and fields(w)['closed_at'] == '2026-11-11T02:01:00Z'
+assert fields(w)['started_at'] == '2026-11-11T02:00:02Z' and fields(w)['closed_at'] == '2026-11-11T02:01:01Z'
 assert fields(successor)['decided_at'] == '2026-11-11T02:00:01Z' and all(fields(m['id'])['recorded_at'] == '2026-11-11T02:00:01Z' for m in measurements)
 requests = [dict(jsonrpc='2.0', id=i, method='tools/call', params=dict(name=n, arguments={})) for i, n in enumerate(['ont_describe', 'ont_action_list'], 1)]
 wire = subprocess.run([binary, '--store', store, 'mcp'], input='\n'.join(map(json.dumps, requests))+'\n', text=True, capture_output=True, timeout=60); assert wire.returncode == 0, wire.stderr
@@ -107,7 +107,7 @@ for request, line in zip(requests, wire.stdout.splitlines(), strict=True):
     answer = json.loads(line)['result']; assert not answer['isError'], answer
     if request['params']['name'] == 'ont_action_list': assert answer['content'][0]['text'].count('Actions take the full Id from search; view arguments take the native key.') == 10
     size = len(answer['content'][0]['text'].encode()); assert size <= 262144; print(request['params']['name'] + '_bytes=' + str(size), file=sys.stderr)
-expected = {'kpi_board': (1, '| checks | 12 | 2026-11-11T01:00:00Z | 12 | ontology/rehearsal.sh |'), 'active_holds': (1, '| publish | review accepted |'), 'current_decisions': (1, '| route | use \\| rendered actions | lead | supersede |'), 'live_workers': (2, 'check \\| next line'), 'closed_workers': (2, 'pending passed')}
+expected = {'kpi_board': (1, '| checks | 14 | 2026-11-11T02:00:02Z | 14 | ontology/rehearsal.sh |'), 'active_holds': (1, '| publish | review accepted |'), 'current_decisions': (1, '| route | use \\| rendered actions | lead | supersede |'), 'live_workers': (2, 'check \\| next line'), 'closed_workers': (2, 'pending passed')}
 for view, (count, text) in expected.items():
     r = render(view); assert r['rows'] == count and not r['truncated'] and text in r['markdown'], r
     assert render(view, 'absent-o13-task')['rows'] == 0
