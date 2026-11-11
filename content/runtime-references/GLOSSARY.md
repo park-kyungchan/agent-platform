@@ -9,7 +9,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 - A term that is not here and not in `AGENTS.md` gets a definition at its first use in the file that needs it. Add it here when a second file needs it.
 - Packets, STATE files and reports use these terms. The user's own wording stays in the conversation and in the decision record that quotes it.
 - Vocabulary of a domain (lessons, students, papers, churches) belongs to the repository that owns the domain, and to the object types of `ontology-platform` once STATE says they are in use. It is not copied here.
-- This is a closed set with a budget, not a list that grows. The content check fails when a term here is used in no other shared file, when the core list, this file or the user table passes its limit (the limits are constants in `agent-platform` `ci/check-content.py`), so adding a row at the limit means removing or moving one first. A term enters only when a second file needs it; a user expression enters only when it appears in a second task; a row leaves when its term is no longer used or the user stopped using the expression.
+- This is a closed set with a budget, not a list that grows. The content check fails when a term here is used in no other shared file, when the core list, this file or the user table passes its limit (the limits are constants in `agent-platform` `ci/check-content.py`; raising one is a reviewed change with its reason), so adding a row at the limit means removing or moving one first. A term enters only when a second file needs it; a user expression enters only when it appears in a second task; a row leaves when its term is no longer used or the user stopped using the expression.
 
 ## 2. Work coordination
 
