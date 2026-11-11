@@ -19,7 +19,8 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A row of the board's thread table | `workstream` |
 | tier | The amount of reasoning a piece of work needs: mechanical, bounded judgment, open judgment | A packet line `Tier: mechanical` | `difficulty level` |
 | assignment file | The one file of a task that says which runtime and model serves which tier and in which order; STATE names it | A section of a task's orchestration document | `routing table` |
-| dispatch | Starting one worker run with one packet | `herdr pane run <pane-id> "<headless command>"` | — |
+| dispatch | Starting one worker run with one packet | `herdr agent start <name> --kind <kind> --pane <pane-id>`, then `herdr agent prompt <name> "<text naming the packet>"` | — |
+| progress message | A message to the user that says where the task stands; not a worker's report | The KPI table and what changed | — |
 | acceptance | The Lead reading back the actual output or effect of a worker and deciding to use it | Reading the diff and rerunning the check | `sign-off` |
 | review | A second agent, in a fresh context, judging a frozen candidate against the request and the contracts | A reviewer subagent that writes findings by severity | — |
 | candidate | The exact revision that is offered for review or merge | A commit on a task branch | — |
@@ -28,7 +29,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | write set | The files one writer may change | `Exact targets` line of a packet | — |
 | build slot | The right to run the one expensive build at a time | Named in STATE at dispatch | — |
 | delegation | Giving a piece of work to a worker | A dispatch | — |
-| standing go-ahead | The user's recorded words that let the Lead carry out one class of irreversible outward action without asking each time | A quoted line in STATE with its date | `blanket approval` |
+| standing go-ahead | The user's recorded words that let the Lead carry out one class of irreversible outward action without asking each time; kept in STATE only | A quoted line in STATE with its date | `blanket approval` |
 
 ## 3. Instructions and loading
 

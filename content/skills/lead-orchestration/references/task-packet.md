@@ -10,7 +10,7 @@ Owner: <Lead>; State: <absolute STATE.md>
 Tier: <mechanical | bounded judgment | open judgment>
 Read first: <absolute TASK.md>, <absolute STATE.md>, <absolute path of each needed SKILL.md or reference>
 First output after reading: one line listing the exact files read
-Authority: <the objective the Lead wrote for this task, and the user's words it rests on; the task scope>
+Authority: <the objective the Lead wrote for this task and the user decision it rests on, in English; the task scope>
 Exact targets: <repo, worktree, branch, base revision, files that may be written>
 Strategy link: <STATE or STRATEGY.md line>; KPI this task moves: <KPI or guardrail, expected effect, how it is measured>
 Allowed effects: <reads, writes, local commits, push, pull request, build slot>

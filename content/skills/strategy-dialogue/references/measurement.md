@@ -6,13 +6,13 @@ The user rarely names a KPI. The Lead derives it from what the user said they wa
 
 | Term | Meaning | Must be written with |
 | --- | --- | --- |
-| Objective | The state the user wants, written as a sentence that can be checked true or false | Who or what changes, and how one would see it |
+| Objective (core term) | The state the user wants, written as a sentence that can be checked true or false | Who or what changes, and how one would see it |
 | Diagnosis | The measured cause of the gap between the present state and the objective | The evidence; assumptions marked as assumptions |
 | Metric | A number computed by a fixed formula from a named source at a stated time | Formula, unit, source, time |
-| KPI | One of the few metrics chosen because its movement shows whether the objective is being reached | Everything a metric has, plus baseline, target, the direction that is good, how often it is measured |
+| KPI (core term) | One of the few metrics chosen because its movement shows whether the objective is being reached | Everything a metric has, plus baseline, target, the direction that is good, how often it is measured |
 | Baseline | The value of a metric before the work | Source and time |
 | Target | The value at which the objective counts as reached | Who set it and why that value |
-| Guardrail | A limit on a metric or a condition that must hold while the KPI is being moved | The limit and what is done when it is reached |
+| Guardrail (core term) | A limit that must hold while a KPI is being moved | The limit and what is done when it is reached |
 | Leading indicator | A metric that moves during the work and can still change the course | What it predicts |
 | Lagging indicator | A metric that shows the result after the work | How long after |
 | Output | The thing the work produced: a merged pull request, a file, a report | — |
@@ -20,6 +20,8 @@ The user rarely names a KPI. The Lead derives it from what the user said they wa
 | Proxy | A metric used in place of something that cannot be measured directly | What it does not capture |
 | Acceptance criterion | A yes-or-no check that decides whether one piece of work is complete | The command or readback that answers it |
 | Evidence | The command output, file or record that shows a value | Path or command, and time |
+
+The three core terms are defined in `/root/.agents/AGENTS.md` section 8; the rows above repeat that wording and add what each must be written with.
 
 A KPI measures an outcome, not an output. "Three files rewritten" is an output; "sessions that loaded the rewritten file, out of sessions started" is a KPI.
 

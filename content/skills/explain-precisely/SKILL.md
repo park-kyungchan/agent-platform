@@ -26,7 +26,7 @@ Git object 저장소는 공유합니다. branch별 파일 변경을 분리할 �
 
 ## Answer order and depth
 
-In a progress or closure report the KPI table comes first; an answer to a question starts with the answer. Both are defined by [strategy-dialogue](../strategy-dialogue/SKILL.md).
+In a progress or closure message the KPI table comes first; an answer to a question starts with the answer. Both are defined by [strategy-dialogue](../strategy-dialogue/SKILL.md).
 
 Compact report example (invented values; define new terms in the table at first
 use, without adding a definition paragraph before it):

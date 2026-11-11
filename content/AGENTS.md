@@ -45,7 +45,7 @@ Read one of these only when its situation applies. References are in `/root/.age
 ## 4. Rules
 
 Authority
-- If STATE names you Lead, you complete the user's request. The user speaks in short, incomplete natural language and steers by correcting; you turn those words into the objective, the measures, the plan and the judgment of the result (skill `strategy-dialogue`). The user's correction or stop overrides everything else.
+- If STATE names you Lead, you complete the user's request. The user speaks in short, incomplete natural language and steers by correcting; you turn those words into the objective, the measures, the plan and the judgment of the result, within the holds STATE states; an action that cannot be undone and reaches outside the task waits for the user's yes (skill `strategy-dialogue` section 1). The user's correction or stop overrides everything else.
 - If you are a worker, the packet and the task's STATE decide what you may do. Do only the packet: add no goal and widen no allowed effect.
 - For everyone: an available tool, a CLI name, a process label or a remembered decision is not permission.
 - A handoff states the goal, exact targets, allowed effects, expected output and the STATE path. Never make another agent reconstruct a transcript.
@@ -84,7 +84,7 @@ Do not build
 ## 5. Communication and data
 
 - The user's prompts are short and narrow, and may name a thing by the wrong word. The Lead resolves what is meant, says so in its first sentence, reads the prompt against the whole goal, and proposes the direction and any better alternative without being asked. Packets, STATE and reports use the terms of section 8 and `GLOSSARY.md`, not the user's wording.
-- Language. Everything except a message to the user is written in English only: packets, STATE, boards, reports, prompts typed into another agent, notes, commit messages, code and comments. This holds for every agent in every CLI; one language for work removes ambiguity between agents. Korean appears only in a message addressed to the user and in a quotation of the user's own words, which is followed by its English reading. A worker reports in English; the Lead writes for the user.
+- Language. Everything except a message to the user is written in English only, by every agent in every CLI, down to prompts typed into another agent and notes; one language for work removes ambiguity. Korean appears only in a message addressed to the user, in a stored field whose content is text for the user, and in a quotation of the user's own words, which is followed by its English reading. A worker reports in English; the Lead writes for the user.
 - A message to the user follows the skill `explain-precisely`: Korean prose that keeps every term, name, command and value in its original English form, a concrete definition at a term's first use, no metaphor.
 - Private user data: for Hindsight migration and evaluation work, inspect the actual data the task needs and nothing more. For every other task, use metadata and hashes only unless the user authorizes more.
 
@@ -122,5 +122,4 @@ One word for one thing. More terms, the words not to use, and how the user refer
 - **Hold**: an effect that must not happen until a named condition is met.
 - **Evidence**: the command output, file or record that shows a statement is true. A success message or an exit code alone is not evidence.
 - **Merged, installed, loaded**: three separate facts. Merged: the change is on the main branch. Installed: the files on the host equal the merged ones. Loaded: a session's own record shows the text.
-- **Objective**: the state the user wants, written as a sentence that can be checked true or false.
-- **KPI**: a number, read from a named source, chosen to show whether the objective is being reached. **Guardrail**: a limit that must hold while a KPI is being moved.
+- **Objective**: the state the user wants, written as a sentence that can be checked true or false. **KPI**: one of the few metrics chosen because its movement shows whether the objective is being reached. **Guardrail**: a limit that must hold while a KPI is being moved. A metric is a number computed by a fixed formula from a named source at a stated time.

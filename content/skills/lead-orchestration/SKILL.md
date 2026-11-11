@@ -23,7 +23,7 @@ Keep your context for three things: orchestration, acceptance, and the conversat
 
 Which runtime and model serves which tier, the order in which to use them and what is unavailable are written in the task's assignment file, which STATE names. If STATE names none, write the assignment into STATE from what the user said before the first dispatch. Never write it into a skill or into `/root/.agents/AGENTS.md`.
 
-Name the model on every spawn, and the effort where the CLI has a flag for it; then read back what the session reports. A subagent of your own CLI is started with an explicit model too: a default that inherits the Lead's model is not used, and the Lead's model is not a worker unless the user says so.
+Name the model on every spawn, and the effort where the CLI has a flag for it; then read back what the session reports. Where a CLI has no model flag, record that in STATE and use what the session reports. A subagent of your own CLI is started with an explicit model too: a default that inherits the Lead's model is not used, and the Lead's model is not a worker unless the user says so.
 
 | Tier | Work | Packet shape |
 | --- | --- | --- |
@@ -47,9 +47,9 @@ Template and the three shapes: `references/task-packet.md`.
 
 Mechanics: `concurrent-work.md` section 5 and skill `herdr`; the commands of each CLI: `/root/.agents/runtime-references/CLI-RUNTIMES.md` section 2. The Lead adds:
 
-- Default to an interactive session: open the CLI in a new tab with as few flags as it needs (the model), then type the prompt, which names the packet file. The user can watch it and the session can take a follow-up. Use a headless run only where an interactive session cannot work.
-- A workspace trust dialog in a pane you started for a worker, in the task's own directory or worktree, is answered by the Lead. A dialog that asks to approve one effect is answered by the packet: approve an effect the packet allows, decline any other. A login or a payment stays with the user.
-- At dispatch, record in the board or STATE: worker, tier, runtime, session, pane, packet, start time read from the clock, and the build-slot owner. Before a build, check free disk space against the task's floor.
+- Default to an interactive session (commands: `concurrent-work.md` section 5): open the CLI in a new tab with as few flags as it needs (the model), then type the prompt, which names the packet file. The user can watch it and the session can take a follow-up. Use a headless run only where an interactive session cannot work.
+- A workspace trust dialog in a pane you started for a worker is answered by the Lead: trust and continue. A dialog that asks to approve one effect is answered by the packet: approve an effect the packet allows, decline any other. A login or a payment stays with the user.
+- At dispatch, record in the board or STATE: worker, tier, runtime, session, pane, packet, start time read from the clock, and the build-slot owner. Before a build, check free disk space against the floor STATE states.
 - Wait in the background with a timeout. Completion needs both the DONE line and a nonempty report; a DONE line that carries the report's SHA-256 shows the file is the finished one. Do not build a resident watcher.
 - Liveness: set the packet's quiet limit from the expected length of the run, never below the time a comparable run took. A worker whose session record and pane did not change for that long has stalled. Read the pane; end the worker by closing the tab you created or by process ID (a name pattern can match your own shell); reconcile what it already changed (`concurrent-work.md` section 4); record the cause, or "unknown". Do not rerun it unchanged: change the packet, split the step, or change the way it is run. Moving to another model needs a reason other than getting past the failure.
 - Give a worker the memory conclusions it needs, already verified, with their source.

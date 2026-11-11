@@ -5,7 +5,7 @@ Copy the block you need. Values in angle brackets are placeholders; a filled blo
 ## Brief (the Lead's record of its interpretation)
 
 ```text
-The user said: "<their words>"
+The user said: "<their words>" (English: <reading>)
 Objective: <the state wanted, as a sentence that can be checked true or false>
 Diagnosis: <measured cause with its evidence; assumptions and unknowns named>
 KPI: <what it counts; formula and source> <baseline at time, or unmeasured> -> <target and why that value>
@@ -37,15 +37,20 @@ Status: <added as a work thread of the current objective | a different objective
 
 ```text
 <date> Lead: <decision>; reason <measurement>; undo <route>; supersedes <decision or none>
-<date> user: "<their words>" -> changes <intent | KPI or target | guardrail | way of working | fact>; reach <this task | every task>; written in <file>; supersedes <decision or none>
+<date> user: "<their words>" (English: <reading>) -> changes <intent | KPI or target | guardrail | way of working | fact>; reach <this task | every task>; written in <file>; supersedes <decision or none>
 ```
 
-## Kept for the user
+## Kept in STATE
 
 ```text
+Standing go-ahead: "<their words>" (English: <reading>) (<date>) covers <class of action>
 Words the user used: "<expression>" -> <glossary term and path>
 Fact from the user: <fact> (<date>)
-Standing go-ahead: "<their words>" (<date>) covers <class of action>
+```
+
+## Kept for the user (board, or STATE when there is no board)
+
+```text
 Waiting for a yes: <prepared irreversible outward action> | recommendation <do it | do not> | effect <on which KPI>
 Reminder owed: <what> | when <condition that triggers it> | context <file>
 ```

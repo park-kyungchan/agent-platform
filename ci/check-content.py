@@ -93,9 +93,24 @@ for name in [n for n in texts if n.endswith(".md")]:
 # One word for one thing: a word the glossary lists under "Do not write" fails anywhere else.
 GLOSSARY = "runtime-references/GLOSSARY.md"
 banned = {}
-for row in re.findall(r"^\| ([^|\n]+) \| [^|\n]+ \| [^|\n]+ \| ([^|\n]*) \|$", texts.get(GLOSSARY, ""), re.M):  # four-column term tables only
-    for word in re.findall(r"`([^`]+)`", row[1]):
-        banned[word.lower()] = row[0].strip()
+if GLOSSARY not in texts:
+    fail("glossary_missing", GLOSSARY, "the word check needs the glossary")
+in_terms = False
+for line in texts.get(GLOSSARY, "").splitlines():
+    if not line.startswith("|"):
+        in_terms = False
+        continue
+    cells = [c.strip() for c in line.strip().strip("|").split(" | ")]
+    if cells[-1] == "Do not write":
+        in_terms = True
+        continue
+    if not in_terms or set(line) <= set("|- "):
+        continue
+    if len(cells) != 4:
+        fail("glossary_row_malformed", GLOSSARY, f"a term row needs four cells: {line[:60]}")
+        continue
+    for word in re.findall(r"`([^`]+)`", cells[3]):
+        banned[word.lower()] = cells[0]
 for name, text in texts.items():
     if name == GLOSSARY:
         continue
