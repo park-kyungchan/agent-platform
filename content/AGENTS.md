@@ -1,6 +1,6 @@
 # Shared agent instructions
 
-Every coding CLI on this host loads this one file through its own pointer: `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.config/muse/AGENTS.md`, `~/.gemini/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.grok/AGENTS.md`. The source is `content/` in the `agent-platform` repository. Edit the source; never edit a pointer and never make a per-CLI copy.
+Every coding CLI on this host loads this one file through its own pointer file. The source is `content/` in the `agent-platform` repository. Edit the source; never edit a pointer and never make a per-CLI copy.
 
 ## 1. Start of a task
 
@@ -14,7 +14,7 @@ No task directory yet: create `work/<scope>-<topic>/STATE.md`. Put the task's Gi
 
 | What | Path |
 | --- | --- |
-| Platform and module repositories (main checkouts) | `/home/palantirkc/platforms/<repo>/`: `agent-platform`, `ontology-platform`, `education-platform`, `education-dc-gang-a`, `agent-vps-operations`. Modules are named `<platform>-<module>` |
+| Platform and module repositories (main checkouts) | `/home/palantirkc/platforms/<repo>/`. Modules are named `<platform>-<module>`. The list is in `codebase-orientation.md` |
 | Tasks | `/home/palantirkc/work/<scope>-<topic>/` with `STATE.md`; task worktrees in `wt/<repo>/` |
 | Pinned external source | `/home/palantirkc/external/` |
 | Other repositories, kept for custody | `/home/palantirkc/projects/` |
@@ -34,6 +34,8 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I must decide where a piece of information belongs, or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
 | Memory returns stale or irrelevant results, or I change memory content or pages | `HINDSIGHT-RUNTIME.md` |
 | I need the official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |
+| I change a shared instruction, a skill or a reference | Section 7 below, then `CLI-RUNTIMES.md` section 7 |
+| I use the Academy tools or prepare a lesson | skill `academy-runtime-routing` for the tools; skill `academy-student-context` for lesson preparation and student status |
 | I answer or report to the user | skill `explain-precisely` |
 | STATE names me Lead | skills `lead-orchestration` and `strategy-dialogue` |
 | I control Herdr panes or agents | skill `herdr`; for Hermes sessions `herdr-hermes` |
@@ -50,7 +52,7 @@ Authority
 Evidence
 - Establish the current state from source, Git, compiler, database and service output. Memory tells you what was decided earlier; check that it still holds.
 - Read only what the next decision needs. Do not scan every repository, history or private custody to find a task.
-- Reuse facts you already have: runner, host or container, role, cwd, pane. Probe a missing fact only if it changes the next action. The model and effort are unknown unless the session reports them.
+- Reuse facts you already have: runner, host or container, role, cwd, pane. Probe a missing fact only if it changes the next action. The model and effort are unknown unless the session reports them. Host, container, shared daemon and remote executor can have different paths and identities, and a tool shell's environment is not the user's pane.
 - Verify by actual output or readback, not by a success message or an exit code alone.
 
 Failure

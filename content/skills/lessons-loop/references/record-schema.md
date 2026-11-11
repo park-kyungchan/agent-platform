@@ -4,9 +4,9 @@ Source: the 2026-11-05 Hindsight architecture design, section 3. This is an
 ordinary document/frontmatter convention; extraction may not preserve every
 field. Verify original-document GET and recall/readback. It does not authorize
 writes, configure the server or establish a validator/loader/runtime gate.
-Official API behavior here was verified against server 1.1.0 / coding-agents
-0.8.2 at upstream revision `a5a619b5ca59c5c39e0f96be6f7a31fabd136bd5`; the host
-runs 1.2.0 / 0.8.5 as observed on 2026-11-06. Check installed source before a
+Official API behavior here was verified against an earlier server version than the
+host runs; the installed versions are stated once, in
+`/root/.agents/runtime-references/HINDSIGHT-RUNTIME.md`. Check installed source before a
 version-dependent operation.
 
 ## Exact tag vocabulary

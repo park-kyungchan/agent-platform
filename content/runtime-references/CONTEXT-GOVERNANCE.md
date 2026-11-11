@@ -6,14 +6,14 @@ The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6;
 
 | Information | Where it lives | Who writes it | How to read it |
 | --- | --- | --- | --- |
-| The active conversation, reasoning, a resumable session, and notes that matter only to that one CLI | The CLI's own session store and private memory | The CLI | Resume only the exact session you need. Never import another agent's transcript. Private memory holds nothing another agent needs |
+| The active conversation, reasoning, a resumable session, and notes that matter only to that one CLI | The CLI's own session store and private memory | The CLI | Resume only the exact session you need. Never import another agent's transcript |
 | Owner, authority, holds, next action, task metrics, verification, the Strategy Brief | The task's `STATE.md`, `TASK.md`, `STRATEGY.md` | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
 | Implemented behaviour, schemas, APIs, tests, build instructions, KPI definitions | The owning repository's source and docs | The implementation owner, through review | Read the current revision. Do not rely on a remembered implementation |
 | Durable decisions and their reasons, lessons, corrections, scoped user preferences, explained terms | The shared Hindsight bank `coding-agent::shared` | An authorized owner or curator through the official HTTP API or client; the MCP tools only for simple notes and initiatives | Search pages, read the selected ones, recall exact evidence. Reflect only when those leave reasoning unresolved |
 | Current operational objects, observations, KPI values and time series, policies, actions, recovery state | The domain or task owner today; `ontology-platform` when its admission is implemented | The trusted domain owner under the task's authority | A fresh authorized read with revision, scope, coverage and freshness. Memory is only a pointer to it |
 
 - A decision another agent needs must not stay only in one CLI's personal memory: write it in the repository contract or in an authorized, sourced Hindsight document.
-- Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off; a retained transcript carries dated status lines that later compete with corrections.
+- Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off (reason: `HINDSIGHT-RUNTIME.md`, "Session path on this host").
 - A KPI target is a strategy decision. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
 
 ## 2. Which source answers a question
@@ -33,13 +33,12 @@ When memory and current source disagree, the source wins for current truth. Keep
 
 ## 3. Reading memory
 
-- Search pages at a new task, a bug, a test or convention question, integration work, a "why" or "what is left" question, and before a commit. Do not search on every tool call.
-- Read only the selected pages. Credit memory you use.
+- When to search is in `/root/.agents/AGENTS.md` section 6. Do not search on every tool call; read only the selected pages.
 - If the memory tool is unavailable or disabled for your task, say so and work from the task's files. Do not start a client or change global configuration to get it back.
 
 ## 4. Writing memory
 
-- A skill or a visible tool is not a write grant. Writing needs the task's authority. In a no-write task leave a local handoff for the curator and do not ingest, PATCH, refresh or delete.
+- A skill or a visible tool is not a write grant. Writing needs the task's authority. A no-write task does not ingest, PATCH, refresh or delete.
 - Structured records (incidents, lessons, decisions, Corrections, profile, glossary, strategy, KPI definition) go through the official HTTP API or client with an explicit stable `document_id`, then a complete-tag-set PATCH, then a GET readback. The exact sequence, endpoint and token-file location: `/root/.agents/skills/lessons-loop/references/hindsight-api.md`.
 - MCP `ingest_document(title, content)` derives its ID from the title and takes no ID, tags or frontmatter: use it only for simple unstructured notes. `capture_initiative` is for an approved initiative and reuses its page when the scope changes.
 - A pinned original is never rewritten: link a Correction or a new version. A mutable record is replaced under the same ID with its complete body, after saving the previous body. A complete-tag-set PATCH replaces all tags and can requeue related sources. Document history is not a text backup.

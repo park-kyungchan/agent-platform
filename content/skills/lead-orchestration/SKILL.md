@@ -5,7 +5,7 @@ description: When task STATE assigns Lead, coordinate authorized workers, isolat
 
 # Lead orchestration
 
-Use this when the task's STATE names you Lead. The assignment comes from STATE, never from a CLI name. The Lead owns sequencing, dispatch, acceptance and delivery; the CLIs own sessions and tools, Herdr owns terminals, Hindsight owns memory. This is a playbook, not a loader, scheduler or permission system.
+Use this when the task's STATE names you Lead. The assignment comes from STATE, never from a CLI name. The Lead owns sequencing, dispatch, acceptance and delivery; the CLIs own sessions and tools, Herdr owns terminals, Hindsight owns memory. This is a playbook, not a loader, scheduler or permission system. An authorization the user already gave stays valid: do not reopen a settled decision.
 
 Strategy brief, user decisions, KPI-first reports and the work-thread list: skill `strategy-dialogue`. Wording toward the user: skill `explain-precisely`. Ownership, worktrees, the build slot and the handoff rules that every agent follows: `/root/.agents/runtime-references/concurrent-work.md`.
 
@@ -60,6 +60,8 @@ Headless and interactive commands per CLI are in `CLI-RUNTIMES.md`. An interacti
 - Completion needs both the DONE line in the pane and a nonempty report file; having the worker print the report's SHA-256 in the DONE line lets you check that the file is the one it finished. A TASK file that contains the marker text is not completion.
 - A send acknowledgement, `idle`, `done` or exit code 0 is not completion. After an uncertain submission, read the pane before sending again.
 - A trust or approval dialog in a worker pane belongs to the user: report it, do not answer it.
+- After launch, check what the session reports: model, effort, cwd, ready for input.
+- Give a worker the memory conclusions it needs, already verified, with their source; do not make it search for them.
 - Workers keep native Hindsight. Memory isolation for an evaluation or a review uses the path override described in `concurrent-work.md`.
 
 ## 4. Acceptance, review and delivery
@@ -81,6 +83,7 @@ Details and the optional lesson candidate: `/root/.agents/skills/lessons-loop/re
 
 - Before changing host configuration: save the exact previous bytes, write a rollback command, change, read back.
 - Before deleting: create and verify the recovery copy, then check every live consumer of the path. A recovery copy alone does not authorize deletion.
-- Builds use a Cargo target directory and fixture roots owned by the task; check free disk space before a build and delete the disposable roots after keeping the logs you need.
+- Quality comes before speed.
+- Builds use a Cargo target directory and fixture roots owned by the task; check free disk space before a build, keep the task's free-space floor, leave other tasks' build roots alone, and delete your disposable roots after keeping the logs you need.
 - Which information goes to memory and which stays in task files: `/root/.agents/runtime-references/CONTEXT-GOVERNANCE.md`.
 - Ask the user only for decisions that belong to the user, with a recommendation and its consequences. End a turn with one status line: what is complete, or what is held and the next action.

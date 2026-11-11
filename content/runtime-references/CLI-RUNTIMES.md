@@ -1,6 +1,6 @@
 # The coding CLIs on this host: files, commands and what a session loads
 
-Read this when you start, resume or configure a CLI, register an MCP server, or must check what a session loaded. The CLIs are Claude Code (`claude`), Codex (`codex`), Muse (`muse`), Antigravity (`agy`) and Grok Build (`grok`). A command below shows the mechanism. It is not permission to launch, authenticate, update or change configuration: that comes from the task's STATE. Which models and CLIs are available now is a changing value and is written in the task's STATE, not here.
+Read this when you start, resume or configure a CLI, register an MCP server, or must check what a session loaded. The CLIs are Claude Code (`claude`), Codex (`codex`), Muse (`muse`), Antigravity (`agy`) and Grok Build (`grok`). A command below shows the mechanism. It is not permission to launch, authenticate, update or change configuration: that comes from the task's STATE.
 
 ## 1. Files per CLI
 
@@ -29,6 +29,8 @@ Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that
 - Antigravity: a `--print` timeout can end the output while the turn still runs. Read the result before retrying.
 - Resume by exact session ID, not `--last`, when several sessions exist. A resumed session keeps older instructions and tool definitions: read the task's STATE again before any effect.
 - If a flag is rejected or missing, read that CLI's installed `--help`. Do not run every CLI's help for every task.
+- Looking at a CLI's help, configuration or session list does not release a hold on logging in or running a model with it; the hold is in the task's STATE.
+- Update a CLI only with its own updater and only when the task authorizes it. Do not copy an installation recipe.
 
 ## 3. What a session loads, and how to check it
 
@@ -37,7 +39,7 @@ Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that
 | CLI | Session record | Limits you must know |
 | --- | --- | --- |
 | Claude Code | `~/.claude/projects/<cwd with slashes as dashes>/<session-id>.jsonl` | A subagent may not receive project instruction files. Excluding ToolSearch from `--tools` loads every MCP tool schema at start |
-| Codex | `~/.codex/sessions/` (`rollout-*.jsonl`) | Outside a Git repository Codex reads project instruction files in the cwd only, not in parent directories. The user-level pointer still loads |
+| Codex | `~/.codex/sessions/` (`rollout-*.jsonl`) | Outside a Git repository Codex reads project instruction files in the cwd only, not in parent directories. The user-level pointer still loads. Do not create a fake repository to change this |
 | Muse | `~/.local/share/muse/sessions/<yyyy>/<mm>/<dd>/<session-id>/session.jsonl` | Without `~/.config/muse/AGENTS.md` Muse falls back to `~/.claude/CLAUDE.md` and shows its `@` line as literal text |
 | Antigravity | `~/.gemini/antigravity-cli/conversations/` | A native rule include is written `@[label](path)`; a bare `@filename` is a reference, not an include |
 | Grok Build | `~/.grok/sessions/` (not yet inspected on this host) | Imports of other CLIs' MCP servers are off: `[compat.claude] mcps=false`, `[compat.cursor] mcps=false` |
@@ -45,11 +47,12 @@ Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that
 - A skill has three separate states: listed in the catalog (name and description only), body read, and applied. A listing does not show that the body was read.
 - A handoff therefore names the files to read first, and the receiver names them in its first output. A child agent does not inherit the parent's activated skills.
 - Codex plugins: `plugins.<plugin>.enabled` applies to local-marketplace entries only; `apps.<id>.enabled` and `skills.config` are separate controls.
+- A session started with restricted tools or flags shows a restricted inventory: do not report it as that CLI's default.
 - A configuration change does not replace what a running session already loaded. Check with a new session of your own; do not restart someone else's.
 
 ## 4. Context compaction
 
-The target window is a task decision and is written in the task's STATE. The native control per CLI:
+The target window is a task decision and is written in the task's STATE. A configured value is not a measured ceiling: read back the effective value, and for Muse read the model's window from its catalog before computing a fraction. The native control per CLI:
 
 | CLI | Control |
 | --- | --- |
@@ -66,11 +69,13 @@ The target window is a task decision and is written in the task's STATE. The nat
 - Registered, enabled, handshake succeeded, tool visible and effect allowed are five different facts. Check the one your next action needs.
 - `academy_operations` works on one academy account with one lock: only the current lesson owner named in the Academy task STATE performs its operations. A visible write tool is not write permission. Do not reach the academy source by direct HTTP, browser or shell instead of the server.
 - The Hindsight integration is installed in `/root/.hindsight/coding-agents`; its settings file `/root/.hindsight/coding-agent.json` contains a credential: read fields inside a process, never print the file.
+- `daniel_prayer_operations` and `academy_operations` keep the launch command, release and credential files their own service defines. Do not put a not-yet-accepted Rust binary in their place.
+- When the user excludes a feature for one CLI, use that CLI's own control, keep the previous bytes and read the result back in a new session of your own. That is not uninstalling it for the account.
 - When reading a configuration file to reconcile a difference, read key names and the command and arguments only. Never print credential values.
 
 ## 6. Hooks
 
-Hook wiring differs per CLI and changes with CLI and plugin versions, so read the actual configuration instead of assuming it: Claude Code `~/.claude/settings.json` `hooks` plus its installed plugins, Codex `~/.codex/hooks.json`, Antigravity `~/.gemini/config/hooks.json`, Grok `~/.grok/hooks/`. A CLI with the `hindsight` MCP server but no Hindsight hook gets no automatic memory injection and no automatic session retention; the agent calls the tools itself. A hook name does not show that injection or retention happened.
+Hook wiring differs per CLI and changes with CLI and plugin versions, so read the actual configuration instead of assuming it: Claude Code `~/.claude/settings.json` `hooks` plus its installed plugins, Codex `~/.codex/hooks.json`, Muse `~/.config/muse/settings.json` `hooks`, Antigravity `~/.gemini/config/hooks.json`, Grok `~/.grok/hooks/`. A CLI with the `hindsight` MCP server but no Hindsight hook gets no automatic memory injection and no automatic session retention; the agent calls the tools itself. A hook name does not show that injection or retention happened.
 
 Do not export a hook-disable variable and do not remove an MCP server to isolate a worker. Memory isolation uses the Hindsight path override described in `concurrent-work.md`.
 
@@ -83,7 +88,7 @@ Do not export a hook-disable variable and do not remove an MCP server to isolate
 | `hindsight-coding-agent` | Generated by the Hindsight integration; changed only through it |
 | Account-synced, marketplace and built-in skills | Their CLI or vendor; changed only through that CLI |
 
-Installed shared path: `/root/.agents/skills/<skill>/SKILL.md`. Change a skill in its source repository through review, then install it; never edit only the installed copy. Source merged, installed on the host and read by a session are three separate facts.
+Installed shared path: `/root/.agents/skills/<skill>/SKILL.md`. Change a skill in its source repository through review, then install it; never edit only the installed copy. Source merged, installed on the host and read by a session are three separate facts. Frontmatter fields other than `name` and `description` do not behave the same in every CLI.
 
 ## 8. Private memory of each CLI
 
