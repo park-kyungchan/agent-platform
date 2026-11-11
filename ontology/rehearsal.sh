@@ -64,7 +64,22 @@ apply('record_measurement', 'measure-2', newer); before = render('kpi_board')['m
 older = dict(mp, observed_at='2026-11-11T00:30:00Z')
 assert not call(['action', 'validate'], dict(action_type='record_measurement', parameters=older))['valid']
 unchanged = fingerprint(); apply('record_measurement', 'measure-old', older, 'older_measurement'); assert fingerprint() == unchanged
-apply('record_measurement', 'measure-bad', dict(mp, observed_at='not-a-time'), 'invalid_parameter'); assert render('kpi_board')['markdown'] == before
+for i, invalid_time in enumerate(['not-a-time', '2026-13-01T00:00:00Z', '2026-02-31T00:00:00Z', '2026-11-11T24:00:00Z']):
+    unchanged = fingerprint(); board = render('kpi_board')['markdown']
+    apply('record_measurement', 'measure-bad-' + str(i), dict(mp, observed_at=invalid_time), 'invalid_parameter')
+    assert fingerprint() == unchanged and render('kpi_board')['markdown'] == board
+# Probe unsupported future guard without installing it or poisoning measurement history.
+probe = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+probe['action_types']['record_measurement']['submission_criteria'].append(dict(code='future_observation', message='Use observed_at no later than application time.', all=[{'le': ['$observed_at', '$now']}]))
+probe_path = pathlib.Path(store).with_name('future.schema.json'); probe_path.write_text(json.dumps(probe))
+probe_result = call(['schema', 'check', str(probe_path)], code=2); assert any(v['code'] == 'unknown_parameter' and v['pointer'].endswith('/le/1') for v in probe_result['violations'])
+print('future_guard_schema_check=' + json.dumps(probe_result), file=sys.stderr)
+future_probe_bytes = fingerprint(); future_probe_board = render('kpi_board')['markdown']
+for timestamp in [now + 3600, now]:
+    utc = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    assert call(['action', 'validate'], dict(action_type='record_measurement', parameters=dict(mp, observed_at=utc)))['valid']
+assert call(['action', 'validate'], dict(action_type='record_measurement', parameters=dict(mp, observed_at='9999-12-31T23:59:59Z')))['valid']
+assert fingerprint() == future_probe_bytes and render('kpi_board')['markdown'] == future_probe_board
 apply('record_measurement', 'measure-correction', dict(newer, value='12')); corrected = render('kpi_board')['markdown']
 apply('record_measurement', 'measure-new-id', dict(newer, value='12')); assert render('kpi_board')['markdown'] == corrected
 measurements = call(['search'], dict(object_type='measurement', where={'eq': ['kpi', k]}))['objects']; assert len(measurements) == 4 and fields(k)['value'] == '12'
@@ -90,6 +105,7 @@ requests = [dict(jsonrpc='2.0', id=i, method='tools/call', params=dict(name=n, a
 wire = subprocess.run([binary, '--store', store, 'mcp'], input='\n'.join(map(json.dumps, requests))+'\n', text=True, capture_output=True, timeout=60); assert wire.returncode == 0, wire.stderr
 for request, line in zip(requests, wire.stdout.splitlines(), strict=True):
     answer = json.loads(line)['result']; assert not answer['isError'], answer
+    if request['params']['name'] == 'ont_action_list': assert answer['content'][0]['text'].count('Actions take the full Id from search; view arguments take the native key.') == 10
     size = len(answer['content'][0]['text'].encode()); assert size <= 262144; print(request['params']['name'] + '_bytes=' + str(size), file=sys.stderr)
 expected = {'kpi_board': (1, '| checks | 12 | 2026-11-11T01:00:00Z | 12 | ontology/rehearsal.sh |'), 'active_holds': (1, '| publish | review accepted |'), 'current_decisions': (1, '| route | use \\| rendered actions | lead | supersede |'), 'live_workers': (2, 'check \\| next line'), 'closed_workers': (2, 'pending passed')}
 for view, (count, text) in expected.items():

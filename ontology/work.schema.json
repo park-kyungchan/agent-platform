@@ -48,6 +48,10 @@
     "utc_time": {
       "base": "string",
       "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "utc_observed_time": {
+      "base": "string",
+      "pattern": "^[0-9]{4}-((01|03|05|07|08|10|12)-(0[1-9]|[12][0-9]|3[01])|(04|06|09|11)-(0[1-9]|[12][0-9]|30)|02-(0[1-9]|1[0-9]|2[0-9]))T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$"
     }
   },
   "sources": {
@@ -233,7 +237,7 @@
   },
   "object_types": {
     "task": {
-      "description": "One task directory under /home/palantirkc/work with its STATE.md; key is the directory name. Properties: directory is the full path of the directory; state_sha256 is the sha256 of STATE.md; title_line is the first line of STATE.md and owner_line the text after Owner: in its first 40 lines (both copied as written, may be long, owner_line may have no value). Actions take the full Id returned by search; view arguments take the referenced object native key.",
+      "description": "One task directory under /home/palantirkc/work with its STATE.md; key is the directory name. Properties: directory is the full path of the directory; state_sha256 is the sha256 of STATE.md; title_line is the first line of STATE.md and owner_line the text after Owner: in its first 40 lines (both copied as written, may be long, owner_line may have no value).",
       "owner": {
         "source": "task_states"
       },
@@ -653,7 +657,7 @@
         },
         "observed_at": {
           "type": {
-            "value_type": "utc_time"
+            "value_type": "utc_observed_time"
           },
           "required": false,
           "max_bytes": 40,
@@ -690,7 +694,7 @@
         },
         "observed_at": {
           "type": {
-            "value_type": "utc_time"
+            "value_type": "utc_observed_time"
           },
           "required": true,
           "max_bytes": 40,
@@ -786,14 +790,14 @@
             "ref": "packet"
           },
           "required": true,
-          "description": "Reference to packet file. Use the Id returned by search; if not indexed, build {\"object_type\":\"packet\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. It dangles until index."
+          "description": "File Id from search; or {\"object_type\":\"packet\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. May remain unresolved when key is wrong; get on the Id shows whether the file object exists."
         },
         "report": {
           "type": {
             "ref": "report"
           },
           "required": false,
-          "description": "Reference to report file. Use the Id returned by search; if not indexed, build {\"object_type\":\"report\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. It dangles until index."
+          "description": "File Id from search; or {\"object_type\":\"report\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. May remain unresolved when key is wrong; get on the Id shows whether the file object exists."
         },
         "last_note": {
           "type": "string",
@@ -928,7 +932,7 @@
   },
   "action_types": {
     "set_hold": {
-      "description": "Record a hold: task is the task reference, effect the blocked change and until the condition for lifting it.",
+      "description": "Record a hold: task is the task reference, effect the blocked change and until the condition for lifting it. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "task": {
           "type": {
@@ -1003,7 +1007,7 @@
       ]
     },
     "lift_hold": {
-      "description": "Lift hold (a hold reference); reason explains why its condition is satisfied.",
+      "description": "Lift hold (a hold reference); reason explains why its condition is satisfied. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "hold": {
           "type": {
@@ -1044,7 +1048,7 @@
       ]
     },
     "record_decision": {
-      "description": "Record a decision: task identifies its task, topic names the current decision, text states it, decided_by is user or lead, reason explains it and undo states its reversal.",
+      "description": "Record a decision: task identifies its task, topic names the current decision, text states it, decided_by is user or lead, reason explains it and undo states its reversal. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "task": {
           "type": {
@@ -1141,7 +1145,7 @@
       ]
     },
     "supersede_decision": {
-      "description": "Replace decision with new text and decided_by (user or lead); optional reason explains the choice and undo its reversal. The old decision supplies task and topic automatically.",
+      "description": "Replace decision with new text and decided_by (user or lead); optional reason explains the choice and undo its reversal. The old decision supplies task and topic automatically. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "decision": {
           "type": {
@@ -1214,7 +1218,7 @@
       ]
     },
     "define_kpi": {
-      "description": "Define a KPI: task identifies its task, name is unique there, definition states what is counted and from which source, and target is the desired value.",
+      "description": "Define a KPI: task identifies its task, name is unique there, definition states what is counted and from which source, and target is the desired value. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "task": {
           "type": {
@@ -1288,7 +1292,7 @@
       ]
     },
     "record_measurement": {
-      "description": "Record a value: kpi is its KPI reference, value the measured text, observed_at its observation time and evidence the path or command proving it; also update the current KPI fields.",
+      "description": "Record a value: kpi is its KPI reference, value the measured text, observed_at its observation time and evidence the path or command proving it; also update the current KPI fields. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "kpi": {
           "type": {
@@ -1305,7 +1309,7 @@
         },
         "observed_at": {
           "type": {
-            "value_type": "utc_time"
+            "value_type": "utc_observed_time"
           },
           "required": true,
           "max_bytes": 40,
@@ -1364,7 +1368,7 @@
       ]
     },
     "set_kpi_target": {
-      "description": "Set target (the desired value text) on kpi (a KPI reference).",
+      "description": "Set target (the desired value text) on kpi (a KPI reference). Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "kpi": {
           "type": {
@@ -1391,7 +1395,7 @@
       ]
     },
     "start_worker_run": {
-      "description": "Start a worker: task identifies its task, name identifies the run, tier its judgment level, runtime the CLI, session its session id, packet its assignment reference. Application time is generated automatically.",
+      "description": "Start a worker: task identifies its task, name identifies the run, tier its judgment level, runtime the CLI, session its session id, packet its assignment reference. Application time is generated automatically. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "task": {
           "type": {
@@ -1430,7 +1434,7 @@
             "ref": "packet"
           },
           "required": true,
-          "description": "Reference to packet file. Use the Id returned by search; if not indexed, build {\"object_type\":\"packet\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. It dangles until index."
+          "description": "File Id from search; or {\"object_type\":\"packet\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. May remain unresolved when key is wrong; get on the Id shows whether the file object exists."
         }
       },
       "submission_criteria": [
@@ -1489,7 +1493,7 @@
       ]
     },
     "note_worker_run": {
-      "description": "Record note as the running worker_run progress; optional report links its report file. This does not change the final result.",
+      "description": "Record note as the running worker_run progress; optional report links its report file. This does not change the final result. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "worker_run": {
           "type": {
@@ -1509,7 +1513,7 @@
             "ref": "report"
           },
           "required": false,
-          "description": "Reference to report file. Use the Id returned by search; if not indexed, build {\"object_type\":\"report\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. It dangles until index."
+          "description": "File Id from search; or {\"object_type\":\"report\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. May remain unresolved when key is wrong; get on the Id shows whether the file object exists."
         }
       },
       "submission_criteria": [
@@ -1537,7 +1541,7 @@
       ]
     },
     "close_worker_run": {
-      "description": "Close running worker_run with required final result and optional report reference; status and application time change automatically.",
+      "description": "Close running worker_run with required final result and optional report reference; status and application time change automatically. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "worker_run": {
           "type": {
@@ -1557,7 +1561,7 @@
             "ref": "report"
           },
           "required": false,
-          "description": "Reference to report file. Use the Id returned by search; if not indexed, build {\"object_type\":\"report\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. It dangles until index."
+          "description": "File Id from search; or {\"object_type\":\"report\",\"namespace\":{\"instance\":\"vps://palantirkc\",\"account\":\"root\"},\"native_key\":\"<path below /home/palantirkc/work/>\"}. May remain unresolved when key is wrong; get on the Id shows whether the file object exists."
         }
       },
       "submission_criteria": [
