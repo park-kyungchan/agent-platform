@@ -46,6 +46,28 @@ fn git_dir_for(manifest_dir: &Path) -> Option<PathBuf> {
 }
 
 fn emit_rerun(manifest_dir: &Path) {
+    let workspace_root = run_git(manifest_dir, &["rev-parse", "--show-toplevel"])
+        .map(|text| PathBuf::from(text.trim()))
+        .filter(|path| !path.as_os_str().is_empty())
+        .unwrap_or_else(|| {
+            manifest_dir
+                .parent()
+                .and_then(|parent| parent.parent())
+                .map(|path| path.to_path_buf())
+                .unwrap_or_else(|| manifest_dir.to_path_buf())
+        });
+    println!(
+        "cargo:rerun-if-changed={}",
+        workspace_root.join("Cargo.toml").display()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        workspace_root.join("Cargo.lock").display()
+    );
+    println!(
+        "cargo:rerun-if-changed={}",
+        workspace_root.join("crates").display()
+    );
     let Some(git_dir) = git_dir_for(manifest_dir) else {
         return;
     };
@@ -98,8 +120,8 @@ fn build_revision(manifest_dir: &Path) -> String {
     if commit.len() != 40 || !commit.chars().all(|c| c.is_ascii_hexdigit()) {
         return "unknown".to_string();
     }
-    let dirty = run_git(&repo_root, &["status", "--porcelain", "--", "."])
-        .is_some_and(|text| !text.trim().is_empty());
+    let dirty =
+        run_git(&repo_root, &["status", "--porcelain"]).is_some_and(|text| !text.trim().is_empty());
     if dirty {
         format!("{commit}-dirty")
     } else {

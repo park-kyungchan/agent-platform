@@ -41,6 +41,32 @@ fn version_word_prints_build_revision() {
 }
 
 #[test]
+fn version_revision_matches_git_head_when_available() {
+    let git = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .unwrap();
+    if !git.status.success() {
+        return;
+    }
+    let Ok(head) = String::from_utf8(git.stdout) else {
+        return;
+    };
+    let head = head.trim().to_ascii_lowercase();
+    if head.len() != 40 || !head.chars().all(|c| c.is_ascii_hexdigit()) {
+        return;
+    }
+    let output = run(&["--version"]);
+    assert_eq!(output.status.code(), Some(0));
+    let text = String::from_utf8(output.stdout).unwrap();
+    let line = text.strip_suffix('\n').unwrap();
+    let revision = line.split(' ').nth(2).unwrap();
+    let revision = revision.strip_suffix("-dirty").unwrap_or(revision);
+    assert_eq!(revision, head, "line: {line:?}");
+}
+
+#[test]
 fn no_arguments_keeps_usage_error() {
     let output = run(&[]);
     assert_eq!(output.status.code(), Some(2));
