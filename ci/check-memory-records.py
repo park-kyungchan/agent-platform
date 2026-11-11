@@ -91,6 +91,9 @@ def check(root):
         except (ValueError, RecursionError):
             fail("record_header", "start with --- then a JSON object then ---; keys must be unique")
             continue
+        if isinstance(header.get("record_id"), str) and header.get("supersedes") == header["record_id"]:
+            fail("memory_successor_is_self", "a record cannot name itself as its predecessor")
+            continue
         allowed = FIELDS | ({"owner_ref_reason"} if header.get("owner_ref") == "none" else set())
         if set(header) != allowed:
             fail("record_fields", "supply exactly the documented header fields (reason only with none)")

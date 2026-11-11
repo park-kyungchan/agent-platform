@@ -36,6 +36,12 @@ class MemoryRecords(unittest.TestCase):
                 rows[cells[1]] = tuple(name.strip() for name in cells[3].split(";"))
         self.assertEqual(rows, CHECK.SECTIONS)
 
+    def test_self_predecessor_diagnostic_preserves_closed_header(self):
+        self.assertEqual({e.split("@")[0] for e in self.check_text(
+            self.mutate(lambda h: h.update(supersedes=h["record_id"])))}, {"memory_successor_is_self"})
+        self.assertEqual({e.split("@")[0] for e in self.check_text(
+            self.mutate(lambda h: h.update(supersedes="another-record")))}, {"record_fields"})
+
     def test_line_feed_only(self):
         original = (FIXTURES / "valid/example-incident.md").read_text()
         for text in [original.replace("\n", "\r\n"), original + "\r"]:

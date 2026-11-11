@@ -113,31 +113,63 @@ assert fields(successor)['decided_at'] == '2026-11-11T02:00:01Z' and all(fields(
 mr = oid('memory_record', 'rehearsal-original'); ms = oid('memory_record', 'rehearsal-successor')
 mpending, mready, msup = 'mark_memory_record_pending', 'mark_memory_record_ready', 'mark_memory_record_superseded'
 def pending(record, digest, **extra): return dict(record=record, document_id=record['native_key'], body_hash=digest, **extra)
-def memory_view(name): return call(['render'], dict(view=name, args={}))
-apply(mpending, 'memory-start', pending(mr, 'a' * 64)); assert fields(mr)['status'] == 'pending'
-assert memory_view('pending_memory_records')['rows'] == 1 and memory_view('ready_memory_records')['rows'] == 0
-unchanged = fingerprint(); apply(mready, 'memory-wrong-hash', dict(record=mr, body_hash='b' * 64), 'memory_body_hash_mismatch'); assert fingerprint() == unchanged
-apply(mready, 'memory-ready', dict(record=mr, body_hash='a' * 64))
-unchanged = fingerprint(); apply(mready, 'memory-not-pending', dict(record=mr, body_hash='a' * 64), 'memory_record_not_pending'); assert fingerprint() == unchanged
-apply(mpending, 'memory-correct', pending(mr, 'b' * 64)); assert fields(mr)['body_hash'] == 'b' * 64
-apply(mready, 'memory-correct-ready', dict(record=mr, body_hash='b' * 64))
-# Regression: a prematurely linked successor cannot become ready, and its
-# predecessor can still enter pending to recover the intended batch order.
-apply(mpending, 'memory-successor', pending(ms, 'c' * 64, supersedes=mr))
-unchanged = fingerprint(); apply(mready, 'memory-predecessor-ready', dict(record=ms, body_hash='c' * 64), 'memory_predecessor_not_pending'); assert fingerprint() == unchanged
-assert memory_view('ready_memory_records')['rows'] == 1 and memory_view('pending_memory_records')['rows'] == 1
-apply(mpending, 'memory-replace', pending(mr, 'b' * 64))
-unchanged = fingerprint(); apply(mready, 'memory-predecessor-reopen', dict(record=mr, body_hash='b' * 64), 'memory_record_has_successor'); assert fingerprint() == unchanged
-unchanged = fingerprint(); apply(msup, 'memory-not-ready-successor', dict(record=mr, successor=ms), 'memory_successor_not_ready'); assert fingerprint() == unchanged
-unchanged = fingerprint(); apply(mpending, 'memory-bad-status', pending(ms, 'c' * 64, status='unknown'), 'invalid_parameter'); assert fingerprint() == unchanged
-apply(mready, 'memory-successor-ready', dict(record=ms, body_hash='c' * 64))
-apply(msup, 'memory-supersede', dict(record=mr, successor=ms))
+def memory_view():
+    result = call(['render'], dict(view='current_memory_records', args={}))
+    assert not result['truncated'] and '| Record id | Document id | Body hash | Status |' in result['markdown'], result
+    rows = {}
+    for line in result['markdown'].split('\n'):
+        if line.startswith('| rehearsal-'):
+            key, document, digest, status = [cell.strip() for cell in line.strip('|').split('|')]
+            rows[key] = (document, digest, status)
+    assert len(rows) == result['rows'], result
+    assert sum(row[2] == 'ready' for row in rows.values()) <= 1, rows
+    return result, rows
+def memory_apply(*args):
+    result = apply(*args)
+    memory_view()  # At every transition/refusal the pair is never both ready.
+    return result
+memory_apply(mpending, 'memory-start', pending(mr, 'a' * 64)); assert fields(mr)['status'] == 'pending'
+assert memory_view()[1] == {mr['native_key']: (mr['native_key'], 'a' * 64, 'pending')}
+unchanged = fingerprint(); memory_apply(mready, 'memory-wrong-hash', dict(record=mr, body_hash='b' * 64), 'memory_body_hash_mismatch'); assert fingerprint() == unchanged
+memory_apply(mready, 'memory-ready', dict(record=mr, body_hash='a' * 64))
+unchanged = fingerprint(); memory_apply(mready, 'memory-not-pending', dict(record=mr, body_hash='a' * 64), 'memory_record_not_pending'); assert fingerprint() == unchanged
+memory_apply(mpending, 'memory-correct', pending(mr, 'b' * 64)); assert fields(mr)['body_hash'] == 'b' * 64
+memory_apply(mready, 'memory-correct-ready', dict(record=mr, body_hash='b' * 64))
+# A prematurely linked successor cannot become ready; pending the predecessor recovers.
+memory_apply(mpending, 'memory-successor', pending(ms, 'c' * 64, supersedes=mr))
+unchanged = fingerprint(); memory_apply(mready, 'memory-predecessor-ready', dict(record=ms, body_hash='c' * 64), 'memory_predecessor_not_pending'); assert fingerprint() == unchanged
+assert {key: row[2] for key, row in memory_view()[1].items()} == {mr['native_key']: 'ready', ms['native_key']: 'pending'}
+memory_apply(mpending, 'memory-replace', pending(mr, 'b' * 64))
+unchanged = fingerprint(); memory_apply(mready, 'memory-predecessor-reopen', dict(record=mr, body_hash='b' * 64), 'memory_record_has_successor'); assert fingerprint() == unchanged
+unchanged = fingerprint(); memory_apply(msup, 'memory-not-ready-successor', dict(record=mr, successor=ms), 'memory_successor_not_ready'); assert fingerprint() == unchanged
+unchanged = fingerprint(); memory_apply(mpending, 'memory-bad-status', pending(ms, 'c' * 64, status='unknown'), 'invalid_parameter'); assert fingerprint() == unchanged
+memory_apply(mready, 'memory-successor-ready', dict(record=ms, body_hash='c' * 64))
+memory_apply(msup, 'memory-supersede', dict(record=mr, successor=ms))
 assert fields(mr)['status'] == 'superseded' and fields(ms)['supersedes'] == mr
-unchanged = fingerprint(); apply(mpending, 'memory-reopen', pending(mr, 'd' * 64), 'memory_record_has_ready_successor'); assert fingerprint() == unchanged
-assert memory_view('pending_memory_records')['rows'] == 0
-memory_rows = memory_view('ready_memory_records')
-assert memory_rows['rows'] == 1 and not memory_rows['truncated'] and ms['native_key'] in memory_rows['markdown'] and 'c' * 64 in memory_rows['markdown']
-print(memory_rows['markdown'])
+unchanged = fingerprint(); memory_apply(msup, 'memory-supersede-again', dict(record=mr, successor=ms), 'memory_record_already_superseded'); assert fingerprint() == unchanged
+unchanged = fingerprint(); memory_apply(mpending, 'memory-reopen', pending(mr, 'd' * 64), 'memory_record_has_ready_successor'); assert fingerprint() == unchanged
+# R1 blocking regression: correcting a successor never reopens its superseded predecessor.
+memory_apply(mpending, 'memory-successor-correction', pending(ms, 'd' * 64))
+assert fields(mr)['status'] == 'superseded' and fields(ms)['body_hash'] == 'd' * 64
+memory_apply(mready, 'memory-successor-correction-ready', dict(record=ms, body_hash='d' * 64))
+assert fields(mr)['status'] == 'superseded' and fields(ms)['status'] == 'ready'
+assert memory_view()[1] == {ms['native_key']: (ms['native_key'], 'd' * 64, 'ready')}
+# Withdrawal removes the successor from the current set; restoration can reuse A.
+memory_apply('withdraw_memory_record', 'memory-withdraw-successor', dict(record=ms))
+assert fields(ms)['status'] == 'superseded' and memory_view()[1] == {}
+unchanged = fingerprint(); memory_apply('withdraw_memory_record', 'memory-withdraw-again', dict(record=ms), 'memory_record_already_superseded'); assert fingerprint() == unchanged
+memory_apply(mpending, 'memory-restore-predecessor', pending(mr, 'e' * 64))
+memory_apply(mready, 'memory-restore-predecessor-ready', dict(record=mr, body_hash='e' * 64))
+assert fields(mr)['status'] == 'ready' and fields(ms)['status'] == 'superseded'
+assert memory_view()[1] == {mr['native_key']: (mr['native_key'], 'e' * 64, 'ready')}
+# Both admitted withdrawal source states are covered.
+memory_apply('withdraw_memory_record', 'memory-withdraw-restored-ready', dict(record=mr))
+memory_apply(mpending, 'memory-pending-before-withdraw', pending(mr, 'f' * 64))
+memory_apply('withdraw_memory_record', 'memory-withdraw-pending', dict(record=mr))
+assert fields(mr)['status'] == 'superseded' and memory_view()[1] == {}
+memory_apply(mpending, 'memory-final-pending', pending(mr, 'e' * 64))
+memory_apply(mready, 'memory-final-ready', dict(record=mr, body_hash='e' * 64))
+print(memory_view()[0]['markdown'])
 requests = [dict(jsonrpc='2.0', id=i, method='tools/call', params=dict(name=n, arguments={})) for i, n in enumerate(['ont_describe', 'ont_action_list'], 1)]
 wire = subprocess.run([binary, '--store', store, 'mcp'], input='\n'.join(map(json.dumps, requests))+'\n', text=True, capture_output=True, timeout=60); assert wire.returncode == 0, wire.stderr
 for request, line in zip(requests, wire.stdout.splitlines(), strict=True):

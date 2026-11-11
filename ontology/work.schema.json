@@ -1775,7 +1775,7 @@
         },
         {
           "code": "memory_predecessor_not_pending",
-          "message": "Mark the linked predecessor pending before completing its successor.",
+          "message": "Mark a ready predecessor pending before completing its successor; superseded predecessors need no reopening.",
           "none": [
             {
               "linked": {
@@ -1784,9 +1784,9 @@
                 "where": {
                   "all": [
                     {
-                      "ne": [
+                      "eq": [
                         "status",
-                        "pending"
+                        "ready"
                       ]
                     }
                   ]
@@ -1797,12 +1797,25 @@
         },
         {
           "code": "memory_record_has_successor",
-          "message": "Complete the successor batch instead of making its predecessor ready.",
+          "message": "Complete or withdraw the current successor before making its predecessor ready.",
           "none": [
             {
               "linked": {
                 "from": "$record",
-                "link": "memory_successors"
+                "link": "memory_successors",
+                "where": {
+                  "all": [
+                    {
+                      "in": [
+                        "status",
+                        [
+                          "pending",
+                          "ready"
+                        ]
+                      ]
+                    }
+                  ]
+                }
               }
             }
           ]
@@ -1838,15 +1851,12 @@
       "submission_criteria": [
         {
           "code": "memory_record_already_superseded",
-          "message": "Choose a current predecessor.",
+          "message": "Choose a pending predecessor.",
           "all": [
             {
-              "in": [
+              "eq": [
                 "$record.status",
-                [
-                  "pending",
-                  "ready"
-                ]
+                "pending"
               ]
             }
           ]
@@ -1896,6 +1906,43 @@
           }
         }
       ]
+    },
+    "withdraw_memory_record": {
+      "description": "Record withdrawal after the original was removed or reverted on main; supersede a pending or ready record without a successor.",
+      "parameters": {
+        "record": {
+          "type": {
+            "ref": "memory_record"
+          },
+          "required": true,
+          "description": "Full Id of the pending or ready record whose original was removed or reverted on main."
+        }
+      },
+      "submission_criteria": [
+        {
+          "code": "memory_record_already_superseded",
+          "message": "Withdraw only a pending or ready record.",
+          "all": [
+            {
+              "in": [
+                "$record.status",
+                [
+                  "pending",
+                  "ready"
+                ]
+              ]
+            }
+          ]
+        }
+      ],
+      "rules": [
+        {
+          "modify_object": "memory_record",
+          "set": {
+            "status": "superseded"
+          }
+        }
+      ]
     }
   },
   "functions": {},
@@ -1930,7 +1977,8 @@
         "close_worker_run",
         "mark_memory_record_pending",
         "mark_memory_record_ready",
-        "mark_memory_record_superseded"
+        "mark_memory_record_superseded",
+        "withdraw_memory_record"
       ]
     }
   ],
@@ -2171,15 +2219,18 @@
         }
       ]
     },
-    "ready_memory_records": {
+    "current_memory_records": {
       "object_type": "memory_record",
       "args": [],
       "filter": {
         "all": [
           {
-            "eq": [
+            "in": [
               "status",
-              "ready"
+              [
+                "pending",
+                "ready"
+              ]
             ]
           }
         ]
@@ -2202,40 +2253,10 @@
         {
           "header": "Body hash",
           "property": "body_hash"
-        }
-      ]
-    },
-    "pending_memory_records": {
-      "object_type": "memory_record",
-      "args": [],
-      "filter": {
-        "all": [
-          {
-            "eq": [
-              "status",
-              "pending"
-            ]
-          }
-        ]
-      },
-      "order": [
-        {
-          "property": "document_id",
-          "direction": "asc"
-        }
-      ],
-      "columns": [
-        {
-          "header": "Record id",
-          "property": "$key"
         },
         {
-          "header": "Document id",
-          "property": "document_id"
-        },
-        {
-          "header": "Body hash",
-          "property": "body_hash"
+          "header": "Status",
+          "property": "status"
         }
       ]
     }

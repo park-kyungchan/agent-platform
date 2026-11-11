@@ -181,8 +181,10 @@ impossible-calendar times, future-time refusals and boundary/later-time acceptan
 clocks, equal-time correction/history, decision inheritance, native-key task
 isolation, indexed/dangling file references, optional missing cells, escaping
 and descending worker order. It also tests synthetic memory corrections,
-supersession ordering, refusal cases and both index views. It prints six rendered
-blocks (one ready-memory block and five program-state blocks) and removes the
+correction after supersession, withdrawal and predecessor restoration, refusal
+cases and the combined current-memory view. It asserts the predecessor/successor
+pair is never both ready after every transition. It prints six rendered blocks
+(one current-memory block and five program-state blocks) and removes the
 store. Its output sizes and time-comparison `validate` answers go to stderr.
 It uses fixed clocks and synthetic operational values on the indexed tasks
 `workspace-strategy-reassessment-20261109` and `ontology-operational-base`.
@@ -245,28 +247,33 @@ The reverse reference link is `memory_successors`; forward is `memory_predecesso
 | Action | Parameters and effect | Submission refusals |
 | --- | --- | --- |
 | `mark_memory_record_pending` | `record` full Id (may be absent on first use), `document_id`, `body_hash`, optional `supersedes`; creates or modifies the same key, sets pending and the hash; omitted predecessor preserves its existing value | `memory_record_has_ready_successor` while a linked successor is ready; continue that successor instead of reopening its predecessor |
-| `mark_memory_record_ready` | `record`, `body_hash`; sets ready after document/fact/page readback | `memory_record_not_pending`; `memory_body_hash_mismatch`; `memory_predecessor_not_pending` if its linked predecessor is not pending; `memory_record_has_successor` if this record has any successor |
-| `mark_memory_record_superseded` | `record` predecessor, `successor`; marks only the predecessor superseded | `memory_record_already_superseded` unless predecessor is pending/ready; `memory_successor_not_ready`; `memory_successor_not_linked` unless successor.supersedes equals record; `memory_successor_is_self` |
+| `mark_memory_record_ready` | `record`, `body_hash`; sets ready after document/fact/page readback | `memory_record_not_pending`; `memory_body_hash_mismatch`; `memory_predecessor_not_pending` only while its linked predecessor is ready; `memory_record_has_successor` only while a successor is pending or ready |
+| `mark_memory_record_superseded` | `record` predecessor, `successor`; marks only the predecessor superseded | `memory_record_already_superseded` unless predecessor is pending; `memory_successor_not_ready`; `memory_successor_not_linked` unless successor.supersedes equals record; `memory_successor_is_self` |
+| `withdraw_memory_record` | `record` full Id; marks a pending or ready record superseded without a successor after its file was removed or reverted on `main` | `memory_record_already_superseded` if already superseded |
 
 The named refusals appear inside `submission_criteria` answers; unknown parameters
 (including a supplied status) and malformed hashes refuse `invalid_parameter`.
 On distinct replacement, mark the predecessor pending first, create its pending
 successor with `supersedes` pointing back, then ready the successor after readback
 and supersede the predecessor. Same-record corrections use pending with a new
-hash, then ready with exactly that hash. A predecessor with a successor cannot
-become ready again. If a successor was linked prematurely, ready refuses until
-the predecessor enters pending; this recovery is allowed while the successor
-is still pending. Thus the pair cannot both be ready.
+hash, then ready with exactly that hash, including a record that superseded
+another: its superseded predecessor stays superseded during correction. A
+predecessor cannot become ready while a successor is pending or ready. After
+withdrawal of that successor, it can enter pending and then ready again. If a
+successor was linked prematurely, ready refuses while the predecessor is ready;
+pending the predecessor recovers the sequence. Thus the pair cannot both be ready.
 These actions record the publication order; they do not contact a memory server.
 
-`ready_memory_records` and `pending_memory_records` take no arguments. Both show
-Record id (`$key`), Document id and Body hash, ordered by document_id, filtered
-on their respective status. For example, send
-`{"view":"ready_memory_records","args":{}}` to `ont render` through stdin.
-One view read supplies its set within the native 200-row default/10,000-head
-bound; a consumer must treat `truncated` as incomplete, not a complete ready set.
+`current_memory_records` takes no arguments and selects every pending or ready
+record in one read. It shows Record id (`$key`), Document id, Body hash and Status,
+ordered by document_id. Send `{"view":"current_memory_records","args":{}}` to
+`ont render` through stdin. Within the native 200-row default/10,000-head bound,
+a reader must treat a `truncated` answer as **current memory unavailable**.
 `agent` receives the same read/action grants as for other Lead-written types.
 `scope_keys` stays empty; namespace stays `vps://palantirkc` / `root`, with no task
 reference or task-specific scope. A record can therefore span multiple tasks.
 The rehearsal upgrades frozen v1 to v2 to v3, preserves an existing v2 object,
-and exercises synthetic transitions, refusals and both index views offline.
+and exercises synthetic transitions, corrections after supersession, withdrawal,
+restoration, refusals and the current-memory view offline.
+
+The store does not refuse `supersedes` equal to the record itself until the engine evaluates `all` in order; the record check refuses it before a record reaches the store.
