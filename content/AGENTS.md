@@ -31,6 +31,7 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I do not know where a repository, task, plan or service lives | `CODEBASE-ORIENTATION.md` |
 | I start, resume or configure a CLI, register an MCP server, or must check what a session loaded | `CLI-RUNTIMES.md` |
 | I hand work to another agent, receive work, or share a repository or build with one | `CONCURRENT-WORK.md` |
+| I need a task's holds, decisions, KPI values or worker runs from the Ontology store, or I am Lead and record one | `ONTOLOGY-USE.md` |
 | I must decide where a piece of information belongs, or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
 | Memory returns stale or irrelevant results, or I change memory content or pages | `HINDSIGHT-RUNTIME.md` |
 | I need the official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |

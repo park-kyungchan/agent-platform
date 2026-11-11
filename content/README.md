@@ -24,10 +24,9 @@ and bytes require an inventory/test/hash update. Neither source acceptance nor
 a rebuilt binary proves host synchronization, native discovery or execution.
 The task owner separately authorizes and verifies any host installation.
 
-The inventory is the file list in `content_inventory.rs`: `AGENTS.md`, six
-runtime references (`CODEBASE-ORIENTATION`, `CLI-RUNTIMES`, `CONCURRENT-WORK`,
-`CONTEXT-GOVERNANCE`, `HINDSIGHT-RUNTIME`, `OFFICIAL-DOCS`) and the six generic
-skill bundles. `AGENTS.md` section 3 is the only routing table: each reference is
-self-contained and is read when its listed situation applies. Changing values
+The inventory is the file list in `content_inventory.rs`: `AGENTS.md`, the
+runtime references (including `ONTOLOGY-USE.md` for operational store reads
+and Lead writes) and the six generic skill bundles. `AGENTS.md` section 3 is the
+only routing table: each reference is self-contained and is read when its listed situation applies. Changing values
 (model names, efforts, versions, token windows, counts, dates of approvals) stay
 out of `AGENTS.md` and skill frontmatter; they belong in task STATE.
