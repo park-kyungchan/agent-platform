@@ -229,7 +229,7 @@
   },
   "object_types": {
     "task": {
-      "description": "One task directory under /home/palantirkc/work with its STATE.md; key is the directory name. Properties (property descriptions are not supported by the schema language): directory is the full path of the directory; state_sha256 is the sha256 of STATE.md; title_line is the first line of STATE.md and owner_line the text after Owner: in its first 40 lines (both copied as written, may be long, owner_line may have no value).",
+      "description": "One task directory under /home/palantirkc/work with its STATE.md; key is the directory name. Properties: directory is the full path of the directory; state_sha256 is the sha256 of STATE.md; title_line is the first line of STATE.md and owner_line the text after Owner: in its first 40 lines (both copied as written, may be long, owner_line may have no value).",
       "owner": {
         "source": "task_states"
       },
@@ -241,22 +241,26 @@
         "directory": {
           "type": "string",
           "required": true,
-          "from": "/dir_path"
+          "from": "/dir_path",
+          "description": "Full task directory path under /home/palantirkc/work."
         },
         "state_sha256": {
           "type": "string",
           "required": true,
-          "from": "/sha256"
+          "from": "/sha256",
+          "description": "SHA-256 digest of STATE.md, from source indexing."
         },
         "title_line": {
           "type": "string",
           "required": true,
-          "from": "/line1"
+          "from": "/line1",
+          "description": "First line of the indexed Markdown file, copied as written."
         },
         "owner_line": {
           "type": "string",
           "required": false,
-          "from": "/fields/Owner"
+          "from": "/fields/Owner",
+          "description": "Owner field found in the first 40 lines; absent if no field was found."
         }
       }
     },
@@ -279,27 +283,32 @@
         "path": {
           "type": "string",
           "required": true,
-          "from": "/path"
+          "from": "/path",
+          "description": "Absolute path of the indexed file."
         },
         "sha256": {
           "type": "string",
           "required": true,
-          "from": "/sha256"
+          "from": "/sha256",
+          "description": "SHA-256 digest of the indexed file bytes."
         },
         "title_line": {
           "type": "string",
           "required": true,
-          "from": "/line1"
+          "from": "/line1",
+          "description": "First line of the indexed Markdown file, copied as written."
         },
         "owner_line": {
           "type": "string",
           "required": false,
-          "from": "/fields/Owner"
+          "from": "/fields/Owner",
+          "description": "Owner field found in the first 40 lines; absent if no field was found."
         },
         "state_line": {
           "type": "string",
           "required": false,
-          "from": "/fields/State"
+          "from": "/fields/State",
+          "description": "State field found in the first 40 lines; absent if no field was found."
         },
         "task": {
           "type": {
@@ -309,7 +318,8 @@
           "from": "/path",
           "transform": {
             "segment_after": "/home/palantirkc/work/"
-          }
+          },
+          "description": "Reference to the task object; obtain its full Id from search."
         }
       }
     },
@@ -332,22 +342,26 @@
         "path": {
           "type": "string",
           "required": true,
-          "from": "/path"
+          "from": "/path",
+          "description": "Absolute path of the indexed file."
         },
         "sha256": {
           "type": "string",
           "required": true,
-          "from": "/sha256"
+          "from": "/sha256",
+          "description": "SHA-256 digest of the indexed file bytes."
         },
         "title_line": {
           "type": "string",
           "required": true,
-          "from": "/line1"
+          "from": "/line1",
+          "description": "First line of the indexed Markdown file, copied as written."
         },
         "status_line": {
           "type": "string",
           "required": false,
-          "from": "/fields/Status"
+          "from": "/fields/Status",
+          "description": "Status field found in the first 40 lines; absent if no field was found."
         },
         "task": {
           "type": {
@@ -357,7 +371,8 @@
           "from": "/path",
           "transform": {
             "segment_after": "/home/palantirkc/work/"
-          }
+          },
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "packet": {
           "type": {
@@ -370,7 +385,8 @@
               "/home/palantirkc/work/",
               ""
             ]
-          }
+          },
+          "description": "Reference to TASK-<id>.md matched from the report filename."
         }
       }
     },
@@ -387,27 +403,32 @@
         "path": {
           "type": "string",
           "required": true,
-          "from": "/path"
+          "from": "/path",
+          "description": "Absolute path of the indexed file."
         },
         "sha256": {
           "type": "string",
           "required": true,
-          "from": "/sha256"
+          "from": "/sha256",
+          "description": "SHA-256 digest of the indexed file bytes."
         },
         "size": {
           "type": "integer",
           "required": true,
-          "from": "/size"
+          "from": "/size",
+          "description": "File size in bytes."
         },
         "mtime": {
           "type": "integer",
           "required": true,
-          "from": "/mtime"
+          "from": "/mtime",
+          "description": "File modification time as Unix seconds."
         },
         "mode": {
           "type": "integer",
           "required": true,
-          "from": "/mode"
+          "from": "/mode",
+          "description": "File permission bits as an integer."
         }
       }
     },
@@ -424,27 +445,32 @@
         "path": {
           "type": "string",
           "required": true,
-          "from": "/path"
+          "from": "/path",
+          "description": "Absolute path of the indexed file."
         },
         "sha256": {
           "type": "string",
           "required": true,
-          "from": "/sha256"
+          "from": "/sha256",
+          "description": "SHA-256 digest of the indexed file bytes."
         },
         "size": {
           "type": "integer",
           "required": true,
-          "from": "/size"
+          "from": "/size",
+          "description": "File size in bytes."
         },
         "mtime": {
           "type": "integer",
           "required": true,
-          "from": "/mtime"
+          "from": "/mtime",
+          "description": "File modification time as Unix seconds."
         },
         "mode": {
           "type": "integer",
           "required": true,
-          "from": "/mode"
+          "from": "/mode",
+          "description": "File permission bits as an integer."
         },
         "source_copy": {
           "type": {
@@ -457,12 +483,13 @@
               "/root/.agents/",
               "/home/palantirkc/platforms/agent-platform/content/"
             ]
-          }
+          },
+          "description": "Reference from installed shared instructions to their source file under agent-platform/content."
         }
       }
     },
     "hold": {
-      "description": "Ontology-owned hold, written only by actions. task_directory mirrors task.directory for string-only view arguments and is checked by actions. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "description": "Ontology-owned hold, written only by actions. Task references are authoritative; times of application come from the trusted action clock.",
       "owner": "ontology",
       "primary_key": {
         "from": "$action_id"
@@ -473,38 +500,44 @@
           "type": {
             "ref": "task"
           },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "effect": {
           "type": "string",
           "required": true,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Change blocked by this hold; unique among active holds on the task."
         },
         "until": {
           "type": "string",
           "required": true,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Condition that must be satisfied before lifting this hold; free text, not an expiry timestamp."
         },
         "status": {
           "type": {
             "value_type": "hold_status"
           },
-          "required": true
+          "required": true,
+          "description": "Current hold status; allowed values are declared by its value type."
         },
         "lift_reason": {
           "type": "string",
           "required": false,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Optional explanation of why the hold condition was satisfied."
+        },
+        "set_at": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 40,
+          "description": "Trusted UTC application time when the hold was set; generated by $now."
         }
       }
     },
     "decision": {
-      "description": "Ontology-owned decision, written only by actions. task_directory mirrors task.directory for string-only view arguments and is checked by actions. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "description": "Ontology-owned decision, written only by actions. Task references are authoritative; times of application come from the trusted action clock.",
       "owner": "ontology",
       "primary_key": {
         "from": "$action_id"
@@ -515,55 +548,64 @@
           "type": {
             "ref": "task"
           },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "topic": {
           "type": "string",
           "required": true,
-          "max_bytes": 120
+          "max_bytes": 120,
+          "description": "Short topic name; only one decision per task and topic is current. Reuse it when replacing that decision."
         },
         "text": {
           "type": "string",
           "required": true,
-          "max_bytes": 1000
+          "max_bytes": 1000,
+          "description": "The decision being made; state the chosen behavior concretely."
         },
         "decided_by": {
           "type": {
             "value_type": "decision_actor"
           },
-          "required": true
+          "required": true,
+          "description": "Who made the decision: user or lead. This is attribution, not authentication."
         },
         "reason": {
           "type": "string",
           "required": false,
-          "max_bytes": 600
+          "max_bytes": 600,
+          "description": "Optional explanation of the decision or why a hold may be lifted."
         },
         "undo": {
           "type": "string",
           "required": false,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Optional instructions for reversing the decision."
         },
         "status": {
           "type": {
             "value_type": "decision_status"
           },
-          "required": true
+          "required": true,
+          "description": "Current decision status; allowed values are declared by its value type."
         },
         "supersedes": {
           "type": {
             "ref": "decision"
           },
-          "required": false
+          "required": false,
+          "description": "Reference to the previous decision replaced by this current decision."
+        },
+        "decided_at": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 40,
+          "description": "Trusted UTC application time when this decision was recorded; generated by $now."
         }
       }
     },
     "kpi": {
-      "description": "Ontology-owned kpi, written only by actions. task_directory mirrors task.directory for string-only view arguments and is checked by actions. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "description": "Ontology-owned kpi, written only by actions. Task references are authoritative; times of application come from the trusted action clock.",
       "owner": "ontology",
       "primary_key": {
         "from": "$action_id"
@@ -574,42 +616,44 @@
           "type": {
             "ref": "task"
           },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "name": {
           "type": "string",
           "required": true,
-          "max_bytes": 120
+          "max_bytes": 120,
+          "description": "KPI name or worker name, unique within its task (worker names only while running)."
         },
         "definition": {
           "type": "string",
           "required": true,
-          "max_bytes": 600
+          "max_bytes": 600,
+          "description": "What is counted and from which source; include enough detail to reproduce the measurement."
         },
         "target": {
           "type": "string",
           "required": false,
-          "max_bytes": 200
+          "max_bytes": 200,
+          "description": "Desired KPI value as text; omit when there is no target. Omission preserves an existing target."
         },
         "value": {
           "type": "string",
           "required": false,
-          "max_bytes": 200
+          "max_bytes": 200,
+          "description": "Measured value as text; absent on a KPI until the first measurement."
         },
         "observed_at": {
           "type": "string",
           "required": false,
-          "max_bytes": 40
+          "max_bytes": 40,
+          "description": "When the value was observed, as normalized UTC ISO 8601 text, for example 2026-11-11T00:00:00Z; distinct from recording time."
         },
         "evidence": {
           "type": "string",
           "required": false,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Path or command whose output proves the measured value; do not include private payloads."
         }
       }
     },
@@ -625,27 +669,37 @@
           "type": {
             "ref": "kpi"
           },
-          "required": true
+          "required": true,
+          "description": "Reference to the KPI object whose measurement is being recorded."
         },
         "value": {
           "type": "string",
           "required": true,
-          "max_bytes": 200
+          "max_bytes": 200,
+          "description": "Measured value as text; absent on a KPI until the first measurement."
         },
         "observed_at": {
           "type": "string",
           "required": true,
-          "max_bytes": 40
+          "max_bytes": 40,
+          "description": "When the value was observed, as normalized UTC ISO 8601 text, for example 2026-11-11T00:00:00Z; distinct from recording time."
         },
         "evidence": {
           "type": "string",
           "required": true,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Path or command whose output proves the measured value; do not include private payloads."
+        },
+        "recorded_at": {
+          "type": "string",
+          "required": true,
+          "max_bytes": 40,
+          "description": "Trusted UTC application time when the measurement was recorded; generated by $now."
         }
       }
     },
     "worker_run": {
-      "description": "Ontology-owned worker_run, written only by actions. task_directory mirrors task.directory for string-only view arguments and is checked by actions. Byte limits apply to properties and parameters; time strings are supplied by the caller.",
+      "description": "Ontology-owned worker_run, written only by actions. Task references are authoritative; times of application come from the trusted action clock.",
       "owner": "ontology",
       "primary_key": {
         "from": "$action_id"
@@ -656,64 +710,70 @@
           "type": {
             "ref": "task"
           },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "name": {
           "type": "string",
           "required": true,
-          "max_bytes": 80
+          "max_bytes": 80,
+          "description": "KPI name or worker name, unique within its task (worker names only while running)."
         },
         "tier": {
           "type": {
             "value_type": "worker_tier"
           },
-          "required": true
+          "required": true,
+          "description": "Worker judgment level: mechanical, bounded, open or review."
         },
         "runtime": {
           "type": "string",
           "required": true,
-          "max_bytes": 120
+          "max_bytes": 120,
+          "description": "CLI or executor used by this worker run, for example codex."
         },
         "session": {
           "type": "string",
           "required": false,
-          "max_bytes": 200
+          "max_bytes": 200,
+          "description": "Optional runtime session identifier for locating the worker session; not an authenticated identity."
         },
         "packet_path": {
           "type": "string",
           "required": true,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Path of the TASK file assigning this worker run."
         },
         "report_path": {
           "type": "string",
           "required": false,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Optional path of the worker report; omit when no report exists yet."
         },
         "started_at": {
           "type": "string",
           "required": true,
-          "max_bytes": 40
+          "max_bytes": 40,
+          "description": "Trusted UTC application time when the worker run started; generated by $now."
         },
         "status": {
           "type": {
             "value_type": "worker_status"
           },
-          "required": true
+          "required": true,
+          "description": "Current worker_run status; allowed values are declared by its value type."
         },
         "result": {
           "type": "string",
           "required": false,
-          "max_bytes": 600
+          "max_bytes": 600,
+          "description": "Optional progress note or closing outcome; omission preserves the previous note."
         },
         "closed_at": {
           "type": "string",
           "required": false,
-          "max_bytes": 40
+          "max_bytes": 40,
+          "description": "Trusted UTC application time when the worker run closed; generated by $now."
         }
       }
     }
@@ -822,46 +882,29 @@
   },
   "action_types": {
     "set_hold": {
-      "description": "Record a hold: task is the task reference, task_directory its directory, effect the blocked change and until the condition for lifting it.",
+      "description": "Record a hold: task is the task reference, effect the blocked change and until the condition for lifting it.",
       "parameters": {
         "task": {
           "type": {
             "ref": "task"
           },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "effect": {
           "type": "string",
           "required": true,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Change blocked by this hold; unique among active holds on the task."
         },
         "until": {
           "type": "string",
           "required": true,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Condition that must be satisfied before lifting this hold; free text, not an expiry timestamp."
         }
       },
       "submission_criteria": [
-        {
-          "code": "task_directory_mismatch",
-          "message": "Read task and pass task_directory equal to task.directory.",
-          "all": [
-            {
-              "exists": "$task"
-            },
-            {
-              "eq": [
-                "$task.directory",
-                "$task_directory"
-              ]
-            }
-          ]
-        },
         {
           "code": "duplicate_active_hold",
           "message": "Lift the existing active hold on this effect before recording another.",
@@ -896,10 +939,10 @@
           "create_object": "hold",
           "set": {
             "task": "$task",
-            "task_directory": "$task_directory",
             "effect": "$effect",
             "until": "$until",
-            "status": "active"
+            "status": "active",
+            "set_at": "$now"
           }
         }
       ]
@@ -911,12 +954,14 @@
           "type": {
             "ref": "hold"
           },
-          "required": true
+          "required": true,
+          "description": "Reference to the active hold being lifted."
         },
         "reason": {
           "type": "string",
-          "required": true,
-          "max_bytes": 300
+          "required": false,
+          "max_bytes": 300,
+          "description": "Optional explanation of the decision or why a hold may be lifted."
         }
       },
       "submission_criteria": [
@@ -944,62 +989,48 @@
       ]
     },
     "record_decision": {
-      "description": "Record a decision: task and task_directory identify its task, topic names the current decision, text states it, decided_by is user or lead, reason explains it and undo states its reversal.",
+      "description": "Record a decision: task identifies its task, topic names the current decision, text states it, decided_by is user or lead, reason explains it and undo states its reversal.",
       "parameters": {
         "task": {
           "type": {
             "ref": "task"
           },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "topic": {
           "type": "string",
           "required": true,
-          "max_bytes": 120
+          "max_bytes": 120,
+          "description": "Short topic name; only one decision per task and topic is current. Reuse it when replacing that decision."
         },
         "text": {
           "type": "string",
           "required": true,
-          "max_bytes": 1000
+          "max_bytes": 1000,
+          "description": "The decision being made; state the chosen behavior concretely."
         },
         "decided_by": {
           "type": {
             "value_type": "decision_actor"
           },
-          "required": true
+          "required": true,
+          "description": "Who made the decision: user or lead. This is attribution, not authentication."
         },
         "reason": {
           "type": "string",
-          "required": true,
-          "max_bytes": 600
+          "required": false,
+          "max_bytes": 600,
+          "description": "Optional explanation of the decision or why a hold may be lifted."
         },
         "undo": {
           "type": "string",
-          "required": true,
-          "max_bytes": 300
+          "required": false,
+          "max_bytes": 300,
+          "description": "Optional instructions for reversing the decision."
         }
       },
       "submission_criteria": [
-        {
-          "code": "task_directory_mismatch",
-          "message": "Read task and pass task_directory equal to task.directory.",
-          "all": [
-            {
-              "exists": "$task"
-            },
-            {
-              "eq": [
-                "$task.directory",
-                "$task_directory"
-              ]
-            }
-          ]
-        },
         {
           "code": "decision_already_current",
           "message": "Use supersede_decision with the current decision reference for this topic.",
@@ -1034,62 +1065,51 @@
           "create_object": "decision",
           "set": {
             "task": "$task",
-            "task_directory": "$task_directory",
             "topic": "$topic",
             "text": "$text",
             "decided_by": "$decided_by",
             "reason": "$reason",
             "undo": "$undo",
-            "status": "current"
+            "status": "current",
+            "decided_at": "$now"
           }
         }
       ]
     },
     "supersede_decision": {
-      "description": "Replace decision (a current decision reference): task, task_directory and topic must repeat its values; text is the new decision, decided_by its user or lead author, reason its basis and undo its reversal.",
+      "description": "Replace decision with new text and decided_by (user or lead); optional reason explains the choice and undo its reversal. The old decision supplies task and topic automatically.",
       "parameters": {
         "decision": {
           "type": {
             "ref": "decision"
           },
-          "required": true
-        },
-        "task": {
-          "type": {
-            "ref": "task"
-          },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
-        },
-        "topic": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 120
+          "description": "Reference to the current decision being replaced; its task and topic are reused automatically."
         },
         "text": {
           "type": "string",
           "required": true,
-          "max_bytes": 1000
+          "max_bytes": 1000,
+          "description": "The decision being made; state the chosen behavior concretely."
         },
         "decided_by": {
           "type": {
             "value_type": "decision_actor"
           },
-          "required": true
+          "required": true,
+          "description": "Who made the decision: user or lead. This is attribution, not authentication."
         },
         "reason": {
           "type": "string",
-          "required": true,
-          "max_bytes": 600
+          "required": false,
+          "max_bytes": 600,
+          "description": "Optional explanation of the decision or why a hold may be lifted."
         },
         "undo": {
           "type": "string",
-          "required": true,
-          "max_bytes": 300
+          "required": false,
+          "max_bytes": 300,
+          "description": "Optional instructions for reversing the decision."
         }
       },
       "submission_criteria": [
@@ -1101,45 +1121,6 @@
               "eq": [
                 "$decision.status",
                 "current"
-              ]
-            }
-          ]
-        },
-        {
-          "code": "task_directory_mismatch",
-          "message": "Read task and pass task_directory equal to task.directory.",
-          "all": [
-            {
-              "exists": "$task"
-            },
-            {
-              "eq": [
-                "$task.directory",
-                "$task_directory"
-              ]
-            }
-          ]
-        },
-        {
-          "code": "decision_context_mismatch",
-          "message": "Read decision and pass its task, task_directory and topic unchanged.",
-          "all": [
-            {
-              "eq": [
-                "$decision.task",
-                "$task"
-              ]
-            },
-            {
-              "eq": [
-                "$decision.topic",
-                "$topic"
-              ]
-            },
-            {
-              "eq": [
-                "$decision.task_directory",
-                "$task_directory"
               ]
             }
           ]
@@ -1155,65 +1136,49 @@
         {
           "create_object": "decision",
           "set": {
-            "task": "$task",
-            "task_directory": "$task_directory",
-            "topic": "$topic",
+            "task": "$decision.task",
+            "topic": "$decision.topic",
             "text": "$text",
             "decided_by": "$decided_by",
             "reason": "$reason",
             "undo": "$undo",
             "status": "current",
-            "supersedes": "$decision"
+            "supersedes": "$decision",
+            "decided_at": "$now"
           }
         }
       ]
     },
     "define_kpi": {
-      "description": "Define a KPI: task and task_directory identify its task, name is unique there, definition states what is counted and from which source, and target is the desired value.",
+      "description": "Define a KPI: task identifies its task, name is unique there, definition states what is counted and from which source, and target is the desired value.",
       "parameters": {
         "task": {
           "type": {
             "ref": "task"
           },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "name": {
           "type": "string",
           "required": true,
-          "max_bytes": 120
+          "max_bytes": 120,
+          "description": "KPI name or worker name, unique within its task (worker names only while running)."
         },
         "definition": {
           "type": "string",
           "required": true,
-          "max_bytes": 600
+          "max_bytes": 600,
+          "description": "What is counted and from which source; include enough detail to reproduce the measurement."
         },
         "target": {
           "type": "string",
-          "required": true,
-          "max_bytes": 200
+          "required": false,
+          "max_bytes": 200,
+          "description": "Desired KPI value as text; omit when there is no target. Omission preserves an existing target."
         }
       },
       "submission_criteria": [
-        {
-          "code": "task_directory_mismatch",
-          "message": "Read task and pass task_directory equal to task.directory.",
-          "all": [
-            {
-              "exists": "$task"
-            },
-            {
-              "eq": [
-                "$task.directory",
-                "$task_directory"
-              ]
-            }
-          ]
-        },
         {
           "code": "duplicate_kpi",
           "message": "Use the existing KPI; change its target with set_kpi_target or record a value with record_measurement.",
@@ -1242,7 +1207,6 @@
           "create_object": "kpi",
           "set": {
             "task": "$task",
-            "task_directory": "$task_directory",
             "name": "$name",
             "definition": "$definition",
             "target": "$target"
@@ -1257,22 +1221,26 @@
           "type": {
             "ref": "kpi"
           },
-          "required": true
+          "required": true,
+          "description": "Reference to the KPI object whose measurement is being recorded."
         },
         "value": {
           "type": "string",
           "required": true,
-          "max_bytes": 200
+          "max_bytes": 200,
+          "description": "Measured value as text; absent on a KPI until the first measurement."
         },
         "observed_at": {
           "type": "string",
           "required": true,
-          "max_bytes": 40
+          "max_bytes": 40,
+          "description": "When the value was observed, as normalized UTC ISO 8601 text, for example 2026-11-11T00:00:00Z; distinct from recording time."
         },
         "evidence": {
           "type": "string",
           "required": true,
-          "max_bytes": 300
+          "max_bytes": 300,
+          "description": "Path or command whose output proves the measured value; do not include private payloads."
         }
       },
       "submission_criteria": [],
@@ -1283,7 +1251,8 @@
             "kpi": "$kpi",
             "value": "$value",
             "observed_at": "$observed_at",
-            "evidence": "$evidence"
+            "evidence": "$evidence",
+            "recorded_at": "$now"
           }
         },
         {
@@ -1303,12 +1272,14 @@
           "type": {
             "ref": "kpi"
           },
-          "required": true
+          "required": true,
+          "description": "Reference to the KPI object whose measurement is being recorded."
         },
         "target": {
           "type": "string",
-          "required": true,
-          "max_bytes": 200
+          "required": false,
+          "max_bytes": 200,
+          "description": "Desired KPI value as text; omit when there is no target. Omission preserves an existing target."
         }
       },
       "submission_criteria": [],
@@ -1322,67 +1293,48 @@
       ]
     },
     "start_worker_run": {
-      "description": "Start a worker: task and task_directory identify its task, name identifies the run, tier its judgment level, runtime the CLI, session its session id, packet_path its assignment and started_at its start time.",
+      "description": "Start a worker: task identifies its task, name identifies the run, tier its judgment level, runtime the CLI, session its session id, packet_path its assignment. Application time is generated automatically.",
       "parameters": {
         "task": {
           "type": {
             "ref": "task"
           },
-          "required": true
-        },
-        "task_directory": {
-          "type": "string",
           "required": true,
-          "max_bytes": 300
+          "description": "Reference to the task object; obtain its full Id from search."
         },
         "name": {
           "type": "string",
           "required": true,
-          "max_bytes": 80
+          "max_bytes": 80,
+          "description": "KPI name or worker name, unique within its task (worker names only while running)."
         },
         "tier": {
           "type": {
             "value_type": "worker_tier"
           },
-          "required": true
+          "required": true,
+          "description": "Worker judgment level: mechanical, bounded, open or review."
         },
         "runtime": {
           "type": "string",
           "required": true,
-          "max_bytes": 120
+          "max_bytes": 120,
+          "description": "CLI or executor used by this worker run, for example codex."
         },
         "session": {
           "type": "string",
-          "required": true,
-          "max_bytes": 200
+          "required": false,
+          "max_bytes": 200,
+          "description": "Optional runtime session identifier for locating the worker session; not an authenticated identity."
         },
         "packet_path": {
           "type": "string",
           "required": true,
-          "max_bytes": 300
-        },
-        "started_at": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 40
+          "max_bytes": 300,
+          "description": "Path of the TASK file assigning this worker run."
         }
       },
       "submission_criteria": [
-        {
-          "code": "task_directory_mismatch",
-          "message": "Read task and pass task_directory equal to task.directory.",
-          "all": [
-            {
-              "exists": "$task"
-            },
-            {
-              "eq": [
-                "$task.directory",
-                "$task_directory"
-              ]
-            }
-          ]
-        },
         {
           "code": "duplicate_running_worker",
           "message": "Close the running worker of this name before starting another.",
@@ -1417,13 +1369,12 @@
           "create_object": "worker_run",
           "set": {
             "task": "$task",
-            "task_directory": "$task_directory",
             "name": "$name",
             "tier": "$tier",
             "runtime": "$runtime",
             "session": "$session",
             "packet_path": "$packet_path",
-            "started_at": "$started_at",
+            "started_at": "$now",
             "status": "running"
           }
         }
@@ -1436,12 +1387,14 @@
           "type": {
             "ref": "worker_run"
           },
-          "required": true
+          "required": true,
+          "description": "Reference to the running worker being noted or closed."
         },
         "result": {
           "type": "string",
-          "required": true,
-          "max_bytes": 600
+          "required": false,
+          "max_bytes": 600,
+          "description": "Optional progress note or closing outcome; omission preserves the previous note."
         }
       },
       "submission_criteria": [
@@ -1468,28 +1421,26 @@
       ]
     },
     "close_worker_run": {
-      "description": "Close worker_run (a running worker reference): result states its outcome, report_path names its report and closed_at its closing time.",
+      "description": "Close worker_run (a running worker reference): result states its outcome, report_path names its report. Application time is generated automatically.",
       "parameters": {
         "worker_run": {
           "type": {
             "ref": "worker_run"
           },
-          "required": true
+          "required": true,
+          "description": "Reference to the running worker being noted or closed."
         },
         "result": {
           "type": "string",
-          "required": true,
-          "max_bytes": 600
+          "required": false,
+          "max_bytes": 600,
+          "description": "Optional progress note or closing outcome; omission preserves the previous note."
         },
         "report_path": {
           "type": "string",
-          "required": true,
-          "max_bytes": 300
-        },
-        "closed_at": {
-          "type": "string",
-          "required": true,
-          "max_bytes": 40
+          "required": false,
+          "max_bytes": 300,
+          "description": "Optional path of the worker report; omit when no report exists yet."
         }
       },
       "submission_criteria": [
@@ -1512,7 +1463,7 @@
           "set": {
             "result": "$result",
             "report_path": "$report_path",
-            "closed_at": "$closed_at",
+            "closed_at": "$now",
             "status": "closed"
           }
         }
@@ -1561,7 +1512,7 @@
         "all": [
           {
             "eq": [
-              "task_directory",
+              "task",
               "$task"
             ]
           }
@@ -1605,7 +1556,7 @@
         "all": [
           {
             "eq": [
-              "task_directory",
+              "task",
               "$task"
             ]
           },
@@ -1643,7 +1594,7 @@
         "all": [
           {
             "eq": [
-              "task_directory",
+              "task",
               "$task"
             ]
           },
@@ -1689,7 +1640,7 @@
         "all": [
           {
             "eq": [
-              "task_directory",
+              "task",
               "$task"
             ]
           },
@@ -1743,7 +1694,7 @@
         "all": [
           {
             "eq": [
-              "task_directory",
+              "task",
               "$task"
             ]
           },

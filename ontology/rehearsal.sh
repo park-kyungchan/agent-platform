@@ -8,13 +8,15 @@ trap 'python3 -c '\''import shutil,sys; shutil.rmtree(sys.argv[1])'\'' "$rehears
 store="$rehearsal_root/store.sqlite"
 [[ $store == "$rehearsal_root/"* ]] || exit 2
 python3 - "$ont_binary" "$repo" "$rehearsal_root" "$store" <<'PY'
-import hashlib, json, os, pathlib, subprocess, sys
+import datetime, hashlib, json, os, pathlib, subprocess, sys
 binary, repo, root, store = sys.argv[1:]
+now = int(datetime.datetime(2026, 11, 11, tzinfo=datetime.timezone.utc).timestamp())
 assert pathlib.Path(store).resolve().parent == pathlib.Path(root).resolve()
 def call(args, request=None, code=0):
-    p = subprocess.run([binary, '--store', store, *args], input=json.dumps(request) if request else None,
+    p = subprocess.run([binary, '--store', store, '--now', str(now), *args], input=json.dumps(request) if request is not None else None,
                        text=True, capture_output=True, timeout=60)
     assert p.returncode == code, (args, p.returncode, p.stdout, p.stderr)
+    if args == ['describe']: print('ont_describe_stdout_bytes=' + str(len(p.stdout.encode())), file=sys.stderr)
     data = json.loads(p.stdout)
     assert data['status'] == ('refused' if code else 'ok'), data
     return data.get('result', data)
@@ -25,10 +27,10 @@ first = pathlib.Path(root, 'v1.json'); first.write_bytes(v1)
 call(['schema', 'install', str(first)])
 call(['schema', 'install', os.path.join(repo, 'ontology/work.schema.json')])
 call(['index', '--source', 'task_states'])
+call(['describe'], {})
 ns = {'instance': 'vps://palantirkc', 'account': 'root'}
 task = {'object_type': 'task', 'namespace': ns, 'native_key': 'workspace-strategy-reassessment-20261109'}
-directory = '/home/palantirkc/work/' + task['native_key']
-base = dict(task=task, task_directory=directory)
+base = dict(task=task)
 def apply(action, request_id, parameters, refusal=None, outcome='applied'):
     r = call(['action', 'apply'], dict(op='apply_action', action_type=action,
              request_id=request_id, parameters=parameters), 2 if refusal else 0)
@@ -40,59 +42,77 @@ def apply(action, request_id, parameters, refusal=None, outcome='applied'):
 
 def created(r, kind):
     return next(e['id'] for e in r['edits'] if e['id']['object_type'] == kind and e['change'] == 'initial')
+def fields(oid):
+    obj = call(['get'], dict(id=oid))['objects'][0]
+    return {k: v.get('value') for k, v in obj['observations'][-1]['fields'].items()}
 hp = dict(base, effect='publish', until='review accepted')
 h = created(apply('set_hold', 'hold-1', hp), 'hold')
+original_time = fields(h)['set_at']; now += 1
 apply('set_hold', 'hold-1', hp, outcome='already_applied')
+assert fields(h)['set_at'] == original_time == '2026-11-11T00:00:00Z'
 apply('set_hold', 'hold-duplicate', hp, 'duplicate_active_hold')
-apply('set_hold', 'hold-directory', dict(hp, task_directory='/wrong'), 'task_directory_mismatch')
 apply('lift_hold', 'lift-1', dict(hold=h, reason='review accepted'))
 apply('lift_hold', 'lift-refused', dict(hold=h, reason='again'), 'hold_not_active')
 apply('set_hold', 'hold-2', hp)
+omit = created(apply('define_kpi', 'optional-kpi', dict(task=dict(task, native_key='ontology-operational-base'), name='optional', definition='test omission')), 'kpi')
+assert 'target' not in fields(omit)
+apply('set_kpi_target', 'optional-target', dict(kpi=omit, target=None))
 dp = dict(base, topic='route', text='use actions', decided_by='lead', reason='auditable', undo='supersede')
 d = created(apply('record_decision', 'decision-1', dp), 'decision')
 apply('record_decision', 'decision-duplicate', dp, 'decision_already_current')
-sp = dict(dp, decision=d, text='use rendered actions')
-apply('supersede_decision', 'decision-context', dict(sp, topic='wrong'), 'decision_context_mismatch')
+sp = dict(decision=d, text='use rendered actions', decided_by='lead', undo='supersede')
 new_d = created(apply('supersede_decision', 'decision-2', sp), 'decision')
 apply('supersede_decision', 'decision-refused', sp, 'decision_not_current')
 kp = dict(base, name='checks', definition='passing checks from rehearsal output', target='10')
 k = created(apply('define_kpi', 'kpi-1', kp), 'kpi')
 apply('define_kpi', 'kpi-duplicate', kp, 'duplicate_kpi')
-empty = call(['render'], dict(view='kpi_board', args=dict(task=directory)))
+empty = call(['render'], dict(view='kpi_board', args=dict(task=task['native_key'])))
 assert '| checks | (missing) | (missing) | 10 | (missing) |' in empty['markdown'], empty
 mp = dict(kpi=k, value='10', observed_at='2026-11-11T00:00:00Z', evidence='ontology/rehearsal.sh')
 apply('record_measurement', 'measurement-1', mp)
 apply('record_measurement', 'measurement-2', dict(mp, value='11'))
 apply('set_kpi_target', 'target-1', dict(kpi=k, target='11'))
 wp = dict(base, name='O13', tier='bounded', runtime='codex', session='rehearsal',
-          packet_path='TASK-O13.md', started_at='2026-11-11T00:00:00Z')
+          packet_path='TASK-O13.md')
 w = created(apply('start_worker_run', 'worker-1', wp), 'worker_run')
 apply('start_worker_run', 'worker-duplicate', wp, 'duplicate_running_worker')
+assert apply('note_worker_run', 'note-empty', dict(worker_run=w))['edits'] == []
 apply('note_worker_run', 'note-1', dict(worker_run=w, result='checked'))
-cp = dict(worker_run=w, result='passed', report_path='REPORT-O13.md', closed_at='2026-11-11T00:01:00Z')
+now += 59
+cp = dict(worker_run=w, result='passed', report_path='REPORT-O13.md')
 apply('close_worker_run', 'close-1', cp)
 apply('note_worker_run', 'note-refused', dict(worker_run=w, result='late'), 'worker_run_not_running')
 apply('close_worker_run', 'close-refused', cp, 'worker_run_not_running')
 apply('start_worker_run', 'worker-2', dict(wp, name='O13-review'))
 measurements = call(['search'], dict(object_type='measurement', where={'eq': ['kpi', k]}))
 assert len(measurements['objects']) == 2, measurements
-def fields(oid):
-    obj = call(['get'], dict(id=oid))['objects'][0]
-    return {k: v.get('value') for k, v in obj['observations'][-1]['fields'].items()}
 assert fields(h)['status'] == 'lifted' and fields(h)['lift_reason'] == 'review accepted'
 assert fields(d)['status'] == 'superseded' and fields(new_d)['supersedes'] == d
 assert fields(new_d)['task'] == task and fields(new_d)['topic'] == 'route'
 assert fields(k)['value'] == '11' and fields(k)['evidence'] == 'ontology/rehearsal.sh'
 assert sorted(fields(m['id'])['value'] for m in measurements['objects']) == ['10', '11']
 assert fields(w)['status'] == 'closed' and fields(w)['report_path'] == 'REPORT-O13.md'
+assert fields(w)['started_at'] == '2026-11-11T00:00:01Z'
+assert fields(w)['closed_at'] == '2026-11-11T00:01:00Z'
+assert fields(new_d)['decided_at'] == '2026-11-11T00:00:01Z'
+assert all(fields(m['id'])['recorded_at'] == '2026-11-11T00:00:01Z' for m in measurements['objects'])
+requests = [dict(jsonrpc='2.0', id=i, method='tools/call', params=dict(name=n, arguments={}))
+            for i, n in enumerate(['ont_describe', 'ont_action_list'], 1)]
+wire = subprocess.run([binary, '--store', store, 'mcp'], input='\n'.join(map(json.dumps, requests))+'\n',
+                      text=True, capture_output=True, timeout=60)
+assert wire.returncode == 0, wire.stderr
+for request, line in zip(requests, wire.stdout.splitlines(), strict=True):
+    answer = json.loads(line)['result']; assert not answer['isError'], answer
+    size = len(answer['content'][0]['text'].encode()); assert size <= 262144
+    print(request['params']['name'] + '_bytes=' + str(size), file=sys.stderr)
 expected = {
     'kpi_board': '| checks | 11 | 2026-11-11T00:00:00Z | 11 | ontology/rehearsal.sh |',
     'active_holds': '| publish | review accepted |',
     'current_decisions': '| route | use rendered actions | lead | supersede |',
-    'live_workers': '| O13-review | bounded | codex | rehearsal | TASK-O13.md | 2026-11-11T00:00:00Z |',
+    'live_workers': '| O13-review | bounded | codex | rehearsal | TASK-O13.md | 2026-11-11T00:01:00Z |',
     'closed_workers': '| O13 | TASK-O13.md | REPORT-O13.md | 2026-11-11T00:01:00Z | passed |'}
 for view, row in expected.items():
-    r = call(['render'], dict(view=view, args=dict(task=directory)))
+    r = call(['render'], dict(view=view, args=dict(task=task['native_key'])))
     assert r['rows'] == 1 and not r['truncated'] and row in r['markdown'], r
     other = call(['render'], dict(view=view, args=dict(task='/absent')))
     assert other['rows'] == 0, other

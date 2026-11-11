@@ -41,103 +41,112 @@ Before changing a glob or the list, enumerate matched names (no content) and
 show none lies under an excluded path.
 
 ## Version 2: program state
-Version 1 is preserved in Git at
+Version 1 remains pinned in Git at
 `f2d1b030bd1a0a66928ef57d9365027526e664da:ontology/work.schema.json`,
 sha256 `4573ab180f63889029ae98c892c996e810f9d8140cf26726ee6d5fffbfc10605`.
-Version 2 retains those source definitions, types and links without changing
-meaning. It adds five types keyed by the creating action id:
+Version 2 retains the original types, sources and links in meaning and adds
+property descriptions. It adds five Ontology-owned types, keyed by action id:
 
 | Type | Records | Actions |
 | --- | --- | --- |
-| `hold` | A blocked effect and its lifting condition/reason | `set_hold`, `lift_hold` |
-| `decision` | One current decision per task/topic, with its predecessor | `record_decision`, `supersede_decision` |
+| `hold` | Blocked effect, lifting condition/reason, `set_at` | `set_hold`, `lift_hold` |
+| `decision` | Current choice per task/topic, predecessor, `decided_at` | `record_decision`, `supersede_decision` |
 | `kpi` | Definition, target and latest recorded value/evidence | `define_kpi`, `set_kpi_target` |
-| `measurement` | Immutable value, observation time and evidence history | `record_measurement` (also updates `kpi`) |
-| `worker_run` | Runtime, assignment, progress and closing result | `start_worker_run`, `note_worker_run`, `close_worker_run` |
+| `measurement` | Immutable value, `observed_at`, evidence, `recorded_at` | `record_measurement` (also updates `kpi`) |
+| `worker_run` | Runtime, assignment, progress, result, start/close time | `start_worker_run`, `note_worker_run`, `close_worker_run` |
 
-Reverse links from tasks are `holds`, `decisions`, `kpis`, `worker_runs`;
+Task references are authoritative; there is no copied task-directory property.
+Reverse links from a task are `holds`, `decisions`, `kpis`, `worker_runs`;
 from a KPI, `measurements`; from an earlier decision, `successors`.
-`agent` reads every type and may apply every declared action. Actors on this
-host share the OS account and are self-reported, including client, agent and
-session; this attribution is not authentication.
+`supersede_decision` takes only the old decision reference and the new text,
+`decided_by`, optional reason and undo. Rules read `$decision.task` and
+`$decision.topic` from the original snapshot even after marking it superseded;
+the successor stores `supersedes` as that old decision reference. Two rules in
+one action are atomic, including measurement creation and updating the KPI.
 
-Action definitions describe every parameter and give actionable criterion
-codes/messages. All listed action parameters are required, including reason,
-undo, target and session; use an empty string when one has no content. Their
-object properties are optional until the relevant action supplies them.
-A new KPI has no value, observation time or evidence until its first measurement.
-Measurement recording updates the KPI with the last applied measurement; it
-does not choose the greatest timestamp. Retrying an identical request with the
-same `request_id`, client and agent returns `already_applied` without new edits.
-Use a distinct `request_id` per intended change. Two rules in one action are
-supported and atomic (decision replacement and measurement recording).
+`agent` reads every type and may apply every action, including permission to
+read properties through references. Actors on this host share the OS account;
+client, agent and session attribution is self-reported, not authentication.
+Rule and criterion reference reads require fresh, readable objects; missing or
+unreadable references refuse, and stale source values refuse `rule_value_stale`.
+Validate before apply and pass its basis as expected revisions to detect changes.
 
-### Language limits and explicit adaptations
-- View arguments compare only with string properties, not references. Each
-  task-owned operational type therefore also stores `task_directory` (at most
-  300 bytes). Its action parameter is checked against the referenced task's
-  `directory`; it cannot be supplied independently. Every view takes `task` as
-  that **full directory**, for example
-  `/home/palantirkc/work/workspace-strategy-reassessment-20261109`, rather than
-  the task key. Typed reference arguments would remove this mirror and parameter.
-- Rule values substitute parameters, but cannot copy a referenced object's
-  properties. `supersede_decision` therefore also requires `task`,
-  `task_directory`, `topic`, checked against the old decision before its status
-  changes; it records `supersedes` as the old decision reference. Allowing
-  `$decision.task`, `$decision.topic` and `$decision.task_directory` in rule
-  values would remove these extra parameters. The extra `decision_supersedes`
-  link makes the predecessor/successor relationship navigable.
-- No application-time expression is available to rule values. The caller passes
-  `observed_at`, `started_at`, `closed_at` as strings (40 bytes maximum); use
-  normalized UTC ISO 8601 values so lexical ordering matches time ordering.
-  A trusted `$now` rule expression would remove caller-supplied application
-  times; typed timestamp parsing would validate observation times separately.
-- The requested views use equality filters and lexical ordering. Typed date or
-  number comparison would be better for KPI value versus target or observation
-  age in `kpi_board`, elapsed runtime in `live_workers`, and a closing date
-  window in `closed_workers`. Add typed arguments and date/number conversions
-  (and property comparisons for value versus target) to express those views.
-  `active_holds.until` is intentionally free text, so a time-based expiry view
-  would also need a separate typed expiry field. `current_decisions` needs no
-  numeric or date comparison.
-- Properties have no description field in this schema language; type descriptions
-  and action descriptions carry the explanations. Adding property descriptions
-  would make them available directly in schema introspection.
+### Times and optional values
+`set_at`, `decided_at`, `started_at`, `closed_at` and `recorded_at` are UTC
+application-time strings generated by `$now`, never supplied as parameters.
+`record_measurement` alone takes `observed_at`: when the observation happened,
+which may differ from when it was recorded. Supply normalized UTC ISO 8601,
+for example `2026-11-11T00:00:00Z`. Time properties are strings, capped at 40
+bytes; observed-time formatting is a caller contract, not calendar validation.
+A KPI shows the last applied measurement, not the one with greatest observed_at.
+Retry with the same `request_id`, client, agent and parameters returns
+`already_applied` and preserves the original application time and object edits.
+
+Reason, undo, target, session, report_path and result parameters are optional;
+`lift_hold` retains its parameter name `reason`, which supplies optional
+`hold.lift_reason`. Omission or null leaves a property absent on create and
+preserves it on modify. Empty strings are not needed. A note with no result or
+a target update with no target writes no object revision but retains an empty
+edit action-log entry for retry. Closing with no result/report still changes
+status and closed_at and preserves any previous note. No criterion compares an
+optional value, so no presence guard is needed; where required, scalar presence
+uses `{"exists":"$parameter"}`. Presence cannot short-circuit a comparison.
+Ordinary scalar values cannot be cleared by setting null; a scalar-clear rule
+would be the smallest language addition to support clearing an existing target.
+
+Descriptions on properties and parameters explain expected content, topic
+uniqueness, time formats and evidence paths; each stays within 300 UTF-8 bytes.
+The rehearsal measures native `describe` output and MCP `ont_describe` and
+`ont_action_list` text sizes, asserting the MCP 262,144-byte response limit.
 
 ### Install and rehearse
-The file install route is for disposable stores only. This executable rehearsal
-requires Bash, Python 3 and Git, takes one `ont` binary path, creates its own
-`mktemp -d` store, verifies the frozen v1 bytes from Git, installs v1 and then the
-worktree's v2 using `schema install <file>`, indexes only `task_states`, exercises
-every action and its criteria, checks retry, history and task isolation, prints
-all five rendered blocks, and removes the store even on failure:
+Use an `ont` build with reference view arguments, reference property rule values,
+`$now`, optional-value skipping and descriptions (ontology-platform PR #33).
+The file install route is only for disposable stores. The rehearsal requires
+Bash, Python 3 and Git and takes one binary path:
 
 ```sh
 ontology/rehearsal.sh /path/to/ont
 ```
 
-Supply a build with actions and `render`. The host installation is a separate
-operation: after review and merge, fetch this repository and use
-`ont --store <authorized-store> schema install --from <checkout> --commit <merged-40-hex> --path ontology/work.schema.json`.
-The temporary-file route does not establish deployment or native CLI loading.
+It creates a store under its own `mktemp -d`, checks the frozen v1 pin, installs
+v1 and then the worktree v2 with `schema install <file>`, indexes `task_states`,
+exercises every action and criterion refusal, checks retries across changed
+application times, optional omission/null, history, decision inheritance and
+native-key task isolation, prints five rendered blocks and removes the store.
+It uses fixed trusted clocks and synthetic operational values; it also creates
+a KPI on the indexed `ontology-operational-base` task to test cross-task filtering.
 
-### Generated views
-All views filter on `task_directory` using the full-directory `task` argument:
-`kpi_board` orders by KPI name; `active_holds` by effect; `current_decisions` by
-topic; `live_workers` by start time; `closed_workers` by close time. The last
-four also filter by their declared status. Each view uses the language's default
-200-row limit (maximum 1000), with an explicit omitted-row count, and the engine's
-10,000-head bound; argument text uses ASCII letters, digits and `._:/-` only.
+Host installation is a separate authorized operation after review and merge:
+fetch this repository, then use `ont --store <authorized-store> schema install
+--from <checkout> --commit <merged-40-hex> --path ontology/work.schema.json`.
+The temporary-store check establishes neither deployment nor native CLI loading.
 
-With an already installed schema in a disposable store, render through stdin:
+### Generated views and remaining limits
+Every view takes `task` as the task's native key, for example
+`workspace-strategy-reassessment-20261109`, and filters directly on the `task`
+reference with `{"eq":["task","$task"]}`. Render through stdin:
 
 ```sh
 set -o pipefail
-printf '%s\n' '{"op":"render","view":"kpi_board","args":{"task":"/home/palantirkc/work/workspace-strategy-reassessment-20261109"}}' | ont --store "$scratch/store.sqlite" render
+printf '%s\n' '{"op":"render","view":"kpi_board","args":{"task":"workspace-strategy-reassessment-20261109"}}' | ont --store "$scratch/store.sqlite" render
 ```
 
-The response's `markdown` field contains the generated block. To update an
-existing document block use `render --write <file> --section kpi_board --arg
-task=<full-directory> --preimage-dir <existing-directory>` with the same explicit
-store; `render --check <file>` checks drift. Render after writers finish for a
-coherent whole block: rendering is not one snapshot across pages.
+The response's `markdown` field is the generated block. `kpi_board` shows
+Observed from `observed_at`, orders by name; `active_holds` filters active and
+orders by effect; `current_decisions` filters current and orders by topic;
+`live_workers` filters running and orders by started_at; `closed_workers`
+filters closed and orders by closed_at. Their columns are unchanged.
+To update an existing block, use `render --write <file> --section kpi_board
+--arg task=<native-key> --preimage-dir <existing-directory>` with an explicit
+store; `render --check <file>` checks drift.
+
+Reference view arguments support equality only; safe argument characters remain
+ASCII letters, digits and `._:/-`. An unrepresentable native key refuses
+`reference_argument_unrepresentable`. Each view defaults to 200 rows with an
+omitted-row count and a 10,000-head engine bound. Rendering is not one snapshot
+across pages: finish writers first for a coherent block. Typed numeric/date
+arguments, conversions and property comparison would enable KPI progress or
+observation-age filtering, elapsed worker time and closed-date windows. A
+hold's `until` is intentionally prose; expiry comparisons need a separate typed
+expiry field. `current_decisions` needs no numeric/date comparison.
