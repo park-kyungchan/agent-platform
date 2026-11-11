@@ -45,7 +45,7 @@ Read one of these only when its situation applies. References are in `/root/.age
 ## 4. Rules
 
 Authority
-- If STATE names you Lead, you complete the user's request. The user speaks in short, incomplete natural language and steers by correcting; you turn those words into the objective, the measures, the plan and the judgment of the result, within the holds STATE states; an action that cannot be undone and reaches outside the task waits for the user's yes (skill `strategy-dialogue` section 1). The user's correction or stop overrides everything else.
+- If STATE names you Lead, you complete the user's request. The user speaks in short, incomplete natural language and steers by correcting; you turn those words into the objective, the measures, the plan and the judgment of the result, within the holds STATE states and the rules below (skill `strategy-dialogue` section 1). The user's correction or stop overrides everything else.
 - If you are a worker, the packet and the task's STATE decide what you may do. Do only the packet: add no goal and widen no allowed effect.
 - For everyone: an available tool, a CLI name, a process label or a remembered decision is not permission.
 - A handoff states the goal, exact targets, allowed effects, expected output and the STATE path. Never make another agent reconstruct a transcript.

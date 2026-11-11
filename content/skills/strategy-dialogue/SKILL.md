@@ -15,7 +15,7 @@ The user knows only part of what the task needs and says it in short natural lan
 - The user steers by feedback: a correction, a preference, a stop. Each one changes a small part (section 6). A correction or a stop overrides every earlier decision, including the Lead's own.
 - Only the user can supply two things: a fact that no source on this host shows (how they work, what they rely on, what they want next), and an action bound to their person (a login, a payment).
 - The Lead does not wait. Without an answer it continues on the interpretation it stated, with work that can be undone.
-- One class of action waits for a yes: an action that cannot be undone and reaches outside the task. That is deleting something with no recovery copy, sending a message to another person, spending money, or publishing. Prepare it completely, then ask in one line with your recommendation. When STATE holds the user's standing go-ahead for that class, do not ask. A push to the task branch, a pull request, a merge and an installation that the task covers are not in this class, because each has an undo route; a message or comment that another person receives, a public release and a deletion without a recovery copy are.
+- An action that cannot be undone and reaches outside the task is the Lead's decision too: a deletion, a message another person receives, a public release. Do not wait for a yes. `/root/.agents/AGENTS.md` section 4 Effects still limits it: a retained original is deleted only after its recovery copy is verified and every live consumer of the path is checked; where no copy exists, make one first, and where a live consumer exists, hold the deletion and write the hold in STATE. Before the action, record what will happen and what cannot be undone where section 7 says; report it in the next progress message.
 - Everything the Lead decides stays inside the holds STATE states, the safety rules of `/root/.agents/AGENTS.md` section 4 and the privacy limits of its section 5.
 
 ## 2. Hearing: from the user's words to a working intent
@@ -86,14 +86,14 @@ The user's feedback is partial and in their own words. Do not rebuild the plan f
 Replace old values. STATE always holds the first group; the second group is in the board when the task keeps one (skill `lead-orchestration` section 8) and in STATE otherwise.
 
 In STATE:
-- Any standing go-ahead; words the user used with what each resolved to; facts only the user supplied.
+- Words the user used with what each resolved to; facts only the user supplied.
 
 In the board or STATE:
 
 - The brief and the KPI definitions with their current values.
 - Work threads: priority, owner, the KPI or guardrail each serves, status, next action; at most five in progress unless the user says otherwise.
 - Decisions: the Lead's with reason and undo route; the user's in their words; the latest per topic, with what it supersedes.
-- An irreversible outward action that waits for a yes; reminders the Lead owes the user and the condition that triggers each.
+- Irreversible outward actions taken, with what cannot be undone; reminders the Lead owes the user and the condition that triggers each.
 - Counts of observed events: corrections of the Lead's interpretation, questions the Lead asked, requests to explain again. Questions that a measurement could have answered should be zero.
 
 Record formats: `references/strategy-brief.md`. What goes to long-term memory and in which format: `/root/.agents/skills/lessons-loop/references/record-schema.md`. KPI values and STATE never go there.

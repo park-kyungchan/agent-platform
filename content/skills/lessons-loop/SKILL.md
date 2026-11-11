@@ -69,8 +69,7 @@ Review recurring failure classes, contradicted assumptions and failed
 codifications. An L3 proposal reaches Lead → current STATE `DIRECTION PROPOSALS`
 with its ID/pin, evidence, alternatives (including keeping the design), expected
 quality/cost effect, reversible trial and success/stop criteria. The Lead decides
-it and reports the decision and its result to the user; an irreversible outward
-action inside a proposal waits as skill `strategy-dialogue` section 1 says.
+it and reports the decision and its result to the user.
 
 ## Readback and derived views
 

@@ -43,7 +43,6 @@ Status: <added as a work thread of the current objective | a different objective
 ## Kept in STATE
 
 ```text
-Standing go-ahead: "<their words>" (English: <reading>) (<date>) covers <class of action>
 Words the user used: "<expression>" -> <glossary term and path>
 Fact from the user: <fact> (<date>)
 ```
@@ -51,6 +50,6 @@ Fact from the user: <fact> (<date>)
 ## Kept for the user (board, or STATE when there is no board)
 
 ```text
-Waiting for a yes: <prepared irreversible outward action> | recommendation <do it | do not> | effect <on which KPI>
+Irreversible action taken: <what> | cannot be undone: <what> | reason <measurement> | <date>
 Reminder owed: <what> | when <condition that triggers it> | context <file>
 ```

@@ -21,7 +21,7 @@ Last update: <time> (<who>; <one line on what changed>)
 | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## Decisions (the latest per topic)
-## Kept for the user (waiting for a yes; reminders owed)
+## Kept for the user (irreversible actions taken; reminders owed)
 ## Counts
 Corrections of the Lead's interpretation: <n> · Questions the Lead asked: <n> · Requests to explain again: <n>
 ```
@@ -31,7 +31,7 @@ The line formats of "Decisions" and "Kept for the user" are in `/root/.agents/sk
 ## Handoff to the next Lead
 
 1. Start prompt: the role, the task directory, the ordered list of files to read, and the first output expected. No rule, value or history is written into it.
-2. STATE checkpoint: the objective as the Lead wrote it and the user decisions it rests on; the source baseline with exact revisions; every effect made, with its rollback route; what is unverified; holds; any standing go-ahead; one next action.
+2. STATE checkpoint: the objective as the Lead wrote it and the user decisions it rests on; the source baseline with exact revisions; every effect made, with its rollback route; what is unverified; holds; one next action.
 3. Nothing of the task is still running: no worker, waiter, build or pane. If something must keep running, STATE names it with its owner and how to stop it.
 4. Cold-read test. Give a reader only the start prompt and ask:
    - What is the next action and how is it verified?
