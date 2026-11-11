@@ -241,8 +241,8 @@ The reverse reference link is `memory_successors`; forward is `memory_predecesso
 
 | Action | Parameters and effect | Submission refusals |
 | --- | --- | --- |
-| `mark_memory_record_pending` | `record` full Id (may be absent on first use), `document_id`, `body_hash`, optional `supersedes`; creates or modifies the same key, sets pending and the hash; omitted predecessor preserves its existing value | `memory_record_has_successor` when any linked successor exists; continue that replacement batch instead of reopening its predecessor |
-| `mark_memory_record_ready` | `record`, `body_hash`; sets ready after document/fact/page readback | `memory_record_not_pending`; `memory_body_hash_mismatch` |
+| `mark_memory_record_pending` | `record` full Id (may be absent on first use), `document_id`, `body_hash`, optional `supersedes`; creates or modifies the same key, sets pending and the hash; omitted predecessor preserves its existing value | `memory_record_has_ready_successor` while a linked successor is ready; continue that successor instead of reopening its predecessor |
+| `mark_memory_record_ready` | `record`, `body_hash`; sets ready after document/fact/page readback | `memory_record_not_pending`; `memory_body_hash_mismatch`; `memory_predecessor_not_pending` if its linked predecessor is not pending; `memory_record_has_successor` if this record has any successor |
 | `mark_memory_record_superseded` | `record` predecessor, `successor`; marks only the predecessor superseded | `memory_record_already_superseded` unless predecessor is pending/ready; `memory_successor_not_ready`; `memory_successor_not_linked` unless successor.supersedes equals record; `memory_successor_is_self` |
 
 The named refusals appear inside `submission_criteria` answers; unknown parameters
@@ -250,7 +250,10 @@ The named refusals appear inside `submission_criteria` answers; unknown paramete
 On distinct replacement, mark the predecessor pending first, create its pending
 successor with `supersedes` pointing back, then ready the successor after readback
 and supersede the predecessor. Same-record corrections use pending with a new
-hash, then ready with exactly that hash. A record with a successor cannot reopen.
+hash, then ready with exactly that hash. A predecessor with a successor cannot
+become ready again. If a successor was linked prematurely, ready refuses until
+the predecessor enters pending; this recovery is allowed while the successor
+is still pending. Thus the pair cannot both be ready.
 These actions record the publication order; they do not contact a memory server.
 
 `ready_memory_records` and `pending_memory_records` take no arguments. Both show

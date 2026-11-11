@@ -1695,13 +1695,23 @@
       },
       "submission_criteria": [
         {
-          "code": "memory_record_has_successor",
-          "message": "Continue the successor batch; a record with a linked successor cannot become pending again.",
+          "code": "memory_record_has_ready_successor",
+          "message": "Continue the ready successor; a predecessor cannot become pending while its successor is ready.",
           "none": [
             {
               "linked": {
                 "from": "$record",
-                "link": "memory_successors"
+                "link": "memory_successors",
+                "where": {
+                  "all": [
+                    {
+                      "eq": [
+                        "status",
+                        "ready"
+                      ]
+                    }
+                  ]
+                }
               }
             }
           ]
@@ -1760,6 +1770,40 @@
                 "$record.body_hash",
                 "$body_hash"
               ]
+            }
+          ]
+        },
+        {
+          "code": "memory_predecessor_not_pending",
+          "message": "Mark the linked predecessor pending before completing its successor.",
+          "none": [
+            {
+              "linked": {
+                "from": "$record",
+                "link": "memory_predecessor",
+                "where": {
+                  "all": [
+                    {
+                      "ne": [
+                        "status",
+                        "pending"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "code": "memory_record_has_successor",
+          "message": "Complete the successor batch instead of making its predecessor ready.",
+          "none": [
+            {
+              "linked": {
+                "from": "$record",
+                "link": "memory_successors"
+              }
             }
           ]
         }

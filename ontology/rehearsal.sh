@@ -121,14 +121,19 @@ apply(mready, 'memory-ready', dict(record=mr, body_hash='a' * 64))
 unchanged = fingerprint(); apply(mready, 'memory-not-pending', dict(record=mr, body_hash='a' * 64), 'memory_record_not_pending'); assert fingerprint() == unchanged
 apply(mpending, 'memory-correct', pending(mr, 'b' * 64)); assert fields(mr)['body_hash'] == 'b' * 64
 apply(mready, 'memory-correct-ready', dict(record=mr, body_hash='b' * 64))
-apply(mpending, 'memory-replace', pending(mr, 'b' * 64))
+# Regression: a prematurely linked successor cannot become ready, and its
+# predecessor can still enter pending to recover the intended batch order.
 apply(mpending, 'memory-successor', pending(ms, 'c' * 64, supersedes=mr))
+unchanged = fingerprint(); apply(mready, 'memory-predecessor-ready', dict(record=ms, body_hash='c' * 64), 'memory_predecessor_not_pending'); assert fingerprint() == unchanged
+assert memory_view('ready_memory_records')['rows'] == 1 and memory_view('pending_memory_records')['rows'] == 1
+apply(mpending, 'memory-replace', pending(mr, 'b' * 64))
+unchanged = fingerprint(); apply(mready, 'memory-predecessor-reopen', dict(record=mr, body_hash='b' * 64), 'memory_record_has_successor'); assert fingerprint() == unchanged
 unchanged = fingerprint(); apply(msup, 'memory-not-ready-successor', dict(record=mr, successor=ms), 'memory_successor_not_ready'); assert fingerprint() == unchanged
 unchanged = fingerprint(); apply(mpending, 'memory-bad-status', pending(ms, 'c' * 64, status='unknown'), 'invalid_parameter'); assert fingerprint() == unchanged
 apply(mready, 'memory-successor-ready', dict(record=ms, body_hash='c' * 64))
 apply(msup, 'memory-supersede', dict(record=mr, successor=ms))
 assert fields(mr)['status'] == 'superseded' and fields(ms)['supersedes'] == mr
-unchanged = fingerprint(); apply(mpending, 'memory-reopen', pending(mr, 'd' * 64), 'memory_record_has_successor'); assert fingerprint() == unchanged
+unchanged = fingerprint(); apply(mpending, 'memory-reopen', pending(mr, 'd' * 64), 'memory_record_has_ready_successor'); assert fingerprint() == unchanged
 assert memory_view('pending_memory_records')['rows'] == 0
 memory_rows = memory_view('ready_memory_records')
 assert memory_rows['rows'] == 1 and not memory_rows['truncated'] and ms['native_key'] in memory_rows['markdown'] and 'c' * 64 in memory_rows['markdown']
