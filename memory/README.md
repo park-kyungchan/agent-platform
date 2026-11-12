@@ -341,7 +341,10 @@ It enforces <=40 retain attempts (including denial probes), >=1s write gaps,
 one request at a time, <=120s per poll and 900s total; the final 120s are reserved
 for cleanup. Three consecutive write errors stop ordinary mutations. Unknown
 shapes refuse; a lost mutation answer never permits a competing deletion.
-Cleanup checks bank/document/marker absence and unchanged other-bank fact counts.
+Cleanup checks bank/document/marker absence. Other-bank `grew` and `new` counts
+are recorded per hashed id as `other_bank_drift: unattributed`, without changing
+the exit code; `shrank` and `missing` keep exit 4. The Lead compares growth with
+the growth of the same banks over an equal idle interval.
 Evidence is new-only, mode 0600, with shapes/counts/hashes/timings, never note bodies
 or credentials. Exit 0 means all automated steps measured and cleanup proven;
 2 means no changing request was sent (read-only preflight may have run);

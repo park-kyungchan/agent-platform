@@ -31,7 +31,7 @@ FAILURE_CODES = frozenset(('absence_unproven allowed_document_failed allowed_rea
     'denial_shape_unmeasured document_bytes_or_tags document_set_changed download_target_rejected '
     'fact_readback_failed fact_set_changed fact_shape foreign_bank_in_body invalid_auth_accepted '
     'invalid_timestamp_not_rejected list_identity list_incomplete list_shape mcp_envelope '
-    'mcp_http_failure mcp_notification_failed mcp_session_missing merge_facts_changed '
+    'mcp_http_failure mcp_notification_failed mcp_session_missing mcp_session_scope merge_facts_changed '
     'missing_delete_not_404 missing_read_not_404 mutation_route_rejected mutation_target_rejected '
     'operation_child_missing operation_children_shape operation_error operation_failed '
     'operation_identity operation_not_discovered operation_parent_missing other_bank_counts_changed '
@@ -54,7 +54,7 @@ OBSERVED_KEYS = frozenset('api_version paths items banks total limit offset bank
     'document_id original_text text entities tags fact_type occurred_start occurred_end provider model input_tokens '
     'output_tokens total_tokens cached_tokens thoughts_tokens scope jsonrpc result content structuredContent isError '
     'tools inputSchema properties required type additionalProperties annotations description download_url storage_key '
-    'byte_size filename webhooks'.split())
+    'byte_size filename webhooks params arguments method updates async query'.split())
 STEPS = ('E1', 'E2', 'E4', 'E5', 'E6')
 CONFIG = json.loads((ROOT / 'memory/engineering.json').read_bytes())
 encode = lambda value: json.dumps(value, ensure_ascii=False, sort_keys=True).encode()
@@ -70,12 +70,31 @@ def keys(value):
     return type(value).__name__
 
 
-def request_keys(value):
+def strings(value):
+    """Walk decoded JSON keys and string values, never serialized escape sequences."""
     if isinstance(value, dict):
-        return {k: request_keys(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [request_keys(value[0])] if value else []
-    return type(value).__name__
+        for k, v in value.items():
+            yield k
+            yield from strings(v)
+    elif isinstance(value, list):
+        for v in value:
+            yield from strings(v)
+    elif isinstance(value, str):
+        yield value
+
+
+def credential_matches(raw, secret):
+    prefixes = [secret[:n] for n in range(min(8, len(secret)), len(secret) + 1)]
+    decoded = list(strings(load(raw)))
+    return sum(raw.count(p.encode()) + sum(s.count(p) for s in decoded) for p in prefixes)
+
+
+def private_fallback(value, secret):
+    raw = encode(value)
+    # A very short credential can collide even with fixed diagnostic keys.
+    if secret and credential_matches(raw, secret):
+        return b'1' if secret == '0' else b'0'
+    return raw
 
 
 @contextlib.contextmanager
@@ -162,6 +181,9 @@ class Exercise:
     def interrupt(self):
         self.interrupted = True  # Signal handlers never interrupt the cleanup boundary.
 
+    def no_foreign(self, value, code):
+        P.require(not any(bank in text for text in strings(value) for bank in self.before or {}), code)
+
     def bound(self, retaining=False):
         if self.interrupted and not self.cleaning:
             raise KeyboardInterrupt
@@ -178,8 +200,8 @@ class Exercise:
                   'mutation_route_rejected')
         self.bound(retaining=route == '/memories' or kwargs.get('retaining', False))
         P.require(not self.uncertain, 'unresolved_mutation')
-        raw_body = body if isinstance(body, bytes) else encode(body)
-        P.require(not any(bank.encode() in raw_body or encode(bank)[1:-1] in raw_body for bank in self.before or {}), 'foreign_bank_in_body')
+        if not isinstance(body, bytes):
+            self.no_foreign(body, 'foreign_bank_in_body')
         path = self.mcp if route == '@mcp' else self.base + route
         query = dict(query or {})
         if route == '/transfer/import':
@@ -201,16 +223,20 @@ class Exercise:
         dispatched_operation = body.get('operation_id') if route == '/memories' and isinstance(body, dict) else None
         if isinstance(dispatched_operation, str):
             self.active.add(dispatched_operation)
+        requests_before = len(self.evidence['requests'])
         try:
             result = self.call(method, path, body, **kwargs)
         except BaseException:
-            self.uncertain = True
+            if len(self.evidence['requests']) > requests_before and self.evidence['requests'][-1]['dispatched']:
+                self.uncertain = True
+            else:
+                self.active.discard(dispatched_operation)
             raise
         status = result[0]
         if 400 <= status < 500 and isinstance(dispatched_operation, str):
             self.active.discard(dispatched_operation)
         self.write_errors = self.write_errors + 1 if status >= 400 else 0
-        if status >= 500 or status in (301, 302, 307, 308):
+        if status >= 500 or status in (301, 302, 303, 307, 308):
             self.uncertain = True
         return result
 
@@ -225,8 +251,8 @@ class Exercise:
                   and not any(x in ('.', '..') for x in allowed.split('/')), 'target_rejected')
         started = self.clock()
         row = {'step': self.step, 'method': method, 'path': path.replace(self.bank, '<bank>'),
-               'request_keys': request_keys(body), 'basis': self.basis(method, allowed),
-               'status': None, 'answered': False, 'verdict': 'failed'}
+               'request_keys': keys(body), 'basis': self.basis(method, allowed),
+               'status': None, 'dispatched': False, 'answered': False, 'verdict': 'failed'}
         if allowed == self.mcp and isinstance(body, dict):
             row['rpc_method'] = body.get('method')
             if body.get('method') == 'tools/call':
@@ -240,6 +266,7 @@ class Exercise:
             row['path'] = '/v1/default/files/download/<key>'
         self.evidence['requests'].append(row)
         try:
+            row['dispatched'] = True
             status, raw, sid = self.wire.exchange(method, path, body,
                  timeout=min(15, max(.001, self.start + 900 - self.clock()),
                              max(.001, getattr(self, 'poll_until', float('inf')) - self.clock())), **kwargs)
@@ -262,7 +289,7 @@ class Exercise:
             else:
                 data = {}
             row['answer_shape'] = keys(data)
-            row['verdict'] = 'failed' if status >= 500 else 'measured'
+            row['verdict'] = 'failed' if status >= 500 or (method != 'GET' and not 200 <= status < 300) else 'measured'
             return status, data, sid
         finally:
             row['seconds'] = self.clock() - started
@@ -422,9 +449,11 @@ class Exercise:
         return answer, sid
 
     def session(self):
-        _, sid = self.rpc('initialize', {'protocolVersion': '2024-11-05', 'capabilities': {},
+        answer, sid = self.rpc('initialize', {'protocolVersion': '2024-11-05', 'capabilities': {},
                                       'clientInfo': {'name': 'memory-exercise', 'version': '1'}})
+        self.observed(isinstance(answer.get('result'), dict) and 'error' not in answer, 'mcp_envelope')
         P.require(isinstance(sid, str) and bool(sid), 'mcp_session_missing')
+        self.no_foreign(sid, 'mcp_session_scope')
         # Notification has no response id (202 is normal); still uses the sole mutation builder.
         status, _, _ = self.change('POST', '@mcp', {'jsonrpc': '2.0', 'method': 'notifications/initialized'}, session=sid)
         P.require(status in (200, 202, 204), 'mcp_notification_failed')
@@ -433,6 +462,7 @@ class Exercise:
 
     def tools(self, session):
         answer, _ = self.rpc('tools/list', {}, session)
+        self.observed(isinstance(answer.get('result'), dict) and 'error' not in answer, 'mcp_envelope')
         result = answer.get('result', {})
         P.require(isinstance(result.get('tools'), list) and not result.get('nextCursor'), 'tool_catalog_incomplete')
         tools = result['tools']
@@ -602,6 +632,7 @@ class Exercise:
         P.require(status == 200 and isinstance(raw, bytes), 'archive_unmeasured')
         found, entries = set(), []
         def inspect(value):
+            self.no_foreign(value, 'archive_foreign_bank')
             if isinstance(value, dict):
                 for k in ('bank_id', 'source_bank_id', 'target_bank_id'):
                     P.require(k not in value or value[k] == self.bank, 'archive_foreign_bank')
@@ -618,18 +649,21 @@ class Exercise:
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             P.require(sum(x.file_size for x in archive.infolist()) <= MAX_BYTES, 'archive_too_large')
             for entry in archive.infolist():
+                self.no_foreign(entry.filename, 'archive_foreign_bank')
                 entries.append({'name_sha256': P.digest(entry.filename.encode()), 'bytes': entry.file_size})
                 with archive.open(entry) as source:
                     value = source.read(MAX_BYTES + 1)  # zipfile checks CRC at EOF; the read is capped.
                 P.require(len(value) <= MAX_BYTES, 'archive_too_large')
-                P.require(not any(bank.encode() in value or encode(bank)[1:-1] in value
-                                  or json.dumps(bank).encode()[1:-1] in value for bank in self.before or {}), 'archive_foreign_bank')
-                if entry.filename.endswith('.json'):
-                    inspect(load(value))
-                elif entry.filename.endswith('.jsonl'):
-                    for line in value.splitlines():
-                        if line:
-                            inspect(load(line))
+                try:
+                    values = [load(value)]
+                except (ValueError, UnicodeError):
+                    try:
+                        values = [load(line) for line in value.splitlines() if line.strip()]
+                    except (ValueError, UnicodeError):
+                        raise P.Stop('archive_unmeasured') from None
+                P.require(bool(values), 'archive_unmeasured')
+                for value in values:
+                    inspect(value)
         P.require(found == set(expected), 'archive_documents_unmeasured')
         self.evidence.setdefault('archives', []).append({'subset': subset, 'sha256': P.digest(raw),
                  'bytes': len(raw), 'entries': entries, 'documents': len(found),
@@ -797,7 +831,9 @@ class Exercise:
                           else 'unchanged') for k in set(other) | set(self.before)}
             self.evidence['other_bank_comparison'] = comparison
             proofs['other_count_differences'] = sum(v != 'unchanged' for v in comparison.values())
-            P.require(proofs['other_counts_equal'], 'other_bank_counts_changed')
+            if any(v in ('grew', 'new') for v in comparison.values()):
+                self.evidence['other_bank_drift'] = 'unattributed'
+            P.require(not any(v in ('shrank', 'missing') for v in comparison.values()), 'other_bank_counts_changed')
             self.evidence['cleanup'] = 'proven'
         except BaseException as error:
             self.evidence['cleanup_failure'] = self.failure(error)
@@ -863,29 +899,31 @@ def main(argv=None):
                 stack.callback(signal.signal, sig, previous)
             with P.locked():
                 code = exercise.run()
-        raw = encode(exercise.evidence)
-        matches = sum(raw.count(secret[:n].encode()) for n in range(8, len(secret) + 1))
-        # On a collision do not write the unsafe evidence, even when a server reflected a secret.
-        if matches:
-            raw = encode({'cleanup': exercise.evidence['cleanup'], 'failure': 'evidence_redaction_failed',
-                          'credential_prefix_matches': matches})
-            code = 4 if exercise.evidence['cleanup'] != 'proven' else 3
-        else:
             exercise.evidence['credential_prefix_matches'] = 0
             raw = encode(exercise.evidence)
-        with os.fdopen(fd, 'wb') as target:
-            fd = None
-            target.write(raw + b'\n')
-        print(json.dumps({'exit': code, 'cleanup': exercise.evidence['cleanup'], 'credential_prefix_matches': matches}))
-        return code
+            matches = credential_matches(raw, secret)
+            # On a collision do not write the unsafe evidence, even when a server reflected a secret.
+            if matches:
+                raw = private_fallback({'cleanup': exercise.evidence['cleanup'], 'failure': 'evidence_redaction_failed',
+                                        'credential_prefix_matches': matches}, secret)
+                code = 4 if exercise.evidence['cleanup'] != 'proven' else 3
+            with os.fdopen(fd, 'wb') as target:
+                fd = None
+                target.write(raw + b'\n')
+            summary = encode({'exit': code, 'cleanup': exercise.evidence['cleanup'], 'credential_prefix_matches': matches})
+            if not credential_matches(summary, secret):
+                print(summary.decode())
+            return code
     except BaseException:
         if fd is not None:
             try:
-                os.write(fd, encode({'cleanup': exercise.evidence['cleanup'] if exercise else 'not_run',
-                                    'failure': 'input_or_local_precondition'}) + b'\n')
+                os.write(fd, private_fallback({'cleanup': exercise.evidence['cleanup'] if exercise else 'not_run',
+                                              'failure': 'input_or_local_precondition'}, secret) + b'\n')
             except OSError:
                 pass
-        print('exercise_refused@scripts/exercise-memory.py:1: input_or_local_precondition')
+        message = 'exercise_refused@scripts/exercise-memory.py:1: input_or_local_precondition'
+        if not secret or not credential_matches(encode(message), secret):
+            print(message)
         return (4 if exercise.evidence['cleanup'] != 'proven' else 3) if exercise and exercise.attempted else 2
     finally:
         if fd is not None:

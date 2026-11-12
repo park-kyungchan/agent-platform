@@ -26,6 +26,17 @@ SECRET = 'private-exercise-sentinel-never-recorded'
 FOREIGN = 'foreign-bank'
 
 
+def edited(name, before, after):
+    owner = X if name in ('main', 'credential_matches', 'private_fallback') else X.Exercise
+    source = textwrap.dedent(inspect.getsource(getattr(owner, name)))
+    assert before in source, 'mutation_target_missing_' + name
+    namespace = dict(vars(X))
+    exec(compile(source.replace(before, after, 1), '<memory-exercise-mutant>', 'exec'), namespace)
+    function = namespace[name]
+    function = types.FunctionType(function.__code__, vars(X), name, function.__defaults__)
+    return patch.object(owner, name, function)
+
+
 class Clock:
     def __init__(self):
         self.now = 0
@@ -204,6 +215,18 @@ class ExerciseTests(unittest.TestCase):
         self.server = FakeServer(self.clock)
         self.exercise = X.Exercise(BANK, self.server, self.clock, self.clock.sleep)
 
+    def check_removals(self, prefix, cases):
+        for name, test, mutation in cases:
+            with self.subTest(guard=name), mutation:
+                result = unittest.TestResult()
+                ExerciseTests(test).run(result)
+            failures = result.failures + result.errors
+            self.assertTrue(failures, prefix + '_removal_survived_' + name)
+            trace = failures[0][1]
+            locations = X.re.findall(r'test_memory_exercise.py", line ([0-9]+)', trace)
+            message = '' if prefix == 'control' else ' message=' + trace.splitlines()[-1]
+            print(prefix + '_removed=' + name + ' failing_line=ci/test_memory_exercise.py:' + locations[-1] + message)
+
     def run_driver(self, action=None):
         if action:
             self.exercise.e1 = action
@@ -328,10 +351,10 @@ class ExerciseTests(unittest.TestCase):
             self.assertEqual(exercise.run(), 4, 'cleanup_failure_hidden')
             self.assertEqual(exercise.evidence['cleanup'], 'incomplete')
 
-    def test_c5_foreign_count_change_is_exit4(self):
+    def test_c5_foreign_count_shrink_is_exit4(self):
         def changed():
             self.exercise.create()
-            self.server.foreign_count += 1
+            self.server.foreign_count -= 1
             raise ValueError('invented')
         self.assert_cleanup(self.run_driver(changed), 4)
 
@@ -886,17 +909,298 @@ class ExerciseTests(unittest.TestCase):
                 print('latency_forecast=' + json.dumps({'request_s': latency, 'step_s': cleanup_started[0],
                      'elapsed_s': clock(), 'conservative_extra_poll_gets': safe_extra_gets, 'with_1s_sleep_per_get': with_poll_sleep}, sort_keys=True))
 
+    def main_result(self, exercise, server, secret=SECRET):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(X.P, 'credential', return_value=secret), \
+             patch.object(X, 'Wire', return_value=server), patch.object(X, 'Exercise', return_value=exercise), \
+             patch.object(X.P, 'locked', contextlib.nullcontext), contextlib.redirect_stdout(io.StringIO()):
+            path = Path(tmp, 'evidence')
+            code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+            raw = path.read_bytes()
+            self.assertTrue(raw, 'evidence_file_empty')
+            return code, X.load(raw)
+
+    def test_m1_decoded_archive_keys_values_names_and_unmeasured_entries(self):
+        cases = ('partial-escape', 'all-escape-key', 'jsonl-unknown', 'name', 'slash',
+                 'nested-zip', 'gzip', 'bytes', 'empty')
+        for kind in cases:
+            with self.subTest(kind=kind):
+                clock = Clock(); server = FakeServer(clock)
+                exercise = X.Exercise(BANK, server, clock, clock.sleep)
+                original = server.answer
+                foreign = 'foreign/x' if kind == 'slash' else FOREIGN
+                escaped = ''.join('\\u%04x' % ord(c) for c in foreign)
+                def hostile(method, path, body=None, **kwargs):
+                    status, answer, sid = original(method, path, body, **kwargs)
+                    if path.startswith(X.BANKS + '?') and kind == 'slash':
+                        answer['banks'][0]['bank_id'] = foreign
+                    if '/transfer/export?' in path:
+                        key = server.ops[answer['operation_id']]['result_metadata']['download_url']
+                        output = io.BytesIO()
+                        with zipfile.ZipFile(io.BytesIO(server.downloads[key])) as old, \
+                             zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as new:
+                            data = old.read('data.json')
+                            if kind == 'partial-escape':
+                                data = data[:-1] + b',"owner":"\\u0066oreign-bank"}'
+                            new.writestr('data.json', data)
+                            name = foreign + '.json' if kind == 'name' else 'opaque.bin'
+                            payload = b'{}'
+                            if kind == 'all-escape-key':
+                                payload = ('{"nested":[{"' + escaped + '":1}]}').encode()
+                            elif kind == 'jsonl-unknown':
+                                payload = ('{"safe":true}\n{"nested":["' + escaped + '"]}\n').encode()
+                            elif kind == 'slash':
+                                payload = b'{"owner":"foreign\\/x"}'
+                            elif kind == 'nested-zip':
+                                nested = io.BytesIO()
+                                with zipfile.ZipFile(nested, 'w', compression=zipfile.ZIP_DEFLATED) as z:
+                                    z.writestr('nested.json', X.encode({'owner': foreign}))
+                                payload = nested.getvalue()
+                            elif kind == 'gzip':
+                                payload = b'\x1f\x8bnot-json'
+                            elif kind in ('bytes', 'empty'):
+                                payload = b'unmeasured' if kind == 'bytes' else b''
+                            new.writestr(name, payload)
+                        server.downloads[key] = output.getvalue()
+                    return status, answer, sid
+                server.answer = hostile
+                self.assertEqual(exercise.run(), 3, 'decoded_archive_accepted')
+                expected = 'archive_unmeasured' if kind in ('nested-zip', 'gzip', 'bytes', 'empty') else 'archive_foreign_bank'
+                self.assertEqual(exercise.evidence['steps']['E1']['failure'], expected, 'archive_refusal_unmeasured')
+                self.assertFalse(any('/transfer/import?' in p for _, p, _, _ in server.calls), 'archive_dispatched')
+                self.assertEqual(exercise.evidence['cleanup'], 'proven')
+
+    def test_m2_schema_names_are_hashed_before_evidence(self):
+        for kind in ('note', 'credential'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            secret = 'q"invented-credential-only'
+            payload = exercise.marker + ' subject A uses ExampleID-A when its gate is closed.' if kind == 'note' else secret
+            server.catalog['retain']['inputSchema'] = {'type': 'object', 'properties': {payload: {'type': 'string'}}, 'required': [payload]}
+            code, evidence = self.main_result(exercise, server, secret)
+            self.assertEqual(code, 0, 'schema_key_was_not_sanitized')
+            self.assertFalse(any(payload in s for s in X.strings(evidence)), 'schema_payload_disclosed')
+            shapes = [r['request_keys'] for r in evidence['requests'] if r.get('tool') == 'retain']
+            self.assertTrue(shapes)
+            self.assertIn('sha256:' + X.P.digest(payload.encode()), shapes[0]['params']['arguments'])
+            self.assertEqual(evidence['credential_prefix_matches'], 0)
+
+    def test_m2_decoded_and_short_credential_check(self):
+        for secret in ('q"invented-secret-only', 'z"7'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            e1 = exercise.e1
+            def inject():
+                e1()
+                exercise.evidence['invented_injection'] = {'nested': [{secret: secret[:min(8, len(secret))]}]}
+            exercise.e1 = inject
+            code, evidence = self.main_result(exercise, server, secret)
+            self.assertEqual(code, 3, 'decoded_credential_disclosure_missed')
+            self.assertEqual(evidence.get('failure'), 'evidence_redaction_failed')
+            self.assertGreater(evidence['credential_prefix_matches'], 0)
+            self.assertFalse(any(secret in s for s in X.strings(evidence)), 'credential_disclosed')
+
+    def test_m2_short_credential_colliding_with_diagnostics(self):
+        for secret in ('s', '0', 'prefix'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            code, evidence = self.main_result(exercise, server, secret)
+            self.assertEqual(code, 3, 'short_collision_not_refused')
+            self.assertEqual(X.credential_matches(X.encode(evidence), secret), 0, 'fallback_disclosed_credential')
+
+    def test_m3_successful_initialize_and_exclusive_list_result(self):
+        for kind in ('initialize-error', 'initialize-both', 'initialize-null', 'list-both'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            original = server.mcp
+            def malformed(body, sid):
+                status, answer, returned = original(body, sid)
+                if body['method'] == ('tools/list' if kind == 'list-both' else 'initialize'):
+                    if kind == 'initialize-null':
+                        answer['result'] = None
+                    else:
+                        answer['error'] = {'code': -32602, 'message': 'invented rejection'}
+                        if kind == 'initialize-error':
+                            answer.pop('result')
+                return status, answer, returned
+            server.mcp = malformed
+            self.assertEqual(exercise.run(), 3, 'rejected_mcp_success_accepted')
+            self.assertEqual(exercise.evidence['cleanup'], 'proven')
+            self.assertTrue(any(r['verdict'] == 'failed' and r.get('rpc_method') in ('initialize', 'tools/list')
+                                for r in exercise.evidence['requests']))
+            if kind != 'list-both':
+                self.assertFalse(exercise.sessions)
+                self.assertFalse(any(isinstance(b, dict) and b.get('method') == 'notifications/initialized'
+                                     for _, _, b, _ in server.calls), 'rejected_session_used')
+
+    def test_m4_foreign_session_id_refused_before_use(self):
+        for sid in (FOREIGN, 'prefix-' + FOREIGN + '-suffix'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            original = server.mcp
+            used = []
+            def named(body, session):
+                if session is not None:
+                    used.append(session)
+                status, answer, returned = original(body, session)
+                return status, answer, sid if body['method'] == 'initialize' else returned
+            server.mcp = named
+            self.assertEqual(exercise.run(), 3, 'foreign_session_header_used')
+            self.assertEqual(exercise.evidence['steps']['E1']['failure'], 'mcp_session_scope')
+            self.assertFalse(used, 'foreign_session_dispatched')
+            self.assertEqual(exercise.evidence['cleanup'], 'proven')
+
+    def test_m5_answered_post_memories_tool_and_import(self):
+        for target in ('memories', 'tool', 'import'):
+            for stop in ('interrupt', 'deadline'):
+                clock = Clock(); server = FakeServer(clock)
+                exercise = X.Exercise(BANK, server, clock, clock.sleep)
+                original = server.exchange
+                fired = []
+                def delayed(method, path, body=None, **kwargs):
+                    result = original(method, path, body, **kwargs)
+                    match = method == 'POST' and (path == exercise.base + '/memories' if target == 'memories'
+                        else isinstance(body, dict) and body.get('method') == 'tools/call' if target == 'tool'
+                        else '/transfer/import?' in path)
+                    if match and not fired:
+                        fired.append(True)
+                        if stop == 'interrupt':
+                            exercise.interrupt()
+                        else:
+                            clock.now = 780.25
+                    return result
+                server.exchange = delayed
+                self.assertEqual(exercise.run(), 3, 'answered_post_left_bank')
+                self.assertTrue(fired, 'write_case_not_exercised')
+                self.assertEqual(exercise.evidence['cleanup'], 'proven')
+                self.assertFalse(exercise.uncertain, 'answered_post_uncertain')
+                self.assertFalse(server.present)
+                rows = [r for r in exercise.evidence['requests'] if r['method'] == 'POST']
+                self.assertTrue(all(r['answered'] for r in rows), 'received_post_answer_lost')
+
+    def test_m5_signal_before_dispatch_does_not_invent_work(self):
+        original = self.exercise.call
+        def between_checks(method, path, body=None, **kwargs):
+            if method == 'POST' and path == self.exercise.base + '/memories':
+                self.exercise.interrupt()
+            return original(method, path, body, **kwargs)
+        self.exercise.call = between_checks
+        def attempt():
+            self.exercise.create()
+            self.exercise.retain('invented-a', self.exercise.marker)
+        self.assertEqual(self.run_driver(attempt), 3, 'unsent_write_marked_uncertain')
+        self.assertEqual(self.exercise.evidence['cleanup'], 'proven')
+        self.assertFalse(self.exercise.uncertain)
+        self.assertFalse(self.exercise.active, 'unsent_operation_left_active')
+        self.assertFalse(any(m == 'POST' and p == self.exercise.base + '/memories' for m, p, _, _ in self.server.calls))
+
+    def test_m6_signal_during_evidence_write_keeps_result(self):
+        previous = signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
+        fdopen = os.fdopen
+        @contextlib.contextmanager
+        def during_write(fd, mode):
+            with fdopen(fd, mode) as target:
+                class Sink:
+                    def write(self, raw):
+                        os.kill(os.getpid(), signal.SIGTERM)
+                        return target.write(raw)
+                yield Sink()
+        try:
+            with patch.object(X.os, 'fdopen', during_write):
+                code, evidence = self.main_result(self.exercise, self.server)
+            self.assertEqual(code, 0, 'evidence_signal_changed_exit')
+            self.assertEqual(evidence['cleanup'], 'proven')
+            self.assertEqual(evidence['credential_prefix_matches'], 0)
+            self.assertFalse(self.server.present)
+        finally:
+            signal.signal(signal.SIGTERM, previous)
+
+    def test_m7_changing_401_and_303_are_failed(self):
+        for status in (401, 303):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            original = server.answer
+            def rejected(method, path, body=None, **kwargs):
+                result = original(method, path, body, **kwargs)
+                return (status, {}, None) if method == 'PUT' else result
+            server.answer = rejected
+            self.assertEqual(exercise.run(), 3 if status == 401 else 4)
+            put = next(r for r in exercise.evidence['requests'] if r['method'] == 'PUT')
+            self.assertTrue(put['answered'])
+            self.assertEqual(put['verdict'], 'failed', 'rejected_write_measured')
+            self.assertEqual(exercise.uncertain, status == 303, 'redirect_not_uncertain')
+
+    def test_m8_growth_is_unattributed_shrink_and_missing_fail(self):
+        for kind in ('grew', 'new', 'shrank', 'missing'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            original = server.answer
+            def drift(method, path, body=None, **kwargs):
+                status, answer, sid = original(method, path, body, **kwargs)
+                if exercise.cleaning and path.startswith(X.BANKS + '?'):
+                    if kind == 'new':
+                        answer['banks'].append({'bank_id': 'new-bank', 'fact_count': 1})
+                        answer['total'] += 1
+                    elif kind == 'missing':
+                        answer['banks'] = [b for b in answer['banks'] if b['bank_id'] != FOREIGN]
+                        answer['total'] -= 1
+                    else:
+                        answer['banks'][0]['fact_count'] += 1 if kind == 'grew' else -1
+                return status, answer, sid
+            server.answer = drift
+            self.assertEqual(exercise.run(), 0 if kind in ('grew', 'new') else 4, 'drift_policy_wrong')
+            comparison = exercise.evidence['other_bank_comparison']
+            self.assertIn(kind, comparison.values())
+            self.assertTrue(all(X.re.fullmatch('[0-9a-f]{64}', k) for k in comparison), 'drift_id_disclosed')
+            self.assertFalse(server.present)
+            if kind in ('grew', 'new'):
+                self.assertEqual(exercise.evidence['cleanup'], 'proven')
+                self.assertEqual(exercise.evidence['other_bank_drift'], 'unattributed', 'growth_attributed')
+                self.assertFalse(exercise.evidence['cleanup_proofs']['other_counts_equal'])
+
+    def test_r3_guard_removals_fail_in_process(self):
+        original = X.P.require
+        bypass = lambda code: patch.object(X.P, 'require', side_effect=lambda condition, actual:
+            original(condition or actual == code, actual))
+        self.check_removals('r3', [
+            ('M1-decoded', 'test_m1_decoded_archive_keys_values_names_and_unmeasured_entries',
+             edited('export', "self.no_foreign(value, 'archive_foreign_bank')", 'pass')),
+            ('M1-parse', 'test_m1_decoded_archive_keys_values_names_and_unmeasured_entries',
+             edited('export', "raise P.Stop('archive_unmeasured') from None", 'values = [None]')),
+            ('M1-name', 'test_m1_decoded_archive_keys_values_names_and_unmeasured_entries',
+             edited('export', "self.no_foreign(entry.filename, 'archive_foreign_bank')", 'pass')),
+            ('M2-schema', 'test_m2_schema_names_are_hashed_before_evidence',
+             edited('call', "'request_keys': keys(body)", "'request_keys': body")),
+            ('M2-decoded', 'test_m2_decoded_and_short_credential_check',
+             edited('credential_matches', 'decoded = list(strings(load(raw)))', 'decoded = []')),
+            ('M2-short', 'test_m2_decoded_and_short_credential_check',
+             edited('credential_matches', 'min(8, len(secret))', '8')),
+            ('M2-fallback', 'test_m2_short_credential_colliding_with_diagnostics',
+             edited('private_fallback', 'if secret and credential_matches(raw, secret):', 'if False:')),
+            ('M2-final-field', 'test_m2_short_credential_colliding_with_diagnostics',
+             edited('main', "exercise.evidence['credential_prefix_matches'] = 0", 'pass')),
+            ('M3-init', 'test_m3_successful_initialize_and_exclusive_list_result',
+             edited('session', "isinstance(answer.get('result'), dict) and 'error' not in answer", 'True')),
+            ('M3-list', 'test_m3_successful_initialize_and_exclusive_list_result',
+             edited('tools', "isinstance(answer.get('result'), dict) and 'error' not in answer", 'True')),
+            ('M4', 'test_m4_foreign_session_id_refused_before_use', bypass('mcp_session_scope')),
+            ('M5-post', 'test_m5_answered_post_memories_tool_and_import',
+             edited('call', "row['answer_shape'] = keys(data)", "if method != 'PUT': self.bound()\n        row['answer_shape'] = keys(data)")),
+            ('M5-unsent', 'test_m5_signal_before_dispatch_does_not_invent_work',
+             edited('change', "if len(self.evidence['requests']) > requests_before and self.evidence['requests'][-1]['dispatched']:", 'if True:')),
+            ('M6', 'test_m6_signal_during_evidence_write_keeps_result',
+             edited('main', 'raw = encode(exercise.evidence)', 'stack.close()\n            raw = encode(exercise.evidence)')),
+            ('M7-status', 'test_m7_changing_401_and_303_are_failed',
+             edited('call', "status >= 500 or (method != 'GET' and not 200 <= status < 300)", 'status >= 500')),
+            ('M7-303', 'test_m7_changing_401_and_303_are_failed',
+             edited('change', '(301, 302, 303, 307, 308)', '(301, 302, 307, 308)')),
+            ('M8', 'test_m8_growth_is_unattributed_shrink_and_missing_fail',
+             edited('cleanup', "not any(v in ('shrank', 'missing') for v in comparison.values())", "proofs['other_counts_equal']")),
+            ('M9', 'test_r2_guard_removals_fail_in_process',
+             patch.dict(globals(), {'edited': lambda *_: contextlib.nullcontext()})),
+        ])
+
     def test_r2_guard_removals_fail_in_process(self):
         original = X.P.require
-        def edited(name, before, after):
-            owner = X if name == 'main' else X.Exercise
-            source = textwrap.dedent(inspect.getsource(getattr(owner, name)))
-            self.assertIn(before, source)
-            namespace = dict(vars(X))
-            exec(compile(source.replace(before, after), '<memory-exercise-mutant>', 'exec'), namespace)
-            function = namespace[name]
-            function = types.FunctionType(function.__code__, vars(X), name, function.__defaults__)
-            return patch.object(owner, name, function)
         def drop_archive_guard(condition, code):
             return original(condition or code == 'archive_foreign_bank', code)
         cases = [
@@ -913,37 +1217,20 @@ class ExerciseTests(unittest.TestCase):
              edited('filtering', "self.denials[sid] = self.denial(baseline, sentinel)",
                     "self.denials[sid] = next(iter(self.denials.values()), self.denial(baseline, sentinel))")),
             ('L4-escaped', 'test_l4_json_escaped_body_and_cleanup_discovery',
-             edited('change', ' or encode(bank)[1:-1] in raw_body', '')),
+             edited('change', "self.no_foreign(body, 'foreign_bank_in_body')", 'pass')),
             ('L4-cleanup-poll', 'test_l4_json_escaped_body_and_cleanup_discovery',
              edited('cleanup', 'self.poll()  # Read-only discovery', 'pass  # Read-only discovery')),
             ('L4-subject', 'test_l4_recall_subject_and_fixed_catalog_order',
              edited('filtering', " and 'subject:task:invented' in r.get('tags', [])", '')),
-            ('L5', 'test_l5_forecast_latency_headroom',
-             edited('filtering', 'full = fresh and tuple(allowed) not in self.full_policies', 'full = fresh')),
             ('L4-order', 'test_l4_recall_subject_and_fixed_catalog_order',
              edited('representatives', 'n for n in names if n in self.catalog', 'n for n in self.catalog if n in names')),
         ]
-        for name, test, mutation in cases:
-            with self.subTest(repair=name), mutation:
-                result = unittest.TestResult()
-                ExerciseTests(test).run(result)
-            failures = result.failures + result.errors
-            self.assertTrue(failures, 'r2_removal_survived_' + name)
-            trace = failures[0][1]
-            locations = X.re.findall(r'test_memory_exercise.py\", line ([0-9]+)', trace)
-            print('r2_removed=' + name + ' failing_line=ci/test_memory_exercise.py:' + locations[-1]
-                  + ' message=' + trace.splitlines()[-1])
+        self.check_removals('r2', cases)
 
     def test_r1_guard_removals_fail_in_process(self):
         original = X.P.require
         bypass = lambda code: patch.object(X.P, 'require', side_effect=lambda condition, actual:
             original(condition or actual == code, actual))
-        def edited(name, before, after):
-            source = textwrap.dedent(inspect.getsource(getattr(X.Exercise, name)))
-            self.assertIn(before, source)
-            namespace = dict(vars(X))
-            exec(compile(source.replace(before, after), '<memory-exercise-mutant>', 'exec'), namespace)
-            return patch.object(X.Exercise, name, namespace[name])
         cases = [
             ('K1-body', 'test_k1_foreign_schema_and_all_changing_bodies', bypass('foreign_bank_in_body')),
             ('K1-sampler', 'test_k1_foreign_schema_and_all_changing_bodies',
@@ -971,21 +1258,11 @@ class ExerciseTests(unittest.TestCase):
             ('K6-delete', 'test_k6_document_absence_delete_status_and_uncertainty', bypass('delete_failed')),
             ('K6-unresolved', 'test_k6_document_absence_delete_status_and_uncertainty', bypass('unresolved_mutation')),
             ('K7-status', 'test_k7_failed_rows_and_hashed_count_directions',
-             edited('call', "'failed' if status >= 500 else 'measured'", "'measured'")),
+             edited('call', "'failed' if status >= 500 or (method != 'GET' and not 200 <= status < 300) else 'measured'", "'measured'")),
             ('K7-hash', 'test_k7_failed_rows_and_hashed_count_directions',
              edited('cleanup', 'P.digest(k.encode())', 'k')),
         ]
-        for name, test, mutation in cases:
-            with self.subTest(guard=name), mutation:
-                result = unittest.TestResult()
-                ExerciseTests(test).run(result)
-            failures = result.failures + result.errors
-            self.assertTrue(failures, 'repair_removal_survived_' + name)
-            trace = failures[0][1]
-            assertion = trace.splitlines()[-1]
-            locations = X.re.findall(r'test_memory_exercise.py\", line ([0-9]+)', trace)
-            print('repair_removed=' + name + ' failing_line=ci/test_memory_exercise.py:' + locations[-1]
-                  + ' message=' + assertion)
+        self.check_removals('repair', cases)
 
     def test_control_guard_removals_are_detected_in_process(self):
         # Run the real assertion controls with ONE named guard disabled in memory.
@@ -1014,7 +1291,7 @@ class ExerciseTests(unittest.TestCase):
              patch.object(X.Exercise, 'cleanup', lambda _: None)),
             ('c4-residue', 'test_c4_failed_delete_and_residue_are_exit4',
              patch.object(X.P, 'require', side_effect=bypass({'absence_unproven'}))),
-            ('c5', 'test_c5_foreign_count_change_is_exit4',
+            ('c5', 'test_c5_foreign_count_shrink_is_exit4',
              patch.object(X.P, 'require', side_effect=bypass({'other_bank_counts_changed'}))),
             ('c6', 'test_c6_server_reflected_key_names_and_exception_redacted',
              patch.object(X, 'keys', lambda value: value if isinstance(value, dict) else {})),
@@ -1023,16 +1300,7 @@ class ExerciseTests(unittest.TestCase):
             ('c7-call', 'test_c7_list_or_call_bypass_fails_e2',
              patch.object(X.P, 'require', side_effect=bypass({'tool_filter_call_failed'}))),
         ]
-        for name, test, mutation in cases:
-            with self.subTest(control=name), mutation:
-                result = unittest.TestResult()
-                ExerciseTests(test).run(result)
-            self.assertGreater(len(result.failures) + len(result.errors), 0, 'guard_removal_survived_' + name)
-            trace = (result.failures + result.errors)[0][1]
-            locations = X.re.findall(r'test_memory_exercise.py\", line ([0-9]+)', trace)
-            print('control_removed=' + name + ' failing_line=ci/test_memory_exercise.py:' + locations[-1])
-
-
+        self.check_removals('control', cases)
 
 if __name__ == '__main__':
     unittest.main()
