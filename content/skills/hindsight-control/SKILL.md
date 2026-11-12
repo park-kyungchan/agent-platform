@@ -9,7 +9,7 @@ Labels classify server claims; steps are caller obligations. Read [evidence and 
 
 ## Version and authority
 
-1. **measured** — API/MCP reported 1.2.0 on 2026-11-12. Read version with `curl --fail --silent --show-error http://127.0.0.1:8888/version` (`api_version`). If different, findings are unverified until re-measured. Revision 34a1386 is an earlier pin, not re-inspected here.
+1. **measured** — API/MCP reported 1.2.0 on 2026-11-12. Read version with `curl --fail --silent --show-error http://127.0.0.1:8888/version` (`api_version`). If different, findings are unverified until re-measured.
 2. **unknown** — Obtain task authority; visible tools grant none. Save recovery text; history is no established archive.
 
 ## Retain and replace (U3/U4/U14)
@@ -35,6 +35,9 @@ Labels classify server claims; steps are caller obligations. Read [evidence and 
 
 ## Consolidation and operations (U11/U14/F3/F4/U1)
 
+**measured (1.2.0; 465,470–475)** — Model lists use items/total/limit/offset without a completeness flag; empty items alone is insufficient: use [model-list preflight](references/measured-20261112.md#mental-model-list).
+**measured (1.2.0; 467–469)** — Bank creation exposes only enable_observations; PATCH config and read back both flags before work.
+
 1. **measured** — Bank-wide flags were set before notes: PATCH B/config updates enable_observations:false, enable_auto_consolidation:false; GET config proves values (005/006,U11). Never change a bank other writers use without its owner’s word. [] scopes still consolidated under enabled defaults (F3); "none" was rejected. **unknown** — Effect on already pending work is unmeasured; pending_consolidation can remain nonzero. Do not treat OFF as cancellation; inspect operations/stats.
 2. **measured** — Exhaust B/operations limit/offset/total; GET B/operations/{id} for parent AND child; include_payload helps attribution. Refresh carries mental_model_id, retain document_id. error_message coexisted with pending parent/retrying child; never overlap a new identity while pending. Cancelled is not failed.
 3. **measured** — Initialize MCP at /mcp/{bank_id}/, parse SSE, carry returned mcp-session-id and inspect bodies. Missing-page read returned HTTP 200, isError=false and structuredContent.error. Inspect body despite success flags.
@@ -45,12 +48,7 @@ Labels classify server claims; steps are caller obligations. Read [evidence and 
 
 ## Unknown: do not assume
 
-- **unknown** — Terminal retain failure/retry: do not assume semantics; F4 stayed active.
-- **unknown** — Operation retention: do not assume old ids/results stay discoverable.
-- **unknown** — Limits: do not assume tested sizes are maxima.
-- **unknown** — Attachment lifecycle: do not assume text-only deletion findings apply.
-- **unknown** — Redirects: do not assume credential safety; clients did not follow them.
-- **unknown** — Index completeness: do not assume absence beyond listed reads/tested banks.
+Read the [unmeasured boundaries](references/measured-20261112.md#unmeasured-boundaries); do not generalize beyond the tested reads, sizes or lifecycle.
 
 ## New measurement and upkeep
 
