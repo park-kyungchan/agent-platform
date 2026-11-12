@@ -120,7 +120,7 @@ maps record_id to `header`, exact `body` bytes, parsed `sections`, `path`.
 list; `recall_tags(subject,descendants=False,horizon=None)` returns tags/all_strict.
 Use helpers only after successful validation; no publisher or service is added here.
 
-## Publisher runbook (V4-2a; offline implementation, not activated)
+## Publisher runbook (V4-2a/V4-2b; offline implementation, not activated)
 `python3 -I -B scripts/publish-memory.py publish --credential-fd 3` and
 `python3 -I -B scripts/publish-memory.py verify --credential-fd 3` use only
 `http://127.0.0.1:8888` and bank `coding-agent::engineering`. Neither accepts an
@@ -143,7 +143,7 @@ working files. Run from a checkout sharing the reviewed local main reference;
 missing config on main refuses, including before this change is merged.
 A nonblocking flock in Git's common directory (`publish-memory.lock`, mode 0600,
 empty) spans pinning through exit and is shared by linked worktrees. Other hosts
-and mount namespaces are unsupported. V4-2b must use the same `locked()` helper.
+and mount namespaces are unsupported. All four subcommands use the same `locked()` helper.
 
 W1 inspects version/config, terminal parent/child operations, full lists and
 page-inclusive models. W2-W5 bank export/restore/delete/create/absence and native
@@ -162,5 +162,43 @@ fresh-session scope/negative-mutation/lesson-route qualification remain UQ2/UQ3
 (V4-5), followed by the Lead's X7 measurement/readback and fresh consumer sessions.
 A successful `verify` alone never exposes a bank or authorizes W8/W9. The script
 never changes CLI settings, starts sessions, creates recovery archives, restores,
-retracts, deletes or creates a bank in this packet. Those unmeasured operations
-have no speculative wire implementation. No live request belongs in CI.
+or deletes/creates a bank in this packet. Those unmeasured operations have no
+speculative wire implementation. No live request belongs in CI.
+
+
+### Retraction and restore (V4-2b)
+`python3 -I -B scripts/publish-memory.py retract --record-id ID --credential-fd 3`
+is the fixed-bank safety route. Before invoking it the Lead stops/drains affected
+consumers and records the pending source-removal hold. The script names these
+obligations in its output; it cannot prove consumer shutdown or inspect the hold.
+It pins main, checks version/profile, terminal parent/child operations and zero
+models/observations, then GETs the exact document. Its original_text hash must
+match the pinned record's publication hash: Git is then the recovery copy.
+A mismatch or missing record stops with `bank_copy_not_in_source` before DELETE.
+`--no-recovery-copy` explicitly states that the owner recovered the bank copy
+outside this script or that it must not be retained. No body is saved or printed.
+
+One DELETE is followed by exact document GET404, exhaustive per-document facts
+with total zero, and chunks GET404 (HC U5). A lost answer always stops with
+`delete_unresolved_route_unavailable_no_resend`, after reporting boolean/unknown
+readbacks; never rerun DELETE as a timeout recovery step. Failed readback stops.
+The script repeats zero-model/profile/terminal-work checks and, for each pinned
+recall term, sends a recall query with the checker's exact subject tag selector
+and all_strict matching (HC U10). No returned result may name the withdrawn id.
+Only these clean reads permit `retracted_on_listed_reads`; arbitrary index
+completeness remains unknown. Missing pinned source yields
+`listed_reads=not_evaluated` and `deleted_unproven`, even with the override.
+Every result leaves the route unavailable and consumers stopped. Only after proof
+may the owning closure PR remove the original and verify removal on reviewed main.
+The Lead keeps the source-removal hold until acceptance; a later rebuild must
+exclude the id. Neither this command nor a recovery copy authorizes republishing it.
+
+`python3 -I -B scripts/publish-memory.py restore --recovery TASK_ARCHIVE.zip --recovery-sha256 HEX --credential-fd 3`
+requires a regular file opened without following a symbolic link and its matching
+SHA-256 before any request. It checks pinned source and W1 preconditions through
+measured reads; a read404 cannot establish an absent restore target. It then
+refuses with `uq1_restore_unmeasured`. Native archive format, absent-target proof
+and import semantics remain UQ1 for V4-5. No import, lifecycle or polling code
+exists here. The Lead must keep restored reads denied until corrected current
+source passes rebuild and qualification. V4-3 may use only the listed-read claim;
+V4-5 must measure missing dependencies before replacing UQ refusals.
