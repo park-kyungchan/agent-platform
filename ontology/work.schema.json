@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 5,
+  "version": 6,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -900,6 +900,7 @@
         "limit_lines": {"type": "integer", "required": true},
         "current_lines": {"type": "integer", "required": true},
         "scope_reviewed": {"type": "boolean", "required": true},
+        "reviewed_lines": {"type": "integer", "required": false},
         "amended_by_family": {"type": "string", "required": true, "max_bytes": 120},
         "reviewer_family": {"type": "string", "required": false, "max_bytes": 120},
         "review_report": {"type": "string", "required": false, "max_bytes": 1000}
@@ -1699,6 +1700,7 @@
           "message": "Engine work requires a domain_route consumer.",
           "all": [{"exists": "$thread"}, {"any": [{"ne": ["$layer", "engine"]}, {"eq": ["$thread.consumer_kind", "domain_route"]}]}]
         },
+        {"code": "plan_missing", "message": "Choose an existing plan.", "all": [{"exists": "$plan"}]},
         {
           "code": "plan_of_other_thread",
           "message": "Use the plan belonging to this thread.",
@@ -1711,8 +1713,8 @@
         },
         {
           "code": "plan_over_limit",
-          "message": "Record an independent scope/design review after the latest plan amendment.",
-          "all": [{"exists": "$plan"}, {"any": [{"le": ["$plan.current_lines", "$plan.limit_lines"]}, {"eq": ["$plan.scope_reviewed", true]}]}]
+          "message": "Record an independent scope/design review covering the current size, or dispatch a reviewer.",
+          "all": [{"exists": "$plan"}, {"any": [{"le": ["$plan.current_lines", "$plan.limit_lines"]}, {"all": [{"present": "$plan.reviewed_lines"}, {"le": ["$plan.current_lines", "$plan.reviewed_lines"]}]}, {"eq": ["$tier", "review"]}]}]
         }
       ],
       "rules": [
@@ -2188,15 +2190,17 @@
       "description": "Record scope/design review by a family different from the latest plan writer; both families are self-declared. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "plan": {"type": {"ref": "plan"}, "required": true},
+        "reviewed_lines": {"type": "integer", "required": true},
         "reviewer_family": {"type": "string", "required": true, "max_bytes": 120},
         "review_report": {"type": "string", "required": true, "max_bytes": 1000}
       },
       "submission_criteria": [
         {"code": "unknown_plan", "message": "Choose an existing plan.", "all": [{"exists": "$plan"}]},
+        {"code": "reviewed_lines_below_current", "message": "Review must cover at least current_lines.", "all": [{"exists": "$plan"}, {"ge": ["$reviewed_lines", "$plan.current_lines"]}]},
         {"code": "scope_review_same_family", "message": "Use a different family from the latest plan writer.", "all": [{"exists": "$plan"}, {"ne": ["$reviewer_family", "$plan.amended_by_family"]}]}
       ],
       "rules": [
-        {"modify_object": "plan", "set": {"scope_reviewed": true, "reviewer_family": "$reviewer_family", "review_report": "$review_report"}}
+        {"modify_object": "plan", "set": {"scope_reviewed": true, "reviewed_lines": "$reviewed_lines", "reviewer_family": "$reviewer_family", "review_report": "$review_report"}}
       ]
     }
   },
