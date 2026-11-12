@@ -226,7 +226,7 @@ class Exercise:
         started = self.clock()
         row = {'step': self.step, 'method': method, 'path': path.replace(self.bank, '<bank>'),
                'request_keys': request_keys(body), 'basis': self.basis(method, allowed),
-               'status': None, 'verdict': 'failed'}
+               'status': None, 'answered': False, 'verdict': 'failed'}
         if allowed == self.mcp and isinstance(body, dict):
             row['rpc_method'] = body.get('method')
             if body.get('method') == 'tools/call':
@@ -243,7 +243,7 @@ class Exercise:
             status, raw, sid = self.wire.exchange(method, path, body,
                  timeout=min(15, max(.001, self.start + 900 - self.clock()),
                              max(.001, getattr(self, 'poll_until', float('inf')) - self.clock())), **kwargs)
-            row.update(status=status, bytes=len(raw), sha256=P.digest(raw), seconds=self.clock() - started)
+            row.update(answered=True, status=status, bytes=len(raw), sha256=P.digest(raw), seconds=self.clock() - started)
             if raw.startswith(b'PK'):
                 data = raw
             elif raw:
@@ -261,7 +261,6 @@ class Exercise:
                     data = matches[0]
             else:
                 data = {}
-            self.bound()
             row['answer_shape'] = keys(data)
             row['verdict'] = 'failed' if status >= 500 else 'measured'
             return status, data, sid
@@ -618,10 +617,13 @@ class Exercise:
                     inspect(v)
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             P.require(sum(x.file_size for x in archive.infolist()) <= MAX_BYTES, 'archive_too_large')
-            P.require(archive.testzip() is None, 'archive_corrupt')
             for entry in archive.infolist():
                 entries.append({'name_sha256': P.digest(entry.filename.encode()), 'bytes': entry.file_size})
-                value = archive.read(entry)
+                with archive.open(entry) as source:
+                    value = source.read(MAX_BYTES + 1)  # zipfile checks CRC at EOF; the read is capped.
+                P.require(len(value) <= MAX_BYTES, 'archive_too_large')
+                P.require(not any(bank.encode() in value or encode(bank)[1:-1] in value
+                                  or json.dumps(bank).encode()[1:-1] in value for bank in self.before or {}), 'archive_foreign_bank')
                 if entry.filename.endswith('.json'):
                     inspect(load(value))
                 elif entry.filename.endswith('.jsonl'):
@@ -856,7 +858,7 @@ def main(argv=None):
         def interrupted(*_):
             exercise.interrupt()
         with contextlib.ExitStack() as stack:
-            for sig in (signal.SIGINT, signal.SIGTERM):
+            for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP, signal.SIGQUIT):
                 previous = signal.signal(sig, interrupted)
                 stack.callback(signal.signal, sig, previous)
             with P.locked():

@@ -346,4 +346,5 @@ Evidence is new-only, mode 0600, with shapes/counts/hashes/timings, never note b
 or credentials. Exit 0 means all automated steps measured and cleanup proven;
 2 means no changing request was sent (read-only preflight may have run);
 3 means failed/unrun steps with cleanup proven, 4 means
-cleanup incomplete. E3 CLI qualification and E5 semantic judgment remain Lead work.
+cleanup incomplete. Imports are not retain attempts. Evidence stays in the task
+directory and is not published. E3 CLI qualification and E5 semantic judgment remain Lead work.
