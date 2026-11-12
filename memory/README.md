@@ -119,3 +119,48 @@ maps record_id to `header`, exact `body` bytes, parsed `sections`, `path`.
 64 lowercase SHA-256 hex characters. `derived_tags(header,nodes)` returns the ordered
 list; `recall_tags(subject,descendants=False,horizon=None)` returns tags/all_strict.
 Use helpers only after successful validation; no publisher or service is added here.
+
+## Publisher runbook (V4-2a; offline implementation, not activated)
+`python3 -I -B scripts/publish-memory.py publish --credential-fd 3` and
+`python3 -I -B scripts/publish-memory.py verify --credential-fd 3` use only
+`http://127.0.0.1:8888` and bank `coding-agent::engineering`. Neither accepts an
+address/bank override. The caller opens an anonymous pipe/private inherited FD
+IN PROCESS and passes only its integer number (`pass_fds` with Python subprocess).
+Write exact credential bytes without a newline, close the writing end, and never
+put them in shell text, argv, environment, config, a token file or debug output.
+Do not invoke these commands against the service without an executing task grant.
+Every request has a <=15s timeout, the run a 900s budget, and mutations have >=1s
+start gaps. No request is automatically retried. A timeout or lost acknowledgement
+means unresolved work: keep consumers stopped and inspect the exact document and
+complete native parent/child operations read-only before any further mutation.
+
+The Lead checks holds (including pending retraction/source-removal holds), reviewed
+main ancestry, private-source admission and sealed held-out count/hashes before
+selecting records. The publisher parses no authority file. It pins local `main`,
+`memory/subjects.json`, `memory/engineering.json`, publication bytes/hashes and
+complete derived tags using the checker's imported helpers. It never publishes
+working files. Run from a checkout sharing the reviewed local main reference;
+missing config on main refuses, including before this change is merged.
+A nonblocking flock in Git's common directory (`publish-memory.lock`, mode 0600,
+empty) spans pinning through exit and is shared by linked worktrees. Other hosts
+and mount namespaces are unsupported. V4-2b must use the same `locked()` helper.
+
+W1 inspects version/config, terminal parent/child operations, full lists and
+page-inclusive models. W2-W5 bank export/restore/delete/create/absence and native
+MCP denial remain UQ1/UQ2: `publish` refuses before any mutation, for existing AND
+absent banks. V4-5 must measure these before replacing the refusals. The measured
+`retain_once()` helper generates a fresh UUID per dispatch and never resends;
+it cannot be reached through production `publish` while those barriers remain.
+`verify` implements W7 set/byte/tag/recall-term/profile/trace checks and repeats
+source/profile/operation checks. It emits counts, hashes and hashes of observed
+extraction provider/model pairs only. It does not certify factual meaning, privacy or answer
+quality. The Lead with a reviewer still checks subject/condition, aliases and
+administrative assertions. No embedding/reranker runtime revision/cap is inferred.
+W8 still requires full fixed/fresh-held-out acceptance at activation/API changes,
+or the fixed canary subset for routine rebuilds (V4-3). W9 tools enablement and
+fresh-session scope/negative-mutation/lesson-route qualification remain UQ2/UQ3
+(V4-5), followed by the Lead's X7 measurement/readback and fresh consumer sessions.
+A successful `verify` alone never exposes a bank or authorizes W8/W9. The script
+never changes CLI settings, starts sessions, creates recovery archives, restores,
+retracts, deletes or creates a bank in this packet. Those unmeasured operations
+have no speculative wire implementation. No live request belongs in CI.

@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "bank_id": "coding-agent::engineering",
+  "retain_custom_instructions": "Extract concise English facts only. Name the subject of the record and its condition within the first 64 tokens of every fact, and keep every non-English literal beside its exact English alias; do not translate away either name. Extract no facts from administrative frontmatter: schema_version, record_id, kind, scope, owner_ref, sources, horizon, review_on, recall_terms, derived_from or codified_in. Title, subject and abstract orient the substantive body; do not duplicate the same claim. Preserve meaningful protocol identifiers and every recall term exactly. Aim for at most 256 tokens per fact.",
+  "mcp_enabled_tools": [
+    "recall",
+    "get_document"
+  ]
+}
