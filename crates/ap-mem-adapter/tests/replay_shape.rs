@@ -34,7 +34,16 @@ fn retain(r: &mut Replay, op: &str, text: &str, hash: bool, recording: &'static 
     )
     .body
 }
+fn recall_args(tag: &str) -> Value {
+    json!({"query":"invented","tags":[tag],"tags_match":"all_strict"})
+}
 fn complete(r: &mut Replay, op: &str) {
+    if let Some(tag) = r.accepted_documents(op)[0].tags.first().cloned() {
+        r.advance(TraceStep::Recall {
+            query: "invented".into(),
+            tags: vec![tag],
+        });
+    }
     r.advance(TraceStep::Retained {
         operation_id: op.into(),
         child_id: format!("{op}-child"),
@@ -182,7 +191,7 @@ fn measured_replace_delete() {
     );
     checked(
         &mut r,
-        request("POST", "/memories/recall", json!({})),
+        request("POST", "/memories/recall", recall_args("fixture-new-tag")),
         "062",
     );
     retain(&mut r, "fixture-op-return", old, false, "079");
@@ -323,7 +332,7 @@ fn rpc_and_observation_shapes() {
     let recall = rpc(
         &mut r,
         "tools/call",
-        json!({"name":"recall","arguments":{"query":"invented"}}),
+        json!({"name":"recall","arguments":recall_args("fixture-tag")}),
         "036",
     );
     let s = recall.body.as_str().unwrap();
@@ -369,7 +378,7 @@ fn hashed_mcp_recall_uses_recorded_empty_metadata() {
     let reply = rpc(
         &mut r,
         "tools/call",
-        json!({"name":"recall","arguments":{"query":"invented"}}),
+        json!({"name":"recall","arguments":recall_args("fixture-tag")}),
         "036",
     );
     assert!(!reply.body.as_str().unwrap().contains("body_hash"));
@@ -387,7 +396,7 @@ fn recorded_crlf_frames_are_accepted() {
             rpc(
                 &mut r,
                 "tools/call",
-                json!({"name":"recall","arguments":{"query":"invented"}}),
+                json!({"name":"recall","arguments":recall_args("fixture-tag")}),
                 "036",
             ),
             "036",
@@ -521,6 +530,14 @@ fn wire_rpc(
     wire_checked(server, comparison, q, recording)
 }
 fn wire_complete(server: &support::upstream::Server, comparison: &mut Replay) {
+    comparison.advance(TraceStep::Recall {
+        query: "invented".into(),
+        tags: vec!["fixture-wire-tag".into()],
+    });
+    server.advance(TraceStep::Recall {
+        query: "invented".into(),
+        tags: vec!["fixture-wire-tag".into()],
+    });
     comparison.advance(TraceStep::Retained {
         operation_id: "fixture-wire-operation".into(),
         child_id: "fixture-wire-child".into(),
@@ -582,7 +599,7 @@ fn every_wire_reply_projected() {
     wire_checked(
         &server,
         &mut comparison,
-        request("POST", "/memories/recall", json!({})),
+        request("POST", "/memories/recall", recall_args("fixture-wire-tag")),
         "062",
     );
     wire_rpc(&server, &mut comparison, "initialize", json!({}), "007");
@@ -591,7 +608,7 @@ fn every_wire_reply_projected() {
         &server,
         &mut comparison,
         "tools/call",
-        json!({"name":"recall","arguments":{"query":"invented"}}),
+        json!({"name":"recall","arguments":recall_args("fixture-wire-tag")}),
         "036",
     );
     wire_rpc(
@@ -845,7 +862,7 @@ fn key_sets_all_routes() {
     wire_checked(
         &server,
         &mut comparison,
-        request("POST", "/memories/recall", json!({})),
+        request("POST", "/memories/recall", recall_args("fixture-tag")),
         "062",
     );
     wire_rpc(&server, &mut comparison, "initialize", json!({}), "007");
@@ -853,7 +870,7 @@ fn key_sets_all_routes() {
         &server,
         &mut comparison,
         "tools/call",
-        json!({"name":"recall","arguments":{"query":"invented"}}),
+        json!({"name":"recall","arguments":recall_args("fixture-tag")}),
         "036",
     );
     server.stop_and_join().unwrap();
@@ -894,4 +911,152 @@ fn key_sets_all_routes() {
         "116",
     );
     server.stop_and_join().unwrap();
+}
+
+#[test]
+fn recall_rejects_unmeasured_scope() {
+    let mut r = Replay::default();
+    let q = request(
+        "POST",
+        "/memories",
+        json!({"operation_id":"fixture-scope-operation","async":true,"items":[
+        {"document_id":"fixture-scope-good","content":"invented requested source","tags":["subject:task:fixture-good"]},
+        {"document_id":"fixture-scope-foreign","content":"invented foreign source","tags":["subject:task:fixture-foreign"]}]}),
+    );
+    checked(&mut r, q, "010");
+    r.advance(TraceStep::Retained {
+        operation_id: "fixture-scope-operation".into(),
+        child_id: "fixture-scope-child".into(),
+        facts: vec![
+            Fact {
+                id: "fixture-scope-fact".into(),
+                document_id: "fixture-scope-good".into(),
+                text: "invented good fact".into(),
+            },
+            Fact {
+                id: "fixture-foreign-fact".into(),
+                document_id: "fixture-scope-foreign".into(),
+                text: "invented foreign fact".into(),
+            },
+        ],
+    });
+    r.advance(TraceStep::Recall {
+        query: "invented scoped query".into(),
+        tags: vec!["subject:task:fixture-good".into()],
+    });
+    let args = json!({"query":"invented scoped query","tags":["subject:task:fixture-good"],"tags_match":"all_strict"});
+    let good = checked(
+        &mut r,
+        request("POST", "/memories/recall", args.clone()),
+        "062",
+    );
+    assert_eq!(good.body["results"].as_array().unwrap().len(), 1);
+    assert_eq!(good.body["results"][0]["document_id"], "fixture-scope-good");
+    // The same reader oracle rejects omitted/wrong selectors; no final-reader stub.
+    for key in ["tags", "tags_match", "query"] {
+        let mut bad = args.clone();
+        bad.as_object_mut().unwrap().remove(key);
+        assert!(r.apply(request("POST", "/memories/recall", bad)).is_err());
+    }
+    let mut wrong = args.clone();
+    wrong["tags"] = json!(["subject:task:fixture-foreign"]);
+    assert!(matches!(
+        r.apply(request("POST", "/memories/recall", wrong)),
+        Err(ReplayStop::NotRecorded(_))
+    ));
+    let mut missing = args.clone();
+    missing.as_object_mut().unwrap().remove("tags");
+    assert!(
+        r.apply(request("POST", "/memories/recall", missing))
+            .is_err()
+    );
+    let mut wrong_query = args.clone();
+    wrong_query["query"] = json!("unmeasured invented query");
+    assert!(
+        r.apply(request("POST", "/memories/recall", wrong_query))
+            .is_err()
+    );
+    let mut bank = request("POST", "/memories/recall", args.clone());
+    bank.path = bank.path.replace("fixture-bank", "unmeasured-bank");
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| r.apply(bank)))
+        .expect("bank mismatch is typed");
+    assert!(matches!(result, Err(ReplayStop::NotRecorded(_))));
+    rpc(&mut r, "initialize", json!({}), "007");
+    let reply = rpc(
+        &mut r,
+        "tools/call",
+        json!({"name":"recall","arguments":args}),
+        "036",
+    );
+    assert!(
+        !reply
+            .body
+            .as_str()
+            .unwrap()
+            .contains("invented foreign fact")
+    );
+}
+#[test]
+fn replay_gap_is_not_a_publisher_failure() {
+    let mut server = support::upstream::Server::start(Replay::default());
+    let client_failed = server
+        .request(request("GET", "/not-recorded", Value::Null))
+        .is_err();
+    let joined = server.stop_and_join();
+    assert_eq!(
+        server.replay_stop(),
+        Some(ReplayStop::NotRecorded("wire_route"))
+    );
+    assert!(client_failed);
+    let error = joined.expect_err("replay gap must survive joining");
+    assert!(matches!(
+        error.get_ref().and_then(|e| e.downcast_ref::<ReplayStop>()),
+        Some(ReplayStop::NotRecorded("wire_route"))
+    ));
+}
+
+#[test]
+fn proxy_preserves_replay_gap_before_transport_error() {
+    use std::net::TcpStream;
+    use support::proxy::{FaultProxy, Frame, Step};
+    for gap in [false, true] {
+        let server = support::upstream::Server::start(Replay::default());
+        let steps = if gap {
+            vec![]
+        } else {
+            vec![Step::RefuseBeforeForward]
+        };
+        let mut proxy = FaultProxy::start(server.into_owned_backend(), steps);
+        let mut stream = TcpStream::connect(proxy.address()).unwrap();
+        Frame {
+            head: format!(
+                "GET {ROOT}/not-recorded HTTP/1.1\r\nAuthorization: Bearer fixture-test-token"
+            ),
+            body: vec![],
+        }
+        .write(&mut stream)
+        .unwrap();
+        let publisher_failed = Frame::read(&mut stream).is_err();
+        let joined = proxy.stop_and_join();
+        assert!(publisher_failed);
+        let case_passed = publisher_failed && joined.is_ok();
+        assert_eq!(
+            case_passed, !gap,
+            "the same oracle must reject a replay gap"
+        );
+        if gap {
+            let error = joined.expect_err("gap must outrank EOF");
+            assert!(matches!(
+                error.get_ref().and_then(|e| e.downcast_ref::<ReplayStop>()),
+                Some(ReplayStop::NotRecorded("wire_route"))
+            ));
+            let events = proxy.transcript();
+            assert_eq!(events.len(), 1);
+            assert_eq!(
+                events[0].replay_stop,
+                Some(ReplayStop::NotRecorded("wire_route"))
+            );
+            assert!(events[0].forwarded && !events[0].response_received);
+        }
+    }
 }

@@ -3,7 +3,7 @@ mod proxy;
 #[path = "support/replay.rs"]
 mod replay;
 use proxy::{Assumption, CrashPoint, FaultProxy, Frame, OwnedBackend, Proxy, Step};
-use replay::{MentalModel, Replay, TraceStep, WireRequest};
+use replay::{MentalModel, Replay, ReplayStops, TraceStep, WireRequest};
 use serde_json::{Value, json};
 use std::io;
 use std::net::{TcpListener, TcpStream};
@@ -27,6 +27,8 @@ fn backend(replay: Replay, publisher: Option<Child>) -> (OwnedBackend, State, Ar
     let done = stop.clone();
     let joined = Arc::new(AtomicBool::new(false));
     let finished = joined.clone();
+    let replay_stops = ReplayStops::default();
+    let failures = replay_stops.clone();
     let worker = thread::spawn(move || {
         while !done.load(Ordering::SeqCst) {
             let (mut stream, peer) = match incoming.accept() {
@@ -49,7 +51,10 @@ fn backend(replay: Replay, publisher: Option<Child>) -> (OwnedBackend, State, Ar
                 .lock()
                 .unwrap()
                 .apply(WireRequest::new(method, path, value))
-                .map_err(|_| io::Error::other("recorded_backend_stop"))?;
+                .map_err(|error| {
+                    failures.lock().unwrap().get_or_insert(error.clone());
+                    io::Error::other(error)
+                })?;
             let body = if let Some(s) = reply.body.as_str() {
                 s.as_bytes().to_vec()
             } else {
@@ -65,7 +70,7 @@ fn backend(replay: Replay, publisher: Option<Child>) -> (OwnedBackend, State, Ar
         Ok(())
     });
     (
-        OwnedBackend::new(listener, stop, worker, publisher),
+        OwnedBackend::new(listener, stop, worker, publisher, replay_stops),
         state,
         joined,
     )

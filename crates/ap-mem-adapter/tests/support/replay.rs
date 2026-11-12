@@ -33,11 +33,22 @@ pub struct RecordedReply {
     pub headers: BTreeMap<String, String>,
     pub body: Value,
 }
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReplayStop {
     NotRecorded(&'static str),
     ShapeMismatch(String),
 }
+impl std::fmt::Display for ReplayStop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotRecorded(case) => write!(f, "replay_not_recorded:{case}"),
+            Self::ShapeMismatch(_) => f.write_str("replay_shape_mismatch"),
+        }
+    }
+}
+impl std::error::Error for ReplayStop {}
+pub type ReplayStops = std::sync::Arc<std::sync::Mutex<Option<ReplayStop>>>;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Document {
     pub id: String,
@@ -84,6 +95,11 @@ pub enum TraceStep {
     Observations(Vec<Fact>),
     RefreshCompleted,
     MaintenanceCompleted,
+    /// Recorded036/062 selector with invented query/tag aliases; no query engine.
+    Recall {
+        query: String,
+        tags: Vec<String>,
+    },
 }
 #[derive(Clone, Default)]
 pub struct Replay {
@@ -98,6 +114,9 @@ pub struct Replay {
     maintenance: bool,
     initialized: bool,
     upstream_defaults: bool,
+    recall: Option<(String, Vec<String>)>,
+    #[cfg(test)]
+    corrupt_next_ack: bool,
 }
 impl Replay {
     /// The enabled/empty-overrides snapshot measured in 161, distinct from 006.
@@ -177,6 +196,7 @@ impl Replay {
             TraceStep::Observations(facts) => self.observations = facts,
             TraceStep::RefreshCompleted => self.refresh = true,
             TraceStep::MaintenanceCompleted => self.maintenance = true,
+            TraceStep::Recall { query, tags } => self.recall = Some((query, tags)),
         }
     }
     fn stage_request(&mut self, request: &WireRequest) {
@@ -233,7 +253,12 @@ impl Replay {
     pub fn apply(&mut self, request: WireRequest) -> Result<RecordedReply, ReplayStop> {
         let mut proposed = self.clone();
         proposed.stage_request(&request);
-        let reply = project(&proposed, &request)?;
+        #[allow(unused_mut)]
+        let mut reply = project(&proposed, &request)?;
+        #[cfg(test)]
+        if std::mem::take(&mut self.corrupt_next_ack) {
+            reply.body["unrecorded_ack_field"] = json!(true);
+        }
         self.accept_projected(proposed, &request, reply)
     }
     fn accept_projected(
@@ -397,8 +422,11 @@ fn query(path: &str) -> BTreeMap<&str, &str> {
 }
 
 /// The ONLY constructor of nominal wire values, including errors and SSE bodies.
-/// Unsupported, uncaptured variants panic rather than inventing a successful answer.
+/// Uncaptured variants stop rather than inventing a successful answer.
 pub fn project(replay: &Replay, request: &WireRequest) -> Result<RecordedReply, ReplayStop> {
+    if !(request.path == "/mcp/fixture-bank/" || request.path.starts_with(&format!("{PREFIX}/"))) {
+        return Err(ReplayStop::NotRecorded("bank_route"));
+    }
     let mut status = 200;
     let mut headers = BTreeMap::from([("content-type".into(), "application/json".into())]);
     let (path, _) = request.path.split_once('?').unwrap_or((&request.path, ""));
@@ -456,9 +484,24 @@ pub fn project(replay: &Replay, request: &WireRequest) -> Result<RecordedReply, 
         };
         json!({"id":id,"task_type":if child {"retain"} else {"batch_retain"},"operation_id":id,"operation_type":if child {"retain"} else {"batch_retain"},"items_count":o.accepted.len(),"document_id":o.accepted[0].id,"filename":null,"mental_model_id":null,"details":null,"created_at":STAMP,"updated_at":STAMP,"status":text(state),"error_message":null,"retry_count":0,"next_retry_at":null,"progress":null})
     };
-    let recall_value = |mcp: bool| {
+    let recall_value = |mcp: bool, args: &Value| -> Result<Value, ReplayStop> {
+        let (query, tags) = replay
+            .recall
+            .as_ref()
+            .ok_or(ReplayStop::NotRecorded("recall_trace"))?;
+        if tags.is_empty()
+            || args["query"].as_str() != Some(query)
+            || args["tags_match"] != "all_strict"
+            || args["tags"] != json!(tags)
+            || args.as_object().is_none_or(|a| {
+                a.keys()
+                    .any(|k| !["query", "tags", "tags_match"].contains(&k.as_str()))
+            })
+        {
+            return Err(ReplayStop::NotRecorded("recall_selector"));
+        }
         let mut chunks = serde_json::Map::new();
-        let results: Vec<_> = replay.facts.values().map(|f| {
+        let results: Vec<_> = replay.facts.values().filter(|f| tags.iter().all(|tag| replay.documents[&f.document_id].tags.contains(tag))).map(|f| {
             let d = &replay.documents[&f.document_id];
             let chunk = format!("{}-chunk",f.id);
             chunks.insert(chunk.clone(), if mcp {json!({"chunk_text":d.original_text,"chunk_index":0,"truncated":false})} else {json!({"id":chunk,"text":d.original_text,"chunk_index":0,"truncated":false,"attachments":null})});
@@ -467,7 +510,9 @@ pub fn project(replay: &Replay, request: &WireRequest) -> Result<RecordedReply, 
             if !mcp { value["attachments"] = Value::Null; }
             value
         }).collect();
-        json!({"results":results,"trace":null,"entities":null,"chunks":chunks,"source_facts":null,"source_facts_truncated":if mcp {Some(false)} else {None}})
+        Ok(
+            json!({"results":results,"trace":null,"entities":null,"chunks":chunks,"source_facts":null,"source_facts_truncated":if mcp {Some(false)} else {None}}),
+        )
     };
     let body = if !request.authorized {
         status = 401;
@@ -498,7 +543,7 @@ pub fn project(replay: &Replay, request: &WireRequest) -> Result<RecordedReply, 
                 let value = match request.body["params"]["name"].as_str().unwrap() {
                     "recall" => {
                         assert!(args["query"].is_string(), "fixed recall query argument");
-                        recall_value(true)
+                        recall_value(true, args)?
                     },
                     "get_document" => doc_value(
                         &replay.documents[args["document_id"].as_str().unwrap()],
@@ -597,7 +642,7 @@ pub fn project(replay: &Replay, request: &WireRequest) -> Result<RecordedReply, 
                 }).collect();
                 json!({"items":items,"total":replay.documents.len(),"limit":limit,"offset":offset,"total_is_estimate":false})
             }
-            ("POST", "/memories/recall") => recall_value(false),
+            ("POST", "/memories/recall") => recall_value(false, &request.body)?,
             ("GET", "/operations") => {
                 let mut items = Vec::new();
                 for o in replay.operations.values().filter(|o| {
@@ -812,12 +857,9 @@ mod atomic_commit {
             &format!("{PREFIX}/memories"),
             json!({"operation_id":"fixture-atomic-operation","async":true,"items":[{"document_id":"fixture-atomic-document","content":"invented atomic body","tags":[]}]}),
         );
-        let mut proposed = replay.clone();
-        proposed.stage_request(&request);
-        let mut reply = project(&proposed, &request).unwrap();
-        reply.body["unrecorded_ack_field"] = json!(true);
+        replay.corrupt_next_ack = true;
         assert!(matches!(
-            replay.accept_projected(proposed, &request, reply),
+            replay.apply(request),
             Err(ReplayStop::ShapeMismatch(_))
         ));
         assert_eq!(replay.active_operations(), 0);

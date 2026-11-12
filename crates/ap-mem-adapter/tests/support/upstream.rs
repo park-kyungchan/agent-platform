@@ -13,7 +13,7 @@ use std::time::Duration;
 const LIMIT: usize = 64 * 1024;
 
 use super::proxy::OwnedBackend;
-use super::replay::{RecordedReply, Replay, TraceStep, WireRequest};
+use super::replay::{RecordedReply, Replay, ReplayStop, ReplayStops, TraceStep, WireRequest};
 
 /// The listener owns only transport and a typed replay; no route builds JSON here.
 pub struct Server {
@@ -22,6 +22,7 @@ pub struct Server {
     replay: Arc<Mutex<Replay>>,
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<io::Result<()>>>,
+    replay_stops: ReplayStops,
 }
 impl Server {
     pub fn start(replay: Replay) -> Self {
@@ -32,6 +33,8 @@ impl Server {
         let replay = Arc::new(Mutex::new(replay));
         let stop = Arc::new(AtomicBool::new(false));
         let (data, stopping) = (replay.clone(), stop.clone());
+        let replay_stops = ReplayStops::default();
+        let failures = replay_stops.clone();
         let worker = thread::spawn(move || {
             while !stopping.load(Ordering::Acquire) {
                 let (mut stream, peer) = match incoming.accept() {
@@ -48,8 +51,9 @@ impl Server {
                 let Ok(request) = read_request(&mut stream) else {
                     continue;
                 };
-                let reply = data.lock().unwrap().apply(request).map_err(|_| {
-                    io::Error::new(io::ErrorKind::Unsupported, "replay_stopped_without_reply")
+                let reply = data.lock().unwrap().apply(request).map_err(|error| {
+                    failures.lock().unwrap().get_or_insert(error.clone());
+                    io::Error::other(error)
                 })?;
                 write_reply(&mut stream, &reply)?;
             }
@@ -61,6 +65,7 @@ impl Server {
             replay,
             stop,
             worker: Some(worker),
+            replay_stops,
         }
     }
     pub fn owned_address(&self) -> SocketAddr {
@@ -69,13 +74,21 @@ impl Server {
     pub fn advance(&self, step: TraceStep) {
         self.replay.lock().unwrap().advance(step);
     }
+    pub fn replay_stop(&self) -> Option<ReplayStop> {
+        self.replay_stops.lock().unwrap().clone()
+    }
     pub fn stop_and_join(&mut self) -> io::Result<()> {
         if let Some(worker) = self.worker.take() {
             self.stop.store(true, Ordering::Release);
             self.listener.take();
-            worker
+            let joined = worker
                 .join()
-                .map_err(|_| io::Error::other("replay_worker_panicked"))??;
+                .map_err(|_| io::Error::other("replay_worker_panicked"))
+                .and_then(|r| r);
+            if let Some(error) = self.replay_stop() {
+                return Err(io::Error::other(error));
+            }
+            joined?;
         }
         Ok(())
     }
@@ -86,6 +99,7 @@ impl Server {
             self.stop.clone(),
             self.worker.take().unwrap(),
             None,
+            self.replay_stops.clone(),
         )
     }
     pub fn request(&self, request: WireRequest) -> io::Result<RecordedReply> {
@@ -191,8 +205,8 @@ fn read_request(stream: &mut TcpStream) -> io::Result<WireRequest> {
     let parts: Vec<_> = lines.next().unwrap_or("").split_whitespace().collect();
     if parts.len() != 3
         || parts[2] != "HTTP/1.1"
-        || !(parts[1].starts_with("/v1/default/banks/fixture-bank/")
-            || parts[1] == "/mcp/fixture-bank/")
+        || !parts[1].starts_with('/')
+        || parts[1].starts_with("//")
     {
         return Err(io::ErrorKind::InvalidData.into());
     }

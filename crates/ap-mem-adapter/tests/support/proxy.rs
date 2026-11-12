@@ -1,5 +1,6 @@
 //! Owned loopback transport faults. Assumptions never enter the nominal replay.
 #![allow(dead_code)]
+use super::replay::{ReplayStop, ReplayStops};
 use serde_json::{Value, json};
 use std::collections::VecDeque;
 use std::io::{self, Read, Write};
@@ -172,6 +173,7 @@ pub struct ForwardEvent {
     pub response_received: bool,
     pub dropped_answer: bool,
     pub crash: Option<CrashPoint>,
+    pub replay_stop: Option<ReplayStop>,
 }
 /// A bound listener token plus its worker/stop owns the destination, not an address
 /// supplied in a request. An optional Child permits killing only an owned process.
@@ -180,6 +182,7 @@ pub struct OwnedBackend {
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<io::Result<()>>>,
     publisher: Option<Child>,
+    replay_stops: ReplayStops,
 }
 impl OwnedBackend {
     pub fn new(
@@ -187,6 +190,7 @@ impl OwnedBackend {
         stop: Arc<AtomicBool>,
         worker: JoinHandle<io::Result<()>>,
         publisher: Option<Child>,
+        replay_stops: ReplayStops,
     ) -> Self {
         assert!(listener.local_addr().unwrap().ip().is_loopback());
         Self {
@@ -194,6 +198,7 @@ impl OwnedBackend {
             stop,
             worker: Some(worker),
             publisher,
+            replay_stops,
         }
     }
     fn address(&self) -> SocketAddr {
@@ -210,16 +215,23 @@ impl OwnedBackend {
     }
     fn finish(&mut self) -> io::Result<()> {
         self.stop.store(true, Ordering::SeqCst);
-        if let Some(child) = self.publisher.as_mut() {
-            if child.try_wait()?.is_none() {
-                child.kill()?;
+        let Some(worker) = self.worker.take() else {
+            return Ok(());
+        };
+        let joined = worker.join().map_err(|_| invalid()).and_then(|r| r);
+        let cleanup = (|| {
+            if let Some(child) = self.publisher.as_mut() {
+                if child.try_wait()?.is_none() {
+                    child.kill()?;
+                }
+                child.wait()?;
             }
-            child.wait()?;
+            Ok(())
+        })();
+        if let Some(error) = self.replay_stops.lock().unwrap().clone() {
+            return Err(io::Error::other(error));
         }
-        if let Some(worker) = self.worker.take() {
-            worker.join().map_err(|_| invalid())??;
-        }
-        Ok(())
+        joined.and(cleanup)
     }
 }
 impl Drop for OwnedBackend {
@@ -236,6 +248,7 @@ pub struct Proxy {
     stop: Arc<AtomicBool>,
     worker: Option<JoinHandle<io::Result<()>>>,
     events: Arc<Mutex<Vec<ForwardEvent>>>,
+    replay_stops: ReplayStops,
 }
 impl FaultProxy {
     pub fn start(mut owned_backend: OwnedBackend, steps: Vec<Step>) -> Proxy {
@@ -250,110 +263,130 @@ impl FaultProxy {
         let done = stop.clone();
         let events = Arc::new(Mutex::new(Vec::new()));
         let trace = events.clone();
+        let replay_stops = owned_backend.replay_stops.clone();
         let worker = thread::spawn(move || {
-            let mut steps: VecDeque<_> = steps.into();
-            while !done.load(Ordering::SeqCst) {
-                let (mut client, peer) = match listener.accept() {
-                    Ok(pair) => pair,
-                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        thread::sleep(Duration::from_millis(2));
-                        continue;
-                    }
-                    Err(e) => return Err(e),
-                };
-                assert!(peer.ip().is_loopback());
-                let request = Frame::read(&mut client)?;
-                request.target()?;
-                let step = steps.pop_front().unwrap_or(Step::Pass);
-                let crash = if let Step::KillPublisherAt(point) = &step {
-                    Some(*point)
-                } else {
-                    None
-                };
-                let mut event = ForwardEvent {
-                    script: step.label().into(),
-                    forwarded: false,
-                    response_received: false,
-                    dropped_answer: false,
-                    crash,
-                };
-                if matches!(step, Step::RefuseBeforeForward) {
-                    // A local refusal emits no native status/no-effect evidence.
-                    event.dropped_answer = true;
-                } else if matches!(step, Step::Manufactured503(_)) {
-                    Frame {
-                        head: "HTTP/1.1 503 Proxy Refusal".into(),
-                        body: Vec::new(),
-                    }
-                    .write(&mut client)?;
-                } else if crash == Some(CrashPoint::BeforeForward) {
-                    owned_backend.kill_publisher()?;
-                    event.dropped_answer = true;
-                } else {
-                    // Only this owned listener's address is ever connected; Host and
-                    // request-target cannot redirect, retry, or select another backend.
-                    let mut upstream =
-                        TcpStream::connect_timeout(&owned_backend.address(), TIMEOUT)?;
-                    request.write(&mut upstream)?;
-                    event.forwarded = true;
-                    let mut response = Frame::read(&mut upstream)?;
-                    event.response_received = true;
-                    if matches!(step, Step::ForwardThenDropAnswer) {
+            let result = (|| {
+                let mut steps: VecDeque<_> = steps.into();
+                while !done.load(Ordering::SeqCst) {
+                    let (mut client, peer) = match listener.accept() {
+                        Ok(pair) => pair,
+                        Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                            thread::sleep(Duration::from_millis(2));
+                            continue;
+                        }
+                        Err(e) => return Err(e),
+                    };
+                    assert!(peer.ip().is_loopback());
+                    let request = Frame::read(&mut client)?;
+                    request.target()?;
+                    let step = steps.pop_front().unwrap_or(Step::Pass);
+                    let crash = if let Step::KillPublisherAt(point) = &step {
+                        Some(*point)
+                    } else {
+                        None
+                    };
+                    let mut event = ForwardEvent {
+                        script: step.label().into(),
+                        forwarded: false,
+                        response_received: false,
+                        dropped_answer: false,
+                        crash,
+                        replay_stop: None,
+                    };
+                    if matches!(step, Step::RefuseBeforeForward) {
+                        // A local refusal emits no native status/no-effect evidence.
                         event.dropped_answer = true;
-                    } else if crash == Some(CrashPoint::AfterForward) {
+                    } else if matches!(step, Step::Manufactured503(_)) {
+                        Frame {
+                            head: "HTTP/1.1 503 Proxy Refusal".into(),
+                            body: Vec::new(),
+                        }
+                        .write(&mut client)?;
+                    } else if crash == Some(CrashPoint::BeforeForward) {
                         owned_backend.kill_publisher()?;
                         event.dropped_answer = true;
                     } else {
-                        match &step {
-                            Step::TerminalFailure(_)
-                            | Step::GappedList(_)
-                            | Step::ChangingList(_) => {
-                                // These are explicitly unmeasured fault replies, never
-                                // nominal answers or evidence about native finality.
-                                let mut value: Value = serde_json::from_slice(&response.body)
-                                    .map_err(|_| invalid())?;
-                                match &step {
-                                    Step::TerminalFailure(_) => {
-                                        if value.get("status").is_none()
-                                            || value.get("error_message").is_none()
-                                        {
-                                            return Err(invalid());
-                                        }
-                                        value["status"] = json!("failed");
-                                        value["error_message"] = json!(step.label());
-                                    }
-                                    Step::GappedList(_) => {
-                                        value["items"].as_array_mut().ok_or_else(invalid)?.pop();
-                                    }
-                                    Step::ChangingList(_) => {
-                                        value["items"].as_array_mut().ok_or_else(invalid)?.clear();
-                                        if !value["total"].is_number() {
-                                            return Err(invalid());
-                                        }
-                                        value["total"] = json!(0);
-                                    }
-                                    _ => unreachable!(),
-                                }
-                                response.body =
-                                    serde_json::to_vec(&value).map_err(|_| invalid())?;
+                        // Only this owned listener's address is ever connected; Host and
+                        // request-target cannot redirect, retry, or select another backend.
+                        let mut upstream =
+                            TcpStream::connect_timeout(&owned_backend.address(), TIMEOUT)?;
+                        request.write(&mut upstream)?;
+                        event.forwarded = true;
+                        let mut response = match Frame::read(&mut upstream) {
+                            Ok(response) => response,
+                            Err(error) => {
+                                event.replay_stop =
+                                    owned_backend.replay_stops.lock().unwrap().clone();
+                                trace.lock().unwrap().push(event);
+                                return Err(error);
                             }
-                            _ => {}
-                        }
-                        response.write(&mut client)?;
-                        if crash == Some(CrashPoint::AfterReply) {
+                        };
+                        event.response_received = true;
+                        if matches!(step, Step::ForwardThenDropAnswer) {
+                            event.dropped_answer = true;
+                        } else if crash == Some(CrashPoint::AfterForward) {
                             owned_backend.kill_publisher()?;
+                            event.dropped_answer = true;
+                        } else {
+                            match &step {
+                                Step::TerminalFailure(_)
+                                | Step::GappedList(_)
+                                | Step::ChangingList(_) => {
+                                    // These are explicitly unmeasured fault replies, never
+                                    // nominal answers or evidence about native finality.
+                                    let mut value: Value = serde_json::from_slice(&response.body)
+                                        .map_err(|_| invalid())?;
+                                    match &step {
+                                        Step::TerminalFailure(_) => {
+                                            if value.get("status").is_none()
+                                                || value.get("error_message").is_none()
+                                            {
+                                                return Err(invalid());
+                                            }
+                                            value["status"] = json!("failed");
+                                            value["error_message"] = json!(step.label());
+                                        }
+                                        Step::GappedList(_) => {
+                                            value["items"]
+                                                .as_array_mut()
+                                                .ok_or_else(invalid)?
+                                                .pop();
+                                        }
+                                        Step::ChangingList(_) => {
+                                            value["items"]
+                                                .as_array_mut()
+                                                .ok_or_else(invalid)?
+                                                .clear();
+                                            if !value["total"].is_number() {
+                                                return Err(invalid());
+                                            }
+                                            value["total"] = json!(0);
+                                        }
+                                        _ => unreachable!(),
+                                    }
+                                    response.body =
+                                        serde_json::to_vec(&value).map_err(|_| invalid())?;
+                                }
+                                _ => {}
+                            }
+                            response.write(&mut client)?;
+                            if crash == Some(CrashPoint::AfterReply) {
+                                owned_backend.kill_publisher()?;
+                            }
                         }
                     }
+                    trace.lock().unwrap().push(event);
                 }
-                trace.lock().unwrap().push(event);
-            }
-            owned_backend.finish()
+                Ok(())
+            })();
+            owned_backend.finish().and(result)
         });
         Proxy {
             address,
             stop,
             worker: Some(worker),
             events,
+            replay_stops,
         }
     }
 }
@@ -367,7 +400,11 @@ impl Proxy {
     pub fn stop_and_join(&mut self) -> io::Result<()> {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(worker) = self.worker.take() {
-            worker.join().map_err(|_| invalid())??;
+            let joined = worker.join().map_err(|_| invalid()).and_then(|r| r);
+            if let Some(error) = self.replay_stops.lock().unwrap().clone() {
+                return Err(io::Error::other(error));
+            }
+            joined?;
         }
         Ok(())
     }
