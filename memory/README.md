@@ -209,11 +209,13 @@ V4-5 must measure missing dependencies before replacing UQ refusals.
 checks 45 identities, three forms, two routes and 270 slots without host reads.
 `--collect --credential-fd N --output EVIDENCE.json` gathers evidence under the
 publisher lock from reviewed main; the caller supplies runtime authority.
-`--subject ID` defaults to engineering, includes descendants and both horizons.
+`--subject ID` defaults to the vocabulary root, with descendants and both horizons.
 Recall uses publisher U10/062,143 low/512 requests and the first five returned
 items. Document reads use their ids plus repeatable caller `--document-id ID`.
 Every result needs 270 human verdicts and `current_count` per slot; use
 `--check-results RESULTS.json --evidence EVIDENCE.json [--output CHECKED.json]`.
+Without held-out evidence, a full result reports held_out=not_evaluated and
+target_reached=false. Every slot must carry the exact evidence_sha256.
 Non-equal source pins require `expectation_reverified:true` and the exact evidence
 file's `evidence_sha256` on every affected slot. Unresolved source_missing answers
 use their subject expectation; a resolved claim is stale under human review.
@@ -225,7 +227,8 @@ For checking, pass the private evidence rewound on M and human slot results on
 R05/R09/R23/R27/R30/N07 and profile/Git hashes; missing reads are unknown. Literal
 checks are drift evidence, never answer verdicts. API changes require X5.
 `--measurement-request PARAMETERS.json --output EXISTING_DIRECTORY` writes
-apply.json, measurement_get.json and kpi_get.json; it executes no store action.
-The Lead supplies existing full Ids, actual UTC time/value/evidence/request_id,
-applies once, then compares measurement/KPI readbacks. `--corpus PATH` selects an
-input corpus; tests use invented inputs. Due metadata remains the checker's `--due`.
+apply.json and kpi_get.json; it executes no store action. The measurement GET
+uses the created Id returned by apply; no measurement_get.json is written ahead.
+The Lead supplies the existing KPI Id and actual UTC time/value/evidence/request_id,
+applies once, then compares measurement/KPI readbacks. Times use UTC seconds and Z.
+`--corpus PATH` selects an input corpus; tests use invented inputs. Due metadata remains the checker's `--due`.

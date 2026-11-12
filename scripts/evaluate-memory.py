@@ -2,6 +2,8 @@
 """Collect fixed-bank evidence for human judgment; never assign answer verdicts."""
 import argparse
 import datetime
+import contextlib
+import io
 import importlib.util
 import json
 import os
@@ -105,10 +107,23 @@ def profile(client, pin):
                 subjects_sha256=P.digest(pin['subjects_raw']), config_sha256=P.digest(pin['config_raw']))
 
 
+def due_count(commit):
+    """Call the checker's on-demand CLI function; preserve the caller's argv/output."""
+    argv, output = sys.argv, io.StringIO()
+    try:
+        sys.argv = ['check-memory-records.py', '--commit', commit, '--due',
+                    datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')]
+        with contextlib.redirect_stdout(output):
+            P.require(P.CHECK.main() == 0, 'source_invalid')
+        return len(load(output.getvalue()))
+    finally:
+        sys.argv = argv
+
+
 def collect(client, pin, data, raw, selector, document_ids, held_fd=None, evidence_fd=None):
     P.require(held_fd is None or evidence_fd is not None, 'held_out_evidence_fd_required')
     held = b'' if held_fd is None else read_fd(held_fd)
-    result = dict(C=pin['commit'], observed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(), corpus_sha256=P.digest(raw), profile=profile(client, pin),
+    result = dict(C=pin['commit'], observed_at=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), corpus_sha256=P.digest(raw), profile=profile(client, pin),
                   payload_sha256={rid: w['hash'] for rid, w in pin['expected'].items()},
                   source_pins={q['id']: source_pins(q) for q in data['questions']})
     P.quiescent(client)
@@ -123,7 +138,7 @@ def collect(client, pin, data, raw, selector, document_ids, held_fd=None, eviden
     result['counts']['subject'] = {t + ':' + i: sum(r['header']['subject'] == dict(type=t, id=i)
                     for r in records.values()) for t, i in {(r['header']['subject']['type'],
                     r['header']['subject']['id']) for r in records.values()}}
-    result['due_count'] = sum(r['header']['review_on'] <= datetime.datetime.now(datetime.timezone.utc).date().isoformat() for r in records.values())
+    result['due_count'] = due_count(pin['commit'])
     result['fact_counts'] = {rid: sum(f.get('document_id') == rid for f in facts) for rid in records}
     extraction = [t for t in traces if t.get('scope') == 'retain_extract_facts']
     result.update(extraction_profiles=[{k: t.get(k) or 'unknown' for k in ('provider', 'model', 'usage')} for t in extraction] or 'unknown',
@@ -170,8 +185,13 @@ def check_results(results, evidence, evidence_hash, data):
         P.require(verdict in VERDICTS, 'verdict_required')
         pins = evidence['source_pins'][slot['id']]
         question = next(q for q in data['questions'] if q['id'] == slot['id'])
-        P.require(len(pins) == len(question['sources']) and all(p['pin'] in
-                  ('equal', 'source_changed', 'reverify', 'missing') for p in pins), 'source_pins_incomplete')
+        P.require(len(pins) == len(question['sources']), 'source_pins_incomplete')
+        pins = [dict(p, pin='reverify') if s['kind'] != 'file' else p
+                for s, p in zip(question['sources'], pins)]
+        P.require(all(p.get('pin') in ('equal', 'source_changed', 'reverify', 'missing')
+                      for p in pins), 'source_pins_incomplete')
+        evidence['source_pins'][slot['id']] = pins
+        P.require(slot.get('evidence_sha256') == evidence_hash, 'evidence_hash_mismatch')
         if any(p['pin'] != 'equal' for p in pins):
             P.require(slot.get('expectation_reverified') is True and slot.get('evidence_sha256') == evidence_hash,
                       'expectation_not_reverified')
@@ -215,15 +235,15 @@ def canary(client, pin, data, selector, baseline):
                 or any(q['literal'] != 'literal_present' for q in evidence) else 'no_readable_drift')
 
 
-def measurement(kpi, value, observed_at, evidence, request_id, measurement_id):
-    P.require(P.CHECK.object_id(kpi) and kpi['object_type'] == 'kpi' and P.CHECK.object_id(measurement_id)
-              and measurement_id['object_type'] == 'measurement' and P.CHECK.nonempty(request_id)
+def measurement(kpi, value, observed_at, evidence, request_id):
+    P.require(P.CHECK.object_id(kpi) and kpi['object_type'] == 'kpi' and P.CHECK.nonempty(request_id)
               and P.CHECK.nonempty(value) and P.CHECK.nonempty(evidence) and len(value.encode()) <= 200 and len(evidence.encode()) <= 300, 'measurement_request_invalid')
     P.require(datetime.datetime.fromisoformat(observed_at.replace('Z', '+00:00')).utcoffset()
               == datetime.timedelta(0), 'measurement_time_invalid')
+    observed_at = datetime.datetime.fromisoformat(observed_at.replace('Z', '+00:00')).strftime('%Y-%m-%dT%H:%M:%SZ')
     return dict(apply=dict(action_type='record_measurement', request_id=request_id,
                           parameters=dict(kpi=kpi, value=value, observed_at=observed_at, evidence=evidence)),
-                measurement_get=dict(id=measurement_id), kpi_get=dict(id=kpi))
+                kpi_get=dict(id=kpi))
 
 
 def main(argv=None):
@@ -238,7 +258,7 @@ def main(argv=None):
         parser.add_argument('--' + flag, type=Path)
     for flag in ('credential-fd', 'held-out-fd', 'held-out-evidence-fd', 'held-out-results-fd'):
         parser.add_argument('--' + flag, type=int)
-    parser.add_argument('--subject', default='engineering')
+    parser.add_argument('--subject')
     parser.add_argument('--document-id', action='append', default=[])
     args = parser.parse_args(argv)
     try:
@@ -263,6 +283,8 @@ def main(argv=None):
                                        P.digest(private_raw), private)
                 result['held_out'] = judged['total']
                 result['target_reached'] &= judged['target_reached']
+            else:
+                result.update(held_out='not_evaluated', target_reached=False)
         elif args.measurement_request:
             result = measurement(**load(args.measurement_request.read_bytes()))
             P.require(args.output is not None and args.output.is_dir(), 'request_output_directory_required')
@@ -276,7 +298,8 @@ def main(argv=None):
                 pin = P.pinned()
                 _, _, nodes, errors = P.CHECK.load(Path('memory/records'), Path('memory/subjects.json'),
                                                   commit=pin['commit'], publication=True)
-                matches = [n for n in nodes if n[1] == args.subject]
+                matches = [n for n in nodes if n[1] == args.subject] if args.subject is not None else [
+                    n for n in nodes if nodes[n]['parent'] is None]
                 P.require(not errors and len(matches) == 1, 'subject_unknown_or_ambiguous')
                 selector = P.CHECK.recall_tags(dict(zip(('type', 'id'), matches[0])), descendants=True)
                 client = P.Client(P.credential(args.credential_fd))
