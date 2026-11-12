@@ -211,6 +211,7 @@ fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
         .map(|(_, value)| value.trim().parse::<usize>())
         .collect();
     let length = match lengths.as_slice() {
+        [] => 0,
         [Ok(n)] if *n <= LIMIT => *n,
         _ => return Err(io::ErrorKind::InvalidData.into()),
     };
@@ -219,7 +220,11 @@ fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
     Ok(Request {
         method: parts[0].into(),
         path: parts[1].into(),
-        body: serde_json::from_slice(&body)?,
+        body: if body.is_empty() {
+            json!({})
+        } else {
+            serde_json::from_slice(&body)?
+        },
     })
 }
 
@@ -277,11 +282,11 @@ fn route(model: &mut Model, request: Request) -> Reply {
     if request.method == "POST" && request.path == "/memories" {
         return mutate(model, request, None);
     }
-    if request.method == "DELETE" {
-        if let Some(id) = request.path.strip_prefix("/__test__/document/") {
-            let id = id.to_owned();
-            return mutate(model, request, Some(&id));
-        }
+    if request.method == "DELETE"
+        && let Some(id) = request.path.strip_prefix("/__test__/document/")
+    {
+        let id = id.to_owned();
+        return mutate(model, request, Some(&id));
     }
     if request.method != "POST" || request.path != MCP_PATH {
         return missing();

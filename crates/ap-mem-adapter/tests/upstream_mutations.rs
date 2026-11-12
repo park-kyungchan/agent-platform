@@ -1,5 +1,6 @@
 mod support;
 use serde_json::{Value, json};
+use std::io::{Read, Write};
 use support::upstream::{MutationFault, Server};
 
 fn cases() -> Value {
@@ -21,6 +22,24 @@ fn operation(server: &Server, id: &str) -> Value {
         .unwrap();
     assert_eq!(reply.status, 200);
     reply.body
+}
+
+// A raw ordinary client, independent of Server::request's JSON-body framing.
+fn bodyless(server: &Server, method: &str, path: &str) -> Value {
+    let timeout = std::time::Duration::from_secs(1);
+    let mut stream = std::net::TcpStream::connect_timeout(&server.address(), timeout).unwrap();
+    stream.set_read_timeout(Some(timeout)).unwrap();
+    stream.set_write_timeout(Some(timeout)).unwrap();
+    write!(
+        stream,
+        "{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+    )
+    .unwrap();
+    let mut raw = String::new();
+    stream.take(131072).read_to_string(&mut raw).unwrap();
+    let (headers, body) = raw.split_once("\r\n\r\n").unwrap();
+    assert!(headers.starts_with("HTTP/1.1 200 "), "{headers}");
+    serde_json::from_str(body).unwrap()
 }
 
 #[test]
@@ -105,6 +124,7 @@ fn running_async_order() {
 fn config_false_required() {
     let server = server();
     let data = cases();
+    assert_eq!(bodyless(&server, "GET", "/config"), data["config"]);
     let cases = data["config_cases"].as_array().unwrap();
     assert_eq!(cases.len(), 8);
     for case in cases {
@@ -185,10 +205,7 @@ fn delete_source_residue() {
             .contains(&json!("eng-a"))
     );
     assert_eq!(
-        server
-            .request("DELETE", "/__test__/document/eng-a", json!({}))
-            .unwrap()
-            .status,
-        200
+        bodyless(&server, "DELETE", "/__test__/document/eng-a"),
+        json!({"test_deleted":"eng-a"})
     );
 }
