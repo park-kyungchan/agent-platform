@@ -13,6 +13,8 @@ import signal
 import stat
 import tempfile
 import unittest
+import warnings
+import subprocess
 from unittest.mock import patch
 import urllib.parse
 import zipfile
@@ -206,6 +208,64 @@ class FakeServer:
 
 
 class ExerciseTests(unittest.TestCase):
+    program_runs = 0
+
+    @classmethod
+    def tearDownClass(cls):
+        print('program_output_runs=' + str(cls.program_runs))
+
+    def program(self, action, secret=SECRET, notes=()):
+        """Read both Python streams and OS descriptors for every program run."""
+        ExerciseTests.program_runs += 1
+        parent = X.sys.stdout
+        out, err = io.StringIO(), io.StringIO()
+        exercise = getattr(action, '__self__', None) or getattr(X.Exercise, 'return_value', self.exercise)
+        with tempfile.TemporaryFile() as native_out, tempfile.TemporaryFile() as native_err:
+            saved = [os.dup(1), os.dup(2)]
+            os.dup2(native_out.fileno(), 1)
+            os.dup2(native_err.fileno(), 2)
+            try:
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), X.output_policy():
+                    result = action()
+                    if isinstance(result, subprocess.CompletedProcess):
+                        out.write(result.stdout.decode('utf-8', errors='replace'))
+                        err.write(result.stderr.decode('utf-8', errors='replace'))
+                        return result.returncode
+                    return result
+            finally:
+                os.dup2(saved[0], 1)
+                os.dup2(saved[1], 2)
+                for fd in saved:
+                    os.close(fd)
+                native_out.seek(0); native_err.seek(0)
+                text = out.getvalue() + native_out.read().decode('utf-8', errors='replace')
+                self.assertFalse(bool(err.getvalue() or native_err.read()), 'library_stderr_escaped')
+                self.assertTrue(not text or text.endswith('\n'), 'partial_program_output')
+                self.assertLessEqual(len(text.splitlines()), 1, 'extra_program_output')
+                for line in text.splitlines():
+                    if line in (X.REFUSAL, X.SHORT_REFUSAL):
+                        continue
+                    try:
+                        value = json.loads(line)
+                    except ValueError:
+                        self.fail('undefined_program_output')
+                    self.assertTrue(isinstance(value, dict) and set(value) == {'exit', 'cleanup', 'credential_prefix_matches'}, 'undefined_program_output')
+                    self.assertTrue(type(value['exit']) is int and value['exit'] in (0, 2, 3, 4), 'undefined_program_exit')
+                    self.assertTrue(value['cleanup'] in ('not_run', 'proven', 'incomplete'), 'undefined_program_cleanup')
+                    self.assertTrue(type(value['credential_prefix_matches']) is int and value['credential_prefix_matches'] >= 0, 'undefined_program_count')
+                    self.assertTrue(line == X.encode(value).decode(), 'undefined_program_output')
+                for n in range(min(8, len(secret)), len(secret) + 1):
+                    self.assertFalse(secret[:n] in text, 'output_credential_disclosed')
+                retained = list(notes)
+                for _, _, body, _ in getattr(getattr(exercise, 'wire', None), 'calls', []):
+                    if isinstance(body, dict):
+                        retained.extend(item.get('content') for item in body.get('items', []))
+                for note in retained:
+                    if isinstance(note, str) and note:
+                        self.assertFalse(note in text, 'output_note_disclosed')
+                if isinstance(parent, io.StringIO):
+                    parent.write(text)
+
     def setUp(self):
         self.socket = patch.object(X.P.socket, 'create_connection', side_effect=AssertionError('offline_only'))
         self.blocked = self.socket.start()
@@ -231,7 +291,7 @@ class ExerciseTests(unittest.TestCase):
     def run_driver(self, action=None):
         if action:
             self.exercise.e1 = action
-        return self.exercise.run()
+        return self.program(self.exercise.run)
 
     def assert_cleanup(self, code, expected=3):
         self.assertEqual(code, expected)
@@ -333,7 +393,7 @@ class ExerciseTests(unittest.TestCase):
                     def failure(*_):
                         raise ValueError(SECRET)
                     setattr(exercise, 'filtering' if stage == 'E2' else 'e5', failure)
-                self.assertEqual(exercise.run(), 3, 'exception_not_cleaned')
+                self.assertEqual(self.program(exercise.run), 3, 'exception_not_cleaned')
                 self.assertEqual(exercise.evidence['cleanup'], 'proven')
                 self.assertFalse(server.present)
                 self.assertNotIn(SECRET, json.dumps(exercise.evidence))
@@ -349,7 +409,7 @@ class ExerciseTests(unittest.TestCase):
                 server.leave_marker = mode == 'marker'
                 raise ValueError('invented')
             exercise.e1 = fail
-            self.assertEqual(exercise.run(), 4, 'cleanup_failure_hidden')
+            self.assertEqual(self.program(exercise.run), 4, 'cleanup_failure_hidden')
             self.assertEqual(exercise.evidence['cleanup'], 'incomplete')
 
     def test_c5_foreign_count_shrink_is_exit4(self):
@@ -371,7 +431,7 @@ class ExerciseTests(unittest.TestCase):
                      patch.object(X, 'Exercise', return_value=self.exercise), \
                      patch.object(X.P, 'locked', contextlib.nullcontext), \
                      contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
-                    code = X.main(['--bank', BANK, '--credential-fd', str(read_fd), '--evidence', str(path)])
+                    code = self.program(lambda: X.main(['--bank', BANK, '--credential-fd', str(read_fd), '--evidence', str(path)]))
             finally:
                 os.close(read_fd)
             self.assertEqual(code, 0)
@@ -404,7 +464,7 @@ class ExerciseTests(unittest.TestCase):
             server = FakeServer(clock)
             setattr(server, guard, False)
             exercise = X.Exercise(BANK, server, clock, clock.sleep)
-            self.assertEqual(exercise.run(), 3, 'tool_filter_failure_accepted')
+            self.assertEqual(self.program(exercise.run), 3, 'tool_filter_failure_accepted')
             self.assertEqual(exercise.evidence['steps']['E2']['verdict'], 'failed')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
 
@@ -436,7 +496,7 @@ class ExerciseTests(unittest.TestCase):
             path.write_text('retained')
             with patch.object(X.P, 'credential', return_value=SECRET), patch.object(X, 'Wire') as wire, \
                  contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)]), 2)
+                self.assertEqual(self.program(lambda: X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])), 2)
             wire.assert_not_called()
             self.assertEqual(path.read_text(), 'retained')
 
@@ -450,7 +510,7 @@ class ExerciseTests(unittest.TestCase):
             with patch.object(X.P, 'credential', return_value=SECRET), patch.object(X, 'Wire', return_value=self.server), \
                  patch.object(X, 'Exercise', return_value=self.exercise), patch.object(X.P, 'locked', contextlib.nullcontext), \
                  contextlib.redirect_stdout(io.StringIO()):
-                self.assertEqual(X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)]), 3)
+                self.assertEqual(self.program(lambda: X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])), 3)
             self.assertEqual(json.loads(path.read_text())['cleanup'], 'proven')
 
     def test_whole_http_response_budget_expires_and_restores_handler(self):
@@ -506,7 +566,7 @@ class ExerciseTests(unittest.TestCase):
                             answer['error']['message'] = 'Other denial: ' + name
                 return status, answer, returned
             server.mcp = reply
-            self.assertEqual(exercise.run(), 3, 'executed_or_unmatched_error_accepted')
+            self.assertEqual(self.program(exercise.run), 3, 'executed_or_unmatched_error_accepted')
             self.assertEqual(exercise.evidence['steps']['E2']['verdict'], 'failed')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
 
@@ -552,7 +612,7 @@ class ExerciseTests(unittest.TestCase):
                 old_trace = X.sys.gettrace()
                 try:
                     X.sys.settrace(trace)
-                    code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+                    code = self.program(lambda: X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)]))
                 finally:
                     X.sys.settrace(old_trace)
                 saved = X.load(path.read_bytes())
@@ -634,7 +694,7 @@ class ExerciseTests(unittest.TestCase):
                     answer = {'webhooks': [{'id': 'invented-hook'}]}
                 return status, answer, sid
             server.answer = changed
-            self.assertEqual(exercise.run(), 3, 'restore_difference_accepted_' + kind)
+            self.assertEqual(self.program(exercise.run), 3, 'restore_difference_accepted_' + kind)
             self.assertEqual(exercise.evidence['steps']['E1']['failure'], failure)
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
 
@@ -672,7 +732,7 @@ class ExerciseTests(unittest.TestCase):
                     raise TimeoutError(SECRET)
                 return 503 if outcome == '5xx' else 200, b'not-json' if outcome == 'unreadable' else b'{}', None
             server.exchange = failure
-            self.assertEqual(exercise.run(), 2)
+            self.assertEqual(self.program(exercise.run), 2)
             self.assertEqual(exercise.evidence['requests'][0]['verdict'], 'failed', 'failed_row_measured')
         clock = Clock(); server = FakeServer(clock)
         exercise = X.Exercise(BANK, server, clock, clock.sleep)
@@ -721,7 +781,7 @@ class ExerciseTests(unittest.TestCase):
                     self.assertNotIn(foreign.encode(), output.getvalue())
                 return status, answer, sid
             server.answer = archive_reply
-            self.assertEqual(exercise.run(), 3, 'compressed_foreign_archive_accepted')
+            self.assertEqual(self.program(exercise.run), 3, 'compressed_foreign_archive_accepted')
             self.assertEqual(exercise.evidence['steps']['E1']['failure'], 'archive_foreign_bank')
             self.assertFalse(any('/transfer/import?' in p for _, p, _, _ in server.calls), 'unsafe_archive_imported')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
@@ -749,7 +809,7 @@ class ExerciseTests(unittest.TestCase):
                         server.downloads[key] = bytes(raw)
                 return status, answer, sid
             server.answer = bad_archive
-            self.assertEqual(exercise.run(), 3, 'bad_entry_accepted')
+            self.assertEqual(self.program(exercise.run), 3, 'bad_entry_accepted')
             self.assertFalse(any('/transfer/import?' in p for _, p, _, _ in server.calls))
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
 
@@ -773,7 +833,7 @@ class ExerciseTests(unittest.TestCase):
                     clock.now = 779.5
                 e1()
             exercise.e1 = at_boundary
-            self.assertEqual(exercise.run(), 3, 'answered_write_left_bank')
+            self.assertEqual(self.program(exercise.run), 3, 'answered_write_left_bank')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
             put = next(r for r in exercise.evidence['requests'] if r['method'] == 'PUT')
             self.assertTrue(put['answered'], 'received_answer_lost')
@@ -801,7 +861,7 @@ class ExerciseTests(unittest.TestCase):
                      patch.object(X, 'Wire', return_value=server), patch.object(X, 'Exercise', return_value=exercise), \
                      patch.object(X.P, 'locked', contextlib.nullcontext), contextlib.redirect_stdout(io.StringIO()):
                     path = Path(tmp, 'evidence')
-                    code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+                    code = self.program(lambda: X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)]))
                     self.assertEqual(code, 3, 'signal_not_deferred')
                     self.assertEqual(X.load(path.read_bytes())['cleanup'], 'proven')
                 self.assertIs(signal.getsignal(sig), previous_handler, 'signal_handler_not_restored')
@@ -825,7 +885,7 @@ class ExerciseTests(unittest.TestCase):
                         baselines.append(sid)
                 return status, answer, returned
             server.mcp = sessions
-            self.assertEqual(exercise.run(), 3 if kind == 'old-list' else 0, 'session_qualification_lost')
+            self.assertEqual(self.program(exercise.run), 3 if kind == 'old-list' else 0, 'session_qualification_lost')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
             if kind == 'session-denial':
                 self.assertEqual(set(baselines), set(exercise.sessions), 'session_baseline_missing')
@@ -874,7 +934,7 @@ class ExerciseTests(unittest.TestCase):
                         fact['tags'] = ['subject:task:sibling']
                 return status, answer, returned
             server.mcp = wrong_subject
-            self.assertEqual(exercise.run(), 3 if kind == 'subject' else 0, 'recall_subject_scope_lost')
+            self.assertEqual(self.program(exercise.run), 3 if kind == 'subject' else 0, 'recall_subject_scope_lost')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
             if kind == 'order':
                 self.assertEqual(exercise.evidence['E2_classes'], {'retain': 'retain', 'delete': 'delete_document',
@@ -898,7 +958,7 @@ class ExerciseTests(unittest.TestCase):
                 clock.now += latency
                 return answer
             server.exchange = delayed
-            self.assertEqual(exercise.run(), 0)
+            self.assertEqual(self.program(exercise.run), 0)
             self.assertEqual(len(server.calls), 297)
             self.assertEqual(300 - len(server.calls), 3, 'request_headroom_changed')
             if latency:
@@ -915,7 +975,7 @@ class ExerciseTests(unittest.TestCase):
              patch.object(X, 'Wire', return_value=server), patch.object(X, 'Exercise', return_value=exercise), \
              patch.object(X.P, 'locked', contextlib.nullcontext), contextlib.redirect_stdout(io.StringIO()):
             path = Path(tmp, 'evidence')
-            code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+            code = self.program(lambda: X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)]), secret=secret)
             raw = path.read_bytes()
             self.assertTrue(raw, 'evidence_file_empty')
             return code, X.load(raw)
@@ -966,7 +1026,7 @@ class ExerciseTests(unittest.TestCase):
                         server.downloads[key] = output.getvalue()
                     return status, answer, sid
                 server.answer = hostile
-                self.assertEqual(exercise.run(), 3, 'decoded_archive_accepted')
+                self.assertEqual(self.program(exercise.run), 3, 'decoded_archive_accepted')
                 expected = 'archive_unmeasured' if kind in ('nested-zip', 'gzip', 'bytes', 'binary', 'empty') else 'archive_foreign_bank'
                 self.assertEqual(exercise.evidence['steps']['E1']['failure'], expected, 'archive_refusal_unmeasured')
                 self.assertFalse(any('/transfer/import?' in p for _, p, _, _ in server.calls), 'archive_dispatched')
@@ -1037,7 +1097,7 @@ class ExerciseTests(unittest.TestCase):
                             answer.pop('result')
                 return status, answer, returned
             server.mcp = malformed
-            self.assertEqual(exercise.run(), 3, 'rejected_mcp_success_accepted')
+            self.assertEqual(self.program(exercise.run), 3, 'rejected_mcp_success_accepted')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
             self.assertTrue(any(r['verdict'] == 'failed' and r.get('rpc_method') in ('initialize', 'tools/list')
                                 for r in exercise.evidence['requests']))
@@ -1058,7 +1118,7 @@ class ExerciseTests(unittest.TestCase):
                 status, answer, returned = original(body, session)
                 return status, answer, sid if body['method'] == 'initialize' else returned
             server.mcp = named
-            self.assertEqual(exercise.run(), 3, 'foreign_session_header_used')
+            self.assertEqual(self.program(exercise.run), 3, 'foreign_session_header_used')
             self.assertEqual(exercise.evidence['steps']['E1']['failure'], 'mcp_session_scope')
             self.assertFalse(used, 'foreign_session_dispatched')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
@@ -1083,7 +1143,7 @@ class ExerciseTests(unittest.TestCase):
                             clock.now = 780.25
                     return result
                 server.exchange = delayed
-                self.assertEqual(exercise.run(), 3, 'answered_post_left_bank')
+                self.assertEqual(self.program(exercise.run), 3, 'answered_post_left_bank')
                 self.assertTrue(fired, 'write_case_not_exercised')
                 self.assertEqual(exercise.evidence['cleanup'], 'proven')
                 self.assertFalse(exercise.uncertain, 'answered_post_uncertain')
@@ -1137,7 +1197,7 @@ class ExerciseTests(unittest.TestCase):
                 result = original(method, path, body, **kwargs)
                 return (status, {}, None) if method == 'PUT' else result
             server.answer = rejected
-            self.assertEqual(exercise.run(), 3 if status == 401 else 4)
+            self.assertEqual(self.program(exercise.run), 3 if status == 401 else 4)
             put = next(r for r in exercise.evidence['requests'] if r['method'] == 'PUT')
             self.assertTrue(put['answered'])
             self.assertEqual(put['verdict'], 'failed', 'rejected_write_measured')
@@ -1161,7 +1221,7 @@ class ExerciseTests(unittest.TestCase):
                         answer['banks'][0]['fact_count'] += 1 if kind == 'grew' else -1
                 return status, answer, sid
             server.answer = drift
-            self.assertEqual(exercise.run(), 0 if kind in ('grew', 'new') else 4, 'drift_policy_wrong')
+            self.assertEqual(self.program(exercise.run), 0 if kind in ('grew', 'new') else 4, 'drift_policy_wrong')
             comparison = exercise.evidence['other_bank_comparison']
             self.assertIn(kind, comparison.values())
             self.assertTrue(all(X.re.fullmatch('[0-9a-f]{64}', k) for k in comparison), 'drift_id_disclosed')
@@ -1195,7 +1255,7 @@ class ExerciseTests(unittest.TestCase):
                 self.server.downloads[key] = raw + b'trailing ' + payload
             return status, answer, sid
         self.server.answer = metadata
-        self.assertEqual(self.exercise.run(), 0, 'clean_entries_not_rebuilt')
+        self.assertEqual(self.program(self.exercise.run), 0, 'clean_entries_not_rebuilt')
         imports = [b[b.index(b'PK'):].rsplit(b'\r\n--', 1)[0] for _, p, b, _ in self.server.calls if '/transfer/import?' in p]
         self.assertEqual(len(imports), 2)
         for raw, wanted in zip(imports, (expected[0], expected[2])):
@@ -1254,15 +1314,15 @@ class ExerciseTests(unittest.TestCase):
                  patch.object(X, 'Wire', return_value=self.server) as wire, patch.object(X, 'Exercise', return_value=self.exercise), \
                  patch.object(X.P, 'locked', contextlib.nullcontext), contextlib.redirect_stdout(io.StringIO()) as output:
                 path = Path(tmp, 'evidence')
-                code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+                code = self.program(lambda: X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)]), secret=secret)
                 self.assertEqual(code, 2, 'short_credential_admitted')
-                self.assertIn('credential_too_short', output.getvalue())
+                self.assertEqual(output.getvalue(), '' if secret in X.SHORT_REFUSAL else X.SHORT_REFUSAL + '\n')
                 wire.assert_not_called()
                 self.assertFalse(path.exists(), 'short_credential_created_evidence')
                 self.assertFalse(self.server.calls)
 
     def test_q5_unchanged_banks_have_no_unattributed_drift(self):
-        self.assertEqual(self.exercise.run(), 0)
+        self.assertEqual(self.program(self.exercise.run), 0)
         self.assertFalse('other_bank_drift' in self.exercise.evidence, 'drift_without_growth')
 
     def test_q5_summary_and_message_guards_have_admitted_credentials(self):
@@ -1274,10 +1334,129 @@ class ExerciseTests(unittest.TestCase):
                  patch.object(X, 'Exercise', return_value=exercise), patch.object(X.P, 'locked', contextlib.nullcontext), \
                  contextlib.redirect_stdout(io.StringIO()) as output:
                 path = Path(tmp, 'evidence')
-                code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+                code = self.program(lambda: X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)]), secret=secret)
                 self.assertEqual(code, 3 if mode == 'summary' else 2)
                 self.assertFalse(secret in output.getvalue(), mode + '_credential_disclosed')
                 self.assertEqual(X.credential_matches(path.read_bytes(), secret), 0)
+
+    def test_s1_duplicate_note_names_refuse_before_any_rebuild_write(self):
+        note = self.exercise.marker + ' subject A uses ExampleID-A when its gate is closed.'
+        original = self.server.answer
+        def duplicates(method, path, body=None, **kwargs):
+            status, answer, sid = original(method, path, body, **kwargs)
+            if '/transfer/export?' in path:
+                key = self.server.ops[answer['operation_id']]['result_metadata']['download_url']
+                output = io.BytesIO()
+                with warnings.catch_warnings(), zipfile.ZipFile(io.BytesIO(self.server.downloads[key])) as old:
+                    warnings.simplefilter('ignore', UserWarning)  # Only construction of the hostile test fixture.
+                    with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as z:
+                        z.writestr('data.json', old.read('data.json'))
+                        z.writestr(note + '.json', b'{}')
+                        z.writestr(note + '.json', b'{}')
+                self.server.downloads[key] = output.getvalue()
+            return status, answer, sid
+        self.server.answer = duplicates
+        def action():
+            self.exercise.create()
+            self.exercise.retain('invented-a', note)
+            self.exercise.export({'invented-a': note})
+        self.exercise.e1 = action
+        writestr = zipfile.ZipFile.writestr
+        writes = []
+        def watched(z, info, data, *args, **kwargs):
+            if isinstance(info, zipfile.ZipInfo) and info.date_time == (1980, 1, 1, 0, 0, 0):
+                writes.append(True)
+            return writestr(z, info, data, *args, **kwargs)
+        with patch.object(zipfile.ZipFile, 'writestr', watched):
+            self.assertEqual(self.program(self.exercise.run), 3, 'duplicate_archive_accepted')
+        self.assertEqual(self.exercise.evidence['cleanup'], 'proven')
+        self.assertEqual(self.exercise.evidence['steps']['E1']['failure'], 'archive_unmeasured')
+        self.assertFalse(writes, 'duplicate_archive_written')
+        record = self.exercise.evidence['archives'][-1]
+        self.assertEqual(record['failed_entry_index'], 2)
+        self.assertEqual([e['class'] for e in record['entries']], ['json'] * 3)
+        self.assertEqual(record['entries'][1]['name_sha256'], record['entries'][2]['name_sha256'])
+
+    def test_s2_warning_inside_export_fails_step_without_output(self):
+        note = self.exercise.marker + ' subject A uses ExampleID-A when its gate is closed.'
+        original = self.exercise.export
+        def noisy(*args, **kwargs):
+            warnings.warn(note, UserWarning)
+            return original(*args, **kwargs)
+        self.exercise.export = noisy
+        self.assertEqual(self.program(self.exercise.run), 3, 'library_warning_not_a_failure')
+        self.assertEqual(self.exercise.evidence['steps']['E1']['failure'], 'library_warning')
+        self.assertEqual(self.exercise.evidence['cleanup'], 'proven')
+
+    def test_s2_process_import_exception_native_output_and_shutdown(self):
+        note = 'InventedPrivateNoteForProcessOutput'
+        source = (ROOT / 'scripts/exercise-memory.py').read_text()
+        cases = [
+            ("raise ValueError(" + repr(note) + ")", 2),
+            ("warnings.warn(" + repr(note) + ", UserWarning)", 2),
+            ("os.write(1, " + repr(note.encode()) + "); os.write(2, " + repr(note.encode()) + "); print(" + repr(note) + ")", 0),
+            ("import atexit; atexit.register(lambda: warnings.warn(" + repr(note) + ", ResourceWarning))", 0),
+            ("import atexit; atexit.register(lambda: (_ for _ in ()).throw(ValueError(" + repr(note) + ")))", 0),
+            ("unclosed = open(os.devnull)", 0),
+            ("sys.argv = ['exercise', " + repr(note) + "]", 2),
+        ]
+        for injection, expected in cases:
+            modified = source.replace('ROOT = Path(__file__).resolve().parents[1]', injection + '\nROOT = Path(__file__).resolve().parents[1]', 1)
+            launcher = ("import socket, sys\n"
+                        "socket.create_connection = lambda *a, **k: (_ for _ in ()).throw(AssertionError('offline_only'))\n"
+                        "sys.argv = ['exercise', '--help']\n"
+                        "exec(compile(" + repr(modified) + ", 'exercise-process', 'exec'), {'__name__':'__main__', '__file__':" + repr(str(ROOT / 'scripts/exercise-memory.py')) + "})")
+            code = self.program(lambda: subprocess.run([X.sys.executable, '-I', '-B', '-c', launcher], capture_output=True, timeout=15), notes=(note,))
+            self.assertEqual(code, expected, 'process_output_policy_failed')
+
+    def test_s4_container_refusals_have_no_entry_index_and_keep_body_class(self):
+        for kind, raw in [('json', b'{"not":"zip"}'), ('jsonl', b'{}\n{}'), ('gzip', b'\x1f\x8bnot-json'),
+                          ('text', b'not-an-archive'), ('binary', b'\xff\x00'), ('empty', b''), ('zip', b'PKbroken')]:
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            original = server.answer
+            def nonzip(method, path, body=None, **kwargs):
+                status, answer, sid = original(method, path, body, **kwargs)
+                if '/transfer/export?' in path:
+                    key = server.ops[answer['operation_id']]['result_metadata']['download_url']
+                    server.downloads[key] = raw
+                return status, answer, sid
+            server.answer = nonzip
+            self.assertEqual(self.program(exercise.run), 3)
+            self.assertEqual(exercise.evidence['steps']['E1']['failure'], 'archive_unmeasured', 'nonzip_not_unmeasured')
+            record = exercise.evidence['archives'][-1]
+            self.assertEqual(record['entries'], [])
+            self.assertEqual(record.get('body_class'), kind, 'download_body_class_missing')
+            self.assertNotIn('failed_entry_index', record)
+        original = self.server.answer
+        def incomplete(method, path, body=None, **kwargs):
+            status, answer, sid = original(method, path, body, **kwargs)
+            if '/transfer/export?' in path:
+                key = self.server.ops[answer['operation_id']]['result_metadata']['download_url']
+                output = io.BytesIO()
+                with zipfile.ZipFile(output, 'w') as z:
+                    z.writestr('empty-data.json', b'{}')
+                self.server.downloads[key] = output.getvalue()
+            return status, answer, sid
+        self.server.answer = incomplete
+        self.assertEqual(self.program(self.exercise.run), 3)
+        record = self.exercise.evidence['archives'][-1]
+        self.assertEqual(self.exercise.evidence['steps']['E1']['failure'], 'archive_documents_unmeasured')
+        self.assertFalse('failed_entry_index' in record, 'container_refusal_has_entry_index')
+
+    def test_r5_guard_removals_fail_in_process(self):
+        self.check_removals('r5', [
+            ('S1', 'test_s1_duplicate_note_names_refuse_before_any_rebuild_write',
+             edited('export', "P.require(entry.filename not in seen, 'archive_unmeasured')", 'pass')),
+            ('S2-warning', 'test_s2_warning_inside_export_fails_step_without_output',
+             patch.object(warnings, 'simplefilter', lambda *_a, **_k: None)),
+            ('S3-output', 'test_s2_warning_inside_export_fails_step_without_output',
+             patch.object(X, 'output_policy', contextlib.nullcontext)),
+            ('S4-class', 'test_s4_container_refusals_have_no_entry_index_and_keep_body_class',
+             edited('export', "record['body_class'] = archive_content(raw)[0]", 'pass')),
+            ('S4-index', 'test_s4_container_refusals_have_no_entry_index_and_keep_body_class',
+             edited('export', "record.pop('failed_entry_index', None)", 'pass')),
+        ])
 
     def test_r4_guard_removals_fail_in_process(self):
         self.check_removals('r4', [

@@ -1,15 +1,65 @@
 #!/usr/bin/env python3
 """Opt-in, bounded invented-bank measurement. Never run as part of CI."""
-import argparse
 import contextlib
-import importlib.util
 import io
-import json
 import os
+import sys
+import warnings
+
+REFUSAL = 'exercise_refused@scripts/exercise-memory.py:1: input_or_local_precondition'
+SHORT_REFUSAL = 'exercise_refused@scripts/exercise-memory.py:1: credential_too_short'
+_OUTPUT = None
+
+
+def emit(line):
+    if _OUTPUT is None:
+        print(line)
+    else:
+        _OUTPUT(line)
+
+
+@contextlib.contextmanager
+def output_policy(restore=True):
+    """Only emit() retains an output channel; library streams remain sinks through shutdown."""
+    global _OUTPUT
+    old = (sys.stdout, sys.stderr, sys.excepthook, sys.unraisablehook, _OUTPUT)
+    descriptors = [os.dup(1), os.dup(2)]
+    sink = open(os.devnull, 'w')
+    capture = warnings.catch_warnings()
+    capture.__enter__()
+    warnings.simplefilter('error')
+    _OUTPUT = (lambda line: old[0].write(line + '\n')) if isinstance(old[0], io.StringIO) else (
+        lambda line: os.write(descriptors[0], (line + '\n').encode()))
+    sys.stdout = sys.stderr = sink
+    os.dup2(sink.fileno(), 1)
+    os.dup2(sink.fileno(), 2)
+    def uncaught(*_):
+        emit(REFUSAL)
+        os._exit(2)
+    sys.excepthook, sys.unraisablehook = uncaught, lambda *_: None
+    try:
+        yield
+    finally:
+        if restore:
+            os.dup2(descriptors[0], 1)
+            os.dup2(descriptors[1], 2)
+            sys.stdout, sys.stderr, sys.excepthook, sys.unraisablehook, _OUTPUT = old
+            capture.__exit__(None, None, None)
+            sink.close()
+            for fd in descriptors:
+                os.close(fd)
+
+
+if __name__ == '__main__':
+    _POLICY = output_policy(restore=False)
+    _POLICY.__enter__()
+
+import argparse
+import importlib.util
+import json
 from pathlib import Path
 import re
 import signal
-import sys
 import time
 import urllib.error
 import urllib.parse
@@ -59,6 +109,27 @@ STEPS = ('E1', 'E2', 'E4', 'E5', 'E6')
 CONFIG = json.loads((ROOT / 'memory/engineering.json').read_bytes())
 encode = lambda value: json.dumps(value, ensure_ascii=False, sort_keys=True).encode()
 load = lambda raw: json.loads(raw, object_pairs_hook=P.CHECK.unique_pairs)
+
+
+def archive_content(value):
+    try:
+        return 'json', [load(value)]
+    except (ValueError, UnicodeError):
+        try:
+            values = [load(line) for line in value.splitlines() if line.strip()]
+            if values:
+                return 'jsonl', values
+        except (ValueError, UnicodeError):
+            pass
+    if value.startswith(b'PK'):
+        return 'zip', []
+    if value.startswith(b'\x1f\x8b'):
+        return 'gzip', []
+    try:
+        value.decode('utf-8')
+        return 'text' if value else 'empty', []
+    except UnicodeError:
+        return 'binary', []
 
 
 def keys(value):
@@ -270,7 +341,7 @@ class Exercise:
                  timeout=min(15, max(.001, self.start + 900 - self.clock()),
                              max(.001, getattr(self, 'poll_until', float('inf')) - self.clock())), **kwargs)
             row.update(answered=True, status=status, bytes=len(raw), sha256=P.digest(raw), seconds=self.clock() - started)
-            if raw.startswith(b'PK'):
+            if raw.startswith(b'PK') or allowed == getattr(self, 'download', None):
                 data = raw
             elif raw:
                 try:
@@ -629,10 +700,15 @@ class Exercise:
         self.download = url.path
         status, raw, _ = self.call('GET', self.download)
         P.require(status == 200 and isinstance(raw, bytes), 'archive_unmeasured')
-        found, entries = set(), []
+        found, seen, entries, checked = set(), set(), [], []
         record = {'subset': subset, 'sha256': P.digest(raw), 'bytes': len(raw), 'entries': entries,
                   'flags': sorted(query), 'verdict': 'refused_unmeasured', 'answer_shape': keys(meta)}
         self.evidence.setdefault('archives', []).append(record)
+        try:
+            archive = zipfile.ZipFile(io.BytesIO(raw))
+        except zipfile.BadZipFile:
+            record['body_class'] = archive_content(raw)[0]
+            raise P.Stop('archive_unmeasured') from None
         def inspect(value):
             self.no_foreign(value, 'archive_foreign_bank')
             if isinstance(value, dict):
@@ -649,7 +725,7 @@ class Exercise:
                 for v in value:
                     inspect(v)
         output = io.BytesIO()
-        with zipfile.ZipFile(io.BytesIO(raw)) as archive, zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_STORED) as rebuilt:
+        with archive:
             record['container_removed'] = {'archive_comment_bytes': len(archive.comment),
                 'entry_comments': sum(bool(e.comment) for e in archive.infolist()), 'entry_extra_fields': sum(bool(e.extra) for e in archive.infolist()),
                 'compression_methods': sorted({e.compress_type for e in archive.infolist()})}
@@ -662,31 +738,21 @@ class Exercise:
                         content = source.read(MAX_BYTES + 1)  # zipfile checks CRC at EOF; the read is capped.
                 except (zipfile.BadZipFile, RuntimeError, NotImplementedError):
                     raise P.Stop('archive_unmeasured') from None
-                value = content
-                row['class'] = 'empty' if not value else 'zip' if value.startswith(b'PK') else 'gzip' if value.startswith(b'\x1f\x8b') else 'binary'
-                try:
-                    value.decode('utf-8')
-                    if row['class'] == 'binary': row['class'] = 'text'
-                except UnicodeError:
-                    pass
-                try:
-                    values = [load(value)]
-                    row['class'] = 'json'
-                except (ValueError, UnicodeError):
-                    try:
-                        values = [load(line) for line in value.splitlines() if line.strip()]
-                        if values: row['class'] = 'jsonl'
-                    except (ValueError, UnicodeError):
-                        values = []
-                P.require(sum(e['bytes'] for e in entries) <= MAX_BYTES and len(value) <= MAX_BYTES, 'archive_too_large')
+                row['class'], values = archive_content(content)
+                P.require(sum(e['bytes'] for e in entries) <= MAX_BYTES and len(content) <= MAX_BYTES, 'archive_too_large')
                 self.no_foreign(entry.filename, 'archive_foreign_bank')
                 P.require(bool(values), 'archive_unmeasured')
                 for value in values:
                     inspect(value)
-                rebuilt.writestr(zipfile.ZipInfo(entry.filename, (1980, 1, 1, 0, 0, 0)), content)
-        P.require(found == set(expected), 'archive_documents_unmeasured')
+                P.require(entry.filename not in seen, 'archive_unmeasured')
+                seen.add(entry.filename)
+                checked.append((entry.filename, content))
+            record.pop('failed_entry_index', None)
+            P.require(found == set(expected), 'archive_documents_unmeasured')
+        with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_STORED) as rebuilt:
+            for name, content in checked:
+                rebuilt.writestr(zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0)), content)
         raw = output.getvalue()
-        record.pop('failed_entry_index', None)
         record.update(archive_rebuilt=True, rebuilt_sha256=P.digest(raw), rebuilt_bytes=len(raw), documents=len(found), verdict='measured')
         return raw
 
@@ -864,6 +930,8 @@ class Exercise:
     @staticmethod
     def failure(error):
         # Only exact exception class + a closed lexical code may be emitted.
+        if isinstance(error, Warning):
+            return 'library_warning'
         if type(error) is P.Stop and str(error) in FAILURE_CODES:
             return str(error)
         return 'interrupted' if isinstance(error, (KeyboardInterrupt, SystemExit)) else 'local_or_transport_failure'
@@ -899,6 +967,9 @@ class Exercise:
 
 
 def main(argv=None):
+    if _OUTPUT is None:
+        with output_policy():
+            return main(argv)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bank', required=True)
     parser.add_argument('--credential-fd', required=True, type=int)
@@ -909,7 +980,8 @@ def main(argv=None):
         P.require(bool(ID.fullmatch(args.bank)), 'bank_id_rejected')
         secret = P.credential(args.credential_fd)
         if len(secret) < 8:
-            print('exercise_refused@scripts/exercise-memory.py:1: credential_too_short')
+            if secret not in SHORT_REFUSAL:
+                emit(SHORT_REFUSAL)
             return 2
         fd = os.open(args.evidence, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         os.fchmod(fd, 0o600)
@@ -935,7 +1007,7 @@ def main(argv=None):
                 target.write(raw + b'\n')
             summary = encode({'exit': code, 'cleanup': exercise.evidence['cleanup'], 'credential_prefix_matches': matches})
             if not credential_matches(summary, secret):
-                print(summary.decode())
+                emit(summary.decode())
             return code
     except BaseException:
         if fd is not None:
@@ -944,9 +1016,9 @@ def main(argv=None):
                                               'failure': 'input_or_local_precondition'}, secret) + b'\n')
             except OSError:
                 pass
-        message = 'exercise_refused@scripts/exercise-memory.py:1: input_or_local_precondition'
+        message = REFUSAL
         if not secret or not credential_matches(encode(message), secret):
-            print(message)
+            emit(message)
         return (4 if exercise.evidence['cleanup'] != 'proven' else 3) if exercise and exercise.attempted else 2
     finally:
         if fd is not None:

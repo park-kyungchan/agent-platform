@@ -338,6 +338,9 @@ is an opt-in E1/E2/E4/E5/E6 measurement, using the publisher's fixed origin,
 private FD reader, proxy-free opener and shared lock. Credentials shorter than
 eight characters refuse before any request with exit 2 (`credential_too_short`). It accepts only an initially
 absent disposable id; every mutation binds that id. Part A made no live call.
+Only fixed program diagnostics and the summary may reach output; library output
+is silenced process-wide. A step warning fails as `library_warning`. Repeated
+ZIP entry names refuse before rebuilding any entry.
 It enforces <=40 retain attempts (including denial probes), >=1s write gaps,
 one request at a time, <=120s per poll and 900s total; the final 120s are reserved
 for cleanup. Three consecutive write errors stop ordinary mutations. Unknown
