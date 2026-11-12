@@ -26,7 +26,7 @@ An Id is JSON with `object_type`, `namespace` and `native_key`. Use the Id retur
 | `task` | Task directory name below `/home/palantirkc/work/`, for example `ws-example` |
 | `packet`, `report` | File path relative to that work root, for example `ws-example/TASK-example.md` or `ws-example/REPORT-example.md` |
 | `installed_artifact`, `instruction_file` | Absolute file path |
-| `hold`, `decision`, `kpi`, `measurement`, `worker_run` | Generated at creation: in the apply answer it is the `id` of the `result.edits[]` entry whose `change` is `initial` (its `native_key` equals `result.action_id`); later take `result.objects[].id` from search; do not invent a key |
+| `hold`, `decision`, `kpi`, `measurement`, `worker_run`, `thread`, `plan` | Generated at creation: in the apply answer it is the `id` of the `result.edits[]` entry whose `change` is `initial` (its `native_key` equals `result.action_id`); later take `result.objects[].id` from search; do not invent a key |
 
 ## 4. Read recipes
 These examples use the made-up task `ws-example`. Replace its Id with the owning task's search result. Shell pipelines use `set -o pipefail`.
@@ -77,23 +77,28 @@ A required parameter has no `?` below. Numbers after strings are maximum UTF-8 b
 
 | Action | What it records | Parameters and limits |
 | --- | --- | --- |
+| `open_thread` | Task's work thread and first consumer/use | task, key:120, consumer:1000, consumer_kind:`domain_route`/`harness`/`none`, first_use:1000; unique task/key |
+| `amend_thread` | Consumer/use amendment, previous values in history | thread, consumer:1000, consumer_kind, first_use:1000, reason:600 |
+| `open_plan` | One plan per thread, opening estimates immutable | thread, first_lines:integer, limit_lines:integer (Lead supplies 1.5 times first_lines), current_lines:integer, amended_by_family:120 |
+| `amend_plan` | Current size/latest writer; clears scope_reviewed | plan, current_lines:integer, amended_by_family:120 |
+| `record_scope_review` | Scope/design review after latest amendment | plan, reviewer_family:120, review_report:1000; equal latest-writer family refuses `scope_review_same_family`; families are self-declared |
 | `set_hold` | Active blocked effect | task, effect:300, until:300 (lifting condition in prose); effect unique among active holds |
 | `lift_hold` | Lifting an active hold | hold, reason?:300 |
-| `record_decision` | Current task/topic choice | task, topic:120, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300; one current per topic |
-| `supersede_decision` | Replacement and predecessor | decision, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300; inherits task/topic |
+| `record_decision` | Current task/topic choice | task, topic:120, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300, user_words?:1000, user_form?:`decision`/`question` (both required for user, user_words must be nonempty; question refuses `user_question_is_not_a_decision`); one current per topic |
+| `supersede_decision` | Replacement and predecessor | decision, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300, user_words?:1000, user_form?:`decision`/`question` (both required for user, user_words must be nonempty; question refused); inherits task/topic |
 | `define_kpi` | Named task KPI | task, name:120, definition:600, target?:200; name unique within task |
 | `record_measurement` | Immutable observation and latest KPI | kpi, value:200, observed_at:40, evidence:300; `observed_at` is a real UTC time written exactly as `YYYY-MM-DDTHH:MM:SSZ` (`date -u +%Y-%m-%dT%H:%M:%SZ`), not older than history or later than application time |
 | `set_kpi_target` | Desired KPI value | kpi, target:200 |
-| `start_worker_run` | Dispatch | task, name:80, tier:`mechanical`/`bounded`/`open`/`review`, runtime:120, packet, session?:200; name unique among running workers |
+| `start_worker_run` | Dispatch | task, name:80, tier:`mechanical`/`bounded`/`open`/`review`, runtime:120, packet, thread, plan, layer:`engine`/`domain`/`harness`, session?:200; thread must belong to task (`thread_of_other_task`); plan must belong to thread; engine needs domain_route; kind none/empty first_use and unreviewed over-limit plans refused; name unique among running workers |
 | `note_worker_run` | Progress, separate from final result | worker_run, note:600, report?; run must be running |
 | `close_worker_run` | Final outcome and close time | worker_run, result:600, report?; run must be running |
 
 `request_id` is 1–64 ASCII letters, digits, `.`, `_` or `-`. Optional attribution: `agent` and `session` are top-level fields of the body beside `request_id` (those characters plus `:`, 1–64), and the client is the command option `--client NAME`.
 Retry an uncertain apply with the same client, agent, request_id and body: it returns `result.outcome=already_applied` without new edits. Changed content with that identity refuses `request_id_reused`; a new identity is a new action. Reconcile the target before retrying.
-For the board practice below, set PACKET_ID and REPORT_ID to full file Id JSON, WORKER_ID to the start action's worker Id, KPI_ID to the KPI Id, and OBSERVED_AT to the actual observation time. The file references use work-relative keys even before indexing. `render --write` replaces an existing block; the first block of a section is created by pasting the `markdown` of `ont render` for that view into the board file once. The example board has one block.
+For the board practice below, set THREAD_ID and PLAN_ID to the thread and its plan full Ids, PACKET_ID and REPORT_ID to full file Id JSON, WORKER_ID to the start action's worker Id, KPI_ID to the KPI Id, and OBSERVED_AT to the actual observation time. The file references use work-relative keys even before indexing. `render --write` replaces an existing block; the first block of a section is created by pasting the `markdown` of `ont render` for that view into the board file once. The example board has one block.
 
 ```sh
-printf '{"action_type":"start_worker_run","request_id":"example-dispatch","parameters":{"task":%s,"name":"example-worker","tier":"bounded","runtime":"codex","packet":%s}}\n' "$TASK_ID" "$PACKET_ID" | ont action apply
+printf '{"action_type":"start_worker_run","request_id":"example-dispatch","parameters":{"task":%s,"name":"example-worker","tier":"bounded","runtime":"codex","packet":%s,"thread":%s,"plan":%s,"layer":"domain"}}\n' "$TASK_ID" "$PACKET_ID" "$THREAD_ID" "$PLAN_ID" | ont action apply
 printf '{"action_type":"note_worker_run","request_id":"example-progress","parameters":{"worker_run":%s,"note":"Recipes verified"}}\n' "$WORKER_ID" | ont action apply
 printf '{"action_type":"close_worker_run","request_id":"example-final-result","parameters":{"worker_run":%s,"result":"Verification complete","report":%s}}\n' "$WORKER_ID" "$REPORT_ID" | ont action apply
 printf '{"action_type":"record_measurement","request_id":"example-observation","parameters":{"kpi":%s,"value":"2","observed_at":"%s","evidence":"ws-example/REPORT-example.md"}}\n' "$KPI_ID" "$OBSERVED_AT" | ont action apply

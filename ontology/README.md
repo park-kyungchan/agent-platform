@@ -49,17 +49,19 @@ property descriptions. It adds five Ontology-owned types, keyed by action id:
 
 | Type | Records | Actions |
 | --- | --- | --- |
+| `thread` (v5) | Task/key, consumer, consumer_kind (`domain_route`/`harness`/`none`), first_use; prior values in history | `open_thread`, `amend_thread` (requires reason) |
+| `plan` (v5) | One per thread; immutable first_lines/limit_lines, current_lines, amended_by_family, scope_reviewed, reviewer_family, review_report | `open_plan`, `amend_plan`, `record_scope_review` |
 | `hold` | Blocked effect, lifting condition/reason, `set_at` | `set_hold`, `lift_hold` |
 | `decision` | Current choice per task/topic, predecessor, `decided_at` | `record_decision`, `supersede_decision` |
 | `kpi` | Definition, target and latest recorded value/evidence | `define_kpi`, `set_kpi_target` |
 | `measurement` | Immutable value, `observed_at`, evidence, `recorded_at` | `record_measurement` (also updates `kpi`) |
-| `worker_run` | Runtime, assignment, progress, result, start/close time | `start_worker_run`, `note_worker_run`, `close_worker_run` |
+| `worker_run` | Runtime, assignment, thread, plan, layer, progress, result, start/close time | `start_worker_run`, `note_worker_run`, `close_worker_run` |
 
 Task references are authoritative; there is no copied task-directory property.
 Reverse links from a task are `holds`, `decisions`, `kpis`, `worker_runs`;
 from a KPI, `measurements`; from an earlier decision, `successors`.
 `supersede_decision` takes only the old decision reference and the new text,
-`decided_by`, optional reason and undo. Rules read `$decision.task` and
+`decided_by`, optional reason and undo; user attribution also requires nonempty quoted `user_words` and `user_form:decision`. A question refuses `user_question_is_not_a_decision`. Rules read `$decision.task` and
 `$decision.topic` from the original snapshot even after marking it superseded;
 the successor stores `supersedes` as that old decision reference. Two rules in
 one action are atomic, including measurement creation and updating the KPI.
@@ -70,6 +72,29 @@ client, agent and session attribution is self-reported, not authentication.
 Rule and criterion reference reads require fresh, readable objects; missing or
 unreadable references refuse, and stale source values refuse `rule_value_stale`.
 Validate before apply and pass its basis as expected revisions to detect changes.
+
+### Version 5 dispatch parameters
+`open_thread(task,key,consumer,consumer_kind,first_use)` creates one task/key;
+`amend_thread(thread,consumer,consumer_kind,first_use,reason)` preserves its history.
+`open_plan(thread,first_lines,limit_lines,current_lines,amended_by_family)` sets
+opening estimates once; Lead supplies limit_lines as 1.5 times first_lines.
+`amend_plan(plan,current_lines,amended_by_family)` clears scope_reviewed.
+`record_scope_review(plan,reviewer_family,review_report)` records scope/design
+review; equal reviewer/latest-writer families refuse `scope_review_same_family`.
+Families are self-declared caller values, not authenticated identities.
+`start_worker_run` additionally requires thread, plan and layer (`engine`/`domain`/`harness`).
+The thread must belong to the task (`thread_of_other_task`); the plan must
+belong to the thread (`plan_of_other_thread`); missing plan input
+uses native `invalid_parameter`, unknown plan fails the plan criteria.
+Engine work without consumer_kind domain_route refuses `engine_without_domain_consumer`.
+Consumer kind none or empty first_use refuses `missing_first_use`; whitespace-only
+text is not tested, and parameter definitions have no minimum-length field.
+current_lines > limit_lines requires scope_reviewed, otherwise `plan_over_limit`.
+Both stored numbers are read through the required plan reference. No arithmetic,
+review-content inspection or view is added by these criteria.
+`record_decision` and `supersede_decision` accept optional user_words:1000 and
+user_form (`decision`/`question`); user attribution requires both and nonempty user_words, otherwise
+`user_decision_evidence_required`. Lead decisions may quote questions in reason.
 
 ### Times and optional values
 `set_at`, `decided_at`, `started_at`, `closed_at` and `recorded_at` are UTC
