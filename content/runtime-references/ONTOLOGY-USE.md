@@ -12,7 +12,7 @@ The placement rule is `CONTEXT-GOVERNANCE.md`; the store implements these operat
 | Task files, packets, reports, binaries and instructions | Original files; store `task`, `packet`, `report`, `installed_artifact`, `instruction_file` are indexed observations |
 
 ## 2. Authority
-Every agent may read: `help`, `describe`, `get`, `search`, `action list`, `action validate`, `render` to standard output and `render --check`.
+Every agent may read: `help`, `describe`, `get`, `search`, `around`, `aggregate`, `action list`, `action validate`, `render` to standard output and `render --check`.
 Only the Lead of the task owning the objects writes: `action apply` and `render --write`. A worker writes its report; the Lead records it. A reviewer never writes.
 Only a Lead authorized by the task's STATE runs `index`, `schema install`, `backup` or anything changing the installed binary. The same rules apply to the tools of `ont mcp`. An example grants no authority.
 The command authenticates nobody: every agent on this host shares the same OS user. Client, agent and session are self-reported attribution. These restrictions are rules of work.
@@ -49,7 +49,25 @@ printf '{"id":%s}\n' "$TASK_ID" | ont get
 printf '%s\n' '{"view":"active_holds","args":{"task":"ws-example"}}' | ont render
 ```
 
-For search, values are `result.objects[].head.fields.<property>.value`; identity is `result.objects[].id`. `result.basis.qualified` false means the answer is incomplete (`stale`, `partial` or `unresolved_excluded` say why); follow `result.continuation` with the same query for further pages.
+The engine contract and detailed bounds are in `ontology-platform/crates/ont/README.md`; these are the limits relevant to task reads:
+
+| Reader | Candidate allowance | Output and other limits |
+| --- | --- | --- |
+| `search` | 10,000 per page | 1–1,000 rows, default 100 |
+| `around` | 10,000 unique admitted heads per type across all hops; candidates at first hop | 1–3 hops, 10,000 reference entries, 1–1,000 rows, default 100 |
+| `aggregate` | 10,000 per operation | 2 group keys, 1 count metric, 1,000 buckets, 1,024 bytes per group value |
+| `render` | 10,000 across all pages | 1–1,000 displayed rows, default 200; exact omitted count |
+
+The scan limit counts admitted filter candidates, not every head. The first `eq` or `in` reachable through `all` supplies a necessary property condition; `any`, `none`, other operators or no filter leave an unfiltered scan. Unresolved properties, historical schema pins, partial coverage and stale heads remain candidates to preserve qualification/exclusion effects. On `result_too_large`, narrow the request with a necessary task/status equality or split it into disjoint requests; a smaller display limit does not reset the whole-operation allowance of `aggregate`, `around` or `render`.
+
+`aggregate` requires `read` and `derive` on the type and each candidate's scope. `describe` identifies the installed schema pin and readable types; the matching work schema grants `derive` on `hold`, `decision`, `kpi`, `measurement` and `worker_run`. Recheck the matching schema when its pin changes; readable types alone do not prove `derive`. For example, count running workers without fetching their fields:
+
+```sh
+printf '%s\n' '{"object_type":"worker_run","where":{"eq":["status","running"]},"metrics":["count"]}' | ont aggregate
+```
+
+The answer has `result.kind:"aggregation"`, `result.groups:[{"key":{},"count":N}]` and `result.basis`; require `qualified:true` for a complete count.
+For search, values are `result.objects[].head.fields.<property>.value`; identity is `result.objects[].id`. `result.basis.qualified` false means the answer is incomplete (`stale`, `partial` or `unresolved_excluded` say why); pass each non-null `result.continuation` back as `continuation` with the same query until null, even after an empty page. A continuation promises another candidate, not another matching row.
 For get, `result.objects[].head` is a revision string: choose the `observations[]` entry whose `revision` equals it, then read `fields.<property>.value`. Render returns text in top-level `markdown`, with `rows` and `truncated`.
 The KPI's latest value is updated atomically with its measurement history. Equal observation times allow corrections; the last applied value wins. An unset optional property has no value; views show `(missing)`. Packet/report references may be dangling; use `get` to check existence.
 
@@ -82,17 +100,19 @@ printf '{"action_type":"record_measurement","request_id":"example-observation","
 ont render --write "$BOARD" --section active_holds --arg task=ws-example --preimage-dir "$PREIMAGES"; ont render --check "$BOARD" --expect-blocks 1
 ```
 
-Finish writers before rendering: views do not give one snapshot across pages. Check `truncated` and omitted rows. `render --write` keeps a preimage; `render --check FILE --expect-blocks N` checks drift and the expected number of generated blocks.
+One render operation reads its schema and all pages in one snapshot; separate render operations can observe different commits. Check `truncated` and omitted rows. `render --write` keeps a preimage; `render --check FILE --expect-blocks N` checks drift and the expected number of generated blocks.
 
 ## 6. Refusals
 Read `code`, `field`, `rule` and `hint` when present; repair that field or precondition. Do not repeat a refused call unchanged. Submission refusals instead list details in `failed[]`, `failures[].code` and `failures[].message`.
 
 | First-use refusal | Cause and repair |
 | --- | --- |
+| `projection_stale` | Projected generations differ or required triggers are missing/changed; reads refuse instead of using an invalid projection. Only the STATE-authorized Lead repairs it by installing the exact installed schema bytes again; `changed:false` can still mean the projection was rebuilt. |
 | `wrong_value_type`, field `/where` | A search reference filter received a native-key string; pass the full task Id |
 | `submission_criteria` / `decision_already_current` | A current decision already owns the topic; use `supersede_decision` with its Id |
 | `submission_criteria` / `older_measurement` | History contains a later observation; use the actual latest observation, equal-time correction allowed |
 
 ## 7. Recovery pointers
+A session whose `ont` MCP server started before an engine installation must reconnect that server: the old server refuses the new store format. See the engine README for compatibility and identical-schema repair; reconnecting does not authorize a write or repair.
 Binary installation and rollback belong to `ontology-platform/scripts/install-ont.sh` (`install` and `rollback`); its source describes verification and recovery.
 Store backups exist under the store's `backup/` directory. Only the task's STATE-authorized Lead may restore one; consult that task's recovery evidence and the store owner's documentation. Rebuilding indexed files does not restore Ontology-owned action history.
