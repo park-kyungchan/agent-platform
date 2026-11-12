@@ -350,8 +350,29 @@ are recorded per hashed id as `other_bank_drift: unattributed`, without changing
 the exit code; `shrank` and `missing` keep exit 4. The Lead compares growth with
 the growth of the same banks over an equal idle interval.
 Evidence is new-only, mode 0600, with shapes/counts/hashes/timings, never note bodies
-or credentials. Exit 0 means all automated steps measured and cleanup proven;
+or credentials, except bounded extracted facts/entities of the source-invented E5
+cases, retained solely for the Lead's semantic judgment. E5 stays `not_run` while
+its literal tests report `automated_verdict: measured`; a completed automated
+exercise therefore exits 3 until all required judgments are measured.
+Exit 0 means all required steps measured and cleanup proven;
 2 means no changing request was sent (read-only preflight may have run);
 3 means failed/unrun steps with cleanup proven, 4 means
 cleanup incomplete. Imports are not retain attempts. Evidence stays in the task
 directory and is not published. E3 CLI qualification and E5 semantic judgment remain Lead work.
+
+R6 makes no live call. It compares the used REST contract with
+`ci/memory-exercise-openapi.json` at preflight and before the first destructive
+request; another API version stops before any mutation. The fixture contains the
+used operations and their referenced schemas, without descriptions/examples.
+The fake enforces the fixture, including query/form locations and unknown-field
+refusals; these offline refusals are not claims of new live measurements.
+E2 lists old/new sessions before probes and sweeps every excluded tool on each
+new lifecycle session. Same-session dispatcher error fingerprints require true
+boolean `isError` (or a matching JSON-RPC error) and unchanged terminal bank state;
+read denial claims only refusal with no returned data. Content diagnostics keep
+lengths/hashes/classes; complete tool inventories preserve all schema members,
+with arbitrary names/prose hashed. E6 calls the imported publisher profile check
+on the owned-bank reader while instructions are changed, then restores them.
+Known R5 limits remain: a signal after return can produce exit 2 after the real
+summary (trust the evidence), and a warning promoted to an error during cleanup
+can leave the bank with exit 4. Neither is evidence of a completed cleanup.

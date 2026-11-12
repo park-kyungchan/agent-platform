@@ -91,7 +91,9 @@ FAILURE_CODES = frozenset(('absence_unproven allowed_document_failed allowed_rea
     'tool_arguments_unmeasured tool_catalog_incomplete tool_catalog_shape tool_filter_call_failed '
     'tool_filter_list_failed tool_names_unmeasured total_time_bound transfer_route_unmeasured '
     'transport_uncertain uncertain_work_keep_bank unresolved_mutation write_error_bound '
-    'write_gap_bound').split())
+    'write_gap_bound api_version_unmeasured schema_contract_unmeasured schema_contract_changed '
+    'denial_iserror_false denial_iserror_missing denial_iserror_nonboolean denial_class_mismatch denial_executed '
+    'denial_effect_changed denial_executor_error denial_argument_error models_present transfer_submit_unmeasured').split())
 SUPPORTED_TOOLS = frozenset('retain sync_retain recall reflect list_mental_models get_mental_model '
     'create_mental_model update_mental_model delete_mental_model refresh_mental_model clear_mental_model '
     'list_directives create_directive delete_directive list_memories get_memory update_memory invalidate_memory '
@@ -103,7 +105,7 @@ OBSERVED_KEYS = frozenset('api_version paths items banks total limit offset bank
     'mcp_enabled_tools operations status result_metadata child_operations operation_id error_message error success '
     'document_id original_text text entities tags fact_type occurred_start occurred_end provider model input_tokens '
     'output_tokens total_tokens cached_tokens thoughts_tokens scope jsonrpc result content structuredContent isError '
-    'tools inputSchema properties required type additionalProperties annotations description download_url storage_key '
+    'tools inputSchema outputSchema properties required type additionalProperties annotations description download_url storage_key '
     'byte_size filename webhooks params arguments method updates async query'.split())
 STEPS = ('E1', 'E2', 'E4', 'E5', 'E6')
 CONFIG = json.loads((ROOT / 'memory/engineering.json').read_bytes())
@@ -139,6 +141,63 @@ def keys(value):
     if isinstance(value, list):
         return [keys(value[0])] if value else []
     return type(value).__name__
+
+
+CONTRACT_FILE = ROOT / 'ci/memory-exercise-openapi.json'
+CONTRACT_ROUTES = [('GET', '/version'), ('GET', BANKS), ('GET', '/v1/default/files/download/{key}')]
+CONTRACT_ROUTES += [(method, BANKS + '/{bank_id}' + route) for method, route in (
+    ('PUT', ''), ('DELETE', ''), ('GET', '/config'), ('PATCH', '/config'),
+    ('POST', '/memories'), ('POST', '/memories/recall'), ('GET', '/memories/list'),
+    ('GET', '/documents'), ('GET', '/documents/{document_id}'), ('DELETE', '/documents/{document_id}'),
+    ('GET', '/documents/{document_id}/chunks'), ('GET', '/operations'), ('GET', '/operations/{operation_id}'),
+    ('GET', '/webhooks'), ('GET', '/llm-requests'), ('GET', '/knowledge-base/search'),
+    ('GET', '/mental-models'), ('POST', '/transfer/export'), ('POST', '/transfer/import'))]
+
+
+def schema_contract(schema):
+    """Project used operations and transitive references; keep semantics, not prose."""
+    def strip(value, names=False):
+        if isinstance(value, dict):
+            return {k: strip(v, k == 'properties') for k, v in value.items()
+                    if names or k not in ('description', 'example', 'examples', 'title')}
+        return [strip(v) for v in value] if isinstance(value, list) else value
+    paths, components = {}, {}
+    for method, path in CONTRACT_ROUTES:
+        operation = schema.get('paths', {}).get(path, {}).get(method.lower())
+        P.require(isinstance(operation, dict), 'schema_contract_unmeasured')
+        paths.setdefault(path, {})[method.lower()] = strip({k: operation[k] for k in ('parameters', 'requestBody', 'responses') if k in operation})
+    def references(value):
+        if isinstance(value, dict):
+            if '$ref' in value:
+                name = value['$ref'].removeprefix('#/components/schemas/')
+                if name not in components:
+                    P.require(name in schema.get('components', {}).get('schemas', {}), 'schema_contract_unmeasured')
+                    components[name] = strip(schema['components']['schemas'][name])
+                    references(components[name])
+            for item in value.values():
+                references(item)
+        elif isinstance(value, list):
+            for item in value:
+                references(item)
+    references(paths)
+    return {'paths': paths, 'components': {'schemas': components}}
+
+
+def catalog_evidence(value, field=''):
+    """Keep all schema members; arbitrary names/prose are hashes, never bodies."""
+    if isinstance(value, dict):
+        return {k if re.fullmatch(r'[$A-Za-z_][A-Za-z0-9_]*', k) else 'sha256:' + P.digest(k.encode()):
+                catalog_evidence(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [catalog_evidence(v, field) for v in value]
+    if isinstance(value, str) and (field in ('description', 'title', 'example', 'examples')
+            or not re.fullmatch(r'[A-Za-z0-9_./:#$+-]*', value)):
+        return 'sha256:' + P.digest(value.encode())
+    return value
+
+
+def tool_token(text, name):
+    return re.sub(r'(?<![A-Za-z0-9_])' + re.escape(name) + r'(?![A-Za-z0-9_])', '<tool>', text)
 
 
 def strings(value):
@@ -232,7 +291,10 @@ class Exercise:
         self.active = set()
         self.catalog, self.denials, self.completed = {}, {}, {}
         self.interrupted = False
-        self.full_policies = set()
+        self.full_policies = set()  # (lifecycle, policy), not a cross-lifecycle cache.
+        self.lifecycle = 0
+        self.destructive_checked = False
+        self.stage_times = {}
         self.tool_policy = None
         self.sessions = []
         self.marker = 'InventedConformance' + bank[-8:]
@@ -269,6 +331,9 @@ class Exercise:
         """The sole builder of ALL changing requests, including scoped MCP calls."""
         P.require(route == '@mcp' or route in ('', '/config', '/memories', '/transfer/export', '/transfer/import', '/documents/missing-invented'),
                   'mutation_route_rejected')
+        if not self.cleaning and not self.destructive_checked and (method == 'DELETE' or route in ('/memories', '/transfer/import')):
+            self.check_schema()
+            self.destructive_checked = True
         self.bound(retaining=route == '/memories' or kwargs.get('retaining', False))
         P.require(not self.uncertain, 'unresolved_mutation')
         self.no_foreign(body.decode('utf-8', errors='replace') if isinstance(body, bytes) else body, 'foreign_bank_in_body')
@@ -324,6 +389,8 @@ class Exercise:
                'request_keys': keys(body), 'basis': self.basis(method, allowed),
                'status': None, 'dispatched': False, 'answered': False, 'verdict': 'failed'}
         if allowed == self.mcp and isinstance(body, dict):
+            row['session'] = self.sessions.index(kwargs['session']) + 1 if kwargs.get('session') in self.sessions else len(self.sessions) + 1
+            row['lifecycle'], row['allowlist'] = self.lifecycle, self.tool_policy
             row['rpc_method'] = body.get('method')
             if body.get('method') == 'tools/call':
                 row['tool'] = body['params']['name']  # Already checked against SUPPORTED_TOOLS.
@@ -359,6 +426,12 @@ class Exercise:
             else:
                 data = {}
             row['answer_shape'] = keys(data)
+            if allowed == '/openapi.json':
+                row['answer_shape'] = {'schema_sha256': row['sha256']}
+            if row.get('rpc_method') == 'tools/call':
+                row['content_items'] = self.content_items(data, row['tool'])
+                value = data.get('result', {}).get('isError')
+                row['isError'] = value if type(value) is bool else 'unmeasured'
             row['verdict'] = 'failed' if status >= 500 or (method != 'GET' and not 200 <= status < 300) else 'measured'
             return status, data, sid
         finally:
@@ -429,11 +502,16 @@ class Exercise:
         version = self.get('/version')
         self.evidence['api_version_sha256'] = P.digest(encode(version))
         self.evidence['api_version'] = version.get('api_version') if version.get('api_version') == P.API_VERSION else 'unmeasured'
+        P.require(self.evidence['api_version'] == P.API_VERSION, 'api_version_unmeasured')
+        self.check_schema()
+
+    def check_schema(self):
         schema = self.get('/openapi.json')
         self.evidence['openapi_sha256'] = P.digest(encode(schema))
-        for suffix in ('/transfer/export', '/transfer/import'):
-            P.require('post' in schema.get('paths', {}).get(BANKS + '/{bank_id}' + suffix, {}),
-                      'transfer_route_unmeasured')
+        self.evidence['openapi_bytes_sha256'] = self.evidence['requests'][-1]['sha256']
+        actual = schema_contract(schema)
+        self.evidence['schema_contract_sha256'] = P.digest(encode(actual))
+        self.observed(actual == load(CONTRACT_FILE.read_bytes()), 'schema_contract_changed')
 
     def poll(self, refresh=False):
         if refresh:
@@ -480,11 +558,11 @@ class Exercise:
                 return details
             self.sleep(min(1, max(0, deadline - self.clock())))
 
-    def submitted(self, answer):
+    def submitted(self, answer, expected=200):
         status, data, _ = answer
-        if not (status in (200, 202) and isinstance(data.get('operation_id'), str)):
+        if not (status == expected and isinstance(data.get('operation_id'), str)):
             self.uncertain = True
-            raise P.Stop('submit_unmeasured')
+            raise P.Stop('transfer_submit_unmeasured' if expected == 202 else 'submit_unmeasured')
         oid = data['operation_id']
         self.active.add(oid)
         return self.poll()[oid]
@@ -495,8 +573,10 @@ class Exercise:
         self.tool_policy = None
         status, _, _ = self.change('PUT', body={'enable_observations': False})
         P.require(status == 200, 'create_failed')
+        self.lifecycle += 1
         if not default:
             self.configure([])
+        self.observed(not self.pages('/mental-models', query={'exclude_knowledge_pages': 'false'}), 'models_present')
 
     def configure(self, tools, instruction=None):
         desired = {'enable_observations': False, 'enable_auto_consolidation': False,
@@ -539,6 +619,8 @@ class Exercise:
         P.require(all(isinstance(t.get('name'), str) for t in tools)
                   and len({t['name'] for t in tools}) == len(tools), 'tool_catalog_shape')
         P.require({t['name'] for t in tools} <= SUPPORTED_TOOLS, 'tool_names_unmeasured')
+        self.evidence.setdefault('tool_catalogs', []).append({'session': self.sessions.index(session) + 1,
+            'lifecycle': self.lifecycle, 'tools': [{k: catalog_evidence(t[k]) for k in ('name', 'inputSchema', 'outputSchema') if k in t} for t in tools]})
         return {t['name']: t for t in tools}
 
     def arguments(self, schema):
@@ -578,15 +660,63 @@ class Exercise:
 
     @staticmethod
     def denial(answer, name):
-        # Every result is execution, including isError and an executor's missing-resource error.
-        error = answer.get('error')
-        if 'result' in answer or not isinstance(error, dict) or type(error.get('code')) is not int or not isinstance(error.get('message'), str):
+        error, result = answer.get('error'), answer.get('result')
+        if set(answer) == {'jsonrpc', 'id', 'error'} and isinstance(error, dict) and type(error.get('code')) is int and isinstance(error.get('message'), str):
+            return 'rpc_error', error['code'], keys(error), P.digest(encode(dict(error, message=tool_token(error['message'], name))))
+        if set(answer) != {'jsonrpc', 'id', 'result'} or not isinstance(result, dict) or result.get('isError') is not True or set(result) != {'content', 'isError'}:
             return None
-        normalized = dict(error, message=error['message'].replace(name, '<tool>'))
-        return error['code'], keys(error), P.digest(encode(normalized))
+        items = result.get('content')
+        if not isinstance(items, list) or not items or not all(isinstance(i, dict) and set(i) == {'type', 'text'}
+                and i['type'] == 'text' and isinstance(i['text'], str) and i['text'] for i in items):
+            return None
+        return 'tool_error', tuple(P.digest(tool_token(i['text'], name).encode()) for i in items)
+
+    @staticmethod
+    def denial_failure(answer):
+        result = answer.get('result', {})
+        if 'result' not in answer:
+            return 'denial_class_mismatch'
+        if 'isError' not in result:
+            return 'denial_iserror_missing'
+        if type(result['isError']) is not bool:
+            return 'denial_iserror_nonboolean'
+        if result['isError'] is False:
+            if isinstance(result.get('structuredContent'), dict):
+                return 'denial_executor_error' if result['structuredContent'].get('error') else 'denial_executed'
+            return 'denial_iserror_false'
+        texts = [i.get('text', '') for i in result.get('content', []) if isinstance(i, dict)]
+        if any(t.startswith('Error executing tool ') for t in texts):
+            return 'denial_executor_error'
+        if any(t.startswith('Input validation error') for t in texts):
+            return 'denial_argument_error'
+        return 'denial_class_mismatch'
+
+    def content_items(self, answer, name):
+        result = answer.get('result', {})
+        rows = []
+        for item in result.get('content', []) if isinstance(result.get('content'), list) else []:
+            text = item.get('text') if isinstance(item, dict) else None
+            raw = text.encode() if isinstance(text, str) else encode(item)
+            rows.append({'type': item.get('type') if isinstance(item, dict) and item.get('type') in ('text', 'image', 'audio', 'resource') else 'unmeasured',
+                         'bytes': len(raw), 'sha256': P.digest(raw),
+                         'normalized_sha256': P.digest(tool_token(text, name).encode()) if isinstance(text, str) else P.digest(raw),
+                         'class': 'error_candidate' if self.denial(answer, name) else self.denial_failure(answer)})
+        return rows
 
     def denied(self, answer, name, sid):
         return self.denial(answer, name) is not None and self.denial(answer, name) == self.denials[sid]
+
+    def state_pin(self):
+        operations = self.poll(refresh=True)
+        documents = {}
+        for item in self.pages('/documents'):
+            rid = item['id']
+            doc = self.get('/documents/' + P.segment(rid))
+            documents[rid] = {'sha256': P.digest(str(doc.get('original_text')).encode()), 'tags': doc.get('tags'),
+                              'facts': len(self.pages('/memories/list', query={'document_id': rid}))}
+        return P.digest(encode({'documents': documents, 'facts': len(self.pages('/memories/list')),
+            'config': self.get('/config'), 'operations': operations,
+            'models': self.pages('/mental-models', query={'exclude_knowledge_pages': 'false'})}))
 
     def representatives(self):
         # First catalog member of each fixed tuple; never choose by server order or description.
@@ -600,8 +730,11 @@ class Exercise:
 
     def filtering(self, old=None):
         started = self.clock()
+        self.e2_started = started
         self.step = 'E2'
-        visible_ids = set(self.docs)  # Owned originals already compared by E1; a fresh create clears them.
+        self.configure([])
+        before = self.state_pin()
+        visible_ids = set(self.docs) - {'invented-excluded'}  # Owned originals already compared by E1; a fresh create clears them.
         document_status = 200 if 'invented-a' in self.docs else 404
         document = {'original_text': self.docs.get('invented-a')}
         if old is None:
@@ -611,15 +744,18 @@ class Exercise:
         for allowed in ([], ['recall', 'get_document']):
             if self.tool_policy != allowed:
                 self.configure(allowed)
-            for sid, fresh in ((old, False), (self.session(), True)):
+            new = self.session()
+            sessions = ((old, False), (new, True))
+            for sid, fresh in sessions:
                 listed = self.tools(sid)
                 self.observed(set(listed) == set(allowed), 'tool_filter_list_failed')
+            for sid, fresh in sessions:
                 if sid not in self.denials:
                     sentinel = 'zz_nonexistent_exercise_probe'
                     baseline, _ = self.rpc('tools/call', {'name': sentinel, 'arguments': {}}, sid)
                     self.denials[sid] = self.denial(baseline, sentinel)
                     self.observed(self.denials[sid] is not None, 'denial_shape_unmeasured')
-                full = fresh and tuple(allowed) not in self.full_policies
+                full = fresh and (self.lifecycle, tuple(allowed)) not in self.full_policies
                 names = list(self.catalog) if full else representatives
                 # Preserve successful scoped reads after restore, alongside the four denial classes.
                 if allowed and fresh and not full:
@@ -636,7 +772,10 @@ class Exercise:
                     answer, _ = self.rpc('tools/call', {'name': name, 'arguments': args}, sid,
                                          retaining=name in ('retain', 'sync_retain'))
                     if name not in allowed:
-                        self.observed(self.denied(answer, name, sid), 'tool_filter_call_failed')
+                        self.observed(self.denied(answer, name, sid), self.denial_failure(answer))
+                        for item in self.evidence['requests'][-1]['content_items']:
+                            item['class'] = 'denied_no_data'
+                        self.evidence['requests'][-1]['denial_claim'] = 'refused_no_data_returned'
                     else:
                         self.observed(not ('error' in answer or answer.get('result', {}).get('isError')), 'allowed_read_failed')
                         structured = answer.get('result', {}).get('structuredContent')
@@ -653,17 +792,22 @@ class Exercise:
                         else:
                             self.observed(document_status == 404 and bool(structured.get('error')), 'allowed_document_failed')
                 if full:
-                    self.full_policies.add(tuple(allowed))
+                    self.full_policies.add((self.lifecycle, tuple(allowed)))
         self.configure([])
+        after = self.state_pin()
+        self.evidence.setdefault('denial_sweeps', []).append({'lifecycle': self.lifecycle, 'before_sha256': before, 'after_sha256': after, 'all_terminal': True})
+        self.observed(before == after, 'denial_effect_changed')
+        self.stage_times['E2'] = self.stage_times.get('E2', 0) + self.clock() - started
+        del self.e2_started
         self.evidence['steps']['E2'] = {'verdict': 'measured', 'sessions': len(self.sessions),
                                        'catalog_count': len(self.catalog),
-                                       'seconds': self.clock() - started + self.evidence['steps'].get('E2', {}).get('seconds', 0)}
+                                       'seconds': self.stage_times['E2']}
 
-    def retain(self, rid, text):
-        want = {'content': text, 'document_id': rid, 'tags': ['subject:task:invented'], 'update_mode': 'replace'}
+    def retain(self, rid, text, tags=None):
+        want = {'content': text, 'document_id': rid, 'tags': tags if tags is not None else ['subject:task:invented'], 'update_mode': 'replace'}
         oid = str(uuid.uuid4())
         result = self.change('POST', '/memories', {'items': [want], 'async': True, 'operation_id': oid})
-        if result[0] not in (200, 202) or result[1].get('operation_id') != oid:
+        if result[0] != 200 or result[1].get('operation_id') != oid:
             self.uncertain = True
             raise P.Stop('submit_unmeasured')
         self.submitted(result)
@@ -676,7 +820,7 @@ class Exercise:
         snapshots, fact_ids = {}, set()
         for rid, text in expected.items():
             doc = self.get('/documents/' + P.segment(rid))
-            P.require(doc.get('original_text') == text and doc.get('tags') == ['subject:task:invented'], 'document_bytes_or_tags')
+            P.require(doc.get('original_text') == text and doc.get('tags') == (['subject:task:excluded'] if rid == 'invented-excluded' else ['subject:task:invented']), 'document_bytes_or_tags')
             facts = self.pages('/memories/list', query={'document_id': rid})
             P.require(bool(facts) and all(f.get('document_id') == rid and f.get('tags') == doc['tags']
                        and f.get('fact_type') in ('world', 'experience') for f in facts), 'fact_readback_failed')
@@ -692,9 +836,14 @@ class Exercise:
     def export(self, expected, subset=False):
         query = {'document_id': list(expected)} if subset else {
                  'include_data': 'true', 'include_bank_config': 'true', 'include_history': 'true'}
-        detail = self.submitted(self.change('POST', '/transfer/export', query=query))
+        detail = self.submitted(self.change('POST', '/transfer/export', query=query), expected=202)
         meta = detail.get('result_metadata') or {}
         url = urllib.parse.urlsplit(meta.get('download_url', ''))
+        self.evidence.setdefault('transfers', []).append({'kind': 'export', 'subset': subset,
+            'metadata_shape': keys(meta), 'download_target': {'scheme': url.scheme if url.scheme in ('', 'http', 'https') else 'other',
+            'authority_present': bool(url.netloc), 'query_present': bool(url.query), 'fragment_present': bool(url.fragment),
+            'path_sha256': P.digest(url.path.encode()), 'download_prefix': url.path.startswith('/v1/default/files/download/')},
+            'byte_size': meta.get('byte_size') if type(meta.get('byte_size')) is int else 'unmeasured'})
         P.require(not url.scheme and not url.netloc and not url.query and not url.fragment
                   and url.path.startswith('/v1/default/files/download/'), 'download_target_rejected')
         self.download = url.path
@@ -766,7 +915,11 @@ class Exercise:
                   query={'mode': 'merge' if merge else 'restore', 'document_conflict': 'replace',
                          'include_data': 'true', 'include_bank_config': 'true', 'include_history': 'true'},
                   content_type='multipart/form-data; boundary=' + boundary)
-        self.submitted(result)
+        detail = self.submitted(result, expected=202)
+        self.evidence.setdefault('transfers', []).append({'kind': 'merge' if merge else 'restore',
+            'metadata_shape': keys(detail.get('result_metadata') or {}), 'terminal': detail.get('status') == 'completed'})
+        if not merge:
+            self.lifecycle += 1
 
     def absence(self):
         absent = self.bank not in self.counts()
@@ -789,9 +942,10 @@ class Exercise:
         self.filtering(old)
         self.step = 'E1'
         originals = {'invented-a': self.marker + ' subject A uses ExampleID-A when its gate is closed.',
-                     'invented-b': self.marker + ' subject B uses ExampleID-B when its gate is open.'}
+                     'invented-b': self.marker + ' subject B uses ExampleID-B when its gate is open.',
+                     'invented-excluded': self.marker + ' excluded subject uses ExcludedID.'}
         for rid, text in originals.items():
-            self.retain(rid, text)
+            self.retain(rid, text, ['subject:task:excluded'] if rid == 'invented-excluded' else None)
         before = self.compare(originals)
         profile = self.get('/config')
         original_history = set(self.poll())
@@ -809,14 +963,20 @@ class Exercise:
         self.delete()  # Native restore requires the target to be absent.
         self.restore(full)
         self.docs = dict(originals)
-        P.require(self.compare(originals) == before, 'restore_facts_changed')
-        P.require(self.get('/config') == profile, 'restore_config_changed')
+        restored, restored_profile = self.compare(originals), self.get('/config')
+        self.evidence['restore_pins'] = {'facts_expected_sha256': P.digest(encode(before)),
+            'facts_observed_sha256': P.digest(encode(restored)), 'config_expected_sha256': P.digest(encode(profile)),
+            'config_observed_sha256': P.digest(encode(restored_profile))}
+        P.require(restored == before, 'restore_facts_changed')
+        P.require(restored_profile == profile, 'restore_config_changed')
         self.restore(subset, merge=True)
         self.docs['invented-a'] = changed
         P.require(self.compare({'invented-a': changed}, False) == changed_facts, 'merge_facts_changed')
-        self.compare({'invented-a': changed, 'invented-b': originals['invented-b']})
+        self.compare(dict(originals, **{'invented-a': changed}))
         history = self.poll(refresh=True)
         missing_history = len(original_history - set(history))
+        self.evidence['restored_history'] = {'original_count': len(original_history), 'observed_count': len(history),
+                                             'missing_count': missing_history, 'all_terminal': True}
         self.observed(missing_history == 0, 'restored_history_missing')
         self.observed(self.get('/webhooks') == hooks, 'restored_webhooks_changed')
         self.evidence['steps']['E1'] = {'verdict': 'measured', 'history_count': len(history), 'missing_original_history': missing_history,
@@ -846,6 +1006,9 @@ class Exercise:
         cases = [('identifier', 'ExampleID.C5-A'), ('alias', '\uac00\ub78c Garam'),
                  ('dated', '2026-01-02'), ('boundary-4095', 'BoundaryID'), ('boundary-4096', 'BoundaryID')]
         results = []
+        self.evidence['steps']['E5'] = {'verdict': 'not_run', 'cases': results,
+            'subject_condition_judgment': 'not_run', 'administrative_assertion_judgment': 'not_run',
+            'semantic_judgment': 'Lead_required_before_publication'}
         for label, term in cases:
             text = self.marker + ' subject ' + label + ' uses ' + term + ' only when the invented gate is closed.'
             if label.startswith('boundary-'):
@@ -855,12 +1018,13 @@ class Exercise:
             self.retain(rid, text)
             facts = self.last_facts  # The exhaustive read just performed by retain/compare.
             terms = term.split() if label == 'alias' else [term]
-            P.require(all(any(t in str(f.get('text', '')) or t in str(f.get('entities', '')) for f in facts)
-                          for t in terms), 'term_missing')
             results.append({'case': label, 'bytes': len(text.encode()), 'sha256': P.digest(text.encode()),
                             'facts': len(facts), 'terms': len(terms),
+                            'extracted': [{'text': f['text'][:8192], 'entities': f['entities'][:8192]} for f in facts[:100]],
+                            'extracted_truncated': len(facts) > 100 or any(len(f['text']) > 8192 or len(f['entities']) > 8192 for f in facts),
                             'dated_facts': sum(f.get('occurred_start') is not None for f in facts), 'fact_entity_sha256': P.digest(encode(facts))})
-        self.evidence['steps']['E5'] = {'verdict': 'measured', 'cases': results,
+            P.require(all(any(t in f['text'] or t in f['entities'] for f in facts) for t in terms), 'term_missing')
+        self.evidence['steps']['E5'] = {'verdict': 'not_run', 'automated_verdict': 'measured', 'cases': results,
              'subject_condition_judgment': 'not_run', 'administrative_assertion_judgment': 'not_run'}
         # Meaning is judged by the Lead; literal survival cannot certify it.
         self.evidence['steps']['E5']['semantic_judgment'] = 'Lead_required_before_publication'
@@ -873,7 +1037,20 @@ class Exercise:
         self.configure([], expected + ' Invented deliberate canary drift.')
         drift = self.get('/config').get('config', {})
         P.require(P.digest(str(drift.get('retain_custom_instructions')).encode()) != baseline, 'canary_missed_drift')
-        self.configure([])
+        owner = self
+        class ProfileReader:
+            def request(self, method, path):
+                P.require(method == 'GET' and (path == '/version' or path == P.B + '/config'), 'read_target_rejected')
+                return owner.get('/version' if path == '/version' else '/config')
+        detected = False
+        try:
+            P.profile(ProfileReader(), CONFIG)
+        except P.Stop as error:
+            P.require(str(error) == 'profile_drift', 'canary_missed_drift')
+            detected = True
+        finally:
+            self.configure([])
+        P.require(detected, 'canary_missed_drift')
         questions = []
         for question in ('ExampleID-A', 'ExampleID-B', self.marker):
             started = self.clock()
@@ -942,17 +1119,26 @@ class Exercise:
             self.preflight()
             for name, action in [('E1', self.e1), ('E4', self.e4), ('E5', self.e5), ('E6', self.e6)]:
                 self.step = name
-                started = self.clock()
+                started, nested = self.clock(), self.stage_times.get('E2', 0)
                 try:
                     action()
+                except BaseException as error:
+                    if self.step != name:
+                        self.evidence['steps'][name] = {'verdict': 'failed', 'cause_step': self.step, 'failure': self.failure(error)}
+                    raise
                 finally:
-                    self.evidence['steps'].setdefault(name, {'verdict': 'failed'})['seconds'] = self.clock() - started
+                    if hasattr(self, 'e2_started'):
+                        self.stage_times['E2'] = self.stage_times.get('E2', 0) + self.clock() - self.e2_started
+                        del self.e2_started
+                        self.evidence['steps'].setdefault('E2', {})['seconds'] = self.stage_times['E2']
+                    self.evidence['steps'].setdefault(name, {'verdict': 'failed'})['seconds'] = self.clock() - started - (self.stage_times.get('E2', 0) - nested)
             code = 0 if all(self.evidence['steps'].get(s, {}).get('verdict') == 'measured' for s in STEPS) else 3
         except BaseException as error:
             # Never serialize exception text: even fake transports can include credentials/bodies.
-            self.evidence['steps'][self.step] = {'verdict': 'refused_unmeasured' if self.failure(error).endswith('unmeasured') else 'failed',
+            elapsed = self.evidence['steps'].get(self.step, {}).get('seconds', 0)
+            self.evidence['steps'].setdefault(self.step, {}).update({'seconds': elapsed, 'verdict': 'refused_unmeasured' if self.failure(error).endswith('unmeasured') else 'failed',
                                                 'failure': self.failure(error),
-                                                'interrupted': isinstance(error, (KeyboardInterrupt, SystemExit))}
+                                                'interrupted': isinstance(error, (KeyboardInterrupt, SystemExit))})
             if not self.attempted:
                 code = 2 if self.step == 'preflight' else 3
         finally:

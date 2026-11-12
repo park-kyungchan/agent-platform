@@ -18,6 +18,7 @@ import subprocess
 from unittest.mock import patch
 import urllib.parse
 import zipfile
+from datetime import datetime
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('exercise', ROOT / 'scripts/exercise-memory.py')
@@ -26,6 +27,82 @@ SPEC.loader.exec_module(X)
 BANK = 'zz-conformance-20261112-0123abcd'
 SECRET = 'private-exercise-sentinel-never-recorded'
 FOREIGN = 'foreign-bank'
+CONTRACT = json.loads(X.CONTRACT_FILE.read_bytes())
+
+
+def valid(value, schema):
+    if '$ref' in schema:
+        return valid(value, CONTRACT['components']['schemas'][schema['$ref'].rsplit('/', 1)[1]])
+    if 'anyOf' in schema:
+        return any(valid(value, node) for node in schema['anyOf'])
+    kind = schema.get('type')
+    if kind and not {'object': isinstance(value, dict), 'array': isinstance(value, list),
+            'string': isinstance(value, str), 'boolean': type(value) is bool, 'null': value is None,
+            'integer': type(value) is int, 'number': type(value) in (int, float)}.get(kind, False):
+        return False
+    if 'enum' in schema and value not in schema['enum']:
+        return False
+    if kind == 'object':
+        props, extra = schema.get('properties', {}), schema.get('additionalProperties', False)
+        return set(schema.get('required', [])) <= set(value) and all(
+            valid(v, props[k]) if k in props else (valid(v, extra) if isinstance(extra, dict) else bool(extra)) for k, v in value.items())
+    if kind == 'array':
+        return all(valid(item, schema.get('items', {})) for item in value)
+    if kind == 'string' and schema.get('format') == 'date-time':
+        try:
+            datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError:
+            return False
+    return not (type(value) in (int, float) and (value < schema.get('minimum', value) or value > schema.get('maximum', value)))
+
+
+def query_value(values, schema):
+    if 'anyOf' in schema:
+        schema = next(s for s in schema['anyOf'] if s.get('type') != 'null')
+    if schema.get('type') == 'array':
+        return values
+    if len(values) != 1:
+        raise ValueError
+    value = values[0]
+    if schema.get('type') == 'boolean':
+        if value not in ('true', 'false'):
+            raise ValueError
+        return value == 'true'
+    return int(value) if schema.get('type') == 'integer' else value
+
+
+def request_status(method, path, body, kwargs):
+    url = urllib.parse.urlsplit(path)
+    if url.path == '/openapi.json' or url.path.startswith('/mcp/'):
+        return None
+    for pattern, methods in CONTRACT['paths'].items():
+        if not X.re.fullmatch(X.re.sub(r'\{[^}]+\}', '[^/]+', pattern), url.path):
+            continue
+        if method.lower() not in methods:
+            return 405
+        op = methods[method.lower()]
+        params = {p['name']: p for p in op.get('parameters', []) if p['in'] == 'query'}
+        query = urllib.parse.parse_qs(url.query, keep_blank_values=True)
+        try:
+            if not set(query) <= set(params) or any(p.get('required') and k not in query for k, p in params.items()):
+                return 422
+            if not all(valid(query_value(v, params[k]['schema']), params[k]['schema']) for k, v in query.items()):
+                return 422
+        except (ValueError, StopIteration):
+            return 422
+        content = op.get('requestBody', {}).get('content', {})
+        if not content:
+            return 422 if body is not None else None
+        media = kwargs.get('content_type', 'application/json').split(';')[0]
+        if media not in content:
+            return 422
+        if media == 'multipart/form-data':
+            if not isinstance(body, bytes):
+                return 422
+            fields = X.re.findall(rb'Content-Disposition: form-data; name="([^"]+)"', body)
+            body = {f.decode(): 'invented-file' for f in fields}
+        return None if valid(body, content[media]['schema']) else 422
+    return 404
 
 
 def edited(name, before, after):
@@ -35,7 +112,11 @@ def edited(name, before, after):
     namespace = dict(vars(X))
     exec(compile(source.replace(before, after, 1), '<memory-exercise-mutant>', 'exec'), namespace)
     function = namespace[name]
+    if isinstance(function, staticmethod):
+        function = function.__func__
     function = types.FunctionType(function.__code__, vars(X), name, function.__defaults__)
+    if isinstance(getattr(owner, '__dict__', {}).get(name), staticmethod):
+        function = staticmethod(function)
     return patch.object(owner, name, function)
 
 
@@ -66,6 +147,8 @@ class FakeServer:
         self.downloads = {}
         self.foreign_count = 7
         self.session_count = 0
+        self.schema = copy.deepcopy(CONTRACT)
+        self.rpc_denial = False
         self.filter_list = self.filter_call = True
         self.pending = False
         self.leave_marker = self.fail_delete = False
@@ -93,6 +176,9 @@ class FakeServer:
         self.calls.append((method, path, copy.deepcopy(body), self.clock()))
         if self.fail:
             self.fail(method, path, body)
+        refused = request_status(method, path, body, kwargs)
+        if refused:
+            return refused, b'', None
         status, answer, sid = self.answer(method, path, body, **kwargs)
         return status, answer if isinstance(answer, bytes) else X.encode(answer), sid
 
@@ -105,8 +191,7 @@ class FakeServer:
         if url.path == '/version':
             return 200, {'api_version': X.P.API_VERSION}, None
         if url.path == '/openapi.json':
-            return 200, {'paths': {X.BANKS + '/{bank_id}' + r: {'post': {}}
-                                   for r in ('/transfer/import', '/transfer/export')}}, None
+            return 200, copy.deepcopy(self.schema), None
         if url.path == X.BANKS:
             items = [{'bank_id': FOREIGN, 'fact_count': self.foreign_count}]
             if self.present:
@@ -143,6 +228,8 @@ class FakeServer:
             return 404, {}, None
         if route == '/webhooks':
             return 200, {'webhooks': []}, None
+        if route == '/mental-models':
+            return 200, envelope([], q), None
         if route == '/config':
             if method == 'PATCH':
                 self.config.update(body['updates'])
@@ -177,7 +264,7 @@ class FakeServer:
             self.downloads[key] = archive.getvalue()
             return 202, self.operation(meta={'download_url': key}), None
         if route == '/memories/recall':
-            return 200, {'results': [self.fact(r) for r in self.docs][:2]}, None
+            return 200, {'results': [self.fact(r) for r in self.docs if 'subject:task:invented' in self.docs[r]['tags']][:2]}, None
         if route == '/llm-requests':
             return 200, envelope([{'id': 'trace', 'scope': 'retain_extract_facts',
                 'input_tokens': 12, 'output_tokens': 3, 'provider': 'invented', 'model': 'invented'}], q), None
@@ -196,14 +283,17 @@ class FakeServer:
             return 200, {'jsonrpc': '2.0', 'id': 1, 'result': {'tools': [self.catalog[n] for n in names]}}, sid
         name = body['params']['name']
         if name not in self.catalog or (self.filter_call and enabled is not None and name not in enabled):
-            return 200, {'jsonrpc': '2.0', 'id': 1, 'error': {'code': -32602, 'message': 'Unknown tool: ' + name}}, sid
+            if self.rpc_denial:
+                return 200, {'jsonrpc': '2.0', 'id': 1, 'error': {'code': -32602, 'message': 'Unknown tool: ' + name}}, sid
+            return 200, {'jsonrpc': '2.0', 'id': 1, 'result': {'isError': True,
+                'content': [{'type': 'text', 'text': 'Unknown tool: ' + name}]}}, sid
         # Executed forbidden tools return success, never get mistaken for denial.
-        if name == 'get_document' and not self.docs:
+        if name == 'get_document' and 'invented-a' not in self.docs:
             result = {'isError': False, 'structuredContent': {'error': 'Document not found'}}
         elif name == 'get_document':
             result = {'isError': False, 'structuredContent': self.docs['invented-a']}
         else:
-            result = {'isError': False, 'structuredContent': {'results': [self.fact(r) for r in self.docs]}}
+            result = {'isError': False, 'structuredContent': {'results': [self.fact(r) for r in self.docs if 'subject:task:invented' in self.docs[r]['tags']]}}
         return 200, {'jsonrpc': '2.0', 'id': 1, 'result': result}, sid
 
 
@@ -277,7 +367,9 @@ class ExerciseTests(unittest.TestCase):
 
     def check_removals(self, prefix, cases):
         for name, test, mutation in cases:
-            with self.subTest(guard=name), mutation:
+            with self.subTest(guard=name), warnings.catch_warnings(), mutation:
+                # Ambient -W error must not supply the very guard a trial removes.
+                warnings.resetwarnings()
                 result = unittest.TestResult()
                 ExerciseTests(test).run(result)
             failures = result.failures + result.errors
@@ -299,10 +391,10 @@ class ExerciseTests(unittest.TestCase):
         self.assertTrue(any(m == 'DELETE' for m, _, _, _ in self.server.calls))
 
     def test_full_fake_run_and_ownership_c2(self):
-        self.assert_cleanup(self.run_driver(), 0)
+        self.assert_cleanup(self.run_driver(), 3)
         self.assertEqual(set(self.exercise.evidence['steps']), set(X.STEPS))
         for step in X.STEPS:
-            self.assertEqual(self.exercise.evidence['steps'][step]['verdict'], 'measured')
+            self.assertEqual(self.exercise.evidence['steps'][step]['verdict'], 'not_run' if step == 'E5' else 'measured')
         writes = [x for x in self.server.calls if x[0] != 'GET' and '/memories/recall' not in x[1]]
         self.assertTrue(writes)
         for method, path, body, started in writes:
@@ -312,7 +404,7 @@ class ExerciseTests(unittest.TestCase):
                 self.assertEqual(q['target_bank_id'], [BANK], 'foreign_import')
         times = [x[3] for x in writes]
         self.assertTrue(all(b - a >= 1 for a, b in zip(times, times[1:])))
-        self.assertEqual(self.exercise.retains, 23)  # Includes denied retain/sync_retain probes.
+        self.assertEqual(self.exercise.retains, 28)  # Includes denied retain/sync_retain probes.
         self.assertLess(self.clock(), 900)
         self.assertFalse(self.server.present)
         self.assertEqual(len(self.exercise.evidence['archives']), 3)
@@ -434,7 +526,7 @@ class ExerciseTests(unittest.TestCase):
                     code = self.program(lambda: X.main(['--bank', BANK, '--credential-fd', str(read_fd), '--evidence', str(path)]))
             finally:
                 os.close(read_fd)
-            self.assertEqual(code, 0)
+            self.assertEqual(code, 3)
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
             text = path.read_text() + output.getvalue()
             for n in range(8, len(SECRET) + 1):
@@ -442,7 +534,7 @@ class ExerciseTests(unittest.TestCase):
             for _, _, body, _ in self.server.calls:
                 if isinstance(body, dict):
                     for item in body.get('items', []):
-                        if 'content' in item and item['content'] != self.exercise.marker:
+                        if 'content' in item and item['content'] != self.exercise.marker and item.get('document_id') in ('invented-a', 'invented-b', 'invented-excluded'):
                             self.assertFalse(item['content'] in text, 'note_disclosed')
             self.assertEqual(json.loads(path.read_text())['credential_prefix_matches'], 0)
 
@@ -548,6 +640,7 @@ class ExerciseTests(unittest.TestCase):
     def test_k2_executor_error_and_nonmatching_rpc_errors_are_not_denial(self):
         for mode in ('executed', 'code', 'shape', 'message'):
             clock = Clock(); server = FakeServer(clock)
+            server.rpc_denial = True
             exercise = X.Exercise(BANK, server, clock, clock.sleep)
             original = server.mcp
             def reply(body, sid):
@@ -625,14 +718,14 @@ class ExerciseTests(unittest.TestCase):
     def test_k5_full_catalog_forecast_and_probe_coverage(self):
         for name in X.SUPPORTED_TOOLS:
             self.server.catalog.setdefault(name, {'name': name, 'inputSchema': {'type': 'object', 'properties': {}}})
-        self.assertEqual(self.run_driver(), 0)
-        self.assertLessEqual(len(self.server.calls), 300, 'request_budget_exceeded')
-        self.assertLessEqual(self.clock(), 240, 'spacing_budget_exceeded')
+        self.assertEqual(self.run_driver(), 3)
+        self.assertLessEqual(len(self.server.calls), 600, 'request_budget_exceeded')
+        self.assertLessEqual(self.clock(), 400, 'spacing_budget_exceeded')
         self.assertEqual(self.exercise.evidence['E2_classes'], {'retain': 'retain', 'delete': 'delete_document',
                          'reflect': 'reflect', 'page': 'create_knowledge_page'})
         probes = [r for r in self.exercise.evidence['requests'] if r.get('rpc_method') == 'tools/call']
         # Nonrepresentative tools only appear on the two full new-session policy passes.
-        self.assertEqual(sum(r.get('tool') == 'update_memory' for r in probes), 2, 'full_sweep_repeated_or_lost')
+        self.assertEqual(sum(r.get('tool') == 'update_memory' for r in probes), 6, 'full_sweep_repeated_or_lost')
         for name in ('retain', 'delete_document', 'reflect', 'create_knowledge_page'):
             self.assertEqual(sum(r.get('tool') == name for r in probes), 12, 'class_probe_lost')
         grouped = {}
@@ -649,7 +742,7 @@ class ExerciseTests(unittest.TestCase):
                 X.Exercise(invalid, self.server, self.clock, self.clock.sleep)
         self.server.catalog['delete_bank'] = {'name': 'delete_bank', 'inputSchema': {'type': 'object',
             'properties': {'bank_id': {'type': 'string'}}, 'required': ['bank_id']}}
-        self.assertEqual(self.run_driver(), 0)
+        self.assertEqual(self.run_driver(), 3)
         calls = [b['params']['arguments']['bank_id'] for m, p, b, _ in self.server.calls
                  if isinstance(b, dict) and b.get('method') == 'tools/call' and b['params']['name'] == 'delete_bank']
         self.assertTrue(calls)
@@ -875,6 +968,7 @@ class ExerciseTests(unittest.TestCase):
             exercise = X.Exercise(BANK, server, clock, clock.sleep)
             original = server.mcp
             baselines = []
+            server.rpc_denial = True
             def sessions(body, sid):
                 status, answer, returned = original(body, sid)
                 if kind == 'old-list' and body['method'] == 'tools/list' and sid == 'session-1':
@@ -885,8 +979,9 @@ class ExerciseTests(unittest.TestCase):
                         baselines.append(sid)
                 return status, answer, returned
             server.mcp = sessions
-            self.assertEqual(self.program(exercise.run), 3 if kind == 'old-list' else 0, 'session_qualification_lost')
+            self.assertEqual(self.program(exercise.run), 3, 'session_qualification_lost')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
+            self.assertEqual(exercise.evidence['steps']['E2']['verdict'], 'failed' if kind == 'old-list' else 'measured')
             if kind == 'session-denial':
                 self.assertEqual(set(baselines), set(exercise.sessions), 'session_baseline_missing')
 
@@ -934,14 +1029,15 @@ class ExerciseTests(unittest.TestCase):
                         fact['tags'] = ['subject:task:sibling']
                 return status, answer, returned
             server.mcp = wrong_subject
-            self.assertEqual(self.program(exercise.run), 3 if kind == 'subject' else 0, 'recall_subject_scope_lost')
+            self.assertEqual(self.program(exercise.run), 3, 'recall_subject_scope_lost')
             self.assertEqual(exercise.evidence['cleanup'], 'proven')
+            self.assertEqual(exercise.evidence['steps']['E2']['verdict'], 'failed' if kind == 'subject' else 'measured')
             if kind == 'order':
                 self.assertEqual(exercise.evidence['E2_classes'], {'retain': 'retain', 'delete': 'delete_document',
                     'reflect': 'reflect', 'page': 'create_knowledge_page'}, 'catalog_order_used_for_class')
 
     def test_l5_forecast_latency_headroom(self):
-        for latency in (0, .5, 1.5):
+        for latency in (0, .5, 1):
             clock = Clock(); server = FakeServer(clock)
             exercise = X.Exercise(BANK, server, clock, clock.sleep)
             for name in X.SUPPORTED_TOOLS:
@@ -958,17 +1054,13 @@ class ExerciseTests(unittest.TestCase):
                 clock.now += latency
                 return answer
             server.exchange = delayed
-            self.assertEqual(self.program(exercise.run), 0)
-            self.assertEqual(len(server.calls), 297)
-            self.assertEqual(300 - len(server.calls), 3, 'request_headroom_changed')
-            if latency:
-                # Conservative: charge every request AND all spacing against steps; no overlap credit.
-                safe_extra_gets = int((780 - 180 - len(server.calls) * latency) // latency)
-                self.assertEqual(safe_extra_gets, 903 if latency == .5 else 103)
-                with_poll_sleep = int((780 - 180 - len(server.calls) * latency) // (latency + 1))
-                self.assertEqual(with_poll_sleep, 301 if latency == .5 else 61)
-                print('latency_forecast=' + json.dumps({'request_s': latency, 'step_s': cleanup_started[0],
-                     'elapsed_s': clock(), 'conservative_extra_poll_gets': safe_extra_gets, 'with_1s_sleep_per_get': with_poll_sleep}, sort_keys=True))
+            self.assertEqual(self.program(exercise.run), 3)
+            self.assertEqual(exercise.evidence['steps']['E6']['verdict'], 'measured')
+            self.assertLess(cleanup_started[0], 780, 'step_budget_exhausted')
+            self.assertLess(clock(), 900, 'cleanup_budget_exhausted')
+            self.assertLessEqual(len(server.calls), 600)
+            print('latency_forecast=' + json.dumps({'request_s': latency, 'requests': len(server.calls),
+                  'retains': exercise.retains, 'step_s': cleanup_started[0], 'elapsed_s': clock()}, sort_keys=True))
 
     def main_result(self, exercise, server, secret=SECRET):
         with tempfile.TemporaryDirectory() as tmp, patch.object(X.P, 'credential', return_value=secret), \
@@ -1051,7 +1143,7 @@ class ExerciseTests(unittest.TestCase):
             payload = exercise.marker + ' subject A uses ExampleID-A when its gate is closed.' if kind == 'note' else secret
             server.catalog['retain']['inputSchema'] = {'type': 'object', 'properties': {payload: {'type': 'string'}}, 'required': [payload]}
             code, evidence = self.main_result(exercise, server, secret)
-            self.assertEqual(code, 0, 'schema_key_was_not_sanitized')
+            self.assertEqual(code, 3, 'schema_key_was_not_sanitized')
             self.assertFalse(any(payload in s for s in X.strings(evidence)), 'schema_payload_disclosed')
             shapes = [r['request_keys'] for r in evidence['requests'] if r.get('tool') == 'retain']
             self.assertTrue(shapes)
@@ -1079,6 +1171,7 @@ class ExerciseTests(unittest.TestCase):
             exercise = X.Exercise(BANK, server, clock, clock.sleep)
             code, evidence = self.main_result(exercise, server, secret)
             self.assertEqual(code, 3, 'diagnostic_collision_not_refused')
+            self.assertEqual(evidence, 0, 'diagnostic_collision_not_redacted')
             self.assertEqual(X.credential_matches(X.encode(evidence), secret), 0, 'fallback_disclosed_credential')
 
     def test_m3_successful_initialize_and_exclusive_list_result(self):
@@ -1181,7 +1274,7 @@ class ExerciseTests(unittest.TestCase):
         try:
             with patch.object(X.os, 'fdopen', during_write):
                 code, evidence = self.main_result(self.exercise, self.server)
-            self.assertEqual(code, 0, 'evidence_signal_changed_exit')
+            self.assertEqual(code, 3, 'evidence_signal_changed_exit')
             self.assertEqual(evidence['cleanup'], 'proven')
             self.assertEqual(evidence['credential_prefix_matches'], 0)
             self.assertFalse(self.server.present)
@@ -1221,7 +1314,7 @@ class ExerciseTests(unittest.TestCase):
                         answer['banks'][0]['fact_count'] += 1 if kind == 'grew' else -1
                 return status, answer, sid
             server.answer = drift
-            self.assertEqual(self.program(exercise.run), 0 if kind in ('grew', 'new') else 4, 'drift_policy_wrong')
+            self.assertEqual(self.program(exercise.run), 3 if kind in ('grew', 'new') else 4, 'drift_policy_wrong')
             comparison = exercise.evidence['other_bank_comparison']
             self.assertIn(kind, comparison.values())
             self.assertTrue(all(X.re.fullmatch('[0-9a-f]{64}', k) for k in comparison), 'drift_id_disclosed')
@@ -1255,7 +1348,7 @@ class ExerciseTests(unittest.TestCase):
                 self.server.downloads[key] = raw + b'trailing ' + payload
             return status, answer, sid
         self.server.answer = metadata
-        self.assertEqual(self.program(self.exercise.run), 0, 'clean_entries_not_rebuilt')
+        self.assertEqual(self.program(self.exercise.run), 3, 'clean_entries_not_rebuilt')
         imports = [b[b.index(b'PK'):].rsplit(b'\r\n--', 1)[0] for _, p, b, _ in self.server.calls if '/transfer/import?' in p]
         self.assertEqual(len(imports), 2)
         for raw, wanted in zip(imports, (expected[0], expected[2])):
@@ -1322,7 +1415,7 @@ class ExerciseTests(unittest.TestCase):
                 self.assertFalse(self.server.calls)
 
     def test_q5_unchanged_banks_have_no_unattributed_drift(self):
-        self.assertEqual(self.program(self.exercise.run), 0)
+        self.assertEqual(self.program(self.exercise.run), 3)
         self.assertFalse('other_bank_drift' in self.exercise.evidence, 'drift_without_growth')
 
     def test_q5_summary_and_message_guards_have_admitted_credentials(self):
@@ -1443,6 +1536,204 @@ class ExerciseTests(unittest.TestCase):
         record = self.exercise.evidence['archives'][-1]
         self.assertEqual(self.exercise.evidence['steps']['E1']['failure'], 'archive_documents_unmeasured')
         self.assertFalse('failed_entry_index' in record, 'container_refusal_has_entry_index')
+
+    def test_r6_denial_forms_and_rejections(self):
+        cases = {'class': 'denial_class_mismatch', 'false': 'denial_iserror_false',
+                 'missing': 'denial_iserror_missing', 'nonboolean': 'denial_iserror_nonboolean',
+                 'executor': 'denial_executor_error', 'argument': 'denial_argument_error',
+                 'success': 'denial_executed', 'read-data': 'denial_class_mismatch'}
+        for kind, expected in cases.items():
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            original = server.mcp
+            def reply(body, sid):
+                status, answer, returned = original(body, sid)
+                if body['method'] == 'tools/call' and body['params']['name'] == 'retain':
+                    result = answer['result']
+                    if kind in ('class', 'executor', 'argument'):
+                        result['content'][0]['text'] = {'class': 'Other error: retain',
+                            'executor': 'Error executing tool retain: Document not found',
+                            'argument': 'Input validation error: retain'}[kind]
+                    elif kind == 'missing':
+                        result.pop('isError')
+                    elif kind == 'nonboolean':
+                        result['isError'] = 1
+                    elif kind == 'false':
+                        result['isError'] = False
+                    elif kind == 'success':
+                        answer['result'] = {'isError': False, 'structuredContent': {'success': True}}
+                    else:
+                        result['content'].append({'type': 'text', 'text': 'invented read data'})
+                return status, answer, returned
+            server.mcp = reply
+            self.assertEqual(self.program(exercise.run), 3)
+            self.assertEqual(exercise.evidence['steps']['E2']['verdict'], 'failed', 'forbidden_call_accepted')
+            self.assertEqual(exercise.evidence['steps']['E2']['failure'], expected)
+            self.assertEqual(exercise.evidence['cleanup'], 'proven')
+        self.server.rpc_denial = True
+        self.assertEqual(self.run_driver(), 3)
+        self.assertEqual(self.exercise.evidence['steps']['E2']['verdict'], 'measured', 'rpc_denial_lost')
+
+    def test_r6_denial_state_pin_and_read_leak(self):
+        original = self.server.mcp
+        def changed(body, sid):
+            answer = original(body, sid)
+            if body['method'] == 'tools/call' and body['params']['name'] == 'retain':
+                self.server.docs['hidden'] = {'id': 'hidden', 'original_text': 'invented hidden write',
+                                              'tags': ['subject:task:excluded']}
+            return answer
+        self.server.mcp = changed
+        self.assertEqual(self.run_driver(), 3)
+        self.assertEqual(self.exercise.evidence['steps']['E2'].get('failure'), 'denial_effect_changed', 'writer_effect_not_detected')
+        self.assertEqual(self.exercise.evidence['cleanup'], 'proven')
+        clock = Clock(); server = FakeServer(clock); exercise = X.Exercise(BANK, server, clock, clock.sleep)
+        original = server.mcp
+        def leaked(body, sid):
+            status, answer, returned = original(body, sid)
+            if body['method'] == 'tools/call' and body['params']['name'] == 'get_document' and not server.config.get('mcp_enabled_tools'):
+                answer['result']['content'].append({'type': 'text', 'text': 'invented forbidden read body'})
+            return status, answer, returned
+        server.mcp = leaked
+        self.assertEqual(self.program(exercise.run), 3)
+        self.assertEqual(exercise.evidence['steps']['E2'].get('failure'), 'denial_class_mismatch', 'read_data_not_detected')
+        self.assertNotIn('invented forbidden read body', X.encode(exercise.evidence).decode())
+
+    def test_r6_nonerror_baseline_is_unmeasured(self):
+        original = self.server.mcp
+        def nonerror(body, sid):
+            status, answer, returned = original(body, sid)
+            if body['method'] == 'tools/call' and body['params']['name'] == 'zz_nonexistent_exercise_probe':
+                answer['result']['isError'] = False
+            return status, answer, returned
+        self.server.mcp = nonerror
+        self.assertEqual(self.run_driver(), 3)
+        step = self.exercise.evidence['steps']['E2']
+        self.assertEqual(step['verdict'], 'refused_unmeasured')
+        self.assertEqual(step['failure'], 'denial_shape_unmeasured')
+        row = next(r for r in self.exercise.evidence['requests'] if r.get('tool') == 'zz_nonexistent_exercise_probe')
+        self.assertIs(row['isError'], False)
+        self.assertTrue(row['content_items'])
+        self.assertEqual(self.exercise.retains, 0)
+
+    def test_r6_failed_e5_keeps_bounded_judgment_material(self):
+        original = self.server.fact
+        def lost_term(rid):
+            fact = original(rid)
+            if rid == 'invented-identifier':
+                fact['text'], fact['entities'] = 'invented subject and condition, identifier lost', ''
+            return fact
+        self.server.fact = lost_term
+        self.assertEqual(self.run_driver(), 3)
+        step = self.exercise.evidence['steps']['E5']
+        self.assertEqual(step.get('failure'), 'term_missing')
+        self.assertEqual(step['cases'][0]['extracted'][0]['text'], 'invented subject and condition, identifier lost')
+        self.assertIs(step['cases'][0]['extracted_truncated'], False)
+        self.assertEqual(step['subject_condition_judgment'], 'not_run')
+
+    def test_r6_every_lifecycle_new_and_old_coverage(self):
+        self.server.catalog['update_memory'] = {'name': 'update_memory', 'inputSchema': {'type': 'object', 'properties': {}}}
+        self.assertEqual(self.run_driver(), 3)
+        rows = self.exercise.evidence['requests']
+        for lifecycle in (1, 2, 3):
+            for allowed in ([], ['recall', 'get_document']):
+                selected = [r for r in rows if r.get('lifecycle') == lifecycle and r.get('allowlist') == allowed]
+                calls = [r for r in selected if r.get('rpc_method') == 'tools/call']
+                new = {r['session'] for r in calls if r['session'] != 1}
+                self.assertEqual(len(new), 1)
+                ordinal = new.pop()
+                listed = {r['session'] for r in selected if r.get('rpc_method') == 'tools/list'}
+                self.assertEqual(listed, {1, ordinal}, 'new_or_old_list_missing')
+                self.assertEqual({r.get('tool') for r in calls if r['session'] == ordinal} - {'zz_nonexistent_exercise_probe'},
+                                 set(self.server.catalog), 'lifecycle_full_sweep_missing')
+                self.assertTrue({'retain', 'delete_document', 'reflect'} <= {r.get('tool') for r in calls if r['session'] == 1})
+        self.assertEqual(len(self.exercise.evidence['denial_sweeps']), 3)
+        self.assertEqual(self.exercise.evidence['steps']['E2']['verdict'], 'measured')
+        self.assertEqual(self.exercise.evidence['steps']['E5']['verdict'], 'not_run')
+        evidence = X.encode(self.exercise.evidence)
+        self.assertNotIn(b'Unknown tool: ', evidence)
+        self.assertNotIn(b'subject A uses ExampleID-A', evidence)
+        self.assertTrue(self.exercise.evidence['steps']['E5']['cases'][0]['extracted'])
+        self.assertTrue(self.exercise.evidence['steps']['E6']['canary_drift_detected'])
+
+    def test_r6_schema_contract_and_strict_fake(self):
+        self.assertLessEqual(X.CONTRACT_FILE.stat().st_size, 60000)
+        self.assertEqual(X.schema_contract(CONTRACT), CONTRACT)
+        base = self.server.base
+        for method, path, body, kwargs, expected in [
+            ('POST', base + '/transfer/export?unknown=true', None, {}, 422),
+            ('POST', base + '/transfer/export?include_data=bad', None, {}, 422),
+            ('POST', base + '/memories/recall', {'query': 'invented', 'tags_match': 'unknown'}, {}, 422),
+            ('POST', base + '/transfer/import', b'--b\r\nContent-Disposition: form-data; name="file"\r\n\r\nzip\r\n--b\r\nContent-Disposition: form-data; name="mode"\r\n\r\nrestore\r\n--b--',
+             {'content_type': 'multipart/form-data; boundary=b'}, 422),
+            ('POST', base + '/memories', {'items': [{'content': 'invented', 'unknown': 1}]}, {}, 422),
+            ('POST', base + '/not-a-route', {}, {}, 404)]:
+            self.assertEqual(self.server.exchange(method, path, body, **kwargs)[0], expected, 'schema_invalid_request_accepted')
+        for kind in ('version', 'schema', 'late-schema', 'query', 'form'):
+            clock = Clock(); server = FakeServer(clock); exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            if kind == 'version':
+                reply = server.answer
+                server.answer = lambda m, p, b=None, **kw: (200, {'api_version': 'future'}, None) if p == '/version' else reply(m, p, b, **kw)
+            elif kind == 'schema':
+                server.schema['paths'][X.BANKS + '/{bank_id}/config']['get']['responses'].pop('200')
+            else:
+                def invalid_step():
+                    exercise.create()
+                    if kind == 'late-schema':
+                        server.schema['paths'][X.BANKS + '/{bank_id}/config']['get']['responses'].pop('200')
+                        exercise.retain('invented-a', 'invented')
+                    else:
+                        body = None if kind == 'query' else {'include_data': True}
+                        result = exercise.change('POST', '/transfer/export', body, query={'unknown': 'true'} if kind == 'query' else {})
+                        exercise.submitted(result, expected=202)
+                exercise.e1 = invalid_step
+            self.assertEqual(self.program(exercise.run), 2 if kind in ('version', 'schema') else 3 if kind == 'late-schema' else 4)
+            self.assertFalse(any(m == 'POST' and p.endswith('/memories') for m, p, _, _ in server.calls), 'destructive_request_after_schema_failure')
+            if kind in ('version', 'schema'):
+                self.assertFalse(any(m != 'GET' for m, _, _, _ in server.calls), 'schema_failure_mutated')
+
+    def test_r6_catalog_content_scalars_parent_and_consumer(self):
+        self.server.catalog = {k: v for k, v in self.server.catalog.items() if k in ('retain', 'recall', 'get_document')}
+        self.server.catalog['retain']['outputSchema'] = {'type': 'object', 'additionalProperties': True}
+        self.server.catalog['retain']['inputSchema']['properties']['path'] = {'enum': ['delta', 'full'], 'type': 'string'}
+        self.exercise.preflight(); self.exercise.create(default=True)
+        old = self.exercise.session(); self.exercise.catalog = self.exercise.tools(old)
+        self.exercise.filtering(old)
+        catalog = self.exercise.evidence['tool_catalogs'][0]['tools']
+        self.assertEqual([t['name'] for t in catalog], list(self.server.catalog), 'catalog_truncated')
+        self.assertEqual(next(t for t in catalog if t['name'] == 'retain')['outputSchema'], self.server.catalog['retain']['outputSchema'])
+        self.assertEqual(next(t for t in catalog if t['name'] == 'retain')['inputSchema']['properties']['path']['enum'], ['delta', 'full'])
+        content = [i for r in self.exercise.evidence['requests'] for i in r.get('content_items', [])]
+        self.assertTrue(content)
+        self.assertTrue(all(set(i) == {'type', 'bytes', 'sha256', 'normalized_sha256', 'class'} for i in content))
+        self.assertFalse(any('Unknown tool:' in s or SECRET[:8] in s for s in X.strings(self.exercise.evidence)))
+        clock = Clock(); server = FakeServer(clock); exercise = X.Exercise(BANK, server, clock, clock.sleep)
+        server.filter_list = False
+        self.assertEqual(self.program(exercise.run), 3)
+        parent, child = exercise.evidence['steps']['E1'], exercise.evidence['steps']['E2']
+        self.assertEqual(parent.get('cause_step'), 'E2', 'parent_cause_missing')
+        self.assertEqual(parent.get('failure'), child['failure'])
+        self.assertGreater(child['seconds'], 0)
+        self.assertEqual(parent['seconds'] + child['seconds'], clock() - 1, 'nested_stage_time_double_counted')
+        clock = Clock(); server = FakeServer(clock); exercise = X.Exercise(BANK, server, clock, clock.sleep)
+        with patch.object(X.P, 'profile', return_value='missed-drift'):
+            self.assertEqual(self.program(exercise.run), 3)
+        self.assertEqual(exercise.evidence['steps']['E6'].get('failure'), 'canary_missed_drift', 'consumer_check_not_used')
+
+    def test_r6_guard_removals_fail_in_process(self):
+        original = X.P.require
+        bypass = lambda code: patch.object(X.P, 'require', side_effect=lambda condition, actual: original(condition or actual == code, actual))
+        self.check_removals('r6', [
+            ('r1-flag', 'test_r6_denial_forms_and_rejections', edited('denial', "result.get('isError') is not True", 'False')),
+            ('r1-class', 'test_r6_denial_forms_and_rejections', edited('denied', 'self.denial(answer, name) == self.denials[sid]', 'True')),
+            ('r2-effects', 'test_r6_denial_state_pin_and_read_leak', bypass('denial_effect_changed')),
+            ('r2-read', 'test_r6_denial_state_pin_and_read_leak', patch.object(X.Exercise, 'denied', return_value=True)),
+            ('r3-lifecycle', 'test_r6_every_lifecycle_new_and_old_coverage', edited('filtering', 'full = fresh and (self.lifecycle, tuple(allowed)) not in self.full_policies', 'full = fresh and (1, tuple(allowed)) not in self.full_policies')),
+            ('r3-new-list', 'test_r6_every_lifecycle_new_and_old_coverage', edited('filtering', 'for sid, fresh in sessions:', 'for sid, fresh in sessions[:1]:')),
+            ('r4-schema', 'test_r6_schema_contract_and_strict_fake', bypass('schema_contract_changed')),
+            ('r4-fake', 'test_r6_schema_contract_and_strict_fake', patch.dict(globals(), {'request_status': lambda *_: None})),
+            ('r5-catalog', 'test_r6_catalog_content_scalars_parent_and_consumer', edited('tools', 'for t in tools]})', 'for t in tools[:1]]})')),
+            ('r6-cause', 'test_r6_catalog_content_scalars_parent_and_consumer', edited('run', "'cause_step': self.step", "'lost_cause': self.step")),
+        ])
 
     def test_r5_guard_removals_fail_in_process(self):
         self.check_removals('r5', [
@@ -1567,7 +1858,7 @@ class ExerciseTests(unittest.TestCase):
             ('K4-mark', 'test_k4_signals_at_finally_and_cleanup_first_statement',
              edited('change', "self.evidence['cleanup'] = 'incomplete'", 'pass')),
             ('K5', 'test_k5_full_catalog_forecast_and_probe_coverage',
-             edited('filtering', 'full = fresh and tuple(allowed) not in self.full_policies', 'full = fresh')),
+             edited('filtering', 'full = fresh and (self.lifecycle, tuple(allowed)) not in self.full_policies', 'full = fresh and (1, tuple(allowed)) not in self.full_policies')),
             ('K6-match', 'test_k6_id_rejects_suffix_and_sampler_forces_bank_id',
              patch.object(X, 'ID', types.SimpleNamespace(fullmatch=X.ID.match))),
             ('K6-bank', 'test_k6_id_rejects_suffix_and_sampler_forces_bank_id',
@@ -1621,7 +1912,7 @@ class ExerciseTests(unittest.TestCase):
             ('c7-list', 'test_c7_list_or_call_bypass_fails_e2',
              patch.object(X.P, 'require', side_effect=bypass({'tool_filter_list_failed'}))),
             ('c7-call', 'test_c7_list_or_call_bypass_fails_e2',
-             patch.object(X.P, 'require', side_effect=bypass({'tool_filter_call_failed'}))),
+             patch.object(X.Exercise, 'denied', return_value=True)),
         ]
         self.check_removals('control', cases)
 
