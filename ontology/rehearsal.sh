@@ -48,7 +48,11 @@ call(['describe'], {})
 hp = dict(task=task, effect='publish', until='review accepted')
 dp = dict(task=task, topic='route', text='use actions', decided_by='lead', undo='supersede')
 kp = dict(task=task, name='checks', definition='passing checks from rehearsal output')
-wp = dict(task=task, name='O13', tier='bounded', runtime='codex', packet=packet)
+tp = dict(task=task, key='rehearsal', consumer='Academy daily-record route', consumer_kind='domain_route', first_use='Save a daily record and observe its readback')
+thread = created(apply('open_thread', 'thread', tp), 'thread')
+pp = dict(thread=thread, first_lines=100, limit_lines=150, current_lines=100, amended_by_family='family-a')
+plan = created(apply('open_plan', 'plan', pp), 'plan')
+wp = dict(task=task, name='O13', tier='bounded', runtime='codex', packet=packet, thread=thread, plan=plan, layer='domain')
 unchanged = fingerprint()
 for action, params in [('set_hold', hp), ('record_decision', dp), ('define_kpi', kp), ('start_worker_run', wp)]:
     apply(action, 'unknown-' + action, dict(params, task=oid('task', 'invented-o13-task')), 'unknown_task')
@@ -132,7 +136,7 @@ requests = [dict(jsonrpc='2.0', id=i, method='tools/call', params=dict(name=n, a
 wire = subprocess.run([binary, '--store', store, 'mcp'], input='\n'.join(map(json.dumps, requests))+'\n', text=True, capture_output=True, timeout=60); assert wire.returncode == 0, wire.stderr
 for request, line in zip(requests, wire.stdout.splitlines(), strict=True):
     answer = json.loads(line)['result']; assert not answer['isError'], answer
-    if request['params']['name'] == 'ont_action_list': assert answer['content'][0]['text'].count('Actions take the full Id from search; view arguments take the native key.') == 10
+    if request['params']['name'] == 'ont_action_list': assert answer['content'][0]['text'].count('Actions take the full Id from search; view arguments take the native key.') == 15
     size = len(answer['content'][0]['text'].encode()); assert size <= 262144; print(request['params']['name'] + '_bytes=' + str(size), file=sys.stderr)
 expected = {'kpi_board': (1, '| checks | 14 | 2026-11-11T02:00:02Z | 14 | ontology/rehearsal.sh |'), 'active_holds': (1, '| publish | review accepted |'), 'current_decisions': (1, '| route | use \\| rendered actions | lead | supersede |'), 'live_workers': (2, 'check \\| next line'), 'closed_workers': (2, 'pending passed')}
 for view, (count, text) in expected.items():
@@ -142,6 +146,58 @@ for view, (count, text) in expected.items():
     if view == 'live_workers': assert '(missing)' in r['markdown']
     if view == 'closed_workers': assert report['native_key'] in r['markdown'] and pending_report['native_key'] in r['markdown'] and r['markdown'].index('pending passed') < r['markdown'].index('| passed |')
     print(r['markdown'])
+# v5 gate rows run after the frozen view/aggregate expectations above.
+def gate(action, rid, params, failure=None):
+    before = fingerprint(); answer = apply(action, 'gate-' + action + '-' + rid, params, failure)
+    if failure: assert fingerprint() == before
+    print('gate_row=' + rid + ' expected=' + (failure or 'admitted'))
+    return answer
+def dispatch(rid, failure=None, **changes):
+    answer = gate('start_worker_run', rid, dict(wp, name='gate-' + rid, **changes), failure)
+    if not failure: apply('close_worker_run', 'gate-close-' + rid, dict(worker_run=created(answer, 'worker_run'), result='gate passed'))
+gate('open_thread', 'duplicate-thread', tp, 'duplicate_thread')
+gate('open_thread', 'new-thread', dict(tp, key='other'))
+missing_thread = oid('thread', 'absent'); missing_plan = oid('plan', 'absent')
+gate('amend_thread', 'unknown-thread', dict(thread=missing_thread, consumer='x', consumer_kind='none', first_use='', reason='fixture'), 'unknown_thread')
+gate('amend_thread', 'reason-required', dict(thread=thread, consumer='x', consumer_kind='none', first_use=''), 'invalid_parameter')
+gate('open_plan', 'duplicate-plan', pp, 'duplicate_plan')
+gate('open_plan', 'unknown-plan-thread', dict(pp, thread=missing_thread), 'unknown_thread')
+gate('amend_plan', 'unknown-plan', dict(plan=missing_plan, current_lines=101, amended_by_family='family-a'), 'unknown_plan')
+gate('amend_plan', 'first-immutable', dict(plan=plan, current_lines=101, first_lines=1, amended_by_family='family-a'), 'invalid_parameter')
+# A missing required plan parameter uses the native parameter refusal.
+gate('start_worker_run', 'plan-missing', {k: v for k, v in wp.items() if k != 'plan'}, 'invalid_parameter')
+dispatch('plan-unknown', 'plan_of_other_thread', plan=missing_plan)
+other = created(gate('open_thread', 'plan-other-thread', dict(tp, key='plan-other')), 'thread')
+other_plan = created(gate('open_plan', 'plan-other', dict(pp, thread=other)), 'plan')
+dispatch('plan-mismatch', 'plan_of_other_thread', plan=other_plan); dispatch('plan-matches')
+for kind in ['harness', 'none']:
+    gate('amend_thread', 'consumer-' + kind, dict(thread=thread, consumer='Program board', consumer_kind=kind, first_use=tp['first_use'], reason='gate fixture'))
+    dispatch('engine-' + kind, 'engine_without_domain_consumer', layer='engine')
+    if kind == 'none': dispatch('no-kind', 'missing_first_use')
+gate('amend_thread', 'domain-consumer', dict(thread=thread, consumer='', consumer_kind='domain_route', first_use=tp['first_use'], reason='kind decides'))
+dispatch('engine-domain', layer='engine')
+gate('amend_thread', 'empty-first-use', dict(thread=thread, consumer='Academy', consumer_kind='domain_route', first_use='', reason='gate fixture'))
+dispatch('empty-use', 'missing_first_use')
+gate('amend_thread', 'restore-first-use', dict(thread=thread, consumer='Academy', consumer_kind='domain_route', first_use=tp['first_use'], reason='gate fixture'))
+dispatch('has-use')
+assert any(o['fields']['consumer_kind'].get('value') == 'harness' for o in obj(thread)['observations'])
+review = dict(plan=plan, reviewer_family='family-a', review_report='fixture/REVIEW.md')
+gate('amend_plan', 'at-limit', dict(plan=plan, current_lines=150, amended_by_family='family-a')); dispatch('at-limit')
+gate('amend_plan', 'over-limit', dict(plan=plan, current_lines=151, amended_by_family='family-a')); dispatch('over-limit', 'plan_over_limit')
+gate('record_scope_review', 'same-family', review, 'scope_review_same_family')
+gate('record_scope_review', 'different-family', dict(review, reviewer_family='family-b')); dispatch('reviewed-over-limit')
+assert fields(plan)['scope_reviewed'] and fields(plan)['review_report'] == review['review_report']
+gate('amend_plan', 'invalidate-review', dict(plan=plan, current_lines=152, amended_by_family='family-b'))
+assert not fields(plan)['scope_reviewed'] and fields(plan)['first_lines'] == 100 and fields(plan)['limit_lines'] == 150
+dispatch('amended-after-review', 'plan_over_limit')
+gate('record_scope_review', 'latest-family', dict(review, reviewer_family='family-b'), 'scope_review_same_family')
+for action, params in [('record_decision', dict(dp, topic='gate-user')), ('supersede_decision', dict(sp, decision=successor))]:
+    gate(action, action + '-no-evidence', dict(params, decided_by='user'), 'user_decision_evidence_required')
+    user = dict(params, decided_by='user', user_words='"Use the domain route."', user_form='question')
+    gate(action, action + '-question', user, 'user_question_is_not_a_decision')
+    answer = gate(action, action + '-decision', dict(user, user_form='decision'))
+    assert fields(created(answer, 'decision'))['user_words'] == user['user_words']
+print('v5_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
