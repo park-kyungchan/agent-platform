@@ -86,7 +86,7 @@ fn page_policy() {
     assert!(tree["folders"]["folder-platform"].is_object());
     assert_eq!(tree["pages"]["page-engineering"], page);
     // U6: exact wire cron names are unknown; test_cron_fields are explicit aliases.
-    for fault in cases()["faults"].as_array().unwrap() {
+    for (n, fault) in cases()["faults"].as_array().unwrap().iter().enumerate() {
         let mut wrong = cases()["page"].clone();
         for (key, value) in fault["patch"].as_object().unwrap() {
             wrong[key] = value.clone();
@@ -96,6 +96,9 @@ fn page_policy() {
             .request("POST", "/knowledge-base/pages", cases()["page"].clone())
             .unwrap();
         assert_eq!(reply.status, 201);
+        let assigned = format!("page-engineering#{}", n + 2);
+        assert_eq!(reply.body["test_id"], assigned);
+        wrong["test_id"] = json!(assigned);
         assert_eq!(reply.body["test_value"], wrong, "{}", fault["label"]);
         assert_ne!(reply.body["test_value"], page);
     }
@@ -164,6 +167,22 @@ fn create_lost_ack() {
         .unwrap();
     assert_eq!(retry.body["test_id"], "page-engineering#2");
     assert_eq!(server.edit(|m| m.pages.len()), 2);
+    let tree = server.mcp("get_knowledge_base_tree", json!({"test_live_tree":true}));
+    for id in ["page-engineering", "page-engineering#2"] {
+        assert_eq!(tree["pages"][id]["test_id"], id);
+        let page = server.mcp("get_knowledge_page", json!({"test_page_id":id}));
+        assert_eq!(page["test_id"], id);
+    }
+    let folder = server
+        .request("POST", "/knowledge-base/folders", cases()["folder"].clone())
+        .unwrap();
+    assert_eq!(folder.body["test_id"], "folder-platform#2");
+    assert_eq!(folder.body["test_value"]["test_id"], "folder-platform#2");
+    let tree = server.mcp("get_knowledge_base_tree", json!({"test_live_tree":true}));
+    assert_eq!(
+        tree["folders"]["folder-platform#2"]["test_id"],
+        "folder-platform#2"
+    );
     server.edit(|m| m.page_deduplicate = true);
     let retry = server
         .request("POST", "/knowledge-base/pages", cases()["page"].clone())

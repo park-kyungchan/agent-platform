@@ -554,7 +554,7 @@ fn page_route(model: &mut Model, request: &Request) -> Option<Reply> {
                 n += 1;
             }
         }
-        let value = if page {
+        let mut value = if page {
             model
                 .page_reply_override
                 .clone()
@@ -562,6 +562,7 @@ fn page_route(model: &mut Model, request: &Request) -> Option<Reply> {
         } else {
             request.body.clone()
         };
+        value["test_id"] = json!(key); // U6: assigned discovery identity, not caller intent.
         let value = entries.entry(key.clone()).or_insert(value).clone();
         Reply {
             status: 201,
