@@ -34,7 +34,15 @@ assert hashlib.sha256(v1).hexdigest() == '4573ab180f63889029ae98c892c996e810f9d8
 first = pathlib.Path(store).with_name('v1.json'); first.write_bytes(v1)
 call(['schema', 'install', str(first)]); call(['index', '--source', 'task_states', '--source', 'packets', '--source', 'reports'])
 revision = obj(task)['observations'][-1]['revision']; obj(packet); obj(report)
+v2 = subprocess.check_output(['git', '-C', repo, 'show', '2b9417c8bc96b0cbeb4ab7913aa44cb49ad8d604:ontology/work.schema.json'], timeout=10)
+assert hashlib.sha256(v2).hexdigest() == '27de5fd02c20299897720ab34543e04e6db685438c3dd7409691cb8ddae11f24'
+second = pathlib.Path(store).with_name('v2.json'); second.write_bytes(v2)
+call(['schema', 'install', str(second)])
+probe = created(apply('set_hold', 'v2-probe', dict(task=task, effect='upgrade probe', until='schema v3')), 'hold')
+apply('lift_hold', 'v2-probe-lift', dict(hold=probe))
+probe_revision = obj(probe)['head']
 call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+assert obj(probe)['head'] == probe_revision
 assert obj(task)['observations'][-1]['revision'] == revision
 call(['describe'], {})
 hp = dict(task=task, effect='publish', until='review accepted')
@@ -101,6 +109,19 @@ apply('note_worker_run', 'live-note', dict(worker_run=live, note='check | next\n
 apply('start_worker_run', 'live-pending', dict(wp, name='live-pending', packet=pending_packet))
 assert fields(w)['started_at'] == '2026-11-11T02:00:02Z' and fields(w)['closed_at'] == '2026-11-11T02:01:01Z'
 assert fields(successor)['decided_at'] == '2026-11-11T02:00:01Z' and all(fields(m['id'])['recorded_at'] == '2026-11-11T02:00:01Z' for m in measurements)
+# Render/installation fixture; transition coverage belongs to the exhaustive walk.
+record = oid('memory_record', 'rehearsal-render')
+apply('mark_memory_record_pending', 'memory-render-pending', dict(record=record, document_id='rehearsal-render', body_hash='a' * 64))
+apply('mark_memory_record_ready', 'memory-render-ready', dict(record=record))
+# Hash values are abstracted by the walk; prove actual replacement separately.
+apply('mark_memory_record_pending', 'memory-render-correction', dict(record=record, document_id='rehearsal-render', body_hash='b' * 64))
+assert fields(record)['status'] == 'pending' and fields(record)['body_hash'] == 'b' * 64
+apply('mark_memory_record_ready', 'memory-render-corrected-ready', dict(record=record))
+memory_block = call(['render'], dict(view='current_memory_records', args={}))
+assert memory_block['rows'] == 1 and not memory_block['truncated']
+assert '| Record id | Document id | Body hash | Status |' in memory_block['markdown']
+assert '| rehearsal-render | rehearsal-render | ' + 'b' * 64 + ' | ready |' in memory_block['markdown']
+print(memory_block['markdown'])
 requests = [dict(jsonrpc='2.0', id=i, method='tools/call', params=dict(name=n, arguments={})) for i, n in enumerate(['ont_describe', 'ont_action_list'], 1)]
 wire = subprocess.run([binary, '--store', store, 'mcp'], input='\n'.join(map(json.dumps, requests))+'\n', text=True, capture_output=True, timeout=60); assert wire.returncode == 0, wire.stderr
 for request, line in zip(requests, wire.stdout.splitlines(), strict=True):
@@ -116,3 +137,5 @@ for view, (count, text) in expected.items():
     if view == 'closed_workers': assert report['native_key'] in r['markdown'] and pending_report['native_key'] in r['markdown'] and r['markdown'].index('pending passed') < r['markdown'].index('| passed |')
     print(r['markdown'])
 PY
+
+python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
