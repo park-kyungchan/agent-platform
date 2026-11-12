@@ -11,10 +11,12 @@ use std::{
 const PACKET: &str = "/home/palantirkc/work/example/TASK.md";
 const REPORT: &str = "/home/palantirkc/work/example/REPORT.md";
 const BYTES: &[u8] = b"Callers searched:\nBroken tests:\nControls:\n";
+#[derive(Clone)]
 enum Response {
     Json(Value),
     Unreadable,
     Raw(Vec<u8>),
+    Stderr(Vec<u8>),
     Failed,
 }
 struct Step {
@@ -72,10 +74,11 @@ impl System for Script {
         }
         self.clock
             .set(self.clock.get() + Duration::from_millis(expected.elapsed));
+        let stderr_only = matches!(expected.response, Response::Stderr(_));
         let bytes = match expected.response {
             Response::Json(v) => serde_json::to_vec(&v).unwrap(),
             Response::Unreadable => b"not json".to_vec(),
-            Response::Raw(bytes) => bytes,
+            Response::Raw(bytes) | Response::Stderr(bytes) => bytes,
             Response::Failed => {
                 return Err(Failure {
                     code: "process_failed",
@@ -86,6 +89,7 @@ impl System for Script {
         };
         Ok(Reply {
             success: expected.success,
+            stdout: if stderr_only { vec![] } else { bytes.clone() },
             bytes,
         })
     }
@@ -119,6 +123,16 @@ fn hash(bytes: &[u8], n: usize) -> String {
 }
 fn start_setup() -> (Value, Vec<Step>) {
     let r = json!({"name":"worker","packet":PACKET,"report":REPORT,"task_dir":"/home/palantirkc/work/example","thread":"P12","layer":"harness","tier":"bounded","cwd":"/example","workspace":"w1","model":"fixture-model","effort":"medium","store":"/scratch/store"});
+    let mut prompt = step(
+        "herdr",
+        "agent prompt w1:p2 --wait --until working --until blocked --timeout 30000",
+        json!({}),
+    );
+    prompt.argv.insert(
+        3,
+        format!("Read the file {PACKET} and do exactly what it says."),
+    );
+    prompt.ms = 30_000;
     let mut steps = vec![
         step("ont", "search --store /scratch/store", row("thread")),
         step("ont", "search --store /scratch/store", row("plan")),
@@ -141,14 +155,14 @@ fn start_setup() -> (Value, Vec<Step>) {
         step(
             "herdr",
             "agent list",
-            json!({"result":{"agents":[{"name":"worker","agent_session":{"value":"fixture-session"}}]}}),
+            json!({"result":{"agents":[{"name":"other","agent_session":{"value":"wrong-session"}},{"name":"worker","agent_session":{"value":"fixture-session"}}]}}),
         ),
         step(
             "ont",
             "action apply --client lead --store /scratch/store",
             json!({"status":"ok","result":{"edits":[{"change":"initial","id":id("worker_run")}]}}),
         ),
-        step("herdr", "", json!({})),
+        prompt,
     ];
     let task = json!({"object_type":"task","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"example"});
     steps[0].body = Some(
@@ -162,20 +176,6 @@ fn start_setup() -> (Value, Vec<Step>) {
     body["request_id"] = json!(format!("start-worker-{}", hash(BYTES, 12)));
     steps[7].body = Some(body);
     steps[5].ms = 90_000;
-    steps[8].argv = vec![
-        "agent".into(),
-        "prompt".into(),
-        "worker".into(),
-        format!("Read the file {PACKET} and do exactly what it says."),
-        "--wait".into(),
-        "--until".into(),
-        "working".into(),
-        "--until".into(),
-        "blocked".into(),
-        "--timeout".into(),
-        "30000".into(),
-    ];
-    steps[8].ms = 30_000;
     for i in [0, 1, 2, 7] {
         steps[i].ms = 30_000;
     }
@@ -296,6 +296,7 @@ fn start_answer_refusals_and_controls() {
         json!({}),
         Value::Null,
         json!({"status":"ok"}),
+        json!({"result":{"edits":[{"change":"initial","id":id("worker_run")}]}}),
         json!({"status":"ok","result":{"edits":[{"change":"initial","id":null}]}}),
         json!({"status":"ok","result":{"edits":[{"change":"initial","id":{"native_key":"partial"}}]}}),
     ] {
@@ -335,6 +336,7 @@ fn start_success_prompt_control_and_deadline() {
         let (v, status) = execute(&mut s, "start", &r).unwrap();
         assert_eq!(status, 0);
         assert_eq!(v["run"], id("worker_run"));
+        assert_eq!(v["prompt_target"], "w1:p2");
         assert_eq!(v["prompt"], if failed { "uncertain" } else { "sent" });
         assert!(v.get("started_at").is_none());
         s.finish();
@@ -426,6 +428,11 @@ fn close_refusals_and_controls() {
             Response::Json(json!({"result":{"tab":{"label":"other"}}})),
             "tab_not_owned",
         ),
+        (
+            0,
+            Response::Json(json!({"result":{"tab":{"label":"worker-old"}}})),
+            "tab_not_owned",
+        ),
         (1, Response::Unreadable, "agent_status_unreadable"),
         (1, Response::Failed, "agent_status_unreadable"),
         (
@@ -512,6 +519,7 @@ fn wait_checks_report_after_every_answer() {
     for response in [
         Response::Failed,
         Response::Unreadable,
+        Response::Json(json!({"result":{"agent":{"agent_status":"idle"}}})),
         Response::Json(json!({"result":{"event":{"data":{"agent_status":"idle"}}}})),
     ] {
         for present in [false, true] {
@@ -521,12 +529,7 @@ fn wait_checks_report_after_every_answer() {
                 json!({}),
             );
             call.ms = 1000;
-            call.response = match &response {
-                Response::Failed => Response::Failed,
-                Response::Unreadable => Response::Unreadable,
-                Response::Raw(v) => Response::Raw(v.clone()),
-                Response::Json(v) => Response::Json(v.clone()),
-            };
+            call.response = response.clone();
             let mut s = Script::new(vec![call]);
             if present {
                 s.files.insert(REPORT.into(), b"report".to_vec());
@@ -634,7 +637,6 @@ fn input_and_native_exit_refusals() {
         (3, "herdr_answer_unreadable"),
         (4, "tab_create_failed"),
         (5, "agent_start_failed"),
-        (6, "session_not_reported"),
     ] {
         let (r, mut steps) = start_setup();
         steps.truncate(at + 1);
@@ -646,15 +648,10 @@ fn input_and_native_exit_refusals() {
     let mut git = step("git", "-C /tree status --porcelain", json!({}));
     git.success = false;
     check_error(Script::new(vec![git]), "start", &r, "io_error");
-    for (at, code) in [
-        (0, "herdr_answer_unreadable"),
-        (1, "agent_status_unreadable"),
-    ] {
-        let (r, mut steps) = close_setup();
-        steps.truncate(at + 1);
-        steps[at].success = false;
-        check_error(Script::new(steps), "close", &r, code);
-    }
+    let (r, mut steps) = close_setup();
+    steps.truncate(1);
+    steps[0].success = false;
+    check_error(Script::new(steps), "close", &r, "herdr_answer_unreadable");
     let (mut r, steps) = close_setup();
     r["report"] = json!("/outside/REPORT.md");
     check_error(
@@ -677,8 +674,137 @@ fn clean_and_continued_worktree_success() {
             vec![]
         });
         steps.insert(0, git);
+        let mut head = step("git", "-C /tree rev-parse HEAD", Value::Null);
+        head.response = Response::Raw(b"fixture-head\n".to_vec());
+        steps.insert(1, head);
         let mut s = Script::new(steps);
-        execute(&mut s, "start", &r).unwrap();
+        assert_eq!(
+            execute(&mut s, "start", &r).unwrap().0["worktree_head"],
+            "fixture-head"
+        );
         s.finish();
     }
+}
+
+#[test]
+fn empty_report_is_missing() {
+    let mut call = step(
+        "herdr",
+        "agent wait worker --until idle --until done --until blocked --timeout 1000",
+        json!({"result":{"agent":{"agent_status":"idle"}}}),
+    );
+    call.ms = 1000;
+    let mut s = Script::new(vec![call]);
+    s.files.insert(REPORT.into(), vec![]);
+    let (v, exit) = execute(
+        &mut s,
+        "wait",
+        &json!({"name":"worker","report":REPORT,"timeout_seconds":1}),
+    )
+    .unwrap();
+    assert_eq!(v, json!({"status":"report_missing","agent_status":"idle"}));
+    assert_eq!(exit, 3);
+    s.finish();
+}
+#[test]
+fn search_requires_qualification_and_bounded_pages() {
+    for kind in ["thread", "plan"] {
+        let (r, mut steps) = start_setup();
+        let at = usize::from(kind == "plan");
+        steps.truncate(at + 1);
+        let mut answer = row(kind);
+        answer["result"]["basis"] = json!({"qualified":false});
+        steps[at].response = Response::Json(answer);
+        check_error(Script::new(steps), "start", &r, "store_search_unqualified");
+        let (r, mut steps) = start_setup();
+        let body = steps[at].body.clone().unwrap();
+        steps.truncate(at);
+        for page in 0..20 {
+            let mut call = step(
+                "ont",
+                "search --store /scratch/store",
+                json!({"status":"ok","result":{"objects":[],"continuation":"next","basis":{"qualified":true}}}),
+            );
+            call.ms = 30_000;
+            let mut q = body.clone();
+            if page > 0 {
+                q["continuation"] = json!("next");
+            }
+            call.body = Some(q);
+            steps.push(call);
+        }
+        check_error(Script::new(steps), "start", &r, "store_search_unbounded");
+    }
+}
+#[test]
+fn wait_uses_supplied_pane_and_null_for_absent_status() {
+    let mut call = step(
+        "herdr",
+        "agent wait w1:p2 --until idle --until done --until blocked --timeout 1000",
+        json!({"result":{"agent":{}}}),
+    );
+    call.ms = 1000;
+    let mut s = Script::new(vec![call]);
+    s.files.insert(REPORT.into(), b"report".to_vec());
+    let (v, exit) = execute(
+        &mut s,
+        "wait",
+        &json!({"name":"worker","pane":"w1:p2","report":REPORT,"timeout_seconds":1}),
+    )
+    .unwrap();
+    assert_eq!(exit, 0);
+    assert_eq!(v["agent_status"], Value::Null);
+    s.finish();
+}
+#[test]
+fn worktree_head_failure_and_stderr_status() {
+    for failed in [false, true] {
+        let (mut r, mut steps) = start_setup();
+        r["worktree"] = json!("/tree");
+        let mut status = step("git", "-C /tree status --porcelain", Value::Null);
+        status.response = Response::Stderr(b"fixture diagnostic".to_vec());
+        let mut head = step("git", "-C /tree rev-parse HEAD", Value::Null);
+        head.response = if failed {
+            Response::Failed
+        } else {
+            Response::Raw(b"fixture-head\n".to_vec())
+        };
+        steps.insert(0, status);
+        steps.insert(1, head);
+        if failed {
+            steps.truncate(2);
+            check_error(Script::new(steps), "start", &r, "io_error");
+        } else {
+            let mut s = Script::new(steps);
+            let (v, exit) = execute(&mut s, "start", &r).unwrap();
+            assert_eq!(exit, 0);
+            assert_eq!(v["worktree_head"], "fixture-head");
+            s.finish();
+        }
+    }
+    let out = Host
+        .call(
+            "sh",
+            &["-c".into(), "printf diagnostic >&2".into()],
+            &Value::Null,
+            1000,
+        )
+        .unwrap();
+    assert!(out.success);
+    assert!(out.stdout.is_empty());
+    assert_eq!(out.bytes, b"diagnostic");
+}
+#[test]
+fn work_help_names_commands_without_changing_global_help() {
+    let out = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["work", "--help"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    assert!(out.stderr.is_empty());
+    assert!(
+        String::from_utf8(out.stdout)
+            .unwrap()
+            .contains("ap work <start|wait|close>")
+    );
 }

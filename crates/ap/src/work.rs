@@ -30,6 +30,7 @@ fn error(code: &'static str, field: &str) -> Failure {
 pub struct Reply {
     pub success: bool,
     pub bytes: Vec<u8>,
+    pub stdout: Vec<u8>,
 }
 pub type Answer = Result<Reply, Failure>;
 /// All subprocesses cross this boundary; tests supply literal replies and record calls.
@@ -130,11 +131,15 @@ fn agents(s: &mut impl System, code: &'static str, ms: u64) -> Result<Vec<Value>
 fn search(s: &mut impl System, r: &Value, kind: &str, filter: Value) -> Result<Value, Failure> {
     let mut q = json!({"object_type":kind,"where":filter,"limit":200});
     let mut found = Value::Null;
+    let mut pages = 0;
     loop {
+        require!(pages < 20 => "store_search_unbounded", kind);
+        pages += 1;
         let v = parse(ont(s, r, &["search"], &q)?, "store_answer_unreadable")?;
         if v["status"] != "ok" {
             return Err(fail("store_search_refused", kind, codes(&v)));
         }
+        require!(v["result"]["basis"]["qualified"] != false => "store_search_unqualified", kind);
         for o in v["result"]["objects"].as_array().into_iter().flatten() {
             let ambiguous = if kind == "thread" {
                 "thread_ambiguous"
@@ -176,6 +181,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         .map_err(|_| error("packet_missing", "packet"))?;
     require!(!bytes.is_empty() => "packet_missing", "packet");
     require!(!s.exists(text(r,"report")?).map_err(|_| error("io_error","report"))? => "report_exists", "report");
+    let mut worktree_head = Value::Null;
     if let Some(w) = r["worktree"].as_str() {
         let dirty = s.call(
             "git",
@@ -184,10 +190,24 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
             5_000,
         )?;
         require!(dirty.success => "io_error", "worktree");
-        require!(dirty.bytes.is_empty() || r["continue_dirty"] == true => "worktree_dirty", "worktree");
+        require!(dirty.stdout.is_empty() || r["continue_dirty"] == true => "worktree_dirty", "worktree");
         let has = |prefix: &[u8]| bytes.split(|b| *b == b'\n').any(|l| l.starts_with(prefix));
         require!(has(b"Callers searched:") && has(b"Broken tests:") => "packet_lacks_callers_or_broken_tests_line", "packet");
         require!(has(b"Controls:") => "packet_lacks_controls_line", "packet");
+        let head = s
+            .call(
+                "git",
+                &args(&["-C", w, "rev-parse", "HEAD"]),
+                &Value::Null,
+                5_000,
+            )
+            .map_err(|_| error("io_error", "worktree"))?;
+        require!(head.success => "io_error", "worktree");
+        worktree_head = json!(
+            std::str::from_utf8(&head.stdout)
+                .map_err(|_| error("io_error", "worktree"))?
+                .trim_end()
+        );
     }
     let task_key = Path::new(text(r, "task_dir")?)
         .file_name()
@@ -279,9 +299,9 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
             json!({"request_id":request,"tab":tab,"pane":pane}),
         ));
     };
-    let prompt = herdr!(s, 30_000; "agent", "prompt", name, &format!("Read the file {packet} and do exactly what it says."), "--wait", "--until", "working", "--until", "blocked", "--timeout", "30000");
+    let prompt = herdr!(s, 30_000; "agent", "prompt", pane, &format!("Read the file {packet} and do exactly what it says."), "--wait", "--until", "working", "--until", "blocked", "--timeout", "30000");
     Ok(
-        json!({"status":"started","run":run,"session":session,"pane":pane,"tab":tab,"prompt":if prompt.is_ok_and(|a| a.success) {"sent"} else {"uncertain"}}),
+        json!({"status":"started","run":run,"session":session,"pane":pane,"tab":tab,"prompt_target":pane,"worktree_head":worktree_head,"prompt":if prompt.is_ok_and(|a| a.success) {"sent"} else {"uncertain"}}),
     )
 }
 fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
@@ -320,16 +340,24 @@ fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
 }
 fn wait(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let name = text(r, "name")?;
+    let target = r["pane"].as_str().unwrap_or(name);
     let ms = r["timeout_seconds"]
         .as_u64()
         .and_then(|n| n.checked_mul(1000))
         .ok_or_else(|| fail("invalid_input", "timeout_seconds", Value::Null))?;
-    let reply = herdr!(s, ms; "agent","wait",name,"--until","idle","--until","done","--until","blocked","--timeout",&ms.to_string());
+    let reply = herdr!(s, ms; "agent","wait",target,"--until","idle","--until","done","--until","blocked","--timeout",&ms.to_string());
     let status = match reply.and_then(|a| parse(a, "herdr_answer_unreadable")) {
-        Ok(v) => v["result"]["event"]["data"]["agent_status"].clone(),
+        Ok(v) => v
+            .pointer("/result/agent/agent_status")
+            .or_else(|| v.pointer("/result/event/data/agent_status"))
+            .cloned()
+            .unwrap_or(Value::Null),
         Err(_) => Value::Null,
     };
     match s.read(text(r, "report")?) {
+        Ok(bytes) if bytes.is_empty() => {
+            Ok(json!({"status":"report_missing","agent_status":status}))
+        }
         Ok(bytes) => Ok(
             json!({"status":"report_present","sha256":digest(&bytes),"bytes":bytes.len(),"agent_status":status}),
         ),
@@ -463,7 +491,8 @@ impl System for Host {
         }
         Ok(Reply {
             success: status.success(),
-            bytes: if out.is_empty() { err } else { out },
+            bytes: if out.is_empty() { err } else { out.clone() },
+            stdout: out,
         })
     }
 }
