@@ -17,6 +17,7 @@ Labels classify server claims; steps are caller obligations. Read [evidence and 
 1. **measured** — POST B/memories accepts `items`, `async:true`, `operation_id`; known UUIDs ignore changed bytes. UUIDv8 worked; new ids create new operations even for identical text (U3). **Caller obligation:** bind id to payload hash and reject mismatches locally; the server does not enforce this.
 2. **measured** — Poll parent/children; GET B/documents/{id}, compare original_text/hash; exhaust B/memories/list?document_id={id} for facts/tags. LF/CRLF/spacing survived.
 3. **measured** — Save prior GET; retain same document_id with `update_mode:"replace"`/new bound id; read document/all facts: old facts/tags removed here. PATCH B/documents/{id} tags replaces the set; read document/fact tags, duplicates included. Old text can remain in derived pages/models/search after replace until refresh or model deletion (U10); read each before claiming the change.
+4. **Caller obligation:** before ready, check authored retrieval terms against extracted facts/entities using the [MEASURE-H readback requirements](references/measured-20261112.md#ancestor-tags-extraction-shape-and-readable-profile-measured-on-api-120).
 
 ## Delete and retract (U5/U7/U15/F1)
 
