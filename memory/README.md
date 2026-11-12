@@ -9,7 +9,7 @@ Checks neither authorize effects nor adopt proposed rules.
 `records/<record_id>.md` is UTF-8 without BOM: first line `---`, a JSON object,
 a line `---`, then Markdown. Split on line feed only; no carriage returns anywhere.
 Use unique JSON keys and exactly these fields:
-`schema_version` (integer 1), `record_id`, `kind`, `title`, `subject`, `scope`,
+`schema_version` (integer 2 for current records; 1 only for legacy/migration input), `record_id`, `kind`, `title`, `subject`, `scope`,
 `owner_ref`, `sources`. `title` and `scope` are nonempty strings.
 `record_id` matches the filename: lowercase ASCII letters/digits separated by
 single hyphens; keep it stable through edits and topic renames.
@@ -22,7 +22,29 @@ or `"none"`. Only `none` requires/allows the nonempty string `owner_ref_reason`;
 a cross-task rationale without a store decision uses reason `spans tasks`.
 `sources` is a nonempty array of exactly `{ "date": "YYYY-MM-DD", "locator": "..." }`
 objects; each date is a real calendar date and each locator a nonempty string.
+Schema 2 also requires `abstract` (nonempty), `horizon` (`mid-term` or `long-term`),
+`review_on` (real ISO date), `recall_terms`, `derived_from`, and `codified_in`.
+`recall_terms` has 1..8 distinct nonempty literal strings. The complete original
+must fit in 4,096 UTF-8 bytes. The publisher must later verify each term in an
+extracted fact or its entities; this byte limit is no token/semantic guarantee.
+`derived_from` entries contain exactly `record_id` and nonempty `evidence_ref`;
+targets must exist locally, without cycles or upward abstraction links.
+Incidents have none; lessons require incidents; patterns require at least two
+distinct incident chains through incidents/lessons. A Lead with a reviewer checks
+actual independence. Proposals target patterns, lessons or incidents; without a
+pattern target, Supporting records must contain `Critical exception: <text>` at
+the start of a line. Only presence is checked, never justification.
+Profiles/glossary have no abstraction levels. `codified_in` entries have exactly
+nonempty `repository`, `path`, `commit` (40 hex digits), `anchor`; these link to a
+rule rather than repeat it. No reverse relation store is maintained.
 No status, manual revision counter or supersession field belongs in the file.
+
+One original explains one assertion/mechanism in English, naming its subject,
+condition and distinguishing identifiers; keep Korean proper nouns beside English
+aliases. Source admission pins repository commit/path or evidence hash and excludes
+private lesson bodies. A syntax checker cannot establish truth or detect every
+private name. Initial review intervals <=30/180 days for mid/long-term are curator
+policy. Overdue means review is due, not automatic invalidity or expiry.
 
 ## Kinds and required body sections
 Each required section is a unique, nonempty second-level heading (`## Name`).
@@ -45,13 +67,55 @@ same original; distinct successors link through the store.
 The task's Lead writes and commits its records in the task's closure pull request.
 Independent review of a record is required only for `direction-proposal`.
 The file is the original; the server holds a retrieval copy written only from a
-commit on `main`. Use record_id as document_id and hash the exact UTF-8 file bytes
-outside the file. Status lives only in the store; pending hides unfinished work.
+commit on `main`. Use record_id as document_id. Schema 1 requires explicit source
+conversion before publication. Publication bytes remove ONLY `review_on`, emit
+`title`, `subject`, `abstract` first, then remaining header keys sorted; nested
+object keys are sorted, arrays retain order. Use compact JSON, `ensure_ascii=false`,
+UTF-8 and `---\n<JSON>\n---\n<body>` with unchanged body bytes. SHA-256 hashes those
+projected bytes outside the original. A review_on-only edit changes no retrieval
+bytes/tags; every other record/subject/tag change needs the next maintenance window.
+Status stays in its owning store; rebuilds make engineering retrieval unavailable.
 No real work record is written yet: select the first records only after the
 held-out questions are sealed under design section 10. This packet adds none.
+
+## Subjects and tags
+`subjects.json` is the sole vocabulary: exactly `schema_version:1` and `nodes`.
+Each node has `type`, `id`, `parent` (null or `{type,id}`), nonempty `display_name`,
+and distinct literal string `aliases`. Only memory-map:engineering is root;
+maximum depth is four edges. platform/host/user attach to root; module to platform;
+procedure to platform/module/host; task to root/platform/module/procedure/host;
+term to root/platform/module/procedure. Reject duplicate nodes, unknown parents,
+cycles, disconnected nodes, invalid parent types and unknown record subjects.
+Subject ids use `[a-z0-9][a-z0-9._-]{0,127}`, never paths. Keep ids through rename
+or reparent; user nodes imply no people hierarchy. Only the root is populated yet.
+Tags are ordered: `subject:<type>:<id>`, `within:<type>:<id>` from self through root,
+`kind:<kind>`, `horizon:<value>`. No authored status/parent/tag lists. Reparenting
+requires a full rebuild before retrieval. Exact recall uses subject; explicit
+descendants uses within, with `tags_match:"all_strict"` and optional literal
+horizon tag; default includes both horizons. No wildcard or prefix inference.
 
 ## Check
 `python3 -I -B ci/check-memory-records.py` checks every file under `memory/records/`.
 An absent/empty record directory passes with zero files; keep fixtures only under
 `ci/fixtures/memory-records/`. It is a syntax/shape check, not a factual judge.
 `python3 -I -B -m unittest discover -s ci -p test_check_memory_records.py` runs tests.
+
+Default checking requires schema 2 and loads `memory/subjects.json`; an explicit
+positional directory is legacy/migration input (schema 1 accepted). `--subjects PATH`
+selects a vocabulary; schema 2 always needs one. `--commit C` reads pinned Git blobs
+and vocabulary, using the same validator, never working file bytes. Commit paths
+are repository-relative; symlink/nonregular/nested originals are rejected.
+Success is `memory records: <count> files, 0 errors`; failure is one
+`<code>@<path>: <cause>` line per error, exit 1, without record bodies.
+`--due YYYY-MM-DD` instead emits a JSON array sorted by record_id containing
+`{"horizon":"...","record_id":"...","review_on":"..."}` for dates <= the input.
+`--tree` emits a JSON array sorted by (type,id), containing vocabulary nodes plus
+`depth`, only for schema-2 records and their ancestors. Empty views emit `[]`.
+Both views validate the full input first, are mutually exclusive, and store nothing.
+Python helpers for later packets: `load(root, subjects, commit, publication)` returns
+`(count, records, nodes, errors)`, with no records returned on failure; `records`
+maps record_id to `header`, exact `body` bytes, parsed `sections`, `path`.
+`publication_bytes(record)` refuses schema 1; `publication_hash(record)` returns
+64 lowercase SHA-256 hex characters. `derived_tags(header,nodes)` returns the ordered
+list; `recall_tags(subject,descendants=False,horizon=None)` returns tags/all_strict.
+Use helpers only after successful validation; no publisher or service is added here.
