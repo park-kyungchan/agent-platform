@@ -6,6 +6,7 @@ use serde::Serialize;
 
 const INPUT_LIMIT: u64 = 1_048_576;
 const HELP: &str = "Usage: ap render < request.json\nPure JSON proposal on stdout; no file access or installation.\n";
+const WORK_HELP: &str = "Usage: ap work <start|wait|close> < request.json\nOne JSON request; admission through ont and lifecycle through herdr.\n";
 const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
     Some(value) => value,
     None => "unknown",
@@ -44,6 +45,15 @@ fn main() -> ExitCode {
         } else {
             fail("io_error", "stdout", 4)
         };
+    }
+    if args.first().is_some_and(|arg| arg == "work") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout().lock().write_all(WORK_HELP.as_bytes()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::work::cli(&args[1..]);
     }
     #[cfg(target_os = "linux")]
     if args.first().is_some_and(|arg| arg == "pane") {
