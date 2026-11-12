@@ -78,6 +78,13 @@ fn file_id(kind: &str, path: &str) -> Result<Value, Failure> {
 fn parse(reply: Reply, code: &'static str) -> Result<Value, Failure> {
     serde_json::from_slice(&reply.bytes).map_err(|_| error(code, "answer"))
 }
+fn acknowledged(reply: Answer) -> bool {
+    reply.is_ok_and(|r| {
+        r.success
+            && serde_json::from_slice::<Value>(&r.stdout)
+                .is_ok_and(|v| v.is_object() && v["result"].is_object() && v.get("error").is_none())
+    })
+}
 fn codes(v: &Value) -> Value {
     let mut found: Vec<String> = v["result"]["criteria"]
         .as_array()
@@ -139,7 +146,7 @@ fn search(s: &mut impl System, r: &Value, kind: &str, filter: Value) -> Result<V
         if v["status"] != "ok" {
             return Err(fail("store_search_refused", kind, codes(&v)));
         }
-        require!(v["result"]["basis"]["qualified"] != false => "store_search_unqualified", kind);
+        require!(v["result"]["basis"]["qualified"] == true => "store_search_unqualified", kind);
         for o in v["result"]["objects"].as_array().into_iter().flatten() {
             let ambiguous = if kind == "thread" {
                 "thread_ambiguous"
@@ -167,11 +174,11 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         .as_str()
         .ok_or_else(|| error("invalid_input", "name"))?;
     if name.is_empty()
-        || name.len() > 40
+        || name.len() > 32
         || !name
             .bytes()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
-        || name.starts_with('-')
+        || !name.as_bytes()[0].is_ascii_lowercase()
     {
         return Err(error("name_invalid", "name"));
     }
@@ -245,7 +252,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         .ok_or_else(|| error("tab_create_failed", "pane"))?;
     let context = json!({"tab":tab,"pane":pane});
     let launch = herdr!(s, 90_000; "agent", "start", name, "--kind", "codex", "--pane", pane, "--timeout", "90000", "--", "--no-daemon", "-C", cwd, "-m", text(r,"model")?, "-c", &format!("model_reasoning_effort={}",text(r,"effort")?), "--dangerously-bypass-approvals-and-sandbox");
-    if !launch.is_ok_and(|a| a.success) {
+    if !acknowledged(launch) {
         return Err(fail("agent_start_failed", "agent", context));
     }
     let deadline = s.now() + Duration::from_secs(60);
@@ -259,10 +266,17 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         if s.now() >= deadline {
             return Err(fail("session_not_reported", "session", context));
         }
-        if let Some(a) = list.iter().find(|a| a["name"] == name)
+        if list
+            .iter()
+            .any(|a| a["name"] == name && a["pane_id"] != pane)
+        {
+            return Err(fail("agent_identity_conflict", "session", context));
+        }
+        if let Some(a) = list
+            .iter()
+            .find(|a| a["name"] == name && a["pane_id"] == pane)
             && let Some(sid) = a["agent_session"]["value"]
                 .as_str()
-                .or_else(|| a["agent_session"].as_str())
                 .filter(|s| !s.is_empty())
         {
             break sid.to_owned();
@@ -276,7 +290,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         .and_then(|a| parse(a, "store_start_uncertain"));
     let applied = match applied {
         Ok(v) if refused(&v) => {
-            let closed = herdr!(s, 5_000; "tab", "close", tab).is_ok_and(|a| a.success);
+            let closed = acknowledged(herdr!(s, 5_000; "tab", "close", tab));
             let mut detail = codes(&v);
             detail["tab_closed"] = json!(closed);
             detail["tab"] = json!(tab);
@@ -299,9 +313,9 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
             json!({"request_id":request,"tab":tab,"pane":pane}),
         ));
     };
-    let prompt = herdr!(s, 30_000; "agent", "prompt", pane, &format!("Read the file {packet} and do exactly what it says."), "--wait", "--until", "working", "--until", "blocked", "--timeout", "30000");
+    let prompt = herdr!(s, 30_000; "agent", "prompt", pane, &format!("Read the file {packet} and do exactly what it says. Never open a question dialog and never wait for an answer: a point that only the Lead can decide goes into your report, and you continue with every step that does not depend on it."), "--wait", "--until", "working", "--until", "blocked", "--timeout", "30000");
     Ok(
-        json!({"status":"started","run":run,"session":session,"pane":pane,"tab":tab,"prompt_target":pane,"worktree_head":worktree_head,"prompt":if prompt.is_ok_and(|a| a.success) {"sent"} else {"uncertain"}}),
+        json!({"status":"started","run":run,"session":session,"pane":pane,"tab":tab,"prompt_target":pane,"worktree_head":worktree_head,"prompt":if acknowledged(prompt) {"sent"} else {"uncertain"}}),
     )
 }
 fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
@@ -311,14 +325,20 @@ fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         herdr!(s, 5_000; "tab", "get", tab).map_err(|_| error("herdr_answer_unreadable", "tab"))?;
     require!(reply.success => "herdr_answer_unreadable", "tab");
     let v = parse(reply, "herdr_answer_unreadable")?;
-    require!(v["result"]["tab"]["label"] == name => "tab_not_owned", "tab");
+    require!(v["result"]["tab"]["label"] == name && v["result"]["tab"]["pane_count"] == 1 => "tab_not_owned", "tab");
     let list = agents(s, "agent_status_unreadable", 5_000)?;
+    if r["agent_gone"] == true {
+        require!(!list.iter().any(|a| a["name"] == name || a["tab_id"] == tab) => "tab_not_owned", "tab");
+    }
     match list.iter().find(|a| a["name"] == name) {
-        Some(a) => match a["agent_status"].as_str() {
-            Some("idle" | "done" | "blocked") => (),
-            Some("working") => return Err(error("agent_still_working", "name")),
-            _ => return Err(error("agent_status_unknown", "name")),
-        },
+        Some(a) => {
+            require!(a["tab_id"] == tab && a["agent_session"]["value"] == r["session"] => "tab_not_owned", "tab");
+            match a["agent_status"].as_str() {
+                Some("idle" | "done" | "blocked") => (),
+                Some("working") => return Err(error("agent_still_working", "name")),
+                _ => return Err(error("agent_status_unknown", "name")),
+            }
+        }
         None if r["agent_gone"] == true => (),
         None => return Err(error("agent_not_listed", "name")),
     }
@@ -335,11 +355,14 @@ fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         return Err(fail("store_close_refused", "apply", codes(&v)));
     }
     require!(v["status"] == "ok" => "store_close_uncertain", "apply");
-    let closed = herdr!(s, 5_000; "tab","close",tab).is_ok_and(|a| a.success);
+    let closed = acknowledged(herdr!(s, 5_000; "tab","close",tab));
     Ok(json!({"status":"closed","outcome":v["result"]["outcome"],"tab_closed":closed}))
 }
 fn wait(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let name = text(r, "name")?;
+    if let Some(pane) = r.get("pane") {
+        require!(pane.is_string() => "invalid_input", "pane");
+    }
     let target = r["pane"].as_str().unwrap_or(name);
     let ms = r["timeout_seconds"]
         .as_u64()
@@ -390,7 +413,7 @@ pub fn execute(s: &mut impl System, verb: &str, r: &Value) -> Result<(Value, u8)
     let required = match verb {
         "start" => "packet report task_dir thread tier layer cwd workspace model effort",
         "wait" => "name report",
-        "close" => "name tab result",
+        "close" => "name tab result session",
         _ => return Err(fail("usage", "args", Value::Null)),
     };
     for key in required.split_whitespace() {
