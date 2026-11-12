@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ap", "crates/kpi-producer"]
+members = ["crates/ap", "crates/kpi-producer", "crates/ap-mem-adapter"]
 resolver = "3"
 
 [workspace.package]
