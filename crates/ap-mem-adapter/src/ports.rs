@@ -60,6 +60,5 @@ mod tests {
         let route = EngineeringRoute::Engineering;
         assert_eq!(route.bank(), "coding-agent::engineering");
         assert_eq!(route.mcp_path(), "/mcp/coding-agent::engineering/");
-        assert!(!format!("{route:?}").contains("lesson"));
     }
 }

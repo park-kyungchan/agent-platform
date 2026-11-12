@@ -36,8 +36,37 @@ fn mcp_read_only() {
             "mem_document_read"
         ]
     );
-    for name in ["publish", "mem_publish", "retain", "delete", "reflect"] {
-        assert_eq!(parse_call(name, json!({})), Err("unknown_tool"));
+    // Enumerate every literal in the closed dispatch, including a future arm.
+    // Classification uses unknown_tool so argument errors do not hide a name.
+    let source = include_str!("../src/catalog.rs")
+        .split("pub fn parse_call")
+        .nth(1)
+        .unwrap();
+    let candidates: std::collections::BTreeSet<_> = source.split('"').skip(1).step_by(2).collect();
+    let accepted: std::collections::BTreeSet<_> = candidates
+        .into_iter()
+        .filter(|name| parse_call(name, json!({})) != Err("unknown_tool"))
+        .collect();
+    assert_eq!(accepted, names.iter().copied().collect());
+    for name in names {
+        let args = match name {
+            "mem_recall" | "mem_page_search" => {
+                json!({"subject":{"type":"task","id":"x"},"query":"q"})
+            }
+            "mem_page_read" => json!({"page_id":"page-x"}),
+            "mem_document_read" => json!({"record_id":"record-x"}),
+            "mem_tree_read" => json!({}),
+            _ => panic!("unexpected catalog name"),
+        };
+        assert!(parse_call(name, args).is_ok());
+        for other in [
+            format!("{name}_write"),
+            format!("x{name}"),
+            name.to_uppercase(),
+            String::new(),
+        ] {
+            assert_eq!(parse_call(&other, json!({})), Err("unknown_tool"));
+        }
     }
 }
 

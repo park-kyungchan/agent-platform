@@ -102,32 +102,26 @@ mod tests {
 
     #[test]
     fn closed_types() {
-        for name in [
-            "platform",
-            "module",
-            "host",
-            "task",
-            "procedure",
-            "user",
-            "term",
-            "memory-map",
-        ] {
-            assert!(serde_json::from_value::<SubjectType>(json!(name)).is_ok());
+        // Exhaustive matches make an added enum variant a compile failure here.
+        macro_rules! exact_enum {
+            ($ty:ident, {$($variant:ident => $name:literal),+ $(,)?}) => {{
+                let values = [$($ty::$variant),+];
+                assert_eq!(serde_json::to_value(values).unwrap(), json!([$($name),+]));
+                for value in values {
+                    let name = match value { $($ty::$variant => $name),+ };
+                    assert_eq!(serde_json::from_value::<$ty>(json!(name)).unwrap(), value);
+                }
+            }};
         }
-        for name in [
-            "rationale",
-            "incident",
-            "lesson",
-            "pattern",
-            "direction-proposal",
-            "user-profile",
-            "glossary",
-        ] {
-            assert!(serde_json::from_value::<RecordKind>(json!(name)).is_ok());
-        }
-        for name in ["pending", "ready", "superseded"] {
-            assert!(serde_json::from_value::<RecordStatus>(json!(name)).is_ok());
-        }
+        exact_enum!(SubjectType, {
+            Platform => "platform", Module => "module", Host => "host", Task => "task",
+            Procedure => "procedure", User => "user", Term => "term", MemoryMap => "memory-map"
+        });
+        exact_enum!(RecordKind, {
+            Rationale => "rationale", Incident => "incident", Lesson => "lesson", Pattern => "pattern",
+            DirectionProposal => "direction-proposal", UserProfile => "user-profile", Glossary => "glossary"
+        });
+        exact_enum!(RecordStatus, { Pending => "pending", Ready => "ready", Superseded => "superseded" });
         assert!(serde_json::from_value::<SubjectType>(json!("class")).is_err());
         assert!(serde_json::from_value::<RecordKind>(json!("status")).is_err());
         assert!(serde_json::from_value::<RecordStatus>(json!("withdrawn")).is_err());
