@@ -42,6 +42,10 @@ fn whole_hostile_default() {
     assert_eq!(
         Behaviour::default(),
         Behaviour {
+            recall_current: false,
+            search_current: false,
+            foreign_provenance: true,
+            malformed_reads: true,
             require_initialize: true,
             root_routes: false,
             reject_unknown: true,
@@ -89,6 +93,11 @@ macro_rules! contrasts {
     }
 }
 contrasts! {
+    recall_current, "READY_ONLY", "NEW", |s: &Server| {let id=retain(s,"NEW");s.edit(|m|m.finish(&id,true));s.mcp("recall",json!({}))["facts"][0]["text"].clone()};
+    search_current, "ENGINEERING_OLD_SYNTHETIC", "NEW_PAGE", |s: &Server| {let p=page(s);s.edit(|m|m.behaviour.refresh_keeps_old=false);let job=refresh(s,&p);s.edit(|m|m.finish_refresh(&job,true));s.mcp("search_knowledge_base",json!({}))["pages"][0]["snippet"].clone()};
+    foreign_provenance, "eng-a", "TEST_FOREIGN_SOURCE", |s: &Server| {s.request("GET","/__test__/facts",json!({})).unwrap().body[0]["document_ids"][0].clone()};
+    malformed_reads, false, true, |s: &Server| {json!(s.request("GET","/__test__/facts",json!({})).is_err())};
+
 require_initialize, 200, 409, |s: &Server| json!(
     s.request("POST", MCP_PATH, json!({"id":1,"method":"tools/list"}))
         .unwrap()

@@ -32,18 +32,22 @@ pub enum MutationFault {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Behaviour {
-    pub require_initialize: bool,   // U1: default true; bare MCP is refused.
-    pub root_routes: bool,          // U1: default false; unverified root HTTP routes unavailable.
-    pub reject_unknown: bool,       // U1/U2: default true; unknown routes/tools refused.
-    pub validate_shape: bool,       // U4/U6/U12/U13: default false; malformed input accepted.
-    pub provenance: bool,           // U2: default false; no complete document_ids attribution.
-    pub complete_reads: bool,       // U8: default false; partial body/list responses.
+    pub recall_current: bool, // U10: default false; recall index stays at old snapshot.
+    pub search_current: bool, // U10: default false; page-search index stays at old snapshot.
+    pub foreign_provenance: bool, // U2/U4: default true; attributed ids are foreign.
+    pub malformed_reads: bool, // U1/U2/U8: default true; read response bytes are invalid JSON.
+    pub require_initialize: bool, // U1: default true; bare MCP is refused.
+    pub root_routes: bool,    // U1: default false; unverified root HTTP routes unavailable.
+    pub reject_unknown: bool, // U1/U2: default true; unknown routes/tools refused.
+    pub validate_shape: bool, // U4/U6/U12/U13: default false; malformed input accepted.
+    pub provenance: bool,     // U2: default false; no complete document_ids attribution.
+    pub complete_reads: bool, // U8: default false; partial body/list responses.
     pub honor_retrieval_args: bool, // U2/U8: default false; recall/search ignore selectors.
-    pub config_resolved: bool,      // U11: default false; config omits resolved values.
+    pub config_resolved: bool, // U11: default false; config omits resolved values.
     pub observable_operations: bool, // U3/U14: default false; jobs cannot be inspected.
-    pub absent_read_404: bool,      // U4/U7: default true; absent reads fail.
-    pub deduplicate: bool,          // U3: default false; resend creates another opaque operation.
-    pub reject_mismatch: bool,      // U3: default false. With dedup on, changed bytes are
+    pub absent_read_404: bool, // U4/U7: default true; absent reads fail.
+    pub deduplicate: bool,    // U3: default false; resend creates another opaque operation.
+    pub reject_mismatch: bool, // U3: default false. With dedup on, changed bytes are
     // silently IGNORED unless restart_mismatch is selected: stale intent is acknowledged,
     // the least favourable outcome for a publisher expecting its new bytes to apply.
     pub restart_mismatch: bool, // U3/U14: default false; finished work never restarts implicitly.
@@ -67,6 +71,10 @@ pub struct Behaviour {
 impl Default for Behaviour {
     fn default() -> Self {
         Self {
+            recall_current: false,
+            search_current: false,
+            foreign_provenance: true,
+            malformed_reads: true,
             require_initialize: true,
             root_routes: false,
             reject_unknown: true,
@@ -244,18 +252,20 @@ impl Model {
         }
     }
     fn view(&self, mut value: Value) -> Value {
-        fn strip(value: &mut Value, provenance: bool, complete: bool) {
+        fn strip(value: &mut Value, provenance: bool, complete: bool, foreign: bool) {
             match value {
                 Value::Object(map) => {
                     if !provenance {
                         map.remove("document_ids");
+                    } else if foreign && map.contains_key("document_ids") {
+                        map.insert("document_ids".into(), json!(["TEST_FOREIGN_SOURCE"]));
                     }
                     if !complete {
                         map.remove("body");
                         map.insert("test_partial".into(), json!(true));
                     }
                     for v in map.values_mut() {
-                        strip(v, provenance, complete);
+                        strip(v, provenance, complete, foreign);
                     }
                 }
                 Value::Array(items) => {
@@ -263,7 +273,7 @@ impl Model {
                         items.truncate(1);
                     }
                     for v in items {
-                        strip(v, provenance, complete);
+                        strip(v, provenance, complete, foreign);
                     }
                 }
                 _ => {}
@@ -273,6 +283,7 @@ impl Model {
             &mut value,
             self.behaviour.provenance,
             self.behaviour.complete_reads,
+            self.behaviour.foreign_provenance,
         );
         value
     }
@@ -309,11 +320,13 @@ impl Server {
                         stream
                             .set_write_timeout(Some(Duration::from_secs(1)))
                             .unwrap();
-                        let (reply, disconnect) = match read_request(&mut stream) {
+                        let (reply, disconnect, malformed) = match read_request(&mut stream) {
                             Ok(request) => {
                                 let mut model = data.lock().unwrap();
+                                let malformed =
+                                    model.behaviour.malformed_reads && is_read(&request);
                                 let reply = route(&mut model, request);
-                                (reply, std::mem::take(&mut model.disconnect))
+                                (reply, std::mem::take(&mut model.disconnect), malformed)
                             }
                             Err(_) => (
                                 Reply {
@@ -321,10 +334,11 @@ impl Server {
                                     body: json!({"error":"test_bad_request"}),
                                 },
                                 false,
+                                false,
                             ),
                         };
                         if !disconnect {
-                            let _ = write_reply(&mut stream, reply);
+                            let _ = write_reply(&mut stream, reply, malformed);
                         }
                     }
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -463,8 +477,12 @@ fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
     })
 }
 
-fn write_reply(stream: &mut TcpStream, reply: Reply) -> io::Result<()> {
-    let body = serde_json::to_vec(&reply.body)?;
+fn write_reply(stream: &mut TcpStream, reply: Reply, malformed: bool) -> io::Result<()> {
+    let body = if malformed {
+        b"{".to_vec()
+    } else {
+        serde_json::to_vec(&reply.body)?
+    };
     write!(
         stream,
         "HTTP/1.1 {} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -494,8 +512,29 @@ fn read_reply(model: &Model, value: Value) -> Reply {
         body: model.view(value),
     }
 }
+fn is_read(request: &Request) -> bool {
+    request.method == "GET"
+        || (request.method == "POST"
+            && request.path == MCP_PATH
+            && matches!(
+                request.body["method"].as_str(),
+                Some("tools/call" | "tools/list")
+            ))
+}
 fn route(model: &mut Model, request: Request) -> Reply {
     model.requests.push(request.clone());
+    if is_read(&request) {
+        match model.behaviour.fault.take() {
+            Some(MutationFault::BeforeAccept) => {
+                return Reply {
+                    status: 503,
+                    body: Value::Null,
+                };
+            }
+            Some(MutationFault::LostAck) => model.disconnect = true,
+            None => {}
+        }
+    }
     if request.method == "GET" {
         if request.path == "/config" {
             return if model.behaviour.root_routes {
@@ -594,7 +633,16 @@ fn route(model: &mut Model, request: Request) -> Reply {
                     json!({"folders":model.folders,"pages":pages})
                 }
                 _ => {
-                    let Some(mut response) = model.fixture["responses"].get(name).cloned() else {
+                    let selected = match name {
+                        "recall" if model.behaviour.recall_current => {
+                            Some(json!({"facts":model.fixture["facts"]}))
+                        }
+                        "search_knowledge_base" if model.behaviour.search_current => Some(
+                            json!({"pages":model.pages.iter().map(|(id,p)|json!({"page_id":id,"snippet":p["body"],"document_ids":p["document_ids"]})).collect::<Vec<_>>()}),
+                        ),
+                        _ => model.fixture["responses"].get(name).cloned(),
+                    };
+                    let Some(mut response) = selected else {
                         return if model.behaviour.reject_unknown {
                             Reply {
                                 status: 200,

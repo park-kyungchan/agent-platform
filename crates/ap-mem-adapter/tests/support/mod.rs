@@ -8,6 +8,8 @@ pub fn fixture_server(fixture: serde_json::Value) -> upstream::Server {
     assert!(server.address().ip().is_loopback());
     server.edit(|m| {
         m.behaviour.fault = None;
+        m.behaviour.foreign_provenance = false;
+        m.behaviour.malformed_reads = false;
         m.behaviour.require_initialize = false;
         m.behaviour.root_routes = true;
         m.behaviour.provenance = true;

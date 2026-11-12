@@ -1,0 +1,10 @@
+{
+  "old":"G4_OLD_CANARY",
+  "new":"G4_NEW_CANARY",
+  "empty":"G4_EMPTY_SUBJECT",
+  "facts":[{"text":"G4_OLD_CANARY","document_ids":["eng-a"]},{"text":"G4_PEER_CANARY","document_ids":["eng-b"]}],
+  "page":{"test_id":"fixture-page-intent","body":"G4_OLD_CANARY","document_ids":["eng-a"]},
+  "retain":{"test_operation_id":"fixture-retain-intent","document":{"document_id":"eng-a","body":"G4_NEW_CANARY","tags":["subject:task:fixture"]},"async":true,"update_mode":"replace"},
+  "target":{"body":"G4_NEW_CANARY","document_ids":["eng-a"]},
+  "withdrawn":{"body":"G4_EMPTY_SUBJECT","document_ids":[]}
+}
