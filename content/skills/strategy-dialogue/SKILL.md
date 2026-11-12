@@ -15,7 +15,7 @@ The user knows only part of what the task needs and says it in short natural lan
 - The user steers by feedback: a correction, a preference, a stop. Each one changes a small part (section 6). A correction or a stop overrides every earlier decision, including the Lead's own.
 - Only the user can supply two things: a fact that no source on this host shows (how they work, what they rely on, what they want next), and an action bound to their person (a login, a payment).
 - The Lead does not wait. Without an answer it continues on the interpretation it stated, with work that can be undone.
-- An action that cannot be undone and reaches outside the task is the Lead's decision too: a deletion, a message another person receives, a public release. Do not wait for a yes. `/root/.agents/AGENTS.md` section 4 Effects still limits it: a retained original is deleted only after its recovery copy is verified and every live consumer of the path is checked; where no copy exists, make one first, and where a live consumer exists, hold the deletion and write the hold in STATE. Before the action, record what will happen and what cannot be undone where section 7 says; report it in the next progress message.
+- An action that cannot be undone and reaches outside the task is the Lead's decision too: a deletion, a message another person receives, a public release. Do not wait for a yes. `/root/.agents/AGENTS.md` section 4 Effects still limits it: recovery copy verified and live consumers checked first; where a live consumer exists, hold the deletion and write the hold in STATE. Before the action, record what will happen and what cannot be undone where section 7 says; report it in the next progress message.
 - Everything the Lead decides stays inside the holds STATE states, the safety rules of `/root/.agents/AGENTS.md` section 4 and the privacy limits of its section 5.
 
 ## 2. Hearing: from the user's words to a working intent
@@ -26,7 +26,7 @@ For every message, in this order:
 2. Connect the message to the objective and the open work threads. Add what the objective needs and the message did not say.
 3. Say your interpretation in the first sentence, naming the exact thing (file, repository, command, value), so the user can correct it with one word.
 4. Proceed. Ask only when two readings lead to different effects and no source decides between them; then give both readings and the one you take if no answer comes.
-5. Write the glossary's terms into STATE and packets, never the user's wording. Record a new expression in STATE under "Words the user used" with what it resolved to.
+5. Record a new expression of the user in STATE under "Words the user used" with what it resolved to.
 
 | The message is | Do |
 | --- | --- |
@@ -41,7 +41,7 @@ For every message, in this order:
 
 Once per task, and again when the objective changes, write the brief: Objective, Diagnosis, KPI with baseline and target, Guardrails, Domain. When STATE names the Ontology store's `kpi` objects in use, the brief's KPI line names that object and does not copy its target or value. It is the Lead's record of its own interpretation, kept in the task's STATE or `STRATEGY.md`; the user is shown it and corrects what is wrong, but work does not wait for a confirmation. Template: `references/strategy-brief.md`.
 
-Terms and the steps from a wish to a KPI: `references/measurement.md`. In short: write the objective as a checkable sentence; derive at most three KPIs that measure the outcome, not the output; measure the baseline before changing anything, or write "unmeasured" and measure first; set the target yourself with a reason; give each KPI a guardrail.
+Terms and the steps from a wish to a KPI: `references/measurement.md`. In short: write the objective as a checkable sentence; derive at most three KPIs that measure the outcome, not the output: at least one counts the objective's result in use by its user, and a count of the task's own artifacts (documents, boards, lists of ported parts) is a guardrail, not a KPI; measure the baseline before changing anything, or write "unmeasured" and measure first; set the target yourself with a reason; give each KPI a guardrail.
 
 Where a real choice of route exists, compare two or three options by their predicted effect on the KPIs and guardrails, their risk and how each is undone. Choose one, say which and why, and proceed.
 
@@ -91,9 +91,9 @@ In STATE:
 In the board or STATE:
 
 - The brief and the KPI definitions with their current values.
-- Work threads: priority, owner, the KPI or guardrail each serves, status, next action; at most five in progress unless the user says otherwise.
-- Decisions: the Lead's with reason and undo route; the user's in their words; the latest per topic, with what it supersedes.
-- Irreversible outward actions taken, with what cannot be undone; reminders the Lead owes the user and the condition that triggers each.
-- Counts of observed events: corrections of the Lead's interpretation, questions the Lead asked, requests to explain again. Questions that a measurement could have answered should be zero.
+- Work threads: priority, owner, the user and first use of each, the KPI or guardrail it serves, status, next action; at most five in progress.
+- Decisions: the Lead's with reason and undo route; the user's in their words, and a question of the user is not recorded as a decision of the user; the latest per topic.
+- Irreversible outward actions taken; reminders owed to the user with the condition that triggers each.
+- Counts of corrections of the Lead's interpretation, questions the Lead asked and requests to explain again.
 
-Record formats: `references/strategy-brief.md`. What goes to long-term memory and in which format: `/root/.agents/skills/lessons-loop/references/record-schema.md`. KPI values and STATE never go there.
+Record formats: `references/strategy-brief.md`. What goes to long-term memory and in which format: `/root/.agents/skills/lessons-loop/references/record-schema.md`.
