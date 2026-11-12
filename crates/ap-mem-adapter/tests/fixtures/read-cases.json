@@ -1,6 +1,8 @@
 {
   "tool_names": ["recall", "search_knowledge_base", "get_knowledge_page", "get_knowledge_base_tree", "get_document", "retain_pollution"],
   "documents": {
+    "wrong-id": {"document_id":"different-id","body":"WRONG_ID_SYNTHETIC","tags":["subject:task:fixture"]},
+    "wrong-tag": {"document_id":"wrong-tag","body":"WRONG_TAG_SYNTHETIC","tags":["subject:task:foreign"]},
     "eng-a": {"document_id":"eng-a","body":"ENGINEERING_OLD_SYNTHETIC","tags":["subject:task:fixture"]},
     "lesson-canary": {"document_id":"lesson-canary","body":"LESSON_CANARY_INVENTED","tags":["synthetic-foreign"]}
   },

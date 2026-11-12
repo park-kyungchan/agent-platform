@@ -1,6 +1,6 @@
 //! Synthetic wire only: /__test__ aliases are deliberately not native bindings.
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{
@@ -28,15 +28,35 @@ pub enum MutationFault {
     LostAck,
 }
 
+// Every default is hostile to a publisher; tests select favourable cases explicitly.
+#[derive(Default)]
+pub struct RetryPolicy {
+    pub deduplicate: bool, // U3: default false: a resend creates another operation.
+    pub reject_mismatch: bool, // U3: default false: changed bytes are accepted.
+    pub delete_immediate: bool, // U5: default false: reply precedes deletion.
+    pub absent_delete_ok: bool, // U5: default false: an absent id returns 404.
+}
+
 pub struct Model {
     pub fixture: Value,
     pub requests: Vec<Request>,
     pub operations: BTreeMap<String, Value>,
     pub next_fault: Option<MutationFault>,
+    pub retry: RetryPolicy,
+    pub pending_deletes: BTreeSet<String>,
     disconnect: bool,
 }
 
 impl Model {
+    #[allow(dead_code)]
+    pub fn finish_delete(&mut self, id: &str) {
+        assert!(self.pending_deletes.remove(id));
+        self.fixture["documents"]
+            .as_object_mut()
+            .unwrap()
+            .remove(id);
+        // U5/U15: completion need not remove facts or page-source membership.
+    }
     #[allow(dead_code)]
     pub fn finish(&mut self, operation_id: &str, success: bool) {
         let op = self.operations.get_mut(operation_id).unwrap();
@@ -45,8 +65,10 @@ impl Model {
         if success {
             let document = op["request"]["document"].clone();
             let id = document["document_id"].as_str().unwrap().to_owned();
+            // U4/U14: replacement bytes/tags are synthetic; the last finisher wins.
             self.fixture["documents"][&id] = document.clone();
             // Recall and page-search indexes deliberately remain independent.
+            // U2: document_ids is a test provenance shape, not a verified binding.
             let facts = self.fixture["facts"].as_array_mut().unwrap();
             facts.retain(|fact| {
                 !fact["document_ids"]
@@ -80,6 +102,8 @@ impl Server {
             requests: Vec::new(),
             operations: BTreeMap::new(),
             next_fault: None,
+            retry: RetryPolicy::default(),
+            pending_deletes: BTreeSet::new(),
             disconnect: false,
         }));
         let stop = Arc::new(AtomicBool::new(false));
@@ -126,6 +150,13 @@ impl Server {
             stop,
             worker: Some(worker),
         }
+    }
+
+    pub fn stop_and_join(&mut self) -> bool {
+        self.stop.store(true, Ordering::Release);
+        self.worker
+            .take()
+            .is_none_or(|worker| worker.join().is_ok())
     }
 
     pub fn address(&self) -> SocketAddr {
@@ -177,11 +208,8 @@ impl Server {
 
 impl Drop for Server {
     fn drop(&mut self) {
-        self.stop.store(true, Ordering::Release);
-        let result = self.worker.take().unwrap().join();
-        if !thread::panicking() {
-            result.unwrap();
-        }
+        let ok = self.stop_and_join();
+        assert!(ok || thread::panicking(), "synthetic worker panicked");
     }
 }
 
@@ -205,8 +233,15 @@ fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
     if parts.len() != 3 || parts[2] != "HTTP/1.1" {
         return Err(io::ErrorKind::InvalidData.into());
     }
-    let lengths: Vec<_> = lines
-        .filter_map(|line| line.split_once(':'))
+    let headers: Vec<_> = lines.filter_map(|line| line.split_once(':')).collect();
+    if headers
+        .iter()
+        .any(|(key, _)| key.eq_ignore_ascii_case("transfer-encoding"))
+    {
+        return Err(io::ErrorKind::InvalidData.into());
+    }
+    let lengths: Vec<_> = headers
+        .into_iter()
         .filter(|(key, _)| key.eq_ignore_ascii_case("content-length"))
         .map(|(_, value)| value.trim().parse::<usize>())
         .collect();
@@ -246,12 +281,14 @@ fn route(model: &mut Model, request: Request) -> Reply {
         body: json!({"error":"test_not_found"}),
     };
     if request.method == "GET" {
+        // U1/U11: root config route/resolved envelope have no verified bank base.
         if request.path == "/config" {
             return Reply {
                 status: 200,
                 body: model.fixture["config"].clone(),
             };
         }
+        // U3/U14: synthetic operation lookup and terminal-state vocabulary.
         if let Some(id) = request.path.strip_prefix("/__test__/operation/") {
             return Reply {
                 status: if model.operations.contains_key(id) {
@@ -262,6 +299,7 @@ fn route(model: &mut Model, request: Request) -> Reply {
                 body: model.operations.get(id).cloned().unwrap_or(Value::Null),
             };
         }
+        // U4: exact-document fields/body/tags are synthetic fixtures.
         if let Some(id) = request.path.strip_prefix("/__test__/document/") {
             return Reply {
                 status: if model.fixture["documents"][id].is_null() {
@@ -279,6 +317,7 @@ fn route(model: &mut Model, request: Request) -> Reply {
             };
         }
     }
+    // U1: root memories route has no verified bank base.
     if request.method == "POST" && request.path == "/memories" {
         return mutate(model, request, None);
     }
@@ -291,6 +330,7 @@ fn route(model: &mut Model, request: Request) -> Reply {
     if request.method != "POST" || request.path != MCP_PATH {
         return missing();
     }
+    // U1: bare POST JSON-RPC deliberately omits initialize/session framing.
     let id = request.body["id"].clone();
     let result = match request.body["method"].as_str() {
         Some("tools/list") => json!({"tools":model.fixture["tool_names"]}),
@@ -303,8 +343,11 @@ fn route(model: &mut Model, request: Request) -> Reply {
                 else {
                     return missing();
                 };
+                // U4: wrong-id/tag readback is selected directly by the fixture id.
                 model.fixture["documents"][id].clone()
             } else if let Some(result) = model.fixture["responses"].get(name) {
+                // U2/U8: fixture recall/search ignore arguments; callers must inspect requests.
+                // U2: document_ids is test-only provenance; completeness is unverified.
                 result.clone()
             } else {
                 return Reply {
@@ -332,11 +375,21 @@ fn mutate(model: &mut Model, request: Request, delete: Option<&str>) -> Reply {
         };
     }
     let reply = if let Some(id) = delete {
-        model.fixture["documents"]
-            .as_object_mut()
-            .unwrap()
-            .remove(id);
-        // A successful DELETE can leave facts, page sources and read indexes.
+        if model.fixture["documents"][id].is_null() && !model.retry.absent_delete_ok {
+            return Reply {
+                status: 404,
+                body: json!({"error":"test_absent_document"}),
+            };
+        }
+        if model.retry.delete_immediate {
+            model.fixture["documents"]
+                .as_object_mut()
+                .unwrap()
+                .remove(id);
+        } else {
+            model.pending_deletes.insert(id.to_owned());
+        }
+        // U5/U15: even completion can leave facts, page sources and read indexes.
         Reply {
             status: 200,
             body: json!({"test_deleted":id}),
@@ -360,22 +413,31 @@ fn mutate(model: &mut Model, request: Request, delete: Option<&str>) -> Reply {
                 body: json!({"error":"test_invalid_retain"}),
             };
         }
-        if let Some(old) = model.operations.get(id) {
-            if old["request"] != *body {
-                return Reply {
-                    status: 409,
-                    body: json!({"error":"test_payload_mismatch"}),
-                };
+        let old = model.operations.get(id);
+        let mismatch = old.is_some_and(|op| op["request"] != *body);
+        if mismatch && model.retry.reject_mismatch {
+            return Reply {
+                status: 409,
+                body: json!({"error":"test_payload_mismatch"}),
+            };
+        }
+        let mut key = id.to_owned();
+        if old.is_some() && !model.retry.deduplicate {
+            let mut n = 2;
+            while model.operations.contains_key(&format!("{id}#{n}")) {
+                n += 1;
             }
-        } else {
+            key = format!("{id}#{n}");
+        }
+        if !model.operations.contains_key(&key) || mismatch {
             model.operations.insert(
-                id.into(),
-                json!({"test_operation_id":id,"test_state":"running","request":body}),
+                key.clone(),
+                json!({"test_operation_id":key,"test_state":"running","request":body}),
             );
         }
         Reply {
             status: 202,
-            body: json!({"test_operation_id":id}),
+            body: json!({"test_operation_id":key}),
         }
     };
     model.disconnect = matches!(fault, Some(MutationFault::LostAck));

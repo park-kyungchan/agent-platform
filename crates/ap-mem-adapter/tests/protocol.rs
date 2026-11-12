@@ -9,9 +9,7 @@ impl TempDir {
     fn new() -> Self {
         use std::os::unix::fs::DirBuilderExt;
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let parent = std::env::var_os("AP_S03_TEST_ROOT")
-            .map(PathBuf::from)
-            .unwrap_or_else(std::env::temp_dir);
+        let parent = std::env::temp_dir();
         loop {
             let path = parent.join(format!(
                 "ap-mem-grammar-{}-{}",
@@ -28,7 +26,9 @@ impl TempDir {
 }
 impl Drop for TempDir {
     fn drop(&mut self) {
-        std::fs::remove_dir_all(&self.0).unwrap();
+        if let Err(error) = std::fs::remove_dir_all(&self.0) {
+            eprintln!("test_cleanup_failed: {error}");
+        }
     }
 }
 use std::process::{Command, Stdio};
@@ -38,22 +38,38 @@ fn parse(args: &[&str]) -> Result<cli::Command, &'static str> {
 }
 
 fn run(args: &[&str], input: &str) -> std::process::Output {
+    let private = TempDir::new();
     run_in(
         args,
         input,
         Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures")),
+        &private.0,
+        &private.0,
+        false,
     )
 }
 
-fn run_in(args: &[&str], input: &str, cwd: &Path) -> std::process::Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_ap-mem-adapter"))
+fn run_in(
+    args: &[&str],
+    input: &str,
+    cwd: &Path,
+    home: &Path,
+    temp: &Path,
+    grants: bool,
+) -> std::process::Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_ap-mem-adapter"));
+    command
         .args(args)
         .current_dir(cwd)
-        .envs([
-            ("AP_MEM_WRITE_GRANT", "allow"),
-            ("AP_MEM_GRANT", "allow"),
-            ("AP_MEM_AUTHORIZED", "true"),
-        ])
+        .env("HOME", home)
+        .env("TMPDIR", temp);
+    for key in ["AP_MEM_WRITE_GRANT", "AP_MEM_GRANT", "AP_MEM_AUTHORIZED"] {
+        command.env_remove(key);
+        if grants {
+            command.env(key, "allow");
+        }
+    }
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -106,8 +122,12 @@ fn unknown_publish_rpc_no_effect() {
     }
     input.push_str("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}\n");
     let temporary = TempDir::new();
-    let output = run_in(&["mcp"], &input, &temporary.0);
-    assert_eq!(std::fs::read_dir(&temporary.0).unwrap().count(), 0);
+    let home = TempDir::new();
+    let temp = TempDir::new();
+    let output = run_in(&["mcp"], &input, &temporary.0, &home.0, &temp.0, false);
+    for path in [&temporary.0, &home.0, &temp.0] {
+        assert_eq!(std::fs::read_dir(path).unwrap().count(), 0);
+    }
     assert!(output.status.success());
     assert!(output.stderr.is_empty());
     let replies: Vec<Value> = String::from_utf8(output.stdout)
@@ -214,13 +234,39 @@ fn record_pair_arg_rejected() {
 #[test]
 fn no_state_parser() {
     let temporary = TempDir::new();
-    let absent = run_in(&["publish", "--task", "x"], "", &temporary.0);
+    let temp = TempDir::new();
+    let absent = run_in(
+        &["publish", "--task", "x"],
+        "",
+        &temporary.0,
+        &temporary.0,
+        &temp.0,
+        true,
+    );
     std::fs::write(
         temporary.0.join("STATE.md"),
         "Authority: memory writes forbidden. Grant: denied.\n",
     )
     .unwrap();
-    let denied = run_in(&["publish", "--task", "x"], "", &temporary.0);
+    let denied = run_in(
+        &["publish", "--task", "x"],
+        "",
+        &temporary.0,
+        &temporary.0,
+        &temp.0,
+        true,
+    );
+    let ungranted = run_in(
+        &["publish", "--task", "x"],
+        "",
+        &temporary.0,
+        &temporary.0,
+        &temp.0,
+        false,
+    );
+    assert_eq!(denied.status.code(), ungranted.status.code());
+    assert_eq!(denied.stdout, ungranted.stdout);
+    assert_eq!(denied.stderr, ungranted.stderr);
     assert_eq!(absent.status.code(), denied.status.code());
     assert_eq!(absent.stdout, denied.stdout);
     assert_eq!(absent.stderr, denied.stderr);

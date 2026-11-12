@@ -8,7 +8,7 @@ fn fixture() -> Value {
 
 #[test]
 fn fixed_endpoint() {
-    let server = Server::start(fixture());
+    let mut server = Server::start(fixture());
     let address = server.address();
     assert!(address.ip().is_loopback());
     assert_ne!(address.port(), 0);
@@ -29,11 +29,17 @@ fn fixed_endpoint() {
         assert_eq!(m.requests[0].path, MCP_PATH);
         assert_eq!(m.requests[0].body["method"], "tools/list");
     });
-    drop(server);
-    assert!(
-        std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_millis(100))
-            .is_err()
-    );
+    // TE is unsupported, including a header with no content length.
+    use std::io::{Read, Write};
+    let mut raw =
+        std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(1)).unwrap();
+    raw.set_read_timeout(Some(std::time::Duration::from_secs(1)))
+        .unwrap();
+    raw.write_all(b"POST /mcp/coding-agent::engineering/ HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n").unwrap();
+    let mut response = String::new();
+    raw.take(131072).read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 400 "));
+    assert!(server.stop_and_join()); // Joining proves the owned worker exited.
 }
 
 #[test]
@@ -86,6 +92,14 @@ fn provenance_cases() {
         raw["facts"][2]["document_ids"],
         json!(["eng-a", "lesson-canary"])
     );
+    // U4: explicit wrong-id and wrong-tag document fault cases.
+    let wrong_id = server.mcp("get_document", json!({"test_document_id":"wrong-id"}));
+    assert_eq!(wrong_id["document_id"], "different-id");
+    assert_ne!(wrong_id["document_id"], "wrong-id");
+    let wrong_tag = server.mcp("get_document", json!({"test_document_id":"wrong-tag"}));
+    assert_eq!(wrong_tag["document_id"], "wrong-tag");
+    assert_eq!(wrong_tag["tags"], json!(["subject:task:foreign"]));
+    assert_ne!(wrong_tag["tags"], json!(["subject:task:fixture"]));
     let before_search = server.mcp("search_knowledge_base", json!({}));
     server.edit(|m| m.fixture["responses"]["recall"]["summary"] = json!("CHANGED_RECALL_ONLY"));
     assert_eq!(

@@ -46,6 +46,12 @@ fn bodyless(server: &Server, method: &str, path: &str) -> Value {
 fn running_async_order() {
     let server = server();
     let data = cases();
+    // U3: explicitly select favourable deduplication and mismatch refusal.
+    server.edit(|m| {
+        m.retry.deduplicate = true;
+        m.retry.reject_mismatch = true;
+    });
+
     server.edit(|m| {
         m.fixture["facts"]
             .as_array_mut()
@@ -118,6 +124,38 @@ fn running_async_order() {
         "failed"
     );
     assert_eq!(document(&server)["body"], data["expected_new"]);
+    let hostile = self::server();
+    hostile.edit(|m| {
+        assert!(!m.retry.deduplicate);
+        assert!(!m.retry.reject_mismatch);
+    });
+    hostile
+        .request("POST", "/memories", data["retain"].clone())
+        .unwrap();
+    hostile
+        .request("POST", "/memories", data["retain"].clone())
+        .unwrap();
+    assert_eq!(hostile.edit(|m| m.operations.len()), 2); // U3: resend duplicates.
+    let mut changed = data["retain"].clone();
+    changed["document"]["body"] = json!("CHANGED_BYTES_ACCEPTED");
+    assert_eq!(
+        hostile
+            .request("POST", "/memories", changed.clone())
+            .unwrap()
+            .status,
+        202
+    );
+    assert_eq!(hostile.edit(|m| m.operations.len()), 3);
+    assert_eq!(operation(&hostile, "operation-a#3")["request"], changed);
+    hostile.edit(|m| m.retry.deduplicate = true);
+    assert_eq!(
+        hostile
+            .request("POST", "/memories", changed.clone())
+            .unwrap()
+            .status,
+        202
+    );
+    assert_eq!(operation(&hostile, "operation-a")["request"], changed);
 }
 
 #[test]
@@ -158,6 +196,12 @@ fn config_false_required() {
 #[test]
 fn delete_source_residue() {
     let server = server();
+    // U5: explicitly select synchronous deletion and absent-id success.
+    server.edit(|m| {
+        m.retry.delete_immediate = true;
+        m.retry.absent_delete_ok = true;
+    });
+
     let recall = server.mcp("recall", json!({}));
     let search = server.mcp("search_knowledge_base", json!({}));
     let page = server.mcp("get_knowledge_page", json!({}));
@@ -207,5 +251,27 @@ fn delete_source_residue() {
     assert_eq!(
         bodyless(&server, "DELETE", "/__test__/document/eng-a"),
         json!({"test_deleted":"eng-a"})
+    );
+    let hostile = self::server();
+    hostile.edit(|m| {
+        assert!(!m.retry.delete_immediate);
+        assert!(!m.retry.absent_delete_ok);
+    });
+    assert_eq!(
+        hostile
+            .request("DELETE", "/__test__/document/eng-a", json!({}))
+            .unwrap()
+            .status,
+        200
+    );
+    assert!(!document(&hostile).is_null()); // U5: reply is not completion.
+    hostile.edit(|m| m.finish_delete("eng-a"));
+    assert!(document(&hostile).is_null());
+    assert_eq!(
+        hostile
+            .request("DELETE", "/__test__/document/eng-a", json!({}))
+            .unwrap()
+            .status,
+        404
     );
 }

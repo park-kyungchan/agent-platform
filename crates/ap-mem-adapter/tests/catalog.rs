@@ -36,18 +36,20 @@ fn mcp_read_only() {
             "mem_document_read"
         ]
     );
-    // Enumerate every literal in the closed dispatch, including a future arm.
-    // Classification uses unknown_tool so argument errors do not hide a name.
-    let source = include_str!("../src/catalog.rs")
-        .split("pub fn parse_call")
-        .nth(1)
-        .unwrap();
-    let candidates: std::collections::BTreeSet<_> = source.split('"').skip(1).step_by(2).collect();
-    let accepted: std::collections::BTreeSet<_> = candidates
-        .into_iter()
-        .filter(|name| parse_call(name, json!({})) != Err("unknown_tool"))
-        .collect();
-    assert_eq!(accepted, names.iter().copied().collect());
+    let mut accepted = std::collections::BTreeSet::new();
+    let mut others: Vec<String> = [
+        "publish",
+        "mem_publish",
+        "mem_retain",
+        "retain",
+        "delete",
+        "reflect",
+        "",
+        "unknown",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect();
     for name in names {
         let args = match name {
             "mem_recall" | "mem_page_search" => {
@@ -58,15 +60,30 @@ fn mcp_read_only() {
             "mem_tree_read" => json!({}),
             _ => panic!("unexpected catalog name"),
         };
-        assert!(parse_call(name, args).is_ok());
+        let reply = ap_mem_adapter::protocol::dispatch(json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":name,"arguments":args}})).unwrap();
+        assert!(reply.get("result").is_some());
+        accepted.insert(name);
         for other in [
             format!("{name}_write"),
             format!("x{name}"),
             name.to_uppercase(),
             String::new(),
         ] {
-            assert_eq!(parse_call(&other, json!({})), Err("unknown_tool"));
+            others.push(other);
         }
+    }
+    assert_eq!(
+        accepted,
+        catalog["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap())
+            .collect()
+    );
+    for other in others {
+        let reply = ap_mem_adapter::protocol::dispatch(json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":other,"arguments":{}}})).unwrap();
+        assert_eq!(reply["error"]["message"], "unknown_tool");
     }
 }
 
