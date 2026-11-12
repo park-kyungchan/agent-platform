@@ -1,8 +1,8 @@
 # Public runtime guidance content
 
 Reviewed distribution source for canonical `AGENTS.md`, runtime references and
-the generic `herdr`, `herdr-hermes`, `explain-precisely`, `lead-orchestration`,
-`lessons-loop` and `strategy-dialogue` skill bundles. Repository source is edited through review and then installed on the host.
+the generic `herdr`, `herdr-hermes`, `explain-precisely`, `hindsight-control`, `lead`
+and `lessons-loop` skill bundles. Repository source is edited through review and then installed on the host.
 The fixed Rust inventory is `crates/ap/src/native/content_inventory.rs`. This
 README is repository documentation, not an owned host entry.
 
@@ -26,7 +26,7 @@ The task owner separately authorizes and verifies any host installation.
 
 The inventory is the file list in `content_inventory.rs`: `AGENTS.md`, the
 runtime references (including `ONTOLOGY-USE.md` for operational store reads
-and Lead writes) and the six generic skill bundles. `AGENTS.md` section 3 is the
+and Lead writes) and the six generic skill bundles (the Lead's one skill is `lead`). `AGENTS.md` section 3 is the
 only routing table: each reference is self-contained and is read when its listed situation applies. Changing values
 (model names, efforts, versions, token windows, counts, dates of approvals) stay
 out of `AGENTS.md` and skill frontmatter; they belong in task STATE.

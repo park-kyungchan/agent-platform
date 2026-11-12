@@ -33,7 +33,7 @@ A KPI measures an outcome, not an output. "Three files rewritten" is an output; 
 4. Measure the baseline now. If it cannot be measured yet, write "unmeasured" and make measuring it the first piece of work. Do not invent a value and do not skip the KPI.
 5. Choose the target. Prefer a value with a reason (all, none, a limit the user named, the level of a comparable case) over a round number. Record that the Lead set it.
 6. Add a guardrail for each way the KPI could be raised by harming something else: a KPI on removal gets a guardrail on what must keep working.
-7. Tell the user in one line per KPI: what it counts, where it is read, which direction is good, the baseline and the target. The user corrects in their own words; section 6 of the skill says how to take that.
+7. Tell the user in one line per KPI: what it counts, where it is read, which direction is good, the baseline and the target. The user corrects in their own words; section 3 of the skill `lead` says how to take that.
 
 ## Checks before adopting
 

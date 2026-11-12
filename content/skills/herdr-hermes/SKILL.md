@@ -5,7 +5,7 @@ description: Use for requested Hermes sessions through Herdr; resolve executor, 
 
 # Hermes through Herdr
 
-Use the installed [herdr](../herdr/SKILL.md) skill for native caller identity and terminal control. Follow the assigned topology/cwd and [Context Governance](../../runtime-references/CONTEXT-GOVERNANCE.md) for isolation or justified continuity. Use [lead-orchestration](../lead-orchestration/SKILL.md) only when assigned Lead; [strategy-dialogue](../strategy-dialogue/SKILL.md) owns Strategy/KPI reporting. A CLI name does not define a task role. Delegation needs the current task's authorization and a direct handoff of goal, targets, allowed effects, output and state path; no retired `herdr-codex-long-work` dependency or custom scheduler is required.
+Use the installed [herdr](../herdr/SKILL.md) skill for native caller identity and terminal control. Follow the assigned topology/cwd and [Context Governance](../../runtime-references/CONTEXT-GOVERNANCE.md) for isolation or justified continuity. Use [lead](../lead/SKILL.md) only when assigned Lead; it owns Strategy/KPI reporting. A CLI name does not define a task role. Delegation needs the current task's authorization and a direct handoff of goal, targets, allowed effects, output and state path; no retired `herdr-codex-long-work` dependency or custom scheduler is required.
 
 For launch, resume, input or recovery, read [control.md](references/control.md). Resolve the actual executor: host, SSH, Docker and a saved remote Herdr machine are different paths. An existing recognized remote agent does not require a local Hermes executable; a new launch requires the executable in its real executor. Do not manufacture recognition or alter credentials to make detection pass.
 

@@ -11,7 +11,7 @@ Use at the closure of a task or a worker run, when the user corrects the Lead, a
 
 1. At closure, record in the task's files: workers, review findings by severity, rework rounds, CI minutes. An unknown value stays unknown.
 2. Capture a lesson only when something durable was learned. Levels: L0 incident, L1 lesson, L2 pattern, L3 structural issue with a direction proposal. Promotion needs independent occurrences of a verified mechanism, never a document count.
-3. A correction from the user is an occurrence. The first one changes the instance (skill `strategy-dialogue` section 6). A second correction of the same kind is a missing or unclear rule: the Lead changes the rule in the file that holds it, through a pull request, and reports the change.
+3. A correction from the user is an occurrence. The first one changes the instance (skill `lead` section 3). A second correction of the same kind is a missing or unclear rule: the Lead changes the rule in the file that holds it, through a pull request, and reports the change.
 4. An expression of the user that appears in a second task is added to `/root/.agents/runtime-references/GLOSSARY.md` section 7 the same way.
 5. Engineering capture follows the Git-original/native-publisher contract in `agent-platform` `memory/README.md`, only within task authority and without student, lesson or operational payloads. In a no-write task leave a short handoff file in the task directory and name it in STATE.
 6. An L3 direction proposal goes to the Lead and into the current STATE under `DIRECTION PROPOSALS`. The Lead decides it by the measure it would move, carries it out as a reversible trial where one exists, and reports the decision and the result to the user.

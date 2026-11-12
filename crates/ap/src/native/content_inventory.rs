@@ -78,16 +78,28 @@ pub const OWNED: &[(&str, &str)] = &[
         ),
     ),
     (
-        "skills/lead-orchestration/SKILL.md",
-        include_str!("../../../../content/skills/lead-orchestration/SKILL.md"),
+        "skills/lead/SKILL.md",
+        include_str!("../../../../content/skills/lead/SKILL.md"),
     ),
     (
-        "skills/lead-orchestration/references/program-board.md",
-        include_str!("../../../../content/skills/lead-orchestration/references/program-board.md"),
+        "skills/lead/references/design.md",
+        include_str!("../../../../content/skills/lead/references/design.md"),
     ),
     (
-        "skills/lead-orchestration/references/task-packet.md",
-        include_str!("../../../../content/skills/lead-orchestration/references/task-packet.md"),
+        "skills/lead/references/measurement.md",
+        include_str!("../../../../content/skills/lead/references/measurement.md"),
+    ),
+    (
+        "skills/lead/references/program-board.md",
+        include_str!("../../../../content/skills/lead/references/program-board.md"),
+    ),
+    (
+        "skills/lead/references/strategy-brief.md",
+        include_str!("../../../../content/skills/lead/references/strategy-brief.md"),
+    ),
+    (
+        "skills/lead/references/task-packet.md",
+        include_str!("../../../../content/skills/lead/references/task-packet.md"),
     ),
     (
         "skills/lessons-loop/SKILL.md",
@@ -104,17 +116,5 @@ pub const OWNED: &[(&str, &str)] = &[
     (
         "skills/lessons-loop/references/worker-closure.md",
         include_str!("../../../../content/skills/lessons-loop/references/worker-closure.md"),
-    ),
-    (
-        "skills/strategy-dialogue/SKILL.md",
-        include_str!("../../../../content/skills/strategy-dialogue/SKILL.md"),
-    ),
-    (
-        "skills/strategy-dialogue/references/measurement.md",
-        include_str!("../../../../content/skills/strategy-dialogue/references/measurement.md"),
-    ),
-    (
-        "skills/strategy-dialogue/references/strategy-brief.md",
-        include_str!("../../../../content/skills/strategy-dialogue/references/strategy-brief.md"),
     ),
 ];

@@ -85,7 +85,7 @@ references = {p.name for p in (ROOT / "runtime-references").iterdir()}
 for name in [n for n in texts if n.endswith(".md")]:
     for m in re.finditer(r"`([A-Za-z][\w-]*\.md)`", texts[name]):
         token = m.group(1)
-        if "_" in token or token in ("STATE.md", "TASK.md", "STRATEGY.md", "SKILL.md", "MEMORY.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", "README.md"):
+        if "_" in token or token in ("STATE.md", "TASK.md", "STRATEGY.md", "LENS.md", "SKILL.md", "MEMORY.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", "README.md"):
             continue
         if token not in references:
             fail("route_to_missing_reference", name, f"`{token}` is not in content/runtime-references")
@@ -136,7 +136,7 @@ if core > CORE_TERM_LIMIT:
 size = len(texts.get(GLOSSARY, "").encode())
 if size > GLOSSARY_BYTE_LIMIT:
     fail("glossary_over_limit", GLOSSARY, f"{size} bytes, limit {GLOSSARY_BYTE_LIMIT}: remove or move rows before adding")
-for path, limit in (("AGENTS.md", AGENTS_BYTE_LIMIT), ("skills/strategy-dialogue/references/measurement.md", MEASUREMENT_BYTE_LIMIT)):
+for path, limit in (("AGENTS.md", AGENTS_BYTE_LIMIT), ("skills/lead/references/measurement.md", MEASUREMENT_BYTE_LIMIT)):
     used = len(texts.get(path, "").encode())
     if used > limit:
         fail("file_over_limit", path, f"{used} bytes, limit {limit}: cut or move text before adding")

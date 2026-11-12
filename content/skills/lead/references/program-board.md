@@ -26,11 +26,11 @@ Last update: <time> (<who>; <one line on what changed>)
 Corrections of the Lead's interpretation: <n> · Questions the Lead asked: <n> · Requests to explain again: <n>
 ```
 
-The line formats of "Decisions" and "Kept for the user" are in `/root/.agents/skills/strategy-dialogue/references/strategy-brief.md`. A superseded decision is replaced by the one that supersedes it; the task's Git history or the kept previous bytes hold the older line. The assignment file is named in STATE; the board does not repeat it.
+The line formats of "Decisions" and "Kept for the user" are in `/root/.agents/skills/lead/references/strategy-brief.md`. A superseded decision is replaced by the one that supersedes it; the task's Git history or the kept previous bytes hold the older line. The assignment file is named in STATE; the board does not repeat it.
 
 ## Handoff to the next Lead
 
-1. Start prompt: the role, the task directory, the ordered list of files to read, and the first output expected. No rule, value or history is written into it.
+1. Start prompt: the role, the task directory, the ordered list of files to read (STATE, then the lens file, then the board), and the first output expected. No rule, value or history is written into it.
 2. STATE checkpoint: the objective as the Lead wrote it and the user decisions it rests on; the source baseline with exact revisions; every effect made, with its rollback route; what is unverified; holds; one next action.
 3. Nothing of the task is still running: no worker, waiter, build or pane. If something must keep running, STATE names it with its owner and how to stop it.
 4. Cold-read test. Give a reader only the start prompt and ask:

@@ -40,15 +40,15 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I use the Academy tools or prepare a lesson | skill `academy-runtime-routing` for the tools; skill `academy-student-context` for lesson preparation and student status |
 | A word in an instruction, a packet or the user's message is unclear, or I am about to use a new term | Section 8 below, then `GLOSSARY.md` |
 | I answer or report to the user | skill `explain-precisely` |
-| STATE names me Lead | skills `lead-orchestration` and `strategy-dialogue` |
+| STATE names me Lead | skill `lead` |
 | I control Herdr panes or agents | skill `herdr`; for Hermes sessions `herdr-hermes` |
 | A task closes, or I curate lessons | skill `lessons-loop` |
 
 ## 4. Rules
 
 Authority
-- If STATE names you Lead, you complete the user's request. The user speaks in short, incomplete natural language and steers by correcting; you turn those words into the objective, the measures, the plan and the judgment of the result, within the holds STATE states and the rules below (skill `strategy-dialogue` section 1). The user's correction or stop overrides everything else.
-- If you are a worker, the packet and the task's STATE decide what you may do. Do only the packet: add no goal and widen no allowed effect.
+- If STATE names you Lead, you complete the user's request and you design. The user speaks in short, incomplete natural language and steers by correcting; you turn those words into the objective, the measures, the design of every change from code you read yourself, the plan and the judgment of the result, within the holds STATE states and the rules below (skill `lead`). The user's correction or stop overrides everything else.
+- If you are a worker, the packet and the task's STATE decide what you may do. Do only the packet: add no goal and widen no allowed effect. Its design is the Lead's: report a mismatch with the code, do not redesign.
 - For everyone: an available tool, a CLI name, a process label or a remembered decision is not permission.
 - A handoff states the goal, exact targets, allowed effects, expected output and the STATE path. Never make another agent reconstruct a transcript.
 - After a context reset or a resumed session, read the task's rules and STATE again before any effect.
@@ -114,11 +114,11 @@ Do not build
 
 One word for one thing. More terms, the words not to use, and how the user refers to things: `GLOSSARY.md`.
 
-- **Lead**: the agent that the task's STATE names as responsible for the task. It talks with the user, plans, starts workers and accepts their results.
+- **Lead**: the Claude Code session that the task's STATE names as responsible for the task. It talks with the user, keeps the whole view, designs every change, starts workers and accepts their results.
 - **Worker**: an agent that carries out one packet for a Lead. It does not talk with the user.
 - **Task directory**: `/home/palantirkc/work/<scope>-<topic>/`, the place of one task's files.
 - **STATE**: the file `STATE.md` in the task directory: owner, authority, holds, exact revisions, effects and the one next action, as of the time it was written.
-- **Packet**: one `TASK*.md` file that gives a worker its goal, exact targets, allowed and forbidden effects, expected output and DONE marker.
+- **Packet**: one `TASK*.md` file that gives a worker its goal, the Lead's design, exact targets, allowed and forbidden effects, expected output and DONE marker.
 - **Report**: the file a worker writes as its result. The **DONE marker** is the literal last line it prints.
 - **Effect**: any change outside your own reasoning: a file write, a commit, a push, a merge, an installation, a configuration change, a sent message, a call that changes a service. Reading is not an effect.
 - **Hold**: an effect that must not happen until a named condition is met.

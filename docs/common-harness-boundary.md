@@ -151,7 +151,7 @@ tag name. No retention or refresh operation is performed here. [G3][H1][H2]
 
 Current [Context Governance](../content/runtime-references/CONTEXT-GOVERNANCE.md)
 owns isolation/continuity and source authority. Task handoffs include the Strategy
-link and KPI/guardrail fields from [strategy-dialogue](../content/skills/strategy-dialogue/SKILL.md).
+link and KPI/guardrail fields from [lead](../content/skills/lead/SKILL.md).
 Task topology/worktrees win over generic pane examples; assigned Leads use one tab
 per worker. Use [worker closure](../content/skills/lessons-loop/references/worker-closure.md)
 for task-local output/effect reconciliation and optional curator candidates.

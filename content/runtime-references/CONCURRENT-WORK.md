@@ -8,7 +8,7 @@ Read this when you hand work to another agent, receive work, or share a reposito
 - Keep three kinds of work apart: read-only review, implementation in its own worktree, and integration.
 - Two agents may read the same checkout. Two agents that write need separate Git worktrees or file sets that do not overlap.
 - A worktree separates files only. It does not separate global settings, databases, ports, service accounts or a shared build directory.
-- Shared files have one integrator, the Lead unless STATE names another: `Cargo.lock` and manifests, public schemas, generated outputs, and global or per-CLI configuration. Everyone else proposes a change to the integrator.
+- Shared files have one integrator, the Lead unless STATE names another: `Cargo.lock` and manifests, public schemas, generated outputs, workflow files, repository settings (required checks, branch rules), and global or per-CLI configuration. Everyone else proposes a change to the integrator.
 - One expensive build runs at a time, with its owner named in STATE and the number of parallel build jobs (`-j`) that STATE states (`-j1` when it states none). Each checkout uses its own `CARGO_TARGET_DIR`. Never delete a cache or a lock file to get past a running build. Check CPU, memory and disk before running more at once.
 
 ## 2. Handing work over
@@ -42,7 +42,7 @@ Memory for workers:
 3. Stay inside the write set. If the task needs a shared file, stop at that file and report the proposed change.
 4. If a dependency fails, stop the steps that depend on it. Work that does not depend on it may continue.
 5. Treat reference inputs as read-only. Give every subprocess a time limit and a bound on its output; keep the full log in the task directory and report a short excerpt.
-6. Run the checks the change affects. Widen them only when the change crosses a boundary or evidence is still open.
+6. Run the checks the packet names; without such a line, the checks the change affects. A check the packet leaves to the CI job is read on the pushed head, not rerun on the host. Widen them only when the change crosses a boundary or evidence is still open.
 
 ## 4. Returning and accepting work
 
