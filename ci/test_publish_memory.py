@@ -390,6 +390,53 @@ class RetractionTests(unittest.TestCase):
         self.assertTrue(stub.calls)
         self.assertTrue(all(call[0] == 'GET' for call in stub.calls))
 
+    def test_final_rerun_catches_drift_after_recall(self):
+        for drift, code in [('operations', 'operation_not_completed'),
+                            ('models', 'models_present'),
+                            ('profile', 'profile_drift'), ('source', 'stale_commit')]:
+            with self.subTest(drift=drift):
+                stub = RetractStub()
+                original = stub.request
+                recalled = False
+                def read(method, path, body=None):
+                    nonlocal recalled
+                    answer = original(method, path, body)
+                    if method == 'POST':
+                        recalled = True
+                    elif recalled:
+                        if drift == 'operations' and '/operations?' in path:
+                            return envelope([{'id': 'late', 'status': 'pending'}], key='operations')
+                        if drift == 'models' and '/mental-models?' in path:
+                            return envelope([{'id': 'late-model'}])
+                        if drift == 'profile' and path.endswith('/config'):
+                            answer['config']['retain_custom_instructions'] = 'invented drift'
+                    return answer
+                def source_check(_):
+                    if recalled and drift == 'source':
+                        raise P.Stop('stale_commit')
+                stub.request = read
+                with patch.object(P, 'unchanged', side_effect=source_check), \
+                     contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(P.Stop, '^' + code + '$'):
+                    P.retract(stub, stub.pin, 'invented')
+                self.assertTrue(recalled)
+
+    def test_retract_success_emits_no_fact_or_original_text(self):
+        stub = RetractStub()
+        stub.fact['text'] = 'ExampleID applies when the cache is closed.'
+        stdout, stderr = io.StringIO(), io.StringIO()
+        bodies = [stub.fact['text'], stub.doc['original_text']]
+        stopped, result = None, None
+        with patch.object(P, 'unchanged'), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            try:
+                result = P.retract(stub, stub.pin, 'invented')
+            except Exception as error:
+                stopped = error
+        output = stdout.getvalue() + stderr.getvalue() + str(stopped) + json.dumps(result)
+        for body in bodies:
+            self.assertNotIn(body, output, 'retract_body_disclosed')
+        self.assertIsNone(stopped)
+        self.assertEqual(result['result'], 'retracted_on_listed_reads')
+
     def test_failed_preconditions_have_nonvacuous_no_mutation_assertions(self):
         for command in ('publish', 'retract', 'restore'):
             for route, failure in [('/version', 'read_404'), ('/config', 'read_uncertain'),
