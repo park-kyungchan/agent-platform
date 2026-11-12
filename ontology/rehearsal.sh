@@ -44,6 +44,13 @@ call(['schema', 'install', str(second)])
 probe = created(apply('set_hold', 'v2-probe', dict(task=task, effect='upgrade probe', until='schema v3')), 'hold')
 apply('lift_hold', 'v2-probe-lift', dict(hold=probe))
 probe_revision = obj(probe)['head']
+# Preserve a real v5 flag-only review across the upgrade to v6.
+legacy = pathlib.Path(store).with_name('v5.json')
+legacy.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', 'f46cdf49ba74e117ddaaf387416a0eac1d53f2af:ontology/work.schema.json'], timeout=10))
+call(['schema', 'install', str(legacy)])
+legacy_thread = created(apply('open_thread', 'legacy-thread', dict(task=task, key='legacy-v5', consumer='fixture', consumer_kind='harness', first_use='upgrade')), 'thread')
+legacy_plan = created(apply('open_plan', 'legacy-plan', dict(thread=legacy_thread, first_lines=100, limit_lines=150, current_lines=151, amended_by_family='family-a')), 'plan')
+apply('record_scope_review', 'legacy-review', dict(plan=legacy_plan, reviewer_family='family-b', review_report='fixture/v5.md'))
 call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
 assert obj(probe)['head'] == probe_revision
 assert obj(task)['observations'][-1]['revision'] == revision
@@ -150,7 +157,7 @@ for view, (count, text) in expected.items():
     if view == 'live_workers': assert '(missing)' in r['markdown']
     if view == 'closed_workers': assert report['native_key'] in r['markdown'] and pending_report['native_key'] in r['markdown'] and r['markdown'].index('pending passed') < r['markdown'].index('| passed |')
     print(r['markdown'])
-# v5 gate rows run after the frozen view/aggregate expectations above.
+# v6 gate rows run after the frozen view/aggregate expectations above.
 def gate(action, rid, params, failure=None):
     before = fingerprint(); answer = apply(action, 'gate-' + action + '-' + rid, params, failure)
     if failure: assert fingerprint() == before
@@ -173,7 +180,7 @@ gate('start_worker_run', 'plan-missing', {k: v for k, v in wp.items() if k != 'p
 dispatch('thread-unknown', ('unknown_thread', 'thread_of_other_task', 'engine_without_domain_consumer', 'plan_of_other_thread', 'missing_first_use'), thread=missing_thread)
 restarted = created(gate('start_worker_run', 'closed-name', wp), 'worker_run')
 apply('close_worker_run', 'gate-close-restarted', dict(worker_run=restarted, result='gate passed'))
-dispatch('plan-unknown', ('plan_of_other_thread', 'plan_over_limit'), plan=missing_plan)
+dispatch('plan-unknown', ('plan_missing', 'plan_of_other_thread', 'plan_over_limit'), plan=missing_plan)
 other = created(gate('open_thread', 'plan-other-thread', dict(tp, key='plan-other')), 'thread')
 other_plan = created(gate('open_plan', 'plan-other', dict(pp, thread=other)), 'plan')
 dispatch('plan-mismatch', 'plan_of_other_thread', plan=other_plan); dispatch('plan-matches')
@@ -195,17 +202,26 @@ dispatch('empty-use', 'missing_first_use')
 gate('amend_thread', 'restore-first-use', dict(thread=thread, consumer='Academy', consumer_kind='domain_route', first_use=tp['first_use'], reason='gate fixture'))
 dispatch('has-use')
 assert any(o['fields']['consumer_kind'].get('value') == 'harness' for o in obj(thread)['observations'])
-review = dict(plan=plan, reviewer_family='family-a', review_report='fixture/REVIEW.md')
+assert fields(legacy_plan)['scope_reviewed'] and 'reviewed_lines' not in fields(legacy_plan)
+dispatch('v5-flag-only', 'plan_over_limit', thread=legacy_thread, plan=legacy_plan)
+review = dict(plan=plan, reviewed_lines=152, reviewer_family='family-a', review_report='fixture/REVIEW.md')
 gate('amend_plan', 'at-limit', dict(plan=plan, current_lines=150, amended_by_family='family-a')); dispatch('at-limit')
 gate('amend_plan', 'over-limit', dict(plan=plan, current_lines=151, amended_by_family='family-a')); dispatch('over-limit', 'plan_over_limit')
-gate('record_scope_review', 'unknown-plan', dict(review, plan=missing_plan), ('unknown_plan', 'scope_review_same_family'))
+gate('record_scope_review', 'unknown-plan', dict(review, plan=missing_plan), ('unknown_plan', 'reviewed_lines_below_current', 'scope_review_same_family'))
+dispatch('review-over-limit', tier='review')
+dispatch('review-other-refusals', 'plan_of_other_thread', tier='review', plan=other_plan)
+gate('record_scope_review', 'size-required', {k: v for k, v in review.items() if k != 'reviewed_lines'}, 'invalid_parameter')
+gate('record_scope_review', 'below-current', dict(review, reviewer_family='family-b', reviewed_lines=150), 'reviewed_lines_below_current')
 gate('record_scope_review', 'same-family', review, 'scope_review_same_family')
 gate('record_scope_review', 'different-family', dict(review, reviewer_family='family-b')); dispatch('reviewed-over-limit')
-assert fields(plan)['scope_reviewed'] and fields(plan)['review_report'] == review['review_report']
+assert fields(plan)['scope_reviewed'] and fields(plan)['reviewed_lines'] == 152 and fields(plan)['review_report'] == review['review_report']
 gate('amend_plan', 'invalidate-review', dict(plan=plan, current_lines=152, amended_by_family='family-b'))
 assert not fields(plan)['scope_reviewed'] and fields(plan)['first_lines'] == 100 and fields(plan)['limit_lines'] == 150
-dispatch('amended-after-review', 'plan_over_limit')
-gate('record_scope_review', 'latest-family', dict(review, reviewer_family='family-b'), 'scope_review_same_family')
+dispatch('amended-within-review')
+assert fields(plan)['current_lines'] == fields(plan)['reviewed_lines']
+gate('amend_plan', 'above-reviewed-size', dict(plan=plan, current_lines=153, amended_by_family='family-b'))
+dispatch('above-reviewed-size', 'plan_over_limit')
+gate('record_scope_review', 'latest-family', dict(review, reviewer_family='family-b', reviewed_lines=153), 'scope_review_same_family')
 for action, params in [('record_decision', dict(dp, topic='gate-user')), ('supersede_decision', dict(sp, decision=successor))]:
     gate(action, action + '-no-evidence', dict(params, decided_by='user'), 'user_decision_evidence_required')
     gate(action, action + '-form-no-words', dict(params, decided_by='user', user_form='decision'), 'user_decision_evidence_required')
@@ -216,7 +232,7 @@ for action, params in [('record_decision', dict(dp, topic='gate-user')), ('super
     answer = gate(action, action + '-decision', dict(user, user_form='decision'))
     assert fields(created(answer, 'decision'))['user_words'] == user['user_words']
 gate('record_decision', 'lead-question', dict(dp, topic='gate-lead-question', user_form='question'))
-print('v5_gate_rows_complete')
+print('v6_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2

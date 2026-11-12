@@ -80,8 +80,8 @@ A required parameter has no `?` below. Numbers after strings are maximum UTF-8 b
 | `open_thread` | Task's work thread and first consumer/use | task, key:120, consumer:1000, consumer_kind:`domain_route`/`harness`/`none`, first_use:1000; unique task/key |
 | `amend_thread` | Consumer/use amendment, previous values in history | thread, consumer:1000, consumer_kind, first_use:1000, reason:600 |
 | `open_plan` | One plan per thread, opening estimates immutable | thread, first_lines:integer, limit_lines:integer (Lead supplies 1.5 times first_lines), current_lines:integer, amended_by_family:120 |
-| `amend_plan` | Current size/latest writer; clears scope_reviewed | plan, current_lines:integer, amended_by_family:120 |
-| `record_scope_review` | Scope/design review after latest amendment | plan, reviewer_family:120, review_report:1000; equal latest-writer family refuses `scope_review_same_family`; families are self-declared |
+| `amend_plan` | Current size/latest writer; clears scope_reviewed, preserves reviewed_lines | plan, current_lines:integer, amended_by_family:120 |
+| `record_scope_review` | Scope/design review covering a stated size | plan, reviewed_lines:integer, reviewer_family:120, review_report:1000; reviewed_lines below current_lines refuses `reviewed_lines_below_current`; equal latest-writer family refuses `scope_review_same_family`; families are self-declared |
 | `set_hold` | Active blocked effect | task, effect:300, until:300 (lifting condition in prose); effect unique among active holds |
 | `lift_hold` | Lifting an active hold | hold, reason?:300 |
 | `record_decision` | Current task/topic choice | task, topic:120, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300, user_words?:1000, user_form?:`decision`/`question` (both required for user, user_words must be nonempty; question refuses `user_question_is_not_a_decision`); one current per topic |
@@ -89,7 +89,7 @@ A required parameter has no `?` below. Numbers after strings are maximum UTF-8 b
 | `define_kpi` | Named task KPI | task, name:120, definition:600, target?:200; name unique within task |
 | `record_measurement` | Immutable observation and latest KPI | kpi, value:200, observed_at:40, evidence:300; `observed_at` is a real UTC time written exactly as `YYYY-MM-DDTHH:MM:SSZ` (`date -u +%Y-%m-%dT%H:%M:%SZ`), not older than history or later than application time |
 | `set_kpi_target` | Desired KPI value | kpi, target:200 |
-| `start_worker_run` | Dispatch | task, name:80, tier:`mechanical`/`bounded`/`open`/`review`, runtime:120, packet, thread, plan, layer:`engine`/`domain`/`harness`, session?:200; thread must belong to task (`thread_of_other_task`); plan must belong to thread; engine needs domain_route; kind none/empty first_use and unreviewed over-limit plans refused; name unique among running workers |
+| `start_worker_run` | Dispatch | task, name:80, tier:`mechanical`/`bounded`/`open`/`review`, runtime:120, packet, thread, plan, layer:`engine`/`domain`/`harness`, session?:200; thread must belong to task (`thread_of_other_task`); unknown plan refuses `plan_missing` before `plan_of_other_thread`; plan must belong to thread; engine needs domain_route; kind none/empty first_use refused; `plan_over_limit` passes only for current_lines at most limit_lines or present reviewed_lines, or tier review; scope_reviewed is not read; name unique among running workers |
 | `note_worker_run` | Progress, separate from final result | worker_run, note:600, report?; run must be running |
 | `close_worker_run` | Final outcome and close time | worker_run, result:600, report?; run must be running |
 

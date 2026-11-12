@@ -50,7 +50,7 @@ property descriptions. It adds five Ontology-owned types, keyed by action id:
 | Type | Records | Actions |
 | --- | --- | --- |
 | `thread` (v5) | Task/key, consumer, consumer_kind (`domain_route`/`harness`/`none`), first_use; prior values in history | `open_thread`, `amend_thread` (requires reason) |
-| `plan` (v5) | One per thread; immutable first_lines/limit_lines, current_lines, amended_by_family, scope_reviewed, reviewer_family, review_report | `open_plan`, `amend_plan`, `record_scope_review` |
+| `plan` (v6) | One per thread; immutable first_lines/limit_lines, current_lines, amended_by_family, scope_reviewed, optional reviewed_lines, reviewer_family, review_report | `open_plan`, `amend_plan`, `record_scope_review` |
 | `hold` | Blocked effect, lifting condition/reason, `set_at` | `set_hold`, `lift_hold` |
 | `decision` | Current choice per task/topic, predecessor, `decided_at` | `record_decision`, `supersede_decision` |
 | `kpi` | Definition, target and latest recorded value/evidence | `define_kpi`, `set_kpi_target` |
@@ -73,24 +73,29 @@ Rule and criterion reference reads require fresh, readable objects; missing or
 unreadable references refuse, and stale source values refuse `rule_value_stale`.
 Validate before apply and pass its basis as expected revisions to detect changes.
 
-### Version 5 dispatch parameters
+### Version 6 dispatch parameters
 `open_thread(task,key,consumer,consumer_kind,first_use)` creates one task/key;
 `amend_thread(thread,consumer,consumer_kind,first_use,reason)` preserves its history.
 `open_plan(thread,first_lines,limit_lines,current_lines,amended_by_family)` sets
 opening estimates once; Lead supplies limit_lines as 1.5 times first_lines.
-`amend_plan(plan,current_lines,amended_by_family)` clears scope_reviewed.
-`record_scope_review(plan,reviewer_family,review_report)` records scope/design
-review; equal reviewer/latest-writer families refuse `scope_review_same_family`.
+`amend_plan(plan,current_lines,amended_by_family)` clears scope_reviewed but preserves reviewed_lines.
+`record_scope_review(plan,reviewed_lines,reviewer_family,review_report)` records the
+size justified by scope/design review; reviewed_lines below current_lines refuses
+`reviewed_lines_below_current`; equal reviewer/latest-writer families refuse `scope_review_same_family`.
 Families are self-declared caller values, not authenticated identities.
 `start_worker_run` additionally requires thread, plan and layer (`engine`/`domain`/`harness`).
 The thread must belong to the task (`thread_of_other_task`); the plan must
 belong to the thread (`plan_of_other_thread`); missing plan input
-uses native `invalid_parameter`, unknown plan fails the plan criteria.
+uses native `invalid_parameter`; unknown plan refuses `plan_missing` before
+`plan_of_other_thread` (the other plan criteria also fail).
 Engine work without consumer_kind domain_route refuses `engine_without_domain_consumer`.
 Consumer kind none or empty first_use refuses `missing_first_use`; whitespace-only
 text is not tested, and parameter definitions have no minimum-length field.
-current_lines > limit_lines requires scope_reviewed, otherwise `plan_over_limit`.
-Both stored numbers are read through the required plan reference. No arithmetic,
+current_lines must be at most limit_lines or present reviewed_lines, or tier must
+be review; otherwise `plan_over_limit`. The legacy scope_reviewed flag is not read.
+A version 5 over-limit plan without reviewed_lines needs a size-bearing review.
+An amendment within reviewed_lines needs no new review. Stored numbers are read
+through the required plan reference; ordered present guards the optional integer. No arithmetic,
 review-content inspection or view is added by these criteria.
 `record_decision` and `supersede_decision` accept optional user_words:1000 and
 user_form (`decision`/`question`); user attribution requires both and nonempty user_words, otherwise
