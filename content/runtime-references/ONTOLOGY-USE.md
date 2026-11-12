@@ -6,7 +6,7 @@ The placement rule is `CONTEXT-GOVERNANCE.md`; the store implements these operat
 | Fact kind | Home |
 | --- | --- |
 | Current blocked effects, task choices, a task's KPI with its target, measured values/history, worker progress/results | Store `hold`, `decision`, `kpi`, `measurement`, `worker_run`, when the task's STATE names that object type in use; STATE then points to the store and does not copy it |
-| Task owner, authority, next action and evidence pointers; holds, decisions, measurements and worker progress of a task whose STATE does not name that object type in use | Task `STATE.md` |
+| Task owner, authority, next action and evidence pointers; holds, decisions, measurements and worker progress of a task whose STATE does not name that object type in use | Task `STATE.md`, or the board that STATE names |
 | Durable rationale, lessons, corrections, preferences and explained terms | Hindsight when the task authorizes it |
 | Schemas, action contracts, implemented behaviour and KPI definitions | Owning repository source; `kpi.definition` records the task's operational definition |
 | Task files, packets, reports, binaries and instructions | Original files; store `task`, `packet`, `report`, `installed_artifact`, `instruction_file` are indexed observations |

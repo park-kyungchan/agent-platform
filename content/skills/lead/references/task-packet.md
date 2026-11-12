@@ -17,7 +17,7 @@ Strategy link: <STATE or STRATEGY.md line>; KPI this task moves: <KPI or guardra
 Allowed effects: <reads, writes, local commits, push, pull request, build slot>
 Forbidden effects: <holds, other paths, host, domain and remote boundaries>
 Expected output: <absolute report path and its fixed shape; source revision; evidence; limitations>
-Verification: <commands and the output or effect to read back>
+Verification: <commands the worker runs on the host and the output or effect to read back; the checks left to the CI job, by name, read on the pushed head>
 Quiet limit: <minutes without output after which the Lead treats the run as stalled; from the expected length of the run>
 DONE marker: <unique literal line printed last, ending with the SHA-256 of the report>
 ```
@@ -51,7 +51,7 @@ If an instruction does not fit what you find: write the mismatch in the report a
 
 ## Open judgment tier: add
 
-For an inventory, a diagnosis across repositories or an attack on a design. Never for a design the Lead owes.
+For an inventory, a diagnosis across repositories or an attack on a design. Never for a design the Lead owes: the report gives facts with evidence, never a recommended structure.
 
 ```markdown
 Goal and acceptance: <what a good result must make true>

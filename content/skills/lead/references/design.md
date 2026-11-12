@@ -23,7 +23,7 @@ One codebase in Rust on one Ontology. "Ontology" is Palantir's sense: object typ
 - R5 Proportion. A measuring instrument is smaller than what it measures. A fact about a real service is measured on the real service, by the Lead where one run suffices.
 - R6 New code is Rust in a platform crate. A script stays only as an exception the lens file names with its bound.
 - R7 First use. Every built thing names who first uses it (a production route, an agent) and by which packet. With no named user, nothing further is built.
-- R8 One check. What proves a change is a command an agent can run on the host, and the CI job runs that same command; a step only a workflow file can run is named with its reason. The split between the host and CI follows measured duration, the build slot and the CI budget.
+- R8 One check. What proves a change is a command an agent can run on the host, and the CI job runs that same command; a step only a workflow file can run is named with its reason. The split between the host and CI follows measured duration, the build slot and the CI budget (the minutes the hosting plan includes for private repositories).
 
 ## Lens file (`LENS.md` in the task directory)
 
@@ -62,6 +62,5 @@ Design (the Lead's; a mismatch with the code is reported, not resolved by the wo
 - Invariant: <sentence>
 - Callers searched: <command>; affected: <file:line list>; each one's fate
 - Tests that must fail on the wrong implementation: <test -> guarantee -> the wrong implementation>
-- Check: <command on the host>; CI job: <name>
 - Not built: <neighbouring things left out on purpose>
 ```
