@@ -13,19 +13,18 @@ Use at the closure of a task or a worker run, when the user corrects the Lead, a
 2. Capture a lesson only when something durable was learned. Levels: L0 incident, L1 lesson, L2 pattern, L3 structural issue with a direction proposal. Promotion needs independent occurrences of a verified mechanism, never a document count.
 3. A correction from the user is an occurrence. The first one changes the instance (skill `strategy-dialogue` section 6). A second correction of the same kind is a missing or unclear rule: the Lead changes the rule in the file that holds it, through a pull request, and reports the change.
 4. An expression of the user that appears in a second task is added to `/root/.agents/runtime-references/GLOSSARY.md` section 7 the same way.
-5. Write to long-term memory only when the task authorizes a write, through the official Hindsight HTTP API or client, without student, lesson or operational payloads. In a no-write task leave a short handoff file in the task directory and name it in STATE.
+5. Engineering capture follows the Git-original/native-publisher contract in `agent-platform` `memory/README.md`, only within task authority and without student, lesson or operational payloads. In a no-write task leave a short handoff file in the task directory and name it in STATE.
 6. An L3 direction proposal goes to the Lead and into the current STATE under `DIRECTION PROPOSALS`. The Lead decides it by the measure it would move, carries it out as a reversible trial where one exists, and reports the decision and the result to the user.
 
 The sections below give the details. They build no database, ledger, watcher, grader or transcript pipeline.
 
 Use [worker-closure.md](references/worker-closure.md) for task-local closure evidence, metrics, holds and optional lesson candidates; the reference grants no memory write or new approval step.
 
-## Capture and official ingestion
+## Capture through reviewed originals
 
-Read [record-schema.md](references/record-schema.md) when drafting or curating a
-record; it defines the exact frontmatter, tags, promotion and status rules.
-This is a human-authored convention inside ordinary Hindsight documents, not a
-new database schema, validator, runtime gate or executable ledger.
+Read [record-schema.md](references/record-schema.md) for the schema's source home,
+and [hindsight-api.md](references/hindsight-api.md) for the publisher's operational
+home. These references grant no direct engineering API/MCP write.
 
 At closure the assigned task owner records actual workers, review findings by
 severity, rework rounds and CI minutes in task STATE. Distinguish CI wall duration
@@ -38,18 +37,13 @@ record kind owned by education-platform
 Unknown cause or metrics remain unknown.
 In a no-write task, leave an allowed task-local handoff for the curator instead.
 
-Structured L0–L3, decision, correction, glossary/profile, strategy and
-KPI-definition records use the official HTTP API/client: explicit stable
-`document_id`, then complete-tag-set PATCH and GET readback. Read
-[hindsight-api.md](references/hindsight-api.md) for endpoint/token-file locations,
-credential handling, exact ordering, provenance and safe replacement. Never print
-secrets. The review correction takes precedence over title-only MCP capture.
-MCP `ingest_document` / `capture_initiative` are only for simple unstructured notes
-and initiatives. A no-write task leaves a local curator handoff instead.
-
-A genuinely approved new initiative uses official `capture_initiative` once;
-a material scope/rationale change reuses its existing page. It is dated intent,
-not a second task tracker or authority grant.
+Draft admitted engineering originals under `agent-platform/memory/records/` and
+commit them in the task's closure PR; the reviewed-main native publisher alone
+writes their retrieval copy. The runbook owns schema, subjects/tags, maintenance,
+retraction, evidence and activation. No MCP ingestion/initiative, direct retain,
+manual tag PATCH, page refresh or session transcript is an engineering capture route.
+An initiative or direction proposal remains intent until the current owner adopts
+it; no record becomes an operational task tracker or an authority grant.
 
 ## Promotion, curation and structural proposals
 
@@ -73,24 +67,13 @@ it and reports the decision and its result to the user.
 
 ## Readback and derived views
 
-Search/read selected pages first; use official recall for exact evidence and
-reflect only for unresolved reasoning. The installed MCP has page search/read
-and reflect, but no raw recall tool; use the official HTTP/client recall route.
-Credit memory used and verify against current native source. Follow
+Use only the task-authorized read route and verify operational claims at their
+native owner. The prepared engineering route is scoped native recall and exact
+document reads; no reflect or engineering pages. Credit memory used. Follow
 [CONTEXT-GOVERNANCE.md](../../runtime-references/CONTEXT-GOVERNANCE.md).
 
-Only an authorized curator changes/refreshes affected Lessons ledger, Structural
-risk review, User glossary or Conventions and patterns pages. These proposed
-views are not assumed installed. Check original-document extraction, observation
-source scope, refreshed page content and recall separately; a queued operation
-or `is_stale:false` does not establish semantic freshness. Strict tagged scopes
-can miss shared untagged observations; non-strict topic routing is not privacy.
-Never re-ingest a generated page as new source evidence.
-
-Use the task's official recall regression suite after each authorized migration
-sub-batch/model batch, weekly curation and routing/tag/model changes. Preserve
-exact specialist contracts, reject stale-current answers and record errors as
-errors. No custom grader, transcript pipeline or new scheduler. Record curator
-candidate/verified/promoted/superseded counts, independent recurrence, recall
-outcomes/stale-current claims, unresolved corrections, source coverage, model
-failures and observed consolidation/refresh time/cost; missing values stay unknown.
+Publication/retraction, due review and canary/full-evaluation timing have one home:
+`agent-platform` `memory/README.md`. Keep unknown coverage/costs unknown, and keep
+failed or unqualified routes unavailable. No custom judge, scheduler or second
+history store. The separate Academy archive retains its private owner/contract;
+its lesson pages are not engineering views and are not changed by this skill.

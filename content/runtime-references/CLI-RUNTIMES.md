@@ -73,6 +73,13 @@ The target window is a task decision and is written in the task's STATE. A confi
 - When the user excludes a feature for one CLI, use that CLI's own control, keep the previous bytes and read the result back in a new session of your own. That is not uninstalling it for the account.
 - When reading a configuration file to reconcile a difference, read key names and the command and arguments only. Never print credential values.
 
+Engineering route preparation, the exact five configuration sections, plugin closure,
+private-FD credentials, stopped-consumer proof and owner undo live in `agent-platform`
+`memory/README.md`. Source installation does not change registrations or running
+sessions. Native transport/FD support and plugin precedence require qualification;
+a CLI with no successful proof stays disconnected. The Academy archive exception
+and its registration remain under their owner's holds.
+
 ## 6. Hooks
 
 Hook wiring differs per CLI and changes with CLI and plugin versions, so read the actual configuration instead of assuming it: Claude Code `~/.claude/settings.json` `hooks` plus its installed plugins, Codex `~/.codex/hooks.json`, Muse `~/.config/muse/settings.json` `hooks`, Antigravity `~/.gemini/config/hooks.json`, Grok `~/.grok/hooks/`. A CLI with the `hindsight` MCP server but no Hindsight hook gets no automatic memory injection and no automatic session retention; the agent calls the tools itself. A hook name does not show that injection or retention happened.

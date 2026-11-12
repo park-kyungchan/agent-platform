@@ -9,10 +9,10 @@ The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6;
 | The active conversation, reasoning, a resumable session, and notes that matter only to that one CLI | The CLI's own session store and private memory | The CLI | Resume only the exact session you need. Never import another agent's transcript |
 | Owner, authority, holds, next action, task metrics, verification, the brief, and for a task with several work threads the board | The task's `STATE.md`, `TASK.md`, `STRATEGY.md`, and the board file STATE names | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
 | Implemented behaviour, schemas, APIs, tests, build instructions, KPI definitions | The owning repository's source and docs | The implementation owner, through review | Read the current revision. Do not rely on a remembered implementation |
-| Durable decisions and their reasons, lessons, corrections, scoped user preferences, explained terms | The shared Hindsight bank `coding-agent::shared` | An authorized owner or curator through the official HTTP API or client; the MCP tools only for simple notes and initiatives | Search pages, read the selected ones, recall exact evidence. Reflect only when those leave reasoning unresolved |
+| Durable decisions and their reasons, lessons, corrections, scoped user preferences, explained terms | Engineering originals in `agent-platform/memory/records/`; Hindsight holds a retrieval copy | The task owner through the closure PR and the native publisher in `agent-platform` `memory/README.md` | Use the authorized current route; the prepared engineering route is native scoped recall/exact-document reads, not pages or reflect |
 | Current operational objects, observations, KPI values and time series, policies, actions, recovery state | The domain or task owner today; `ontology-platform` when its admission is implemented | The trusted domain owner under the task's authority | A fresh authorized read with revision, scope, coverage and freshness. Memory is only a pointer to it |
 
-- A decision another agent needs must not stay only in one CLI's private memory: write it in the repository contract or in an authorized, sourced Hindsight document.
+- A decision another agent needs must not stay only in one CLI's private memory: write its rule in the owning repository; keep a task decision in its admitted store and an engineering rationale in the Git-original contract of `agent-platform` `memory/README.md`.
 - Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off (reason: `HINDSIGHT-RUNTIME.md`, "Session path on this host").
 - A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy, or in the store's `kpi` object when the task's STATE names that object type in use (`ONTOLOGY-USE.md`), never in both; the user corrects them. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
 
@@ -40,12 +40,14 @@ When memory and current source disagree, the source wins for current truth. Keep
 ## 4. Writing memory
 
 - A skill or a visible tool is not a write grant. Writing needs the task's authority. A no-write task does not ingest, PATCH, refresh or delete.
-- Structured records (incidents, lessons, decisions, Corrections, profile, glossary, strategy, KPI definition) go through the official HTTP API or client with an explicit stable `document_id`, then a complete-tag-set PATCH, then a GET readback. The exact sequence, endpoint and token-file location: `/root/.agents/skills/lessons-loop/references/hindsight-api.md`.
-- MCP `ingest_document(title, content)` derives its ID from the title and takes no ID, tags or frontmatter: use it only for simple unstructured notes. `capture_initiative` is for an approved initiative and reuses its page when the scope changes.
-- A pinned original is never rewritten: link a Correction or a new version. A mutable record is replaced under the same ID with its complete body, after saving the previous body. A complete-tag-set PATCH replaces all tags and can requeue related sources. Document history is not a text backup.
-- An acknowledgement or a queued refresh shows nothing about the outcome. Read back the document, the extraction, the page content and the recall separately. Reconcile an uncertain write before retrying.
+- Engineering capture, correction, publication and retraction follow `agent-platform` `memory/README.md`; it is the operational home. Draft a checked Git original and commit it in the owning closure PR; Hindsight is a retrieval copy, never a second original/history store.
+- Do not use MCP `ingest_document` or `capture_initiative`, direct retain/PATCH, generated pages or a copied STATE as the engineering write route. The publisher alone sends reviewed-main publication bytes and derived tags under its authorized maintenance window.
+- Corrections edit the same original through review; preserve Git history and pinned evidence. Retraction proves the listed reads before the owning PR removes the source; uncertain work keeps the route unavailable. No fallback to the mixed bank.
+- The separate private Academy archive keeps its owner and the exception below. This source change does not activate a route or release registration/content holds.
 
 ## 5. Tags and derived pages
+
+Engineering tags come only from the vocabulary and publisher described in `agent-platform` `memory/README.md`; it has no engineering pages. The following provenance and proposed-page guidance concerns retained historical/private-owner material, not new engineering tag authorship.
 
 - Use real provenance: platform `agent`, `education` or `ontology`, plus the repository. A module carries its owner's platform. Keep genuine `source:*`, `harness:*`, `project:*` and historical tags; never imitate a plugin's attribution.
 - A tag routes a topic. It is not privacy and not permission. A strict tagged scope can miss shared untagged observations.
@@ -60,4 +62,4 @@ One exception, by the user's decision of 2026-11-06: the Academy lesson archive.
 ## 7. Lessons and Ontology
 
 - Lessons are promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes through the Lead to the task STATE's `DIRECTION PROPOSALS` and to the user; no memory write enacts architecture or policy. Procedure: skill `lessons-loop`.
-- `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Hindsight owns contextual decisions and lessons. Boundary document: `/home/palantirkc/platforms/ontology-platform/docs/hindsight-boundary.md`. There is no shared database, state replica or automatic promotion of prose into objects between them. Check what `ontology-platform` actually provides at its current revision before relying on it.
+- `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Git owns engineering originals; Hindsight owns their retrieval copy under `agent-platform` `memory/README.md`. Boundary document: `/home/palantirkc/platforms/ontology-platform/docs/hindsight-boundary.md`. There is no shared database, state replica or automatic promotion of prose into objects between them. Check what `ontology-platform` actually provides at its current revision before relying on it.

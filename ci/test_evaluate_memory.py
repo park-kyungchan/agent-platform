@@ -385,7 +385,8 @@ class EvaluationTests(unittest.TestCase):
         for data in (self.data, dict(questions=self.data['questions'][:1])):
             with self.subTest(count=len(data['questions'])):
                 data = copy.deepcopy(data); data['questions'].append(copy.deepcopy(data['questions'][0]))
-                with self.assertRaisesRegex(E.P.Stop, '^held_out_duplicate_id$'):
+                code = 'duplicate_id' if 'schema' in data else 'held_out_duplicate_id'
+                with self.assertRaisesRegex(E.P.Stop, '^' + code + '$'):
                     E.check_results(self.results, self.evidence, self.hash, data)
 
     def test_duplicate_evidence_keys_fixed_and_held_out(self):
@@ -450,7 +451,7 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(checked['pins_changed_since_collect'], 0)
 
     def test_result_fields_cannot_override_collected_fields(self):
-        for name in ('items', 'returned_count', 'latency_ms', 'oracle'):
+        for name in ('items', 'returned_count', 'latency_ms', 'oracle', 'usage', 'native_returned_count', 'response_bytes'):
             with self.subTest(name=name):
                 self.results['slots'][0][name] = 'invented override'
                 with self.assertRaisesRegex(E.P.Stop, '^result_field_not_allowed$'): self.check()
@@ -464,11 +465,61 @@ class EvaluationTests(unittest.TestCase):
         for returned, current in ((0, 0), (1, 0)):
             with self.subTest(returned=returned, current=current):
                 self.evidence['slots'][0]['returned_count'] = returned
+                self.evidence['slots'][0]['items'] = [self.stub.fact] * returned
                 self.results['slots'][0]['current_count'] = current
                 with self.assertRaisesRegex(E.P.Stop, '^supported_without_items$'): self.check()
                 self.results['slots'][0]['verdict'] = 'missing'; self.results['target_reached'] = False
                 self.assertFalse(self.check()['target_reached'])
                 self.results['slots'][0]['verdict'] = 'supported'; self.results['target_reached'] = True
         self.evidence['slots'][0]['returned_count'] = 100
+        self.evidence['slots'][0]['items'] = [self.stub.fact] * 100
         self.results['slots'][0]['current_count'] = 1
         self.assertEqual(self.check()['slots'][0]['current_item_share'], 0.01)
+
+
+    def test_held_out_sources_required_before_reads(self):
+        question = copy.deepcopy(self.data['questions'][0]); question['sources'] = []
+        self.stub.calls.clear()
+        with tempfile.TemporaryFile() as incoming, tempfile.TemporaryFile() as private:
+            incoming.write(E.encode(dict(questions=[question]))); incoming.seek(0)
+            with self.assertRaisesRegex(E.P.Stop, '^held_out_sources_required$'):
+                E.collect(self.stub, self.stub.pin, self.data, self.raw, self.selector, [], incoming.fileno(), private.fileno())
+            self.assertEqual(private.tell(), 0)
+        self.assertEqual(self.stub.calls, [])
+
+    def test_returned_count_must_match_collected_items(self):
+        for returned in (0, 2, True):
+            with self.subTest(returned=returned):
+                self.evidence['slots'][0]['items'] = [self.stub.fact]
+                self.evidence['slots'][0]['returned_count'] = returned
+                with self.assertRaisesRegex(E.P.Stop, '^returned_count_mismatch$'): self.check()
+        self.evidence['slots'][0]['returned_count'] = 1
+        sealed, private, evidence, fixed, judged = self.held_fixture()
+        private['slots'][0]['returned_count'] = 2
+        rc, error = self.check_held(sealed, private, evidence, fixed, judged)
+        self.assertEqual(rc, 1); self.assertIn('returned_count_mismatch', error)
+
+    def test_held_out_changed_pin_reaches_public_count(self):
+        path = self.directory / 'held-source'; path.write_bytes(b'invented old source')
+        question = copy.deepcopy(self.data['questions'][0])
+        question['sources'] = [dict(kind='file', path=str(path), anchor='invented', sha256=E.P.digest(path.read_bytes()))]
+        args = self.held_fixture([question])
+        path.write_bytes(b'invented new source')
+        rc, checked = self.check_held(*args)
+        self.assertEqual(rc, 0); self.assertTrue(checked['target_reached'])
+        self.assertEqual(checked['pins_changed_since_collect'], 1)
+
+    def test_pin_change_count_compares_values_not_metadata(self):
+        path = self.directory / 'source'; path.write_bytes(b'invented old source')
+        source = dict(kind='file', path=str(path), anchor='invented', sha256='0'*64)
+        self.data['questions'][0]['sources'] = [source]
+        self.evidence['source_pins']['R01'] = E.source_pins(dict(sources=[source]))
+        self.assertEqual(self.evidence['source_pins']['R01'][0]['pin'], 'source_changed')
+        path.write_bytes(b'invented other source')
+        checked = self.check()
+        self.assertEqual(checked['pins_changed_since_collect'], 0)
+        self.assertEqual(self.evidence['source_pins']['R01'][0]['pin'], 'source_changed')
+
+    def test_duplicate_fixed_corpus_code(self):
+        self.data['questions'][1]['id'] = self.data['questions'][0]['id']
+        with self.assertRaisesRegex(E.P.Stop, '^duplicate_id$'): E.corpus(E.encode(self.data))

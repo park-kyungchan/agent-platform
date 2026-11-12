@@ -7,6 +7,15 @@ Earlier retrieval/source reading: 2026-11-06, server reference pin 1.2.0
 **measured** — API/MCP reported 1.2.0 on 2026-11-12; those measurements did not independently
 re-inspect revision `34a1386`. After upgrades, re-check source and remeasure behavioral claims.
 
+## Engineering route and authority
+
+The operational home is `agent-platform` `memory/README.md`: Git originals,
+one native publisher and scoped native recall/exact-document reads. Old mixed-bank
+pages, reflect, direct ingestion and plugin capture are not the engineering route.
+The source runbook is preparation only; registration/content holds remain until
+qualification and owner cutover. Historical/lesson behavior below is not proof of
+an activated engineering route or of current embedding/reranker weights.
+
 ## Where to look (cheapest first)
 
 | Need | Route |
@@ -39,7 +48,7 @@ Endpoint paths below are relative to `/v1/default/banks/{bank_id}`.
 
 **Recall** (`POST /memories/recall`): four arms (semantic, BM25, graph, temporal) fused by RRF (k=60).
 A cross-encoder reranks the top candidates per budget (host: low 40, mid 80, high 300), then
-recency (linear, 365 days), temporal and proof-count boosts apply. Host models: embeddings
+recency (linear, 365 days), temporal and proof-count boosts apply. Earlier source-reported models (not current runtime proof): embeddings
 `BAAI/bge-small-en-v1.5` (English-only, 384 dimensions, 512-token input); reranker
 `bge-reranker-v2-m3` (multilingual); BM25 uses an `english` text-search configuration.
 Consequences:

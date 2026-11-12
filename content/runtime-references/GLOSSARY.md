@@ -52,7 +52,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | private memory | A store that one CLI keeps for itself and no other CLI reads | `CLI-RUNTIMES.md` section 8 | `personal memory` |
 | knowledge page | A page Hindsight derives from stored documents; a way to find evidence, not evidence itself | A result of the page search tool | — |
 | operational fact | What is true of a running system or a domain record now | A deployed revision, a KPI value | — |
-| correction | A dated document that says what an earlier record claimed, what is true now and the evidence | A Hindsight document titled "Correction: <topic>" | — |
+| correction | A dated document that says what an earlier record claimed, what is true now and the evidence | For an engineering record, an edit of the same Git original through review; see `CONTEXT-GOVERNANCE.md` section 4 | — |
 
 Where each kind is written: `/root/.agents/AGENTS.md` section 6.
 

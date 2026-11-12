@@ -85,7 +85,7 @@ chat. These references are CLI-agnostic and do not change task authority.
 
 ## Profile and glossary contract
 
-Search the relevant Hindsight profile/glossary first, then check current native source for the requested term/mechanism. Explain in clear Korean with the actual programming terms; use no metaphor. State concrete input, executor and result, then the steps and details needed for the user's learning. Distinguish source fact from inference and do not claim a concept was understood merely because it was explained. Keep a scoped user preference and the terms actually explained, with dated evidence and feedback, in authorized official Hindsight profile/glossary documents; do not store the whole conversation, demographics, private payloads or inferred ability. Reuse stable term identity and correct a materially changed meaning with provenance. In a no-write task, make no Hindsight write and leave only the allowed local note. Credit retrieved memory when it contributes.
+Search the relevant Hindsight profile/glossary first, then check current native source for the requested term/mechanism. Explain in clear Korean with the actual programming terms; use no metaphor. State concrete input, executor and result, then the steps and details needed for the user's learning. Distinguish source fact from inference and do not claim a concept was understood merely because it was explained. Keep a scoped user preference and the terms actually explained, with dated evidence and feedback, in authorized `user-profile`/`glossary` engineering records; do not store the whole conversation, demographics, private payloads or inferred ability. Reuse stable term identity and correct a materially changed meaning with provenance. In a no-write task, make no Hindsight write and leave only the allowed local note. Credit retrieved memory when it contributes.
 
 Use the official page search/read tools only when available and allowed; if
 memory is disabled for this worker, use its exact source packet and record the
@@ -95,28 +95,13 @@ in the current context. A recalled definition never replaces current source.
 
 Keep preferences in a scoped profile; glossary records link that profile instead
 of copying it. Record only terms actually explained, never a predicted syllabus.
-Use ordinary document frontmatter with `schema_version`, `record_id`, `revision`,
-`kind`, title, scope/platforms, status, dated sources and supersession links:
+`user-profile` and `glossary` are engineering records. Their format, identity
+and write route are in `agent-platform` `memory/README.md`.
+A write requires current task authority; a no-write task leaves a local handoff
+in the task directory, named in STATE.
 
-- `user-profile`: `preference`, explicit `user_evidence`,
-  `applies_to_runner_or_domain`, `valid_from`, `revisit_trigger`, `confidence`.
-- `glossary`: `term_literal`, `language`, `definition_ko`, `concrete_input`,
-  `executor`, `result`, `explained_at`, `explanation_evidence_ref`, `scope`,
-  `user_feedback`, `last_confirmed`. Missing feedback remains unknown; an
-  explanation is not proof of mastery or permission.
-
-Use stable ASCII IDs `mem-v1-user-profile-<scope>-<stable-topic>` and
-`mem-v1-glossary-<scope>-<stable-topic>`, scope `agent|education|ontology|cross`.
-A term/topic rename does not change identity. For a mutable authored record,
-increment `revision` and use its exact `document_id` with `update_mode:"replace"`
-and the complete body through official retain. Preserve a recoverable preimage.
-Preserve pinned originals; use a new version/Correction with source/content pins
-for a materially changed meaning. Do not put lesson severity/level on a glossary.
-Structured glossary/profile records must use the official HTTP API/client with
-explicit stable `document_id`, then complete-tag-set PATCH and GET readback.
-See [hindsight-api.md](../lessons-loop/references/hindsight-api.md) for endpoint
-and token-file locations, credential handling and the safe sequence. MCP
-`ingest_document` / `capture_initiative` are only for simple unstructured notes
-and initiatives. No-write tasks leave only the allowed local curator handoff.
-All writes, including profile/glossary capture and refresh, require current task
-authority; never print the token or hardcode secrets.
+Keep the definition, concrete input, executor, result, dated explanation evidence,
+scope and user feedback. Missing feedback remains unknown; an
+explanation is not proof of mastery or permission.
+Do not put lesson severity/level on a glossary.
+Never print the token or hardcode secrets.
