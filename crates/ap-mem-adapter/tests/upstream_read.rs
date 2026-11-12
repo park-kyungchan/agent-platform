@@ -1,6 +1,6 @@
 mod support;
 use serde_json::{Value, json};
-use support::upstream::{MCP_PATH, Server};
+use support::upstream::MCP_PATH;
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/read-cases.json")).unwrap()
@@ -8,7 +8,7 @@ fn fixture() -> Value {
 
 #[test]
 fn fixed_endpoint() {
-    let mut server = Server::start(fixture());
+    let mut server = support::fixture_server(fixture());
     let address = server.address();
     assert!(address.ip().is_loopback());
     assert_ne!(address.port(), 0);
@@ -44,7 +44,7 @@ fn fixed_endpoint() {
 
 #[test]
 fn lesson_canary() {
-    let server = Server::start(fixture());
+    let server = support::fixture_server(fixture());
     for tool in [
         "recall",
         "search_knowledge_base",
@@ -66,7 +66,7 @@ fn lesson_canary() {
 
 #[test]
 fn provenance_cases() {
-    let server = Server::start(fixture());
+    let server = support::fixture_server(fixture());
     let raw = server.mcp("recall", json!({"test_query":"fixture"}));
     assert_eq!(raw, fixture()["responses"]["recall"]);
     let labels: Vec<_> = raw["facts"]

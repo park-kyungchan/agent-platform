@@ -27,7 +27,7 @@ impl TempDir {
 impl Drop for TempDir {
     fn drop(&mut self) {
         if let Err(error) = std::fs::remove_dir_all(&self.0) {
-            eprintln!("test_cleanup_failed: {error}");
+            assert!(std::thread::panicking(), "test_cleanup_failed: {error}");
         }
     }
 }

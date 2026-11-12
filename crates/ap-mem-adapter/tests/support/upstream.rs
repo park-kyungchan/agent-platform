@@ -1,4 +1,7 @@
-//! Synthetic wire only: /__test__ aliases are deliberately not native bindings.
+//! Rules for extensions: EVERY unverified upstream choice belongs to Behaviour,
+//! has a hostile Default and a handler contrast test. ALL assigned identifiers
+//! come from opaque_id(); never derive them from caller bytes or a counter.
+//! Fixed HTTP framing and test_* aliases are test transport, not native bindings.
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Read, Write};
@@ -20,86 +23,258 @@ pub struct Request {
     pub body: Value,
 }
 
-// Controls are consumed by distinct integration-test binaries.
 #[allow(dead_code)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum MutationFault {
     BeforeAccept,
     LostAck,
 }
 
-// Every default is hostile to a publisher; tests select favourable cases explicitly.
-#[derive(Default)]
-pub struct RetryPolicy {
-    pub deduplicate: bool, // U3: default false: a resend creates another operation.
-    pub reject_mismatch: bool, // U3: default false: changed bytes are accepted.
-    pub delete_immediate: bool, // U5: default false: reply precedes deletion.
-    pub absent_delete_ok: bool, // U5: default false: an absent id returns 404.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Behaviour {
+    pub require_initialize: bool,   // U1: default true; bare MCP is refused.
+    pub root_routes: bool,          // U1: default false; unverified root HTTP routes unavailable.
+    pub reject_unknown: bool,       // U1/U2: default true; unknown routes/tools refused.
+    pub validate_shape: bool,       // U4/U6/U12/U13: default false; malformed input accepted.
+    pub provenance: bool,           // U2: default false; no complete document_ids attribution.
+    pub complete_reads: bool,       // U8: default false; partial body/list responses.
+    pub honor_retrieval_args: bool, // U2/U8: default false; recall/search ignore selectors.
+    pub config_resolved: bool,      // U11: default false; config omits resolved values.
+    pub observable_operations: bool, // U3/U14: default false; jobs cannot be inspected.
+    pub absent_read_404: bool,      // U4/U7: default true; absent reads fail.
+    pub deduplicate: bool,          // U3: default false; resend creates another opaque operation.
+    pub reject_mismatch: bool,      // U3: default false. With dedup on, changed bytes are
+    // silently IGNORED unless restart_mismatch is selected: stale intent is acknowledged,
+    // the least favourable outcome for a publisher expecting its new bytes to apply.
+    pub restart_mismatch: bool, // U3/U14: default false; finished work never restarts implicitly.
+    pub delete_immediate: bool, // U5: default false; acknowledgement precedes completion.
+    pub absent_delete_ok: bool, // U5: default false; an absent DELETE returns 404.
+    pub echo_delete: bool,      // U5: default false; acknowledgement does not echo caller id.
+    pub clean_deleted_facts: bool, // U5: default false; fact residue remains.
+    pub clean_deleted_pages: bool, // U15: default false; page-source membership remains.
+    pub exact_retained_body: bool, // U4: default false; retain normalizes/changes body bytes.
+    pub replace_tags: bool,     // U4/U13: default false; old tags survive replacement.
+    pub replace_facts: bool,    // U4/U10: default false; extraction/fact projection stays old.
+    pub last_finish_wins: bool, // U14: default true; an old operation/job may overwrite newer work.
+    pub page_deduplicate: bool, // U6: default false; create retry duplicates.
+    pub reject_orphan: bool,    // U6: default false; orphan parent accepted silently.
+    pub echo_created: bool, // U6: default false; page/folder metadata comes from a separate fixture.
+    pub refresh_keeps_old: bool, // U7: default true; successful refresh can leave stale text.
+    pub tree_bodies: bool,  // U6/U8: default false; navigation need not include page bodies.
+    pub fault: Option<MutationFault>, // U9/U14: default LostAck; uncertain acceptance before any retry.
+}
+
+impl Default for Behaviour {
+    fn default() -> Self {
+        Self {
+            require_initialize: true,
+            root_routes: false,
+            reject_unknown: true,
+            validate_shape: false,
+            provenance: false,
+            complete_reads: false,
+            honor_retrieval_args: false,
+            config_resolved: false,
+            observable_operations: false,
+            absent_read_404: true,
+            deduplicate: false,
+            reject_mismatch: false,
+            restart_mismatch: false,
+            delete_immediate: false,
+            absent_delete_ok: false,
+            echo_delete: false,
+            clean_deleted_facts: false,
+            clean_deleted_pages: false,
+            exact_retained_body: false,
+            replace_tags: false,
+            replace_facts: false,
+            last_finish_wins: true,
+            page_deduplicate: false,
+            reject_orphan: false,
+            echo_created: false,
+            refresh_keeps_old: true,
+            tree_bodies: false,
+            fault: Some(MutationFault::LostAck),
+        }
+    }
+}
+
+/// Only source of assigned operation, job, folder, page and duplicate identities.
+pub fn opaque_id() -> String {
+    let mut bytes = [0_u8; 16];
+    std::fs::File::open("/dev/urandom")
+        .unwrap()
+        .read_exact(&mut bytes)
+        .unwrap();
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 pub struct Model {
     pub fixture: Value,
+    pub behaviour: Behaviour,
     pub requests: Vec<Request>,
     pub operations: BTreeMap<String, Value>,
-    pub next_fault: Option<MutationFault>,
-    pub retry: RetryPolicy,
     pub pending_deletes: BTreeSet<String>,
     pub folders: BTreeMap<String, Value>,
     pub pages: BTreeMap<String, Value>,
     pub page_jobs: BTreeMap<String, Value>,
-    pub page_deduplicate: bool, // U6: default false; lost-ack retries can duplicate.
-    pub page_reply_override: Option<Value>, // U6: selected wrong metadata; default none.
-    pub refresh_keeps_old: bool, // U7: default true; job success need not mean fresh text.
+    initialized: bool,
     disconnect: bool,
+    retains: BTreeMap<String, String>,
+    creates: BTreeMap<(bool, String), String>,
+    applied_order: BTreeMap<String, u64>,
+    next_order: u64,
 }
 
 impl Model {
+    fn new(fixture: Value) -> Self {
+        Self {
+            fixture,
+            behaviour: Behaviour::default(),
+            requests: Vec::new(),
+            operations: BTreeMap::new(),
+            pending_deletes: BTreeSet::new(),
+            folders: BTreeMap::new(),
+            pages: BTreeMap::new(),
+            page_jobs: BTreeMap::new(),
+            initialized: false,
+            disconnect: false,
+            retains: BTreeMap::new(),
+            creates: BTreeMap::new(),
+            applied_order: BTreeMap::new(),
+            next_order: 0,
+        }
+    }
+    fn order(&mut self) -> u64 {
+        self.next_order += 1;
+        self.next_order
+    }
+    fn may_apply(&mut self, target: String, order: u64) -> bool {
+        if !self.behaviour.last_finish_wins
+            && self.applied_order.get(&target).is_some_and(|n| *n > order)
+        {
+            return false;
+        }
+        self.applied_order.insert(target, order);
+        true
+    }
     #[allow(dead_code)]
-    pub fn finish_refresh(&mut self, job_id: &str, success: bool) {
-        let job = self.page_jobs.get_mut(job_id).unwrap();
-        assert_eq!(job["test_state"], "running");
-        job["test_state"] = json!(if success { "succeeded" } else { "failed" });
-        // U7/U14: test-selected result and last-finisher ordering, not a native barrier.
-        if success && !self.refresh_keeps_old {
-            let page = self
-                .pages
-                .get_mut(job["test_page_id"].as_str().unwrap())
-                .unwrap();
-            for key in ["body", "document_ids"] {
-                // U2/U7: synthetic result/source fields.
-                page[key] = job["test_target"][key].clone();
-            }
+    pub fn finish(&mut self, id: &str, success: bool) {
+        let op = self.operations.get_mut(id).unwrap();
+        assert_eq!(op["test_state"], "running");
+        op["test_state"] = json!(if success { "succeeded" } else { "failed" });
+        let mut doc = op["request"]["document"].clone();
+        let order = op["test_order"].as_u64().unwrap();
+        let Some(doc_id) = doc["document_id"].as_str().map(str::to_owned) else {
+            return;
+        };
+        if !success || !self.may_apply(format!("document:{doc_id}"), order) {
+            return;
+        }
+        if !self.behaviour.exact_retained_body {
+            doc["body"] = json!("TEST_NORMALIZED_BODY");
+        }
+        if !self.behaviour.replace_tags {
+            let mut tags = self.fixture["documents"][&doc_id]["tags"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+            tags.extend(doc["tags"].as_array().cloned().unwrap_or_default());
+            doc["tags"] = json!(tags);
+        }
+        self.fixture["documents"][&doc_id] = doc.clone();
+        if self.behaviour.replace_facts {
+            let facts = self.fixture["facts"].as_array_mut().unwrap();
+            facts.retain(|f| {
+                !f["document_ids"]
+                    .as_array()
+                    .is_some_and(|ids| ids.contains(&json!(doc_id)))
+            });
+            facts.push(json!({"text":doc["body"],"document_ids":[doc_id]}));
         }
     }
     #[allow(dead_code)]
     pub fn finish_delete(&mut self, id: &str) {
         assert!(self.pending_deletes.remove(id));
+        self.delete_projection(id);
+    }
+    fn delete_projection(&mut self, id: &str) {
         self.fixture["documents"]
             .as_object_mut()
             .unwrap()
             .remove(id);
-        // U5/U15: completion need not remove facts or page-source membership.
-    }
-    #[allow(dead_code)]
-    pub fn finish(&mut self, operation_id: &str, success: bool) {
-        let op = self.operations.get_mut(operation_id).unwrap();
-        assert_eq!(op["test_state"], "running");
-        op["test_state"] = json!(if success { "succeeded" } else { "failed" });
-        if success {
-            let document = op["request"]["document"].clone();
-            let id = document["document_id"].as_str().unwrap().to_owned();
-            // U4/U14: replacement bytes/tags are synthetic; the last finisher wins.
-            self.fixture["documents"][&id] = document.clone();
-            // Recall and page-search indexes deliberately remain independent.
-            // U2: document_ids is a test provenance shape, not a verified binding.
-            let facts = self.fixture["facts"].as_array_mut().unwrap();
-            facts.retain(|fact| {
-                !fact["document_ids"]
+        if self.behaviour.clean_deleted_facts {
+            self.fixture["facts"].as_array_mut().unwrap().retain(|f| {
+                !f["document_ids"]
                     .as_array()
                     .is_some_and(|ids| ids.contains(&json!(id)))
             });
-            facts.push(json!({"text":document["body"],"document_ids":[id]}));
         }
+        if self.behaviour.clean_deleted_pages {
+            for page in self.pages.values_mut().chain(
+                self.fixture["responses"]
+                    .as_object_mut()
+                    .unwrap()
+                    .values_mut(),
+            ) {
+                if let Some(ids) = page.get_mut("document_ids").and_then(Value::as_array_mut) {
+                    ids.retain(|v| v != id);
+                }
+            }
+        }
+    }
+    #[allow(dead_code)]
+    pub fn finish_refresh(&mut self, id: &str, success: bool) {
+        let job = self.page_jobs.get_mut(id).unwrap();
+        assert_eq!(job["test_state"], "running");
+        job["test_state"] = json!(if success { "succeeded" } else { "failed" });
+        let job = job.clone();
+        let page_id = job["test_page_id"].as_str().unwrap();
+        if success
+            && !self.behaviour.refresh_keeps_old
+            && self.may_apply(
+                format!("page:{page_id}"),
+                job["test_order"].as_u64().unwrap(),
+            )
+        {
+            let page = self.pages.get_mut(page_id).unwrap();
+            for key in ["body", "document_ids"] {
+                page[key] = job["test_target"][key].clone();
+            }
+        }
+    }
+    fn view(&self, mut value: Value) -> Value {
+        fn strip(value: &mut Value, provenance: bool, complete: bool) {
+            match value {
+                Value::Object(map) => {
+                    if !provenance {
+                        map.remove("document_ids");
+                    }
+                    if !complete {
+                        map.remove("body");
+                        map.insert("test_partial".into(), json!(true));
+                    }
+                    for v in map.values_mut() {
+                        strip(v, provenance, complete);
+                    }
+                }
+                Value::Array(items) => {
+                    if !complete {
+                        items.truncate(1);
+                    }
+                    for v in items {
+                        strip(v, provenance, complete);
+                    }
+                }
+                _ => {}
+            }
+        }
+        strip(
+            &mut value,
+            self.behaviour.provenance,
+            self.behaviour.complete_reads,
+        );
+        value
     }
 }
 
@@ -120,21 +295,7 @@ impl Server {
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
         let address = listener.local_addr().unwrap();
         listener.set_nonblocking(true).unwrap();
-        let model = Arc::new(Mutex::new(Model {
-            fixture,
-            requests: Vec::new(),
-            operations: BTreeMap::new(),
-            next_fault: None,
-            folders: BTreeMap::new(),
-            pages: BTreeMap::new(),
-            page_jobs: BTreeMap::new(),
-            page_deduplicate: false,
-            page_reply_override: None,
-            refresh_keeps_old: true,
-            retry: RetryPolicy::default(),
-            pending_deletes: BTreeSet::new(),
-            disconnect: false,
-        }));
+        let model = Arc::new(Mutex::new(Model::new(fixture)));
         let stop = Arc::new(AtomicBool::new(false));
         let (data, stopping) = (Arc::clone(&model), Arc::clone(&stop));
         let worker = thread::spawn(move || {
@@ -228,6 +389,16 @@ impl Server {
     }
 
     pub fn mcp(&self, name: &str, args: Value) -> Value {
+        if self.edit(|m| m.behaviour.require_initialize && !m.initialized) {
+            let reply = self
+                .request(
+                    "POST",
+                    MCP_PATH,
+                    json!({"jsonrpc":"2.0","id":0,"method":"initialize"}),
+                )
+                .unwrap();
+            assert_eq!(reply.status, 200);
+        }
         let reply = self.request("POST", MCP_PATH, json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":name,"arguments":args}})).unwrap();
         assert_eq!(reply.status, 200);
         assert!(reply.body.get("error").is_none(), "{}", reply.body);
@@ -303,102 +474,165 @@ fn write_reply(stream: &mut TcpStream, reply: Reply) -> io::Result<()> {
     stream.write_all(&body)
 }
 
+fn unknown(model: &Model) -> Reply {
+    Reply {
+        status: if model.behaviour.reject_unknown {
+            404
+        } else {
+            200
+        },
+        body: Value::Null,
+    }
+}
+fn read_reply(model: &Model, value: Value) -> Reply {
+    Reply {
+        status: if value.is_null() && model.behaviour.absent_read_404 {
+            404
+        } else {
+            200
+        },
+        body: model.view(value),
+    }
+}
 fn route(model: &mut Model, request: Request) -> Reply {
     model.requests.push(request.clone());
-    let missing = || Reply {
-        status: 404,
-        body: json!({"error":"test_not_found"}),
-    };
-    if let Some(reply) = page_route(model, &request) {
-        return reply;
-    }
     if request.method == "GET" {
-        // U1/U11: root config route/resolved envelope have no verified bank base.
         if request.path == "/config" {
-            return Reply {
-                status: 200,
-                body: model.fixture["config"].clone(),
+            return if model.behaviour.root_routes {
+                Reply {
+                    status: 200,
+                    body: if model.behaviour.config_resolved {
+                        model.fixture["config"].clone()
+                    } else {
+                        json!({})
+                    },
+                }
+            } else {
+                Reply {
+                    status: 404,
+                    body: Value::Null,
+                }
             };
         }
-        // U3/U14: synthetic operation lookup and terminal-state vocabulary.
-        if let Some(id) = request.path.strip_prefix("/__test__/operation/") {
-            return Reply {
-                status: if model.operations.contains_key(id) {
-                    200
+        for (prefix, jobs) in [
+            ("/__test__/operation/", &model.operations),
+            ("/__test__/page-job/", &model.page_jobs),
+        ] {
+            if let Some(id) = request.path.strip_prefix(prefix) {
+                return if model.behaviour.observable_operations {
+                    read_reply(model, jobs.get(id).cloned().unwrap_or(Value::Null))
                 } else {
-                    404
-                },
-                body: model.operations.get(id).cloned().unwrap_or(Value::Null),
-            };
+                    Reply {
+                        status: 404,
+                        body: Value::Null,
+                    }
+                };
+            }
         }
-        // U4: exact-document fields/body/tags are synthetic fixtures.
         if let Some(id) = request.path.strip_prefix("/__test__/document/") {
-            return Reply {
-                status: if model.fixture["documents"][id].is_null() {
-                    404
-                } else {
-                    200
-                },
-                body: model.fixture["documents"][id].clone(),
-            };
+            return read_reply(model, model.fixture["documents"][id].clone());
         }
         if request.path == "/__test__/facts" {
-            return Reply {
-                status: 200,
-                body: model.fixture["facts"].clone(),
-            };
+            return read_reply(model, model.fixture["facts"].clone());
         }
     }
-    // U1: root memories route has no verified bank base.
     if request.method == "POST" && request.path == "/memories" {
-        return mutate(model, request, None);
+        return if model.behaviour.root_routes {
+            mutate(model, &request, None)
+        } else {
+            Reply {
+                status: 404,
+                body: Value::Null,
+            }
+        };
     }
     if request.method == "DELETE"
         && let Some(id) = request.path.strip_prefix("/__test__/document/")
     {
-        let id = id.to_owned();
-        return mutate(model, request, Some(&id));
+        return mutate(model, &request, Some(id));
+    }
+    if let Some(reply) = page_route(model, &request) {
+        return reply;
     }
     if request.method != "POST" || request.path != MCP_PATH {
-        return missing();
+        return unknown(model);
     }
-    // U1: bare POST JSON-RPC deliberately omits initialize/session framing.
     let id = request.body["id"].clone();
-    let result = match request.body["method"].as_str() {
+    let method = request.body["method"].as_str();
+    if method == Some("initialize") {
+        model.initialized = true;
+    } else if model.behaviour.require_initialize && !model.initialized {
+        return Reply {
+            status: 409,
+            body: json!({"error":"test_initialize_required"}),
+        };
+    }
+    let result = match method {
+        Some("initialize") => json!({"protocolVersion":"test-only"}),
         Some("tools/list") => json!({"tools":model.fixture["tool_names"]}),
         Some("tools/call") => {
-            let Some(name) = request.body["params"]["name"].as_str() else {
-                return missing();
-            };
-            // U2/U6/U8: explicit test aliases for live page/tree reads; no native schema claim.
+            let name = request.body["params"]["name"].as_str().unwrap_or("");
             let args = &request.body["params"]["arguments"];
-            if name == "get_knowledge_page" && args["test_page_id"].is_string() {
-                model
+            let result = match name {
+                "get_document" => model.fixture["documents"]
+                    [args["test_document_id"].as_str().unwrap_or("")]
+                .clone(),
+                "get_knowledge_page" if args["test_page_id"].is_string() => model
                     .pages
                     .get(args["test_page_id"].as_str().unwrap())
                     .cloned()
-                    .unwrap_or(Value::Null)
-            } else if name == "get_knowledge_base_tree" && args["test_live_tree"] == true {
-                json!({"folders":model.folders,"pages":model.pages})
-            } else if name == "get_document" {
-                let Some(id) = request.body["params"]["arguments"]["test_document_id"].as_str()
-                else {
-                    return missing();
-                };
-                // U4: wrong-id/tag readback is selected directly by the fixture id.
-                model.fixture["documents"][id].clone()
-            } else if let Some(result) = model.fixture["responses"].get(name) {
-                // U2/U8: fixture recall/search ignore arguments; callers must inspect requests.
-                // U2: document_ids is test-only provenance; completeness is unverified.
-                result.clone()
-            } else {
+                    .unwrap_or(Value::Null),
+                "get_knowledge_base_tree" if args["test_live_tree"] == true => {
+                    let mut pages = model.pages.clone();
+                    if !model.behaviour.tree_bodies {
+                        for page in pages.values_mut() {
+                            if let Some(map) = page.as_object_mut() {
+                                map.remove("body");
+                            }
+                        }
+                    }
+                    json!({"folders":model.folders,"pages":pages})
+                }
+                _ => {
+                    let Some(mut response) = model.fixture["responses"].get(name).cloned() else {
+                        return if model.behaviour.reject_unknown {
+                            Reply {
+                                status: 200,
+                                body: json!({"jsonrpc":"2.0","id":id,"error":{"code":-32601,"message":"test_unknown_tool"}}),
+                            }
+                        } else {
+                            Reply {
+                                status: 200,
+                                body: json!({"jsonrpc":"2.0","id":id,"result":null}),
+                            }
+                        };
+                    };
+                    if model.behaviour.honor_retrieval_args
+                        && let Some(doc) = args["test_document_id"].as_str()
+                    {
+                        for key in ["facts", "pages"] {
+                            if let Some(items) = response.get_mut(key).and_then(Value::as_array_mut)
+                            {
+                                items.retain(|v| {
+                                    v["document_ids"]
+                                        .as_array()
+                                        .is_some_and(|ids| ids.contains(&json!(doc)))
+                                });
+                            }
+                        }
+                    }
+                    response
+                }
+            };
+            if result.is_null() && model.behaviour.absent_read_404 {
                 return Reply {
                     status: 200,
-                    body: json!({"jsonrpc":"2.0","id":id,"error":{"code":-32601,"message":"test_unknown_tool"}}),
+                    body: json!({"jsonrpc":"2.0","id":id,"error":{"code":-32004,"message":"test_absent"}}),
                 };
             }
+            model.view(result)
         }
-        _ => return missing(),
+        _ => return unknown(model),
     };
     Reply {
         status: 200,
@@ -406,103 +640,83 @@ fn route(model: &mut Model, request: Request) -> Reply {
     }
 }
 
-// Known POST route with visibly synthetic operation/document fields; U3/U4
-// remain unverified. The fake does not enforce the publisher's config policy.
-fn mutate(model: &mut Model, request: Request, delete: Option<&str>) -> Reply {
-    let fault = model.next_fault.take();
-    if matches!(fault, Some(MutationFault::BeforeAccept)) {
+fn mutate(model: &mut Model, request: &Request, delete: Option<&str>) -> Reply {
+    let fault = model.behaviour.fault.take();
+    if fault == Some(MutationFault::BeforeAccept) {
         return Reply {
             status: 503,
-            body: json!({"error":"test_before_accept"}),
+            body: Value::Null,
         };
     }
     let reply = if let Some(id) = delete {
-        if model.fixture["documents"][id].is_null() && !model.retry.absent_delete_ok {
+        if model.fixture["documents"][id].is_null() && !model.behaviour.absent_delete_ok {
             return Reply {
                 status: 404,
-                body: json!({"error":"test_absent_document"}),
+                body: Value::Null,
             };
         }
-        if model.retry.delete_immediate {
-            model.fixture["documents"]
-                .as_object_mut()
-                .unwrap()
-                .remove(id);
+        if model.behaviour.delete_immediate {
+            model.delete_projection(id);
         } else {
             model.pending_deletes.insert(id.to_owned());
         }
-        // U5/U15: even completion can leave facts, page sources and read indexes.
         Reply {
             status: 200,
-            body: json!({"test_deleted":id}),
+            body: if model.behaviour.echo_delete {
+                json!({"test_deleted":id})
+            } else {
+                json!({"test_accepted":true})
+            },
         }
     } else {
         let body = &request.body;
-        let Some(id) = body["test_operation_id"].as_str() else {
-            return Reply {
-                status: 400,
-                body: json!({"error":"test_operation_required"}),
-            };
-        };
-        if !body["document"]["document_id"].is_string()
-            || !body["document"]["body"].is_string()
-            || !body["document"]["tags"].is_array()
-            || body["async"] != true
-            || body["update_mode"] != "replace"
+        if model.behaviour.validate_shape
+            && (!body["test_operation_id"].is_string()
+                || !body["document"]["document_id"].is_string()
+                || !body["document"]["body"].is_string()
+                || !body["document"]["tags"].is_array()
+                || body["async"] != true
+                || body["update_mode"] != "replace")
         {
             return Reply {
                 status: 400,
-                body: json!({"error":"test_invalid_retain"}),
+                body: Value::Null,
             };
         }
-        let old = model.operations.get(id);
-        let mismatch = old.is_some_and(|op| op["request"] != *body);
-        if mismatch && model.retry.reject_mismatch {
+        let correlation = body["test_operation_id"]
+            .as_str()
+            .map(str::to_owned)
+            .unwrap_or_else(opaque_id);
+        let old_id = model.retains.get(&correlation).cloned();
+        let mismatch = old_id
+            .as_ref()
+            .is_some_and(|id| model.operations[id]["request"] != *body);
+        if mismatch && model.behaviour.reject_mismatch {
             return Reply {
                 status: 409,
-                body: json!({"error":"test_payload_mismatch"}),
+                body: Value::Null,
             };
         }
-        let mut key = id.to_owned();
-        if old.is_some() && !model.retry.deduplicate {
-            let mut n = 2;
-            while model.operations.contains_key(&format!("{id}#{n}")) {
-                n += 1;
-            }
-            key = format!("{id}#{n}");
+        let key = if model.behaviour.deduplicate {
+            old_id.clone().unwrap_or_else(opaque_id)
+        } else {
+            opaque_id()
+        };
+        if !model.operations.contains_key(&key) || (mismatch && model.behaviour.restart_mismatch) {
+            let order = model.order();
+            model.operations.insert(key.clone(), json!({"test_operation_id":key,"test_order":order,"test_state":"running","request":body}));
         }
-        if !model.operations.contains_key(&key) || mismatch {
-            model.operations.insert(
-                key.clone(),
-                json!({"test_operation_id":key,"test_state":"running","request":body}),
-            );
-        }
+        model.retains.entry(correlation).or_insert(key.clone());
         Reply {
             status: 202,
             body: json!({"test_operation_id":key}),
         }
     };
-    model.disconnect = matches!(fault, Some(MutationFault::LostAck));
+    model.disconnect = fault == Some(MutationFault::LostAck);
     reply
 }
 
-// U6/U7: known create/refresh paths, synthetic field names, job/read aliases and
-// result envelopes. No policy validation is hidden in the fake: override faults
-// must be detected by the later publisher's readback, not an upstream refusal.
 fn page_route(model: &mut Model, request: &Request) -> Option<Reply> {
-    let response = |status, body| Some(Reply { status, body });
-    if request.method == "GET"
-        && let Some(id) = request.path.strip_prefix("/__test__/page-job/")
-    {
-        return response(
-            if model.page_jobs.contains_key(id) {
-                200
-            } else {
-                404
-            },
-            model.page_jobs.get(id).cloned().unwrap_or(Value::Null),
-        );
-    }
     if request.method != "POST" {
         return None;
     }
@@ -511,64 +725,91 @@ fn page_route(model: &mut Model, request: &Request) -> Option<Reply> {
     let refresh = request
         .path
         .strip_prefix("/mental-models/")
-        .and_then(|s| s.strip_suffix("/refresh"));
+        .and_then(|p| p.strip_suffix("/refresh"));
     if !folder && !page && refresh.is_none() {
         return None;
     }
-    let fault = model.next_fault.take();
-    if matches!(fault, Some(MutationFault::BeforeAccept)) {
-        return response(503, json!({"error":"test_before_accept"}));
+    let fault = model.behaviour.fault.take();
+    if fault == Some(MutationFault::BeforeAccept) {
+        return Some(Reply {
+            status: 503,
+            body: Value::Null,
+        });
     }
     let reply = if let Some(id) = refresh {
-        if !model.pages.contains_key(id) || request.body != json!({"mode":"full"}) {
-            return response(400, json!({"error":"test_invalid_refresh"}));
+        if !model.pages.contains_key(id) && model.behaviour.absent_read_404 {
+            return Some(Reply {
+                status: 404,
+                body: Value::Null,
+            });
         }
-        let job_id = format!("refresh-{}", model.page_jobs.len() + 1);
-        // U7: freeze the selected target at job start; completion can be reordered.
-        model.page_jobs.insert(job_id.clone(), json!({"test_job_id":job_id,"test_page_id":id,"test_state":"running","test_target":model.fixture["page_refresh_result"]}));
+        if request.body != json!({"mode":"full"}) && model.behaviour.validate_shape {
+            return Some(Reply {
+                status: 400,
+                body: Value::Null,
+            });
+        }
+        let key = opaque_id();
+        let order = model.order();
+        model.page_jobs.insert(key.clone(), json!({"test_job_id":key,"test_page_id":id,"test_order":order,"test_state":"running","test_target":model.fixture["page_refresh_result"]}));
         Reply {
             status: 202,
-            body: json!({"test_job_id":job_id}),
+            body: json!({"test_job_id":key}),
         }
     } else {
-        let Some(id) = request.body["test_id"].as_str() else {
-            return response(400, json!({"error":"test_id_required"}));
-        };
+        if !request.body["test_id"].is_string() && model.behaviour.validate_shape {
+            return Some(Reply {
+                status: 400,
+                body: Value::Null,
+            });
+        }
         if page
+            && model.behaviour.reject_orphan
             && !model
                 .folders
                 .contains_key(request.body["test_parent_id"].as_str().unwrap_or(""))
         {
-            return response(409, json!({"error":"test_parent_not_folder"}));
+            return Some(Reply {
+                status: 409,
+                body: Value::Null,
+            });
         }
+        let intent = (
+            folder,
+            request.body["test_id"].as_str().unwrap_or("").to_owned(),
+        );
+        let old = model.creates.get(&intent).cloned();
+        let key = if model.behaviour.page_deduplicate {
+            old.unwrap_or_else(opaque_id)
+        } else {
+            opaque_id()
+        };
+        let mut value = if model.behaviour.echo_created {
+            request.body.clone()
+        } else {
+            model.fixture[if folder {
+                "folder_response"
+            } else {
+                "page_response"
+            }]
+            .clone()
+        };
+        if !value.is_object() {
+            value = json!({"test_unverified":true});
+        }
+        value["test_id"] = json!(key);
         let entries = if folder {
             &mut model.folders
         } else {
             &mut model.pages
         };
-        let mut key = id.to_owned();
-        if !model.page_deduplicate {
-            let mut n = 2;
-            while entries.contains_key(&key) {
-                key = format!("{id}#{n}");
-                n += 1;
-            }
-        }
-        let mut value = if page {
-            model
-                .page_reply_override
-                .clone()
-                .unwrap_or_else(|| request.body.clone())
-        } else {
-            request.body.clone()
-        };
-        value["test_id"] = json!(key); // U6: assigned discovery identity, not caller intent.
         let value = entries.entry(key.clone()).or_insert(value).clone();
+        model.creates.entry(intent).or_insert(key.clone());
         Reply {
             status: 201,
             body: json!({"test_id":key,"test_value":value}),
         }
     };
-    model.disconnect = matches!(fault, Some(MutationFault::LostAck));
+    model.disconnect = fault == Some(MutationFault::LostAck);
     Some(reply)
 }

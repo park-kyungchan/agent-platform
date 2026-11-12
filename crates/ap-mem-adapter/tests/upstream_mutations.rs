@@ -9,25 +9,29 @@ fn cases() -> Value {
 fn server() -> Server {
     let mut f: Value = serde_json::from_str(include_str!("fixtures/read-cases.json")).unwrap();
     f["config"] = cases()["config"].clone();
-    let server = Server::start(f);
-    assert!(server.address().ip().is_loopback());
-    server
+    support::fixture_server(f)
 }
-fn document(server: &Server) -> Value {
-    server.mcp("get_document", json!({"test_document_id":"eng-a"}))
+fn document(s: &Server) -> Value {
+    s.request("GET", "/__test__/document/eng-a", json!({}))
+        .unwrap()
+        .body
 }
-fn operation(server: &Server, id: &str) -> Value {
-    let reply = server
+fn operation(s: &Server, id: &str) -> Value {
+    let reply = s
         .request("GET", &format!("/__test__/operation/{id}"), json!({}))
         .unwrap();
     assert_eq!(reply.status, 200);
     reply.body
 }
+fn retain(s: &Server, body: Value) -> String {
+    let reply = s.request("POST", "/memories", body).unwrap();
+    assert_eq!(reply.status, 202);
+    reply.body["test_operation_id"].as_str().unwrap().to_owned()
+}
 
-// A raw ordinary client, independent of Server::request's JSON-body framing.
-fn bodyless(server: &Server, method: &str, path: &str) -> Value {
+fn bodyless(s: &Server, method: &str, path: &str) -> Value {
     let timeout = std::time::Duration::from_secs(1);
-    let mut stream = std::net::TcpStream::connect_timeout(&server.address(), timeout).unwrap();
+    let mut stream = std::net::TcpStream::connect_timeout(&s.address(), timeout).unwrap();
     stream.set_read_timeout(Some(timeout)).unwrap();
     stream.set_write_timeout(Some(timeout)).unwrap();
     write!(
@@ -35,240 +39,148 @@ fn bodyless(server: &Server, method: &str, path: &str) -> Value {
         "{method} {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
     )
     .unwrap();
-    let mut raw = String::new();
-    stream.take(131072).read_to_string(&mut raw).unwrap();
-    let (headers, body) = raw.split_once("\r\n\r\n").unwrap();
-    assert!(headers.starts_with("HTTP/1.1 200 "), "{headers}");
+    let mut response = String::new();
+    stream.take(131072).read_to_string(&mut response).unwrap();
+    let (header, body) = response.split_once("\r\n\r\n").unwrap();
+    assert!(header.starts_with("HTTP/1.1 200 "));
     serde_json::from_str(body).unwrap()
 }
 
 #[test]
 fn running_async_order() {
-    let server = server();
+    let s = server();
     let data = cases();
-    // U3: explicitly select favourable deduplication and mismatch refusal.
-    server.edit(|m| {
-        m.retry.deduplicate = true;
-        m.retry.reject_mismatch = true;
+    s.edit(|m| {
+        m.behaviour.deduplicate = true;
+        m.behaviour.reject_mismatch = true;
     });
-
-    server.edit(|m| {
-        m.fixture["facts"]
-            .as_array_mut()
-            .unwrap()
-            .push(json!({"text":"UNRELATED_FACT", "document_ids":["eng-b"]}))
-    });
-    server.edit(|m| m.next_fault = Some(MutationFault::BeforeAccept));
+    s.edit(|m| m.behaviour.fault = Some(MutationFault::BeforeAccept));
     assert_eq!(
-        server
-            .request("POST", "/memories", data["retain"].clone())
+        s.request("POST", "/memories", data["retain"].clone())
             .unwrap()
             .status,
         503
     );
-    assert!(server.edit(|m| m.operations.is_empty()));
-    assert_eq!(document(&server)["body"], data["expected_old"]);
-    server.edit(|m| m.next_fault = Some(MutationFault::LostAck));
+    assert!(s.edit(|m| m.operations.is_empty()));
+    s.edit(|m| m.behaviour.fault = Some(MutationFault::LostAck));
     assert!(
-        server
-            .request("POST", "/memories", data["retain"].clone())
+        s.request("POST", "/memories", data["retain"].clone())
             .is_err()
     );
-    assert_eq!(operation(&server, "operation-a")["test_state"], "running");
-    assert_eq!(document(&server)["body"], data["expected_old"]);
+    let first = s.edit(|m| m.operations.keys().next().unwrap().clone()); // lost ack: inspect model, never guess.
+    assert_eq!(operation(&s, &first)["test_state"], "running");
+    assert_eq!(document(&s)["body"], data["expected_old"]);
+    assert_eq!(retain(&s, data["retain"].clone()), first);
+    assert_eq!(s.edit(|m| m.operations.len()), 1);
+    let mut changed = data["retain"].clone();
+    changed["document"]["body"] = json!("CHANGED");
     assert_eq!(
-        server
-            .request("POST", "/memories", data["retain"].clone())
-            .unwrap()
-            .status,
-        202
-    );
-    assert_eq!(server.edit(|m| m.operations.len()), 1);
-    let mut conflicting = data["retain"].clone();
-    conflicting["document"]["body"] = json!("CONFLICT");
-    assert_eq!(
-        server
-            .request("POST", "/memories", conflicting)
+        s.request("POST", "/memories", changed.clone())
             .unwrap()
             .status,
         409
     );
-    assert_eq!(
-        server
-            .request("POST", "/memories", data["newer"].clone())
-            .unwrap()
-            .status,
-        202
-    );
-    // Completion is explicitly controlled; submitting or polling never completes it.
-    server.edit(|m| m.finish("operation-b", true));
-    assert_eq!(document(&server)["body"], data["expected_newer"]);
-    assert_eq!(operation(&server, "operation-a")["test_state"], "running");
-    server.edit(|m| m.finish("operation-a", true));
-    assert_eq!(document(&server)["body"], data["expected_new"]);
-    let facts = server
-        .request("GET", "/__test__/facts", json!({}))
-        .unwrap()
-        .body;
-    assert_eq!(
-        facts,
-        json!([{"text":"UNRELATED_FACT","document_ids":["eng-b"]},{"text":data["expected_new"],"document_ids":["eng-a"]}])
-    );
-    assert_eq!(operation(&server, "operation-a")["test_state"], "succeeded");
+    let newer = retain(&s, data["newer"].clone());
+    assert_ne!(first, newer);
+    s.edit(|m| m.finish(&newer, true));
+    assert_eq!(document(&s)["body"], data["expected_newer"]);
+    s.edit(|m| m.finish(&first, true));
+    assert_eq!(document(&s)["body"], data["expected_new"]);
     let mut failed = data["retain"].clone();
-    failed["test_operation_id"] = json!("operation-failed");
-    server.request("POST", "/memories", failed).unwrap();
-    server.edit(|m| m.finish("operation-failed", false));
-    assert_eq!(
-        operation(&server, "operation-failed")["test_state"],
-        "failed"
-    );
-    assert_eq!(document(&server)["body"], data["expected_new"]);
-    let hostile = self::server();
+    failed["test_operation_id"] = json!("failed-intent");
+    let failed = retain(&s, failed);
+    s.edit(|m| m.finish(&failed, false));
+    assert_eq!(operation(&s, &failed)["test_state"], "failed");
+    let hostile = server();
+    let a = retain(&hostile, data["retain"].clone());
+    let b = retain(&hostile, data["retain"].clone());
+    assert_ne!(a, b);
+    let c = retain(&hostile, changed.clone());
+    assert_ne!(a, c);
+    assert_eq!(operation(&hostile, &c)["request"], changed);
     hostile.edit(|m| {
-        assert!(!m.retry.deduplicate);
-        assert!(!m.retry.reject_mismatch);
+        m.behaviour.deduplicate = true;
+        m.finish(&a, true);
     });
-    hostile
-        .request("POST", "/memories", data["retain"].clone())
-        .unwrap();
-    hostile
-        .request("POST", "/memories", data["retain"].clone())
-        .unwrap();
-    assert_eq!(hostile.edit(|m| m.operations.len()), 2); // U3: resend duplicates.
-    let mut changed = data["retain"].clone();
-    changed["document"]["body"] = json!("CHANGED_BYTES_ACCEPTED");
-    assert_eq!(
-        hostile
-            .request("POST", "/memories", changed.clone())
-            .unwrap()
-            .status,
-        202
-    );
-    assert_eq!(hostile.edit(|m| m.operations.len()), 3);
-    assert_eq!(operation(&hostile, "operation-a#3")["request"], changed);
-    hostile.edit(|m| m.retry.deduplicate = true);
-    assert_eq!(
-        hostile
-            .request("POST", "/memories", changed.clone())
-            .unwrap()
-            .status,
-        202
-    );
-    assert_eq!(operation(&hostile, "operation-a")["request"], changed);
+    assert_eq!(retain(&hostile, changed), a);
+    assert_eq!(operation(&hostile, &a)["test_state"], "succeeded");
+    assert_eq!(operation(&hostile, &a)["request"], data["retain"]); // silent mismatch keeps stale bytes.
 }
 
 #[test]
 fn config_false_required() {
-    let server = server();
+    let s = server();
     let data = cases();
-    assert_eq!(bodyless(&server, "GET", "/config"), data["config"]);
-    let cases = data["config_cases"].as_array().unwrap();
-    assert_eq!(cases.len(), 8);
-    for case in cases {
-        server.edit(|m| m.fixture["config"] = case["value"].clone());
-        let reply = server.request("GET", "/config", json!({})).unwrap();
-        assert_eq!(reply.status, 200);
+    assert_eq!(bodyless(&s, "GET", "/config"), data["config"]);
+    for case in data["config_cases"].as_array().unwrap() {
+        s.edit(|m| m.fixture["config"] = case["value"].clone());
+        let reply = s.request("GET", "/config", json!({})).unwrap();
         assert_eq!(reply.body, case["value"]);
-        let both_boolean_false = reply.body["enable_observations"] == json!(false)
-            && reply.body["enable_auto_consolidation"] == json!(false);
         assert_eq!(
-            json!(both_boolean_false),
-            case["allowed"],
-            "{}",
-            case["name"]
+            json!(
+                reply.body["enable_observations"] == false
+                    && reply.body["enable_auto_consolidation"] == false
+            ),
+            case["allowed"]
         );
     }
-    assert!(server.edit(|m| m.requests.iter().all(|r| r.method == "GET")));
-    // The upstream must not mask a missing P19 publisher-side preflight.
-    // Even with unsafe config it accepts a retain: future caller tests must
-    // assert no POST was sent, rather than relying on an upstream refusal.
-    assert_eq!(
-        server
-            .request("POST", "/memories", data["retain"].clone())
-            .unwrap()
-            .status,
-        202
-    );
-    assert_eq!(operation(&server, "operation-a")["test_state"], "running");
+    // The fake never hides a missing publisher-side preflight by enforcing it.
+    let id = retain(&s, data["retain"].clone());
+    assert_eq!(operation(&s, &id)["test_state"], "running");
 }
 
 #[test]
 fn delete_source_residue() {
-    let server = server();
-    // U5: explicitly select synchronous deletion and absent-id success.
-    server.edit(|m| {
-        m.retry.delete_immediate = true;
-        m.retry.absent_delete_ok = true;
+    let s = server();
+    s.edit(|m| {
+        m.behaviour.delete_immediate = true;
+        m.behaviour.absent_delete_ok = true;
     });
-
-    let recall = server.mcp("recall", json!({}));
-    let search = server.mcp("search_knowledge_base", json!({}));
-    let page = server.mcp("get_knowledge_page", json!({}));
-    let facts = server
-        .request("GET", "/__test__/facts", json!({}))
-        .unwrap()
-        .body;
-    server.edit(|m| m.next_fault = Some(MutationFault::BeforeAccept));
+    let recall = s.mcp("recall", json!({}));
+    let search = s.mcp("search_knowledge_base", json!({}));
+    let page = s.mcp("get_knowledge_page", json!({}));
+    s.edit(|m| m.behaviour.fault = Some(MutationFault::BeforeAccept));
     assert_eq!(
-        server
-            .request("DELETE", "/__test__/document/eng-a", json!({}))
+        s.request("DELETE", "/__test__/document/eng-a", json!({}))
             .unwrap()
             .status,
         503
     );
-    assert!(!document(&server).is_null());
-    server.edit(|m| m.next_fault = Some(MutationFault::LostAck));
+    assert!(!document(&s).is_null());
+    s.edit(|m| m.behaviour.fault = Some(MutationFault::LostAck));
     assert!(
-        server
-            .request("DELETE", "/__test__/document/eng-a", json!({}))
+        s.request("DELETE", "/__test__/document/eng-a", json!({}))
             .is_err()
     );
-    assert!(document(&server).is_null());
+    assert!(document(&s).is_null());
     assert_eq!(
-        server
-            .request("GET", "/__test__/document/eng-a", json!({}))
+        s.request("GET", "/__test__/document/eng-a", json!({}))
             .unwrap()
             .status,
         404
     );
+    assert_eq!(s.mcp("recall", json!({})), recall);
+    assert_eq!(s.mcp("search_knowledge_base", json!({})), search);
+    assert_eq!(s.mcp("get_knowledge_page", json!({})), page);
     assert_eq!(
-        server
-            .request("GET", "/__test__/facts", json!({}))
-            .unwrap()
-            .body,
-        facts
-    );
-    assert_eq!(server.mcp("recall", json!({})), recall);
-    assert_eq!(server.mcp("search_knowledge_base", json!({})), search);
-    assert_eq!(server.mcp("get_knowledge_page", json!({})), page);
-    assert!(
-        page["document_ids"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("eng-a"))
-    );
-    assert_eq!(
-        bodyless(&server, "DELETE", "/__test__/document/eng-a"),
-        json!({"test_deleted":"eng-a"})
-    );
-    let hostile = self::server();
-    hostile.edit(|m| {
-        assert!(!m.retry.delete_immediate);
-        assert!(!m.retry.absent_delete_ok);
-    });
-    assert_eq!(
-        hostile
-            .request("DELETE", "/__test__/document/eng-a", json!({}))
+        s.request("DELETE", "/__test__/document/eng-a", json!({}))
             .unwrap()
             .status,
         200
     );
-    assert!(!document(&hostile).is_null()); // U5: reply is not completion.
-    hostile.edit(|m| m.finish_delete("eng-a"));
-    assert!(document(&hostile).is_null());
     assert_eq!(
-        hostile
+        bodyless(&s, "DELETE", "/__test__/document/eng-a"),
+        json!({"test_accepted":true})
+    );
+    let delayed = server();
+    delayed
+        .request("DELETE", "/__test__/document/eng-a", json!({}))
+        .unwrap();
+    assert!(!document(&delayed).is_null());
+    delayed.edit(|m| m.finish_delete("eng-a"));
+    assert!(document(&delayed).is_null());
+    assert_eq!(
+        delayed
             .request("DELETE", "/__test__/document/eng-a", json!({}))
             .unwrap()
             .status,

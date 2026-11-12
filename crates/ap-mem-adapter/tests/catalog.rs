@@ -37,19 +37,7 @@ fn mcp_read_only() {
         ]
     );
     let mut accepted = std::collections::BTreeSet::new();
-    let mut others: Vec<String> = [
-        "publish",
-        "mem_publish",
-        "mem_retain",
-        "retain",
-        "delete",
-        "reflect",
-        "",
-        "unknown",
-    ]
-    .into_iter()
-    .map(str::to_owned)
-    .collect();
+    let mut others = Vec::new();
     for name in names {
         let args = match name {
             "mem_recall" | "mem_page_search" => {
@@ -65,11 +53,25 @@ fn mcp_read_only() {
         accepted.insert(name);
         for other in [
             format!("{name}_write"),
+            format!("{name}_v2"),
             format!("x{name}"),
             name.to_uppercase(),
             String::new(),
         ] {
             others.push(other);
+        }
+        for verb in ["retain", "publish", "delete", "reflect"] {
+            let suffix = name.split_once('_').unwrap().0;
+            for candidate in [format!("{suffix}_{verb}"), format!("{suffix}_{verb}_v2")] {
+                if !catalog["tools"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|t| t["name"] == candidate)
+                {
+                    others.push(candidate);
+                }
+            }
         }
     }
     assert_eq!(
