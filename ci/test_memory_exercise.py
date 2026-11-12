@@ -3,6 +3,9 @@ import contextlib
 import copy
 import importlib.util
 import io
+import inspect
+import textwrap
+import types
 import json
 import os
 from pathlib import Path
@@ -179,7 +182,7 @@ class FakeServer:
             names = self.catalog if enabled is None or not self.filter_list else enabled
             return 200, {'jsonrpc': '2.0', 'id': 1, 'result': {'tools': [self.catalog[n] for n in names]}}, sid
         name = body['params']['name']
-        if self.filter_call and enabled is not None and name not in enabled:
+        if name not in self.catalog or (self.filter_call and enabled is not None and name not in enabled):
             return 200, {'jsonrpc': '2.0', 'id': 1, 'error': {'code': -32602, 'message': 'Unknown tool: ' + name}}, sid
         # Executed forbidden tools return success, never get mistaken for denial.
         if name == 'get_document' and not self.docs:
@@ -225,7 +228,7 @@ class ExerciseTests(unittest.TestCase):
                 self.assertEqual(q['target_bank_id'], [BANK], 'foreign_import')
         times = [x[3] for x in writes]
         self.assertTrue(all(b - a >= 1 for a, b in zip(times, times[1:])))
-        self.assertEqual(self.exercise.retains, 33)  # Includes denied retain/sync_retain probes.
+        self.assertEqual(self.exercise.retains, 23)  # Includes denied retain/sync_retain probes.
         self.assertLess(self.clock(), 900)
         self.assertFalse(self.server.present)
         self.assertEqual(len(self.exercise.evidence['archives']), 3)
@@ -433,6 +436,292 @@ class ExerciseTests(unittest.TestCase):
                 signal.pause()
         self.assertIs(signal.getsignal(signal.SIGALRM), previous)
         self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0, 0))
+
+    def test_k1_foreign_schema_and_all_changing_bodies(self):
+        self.server.catalog['delete_bank'] = {'name': 'delete_bank', 'inputSchema': {'type': 'object',
+            'properties': {'bank': {'type': 'string', 'enum': [FOREIGN]}}, 'required': ['bank']}}
+        self.assertEqual(self.run_driver(), 3)
+        self.assertIn({'tool': 'delete_bank', 'verdict': 'refused_unmeasured'},
+                      self.exercise.evidence.get('tool_probes', []), 'unsafe_sampler_not_refused')
+        self.assertFalse(any(FOREIGN.encode() in (b if isinstance(b, bytes) else X.encode(b))
+                             for m, _, b, _ in self.server.calls if m != 'GET'), 'foreign_id_sent')
+        for route in ('', '/config', '/memories', '/transfer/export', '/transfer/import', '@mcp'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep); exercise.preflight()
+            with self.assertRaisesRegex(X.P.Stop, '^foreign_bank_in_body$'):
+                exercise.change('POST', route, {'payload': FOREIGN})
+            self.assertFalse(any(m != 'GET' for m, _, _, _ in server.calls), 'foreign_body_dispatched')
+        for schema in [
+            {'type': 'object', 'properties': {'other_bank': {'type': 'string'}}},
+            {'type': 'object', 'properties': {'content': {'type': 'string', 'enum': [FOREIGN]}}, 'required': ['content']},
+        ]:
+            with self.assertRaisesRegex(X.P.Stop, '^tool_arguments_unmeasured$'):
+                self.exercise.arguments(schema)
+        sampled = self.exercise.arguments({'type': 'object', 'properties': {
+            'content': {'type': 'string', 'default': FOREIGN, 'example': FOREIGN}}, 'required': ['content']})
+        self.assertEqual(sampled['content'], self.exercise.marker, 'server_value_sampled')
+
+    def test_k2_executor_error_and_nonmatching_rpc_errors_are_not_denial(self):
+        for mode in ('executed', 'code', 'shape', 'message'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            original = server.mcp
+            def reply(body, sid):
+                status, answer, returned = original(body, sid)
+                if body['method'] == 'tools/call':
+                    name = body['params']['name']
+                    if name in server.catalog and name not in (server.config.get('mcp_enabled_tools') or []):
+                        if mode == 'executed':
+                            answer = {'jsonrpc': '2.0', 'id': 1, 'result': {'isError': True,
+                                'content': [{'type': 'text', 'text': 'Error executing tool ' + name + ': Document not found'}]}}
+                        elif mode == 'code':
+                            answer['error']['code'] = -999
+                        elif mode == 'shape':
+                            answer['error']['extra'] = 'invented'
+                        else:
+                            answer['error']['message'] = 'Other denial: ' + name
+                return status, answer, returned
+            server.mcp = reply
+            self.assertEqual(exercise.run(), 3, 'executed_or_unmatched_error_accepted')
+            self.assertEqual(exercise.evidence['steps']['E2']['verdict'], 'failed')
+            self.assertEqual(exercise.evidence['cleanup'], 'proven')
+
+    def test_k3_last_cleanup_bank_list_cannot_reappear(self):
+        original = self.server.answer
+        def reappear(method, path, body=None, **kwargs):
+            if self.exercise.cleaning and path.startswith(X.BANKS + '?') and len(self.server.calls) > 1:
+                if '/knowledge-base/search?' in self.server.calls[-2][1]:
+                    self.server.present = True
+            return original(method, path, body, **kwargs)
+        self.server.answer = reappear
+        self.assertEqual(self.run_driver(), 4, 'final_reappearance_hidden')
+        self.assertEqual(self.exercise.evidence['cleanup_failure'], 'absence_unproven')
+        self.assertTrue(self.server.calls[-1][1].startswith(X.BANKS + '?'), 'last_read_not_bank_list')
+
+    def test_k4_signals_at_finally_and_cleanup_first_statement(self):
+        for point in ('finally', 'cleanup-entry', 'cleanup-running'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            marks = []
+            def action():
+                exercise.create()
+                marks.append(exercise.evidence['cleanup'])
+                self.assertEqual(exercise.evidence['cleanup'], 'incomplete', 'create_not_marked_incomplete')
+            exercise.e1 = action
+            exercise.e4 = exercise.e5 = exercise.e6 = lambda: None
+            fired = False
+            def trace(frame, event, arg):
+                nonlocal fired
+                if frame.f_code.co_filename == str(ROOT / 'scripts/exercise-memory.py') and event == 'line' and not fired:
+                    line = inspect.getsource(frame.f_code).splitlines()[frame.f_lineno - frame.f_code.co_firstlineno]
+                    hit = ((point == 'finally' and frame.f_code.co_name == 'run' and line.strip() == 'if self.attempted:')
+                        or (point == 'cleanup-entry' and frame.f_code.co_name == 'cleanup' and not exercise.cleaning)
+                        or (point == 'cleanup-running' and frame.f_code.co_name == 'cleanup' and exercise.cleaning))
+                    if hit:
+                        fired = True
+                        os.kill(os.getpid(), signal.SIGTERM)
+                return trace
+            with tempfile.TemporaryDirectory() as tmp, patch.object(X.P, 'credential', return_value=SECRET), \
+                 patch.object(X, 'Wire', return_value=server), patch.object(X, 'Exercise', return_value=exercise), \
+                 patch.object(X.P, 'locked', contextlib.nullcontext), contextlib.redirect_stdout(io.StringIO()):
+                path = Path(tmp, 'evidence')
+                old_trace = X.sys.gettrace()
+                try:
+                    X.sys.settrace(trace)
+                    code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+                finally:
+                    X.sys.settrace(old_trace)
+                saved = X.load(path.read_bytes())
+            self.assertEqual(marks, ['incomplete'], 'create_not_marked_incomplete')
+            self.assertTrue(fired, 'signal_point_not_reached')
+            self.assertEqual(code, 3, 'signal_skipped_cleanup')
+            self.assertEqual(saved['cleanup'], 'proven', 'signal_left_bank_unproven')
+            self.assertFalse(server.present)
+
+    def test_k5_full_catalog_forecast_and_probe_coverage(self):
+        for name in X.SUPPORTED_TOOLS:
+            self.server.catalog.setdefault(name, {'name': name, 'inputSchema': {'type': 'object', 'properties': {}}})
+        self.assertEqual(self.run_driver(), 0)
+        self.assertLessEqual(len(self.server.calls), 300, 'request_budget_exceeded')
+        self.assertLessEqual(self.clock(), 240, 'spacing_budget_exceeded')
+        self.assertEqual(self.exercise.evidence['E2_classes'], {'retain': 'retain', 'delete': 'delete_document',
+                         'reflect': 'reflect', 'page': 'create_knowledge_page'})
+        probes = [r for r in self.exercise.evidence['requests'] if r.get('rpc_method') == 'tools/call']
+        # Nonrepresentative tools only appear on the two full new-session policy passes.
+        self.assertEqual(sum(r.get('tool') == 'update_memory' for r in probes), 2, 'full_sweep_repeated_or_lost')
+        for name in ('retain', 'delete_document', 'reflect', 'create_knowledge_page'):
+            self.assertEqual(sum(r.get('tool') == name for r in probes), 12, 'class_probe_lost')
+        grouped = {}
+        for row in self.exercise.evidence['requests']:
+            step = grouped.setdefault(row['step'], {'requests': 0, 'writes': 0})
+            step['requests'] += 1
+            step['writes'] += row['method'] != 'GET' and '/memories/recall' not in row['path']
+        print('full_catalog_forecast=' + json.dumps({'requests': len(self.server.calls), 'retains': self.exercise.retains,
+                                                  'spacing_s': self.clock(), 'steps': grouped}, sort_keys=True))
+
+    def test_k6_id_rejects_suffix_and_sampler_forces_bank_id(self):
+        for invalid in (BANK + '\n', BANK + '/x', BANK + '0'):
+            with self.assertRaisesRegex(X.P.Stop, '^bank_id_rejected$'):
+                X.Exercise(invalid, self.server, self.clock, self.clock.sleep)
+        self.server.catalog['delete_bank'] = {'name': 'delete_bank', 'inputSchema': {'type': 'object',
+            'properties': {'bank_id': {'type': 'string'}}, 'required': ['bank_id']}}
+        self.assertEqual(self.run_driver(), 0)
+        calls = [b['params']['arguments']['bank_id'] for m, p, b, _ in self.server.calls
+                 if isinstance(b, dict) and b.get('method') == 'tools/call' and b['params']['name'] == 'delete_bank']
+        self.assertTrue(calls)
+        self.assertEqual(set(calls), {BANK}, 'bank_id_not_forced')
+
+    def test_k6_download_target_cannot_escape(self):
+        self.exercise.preflight(); self.exercise.create()
+        text = self.exercise.marker + ' invented download subject.'
+        self.exercise.retain('invented-a', text)
+        original = self.server.answer
+        def outside(method, path, body=None, **kwargs):
+            status, answer, sid = original(method, path, body, **kwargs)
+            if '/transfer/export' in path:
+                meta = self.server.ops[answer['operation_id']]['result_metadata']
+                raw = self.server.downloads[meta['download_url']]
+                meta['download_url'] = '/outside/download'
+                self.server.downloads['/outside/download'] = raw
+            return status, answer, sid
+        self.server.answer = outside
+        with self.assertRaisesRegex(X.P.Stop, '^download_target_rejected$'):
+            self.exercise.export({'invented-a': text})
+        self.assertFalse(any(p == '/outside/download' for _, p, _, _ in self.server.calls), 'outside_download_sent')
+
+    def test_k6_restore_config_history_and_webhook_guards(self):
+        for kind, failure in [('config', 'restore_config_changed'), ('history', 'restored_history_missing'),
+                              ('webhooks', 'restored_webhooks_changed')]:
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            original = server.answer
+            restored = False
+            def changed(method, path, body=None, **kwargs):
+                nonlocal restored
+                status, answer, sid = original(method, path, body, **kwargs)
+                if '/transfer/import?' in path and 'mode=restore' in path:
+                    restored = True
+                    if kind == 'config':
+                        server.config['invented_config'] = 'changed'
+                    if kind == 'history':
+                        old = next(k for k in server.ops if len(k) == 36)
+                        del server.ops[old]
+                if restored and kind == 'webhooks' and path.endswith('/webhooks'):
+                    answer = {'webhooks': [{'id': 'invented-hook'}]}
+                return status, answer, sid
+            server.answer = changed
+            self.assertEqual(exercise.run(), 3, 'restore_difference_accepted_' + kind)
+            self.assertEqual(exercise.evidence['steps']['E1']['failure'], failure)
+            self.assertEqual(exercise.evidence['cleanup'], 'proven')
+
+    def test_k6_document_absence_delete_status_and_uncertainty(self):
+        self.exercise.preflight(); self.exercise.create()
+        original = self.server.answer
+        def retained(method, path, body=None, **kwargs):
+            if not self.server.present and '/documents/invented-a' in path:
+                return 200, {'original_text': 'invented residue'}, None
+            return original(method, path, body, **kwargs)
+        self.server.answer = retained
+        self.server.present = False
+        with self.assertRaisesRegex(X.P.Stop, '^absence_unproven$'):
+            self.exercise.absence()
+        self.server.answer = original
+        self.server.present = True
+        def bad_delete(method, path, body=None, **kwargs):
+            status, answer, sid = original(method, path, body, **kwargs)
+            return (503, answer, sid) if method == 'DELETE' else (status, answer, sid)
+        self.server.answer = bad_delete
+        with self.assertRaisesRegex(X.P.Stop, '^delete_failed$'):
+            self.exercise.delete()
+        self.exercise.uncertain = True
+        before = len(self.server.calls)
+        with self.assertRaisesRegex(X.P.Stop, '^unresolved_mutation$'):
+            self.exercise.change('PATCH', '/config', {'updates': {}})
+        self.assertEqual(len(self.server.calls), before, 'mutation_after_uncertainty')
+
+    def test_k7_failed_rows_and_hashed_count_directions(self):
+        for outcome in ('5xx', 'timeout', 'unreadable'):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            def failure(*args, **kwargs):
+                if outcome == 'timeout':
+                    raise TimeoutError(SECRET)
+                return 503 if outcome == '5xx' else 200, b'not-json' if outcome == 'unreadable' else b'{}', None
+            server.exchange = failure
+            self.assertEqual(exercise.run(), 2)
+            self.assertEqual(exercise.evidence['requests'][0]['verdict'], 'failed', 'failed_row_measured')
+        clock = Clock(); server = FakeServer(clock)
+        exercise = X.Exercise(BANK, server, clock, clock.sleep)
+        original = exercise.counts
+        changed = False
+        def counts():
+            counts = original()
+            if exercise.cleaning and counts.get(BANK) is None:
+                counts.update({'grew-bank': 3, 'shrank-bank': 1, 'new-bank': 5})
+                counts.pop('missing-bank', None)
+            return counts
+        exercise.counts = counts
+        exercise.preflight()
+        exercise.before.update({'grew-bank': 2, 'shrank-bank': 2, 'missing-bank': 2})
+        exercise.create(); exercise.cleanup()
+        comparison = exercise.evidence['other_bank_comparison']
+        self.assertEqual(set(comparison.values()), {'unchanged', 'grew', 'shrank', 'missing', 'new'}, 'directions_missing')
+        self.assertTrue(all(X.re.fullmatch('[0-9a-f]{64}', k) for k in comparison), 'bank_id_not_hashed')
+        self.assertEqual(exercise.evidence['cleanup'], 'incomplete')
+        self.assertNotIn(FOREIGN, json.dumps(exercise.evidence))
+
+    def test_r1_guard_removals_fail_in_process(self):
+        original = X.P.require
+        bypass = lambda code: patch.object(X.P, 'require', side_effect=lambda condition, actual:
+            original(condition or actual == code, actual))
+        def edited(name, before, after):
+            source = textwrap.dedent(inspect.getsource(getattr(X.Exercise, name)))
+            self.assertIn(before, source)
+            namespace = dict(vars(X))
+            exec(compile(source.replace(before, after), '<memory-exercise-mutant>', 'exec'), namespace)
+            return patch.object(X.Exercise, name, namespace[name])
+        cases = [
+            ('K1-body', 'test_k1_foreign_schema_and_all_changing_bodies', bypass('foreign_bank_in_body')),
+            ('K1-sampler', 'test_k1_foreign_schema_and_all_changing_bodies',
+             patch.object(X.Exercise, 'arguments', lambda exercise, _: {'bank': FOREIGN})),
+            ('K2', 'test_k2_executor_error_and_nonmatching_rpc_errors_are_not_denial',
+             patch.object(X.Exercise, 'denied', lambda exercise, answer, name, sid:
+                 bool(answer.get('result', {}).get('isError')) or 'error' in answer)),
+            ('K3', 'test_k3_last_cleanup_bank_list_cannot_reappear', bypass('absence_unproven')),
+            ('K4-signal', 'test_k4_signals_at_finally_and_cleanup_first_statement',
+             patch.object(X.Exercise, 'interrupt', side_effect=KeyboardInterrupt)),
+            ('K4-mark', 'test_k4_signals_at_finally_and_cleanup_first_statement',
+             edited('change', "self.evidence['cleanup'] = 'incomplete'", 'pass')),
+            ('K5', 'test_k5_full_catalog_forecast_and_probe_coverage',
+             edited('filtering', 'full = fresh and tuple(allowed) not in self.full_policies', 'full = fresh')),
+            ('K6-match', 'test_k6_id_rejects_suffix_and_sampler_forces_bank_id',
+             patch.object(X, 'ID', types.SimpleNamespace(fullmatch=X.ID.match))),
+            ('K6-bank', 'test_k6_id_rejects_suffix_and_sampler_forces_bank_id',
+             edited('arguments', "if name in ('bank_id', 'target_bank_id'):", 'if False:')),
+            ('K6-download', 'test_k6_download_target_cannot_escape', bypass('download_target_rejected')),
+            ('K6-config', 'test_k6_restore_config_history_and_webhook_guards', bypass('restore_config_changed')),
+            ('K6-history', 'test_k6_restore_config_history_and_webhook_guards', bypass('restored_history_missing')),
+            ('K6-webhooks', 'test_k6_restore_config_history_and_webhook_guards', bypass('restored_webhooks_changed')),
+            ('K6-document404', 'test_k6_document_absence_delete_status_and_uncertainty',
+             edited('absence', 'absent and status == 404 and search == 404', 'absent and search == 404')),
+            ('K6-delete', 'test_k6_document_absence_delete_status_and_uncertainty', bypass('delete_failed')),
+            ('K6-unresolved', 'test_k6_document_absence_delete_status_and_uncertainty', bypass('unresolved_mutation')),
+            ('K7-status', 'test_k7_failed_rows_and_hashed_count_directions',
+             edited('call', "'failed' if status >= 500 else 'measured'", "'measured'")),
+            ('K7-hash', 'test_k7_failed_rows_and_hashed_count_directions',
+             edited('cleanup', 'P.digest(k.encode())', 'k')),
+        ]
+        for name, test, mutation in cases:
+            with self.subTest(guard=name), mutation:
+                result = unittest.TestResult()
+                ExerciseTests(test).run(result)
+            failures = result.failures + result.errors
+            self.assertTrue(failures, 'repair_removal_survived_' + name)
+            trace = failures[0][1]
+            assertion = trace.splitlines()[-1]
+            locations = X.re.findall(r'test_memory_exercise.py\", line ([0-9]+)', trace)
+            print('repair_removed=' + name + ' failing_line=ci/test_memory_exercise.py:' + locations[-1]
+                  + ' message=' + assertion)
 
     def test_control_guard_removals_are_detected_in_process(self):
         # Run the real assertion controls with ONE named guard disabled in memory.

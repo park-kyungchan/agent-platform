@@ -344,5 +344,6 @@ shapes refuse; a lost mutation answer never permits a competing deletion.
 Cleanup checks bank/document/marker absence and unchanged other-bank fact counts.
 Evidence is new-only, mode 0600, with shapes/counts/hashes/timings, never note bodies
 or credentials. Exit 0 means all automated steps measured and cleanup proven;
-2 refuses preflight, 3 means failed/unrun steps with cleanup proven, 4 means
+2 means no changing request was sent (read-only preflight may have run);
+3 means failed/unrun steps with cleanup proven, 4 means
 cleanup incomplete. E3 CLI qualification and E5 semantic judgment remain Lead work.

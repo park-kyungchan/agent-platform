@@ -21,87 +21,27 @@ SPEC = importlib.util.spec_from_file_location('exercise_publisher', ROOT / 'scri
 P = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(P)
 BANKS = '/v1/default/banks'
-ID = re.compile(r'zz-conformance-[0-9]{8}-[0-9a-f]{8}\Z')
+ID = re.compile(r'zz-conformance-[0-9]{8}-[0-9a-f]{8}')
 MAX_BYTES = 8 * 1024 * 1024
-FAILURE_CODES = frozenset({
-    'absence_unproven',
-    'allowed_read_failed',
-    'allowed_tool_denied',
-    'archive_corrupt',
-    'archive_document_mismatch',
-    'archive_documents_unmeasured',
-    'archive_foreign_bank',
-    'archive_too_large',
-    'archive_unmeasured',
-    'bank_already_present',
-    'bank_id_rejected',
-    'canary_missed_drift',
-    'canary_read_failed',
-    'config_failed',
-    'config_readback_failed',
-    'counts_unmeasured',
-    'create_failed',
-    'default_catalog_unmeasured',
-    'delete_failed',
-    'document_bytes_or_tags',
-    'document_set_changed',
-    'download_target_rejected',
-    'fact_readback_failed',
-    'invalid_auth_accepted',
-    'invalid_timestamp_not_rejected',
-    'list_identity',
-    'list_incomplete',
-    'list_shape',
-    'mcp_envelope',
-    'mcp_http_failure',
-    'mcp_notification_failed',
-    'mcp_session_missing',
-    'merge_facts_changed',
-    'missing_read_not_404',
-    'missing_delete_not_404',
-    'mutation_route_rejected',
-    'mutation_target_rejected',
-    'operation_child_missing',
-    'operation_children_shape',
-    'operation_error',
-    'operation_failed',
-    'operation_identity',
-    'operation_not_discovered',
-    'operation_parent_missing',
-    'other_bank_counts_changed',
-    'poll_time_bound',
-    'profile_drift',
-    'read_status',
-    'read_target_rejected',
-    'allowed_shape_unmeasured',
-    'allowed_scope_failed',
-    'allowed_document_failed',
-    'fact_shape',
-    'fact_set_changed',
-    'restored_history_missing',
-    'restored_webhooks_changed',
-    'response_too_large',
-    'restore_config_changed',
-    'restore_facts_changed',
-    'retain_bound',
-    'sse_response_unmeasured',
-    'submit_unmeasured',
-    'target_rejected',
-    'term_missing',
-    'tool_arguments_unmeasured',
-    'tool_names_unmeasured',
-    'tool_catalog_incomplete',
-    'tool_catalog_shape',
-    'tool_filter_call_failed',
-    'tool_filter_list_failed',
-    'total_time_bound',
-    'transfer_route_unmeasured',
-    'transport_uncertain',
-    'uncertain_work_keep_bank',
-    'unresolved_mutation',
-    'write_error_bound',
-    'write_gap_bound',
-})
+FAILURE_CODES = frozenset(('absence_unproven allowed_document_failed allowed_read_failed allowed_scope_failed '
+    'allowed_shape_unmeasured allowed_tool_denied archive_corrupt archive_document_mismatch '
+    'archive_documents_unmeasured archive_foreign_bank archive_too_large archive_unmeasured '
+    'bank_already_present bank_id_rejected canary_missed_drift canary_read_failed config_failed '
+    'config_readback_failed counts_unmeasured create_failed default_catalog_unmeasured delete_failed '
+    'denial_shape_unmeasured document_bytes_or_tags document_set_changed download_target_rejected '
+    'fact_readback_failed fact_set_changed fact_shape foreign_bank_in_body invalid_auth_accepted '
+    'invalid_timestamp_not_rejected list_identity list_incomplete list_shape mcp_envelope '
+    'mcp_http_failure mcp_notification_failed mcp_session_missing merge_facts_changed '
+    'missing_delete_not_404 missing_read_not_404 mutation_route_rejected mutation_target_rejected '
+    'operation_child_missing operation_children_shape operation_error operation_failed '
+    'operation_identity operation_not_discovered operation_parent_missing other_bank_counts_changed '
+    'poll_time_bound profile_drift read_status read_target_rejected response_too_large '
+    'restore_config_changed restore_facts_changed restored_history_missing restored_webhooks_changed '
+    'retain_bound sse_response_unmeasured submit_unmeasured target_rejected term_missing '
+    'tool_arguments_unmeasured tool_catalog_incomplete tool_catalog_shape tool_filter_call_failed '
+    'tool_filter_list_failed tool_names_unmeasured total_time_bound transfer_route_unmeasured '
+    'transport_uncertain uncertain_work_keep_bank unresolved_mutation write_error_bound '
+    'write_gap_bound').split())
 SUPPORTED_TOOLS = frozenset('retain sync_retain recall reflect list_mental_models get_mental_model '
     'create_mental_model update_mental_model delete_mental_model refresh_mental_model clear_mental_model '
     'list_directives create_directive delete_directive list_memories get_memory update_memory invalidate_memory '
@@ -200,7 +140,10 @@ class Exercise:
         self.attempted = self.cleaning = self.uncertain = False
         self.before = None
         self.active = set()
-        self.catalog = {}
+        self.catalog, self.denials, self.completed = {}, {}, {}
+        self.interrupted = False
+        self.full_policies = set()
+        self.tool_policy = None
         self.sessions = []
         self.marker = 'InventedConformance' + bank[-8:]
         self.docs = {}
@@ -216,7 +159,12 @@ class Exercise:
             self.evidence['requests'][-1]['verdict'] = 'failed'
         P.require(condition, code)
 
+    def interrupt(self):
+        self.interrupted = True  # Signal handlers never interrupt the cleanup boundary.
+
     def bound(self, retaining=False):
+        if self.interrupted and not self.cleaning:
+            raise KeyboardInterrupt
         P.require(self.clock() < getattr(self, 'poll_until', float('inf')), 'poll_time_bound')
         # Reserve the last 120 seconds for resolution/deletion/absence proof.
         P.require(self.clock() - self.start < (900 if self.cleaning else 780), 'total_time_bound')
@@ -230,6 +178,8 @@ class Exercise:
                   'mutation_route_rejected')
         self.bound(retaining=route == '/memories' or kwargs.get('retaining', False))
         P.require(not self.uncertain, 'unresolved_mutation')
+        raw_body = body if isinstance(body, bytes) else encode(body)
+        P.require(not any(bank.encode() in raw_body or encode(bank)[1:-1] in raw_body for bank in self.before or {}), 'foreign_bank_in_body')
         path = self.mcp if route == '@mcp' else self.base + route
         query = dict(query or {})
         if route == '/transfer/import':
@@ -246,6 +196,7 @@ class Exercise:
         if route == '/memories' or kwargs.pop('retaining', False):
             self.retains += 1
         if method == 'PUT' or route == '/transfer/import':
+            self.evidence['cleanup'] = 'incomplete'
             self.attempted = True  # Before dispatch: an exception may hide successful creation.
         dispatched_operation = body.get('operation_id') if route == '/memories' and isinstance(body, dict) else None
         if isinstance(dispatched_operation, str):
@@ -312,7 +263,7 @@ class Exercise:
                 data = {}
             self.bound()
             row['answer_shape'] = keys(data)
-            row['verdict'] = 'measured'
+            row['verdict'] = 'failed' if status >= 500 else 'measured'
             return status, data, sid
         finally:
             row['seconds'] = self.clock() - started
@@ -388,7 +339,9 @@ class Exercise:
             P.require('post' in schema.get('paths', {}).get(BANKS + '/{bank_id}' + suffix, {}),
                       'transfer_route_unmeasured')
 
-    def poll(self):
+    def poll(self, refresh=False):
+        if refresh:
+            self.completed.clear()
         self.poll_until = min(self.clock() + 120, self.start + (900 if self.cleaning else 780))
         try:
             return self.poll_work(self.poll_until)
@@ -402,7 +355,9 @@ class Exercise:
             details = {}
             for item in operations:
                 oid = item['id']
-                detail = self.get('/operations/' + P.segment(oid), {'include_payload': 'true'})
+                detail = self.completed.get(oid) if item.get('status') == 'completed' else None
+                if detail is None or oid in self.active:
+                    detail = self.get('/operations/' + P.segment(oid), {'include_payload': 'true'})
                 P.require(detail.get('id') == oid, 'operation_identity')
                 details[oid] = detail
             ids = set(details)
@@ -422,6 +377,8 @@ class Exercise:
                     busy |= child.get('status') != 'completed'
                 if meta.get('is_parent'):
                     P.require(meta.get('num_sub_batches') == len(children), 'operation_child_missing')
+                if status == 'completed' and all(c.get('status') == 'completed' for c in children):
+                    self.completed[detail['id']] = detail
             if not busy:
                 self.active.clear()
                 return details
@@ -436,10 +393,14 @@ class Exercise:
         self.active.add(oid)
         return self.poll()[oid]
 
-    def create(self):
+    def create(self, default=False):
+        self.completed.clear()
+        self.docs.clear()
+        self.tool_policy = None
         status, _, _ = self.change('PUT', body={'enable_observations': False})
         P.require(status == 200, 'create_failed')
-        self.configure([])
+        if not default:
+            self.configure([])
 
     def configure(self, tools, instruction=None):
         desired = {'enable_observations': False, 'enable_auto_consolidation': False,
@@ -449,6 +410,7 @@ class Exercise:
         P.require(status == 200, 'config_failed')
         actual = self.get('/config').get('config', {})
         P.require(all(actual.get(k) == v for k, v in desired.items()), 'config_readback_failed')
+        self.tool_policy = list(tools) if tools is not None else None
         return actual
 
     def rpc(self, method, params=None, session=None, retaining=False):
@@ -481,6 +443,16 @@ class Exercise:
         return {t['name']: t for t in tools}
 
     def arguments(self, schema):
+        def validate(node):
+            if isinstance(node, dict):
+                P.require(all('bank' not in k.lower() or k in ('bank_id', 'target_bank_id')
+                              for k in node.get('properties', {})), 'tool_arguments_unmeasured')
+                for value in node.values():
+                    validate(value)
+            elif isinstance(node, list):
+                for value in node:
+                    validate(value)
+        validate(schema)
         def sample(s, name=''):
             if name in ('bank_id', 'target_bank_id'):
                 return self.bank
@@ -488,8 +460,7 @@ class Exercise:
                 return 'invented-a'
             if name == 'timestamp':
                 return '2026-01-02T00:00:00Z'
-            if 'enum' in s:
-                return s['enum'][0]
+            P.require('enum' not in s, 'tool_arguments_unmeasured')
             if 'anyOf' in s:
                 return sample(next(x for x in s['anyOf'] if x.get('type') != 'null'), name)
             kind = s.get('type')
@@ -500,47 +471,74 @@ class Exercise:
             if kind == 'string':
                 return self.marker
             if kind in ('integer', 'number'):
-                return max(1, s.get('minimum', 1))
+                return 1
             if kind == 'boolean':
                 return False
             raise P.Stop('tool_arguments_unmeasured')
         return sample(schema)
 
     @staticmethod
-    def denied(answer):
-        # Validation errors or a missing resource are NOT proof of tool denial.
-        text = encode(answer).decode().lower()
-        error = 'error' in answer or answer.get('result', {}).get('isError') is True
-        return error and bool(re.search(r'not allowed|disabled|not enabled|unknown tool|tool[^\n]*not found|not available', text))
+    def denial(answer, name):
+        # Every result is execution, including isError and an executor's missing-resource error.
+        error = answer.get('error')
+        if 'result' in answer or not isinstance(error, dict) or type(error.get('code')) is not int or not isinstance(error.get('message'), str):
+            return None
+        normalized = dict(error, message=error['message'].replace(name, '<tool>'))
+        return error['code'], keys(error), P.digest(encode(normalized))
+
+    def denied(self, answer, name, sid):
+        return self.denial(answer, name) is not None and self.denial(answer, name) == self.denials[sid]
+
+    def representatives(self):
+        # First catalog member of each fixed tuple; never choose by server order or description.
+        classes = {'retain': ('retain', 'sync_retain'),
+                   'delete': ('delete_document', 'delete_bank', 'clear_memories'),
+                   'reflect': ('reflect',),
+                   'page': ('create_knowledge_page', 'delete_knowledge_node', 'update_knowledge_node')}
+        chosen = {kind: next((n for n in names if n in self.catalog), None) for kind, names in classes.items()}
+        self.evidence['E2_classes'] = {k: v or 'class_absent' for k, v in chosen.items()}
+        return [name for name in chosen.values() if name]
 
     def filtering(self, old=None):
         started = self.clock()
         self.step = 'E2'
-        document_status, document, _ = self.call('GET', self.base + '/documents/invented-a')
-        visible_ids = {d['id'] for d in self.pages('/documents')}
+        visible_ids = set(self.docs)  # Owned originals already compared by E1; a fresh create clears them.
+        document_status = 200 if 'invented-a' in self.docs else 404
+        document = {'original_text': self.docs.get('invented-a')}
         if old is None:
-            # Observe default exposure before the first config update; caller supplies it when available.
             old = self.session()
             self.catalog.update(self.tools(old))
-        self.configure([])
+        representatives = self.representatives()
         for allowed in ([], ['recall', 'get_document']):
-            self.configure(allowed)
-            for sid in (old, self.session()):
+            if self.tool_policy != allowed:
+                self.configure(allowed)
+            for sid, fresh in ((old, False), (self.session(), True)):
                 listed = self.tools(sid)
-                self.catalog.update(listed)
                 self.observed(set(listed) == set(allowed), 'tool_filter_list_failed')
-                for name, tool in self.catalog.items():
-                    args = self.arguments(tool['inputSchema'])
+                if sid not in self.denials:
+                    sentinel = 'zz_nonexistent_exercise_probe'
+                    baseline, _ = self.rpc('tools/call', {'name': sentinel, 'arguments': {}}, sid)
+                    self.denials[sid] = self.denial(baseline, sentinel)
+                    self.observed(self.denials[sid] is not None, 'denial_shape_unmeasured')
+                full = fresh and tuple(allowed) not in self.full_policies
+                names = list(self.catalog) if full else representatives
+                # Preserve successful scoped reads after restore, alongside the four denial classes.
+                if allowed and fresh and not full:
+                    names = names + list(allowed)
+                for name in names:
+                    try:
+                        args = self.arguments(self.catalog[name]['inputSchema'])
+                    except P.Stop:
+                        self.evidence.setdefault('tool_probes', []).append({'tool': name, 'verdict': 'refused_unmeasured'})
+                        raise
                     if name == 'recall':
                         args.update(query=self.marker, tags=['subject:task:invented'], tags_match='all_strict',
                                     types=['world', 'experience'], budget='low', max_tokens=128)
                     answer, _ = self.rpc('tools/call', {'name': name, 'arguments': args}, sid,
                                          retaining=name in ('retain', 'sync_retain'))
                     if name not in allowed:
-                        self.observed(self.denied(answer), 'tool_filter_call_failed')
+                        self.observed(self.denied(answer, name, sid), 'tool_filter_call_failed')
                     else:
-                        # get_document on an empty bank must fail as missing, not as a disabled tool.
-                        P.require(not self.denied(answer), 'allowed_tool_denied')
                         self.observed(not ('error' in answer or answer.get('result', {}).get('isError')), 'allowed_read_failed')
                         structured = answer.get('result', {}).get('structuredContent')
                         self.observed(isinstance(structured, dict), 'allowed_shape_unmeasured')
@@ -555,6 +553,8 @@ class Exercise:
                                 and not structured.get('error'), 'allowed_document_failed')
                         else:
                             self.observed(document_status == 404 and bool(structured.get('error')), 'allowed_document_failed')
+                if full:
+                    self.full_policies.add(tuple(allowed))
         self.configure([])
         self.evidence['steps']['E2'] = {'verdict': 'measured', 'sessions': len(self.sessions),
                                        'catalog_count': len(self.catalog),
@@ -572,9 +572,8 @@ class Exercise:
         self.compare({rid: text}, exact=False)
 
     def compare(self, expected, exact=True):
-        documents = self.pages('/documents')
         if exact:
-            P.require({d['id'] for d in documents} == set(expected), 'document_set_changed')
+            P.require({d['id'] for d in self.pages('/documents')} == set(expected), 'document_set_changed')
         snapshots, fact_ids = {}, set()
         for rid, text in expected.items():
             doc = self.get('/documents/' + P.segment(rid))
@@ -583,6 +582,7 @@ class Exercise:
             P.require(bool(facts) and all(f.get('document_id') == rid and f.get('tags') == doc['tags']
                        and f.get('fact_type') in ('world', 'experience') for f in facts), 'fact_readback_failed')
             P.require(all(isinstance(f.get('text'), str) and isinstance(f.get('entities'), str) for f in facts), 'fact_shape')
+            self.last_facts = facts
             fact_ids.update(f['id'] for f in facts)
             canonical = [{k: f.get(k) for k in ('text', 'entities', 'tags', 'fact_type', 'occurred_start', 'occurred_end')} for f in facts]
             snapshots[rid] = P.digest(encode(sorted(canonical, key=lambda x: encode(x))))
@@ -635,6 +635,8 @@ class Exercise:
         return raw
 
     def restore(self, raw, merge=False):
+        if not merge:
+            self.completed.clear()  # Restored operation ids must be read again, never accepted from the cache.
         boundary = 'exercise-' + uuid.uuid4().hex
         body = ('--' + boundary + '\r\nContent-Disposition: form-data; name="file"; filename="exercise.zip"\r\n'
                 'Content-Type: application/zip\r\n\r\n').encode() + raw + ('\r\n--' + boundary + '--\r\n').encode()
@@ -657,9 +659,8 @@ class Exercise:
         self.absence()
 
     def e1(self):
-        self.create()
-        # Capture the full default catalog on a separate initially unfiltered create below.
-        self.configure(None)
+        self.create(default=True)
+        # Capture defaults before the first policy update and before any record.
         old = self.session()
         self.catalog = self.tools(old)
         P.require({'recall', 'get_document'} <= set(self.catalog), 'default_catalog_unmeasured')
@@ -685,12 +686,14 @@ class Exercise:
         self.step = 'E1'
         self.delete()  # Native restore requires the target to be absent.
         self.restore(full)
+        self.docs = dict(originals)
         P.require(self.compare(originals) == before, 'restore_facts_changed')
         P.require(self.get('/config') == profile, 'restore_config_changed')
         self.restore(subset, merge=True)
+        self.docs['invented-a'] = changed
         P.require(self.compare({'invented-a': changed}, False) == changed_facts, 'merge_facts_changed')
         self.compare({'invented-a': changed, 'invented-b': originals['invented-b']})
-        history = self.poll()
+        history = self.poll(refresh=True)
         missing_history = len(original_history - set(history))
         self.observed(missing_history == 0, 'restored_history_missing')
         self.observed(self.get('/webhooks') == hooks, 'restored_webhooks_changed')
@@ -728,7 +731,7 @@ class Exercise:
                 text += ' ' + ('x' * (n - len(text.encode()) - 1))
             rid = 'invented-' + label
             self.retain(rid, text)
-            facts = self.pages('/memories/list', query={'document_id': rid})
+            facts = self.last_facts  # The exhaustive read just performed by retain/compare.
             terms = term.split() if label == 'alias' else [term]
             P.require(all(any(t in str(f.get('text', '')) or t in str(f.get('entities', '')) for f in facts)
                           for t in terms), 'term_missing')
@@ -780,12 +783,18 @@ class Exercise:
             P.require(not self.uncertain, 'uncertain_work_keep_bank')
             if self.bank in self.counts():
                 self.delete()
-            self.absence()
-            proofs['owned_bank_absent'] = True
-            after = self.counts()
+            else:
+                self.absence()
+            after = self.counts()  # The LAST cleanup read; no owned-bank reappearance is dropped.
+            proofs['owned_bank_absent'] = self.bank not in after
+            P.require(proofs['owned_bank_absent'], 'absence_unproven')
             other = {k: v for k, v in after.items() if k != self.bank}
             proofs['other_counts_equal'] = other == self.before
-            proofs['other_count_differences'] = sum(other.get(k) != self.before.get(k) for k in set(other) | set(self.before))
+            comparison = {P.digest(k.encode()): ('new' if k not in self.before else 'missing' if k not in other
+                          else 'grew' if other[k] > self.before[k] else 'shrank' if other[k] < self.before[k]
+                          else 'unchanged') for k in set(other) | set(self.before)}
+            self.evidence['other_bank_comparison'] = comparison
+            proofs['other_count_differences'] = sum(v != 'unchanged' for v in comparison.values())
             P.require(proofs['other_counts_equal'], 'other_bank_counts_changed')
             self.evidence['cleanup'] = 'proven'
         except BaseException as error:
@@ -827,7 +836,8 @@ class Exercise:
                 self.evidence['steps'].setdefault(step, {'verdict': 'not_run'})
             self.evidence['elapsed_s'] = self.clock() - self.start
             self.evidence['retain_attempts'] = self.retains
-        return 4 if self.attempted and self.evidence['cleanup'] != 'proven' else code
+        self.evidence['interrupted'] = self.interrupted
+        return 4 if self.attempted and self.evidence['cleanup'] != 'proven' else 3 if self.interrupted else code
 
 
 def main(argv=None):
@@ -844,7 +854,7 @@ def main(argv=None):
         os.fchmod(fd, 0o600)
         exercise = Exercise(args.bank, Wire(secret))
         def interrupted(*_):
-            raise KeyboardInterrupt
+            exercise.interrupt()
         with contextlib.ExitStack() as stack:
             for sig in (signal.SIGINT, signal.SIGTERM):
                 previous = signal.signal(sig, interrupted)
