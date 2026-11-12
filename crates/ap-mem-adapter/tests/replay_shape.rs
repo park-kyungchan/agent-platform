@@ -1,8 +1,8 @@
 #[path = "support/replay.rs"]
 mod replay;
 use replay::{
-    Fact, MentalModel, RecordedReply, Replay, Shape, TraceStep, WireRequest, assert_recorded_keys,
-    project,
+    Fact, MentalModel, RecordedReply, Replay, ReplayStop, Shape, TraceStep, WireRequest,
+    assert_recorded_keys, project,
 };
 use serde_json::{Value, json};
 
@@ -11,7 +11,7 @@ fn request(method: &str, route: &str, body: Value) -> WireRequest {
     WireRequest::new(method, &format!("{ROOT}{route}"), body)
 }
 fn checked(r: &mut Replay, q: WireRequest, recording: &'static str) -> RecordedReply {
-    let reply = r.apply(q);
+    let reply = r.apply(q).expect("recorded request");
     assert_recorded_keys(&reply, &Shape { recording }).unwrap();
     reply
 }
@@ -351,5 +351,116 @@ fn rpc_and_observation_shapes() {
     read(&mut r, "/memories/list?type=observation", "190");
     // project alone cannot mutate state or turn a read into a trace advance.
     let q = request("GET", "/documents/fixture-document", Value::Null);
-    assert_recorded_keys(&project(&r, &q), &Shape { recording: "016" }).unwrap();
+    assert_recorded_keys(&project(&r, &q).unwrap(), &Shape { recording: "016" }).unwrap();
+}
+
+#[test]
+fn hashed_mcp_recall_uses_recorded_empty_metadata() {
+    let mut r = Replay::default();
+    retain(
+        &mut r,
+        "fixture-hashed-recall",
+        "invented hashed body",
+        true,
+        "010",
+    );
+    complete(&mut r, "fixture-hashed-recall");
+    rpc(&mut r, "initialize", json!({}), "007");
+    let reply = rpc(
+        &mut r,
+        "tools/call",
+        json!({"name":"recall","arguments":{"query":"invented"}}),
+        "036",
+    );
+    assert!(!reply.body.as_str().unwrap().contains("body_hash"));
+}
+
+#[test]
+fn recorded_crlf_frames_are_accepted() {
+    let mut r = Replay::default();
+    retain(&mut r, "fixture-crlf", "invented frame body", false, "010");
+    complete(&mut r, "fixture-crlf");
+    let frames = [
+        (rpc(&mut r, "initialize", json!({}), "007"), "007"),
+        (rpc(&mut r, "tools/list", json!({}), "021"), "021"),
+        (
+            rpc(
+                &mut r,
+                "tools/call",
+                json!({"name":"recall","arguments":{"query":"invented"}}),
+                "036",
+            ),
+            "036",
+        ),
+        (
+            rpc(
+                &mut r,
+                "tools/call",
+                json!({"name":"get_document","arguments":{"document_id":"fixture-document"}}),
+                "109",
+            ),
+            "109",
+        ),
+    ];
+    for (mut reply, recording) in frames {
+        assert!(
+            reply
+                .body
+                .as_str()
+                .unwrap()
+                .starts_with("event: message\r\n")
+        );
+        assert!(reply.body.as_str().unwrap().ends_with("\r\n\r\n"));
+        // Only framing comes from the recordings; all JSON values remain invented.
+        let s = reply
+            .body
+            .as_str()
+            .unwrap()
+            .replace("\r\n", "\n")
+            .replace('\n', "\r\n");
+        reply.body = json!(s);
+        assert_recorded_keys(&reply, &Shape { recording }).unwrap();
+    }
+}
+
+#[test]
+fn unknown_operation_does_not_panic() {
+    let r = Replay::default();
+    let q = request(
+        "GET",
+        "/operations/fixture-unknown?include_payload=true",
+        Value::Null,
+    );
+    let result =
+        std::panic::catch_unwind(|| project(&r, &q)).expect("unknown lookup must not panic");
+    assert!(matches!(
+        result,
+        Err(ReplayStop::NotRecorded("operation_lookup_http404"))
+    ));
+    assert!(matches!(
+        Replay::default().apply(q),
+        Err(ReplayStop::NotRecorded(_))
+    ));
+}
+
+#[test]
+fn apply_does_not_emit_an_unrecorded_variant() {
+    let mut r = Replay::default();
+    retain(
+        &mut r,
+        "fixture-unrecorded",
+        "invented hashed document",
+        true,
+        "010",
+    );
+    complete(&mut r, "fixture-unrecorded");
+    rpc(&mut r, "initialize", json!({}), "007");
+    let mut q = WireRequest::new(
+        "POST",
+        "/mcp/fixture-bank/",
+        json!({"jsonrpc":"2.0","id":12,"method":"tools/call","params":{"name":"get_document","arguments":{"document_id":"fixture-document"}}}),
+    );
+    q.session = Some("fixture-session".into());
+    // This cannot pass through shape109 (which records null document metadata).
+    assert!(matches!(r.apply(q), Err(ReplayStop::ShapeMismatch(_))));
 }

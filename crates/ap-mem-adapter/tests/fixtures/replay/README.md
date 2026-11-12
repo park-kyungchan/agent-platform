@@ -74,3 +74,15 @@ All bodies, ids, names, dates and help strings in projection/tests are invented.
 | 472 | 43307042dedccae7271e97f03811ecaa04fc53b63cf2b7f5856bd3fb23be489f |
 | 473 | c4e2a451294c946bae07a9ad69574f6ee92b404763cc9d74ef5f15f60aceb5a9 |
 | 475 | 831c2803d135a45f0b6842dc322a31730a6ca9a3cce6e67639843414cd4066e3 |
+
+## G5b repairs
+
+MCP recall emits empty metadata even for hashed source documents (036;114 is an
+empty-result comparison); REST recall keeps the separately recorded062 metadata.
+All four SSE projections/checks use recorded CRLF framing (007/021/036/109).
+`apply` selects the endpoint/mode shape and validates every answer internally.
+`apply`/`project` return `Result<RecordedReply, ReplayStop>`; unknown shapes never
+become wire replies. No operation-lookup HTTP404 exists in the saved inputs:
+019 is HTTP200/status not_found, not the requested404. Unknown operations stop
+with typed NotRecorded until a suitable recorded variant is assigned, rather
+than panicking or inventing that404. This is not native absence/finality proof.

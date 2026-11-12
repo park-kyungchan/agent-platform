@@ -33,6 +33,11 @@ pub struct RecordedReply {
     pub headers: BTreeMap<String, String>,
     pub body: Value,
 }
+#[derive(Debug, PartialEq, Eq)]
+pub enum ReplayStop {
+    NotRecorded(&'static str),
+    ShapeMismatch(String),
+}
 #[derive(Clone, Debug, PartialEq)]
 pub struct Document {
     pub id: String,
@@ -174,7 +179,7 @@ impl Replay {
             TraceStep::MaintenanceCompleted => self.maintenance = true,
         }
     }
-    pub fn apply(&mut self, request: WireRequest) -> RecordedReply {
+    pub fn apply(&mut self, request: WireRequest) -> Result<RecordedReply, ReplayStop> {
         if request.authorized && !self.absent {
             let route = request.path.split('?').next().unwrap();
             if route == "/mcp/fixture-bank/" && request.body["method"] == "initialize" {
@@ -225,7 +230,11 @@ impl Replay {
             }
         }
         // DELETE projects the pre-delete count, then applies the measured synchronous removal.
-        let reply = project(self, &request);
+        let reply = project(self, &request)?;
+        let shape = self
+            .recorded_shape(&request)
+            .ok_or(ReplayStop::NotRecorded("response_variant"))?;
+        assert_recorded_keys(&reply, &shape).map_err(ReplayStop::ShapeMismatch)?;
         if request.authorized && !self.absent && request.method == "DELETE" && reply.status == 200 {
             let id = request
                 .path
@@ -234,7 +243,119 @@ impl Replay {
             self.documents.remove(id);
             self.facts.retain(|_, f| f.document_id != id);
         }
-        reply
+        Ok(reply)
+    }
+    fn recorded_shape(&self, request: &WireRequest) -> Option<Shape> {
+        let (path, _) = request.path.split_once('?').unwrap_or((&request.path, ""));
+        let q = query(&request.path);
+        let route = path.strip_prefix(PREFIX);
+        let recording = if !request.authorized {
+            "110"
+        } else if self.absent {
+            if route == Some("/mental-models") {
+                "465"
+            } else {
+                return None;
+            }
+        } else if path == "/mcp/fixture-bank/" {
+            match request.body["method"].as_str()? {
+                "initialize" => "007",
+                "tools/list" => "021",
+                "tools/call" => match request.body["params"]["name"].as_str()? {
+                    "recall" => "036",
+                    "get_document" => "109",
+                    _ => return None,
+                },
+                _ => return None,
+            }
+        } else {
+            match (request.method.as_str(), route?) {
+                ("GET", "/config") => {
+                    if self.upstream_defaults {
+                        "161"
+                    } else {
+                        "006"
+                    }
+                }
+                ("GET", "/stats") => "181",
+                ("POST", "/memories") => "010",
+                ("POST", "/memories/recall") => "062",
+                ("GET", "/documents") => "030",
+                ("GET", "/mental-models") => {
+                    if q.get("offset").is_some_and(|n| *n != "0") {
+                        "473"
+                    } else if self.models.is_empty() {
+                        "470"
+                    } else {
+                        "472"
+                    }
+                }
+                ("GET", "/memories/list") => {
+                    if q.get("type").copied() == Some("observation") {
+                        "190"
+                    } else {
+                        let facts: Vec<_> = self
+                            .facts
+                            .values()
+                            .filter(|f| q.get("document_id").is_none_or(|id| *id == f.document_id))
+                            .collect();
+                        if facts.is_empty() {
+                            "126"
+                        } else if facts
+                            .iter()
+                            .all(|f| self.documents[&f.document_id].body_hash.is_some())
+                        {
+                            "061"
+                        } else {
+                            "025"
+                        }
+                    }
+                }
+                ("GET", "/operations") => {
+                    if self.refresh {
+                        "072"
+                    } else if self.maintenance {
+                        "073"
+                    } else {
+                        "018"
+                    }
+                }
+                (method, r) if r.starts_with("/documents/") => {
+                    let doc = self.documents.get(r.strip_prefix("/documents/")?);
+                    match method {
+                        "DELETE" => {
+                            if doc.is_some() {
+                                "124"
+                            } else {
+                                "128"
+                            }
+                        }
+                        "GET" => match doc {
+                            Some(d) if d.body_hash.is_some() => "060",
+                            Some(_) => "016",
+                            None => "125",
+                        },
+                        _ => return None,
+                    }
+                }
+                ("GET", r) if r.starts_with("/operations/") => {
+                    let id = r.strip_prefix("/operations/")?;
+                    if self.operations.contains_key(id) {
+                        "434"
+                    } else if self
+                        .operations
+                        .values()
+                        .any(|o| o.child.as_ref().is_some_and(|c| c.0 == id))
+                    {
+                        "116"
+                    } else {
+                        return None;
+                    }
+                }
+                _ => return None,
+            }
+        };
+        Some(Shape { recording })
     }
 }
 fn strings(v: &Value) -> Vec<String> {
@@ -260,7 +381,7 @@ fn query(path: &str) -> BTreeMap<&str, &str> {
 
 /// The ONLY constructor of nominal wire values, including errors and SSE bodies.
 /// Unsupported, uncaptured variants panic rather than inventing a successful answer.
-pub fn project(replay: &Replay, request: &WireRequest) -> RecordedReply {
+pub fn project(replay: &Replay, request: &WireRequest) -> Result<RecordedReply, ReplayStop> {
     let mut status = 200;
     let mut headers = BTreeMap::from([("content-type".into(), "application/json".into())]);
     let (path, _) = request.path.split_once('?').unwrap_or((&request.path, ""));
@@ -324,7 +445,7 @@ pub fn project(replay: &Replay, request: &WireRequest) -> RecordedReply {
             let d = &replay.documents[&f.document_id];
             let chunk = format!("{}-chunk",f.id);
             chunks.insert(chunk.clone(), if mcp {json!({"chunk_text":d.original_text,"chunk_index":0,"truncated":false})} else {json!({"id":chunk,"text":d.original_text,"chunk_index":0,"truncated":false,"attachments":null})});
-            let mut value = json!({"id":f.id,"text":f.text,"entities":null,"context":"fixture-context","occurred_start":null,"occurred_end":null,"mentioned_at":null,"document_id":d.id,"metadata":d.body_hash.as_ref().map(|h| json!({"body_hash":h})).unwrap_or(json!({})),"chunk_id":chunk,"tags":d.tags,"source_fact_ids":null,"scores":{"final":0.25,"reranker":0.25,"semantic":0.25,"keyword":0.25}});
+            let mut value = json!({"id":f.id,"text":f.text,"entities":null,"context":"fixture-context","occurred_start":null,"occurred_end":null,"mentioned_at":null,"document_id":d.id,"metadata":if mcp { json!({}) } else { d.body_hash.as_ref().map(|h| json!({"body_hash":h})).unwrap_or(json!({})) },"chunk_id":chunk,"tags":d.tags,"source_fact_ids":null,"scores":{"final":0.25,"reranker":0.25,"semantic":0.25,"keyword":0.25}});
             value[if mcp {"fact_type"} else {"type"}] = json!("world");
             if !mcp { value["attachments"] = Value::Null; }
             value
@@ -363,16 +484,16 @@ pub fn project(replay: &Replay, request: &WireRequest) -> RecordedReply {
                         &replay.documents[args["document_id"].as_str().unwrap()],
                         true,
                     ),
-                    _ => panic!("uncaptured RPC tool"),
+                    _ => return Err(ReplayStop::NotRecorded("rpc_tool")),
                 };
                 json!({"content":[{"type":"text","text":serde_json::to_string(&value).unwrap()}],"structuredContent":value,"isError":false})
             }
-            _ => panic!("uncaptured RPC method"),
+            _ => return Err(ReplayStop::NotRecorded("rpc_method")),
         };
         headers.insert("content-type".into(), "text/event-stream".into());
         headers.insert("mcp-session-id".into(), "fixture-session".into());
         json!(format!(
-            "event: message\ndata: {}\n\n",
+            "event: message\r\ndata: {}\r\n\r\n",
             json!({"jsonrpc":"2.0","id":request.body["id"],"result":result})
         ))
     } else {
@@ -522,7 +643,7 @@ pub fn project(replay: &Replay, request: &WireRequest) -> RecordedReply {
                             None
                         }
                     })
-                    .expect("uncaptured operation404");
+                    .ok_or(ReplayStop::NotRecorded("operation_lookup_http404"))?;
                 let payload = params.get("include_payload").copied() == Some("true");
                 assert!(
                     (!child && o.status == Status::Pending)
@@ -543,14 +664,14 @@ pub fn project(replay: &Replay, request: &WireRequest) -> RecordedReply {
                 }
                 value
             }
-            _ => panic!("uncaptured wire route"),
+            _ => return Err(ReplayStop::NotRecorded("wire_route")),
         }
     };
-    RecordedReply {
+    Ok(RecordedReply {
         status,
         headers,
         body,
-    }
+    })
 }
 
 pub struct Shape {
@@ -631,7 +752,8 @@ pub fn assert_recorded_keys(reply: &RecordedReply, shape: &Shape) -> Result<(), 
                 return fail();
             };
             let lines: Vec<_> = s.lines().filter_map(|l| l.strip_prefix("data: ")).collect();
-            if lines.len() != 1 || !s.starts_with("event: message\n") {
+            if lines.len() != 1 || !s.starts_with("event: message\r\n") || !s.ends_with("\r\n\r\n")
+            {
                 return fail();
             }
             let v = serde_json::from_str(lines[0]).map_err(|_| format!("invalid_sse@{at}"))?;
