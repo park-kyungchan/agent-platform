@@ -1,7 +1,8 @@
 # Hindsight runtime: how storage, retrieval and pages actually work
 
-Read on demand before changing memory content, knowledge pages or bank configuration, or before
-diagnosing "memory returns old/irrelevant facts". Verified 2026-11-06 against the installed server
+Read on demand when diagnosing "memory returns old/irrelevant facts". For content control,
+read [hindsight-control](../skills/hindsight-control/SKILL.md), including bank flags and effect proofs.
+Retrieval/source details verified 2026-11-06 against the installed server
 1.2.0 (image `ghcr.io/vectorize-io/hindsight@sha256:19d0c08f…`, revision `34a1386`) and coding-agents
 0.8.5. After an upgrade, re-check the cited source locations before relying on a number below.
 
@@ -27,8 +28,7 @@ Endpoint paths below are relative to `/v1/default/banks/{bank_id}`.
   inside the same resolved **observation scope** (`observation_scopes`: `combined` = the full tag set, default unless the bank sets
   `default_observation_scopes`; `per_tag`, `all_combinations`, `shared` = one global untagged scope; or
   explicit tag lists). A correcting fact in a
-  different scope cannot update a stale observation. Fix: `PATCH /documents/{id}` with
-  `observation_scopes` (re-consolidates, without re-extraction, only memories whose resolved scopes change).
+  different scope cannot update a stale observation. For scope changes and verification, use the content-control skill; a scope change alone is not a stale-page repair.
 - **Mental models** hold synthesized content. A **knowledge page** (`kp-…`) wraps a mental model
   (`mm-…`); create pages with `POST /knowledge-base/pages` (`name`, `source_query`, `tags`,
   `max_tokens`, `trigger`). A page's `tags` SCOPE which memories it reads (`tags_match` defaults to `all_strict` when tags
@@ -66,30 +66,20 @@ Which CLIs have hooks and which have only the MCP server: `CLI-RUNTIMES.md` sect
 
 ## Write semantics and costs
 
-- Same-`document_id` retain with `update_mode: "replace"` retires the old facts and re-extracts.
-  Save the GET body first; document history is not a recoverable text archive.
-- `PATCH /documents/{id}` `tags` replaces the complete tag set; it can invalidate observations and
-  requeue co-sources. An unchanged set needs no PATCH.
-- `PATCH /mental-models/{id}` changes `name`/`source_query`/`max_tokens`/`tags`/`trigger`. Refresh:
-  `POST /mental-models/{id}/refresh` with `{"mode": "full"}` regenerates from scratch, or no body to run the model's own
-  `trigger.mode` (default `full`; `delta` edits sections and falls back to full when there is no
-  baseline or `source_query` changed). Full refresh can drop content (observed 70,131 to 13,857
-  characters), so save the model GET first. `POST …/dry-run-refresh` previews diff and usage without
-  writing, but costs the same LLM tokens as a real refresh.
-- Bank levers (`GET/PATCH /config`, body `{"updates": {...}}`): `retain_mission`,
-  `retain_extraction_mode` (`concise`), `retain_custom_instructions`, `observations_mission`,
-  `reflect_mission`, `enable_*` flags. They affect future processing only. Output language is
-  server-level only (`HINDSIGHT_API_LLM_OUTPUT_LANGUAGE`, forces facts, observations and reflect output
-  into one language); a bank PATCH of `llm_output_language` is rejected.
+Content-control procedures and their measured limits have one home:
+[hindsight-control](../skills/hindsight-control/SKILL.md). Read it before any write or effect claim.
+
 - LLM: provider `chatgpt` (subscription); the model is set in the server configuration. It shares the
   ChatGPT/Codex weekly limit. When that limit is reached, extraction, consolidation, reflect and page
   refresh fail; page search and page read still work. In that state do not retry a failed write or
   refresh and do not make a task's acceptance depend on one. Observed refresh cost: 90 to 210 seconds
-  per page.
+  per page. A dry-run refresh also costs generation work; the earlier source reference describes
+  equal LLM-token cost, not independently measured by the content-control experiments.
+- Output language is server-level (`HINDSIGHT_API_LLM_OUTPUT_LANGUAGE`); the earlier source reference
+  reports rejection of a bank `llm_output_language` PATCH. These experiments did not remeasure it.
 
 ## Checks before claiming an effect
 
-Operation `completed` is not semantic success. Read back the document, facts
-(`GET /memories/list?document_id=`), model content and consolidation queue (`GET /stats`
-`pending_operations` and `pending_consolidation` = 0), then re-run the affected recall or page
-search and judge the result.
+Use the operation-specific readbacks and status limits in
+[hindsight-control](../skills/hindsight-control/SKILL.md); this runtime reference supplies no separate
+content-effect predicate. Session injection and retention paths are described above.
