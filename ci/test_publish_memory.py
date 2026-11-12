@@ -180,6 +180,17 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(writes[0][2]['items'][0]['update_mode'], 'replace')
         self.assertEqual(len(writes[0][2]['operation_id']), 36)
         self.assertTrue(any('/operations?' in path for _, path, _ in stub.calls))
+        calls = []
+        def acknowledged_then_partial(method, path, body=None):
+            calls.append(method)
+            if method == 'POST':
+                return dict(success=True, operation_id=body['operation_id'],
+                            bank_id=P.BANK, items_count=1, **{'async': True})
+            raise P.Stop('list_incomplete')
+        client = type('Partial', (), {'request': staticmethod(acknowledged_then_partial)})()
+        with self.assertRaisesRegex(P.Stop, 'keep_consumers_stopped'):
+            P.retain_once(client, 'invented', stub.pin['expected']['invented'])
+        self.assertEqual(calls, ['POST', 'GET'])
 
     def test_publish_refuses_unmeasured_lifecycle_even_when_existing_or_absent(self):
         for absent in (False, True):

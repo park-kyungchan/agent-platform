@@ -291,8 +291,6 @@ def retain_once(client, rid, want):
                 and result.get('operation_id') == operation and result.get('bank_id') == BANK
                 and result.get('items_count') == 1 and result.get('async') is True,
                 'mutation_uncertain')
-        operations = quiescent(client)
-        require(any(x['id'] == operation for x in operations), 'operation_missing')
     except Stop:
         # Native read-only reconciliation, never an overlapping mutation or resend.
         try:
@@ -301,6 +299,11 @@ def retain_once(client, rid, want):
         except Stop:
             pass
         raise Stop('retain_unresolved_read_document_and_parent_child_operations_keep_consumers_stopped') from None
+    try:
+        operations = quiescent(client)
+        require(any(x['id'] == operation for x in operations), 'operation_missing')
+    except Stop:
+        raise Stop('retain_acknowledged_read_document_and_parent_child_operations_keep_consumers_stopped') from None
 
 
 def publish(client, pin):
