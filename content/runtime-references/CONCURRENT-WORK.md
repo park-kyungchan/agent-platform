@@ -9,7 +9,7 @@ Read this when you hand work to another agent, receive work, or share a reposito
 - Two agents may read the same checkout. Two agents that write need separate Git worktrees or file sets that do not overlap.
 - A worktree separates files only. It does not separate global settings, databases, ports, service accounts or a shared build directory.
 - Shared files have one integrator, the Lead unless STATE names another: `Cargo.lock` and manifests, public schemas, generated outputs, and global or per-CLI configuration. Everyone else proposes a change to the integrator.
-- One expensive build runs at a time, with its owner named in STATE and the job limit STATE states (`-j1` when it states none). Each checkout uses its own `CARGO_TARGET_DIR`. Never delete a cache or a lock file to get past a running build. Check CPU, memory and disk before running more at once.
+- One expensive build runs at a time, with its owner named in STATE and the number of parallel build jobs (`-j`) that STATE states (`-j1` when it states none). Each checkout uses its own `CARGO_TARGET_DIR`. Never delete a cache or a lock file to get past a running build. Check CPU, memory and disk before running more at once.
 
 ## 2. Handing work over
 

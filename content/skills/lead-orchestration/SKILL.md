@@ -60,7 +60,7 @@ Mechanics: `CONCURRENT-WORK.md` section 5 and skill `herdr`; the commands of eac
 
 - A worker's finding is a pointer. Check it against source before acting on it.
 - Accept, send concrete repairs, or reject, and record which. Repairs in the same scope may go to the same worker session.
-- When a review finds a blocking defect in the same place a second time, do not send another case to repair: redesign that step, and prove the new design by a complete check where one is possible.
+- When a review finds a blocker in the same place a second time, do not repair it again by adding one more special case: redesign that part of the change, and prove the new design by a check that covers every case, where such a check is possible. This applies `/root/.agents/AGENTS.md` section 4 "Failure" to review results.
 - A dispatched packet is not edited. A changed decision, including a correction from the user, gets a new packet version, and STATE names the current one.
 
 ## 5. Review by risk
