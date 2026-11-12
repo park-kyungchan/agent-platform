@@ -12,3 +12,5 @@ pub use types::*;
 
 #[cfg(target_os = "linux")]
 pub mod pane;
+
+pub mod work;

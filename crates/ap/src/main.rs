@@ -45,6 +45,9 @@ fn main() -> ExitCode {
             fail("io_error", "stdout", 4)
         };
     }
+    if args.first().is_some_and(|arg| arg == "work") {
+        return ap::work::cli(&args[1..]);
+    }
     #[cfg(target_os = "linux")]
     if args.first().is_some_and(|arg| arg == "pane") {
         return ap::pane::cli(&args[1..]);
