@@ -3,7 +3,7 @@
 //! come from opaque_id(); never derive them from caller bytes or a counter.
 //! Fixed HTTP framing and test_* aliases are test transport, not native bindings.
 use serde_json::{Value, json};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{
@@ -51,17 +51,19 @@ pub struct Behaviour {
     // silently IGNORED unless restart_mismatch is selected: stale intent is acknowledged,
     // the least favourable outcome for a publisher expecting its new bytes to apply.
     pub restart_mismatch: bool, // U3/U14: default false; finished work never restarts implicitly.
-    pub delete_immediate: bool, // U5: default false; acknowledgement precedes completion.
-    pub absent_delete_ok: bool, // U5: default false; an absent DELETE returns 404.
-    pub echo_delete: bool,      // U5: default false; acknowledgement does not echo caller id.
+    pub deduplicate_deletes: bool, // U5: default false; every pending retry is a separate opaque job.
+    pub missing_refresh_succeeds: bool, // U7: default true; a missing result may still report success.
+    pub delete_immediate: bool,         // U5: default false; acknowledgement precedes completion.
+    pub absent_delete_ok: bool,         // U5: default false; an absent DELETE returns 404.
+    pub echo_delete: bool, // U5: default false; acknowledgement does not echo caller id.
     pub clean_deleted_facts: bool, // U5: default false; fact residue remains.
     pub clean_deleted_pages: bool, // U15: default false; page-source membership remains.
     pub exact_retained_body: bool, // U4: default false; retain normalizes/changes body bytes.
-    pub replace_tags: bool,     // U4/U13: default false; old tags survive replacement.
-    pub replace_facts: bool,    // U4/U10: default false; extraction/fact projection stays old.
+    pub replace_tags: bool, // U4/U13: default false; old tags survive replacement.
+    pub replace_facts: bool, // U4/U10: default false; extraction/fact projection stays old.
     pub last_finish_wins: bool, // U14: default true; an old operation/job may overwrite newer work.
     pub page_deduplicate: bool, // U6: default false; create retry duplicates.
-    pub reject_orphan: bool,    // U6: default false; orphan parent accepted silently.
+    pub reject_orphan: bool, // U6: default false; orphan parent accepted silently.
     pub echo_created: bool, // U6: default false; page/folder metadata comes from a separate fixture.
     pub refresh_keeps_old: bool, // U7: default true; successful refresh can leave stale text.
     pub tree_bodies: bool,  // U6/U8: default false; navigation need not include page bodies.
@@ -88,6 +90,8 @@ impl Default for Behaviour {
             deduplicate: false,
             reject_mismatch: false,
             restart_mismatch: false,
+            deduplicate_deletes: false,
+            missing_refresh_succeeds: true,
             delete_immediate: false,
             absent_delete_ok: false,
             echo_delete: false,
@@ -122,7 +126,7 @@ pub struct Model {
     pub behaviour: Behaviour,
     pub requests: Vec<Request>,
     pub operations: BTreeMap<String, Value>,
-    pub pending_deletes: BTreeSet<String>,
+    pub pending_deletes: BTreeMap<String, Value>,
     pub folders: BTreeMap<String, Value>,
     pub pages: BTreeMap<String, Value>,
     pub page_jobs: BTreeMap<String, Value>,
@@ -141,7 +145,7 @@ impl Model {
             behaviour: Behaviour::default(),
             requests: Vec::new(),
             operations: BTreeMap::new(),
-            pending_deletes: BTreeSet::new(),
+            pending_deletes: BTreeMap::new(),
             folders: BTreeMap::new(),
             pages: BTreeMap::new(),
             page_jobs: BTreeMap::new(),
@@ -203,8 +207,14 @@ impl Model {
     }
     #[allow(dead_code)]
     pub fn finish_delete(&mut self, id: &str) {
-        assert!(self.pending_deletes.remove(id));
-        self.delete_projection(id);
+        let delete = self.pending_deletes.remove(id).unwrap();
+        let target = delete["document_id"].as_str().unwrap();
+        if self.may_apply(
+            format!("document:{target}"),
+            delete["test_order"].as_u64().unwrap(),
+        ) {
+            self.delete_projection(target);
+        }
     }
     fn delete_projection(&mut self, id: &str) {
         self.fixture["documents"]
@@ -238,14 +248,20 @@ impl Model {
         job["test_state"] = json!(if success { "succeeded" } else { "failed" });
         let job = job.clone();
         let page_id = job["test_page_id"].as_str().unwrap();
+        if success && !self.pages.contains_key(page_id) {
+            if !self.behaviour.missing_refresh_succeeds {
+                self.page_jobs.get_mut(id).unwrap()["test_state"] = json!("failed");
+            }
+            return;
+        }
         if success
             && !self.behaviour.refresh_keeps_old
             && self.may_apply(
                 format!("page:{page_id}"),
                 job["test_order"].as_u64().unwrap(),
             )
+            && let Some(page) = self.pages.get_mut(page_id)
         {
-            let page = self.pages.get_mut(page_id).unwrap();
             for key in ["body", "document_ids"] {
                 page[key] = job["test_target"][key].clone();
             }
@@ -703,10 +719,23 @@ fn mutate(model: &mut Model, request: &Request, delete: Option<&str>) -> Reply {
                 body: Value::Null,
             };
         }
-        if model.behaviour.delete_immediate {
-            model.delete_projection(id);
-        } else {
-            model.pending_deletes.insert(id.to_owned());
+        let duplicate = model
+            .pending_deletes
+            .values()
+            .any(|v| v["document_id"] == id);
+        if !duplicate || !model.behaviour.deduplicate_deletes {
+            let order = model.order();
+            if model.behaviour.delete_immediate {
+                if model.may_apply(format!("document:{id}"), order) {
+                    model.delete_projection(id);
+                }
+            } else {
+                let key = opaque_id();
+                model.pending_deletes.insert(
+                    key.clone(),
+                    json!({"test_delete_id":key,"document_id":id,"test_order":order}),
+                );
+            }
         }
         Reply {
             status: 200,

@@ -59,6 +59,8 @@ fn whole_hostile_default() {
             deduplicate: false,
             reject_mismatch: false,
             restart_mismatch: false,
+            deduplicate_deletes: false,
+            missing_refresh_succeeds: true,
             delete_immediate: false,
             absent_delete_ok: false,
             echo_delete: false,
@@ -93,6 +95,13 @@ macro_rules! contrasts {
     }
 }
 contrasts! {
+    deduplicate_deletes, 2, 1, |s: &Server| {s.request("DELETE","/__test__/document/eng-a",json!({})).unwrap();s.request("DELETE","/__test__/document/eng-a",json!({})).unwrap();json!(s.edit(|m|m.pending_deletes.len()))};
+    missing_refresh_succeeds, ["failed",true], ["succeeded",true], |s: &Server| {
+        s.edit(|m|{m.behaviour.absent_read_404=false;m.behaviour.refresh_keeps_old=false;});
+        let job=refresh(s,"missing-target");s.edit(|m|m.finish_refresh(&job,true));
+        json!([s.request("GET",&format!("/__test__/page-job/{job}"),json!({})).unwrap().body["test_state"],s.edit(|m|m.pages.is_empty())])
+    };
+
     recall_current, "READY_ONLY", "NEW", |s: &Server| {let id=retain(s,"NEW");s.edit(|m|m.finish(&id,true));s.mcp("recall",json!({}))["facts"][0]["text"].clone()};
     search_current, "ENGINEERING_OLD_SYNTHETIC", "NEW_PAGE", |s: &Server| {let p=page(s);s.edit(|m|m.behaviour.refresh_keeps_old=false);let job=refresh(s,&p);s.edit(|m|m.finish_refresh(&job,true));s.mcp("search_knowledge_base",json!({}))["pages"][0]["snippet"].clone()};
     foreign_provenance, "eng-a", "TEST_FOREIGN_SOURCE", |s: &Server| {s.request("GET","/__test__/facts",json!({})).unwrap().body[0]["document_ids"][0].clone()};
@@ -275,8 +284,8 @@ clean_deleted_pages, 1, 0, |s: &Server| {
 ;
 
     last_finish_wins,
-    ["NEWER", "NEW_PAGE"],
-    ["OLDER", "OLDER_PAGE"],
+    ["NEWER", "NEW_PAGE", "AFTER_DELETE", true],
+    ["OLDER", "OLDER_PAGE", null, false],
     |s: &Server| {
         let old = retain(s, "OLDER");
         let new = retain(s, "NEWER");
@@ -295,10 +304,16 @@ clean_deleted_pages, 1, 0, |s: &Server| {
             m.finish_refresh(&new, true);
             m.finish_refresh(&old, true);
         });
-        json!([
-            document,
-            s.mcp("get_knowledge_page", json!({"test_page_id":p}))["body"]
-        ])
+        let page_body=s.mcp("get_knowledge_page",json!({"test_page_id":p}))["body"].clone();
+        s.request("DELETE","/__test__/document/eng-a",json!({})).unwrap();
+        let delete=s.edit(|m|m.pending_deletes.keys().next().unwrap().clone());
+        let newer=retain(s,"AFTER_DELETE");s.edit(|m|m.finish(&newer,true));
+        s.edit(|m|m.finish_delete(&delete));let delayed=doc(s)["body"].clone();
+        let seed=retain(s,"SEED");s.edit(|m|m.finish(&seed,true));
+        let older=retain(s,"RESURRECTED");s.edit(|m|m.behaviour.delete_immediate=true);
+        s.request("DELETE","/__test__/document/eng-a",json!({})).unwrap();
+        s.edit(|m|m.finish(&older,true));
+        json!([document,page_body,delayed,doc(s).is_null()])
     }
 ;
 page_deduplicate, 2, 1, |s: &Server| {
@@ -364,7 +379,10 @@ fn assigned_identifiers_are_opaque() {
     let op = retain(&s, "NEW");
     let p = page(&s);
     let job = refresh(&s, &p);
-    for id in [op, p, job] {
+    s.request("DELETE", "/__test__/document/eng-a", json!({}))
+        .unwrap();
+    let delete = s.edit(|m| m.pending_deletes.keys().next().unwrap().clone());
+    for id in [op, p, job, delete] {
         assert_eq!(id.len(), 32);
         assert!(!id.contains("intent"));
     }

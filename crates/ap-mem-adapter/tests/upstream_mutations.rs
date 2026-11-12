@@ -177,7 +177,8 @@ fn delete_source_residue() {
         .request("DELETE", "/__test__/document/eng-a", json!({}))
         .unwrap();
     assert!(!document(&delayed).is_null());
-    delayed.edit(|m| m.finish_delete("eng-a"));
+    let delete = delayed.edit(|m| m.pending_deletes.keys().next().unwrap().clone());
+    delayed.edit(|m| m.finish_delete(&delete));
     assert!(document(&delayed).is_null());
     assert_eq!(
         delayed
