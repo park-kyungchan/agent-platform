@@ -2,9 +2,10 @@
 
 Read on demand when diagnosing "memory returns old/irrelevant facts". For content control,
 read [hindsight-control](../skills/hindsight-control/SKILL.md), including bank flags and effect proofs.
-Retrieval/source details verified 2026-11-06 against the installed server
-1.2.0 (image `ghcr.io/vectorize-io/hindsight@sha256:19d0c08f…`, revision `34a1386`) and coding-agents
-0.8.5. After an upgrade, re-check the cited source locations before relying on a number below.
+Earlier retrieval/source reading: 2026-11-06, server reference pin 1.2.0
+(image `ghcr.io/vectorize-io/hindsight@sha256:19d0c08f…`, revision `34a1386`), coding-agents 0.8.5.
+**measured** — API/MCP reported 1.2.0 on 2026-11-12; those measurements did not independently
+re-inspect revision `34a1386`. After upgrades, re-check source and remeasure behavioral claims.
 
 ## Where to look (cheapest first)
 
