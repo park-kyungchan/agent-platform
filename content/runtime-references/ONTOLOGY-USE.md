@@ -16,7 +16,7 @@ Every agent may read: `help`, `describe`, `get`, `search`, `action list`, `actio
 Only the Lead of the task owning the objects writes: `action apply` and `render --write`. A worker writes its report; the Lead records it. A reviewer never writes.
 Only a Lead authorized by the task's STATE runs `index`, `schema install`, `backup` or anything changing the installed binary. The same rules apply to the tools of `ont mcp`. An example grants no authority.
 The command authenticates nobody: every agent on this host shares the same OS user. Client, agent and session are self-reported attribution. These restrictions are rules of work.
-Run `ont help` for command forms; read `ontology/work.schema.json` and `ontology/README.md` in `agent-platform` for the contract. `describe` reads installed object types and lists each view with its arguments; `action list` explains parameters and criteria. Both read empty standard input as `{}`.
+Run `ont help` for command forms; read `ontology/work.schema.json` and `ontology/README.md` in `agent-platform` for the contract. A schema author also reads `crates/ont/README.md` in `ontology-platform`. `describe` reads installed object types and lists each view with its arguments; `action list` explains parameters and criteria. Both read empty standard input as `{}`.
 
 ## 3. Object Ids
 An Id is JSON with `object_type`, `namespace` and `native_key`. Use the Id returned by `search`, including its namespace; a title is not an Id.
