@@ -1,10 +1,10 @@
-#[path = "support/replay.rs"]
-mod replay;
+mod support;
 use replay::{
     Fact, MentalModel, RecordedReply, Replay, ReplayStop, Shape, TraceStep, WireRequest,
     assert_recorded_keys, project,
 };
 use serde_json::{Value, json};
+use support::replay;
 
 const ROOT: &str = "/v1/default/banks/fixture-bank";
 fn request(method: &str, route: &str, body: Value) -> WireRequest {
@@ -487,4 +487,272 @@ fn apply_does_not_emit_an_unrecorded_variant() {
     q.session = Some("fixture-session".into());
     // This cannot pass through shape109 (which records null document metadata).
     assert!(matches!(r.apply(q), Err(ReplayStop::ShapeMismatch(_))));
+}
+
+fn wire_checked(
+    server: &support::upstream::Server,
+    comparison: &mut Replay,
+    q: WireRequest,
+    recording: &'static str,
+) -> RecordedReply {
+    // Transport comparison; the separate recorded shape is still the key oracle.
+    let expected = comparison.apply(q.clone()).unwrap();
+    let reply = server.request(q).unwrap();
+    assert_eq!(reply.status, expected.status);
+    assert_eq!(reply.body, expected.body);
+    assert_recorded_keys(&reply, &Shape { recording }).unwrap();
+    reply
+}
+fn wire_rpc(
+    server: &support::upstream::Server,
+    comparison: &mut Replay,
+    method: &str,
+    params: Value,
+    recording: &'static str,
+) -> RecordedReply {
+    let mut q = WireRequest::new(
+        "POST",
+        "/mcp/fixture-bank/",
+        json!({"jsonrpc":"2.0","id":51,"method":method,"params":params}),
+    );
+    if method != "initialize" {
+        q.session = Some("fixture-session".into());
+    }
+    wire_checked(server, comparison, q, recording)
+}
+fn wire_complete(server: &support::upstream::Server, comparison: &mut Replay) {
+    comparison.advance(TraceStep::Retained {
+        operation_id: "fixture-wire-operation".into(),
+        child_id: "fixture-wire-child".into(),
+        facts: vec![Fact {
+            id: "fixture-wire-fact".into(),
+            document_id: "fixture-wire-document".into(),
+            text: "invented wire fact".into(),
+        }],
+    });
+    server.advance(TraceStep::Retained {
+        operation_id: "fixture-wire-operation".into(),
+        child_id: "fixture-wire-child".into(),
+        facts: vec![Fact {
+            id: "fixture-wire-fact".into(),
+            document_id: "fixture-wire-document".into(),
+            text: "invented wire fact".into(),
+        }],
+    });
+}
+fn wire_retain() -> WireRequest {
+    request(
+        "POST",
+        "/memories",
+        json!({"operation_id":"fixture-wire-operation","async":true,"items":[{"document_id":"fixture-wire-document","content":"invented wire bytes Ω\r\n","tags":["fixture-wire-tag"]}]}),
+    )
+}
+#[test]
+fn every_wire_reply_projected() {
+    let mut comparison = Replay::default();
+    let mut server = support::upstream::Server::start(comparison.clone());
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("GET", "/config", Value::Null),
+        "006",
+    );
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("GET", "/mental-models", Value::Null),
+        "470",
+    );
+    wire_checked(&server, &mut comparison, wire_retain(), "010");
+    wire_complete(&server, &mut comparison);
+    for (route, shape) in [
+        ("/documents/fixture-wire-document", "016"),
+        ("/memories/list", "025"),
+        ("/documents?limit=1&offset=0", "030"),
+        ("/operations?document_id=fixture-wire-document", "018"),
+        ("/operations/fixture-absent?include_payload=true", "019"),
+    ] {
+        wire_checked(
+            &server,
+            &mut comparison,
+            request("GET", route, Value::Null),
+            shape,
+        );
+    }
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("POST", "/memories/recall", json!({})),
+        "062",
+    );
+    wire_rpc(&server, &mut comparison, "initialize", json!({}), "007");
+    wire_rpc(&server, &mut comparison, "tools/list", json!({}), "021");
+    wire_rpc(
+        &server,
+        &mut comparison,
+        "tools/call",
+        json!({"name":"recall","arguments":{"query":"invented"}}),
+        "036",
+    );
+    wire_rpc(
+        &server,
+        &mut comparison,
+        "tools/call",
+        json!({"name":"get_document","arguments":{"document_id":"fixture-wire-document"}}),
+        "109",
+    );
+    let mut denied = request("GET", "/documents/fixture-wire-document", Value::Null);
+    denied.authorized = false;
+    wire_checked(&server, &mut comparison, denied, "110");
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("DELETE", "/documents/fixture-wire-document", Value::Null),
+        "124",
+    );
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("GET", "/documents/fixture-wire-document", Value::Null),
+        "125",
+    );
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("GET", "/memories/list", Value::Null),
+        "126",
+    );
+    server.stop_and_join().unwrap();
+}
+fn raw_wire(address: std::net::SocketAddr, bytes: &[u8]) -> Vec<u8> {
+    use std::io::{Read, Write};
+    let mut stream =
+        std::net::TcpStream::connect_timeout(&address, std::time::Duration::from_secs(1)).unwrap();
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(2)))
+        .unwrap();
+    stream
+        .set_write_timeout(Some(std::time::Duration::from_secs(1)))
+        .unwrap();
+    stream.write_all(bytes).unwrap();
+    let mut result = Vec::new();
+    let read = stream.take(131072).read_to_end(&mut result);
+    assert!(read.is_ok() || read.unwrap_err().kind() == std::io::ErrorKind::ConnectionReset);
+    result
+}
+#[test]
+fn bodyless_get_delete() {
+    let mut comparison = Replay::default();
+    let mut server = support::upstream::Server::start(comparison.clone());
+    let bytes=raw_wire(server.owned_address(),format!("GET {ROOT}/config HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer fixture-test-token\r\nConnection: close\r\n\r\n").as_bytes());
+    let split = bytes.windows(4).position(|s| s == b"\r\n\r\n").unwrap();
+    let reply = RecordedReply {
+        status: 200,
+        headers: Default::default(),
+        body: serde_json::from_slice(&bytes[split + 4..]).unwrap(),
+    };
+    assert_recorded_keys(&reply, &Shape { recording: "006" }).unwrap();
+    wire_checked(&server, &mut comparison, wire_retain(), "010");
+    wire_complete(&server, &mut comparison);
+    let bytes=raw_wire(server.owned_address(),format!("DELETE {ROOT}/documents/fixture-wire-document HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer fixture-test-token\r\nConnection: close\r\n\r\n").as_bytes());
+    assert!(bytes.starts_with(b"HTTP/1.1 200 "));
+    let split = bytes.windows(4).position(|s| s == b"\r\n\r\n").unwrap();
+    let reply = RecordedReply {
+        status: 200,
+        headers: Default::default(),
+        body: serde_json::from_slice(&bytes[split + 4..]).unwrap(),
+    };
+    assert_recorded_keys(&reply, &Shape { recording: "124" }).unwrap();
+    assert_eq!(reply.body["memory_units_deleted"], 1);
+    let absent = server
+        .request(request(
+            "GET",
+            "/documents/fixture-wire-document",
+            Value::Null,
+        ))
+        .unwrap();
+    assert_recorded_keys(&absent, &Shape { recording: "125" }).unwrap();
+    server.stop_and_join().unwrap();
+}
+#[test]
+fn transfer_encoding_refused() {
+    let mut server = support::upstream::Server::start(Replay::default());
+    for headers in [
+        "Transfer-Encoding: chunked\r\n".to_owned(),
+        "Content-Length: 0\r\nContent-Length: 0\r\n".into(),
+        "Content-Length: 65537\r\n".into(),
+        format!("X-Large: {}\r\n", "x".repeat(8192)),
+    ] {
+        let bytes = raw_wire(
+            server.owned_address(),
+            format!("POST {ROOT}/memories HTTP/1.1\r\nHost: fixture\r\n{headers}\r\n").as_bytes(),
+        );
+        assert!(
+            bytes.is_empty(),
+            "transport refusal must not manufacture a native answer"
+        );
+    }
+    let reply = server
+        .request(request("GET", "/operations", Value::Null))
+        .unwrap();
+    assert_recorded_keys(&reply, &Shape { recording: "018" }).unwrap();
+    assert_eq!(reply.body["total"], 0);
+    server.stop_and_join().unwrap();
+}
+#[test]
+fn worker_joined() {
+    let mut server = support::upstream::Server::start(Replay::default());
+    assert!(server.owned_address().ip().is_loopback());
+    assert_ne!(server.owned_address().port(), 0);
+    server
+        .request(request("GET", "/config", Value::Null))
+        .unwrap();
+    server.stop_and_join().unwrap();
+    server.stop_and_join().unwrap();
+    assert_eq!(
+        server
+            .request(request("GET", "/config", Value::Null))
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::NotConnected
+    );
+    drop(support::upstream::Server::start(Replay::default()));
+}
+#[test]
+fn proxy_uses_replay_bridge() {
+    use support::proxy::{FaultProxy, Frame, Step};
+    let server = support::upstream::Server::start(Replay::default());
+    let mut proxy = FaultProxy::start(
+        server.into_owned_backend(),
+        vec![Step::ForwardThenDropAnswer],
+    );
+    let exchange = |q: WireRequest| {
+        let mut stream = std::net::TcpStream::connect_timeout(
+            &proxy.address(),
+            std::time::Duration::from_secs(1),
+        )
+        .unwrap();
+        Frame {
+            head: format!(
+                "{} {} HTTP/1.1\r\nHost: fixture\r\nAuthorization: Bearer fixture-test-token",
+                q.method, q.path
+            ),
+            body: if q.body.is_null() {
+                Vec::new()
+            } else {
+                serde_json::to_vec(&q.body).unwrap()
+            },
+        }
+        .write(&mut stream)
+        .unwrap();
+        Frame::read(&mut stream)
+    };
+    assert!(exchange(wire_retain()).is_err());
+    let lookup = exchange(request("GET", "/operations", Value::Null)).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<Value>(&lookup.body).unwrap()["total"],
+        1
+    );
+    proxy.stop_and_join().unwrap();
+    assert!(proxy.transcript()[0].response_received);
 }

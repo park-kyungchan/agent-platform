@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Legacy state is removed in R1g; never served by this listener.
 //! Rules for extensions: EVERY unverified upstream choice belongs to Behaviour,
 //! has a hostile Default and a handler contrast test. ALL assigned identifiers
 //! come from opaque_id(); never derive them from caller bytes or a counter.
@@ -305,98 +306,121 @@ impl Model {
     }
 }
 
-pub struct Reply {
-    pub status: u16,
-    pub body: Value,
-}
+use super::proxy::OwnedBackend;
+use super::replay::{RecordedReply, Replay, TraceStep, WireRequest};
 
+/// The listener owns only transport and a typed replay; no route builds JSON here.
 pub struct Server {
     address: SocketAddr,
-    model: Arc<Mutex<Model>>,
+    listener: Option<TcpListener>,
+    replay: Arc<Mutex<Replay>>,
     stop: Arc<AtomicBool>,
-    worker: Option<JoinHandle<()>>,
+    worker: Option<JoinHandle<io::Result<()>>>,
 }
-
 impl Server {
-    pub fn start(fixture: Value) -> Self {
+    pub fn start(replay: Replay) -> Self {
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
         let address = listener.local_addr().unwrap();
-        listener.set_nonblocking(true).unwrap();
-        let model = Arc::new(Mutex::new(Model::new(fixture)));
+        let incoming = listener.try_clone().unwrap();
+        incoming.set_nonblocking(true).unwrap();
+        let replay = Arc::new(Mutex::new(replay));
         let stop = Arc::new(AtomicBool::new(false));
-        let (data, stopping) = (Arc::clone(&model), Arc::clone(&stop));
+        let (data, stopping) = (replay.clone(), stop.clone());
         let worker = thread::spawn(move || {
             while !stopping.load(Ordering::Acquire) {
-                match listener.accept() {
-                    Ok((mut stream, peer)) => {
-                        assert!(peer.ip().is_loopback());
-                        stream
-                            .set_read_timeout(Some(Duration::from_secs(1)))
-                            .unwrap();
-                        stream
-                            .set_write_timeout(Some(Duration::from_secs(1)))
-                            .unwrap();
-                        let (reply, disconnect, malformed) = match read_request(&mut stream) {
-                            Ok(request) => {
-                                let mut model = data.lock().unwrap();
-                                let malformed =
-                                    model.behaviour.malformed_reads && is_read(&request);
-                                let reply = route(&mut model, request);
-                                (reply, std::mem::take(&mut model.disconnect), malformed)
-                            }
-                            Err(_) => (
-                                Reply {
-                                    status: 400,
-                                    body: json!({"error":"test_bad_request"}),
-                                },
-                                false,
-                                false,
-                            ),
-                        };
-                        if !disconnect {
-                            let _ = write_reply(&mut stream, reply, malformed);
-                        }
-                    }
+                let (mut stream, peer) = match incoming.accept() {
+                    Ok(pair) => pair,
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                        thread::sleep(Duration::from_millis(2))
+                        thread::sleep(Duration::from_millis(2));
+                        continue;
                     }
-                    Err(e) => panic!("synthetic accept: {e}"),
-                }
+                    Err(e) => return Err(e),
+                };
+                assert!(peer.ip().is_loopback());
+                stream.set_read_timeout(Some(Duration::from_secs(1)))?;
+                stream.set_write_timeout(Some(Duration::from_secs(1)))?;
+                let Ok(request) = read_request(&mut stream) else {
+                    continue;
+                };
+                let reply = data.lock().unwrap().apply(request).map_err(|_| {
+                    io::Error::new(io::ErrorKind::Unsupported, "replay_stopped_without_reply")
+                })?;
+                write_reply(&mut stream, &reply)?;
             }
+            Ok(())
         });
         Self {
             address,
-            model,
+            listener: Some(listener),
+            replay,
             stop,
             worker: Some(worker),
         }
     }
-
-    pub fn stop_and_join(&mut self) -> bool {
-        self.stop.store(true, Ordering::Release);
-        self.worker
-            .take()
-            .is_none_or(|worker| worker.join().is_ok())
-    }
-
-    pub fn address(&self) -> SocketAddr {
+    pub fn owned_address(&self) -> SocketAddr {
         self.address
     }
-
-    pub fn edit<T>(&self, f: impl FnOnce(&mut Model) -> T) -> T {
-        f(&mut self.model.lock().unwrap())
+    pub fn advance(&self, step: TraceStep) {
+        self.replay.lock().unwrap().advance(step);
     }
-
-    // There is no URL/host argument: every client call targets this owned listener.
-    pub fn request(&self, method: &str, path: &str, body: Value) -> io::Result<Reply> {
+    pub fn stop_and_join(&mut self) -> io::Result<()> {
+        if let Some(worker) = self.worker.take() {
+            self.stop.store(true, Ordering::Release);
+            self.listener.take();
+            worker
+                .join()
+                .map_err(|_| io::Error::other("replay_worker_panicked"))??;
+        }
+        Ok(())
+    }
+    /// Transfer the listener capability and worker, never a caller-supplied URL.
+    pub fn into_owned_backend(mut self) -> OwnedBackend {
+        OwnedBackend::new(
+            self.listener.take().unwrap(),
+            self.stop.clone(),
+            self.worker.take().unwrap(),
+            None,
+        )
+    }
+    pub fn request(&self, request: WireRequest) -> io::Result<RecordedReply> {
+        if self.worker.is_none() {
+            return Err(io::ErrorKind::NotConnected.into());
+        }
+        if !request.path.starts_with('/')
+            || request.path.contains(['\r', '\n'])
+            || !request.method.bytes().all(|c| c.is_ascii_uppercase())
+            || request
+                .session
+                .as_deref()
+                .is_some_and(|s| s.contains(['\r', '\n']))
+        {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
+        let payload = if request.body.is_null() {
+            Vec::new()
+        } else {
+            serde_json::to_vec(&request.body)?
+        };
+        if payload.len() > LIMIT {
+            return Err(io::ErrorKind::InvalidInput.into());
+        }
         let mut stream = TcpStream::connect_timeout(&self.address, Duration::from_secs(1))?;
         stream.set_read_timeout(Some(Duration::from_secs(2)))?;
         stream.set_write_timeout(Some(Duration::from_secs(1)))?;
-        let payload = serde_json::to_vec(&body)?;
         write!(
             stream,
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-            self.address,
+            "{} {} HTTP/1.1\r\nHost: {}\r\n",
+            request.method, request.path, self.address
+        )?;
+        if request.authorized {
+            write!(stream, "Authorization: Bearer fixture-test-token\r\n")?;
+        }
+        if let Some(session) = request.session {
+            write!(stream, "Mcp-Session-Id: {session}\r\n")?;
+        }
+        write!(
+            stream,
+            "Content-Length: {}\r\nConnection: close\r\n\r\n",
             payload.len()
         )?;
         stream.write_all(&payload)?;
@@ -412,38 +436,37 @@ impl Server {
             .nth(1)
             .and_then(|s| s.parse().ok())
             .ok_or(io::ErrorKind::InvalidData)?;
-        Ok(Reply {
+        let headers: BTreeMap<String, String> = header
+            .split("\r\n")
+            .skip(1)
+            .filter_map(|l| l.split_once(':'))
+            .map(|(k, v)| (k.to_ascii_lowercase(), v.trim().to_owned()))
+            .collect();
+        let body = if headers.get("content-type").map(String::as_str) == Some("text/event-stream") {
+            Value::String(
+                String::from_utf8(raw[split + 4..].to_vec())
+                    .map_err(|_| io::ErrorKind::InvalidData)?,
+            )
+        } else {
+            serde_json::from_slice(&raw[split + 4..])?
+        };
+        Ok(RecordedReply {
             status,
-            body: serde_json::from_slice(&raw[split + 4..])?,
+            headers,
+            body,
         })
     }
-
-    pub fn mcp(&self, name: &str, args: Value) -> Value {
-        if self.edit(|m| m.behaviour.require_initialize && !m.initialized) {
-            let reply = self
-                .request(
-                    "POST",
-                    MCP_PATH,
-                    json!({"jsonrpc":"2.0","id":0,"method":"initialize"}),
-                )
-                .unwrap();
-            assert_eq!(reply.status, 200);
-        }
-        let reply = self.request("POST", MCP_PATH, json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":name,"arguments":args}})).unwrap();
-        assert_eq!(reply.status, 200);
-        assert!(reply.body.get("error").is_none(), "{}", reply.body);
-        reply.body["result"].clone()
-    }
 }
-
 impl Drop for Server {
     fn drop(&mut self) {
-        let ok = self.stop_and_join();
-        assert!(ok || thread::panicking(), "synthetic worker panicked");
+        let result = self.stop_and_join();
+        if !thread::panicking() {
+            result.expect("replay worker joined");
+        }
     }
 }
 
-fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
+fn read_request(stream: &mut TcpStream) -> io::Result<WireRequest> {
     let started = std::time::Instant::now();
     let mut header = Vec::new();
     while !header.ends_with(b"\r\n\r\n") {
@@ -460,20 +483,31 @@ fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
     let header = std::str::from_utf8(&header).map_err(|_| io::ErrorKind::InvalidData)?;
     let mut lines = header.split("\r\n");
     let parts: Vec<_> = lines.next().unwrap_or("").split_whitespace().collect();
-    if parts.len() != 3 || parts[2] != "HTTP/1.1" {
+    if parts.len() != 3
+        || parts[2] != "HTTP/1.1"
+        || !(parts[1].starts_with("/v1/default/banks/fixture-bank/")
+            || parts[1] == "/mcp/fixture-bank/")
+    {
         return Err(io::ErrorKind::InvalidData.into());
     }
     let headers: Vec<_> = lines.filter_map(|line| line.split_once(':')).collect();
     if headers
         .iter()
-        .any(|(key, _)| key.eq_ignore_ascii_case("transfer-encoding"))
+        .any(|(k, _)| k.eq_ignore_ascii_case("transfer-encoding"))
     {
         return Err(io::ErrorKind::InvalidData.into());
     }
+    let authorized = headers.iter().any(|(k, v)| {
+        k.eq_ignore_ascii_case("authorization") && v.trim() == "Bearer fixture-test-token"
+    });
+    let session = headers
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("mcp-session-id"))
+        .map(|(_, v)| v.trim().to_owned());
     let lengths: Vec<_> = headers
         .into_iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case("content-length"))
-        .map(|(_, value)| value.trim().parse::<usize>())
+        .filter(|(k, _)| k.eq_ignore_ascii_case("content-length"))
+        .map(|(_, v)| v.trim().parse::<usize>())
         .collect();
     let length = match lengths.as_slice() {
         [] => 0,
@@ -482,411 +516,39 @@ fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
     };
     let mut body = vec![0; length];
     stream.read_exact(&mut body)?;
-    Ok(Request {
-        method: parts[0].into(),
-        path: parts[1].into(),
-        body: if body.is_empty() {
-            json!({})
+    let mut request = WireRequest::new(
+        parts[0],
+        parts[1],
+        if body.is_empty() {
+            Value::Null
         } else {
             serde_json::from_slice(&body)?
         },
-    })
+    );
+    request.authorized = authorized;
+    request.session = session;
+    Ok(request)
 }
-
-fn write_reply(stream: &mut TcpStream, reply: Reply, malformed: bool) -> io::Result<()> {
-    let body = if malformed {
-        b"{".to_vec()
+fn write_reply(stream: &mut TcpStream, reply: &RecordedReply) -> io::Result<()> {
+    let body = if reply.headers.get("content-type").map(String::as_str) == Some("text/event-stream")
+    {
+        reply
+            .body
+            .as_str()
+            .ok_or(io::ErrorKind::InvalidData)?
+            .as_bytes()
+            .to_vec()
     } else {
         serde_json::to_vec(&reply.body)?
     };
+    write!(stream, "HTTP/1.1 {} Recorded\r\n", reply.status)?;
+    for (key, value) in &reply.headers {
+        write!(stream, "{key}: {value}\r\n")?;
+    }
     write!(
         stream,
-        "HTTP/1.1 {} Test\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-        reply.status,
+        "Content-Length: {}\r\nConnection: close\r\n\r\n",
         body.len()
     )?;
     stream.write_all(&body)
-}
-
-fn unknown(model: &Model) -> Reply {
-    Reply {
-        status: if model.behaviour.reject_unknown {
-            404
-        } else {
-            200
-        },
-        body: Value::Null,
-    }
-}
-fn read_reply(model: &Model, value: Value) -> Reply {
-    Reply {
-        status: if value.is_null() && model.behaviour.absent_read_404 {
-            404
-        } else {
-            200
-        },
-        body: model.view(value),
-    }
-}
-fn is_read(request: &Request) -> bool {
-    request.method == "GET"
-        || (request.method == "POST"
-            && request.path == MCP_PATH
-            && matches!(
-                request.body["method"].as_str(),
-                Some("tools/call" | "tools/list")
-            ))
-}
-fn route(model: &mut Model, request: Request) -> Reply {
-    model.requests.push(request.clone());
-    if is_read(&request) {
-        match model.behaviour.fault.take() {
-            Some(MutationFault::BeforeAccept) => {
-                return Reply {
-                    status: 503,
-                    body: Value::Null,
-                };
-            }
-            Some(MutationFault::LostAck) => model.disconnect = true,
-            None => {}
-        }
-    }
-    if request.method == "GET" {
-        if request.path == "/config" {
-            return if model.behaviour.root_routes {
-                Reply {
-                    status: 200,
-                    body: if model.behaviour.config_resolved {
-                        model.fixture["config"].clone()
-                    } else {
-                        json!({})
-                    },
-                }
-            } else {
-                Reply {
-                    status: 404,
-                    body: Value::Null,
-                }
-            };
-        }
-        for (prefix, jobs) in [
-            ("/__test__/operation/", &model.operations),
-            ("/__test__/page-job/", &model.page_jobs),
-        ] {
-            if let Some(id) = request.path.strip_prefix(prefix) {
-                return if model.behaviour.observable_operations {
-                    read_reply(model, jobs.get(id).cloned().unwrap_or(Value::Null))
-                } else {
-                    Reply {
-                        status: 404,
-                        body: Value::Null,
-                    }
-                };
-            }
-        }
-        if let Some(id) = request.path.strip_prefix("/__test__/document/") {
-            return read_reply(model, model.fixture["documents"][id].clone());
-        }
-        if request.path == "/__test__/facts" {
-            return read_reply(model, model.fixture["facts"].clone());
-        }
-    }
-    if request.method == "POST" && request.path == "/memories" {
-        return if model.behaviour.root_routes {
-            mutate(model, &request, None)
-        } else {
-            Reply {
-                status: 404,
-                body: Value::Null,
-            }
-        };
-    }
-    if request.method == "DELETE"
-        && let Some(id) = request.path.strip_prefix("/__test__/document/")
-    {
-        return mutate(model, &request, Some(id));
-    }
-    if let Some(reply) = page_route(model, &request) {
-        return reply;
-    }
-    if request.method != "POST" || request.path != MCP_PATH {
-        return unknown(model);
-    }
-    let id = request.body["id"].clone();
-    let method = request.body["method"].as_str();
-    if method == Some("initialize") {
-        model.initialized = true;
-    } else if model.behaviour.require_initialize && !model.initialized {
-        return Reply {
-            status: 409,
-            body: json!({"error":"test_initialize_required"}),
-        };
-    }
-    let result = match method {
-        Some("initialize") => json!({"protocolVersion":"test-only"}),
-        Some("tools/list") => json!({"tools":model.fixture["tool_names"]}),
-        Some("tools/call") => {
-            let name = request.body["params"]["name"].as_str().unwrap_or("");
-            let args = &request.body["params"]["arguments"];
-            let result = match name {
-                "get_document" => model.fixture["documents"]
-                    [args["test_document_id"].as_str().unwrap_or("")]
-                .clone(),
-                "get_knowledge_page" if args["test_page_id"].is_string() => model
-                    .pages
-                    .get(args["test_page_id"].as_str().unwrap())
-                    .cloned()
-                    .unwrap_or(Value::Null),
-                "get_knowledge_base_tree" if args["test_live_tree"] == true => {
-                    let mut pages = model.pages.clone();
-                    if !model.behaviour.tree_bodies {
-                        for page in pages.values_mut() {
-                            if let Some(map) = page.as_object_mut() {
-                                map.remove("body");
-                            }
-                        }
-                    }
-                    json!({"folders":model.folders,"pages":pages})
-                }
-                _ => {
-                    let selected = match name {
-                        "recall" if model.behaviour.recall_current => {
-                            Some(json!({"facts":model.fixture["facts"]}))
-                        }
-                        "search_knowledge_base" if model.behaviour.search_current => Some(
-                            json!({"pages":model.pages.iter().map(|(id,p)|json!({"page_id":id,"snippet":p["body"],"document_ids":p["document_ids"]})).collect::<Vec<_>>()}),
-                        ),
-                        _ => model.fixture["responses"].get(name).cloned(),
-                    };
-                    let Some(mut response) = selected else {
-                        return if model.behaviour.reject_unknown {
-                            Reply {
-                                status: 200,
-                                body: json!({"jsonrpc":"2.0","id":id,"error":{"code":-32601,"message":"test_unknown_tool"}}),
-                            }
-                        } else {
-                            Reply {
-                                status: 200,
-                                body: json!({"jsonrpc":"2.0","id":id,"result":null}),
-                            }
-                        };
-                    };
-                    if model.behaviour.honor_retrieval_args
-                        && let Some(doc) = args["test_document_id"].as_str()
-                    {
-                        for key in ["facts", "pages"] {
-                            if let Some(items) = response.get_mut(key).and_then(Value::as_array_mut)
-                            {
-                                items.retain(|v| {
-                                    v["document_ids"]
-                                        .as_array()
-                                        .is_some_and(|ids| ids.contains(&json!(doc)))
-                                });
-                            }
-                        }
-                    }
-                    response
-                }
-            };
-            if result.is_null() && model.behaviour.absent_read_404 {
-                return Reply {
-                    status: 200,
-                    body: json!({"jsonrpc":"2.0","id":id,"error":{"code":-32004,"message":"test_absent"}}),
-                };
-            }
-            model.view(result)
-        }
-        _ => return unknown(model),
-    };
-    Reply {
-        status: 200,
-        body: json!({"jsonrpc":"2.0","id":id,"result":result}),
-    }
-}
-
-fn mutate(model: &mut Model, request: &Request, delete: Option<&str>) -> Reply {
-    let fault = model.behaviour.fault.take();
-    if fault == Some(MutationFault::BeforeAccept) {
-        return Reply {
-            status: 503,
-            body: Value::Null,
-        };
-    }
-    let reply = if let Some(id) = delete {
-        if model.fixture["documents"][id].is_null() && !model.behaviour.absent_delete_ok {
-            return Reply {
-                status: 404,
-                body: Value::Null,
-            };
-        }
-        let duplicate = model
-            .pending_deletes
-            .values()
-            .any(|v| v["document_id"] == id);
-        if !duplicate || !model.behaviour.deduplicate_deletes {
-            let order = model.order();
-            if model.behaviour.delete_immediate {
-                if model.may_apply(format!("document:{id}"), order) {
-                    model.delete_projection(id);
-                }
-            } else {
-                let key = opaque_id();
-                model.pending_deletes.insert(
-                    key.clone(),
-                    json!({"test_delete_id":key,"document_id":id,"test_order":order}),
-                );
-            }
-        }
-        Reply {
-            status: 200,
-            body: if model.behaviour.echo_delete {
-                json!({"test_deleted":id})
-            } else {
-                json!({"test_accepted":true})
-            },
-        }
-    } else {
-        let body = &request.body;
-        if model.behaviour.validate_shape
-            && (!body["test_operation_id"].is_string()
-                || !body["document"]["document_id"].is_string()
-                || !body["document"]["body"].is_string()
-                || !body["document"]["tags"].is_array()
-                || body["async"] != true
-                || body["update_mode"] != "replace")
-        {
-            return Reply {
-                status: 400,
-                body: Value::Null,
-            };
-        }
-        let correlation = body["test_operation_id"]
-            .as_str()
-            .map(str::to_owned)
-            .unwrap_or_else(opaque_id);
-        let old_id = model.retains.get(&correlation).cloned();
-        let mismatch = old_id
-            .as_ref()
-            .is_some_and(|id| model.operations[id]["request"] != *body);
-        if mismatch && model.behaviour.reject_mismatch {
-            return Reply {
-                status: 409,
-                body: Value::Null,
-            };
-        }
-        let key = if model.behaviour.deduplicate {
-            old_id.clone().unwrap_or_else(opaque_id)
-        } else {
-            opaque_id()
-        };
-        if !model.operations.contains_key(&key) || (mismatch && model.behaviour.restart_mismatch) {
-            let order = model.order();
-            model.operations.insert(key.clone(), json!({"test_operation_id":key,"test_order":order,"test_state":"running","request":body}));
-        }
-        model.retains.entry(correlation).or_insert(key.clone());
-        Reply {
-            status: 202,
-            body: json!({"test_operation_id":key}),
-        }
-    };
-    model.disconnect = fault == Some(MutationFault::LostAck);
-    reply
-}
-
-fn page_route(model: &mut Model, request: &Request) -> Option<Reply> {
-    if request.method != "POST" {
-        return None;
-    }
-    let folder = request.path == "/knowledge-base/folders";
-    let page = request.path == "/knowledge-base/pages";
-    let refresh = request
-        .path
-        .strip_prefix("/mental-models/")
-        .and_then(|p| p.strip_suffix("/refresh"));
-    if !folder && !page && refresh.is_none() {
-        return None;
-    }
-    let fault = model.behaviour.fault.take();
-    if fault == Some(MutationFault::BeforeAccept) {
-        return Some(Reply {
-            status: 503,
-            body: Value::Null,
-        });
-    }
-    let reply = if let Some(id) = refresh {
-        if !model.pages.contains_key(id) && model.behaviour.absent_read_404 {
-            return Some(Reply {
-                status: 404,
-                body: Value::Null,
-            });
-        }
-        if request.body != json!({"mode":"full"}) && model.behaviour.validate_shape {
-            return Some(Reply {
-                status: 400,
-                body: Value::Null,
-            });
-        }
-        let key = opaque_id();
-        let order = model.order();
-        model.page_jobs.insert(key.clone(), json!({"test_job_id":key,"test_page_id":id,"test_order":order,"test_state":"running","test_target":model.fixture["page_refresh_result"]}));
-        Reply {
-            status: 202,
-            body: json!({"test_job_id":key}),
-        }
-    } else {
-        if !request.body["test_id"].is_string() && model.behaviour.validate_shape {
-            return Some(Reply {
-                status: 400,
-                body: Value::Null,
-            });
-        }
-        if page
-            && model.behaviour.reject_orphan
-            && !model
-                .folders
-                .contains_key(request.body["test_parent_id"].as_str().unwrap_or(""))
-        {
-            return Some(Reply {
-                status: 409,
-                body: Value::Null,
-            });
-        }
-        let intent = (
-            folder,
-            request.body["test_id"].as_str().unwrap_or("").to_owned(),
-        );
-        let old = model.creates.get(&intent).cloned();
-        let key = if model.behaviour.page_deduplicate {
-            old.unwrap_or_else(opaque_id)
-        } else {
-            opaque_id()
-        };
-        let mut value = if model.behaviour.echo_created {
-            request.body.clone()
-        } else {
-            model.fixture[if folder {
-                "folder_response"
-            } else {
-                "page_response"
-            }]
-            .clone()
-        };
-        if !value.is_object() {
-            value = json!({"test_unverified":true});
-        }
-        value["test_id"] = json!(key);
-        let entries = if folder {
-            &mut model.folders
-        } else {
-            &mut model.pages
-        };
-        let value = entries.entry(key.clone()).or_insert(value).clone();
-        model.creates.entry(intent).or_insert(key.clone());
-        Reply {
-            status: 201,
-            body: json!({"test_id":key,"test_value":value}),
-        }
-    };
-    model.disconnect = fault == Some(MutationFault::LostAck);
-    Some(reply)
 }
