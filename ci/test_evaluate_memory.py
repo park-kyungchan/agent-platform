@@ -490,6 +490,7 @@ class EvaluationTests(unittest.TestCase):
     def test_returned_count_must_match_collected_items(self):
         for returned in (0, 2, True):
             with self.subTest(returned=returned):
+                self.evidence['slots'][0]['items'] = [self.stub.fact]
                 self.evidence['slots'][0]['returned_count'] = returned
                 with self.assertRaisesRegex(E.P.Stop, '^returned_count_mismatch$'): self.check()
         self.evidence['slots'][0]['returned_count'] = 1
