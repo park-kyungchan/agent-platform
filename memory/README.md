@@ -331,3 +331,18 @@ keeps reads denied until corrected Git source and qualified evaluation pass.
 Do not delete original banks/exports/preimages without recovery, custody expiry,
 residue/consumer checks and the private owner's conditions. Pending work has no
 elapsed-time release. Nothing in this runbook changes host settings by itself.
+
+## Disposable exercise (V4-5 part A; source only, not run)
+`python3 -I -B scripts/exercise-memory.py --bank zz-conformance-YYYYMMDD-xxxxxxxx --credential-fd 3 --evidence /TASK/NEW.json`
+is an opt-in E1/E2/E4/E5/E6 measurement, using the publisher's fixed origin,
+private FD reader, proxy-free opener and shared lock. It accepts only an initially
+absent disposable id; every mutation binds that id. Part A made no live call.
+It enforces <=40 retain attempts (including denial probes), >=1s write gaps,
+one request at a time, <=120s per poll and 900s total; the final 120s are reserved
+for cleanup. Three consecutive write errors stop ordinary mutations. Unknown
+shapes refuse; a lost mutation answer never permits a competing deletion.
+Cleanup checks bank/document/marker absence and unchanged other-bank fact counts.
+Evidence is new-only, mode 0600, with shapes/counts/hashes/timings, never note bodies
+or credentials. Exit 0 means all automated steps measured and cleanup proven;
+2 refuses preflight, 3 means failed/unrun steps with cleanup proven, 4 means
+cleanup incomplete. E3 CLI qualification and E5 semantic judgment remain Lead work.
