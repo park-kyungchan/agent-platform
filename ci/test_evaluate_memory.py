@@ -199,26 +199,18 @@ class EvaluationTests(unittest.TestCase):
         with self.assertRaisesRegex(E.P.Stop, '^evidence_hash_mismatch$'): self.check()
 
     def test_main_held_out_guard_and_target_conjunction(self):
-        held = dict(questions=[self.data['questions'][0]], source_pins={'R01': self.evidence['source_pins']['R01']},
-                    slots=self.evidence['slots'][:6], input_sha256='a'*64)
-        evidence = dict(self.evidence, held_out=dict(count=1, sha256='a'*64))
-        fixed = copy.deepcopy(self.results)
-        for slot in fixed['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(evidence))
+        sealed, held, evidence, fixed, private = self.held_fixture()
         rc, error = self.cli_results(evidence, fixed)
         self.assertEqual(rc, 1)
         self.assertIn('held_out_judgments_required', error)
         for fixed_pass, held_pass in [(True, True), (True, False), (False, True)]:
-            with self.subTest(fixed=fixed_pass, held=held_pass), tempfile.TemporaryFile() as ef, tempfile.TemporaryFile() as rf:
-                fixed = copy.deepcopy(self.results)
-                for slot in fixed['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(evidence))
+            with self.subTest(fixed=fixed_pass, held=held_pass):
+                sealed, held, evidence, fixed, private = self.held_fixture()
                 fixed['target_reached'] = fixed_pass
                 if not fixed_pass: fixed['slots'][0]['verdict'] = 'partial'
-                private = dict(target_reached=held_pass, slots=copy.deepcopy(fixed['slots'][:6]))
-                for slot in private['slots']: slot.update(verdict='supported', evidence_sha256=E.P.digest(E.encode(held)))
+                private['target_reached'] = held_pass
                 if not held_pass: private['slots'][0]['verdict'] = 'partial'
-                ef.write(E.encode(held)); ef.seek(0); rf.write(E.encode(private)); rf.seek(0)
-                rc, result = self.cli_results(evidence, fixed, ['--held-out-evidence-fd', str(ef.fileno()),
-                                                              '--held-out-results-fd', str(rf.fileno())])
+                rc, result = self.check_held(sealed, held, evidence, fixed, private)
                 self.assertEqual(rc, 0)
                 self.assertIs(result['target_reached'], fixed_pass and held_pass)
                 self.assertEqual(result['held_out']['supported'], 6 if held_pass else 5)
@@ -267,14 +259,16 @@ class EvaluationTests(unittest.TestCase):
         self.assertIn('held_out_empty', error)
 
     def test_file_pins_are_recomputed(self):
+        path = self.directory / 'source'; path.write_bytes(b'invented')
+        digest = E.P.digest(path.read_bytes())
         for source, supplied, expected in [
                 (dict(volatile=True), dict(pin='equal'), 'reverify'),
-                (dict(sha256='a'*64), dict(pin='equal', sha256_now='b'*64), 'source_changed'),
-                (dict(sha256='a'*64), dict(pin='equal'), 'source_changed'),
+                (dict(sha256='a'*64), dict(pin='equal', sha256_now='a'*64), 'source_changed'),
+                (dict(sha256=digest), dict(pin='missing'), 'equal'),
                 (dict(volatile=True), dict(pin='missing'), 'missing'),
-                (dict(sha256='a'*64), dict(pin='equal', sha256_now='a'*64), 'equal')]:
+                (dict(sha256=digest), dict(pin='equal', sha256_now='b'*64), 'equal')]:
             with self.subTest(expected=expected):
-                source.update(kind='file', path='invented', anchor='invented')
+                source.update(kind='file', path=str(path), anchor='invented')
                 self.data['questions'][0]['sources'] = [source]
                 self.evidence['source_pins']['R01'] = [supplied]
                 self.results['slots'][0]['expectation_reverified'] = False
@@ -286,18 +280,11 @@ class EvaluationTests(unittest.TestCase):
 
     def test_held_out_binding_guard(self):
         for changed in ('hash', 'count'):
-            with self.subTest(changed=changed), tempfile.TemporaryFile() as ef, tempfile.TemporaryFile() as rf:
-                private = dict(questions=[self.data['questions'][0]], slots=self.evidence['slots'][:6],
-                    source_pins={'R01': self.evidence['source_pins']['R01']},
-                    input_sha256='b'*64 if changed == 'hash' else 'a'*64)
-                evidence = dict(self.evidence, held_out=dict(count=2 if changed == 'count' else 1, sha256='a'*64))
-                fixed = copy.deepcopy(self.results)
-                for slot in fixed['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(evidence))
-                judged = dict(target_reached=True, slots=copy.deepcopy(fixed['slots'][:6]))
-                for slot in judged['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(private))
-                ef.write(E.encode(private)); ef.seek(0); rf.write(E.encode(judged)); rf.seek(0)
-                rc, error = self.cli_results(evidence, fixed, ['--held-out-evidence-fd', str(ef.fileno()),
-                                                              '--held-out-results-fd', str(rf.fileno())])
+            with self.subTest(changed=changed):
+                sealed, private, evidence, fixed, judged = self.held_fixture()
+                if changed == 'hash': private['input_sha256'] = 'b'*64
+                else: evidence['held_out']['count'] = 2
+                rc, error = self.check_held(sealed, private, evidence, fixed, judged)
                 self.assertEqual(rc, 1)
                 self.assertIn('held_out_binding', error)
 
@@ -358,3 +345,130 @@ class EvaluationTests(unittest.TestCase):
             self.assertEqual(E.main(['--collect', '--credential-fd', '3']), 1)
         self.assertIn('checker_argument_failure', output.getvalue())
         self.assertIs(E.sys.argv, argv)
+
+    def held_fixture(self, questions=None):
+        questions = copy.deepcopy(questions if questions is not None else self.data['questions'][:1])
+        sealed = E.encode(dict(questions=questions))
+        private = dict(questions=questions, input_sha256=E.P.digest(sealed),
+                       source_pins={q['id']: E.source_pins(q) for q in questions},
+                       slots=[copy.deepcopy(s) for q in questions for s in self.evidence['slots'] if s['id'] == q['id']])
+        evidence = dict(copy.deepcopy(self.evidence), held_out=dict(count=len(questions), sha256=E.P.digest(sealed)))
+        fixed = copy.deepcopy(self.results)
+        judged = dict(target_reached=True, slots=[dict(id=s['id'], form=s['form'], route=s['route'],
+            verdict='supported', current_count=1, expectation_reverified=True) for s in private['slots']])
+        for slot in fixed['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(evidence))
+        for slot in judged['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(private))
+        return sealed, private, evidence, fixed, judged
+
+    def check_held(self, sealed, private, evidence, fixed, judged, include_input=True):
+        for slot in fixed['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(evidence))
+        for slot in judged['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(private))
+        with tempfile.TemporaryFile() as hf, tempfile.TemporaryFile() as ef, tempfile.TemporaryFile() as rf:
+            for stream, raw in [(hf, sealed), (ef, E.encode(private)), (rf, E.encode(judged))]:
+                stream.write(raw); stream.seek(0)
+            args = ['--held-out-evidence-fd', str(ef.fileno()), '--held-out-results-fd', str(rf.fileno())]
+            if include_input: args += ['--held-out-fd', str(hf.fileno())]
+            return self.cli_results(evidence, fixed, args)
+
+    def test_duplicate_held_out_refused_before_reads_or_evidence(self):
+        questions = [copy.deepcopy(self.data['questions'][0]) for _ in range(2)]
+        questions[1]['forms']['en'] = 'Invented second question with the same id'
+        self.stub.calls.clear()
+        with tempfile.TemporaryFile() as incoming, tempfile.TemporaryFile() as private:
+            incoming.write(E.encode(dict(questions=questions))); incoming.seek(0)
+            with self.assertRaisesRegex(E.P.Stop, '^held_out_duplicate_id$'):
+                E.collect(self.stub, self.stub.pin, self.data, self.raw, self.selector, [], incoming.fileno(), private.fileno())
+            self.assertEqual(private.tell(), 0)
+        self.assertEqual(self.stub.calls, [])
+
+    def test_duplicate_question_ids_at_check(self):
+        for data in (self.data, dict(questions=self.data['questions'][:1])):
+            with self.subTest(count=len(data['questions'])):
+                data = copy.deepcopy(data); data['questions'].append(copy.deepcopy(data['questions'][0]))
+                with self.assertRaisesRegex(E.P.Stop, '^held_out_duplicate_id$'):
+                    E.check_results(self.results, self.evidence, self.hash, data)
+
+    def test_duplicate_evidence_keys_fixed_and_held_out(self):
+        self.evidence['slots'].append(copy.deepcopy(self.evidence['slots'][0]))
+        with self.assertRaisesRegex(E.P.Stop, '^evidence_slots_duplicate$'): self.check()
+        self.evidence['slots'].pop()
+        sealed, private, evidence, fixed, judged = self.held_fixture()
+        private['slots'].append(copy.deepcopy(private['slots'][0]))
+        rc, error = self.check_held(sealed, private, evidence, fixed, judged)
+        self.assertEqual(rc, 1); self.assertIn('evidence_slots_duplicate', error)
+
+    def test_changed_file_since_collect_requires_reverification(self):
+        path = self.directory / 'source'; path.write_bytes(b'invented old source')
+        source = dict(kind='file', path=str(path), anchor='invented', sha256=E.P.digest(path.read_bytes()))
+        self.data['questions'][0]['sources'] = [source]
+        collected = E.source_pins(dict(sources=[source]))
+        self.evidence['source_pins']['R01'] = copy.deepcopy(collected)
+        self.assertEqual(self.check()['pins_changed_since_collect'], 0)
+        path.write_bytes(b'invented new source')
+        for slot in self.results['slots'][:6]: slot['expectation_reverified'] = False
+        with self.assertRaisesRegex(E.P.Stop, '^expectation_not_reverified$'): self.check()
+        for slot in self.results['slots'][:6]: slot['expectation_reverified'] = True
+        self.evidence['source_pins']['R01'] = copy.deepcopy(collected)
+        checked = self.check()
+        self.assertEqual(checked['pins_changed_since_collect'], 1)
+        self.assertEqual(self.evidence['source_pins']['R01'][0]['pin'], 'source_changed')
+        path.unlink(); self.evidence['source_pins']['R01'] = copy.deepcopy(collected)
+        for slot in self.results['slots'][:6]: slot['expectation_reverified'] = False
+        with self.assertRaisesRegex(E.P.Stop, '^expectation_not_reverified$'): self.check()
+        self.assertEqual(self.evidence['source_pins']['R01'][0]['pin'], 'missing')
+
+    def test_empty_source_pins_against_volatile_source(self):
+        self.data['questions'][0]['sources'] = [dict(kind='file', path='invented', anchor='invented', volatile=True)]
+        self.evidence['source_pins']['R01'] = []
+        for slot in self.results['slots'][:6]: slot['expectation_reverified'] = False
+        with self.assertRaisesRegex(E.P.Stop, '^source_pins_incomplete$'): self.check()
+
+    def test_held_out_check_requires_sealed_input(self):
+        args = self.held_fixture()
+        rc, error = self.check_held(*args, include_input=False)
+        self.assertEqual(rc, 1); self.assertIn('held_out_input_required', error)
+
+    def test_held_out_input_content_and_hash_binding(self):
+        for changed in ('id', 'forms', 'sources', 'expectation', 'oracle', 'order', 'sealed_bytes', 'public_hash'):
+            with self.subTest(changed=changed):
+                args = list(self.held_fixture(self.data['questions'][:2]))
+                sealed, private, evidence, fixed, judged = args
+                if changed == 'order': private['questions'].reverse()
+                elif changed == 'sealed_bytes': args[0] = sealed + b' '
+                elif changed == 'public_hash': evidence['held_out']['sha256'] = 'b'*64
+                else: private['questions'][0][changed] = 'invented substitution'
+                rc, error = self.check_held(*args)
+                self.assertEqual(rc, 1); self.assertIn('held_out_binding', error)
+
+    def test_valid_two_question_held_out_and_private_output(self):
+        questions = copy.deepcopy(self.data['questions'][:2])
+        for q in questions: q['oracle'] = 'invented-private-oracle'
+        rc, checked = self.check_held(*self.held_fixture(questions))
+        self.assertEqual(rc, 0); self.assertTrue(checked['target_reached'])
+        self.assertEqual(checked['held_out']['supported'], 12)
+        self.assertNotIn('invented-private-oracle', E.encode(checked).decode())
+        self.assertEqual(checked['pins_changed_since_collect'], 0)
+
+    def test_result_fields_cannot_override_collected_fields(self):
+        for name in ('items', 'returned_count', 'latency_ms', 'oracle'):
+            with self.subTest(name=name):
+                self.results['slots'][0][name] = 'invented override'
+                with self.assertRaisesRegex(E.P.Stop, '^result_field_not_allowed$'): self.check()
+                del self.results['slots'][0][name]
+        sealed, private, evidence, fixed, judged = self.held_fixture()
+        judged['slots'][0]['items'] = []
+        rc, error = self.check_held(sealed, private, evidence, fixed, judged)
+        self.assertEqual(rc, 1); self.assertIn('result_field_not_allowed', error)
+
+    def test_supported_requires_positive_returned_and_current_counts(self):
+        for returned, current in ((0, 0), (1, 0)):
+            with self.subTest(returned=returned, current=current):
+                self.evidence['slots'][0]['returned_count'] = returned
+                self.results['slots'][0]['current_count'] = current
+                with self.assertRaisesRegex(E.P.Stop, '^supported_without_items$'): self.check()
+                self.results['slots'][0]['verdict'] = 'missing'; self.results['target_reached'] = False
+                self.assertFalse(self.check()['target_reached'])
+                self.results['slots'][0]['verdict'] = 'supported'; self.results['target_reached'] = True
+        self.evidence['slots'][0]['returned_count'] = 100
+        self.results['slots'][0]['current_count'] = 1
+        self.assertEqual(self.check()['slots'][0]['current_item_share'], 0.01)

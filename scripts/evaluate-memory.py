@@ -19,6 +19,8 @@ FORMS, ROUTES = ('en', 'ko', 'formed'), ('recall', 'document')
 IDS = [f'R{i:02}' for i in range(1, 36)] + [f'N{i:02}' for i in range(1, 11)]
 CANARY = ['R05', 'R09', 'R23', 'R27', 'R30', 'N07']
 VERDICTS = ('supported', 'partial', 'stale', 'missing')
+RESULT_FIELDS = {'id', 'form', 'route', 'verdict', 'current_count',
+                 'evidence_sha256', 'expectation_reverified'}
 load = lambda raw: json.loads(raw, object_pairs_hook=P.CHECK.unique_pairs)
 encode = lambda value: (json.dumps(value, ensure_ascii=False, sort_keys=True) + '\n').encode()
 
@@ -127,6 +129,8 @@ def collect(client, pin, data, raw, selector, document_ids, held_fd=None, eviden
     held = b'' if held_fd is None else read_fd(held_fd)
     questions = None if held_fd is None else load(held)['questions']
     P.require(questions is None or bool(questions), 'held_out_empty')
+    if questions is not None:
+        unique_questions(questions)
     result = dict(C=pin['commit'], observed_at=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), corpus_sha256=P.digest(raw), profile=profile(client, pin),
                   payload_sha256={rid: w['hash'] for rid, w in pin['expected'].items()},
                   source_pins={q['id']: source_pins(q) for q in data['questions']})
@@ -175,37 +179,46 @@ def write_fd(fd, raw):
         stream.write(raw)
 
 
+def unique_questions(questions):
+    ids = [q['id'] for q in questions]
+    P.require(len(ids) == len(set(ids)), 'held_out_duplicate_id')
+
+
 def reference_pin(source, pin):
-    if source['kind'] != 'file': return 'reverify'
-    if pin.get('pin') == 'missing': return 'missing'
-    if source.get('volatile'): return 'reverify'
-    return 'equal' if pin.get('sha256_now') == source['sha256'] else 'source_changed'
+    if source['kind'] == 'file' and not source.get('volatile'):
+        return source_pins(dict(sources=[source]))[0]
+    return dict(pin, pin='missing' if source['kind'] == 'file' and pin.get('pin') == 'missing' else 'reverify')
 
 
 def check_results(results, evidence, evidence_hash, data):
+    unique_questions(data['questions'])
     required = {(q['id'], f, r) for q in data['questions'] for f in FORMS for r in ROUTES}
-    slots = results['slots']
+    slots = [dict(s) for s in results['slots']]
     keys = [(s['id'], s['form'], s['route']) for s in slots]
     P.require(len(keys) == len(required) and set(keys) == required, 'verdict_slots_incomplete')
     observed = {(s['id'], s['form'], s['route']): s for s in evidence['slots']}
+    P.require(len(observed) == len(evidence['slots']), 'evidence_slots_duplicate')
     P.require(set(observed) == required, 'evidence_slots_incomplete')
+    current_pins, changed = {}, 0
+    for question in data['questions']:
+        pins = evidence['source_pins'][question['id']]
+        P.require(len(pins) == len(question['sources']), 'source_pins_incomplete')
+        fresh = [reference_pin(s, p) for s, p in zip(question['sources'], pins)]
+        changed += sum(a != b for a, b in zip(fresh, pins))
+        current_pins[question['id']] = fresh
+    evidence['source_pins'] = current_pins
     counts, by_status = {}, {}
     for slot, key in zip(slots, keys):
+        P.require(set(slot) <= RESULT_FIELDS, 'result_field_not_allowed')
         verdict = slot['verdict']
         P.require(verdict in VERDICTS, 'verdict_required')
-        pins = evidence['source_pins'][slot['id']]
-        question = next(q for q in data['questions'] if q['id'] == slot['id'])
-        P.require(len(pins) == len(question['sources']), 'source_pins_incomplete')
-        pins = [dict(p, pin=reference_pin(s, p))
-                for s, p in zip(question['sources'], pins)]
-        P.require(all(p.get('pin') in ('equal', 'source_changed', 'reverify', 'missing')
-                      for p in pins), 'source_pins_incomplete')
-        evidence['source_pins'][slot['id']] = pins
+        pins = current_pins[slot['id']]
         P.require(slot.get('evidence_sha256') == evidence_hash, 'evidence_hash_mismatch')
         if any(p['pin'] != 'equal' for p in pins):
             P.require(slot.get('expectation_reverified') is True, 'expectation_not_reverified')
         n, current = observed[key]['returned_count'], slot['current_count']
         P.require(type(current) is int and 0 <= current <= n, 'current_count_invalid')
+        P.require(verdict != 'supported' or (n > 0 and current > 0), 'supported_without_items')
         slot.update({k: v for k, v in observed[key].items() if k not in slot})
         slot['returned_count'], slot['current_item_share'] = n, current/n if n else None
         group = slot['form'] + '/' + slot['route']
@@ -214,7 +227,7 @@ def check_results(results, evidence, evidence_hash, data):
         by_status.setdefault(status, dict.fromkeys(VERDICTS, 0))[verdict] += 1
     reached = all(s['verdict'] == 'supported' for s in slots)
     P.require(results.get('target_reached') is reached, 'false_success')
-    return dict(target_reached=reached, by_route_form=counts, by_status=by_status,
+    return dict(target_reached=reached, pins_changed_since_collect=changed, by_route_form=counts, by_status=by_status,
                 total={v: sum(s['verdict'] == v for s in slots) for v in VERDICTS}, slots=slots,
                 targets={status: sum(q['status'] == status for q in data['questions'])*6 for status in by_status})
 
@@ -285,14 +298,18 @@ def main(argv=None):
                 P.require(evidence['held_out']['count'] > 0, 'held_out_empty')
                 P.require(args.held_out_results_fd is not None and args.held_out_evidence_fd is not None,
                           'held_out_judgments_required')
+                P.require(args.held_out_fd is not None, 'held_out_input_required')
+                sealed_raw = read_fd(args.held_out_fd)
                 private_raw = read_fd(args.held_out_evidence_fd)
                 private = load(private_raw)
-                P.require(private['input_sha256'] == evidence['held_out']['sha256']
+                P.require(P.digest(sealed_raw) == private['input_sha256'] == evidence['held_out']['sha256']
+                          and private['questions'] == load(sealed_raw)['questions']
                           and len(private['questions']) == evidence['held_out']['count'], 'held_out_binding')
                 judged = check_results(load(read_fd(args.held_out_results_fd)), private,
                                        P.digest(private_raw), private)
                 result['held_out'] = judged['total']
                 result['target_reached'] &= judged['target_reached']
+                result['pins_changed_since_collect'] += judged['pins_changed_since_collect']
             else:
                 result.update(held_out='not_evaluated', target_reached=False)
         elif args.measurement_request:

@@ -221,7 +221,8 @@ file's `evidence_sha256` on every affected slot. Unresolved source_missing answe
 use their subject expectation; a resolved claim is stale under human review.
 `--held-out-fd N --held-out-evidence-fd M` keeps questions/oracles and native
 results in inherited private descriptors; public output contains only count/hash.
-For checking, pass the private evidence rewound on M and human slot results on
+For checking, pass the sealed input rewound on N, private evidence rewound on M,
+and human slot results on
 `--held-out-results-fd K`; only aggregate held-out verdict counts leave the process.
 `--canary --credential-fd N --baseline EVIDENCE.json` checks English recall for
 R05/R09/R23/R27/R30/N07 and profile/Git hashes; missing reads are unknown. Literal
@@ -232,3 +233,12 @@ uses the created Id returned by apply; no measurement_get.json is written ahead.
 The Lead supplies the existing KPI Id and actual UTC time/value/evidence/request_id,
 applies once, then compares measurement/KPI readbacks. Times use UTC seconds and Z.
 `--corpus PATH` selects an input corpus; tests use invented inputs. Due metadata remains the checker's `--due`.
+Held-out ids and evidence slot keys must be unique. Checking requires the sealed
+input again via `--held-out-fd N`; its bytes/hash and ordered questions/oracles
+must match the private evidence. Only the seven judge fields `id`, `form`, `route`,
+`verdict`, `current_count`, `evidence_sha256`, `expectation_reverified` are allowed
+in result slots. A supported verdict needs positive returned and current counts.
+`--check-results` rereads hashed file sources locally and reports the number of
+reference pins changed since collection as `pins_changed_since_collect`.
+Run it on the host holding the sources; elsewhere hashed file pins are missing
+and every file-backed slot needs a reverified expectation. No network/store call is added.
