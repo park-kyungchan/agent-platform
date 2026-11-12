@@ -89,7 +89,7 @@ A required parameter has no `?` below. Numbers after strings are maximum UTF-8 b
 | `define_kpi` | Named task KPI | task, name:120, definition:600, target?:200; name unique within task |
 | `record_measurement` | Immutable observation and latest KPI | kpi, value:200, observed_at:40, evidence:300; `observed_at` is a real UTC time written exactly as `YYYY-MM-DDTHH:MM:SSZ` (`date -u +%Y-%m-%dT%H:%M:%SZ`), not older than history or later than application time |
 | `set_kpi_target` | Desired KPI value | kpi, target:200 |
-| `start_worker_run` | Dispatch | task, name:80, tier:`mechanical`/`bounded`/`open`/`review`, runtime:120, packet, thread, plan, layer:`engine`/`domain`/`harness`, session?:200; plan must belong to thread; engine needs domain_route; kind none/empty first_use and unreviewed over-limit plans refused; name unique among running workers |
+| `start_worker_run` | Dispatch | task, name:80, tier:`mechanical`/`bounded`/`open`/`review`, runtime:120, packet, thread, plan, layer:`engine`/`domain`/`harness`, session?:200; thread must belong to task (`thread_of_other_task`); plan must belong to thread; engine needs domain_route; kind none/empty first_use and unreviewed over-limit plans refused; name unique among running workers |
 | `note_worker_run` | Progress, separate from final result | worker_run, note:600, report?; run must be running |
 | `close_worker_run` | Final outcome and close time | worker_run, result:600, report?; run must be running |
 

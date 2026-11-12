@@ -83,7 +83,8 @@ opening estimates once; Lead supplies limit_lines as 1.5 times first_lines.
 review; equal reviewer/latest-writer families refuse `scope_review_same_family`.
 Families are self-declared caller values, not authenticated identities.
 `start_worker_run` additionally requires thread, plan and layer (`engine`/`domain`/`harness`).
-The plan must belong to the thread (`plan_of_other_thread`); missing plan input
+The thread must belong to the task (`thread_of_other_task`); the plan must
+belong to the thread (`plan_of_other_thread`); missing plan input
 uses native `invalid_parameter`, unknown plan fails the plan criteria.
 Engine work without consumer_kind domain_route refuses `engine_without_domain_consumer`.
 Consumer kind none or empty first_use refuses `missing_first_use`; whitespace-only

@@ -1690,6 +1690,11 @@
           "all": [{"exists": "$thread"}]
         },
         {
+          "code": "thread_of_other_task",
+          "message": "Use a thread belonging to this task.",
+          "all": [{"exists": "$thread"}, {"eq": ["$thread.task", "$task"]}]
+        },
+        {
           "code": "engine_without_domain_consumer",
           "message": "Engine work requires a domain_route consumer.",
           "all": [{"exists": "$thread"}, {"any": [{"ne": ["$layer", "engine"]}, {"eq": ["$thread.consumer_kind", "domain_route"]}]}]

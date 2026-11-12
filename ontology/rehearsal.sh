@@ -23,7 +23,10 @@ def fields(i): return {k: v.get('value') for k, v in obj(i)['observations'][-1][
 def created(r, kind): return next(e['id'] for e in r['edits'] if e['id']['object_type'] == kind and e['change'] == 'initial')
 def apply(action, rid, parameters, failure=None, outcome='applied'):
     r = call(['action', 'apply'], dict(action_type=action, request_id=rid, parameters=parameters), 2 if failure else 0)
-    if failure: assert failure in json.dumps(r) and r['code'] in [failure, 'submission_criteria'], r
+    if failure:
+        expected = {failure} if isinstance(failure, str) else set(failure)
+        actual = set(r['failed']) if r['code'] == 'submission_criteria' else {r['code']}
+        assert actual == expected, (expected, r)
     else: assert r['outcome'] == outcome and r['actor_trust'] == 'self_reported', r
     return r
 def render(view, key=None): return call(['render'], dict(view=view, args=dict(task=key or task['native_key'])))
@@ -55,7 +58,8 @@ plan = created(apply('open_plan', 'plan', pp), 'plan')
 wp = dict(task=task, name='O13', tier='bounded', runtime='codex', packet=packet, thread=thread, plan=plan, layer='domain')
 unchanged = fingerprint()
 for action, params in [('set_hold', hp), ('record_decision', dp), ('define_kpi', kp), ('start_worker_run', wp)]:
-    apply(action, 'unknown-' + action, dict(params, task=oid('task', 'invented-o13-task')), 'unknown_task')
+    expected = ('unknown_task', 'thread_of_other_task') if action == 'start_worker_run' else 'unknown_task'
+    apply(action, 'unknown-' + action, dict(params, task=oid('task', 'invented-o13-task')), expected)
 assert fingerprint() == unchanged
 h = created(apply('set_hold', 'hold-1', hp), 'hold'); first_time = fields(h)['set_at']; now += 1
 apply('set_hold', 'hold-1', hp, outcome='already_applied'); assert fields(h)['set_at'] == first_time == '2026-11-11T02:00:00Z'
@@ -150,7 +154,7 @@ for view, (count, text) in expected.items():
 def gate(action, rid, params, failure=None):
     before = fingerprint(); answer = apply(action, 'gate-' + action + '-' + rid, params, failure)
     if failure: assert fingerprint() == before
-    print('gate_row=' + rid + ' expected=' + (failure or 'admitted'))
+    print('gate_row=' + rid + ' expected=' + (','.join(sorted(failure)) if failure and not isinstance(failure, str) else failure or 'admitted'))
     return answer
 def dispatch(rid, failure=None, **changes):
     answer = gate('start_worker_run', rid, dict(wp, name='gate-' + rid, **changes), failure)
@@ -166,13 +170,20 @@ gate('amend_plan', 'unknown-plan', dict(plan=missing_plan, current_lines=101, am
 gate('amend_plan', 'first-immutable', dict(plan=plan, current_lines=101, first_lines=1, amended_by_family='family-a'), 'invalid_parameter')
 # A missing required plan parameter uses the native parameter refusal.
 gate('start_worker_run', 'plan-missing', {k: v for k, v in wp.items() if k != 'plan'}, 'invalid_parameter')
-dispatch('plan-unknown', 'plan_of_other_thread', plan=missing_plan)
+dispatch('plan-unknown', ('plan_of_other_thread', 'plan_over_limit'), plan=missing_plan)
 other = created(gate('open_thread', 'plan-other-thread', dict(tp, key='plan-other')), 'thread')
 other_plan = created(gate('open_plan', 'plan-other', dict(pp, thread=other)), 'plan')
 dispatch('plan-mismatch', 'plan_of_other_thread', plan=other_plan); dispatch('plan-matches')
+foreign = created(gate('open_thread', 'foreign-thread', dict(tp, task=other_task, key='foreign')), 'thread')
+foreign_plan = created(gate('open_plan', 'foreign-plan', dict(pp, thread=foreign)), 'plan')
+dispatch('foreign-task', 'thread_of_other_task', thread=foreign, plan=foreign_plan)
 for kind in ['harness', 'none']:
     gate('amend_thread', 'consumer-' + kind, dict(thread=thread, consumer='Program board', consumer_kind=kind, first_use=tp['first_use'], reason='gate fixture'))
-    dispatch('engine-' + kind, 'engine_without_domain_consumer', layer='engine')
+    expected = ('engine_without_domain_consumer', 'missing_first_use') if kind == 'none' else 'engine_without_domain_consumer'
+    dispatch('engine-' + kind, expected, layer='engine')
+    if kind == 'harness':
+        dispatch('harness-harness', layer='harness')
+        dispatch('harness-use-present', layer='domain')
     if kind == 'none': dispatch('no-kind', 'missing_first_use')
 gate('amend_thread', 'domain-consumer', dict(thread=thread, consumer='', consumer_kind='domain_route', first_use=tp['first_use'], reason='kind decides'))
 dispatch('engine-domain', layer='engine')
@@ -193,10 +204,12 @@ dispatch('amended-after-review', 'plan_over_limit')
 gate('record_scope_review', 'latest-family', dict(review, reviewer_family='family-b'), 'scope_review_same_family')
 for action, params in [('record_decision', dict(dp, topic='gate-user')), ('supersede_decision', dict(sp, decision=successor))]:
     gate(action, action + '-no-evidence', dict(params, decided_by='user'), 'user_decision_evidence_required')
+    gate(action, action + '-words-no-form', dict(params, decided_by='user', user_words='"Use the domain route."'), 'user_decision_evidence_required')
     user = dict(params, decided_by='user', user_words='"Use the domain route."', user_form='question')
     gate(action, action + '-question', user, 'user_question_is_not_a_decision')
     answer = gate(action, action + '-decision', dict(user, user_form='decision'))
     assert fields(created(answer, 'decision'))['user_words'] == user['user_words']
+gate('record_decision', 'lead-question', dict(dp, topic='gate-lead-question', user_form='question'))
 print('v5_gate_rows_complete')
 PY
 
