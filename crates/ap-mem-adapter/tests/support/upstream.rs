@@ -1,5 +1,6 @@
 //! Synthetic wire only: /__test__ aliases are deliberately not native bindings.
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{
@@ -19,9 +20,42 @@ pub struct Request {
     pub body: Value,
 }
 
+// Controls are consumed by distinct integration-test binaries.
+#[allow(dead_code)]
+#[derive(Clone, Copy)]
+pub enum MutationFault {
+    BeforeAccept,
+    LostAck,
+}
+
 pub struct Model {
     pub fixture: Value,
     pub requests: Vec<Request>,
+    pub operations: BTreeMap<String, Value>,
+    pub next_fault: Option<MutationFault>,
+    disconnect: bool,
+}
+
+impl Model {
+    #[allow(dead_code)]
+    pub fn finish(&mut self, operation_id: &str, success: bool) {
+        let op = self.operations.get_mut(operation_id).unwrap();
+        assert_eq!(op["test_state"], "running");
+        op["test_state"] = json!(if success { "succeeded" } else { "failed" });
+        if success {
+            let document = op["request"]["document"].clone();
+            let id = document["document_id"].as_str().unwrap().to_owned();
+            self.fixture["documents"][&id] = document.clone();
+            // Recall and page-search indexes deliberately remain independent.
+            let facts = self.fixture["facts"].as_array_mut().unwrap();
+            facts.retain(|fact| {
+                !fact["document_ids"]
+                    .as_array()
+                    .is_some_and(|ids| ids.contains(&json!(id)))
+            });
+            facts.push(json!({"text":document["body"],"document_ids":[id]}));
+        }
+    }
 }
 
 pub struct Reply {
@@ -44,6 +78,9 @@ impl Server {
         let model = Arc::new(Mutex::new(Model {
             fixture,
             requests: Vec::new(),
+            operations: BTreeMap::new(),
+            next_fault: None,
+            disconnect: false,
         }));
         let stop = Arc::new(AtomicBool::new(false));
         let (data, stopping) = (Arc::clone(&model), Arc::clone(&stop));
@@ -58,14 +95,23 @@ impl Server {
                         stream
                             .set_write_timeout(Some(Duration::from_secs(1)))
                             .unwrap();
-                        let reply = match read_request(&mut stream) {
-                            Ok(request) => route(&mut data.lock().unwrap(), request),
-                            Err(_) => Reply {
-                                status: 400,
-                                body: json!({"error":"test_bad_request"}),
-                            },
+                        let (reply, disconnect) = match read_request(&mut stream) {
+                            Ok(request) => {
+                                let mut model = data.lock().unwrap();
+                                let reply = route(&mut model, request);
+                                (reply, std::mem::take(&mut model.disconnect))
+                            }
+                            Err(_) => (
+                                Reply {
+                                    status: 400,
+                                    body: json!({"error":"test_bad_request"}),
+                                },
+                                false,
+                            ),
                         };
-                        let _ = write_reply(&mut stream, reply);
+                        if !disconnect {
+                            let _ = write_reply(&mut stream, reply);
+                        }
                     }
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
                         thread::sleep(Duration::from_millis(2))
@@ -140,8 +186,12 @@ impl Drop for Server {
 }
 
 fn read_request(stream: &mut TcpStream) -> io::Result<Request> {
+    let started = std::time::Instant::now();
     let mut header = Vec::new();
     while !header.ends_with(b"\r\n\r\n") {
+        if started.elapsed() >= Duration::from_secs(1) {
+            return Err(io::ErrorKind::TimedOut.into());
+        }
         let mut byte = [0];
         stream.read_exact(&mut byte)?;
         header.push(byte[0]);
@@ -191,6 +241,22 @@ fn route(model: &mut Model, request: Request) -> Reply {
         body: json!({"error":"test_not_found"}),
     };
     if request.method == "GET" {
+        if request.path == "/config" {
+            return Reply {
+                status: 200,
+                body: model.fixture["config"].clone(),
+            };
+        }
+        if let Some(id) = request.path.strip_prefix("/__test__/operation/") {
+            return Reply {
+                status: if model.operations.contains_key(id) {
+                    200
+                } else {
+                    404
+                },
+                body: model.operations.get(id).cloned().unwrap_or(Value::Null),
+            };
+        }
         if let Some(id) = request.path.strip_prefix("/__test__/document/") {
             return Reply {
                 status: if model.fixture["documents"][id].is_null() {
@@ -206,6 +272,15 @@ fn route(model: &mut Model, request: Request) -> Reply {
                 status: 200,
                 body: model.fixture["facts"].clone(),
             };
+        }
+    }
+    if request.method == "POST" && request.path == "/memories" {
+        return mutate(model, request, None);
+    }
+    if request.method == "DELETE" {
+        if let Some(id) = request.path.strip_prefix("/__test__/document/") {
+            let id = id.to_owned();
+            return mutate(model, request, Some(&id));
         }
     }
     if request.method != "POST" || request.path != MCP_PATH {
@@ -239,4 +314,65 @@ fn route(model: &mut Model, request: Request) -> Reply {
         status: 200,
         body: json!({"jsonrpc":"2.0","id":id,"result":result}),
     }
+}
+
+// Known POST route with visibly synthetic operation/document fields; U3/U4
+// remain unverified. The fake does not enforce the publisher's config policy.
+fn mutate(model: &mut Model, request: Request, delete: Option<&str>) -> Reply {
+    let fault = model.next_fault.take();
+    if matches!(fault, Some(MutationFault::BeforeAccept)) {
+        return Reply {
+            status: 503,
+            body: json!({"error":"test_before_accept"}),
+        };
+    }
+    let reply = if let Some(id) = delete {
+        model.fixture["documents"]
+            .as_object_mut()
+            .unwrap()
+            .remove(id);
+        // A successful DELETE can leave facts, page sources and read indexes.
+        Reply {
+            status: 200,
+            body: json!({"test_deleted":id}),
+        }
+    } else {
+        let body = &request.body;
+        let Some(id) = body["test_operation_id"].as_str() else {
+            return Reply {
+                status: 400,
+                body: json!({"error":"test_operation_required"}),
+            };
+        };
+        if !body["document"]["document_id"].is_string()
+            || !body["document"]["body"].is_string()
+            || !body["document"]["tags"].is_array()
+            || body["async"] != true
+            || body["update_mode"] != "replace"
+        {
+            return Reply {
+                status: 400,
+                body: json!({"error":"test_invalid_retain"}),
+            };
+        }
+        if let Some(old) = model.operations.get(id) {
+            if old["request"] != *body {
+                return Reply {
+                    status: 409,
+                    body: json!({"error":"test_payload_mismatch"}),
+                };
+            }
+        } else {
+            model.operations.insert(
+                id.into(),
+                json!({"test_operation_id":id,"test_state":"running","request":body}),
+            );
+        }
+        Reply {
+            status: 202,
+            body: json!({"test_operation_id":id}),
+        }
+    };
+    model.disconnect = matches!(fault, Some(MutationFault::LostAck));
+    reply
 }
