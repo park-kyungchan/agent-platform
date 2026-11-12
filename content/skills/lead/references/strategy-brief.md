@@ -1,6 +1,6 @@
 # Brief, options, proposal and record formats
 
-Copy the block you need. Values in angle brackets are placeholders; a filled block lives in the task's STATE, `STRATEGY.md` or board, never in this file. Terms: `/root/.agents/skills/strategy-dialogue/references/measurement.md`.
+Copy the block you need. Values in angle brackets are placeholders; a filled block lives in the task's STATE, `STRATEGY.md` or board, never in this file. Terms: `/root/.agents/skills/lead/references/measurement.md`.
 
 ## Brief (the Lead's record of its interpretation)
 

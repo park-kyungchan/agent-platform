@@ -16,13 +16,15 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | Term | Meaning | Example on this host | Do not write |
 | --- | --- | --- | --- |
 | board | The one file of a multi-thread task that shows KPI values, work threads, live workers, decisions and open questions; STATE points to it | `/home/palantirkc/work/<scope>-<topic>/BOARD.md` | `dashboard file` |
+| lens file | The one file of a task in which the Lead keeps the whole view: target structure, measured structure, findings, design decisions | `/home/palantirkc/work/<scope>-<topic>/LENS.md` | `architecture overview` |
+| design note | The Lead's written design of a change that spans more than one packet: use, code today, decision, shape, invariants, tests by guarantee, packets, undo | `/root/.agents/skills/lead/references/design.md` | `design doc` |
 | checkpoint | The content of STATE at a moment, complete enough for a new session to continue from it | A STATE whose header carries the time it was written | `snapshot file` |
 | work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A row of the board's thread table | `workstream` |
 | tier | The amount of reasoning a piece of work needs: mechanical, bounded judgment, open judgment | A packet line `Tier: mechanical` | `difficulty level` |
 | assignment file | The one file of a task that says which runtime and model serves which tier and in which order; STATE names it | A section of a task's orchestration document | `routing table` |
 | dispatch | Starting one worker run with one packet | `herdr agent start <name> --kind <kind> --pane <pane-id>`, then `herdr agent prompt <name> "<text naming the packet>"` | — |
 | progress message | A message to the user that says where the task stands; not a worker's report | The KPI table and what changed | — |
-| acceptance | The Lead reading back the actual output or effect of a worker and deciding to use it | Reading the diff and rerunning the check | `sign-off` |
+| acceptance | The Lead reading the report and the whole diff or effect of a worker itself and deciding to use it | Reading the diff and rerunning the check | `sign-off` |
 | review | A second agent, in a fresh context, judging a frozen candidate against the request and the contracts | A reviewer subagent that writes findings by severity | — |
 | candidate | The exact revision that is offered for review or merge | A commit on a task branch | — |
 | handoff | Passing a piece of work, with a packet, to another agent; also one Lead passing a task to the next Lead | `CONCURRENT-WORK.md` section 2 | `hand-off`, `handover` |
@@ -58,7 +60,7 @@ Where each kind is written: `/root/.agents/AGENTS.md` section 6.
 
 ## 5. Measurement
 
-Metric, baseline, target, leading and lagging indicator, output and outcome, proxy, acceptance criterion, and the way to build a KPI from the user's words: `/root/.agents/skills/strategy-dialogue/references/measurement.md`.
+Metric, baseline, target, leading and lagging indicator, output and outcome, proxy, acceptance criterion, and the way to build a KPI from the user's words: `/root/.agents/skills/lead/references/measurement.md`.
 
 ## 6. Repositories and paths
 

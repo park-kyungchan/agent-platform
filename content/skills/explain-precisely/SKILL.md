@@ -26,7 +26,7 @@ Git object 저장소는 공유합니다. branch별 파일 변경을 분리할 �
 
 ## Answer order and depth
 
-In a progress or closure message the KPI table comes first; an answer to a question starts with the answer. Both are defined by [strategy-dialogue](../strategy-dialogue/SKILL.md).
+In a progress or closure message the KPI table comes first; an answer to a question starts with the answer. Both are defined by [lead](../lead/SKILL.md), section 3.
 
 Compact report example (invented values; define new terms in the table at first
 use, without adding a definition paragraph before it):
@@ -53,7 +53,7 @@ Short questions get short answers; do not force all six parts, headings, a
 question after each action, quizzes or a tutorial into a routine update. Answer
 the local question and continue the objective. Teaching creates no approval step.
 What the Lead decides itself and the few things it asks the user: skill
-`strategy-dialogue` section 1.
+`lead` section 3.
 
 The user's wording is often loose or names the wrong thing. In the first sentence
 name the exact thing you took it to mean (file, repository, command, value), so
@@ -61,7 +61,7 @@ that one word from the user can correct it. Do not ask the user to restate.
 
 A number is never shown bare. At the first mention of a KPI or metric say what it
 counts, where it is read from and which direction is good; after that the name is
-enough. Terms: `/root/.agents/skills/strategy-dialogue/references/measurement.md`.
+enough. Terms: `/root/.agents/skills/lead/references/measurement.md`.
 
 ## Mechanisms and evidence
 

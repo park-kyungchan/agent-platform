@@ -7,7 +7,7 @@ a read-only task writes only its already permitted local result. If a metric,
 process or session observation is unavailable, say unknown rather than launching
 a client, reading transcripts or expanding authority to obtain it.
 
-[Strategy dialogue](../../strategy-dialogue/SKILL.md) owns KPI-first reporting;
+[Lead](../../lead/SKILL.md) owns KPI-first reporting;
 [explain precisely](../../explain-precisely/SKILL.md) owns user-facing language.
 [Context Governance](../../../runtime-references/CONTEXT-GOVERNANCE.md) owns
 source authority, isolation/continuity and memory boundaries. Parent-facing

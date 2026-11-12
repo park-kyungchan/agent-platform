@@ -1,6 +1,6 @@
 # Task packet
 
-One file per bounded piece of work, with exact values instead of references to a conversation, written in the terms of `/root/.agents/runtime-references/GLOSSARY.md` and never in the user's wording. What a packet must contain and how a worker treats it: `/root/.agents/runtime-references/CONCURRENT-WORK.md` sections 2 and 3. The worker, its model and the build-slot owner are recorded in STATE at dispatch, not in the packet.
+One file per bounded piece of work, with exact values instead of references to a conversation, written in the terms of `/root/.agents/runtime-references/GLOSSARY.md` and never in the user's wording. What a packet must contain and how a worker treats it: `/root/.agents/runtime-references/CONCURRENT-WORK.md` sections 2 and 3. A packet that changes product code carries the Lead's design block (`/root/.agents/skills/lead/references/design.md`): the worker builds that design and reports a mismatch with the code instead of resolving it. The worker run, its model and the build-slot owner are recorded at dispatch (the store's worker run, or STATE), not in the packet.
 
 ## Common part
 
@@ -12,6 +12,7 @@ Read first: <absolute TASK.md>, <absolute STATE.md>, <absolute path of each need
 First output after reading: one line listing the exact files read
 Authority: <the objective the Lead wrote for this task and the user decision it rests on, in English; the task scope>
 Exact targets: <repo, worktree, branch, base revision, files that may be written>
+Design: <the design block, for a packet that changes product code; the path and section of the design note it belongs to>
 Strategy link: <STATE or STRATEGY.md line>; KPI this task moves: <KPI or guardrail, expected effect, how it is measured>
 Allowed effects: <reads, writes, local commits, push, pull request, build slot>
 Forbidden effects: <holds, other paths, host, domain and remote boundaries>
@@ -37,6 +38,8 @@ A mechanical packet is ready when a script could follow it. If a script can do a
 
 ## Bounded judgment tier: add
 
+The tier of every packet that implements a design.
+
 ```markdown
 Contract or criteria: <absolute path and section, or the criteria written out>
 Options: <the allowed outcomes per item>
@@ -47,6 +50,8 @@ If an instruction does not fit what you find: write the mismatch in the report a
 ```
 
 ## Open judgment tier: add
+
+For an inventory, a diagnosis across repositories or an attack on a design. Never for a design the Lead owes.
 
 ```markdown
 Goal and acceptance: <what a good result must make true>
@@ -61,6 +66,7 @@ Request: <what the change was asked to do>
 Contracts: <absolute paths>
 Candidate: <repository, frozen revision, diff command>
 Raw evidence: <check output paths>
+Questions of the Lead: <what the Lead found in its own reading of the diff, each as a sequence to execute, never as a verdict>
 Report: findings by severity (blocker, major, minor), each with path and line and the smallest repair; then a verdict.
 Not given on purpose: the implementer's reasoning and any suggested verdict.
 ```

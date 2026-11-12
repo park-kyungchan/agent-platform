@@ -6,7 +6,7 @@ Profile creation/cloning can seed files, register services and notify gateways. 
 
 For an already recognized native Herdr agent, use its live server-scoped identity. For an authorized SSH/Docker foreground process that is not recognized, use the raw owned-pane surface. Do not use manual report-agent, takeover or a new wrapper to fake support. Resolve command syntax from installed help; preserve SSH host-key checking and Tailscale boundaries.
 
-For an authorized handoff, include current Strategy link, KPI/guardrail moved, exact source revision/write set and shared-build owner where applicable, alongside the goal, effects, output and TASK/STATE paths. [Context Governance](../../../runtime-references/CONTEXT-GOVERNANCE.md) owns isolation/continuity; [strategy-dialogue](../../strategy-dialogue/SKILL.md) owns reporting. Follow the assigned [Herdr](../../herdr/SKILL.md) topology; an existing Hermes service is not automatically a worker or a new role.
+For an authorized handoff, include current Strategy link, KPI/guardrail moved, exact source revision/write set and shared-build owner where applicable, alongside the goal, effects, output and TASK/STATE paths. [Context Governance](../../../runtime-references/CONTEXT-GOVERNANCE.md) owns isolation/continuity; [lead](../../lead/SKILL.md) owns reporting. Follow the assigned [Herdr](../../herdr/SKILL.md) topology; an existing Hermes service is not automatically a worker or a new role.
 
 Version promotion uses only the installed target helper's one-shot path, under current task authority. Never edit updater state, receipts, jobs or transactions directly. Keep SSH host-key checking, Tailscale and native runtime/service identities intact.
 
