@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fixed-bank engineering publication and read-only verification; no retries."""
+"""Fixed-bank engineering publisher, verifier and recovery safety routes; no retries."""
 import argparse
 from contextlib import contextmanager
 import fcntl
@@ -8,6 +8,7 @@ import http.client
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import select
 import signal
@@ -63,7 +64,7 @@ def run_budget():
 
 @contextmanager
 def locked():
-    # The same lock is reserved for V4-2b, across linked worktrees; no progress.
+    # Shared by every subcommand across linked worktrees; no progress.
     common = CHECK.git(ROOT, 'rev-parse', '--git-common-dir').decode().strip()
     path = (ROOT / common).resolve() / 'publish-memory.lock'
     fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
@@ -181,7 +182,8 @@ def pinned():
             and bool(config['retain_custom_instructions']), 'config_invalid')
     subjects = CHECK.git(ROOT, 'show', commit + ':memory/subjects.json')
     expected = {rid: {'bytes': CHECK.publication_bytes(r), 'hash': CHECK.publication_hash(r),
-                     'tags': CHECK.derived_tags(r['header'], nodes), 'terms': r['header']['recall_terms']}
+                     'tags': CHECK.derived_tags(r['header'], nodes), 'terms': r['header']['recall_terms'],
+                     'recall': CHECK.recall_tags(r['header']['subject'])}
                 for rid, r in records.items()}
     return {'commit': commit, 'config_raw': raw, 'subjects_raw': subjects,
             'config': config, 'expected': expected}
@@ -327,20 +329,133 @@ def publish(client, pin):
     raise Stop('UQ1_export_restore_delete_and_UQ2_denial_require_V4_5_no_mutation')
 
 
+def absent_document(client, rid, chunks=False):
+    """HC U5/125,127: only exact GET404 establishes absence on this read."""
+    try:
+        client.request('GET', B + '/documents/' + segment(rid) + ('/chunks' if chunks else ''))
+    except Stop as error:
+        if str(error) == 'read_404':
+            return True
+        raise
+    return False
+
+
+def retract(client, pin, rid, no_recovery_copy=False):
+    """Design 6: Lead owns consumer stop and pending source-removal hold."""
+    require(bool(CHECK.ID.fullmatch(rid)), 'record_id_invalid')
+    unchanged(pin)
+    instruction_hash = profile(client, pin['config'])
+    quiescent(client)
+    empty_derived(client)
+    doc = client.request('GET', B + '/documents/' + segment(rid))  # HC U4/016
+    require(doc.get('id') == rid and isinstance(doc.get('original_text'), str), 'document_shape')
+    want = pin['expected'].get(rid)
+    require(no_recovery_copy or (want is not None
+            and digest(doc['original_text'].encode()) == want['hash']), 'bank_copy_not_in_source')
+    unchanged(pin)
+    uncertain = False
+    try:
+        answer = client.request('DELETE', B + '/documents/' + segment(rid))  # HC U5/124
+        uncertain = not (isinstance(answer, dict) and answer.get('success') is True and answer.get('document_id') == rid)
+    except Stop:
+        uncertain = True
+    # Read each independently even after a lost answer. Never retry DELETE.
+    reads = {}
+    for name, read in [
+            ('document_absent', lambda: absent_document(client, rid)),
+            ('facts_absent', lambda: not pages(client, '/memories/list', query={'document_id': rid})),
+            ('chunks_absent', lambda: absent_document(client, rid, chunks=True))]:
+        try:
+            reads[name] = read()
+        except Stop:
+            reads[name] = 'unknown'
+    # Only booleans/fixed words leave this boundary, never returned text/errors.
+    print(json.dumps(dict(reads, consumers='keep_stopped', source_removal='Lead_hold_required'), sort_keys=True))
+    require(not uncertain, 'delete_unresolved_route_unavailable_no_resend')
+    require(all(value is True for value in reads.values()), 'deleted_unproven')
+    quiescent(client)
+    empty_derived(client)
+    require(profile(client, pin['config']) == instruction_hash, 'profile_drift')
+    if want is None:
+        print('listed_reads=not_evaluated')
+        raise Stop('deleted_unproven')
+    listed = 0
+    for term in want['terms']:
+        # HC U10/062,143: one term query with the exact derived subject selector.
+        answer = client.request('POST', B + '/memories/recall', dict(
+            query=term, types=['world', 'experience'], budget='low', max_tokens=512,
+            include={'entities': None, 'chunks': {'max_tokens': 512}}, **want['recall']))
+        results = answer.get('results')
+        require(isinstance(results, list) and all(isinstance(x, dict)
+                and isinstance(x.get('document_id'), str) for x in results), 'recall_shape')
+        require(all(x['document_id'] != rid for x in results), 'listed_read_contains_document')
+        listed += 1
+    quiescent(client)
+    empty_derived(client)
+    require(profile(client, pin['config']) == instruction_hash, 'profile_drift')
+    unchanged(pin)
+    return {'result': 'retracted_on_listed_reads', 'listed_reads': listed,
+            'consumers': 'keep_stopped', 'source_removal': 'Lead_hold_required',
+            'route': 'unavailable', 'commit': pin['commit']}
+
+
+def recovery_file(path, expected_hash):
+    """Local bytes only; native archive inner format is still UQ1."""
+    require(bool(re.fullmatch('[0-9a-fA-F]{64}', expected_hash)), 'recovery_sha256_invalid')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        require(stat.S_ISREG(os.fstat(fd).st_mode), 'recovery_not_regular')
+        hasher = hashlib.sha256()
+        while True:
+            raw = os.read(fd, 1024 * 1024)
+            if not raw:
+                break
+            hasher.update(raw)
+        require(hasher.hexdigest() == expected_hash.lower(), 'recovery_hash_mismatch')
+    finally:
+        os.close(fd)
+
+
+def restore(client, pin, recovery, recovery_sha256):
+    """Design 8: no speculative import or bank lifecycle shape, even in tests."""
+    recovery_file(recovery, recovery_sha256)
+    unchanged(pin)
+    # Existing-bank preconditions use W1 reads. A 404 is not absence proof (UQ1).
+    try:
+        profile(client, pin['config'])
+        quiescent(client)
+        empty_derived(client)
+    except Stop as error:
+        if str(error) != 'read_404':
+            raise
+    raise Stop('uq1_restore_unmeasured')
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__,
-             epilog='Both subcommands require --credential-fd FD (an inherited private descriptor).')
+             epilog='All subcommands require --credential-fd FD (an inherited private descriptor).')
     commands = parser.add_subparsers(dest='command', required=True)
-    for name in ('publish', 'verify'):
+    for name in ('publish', 'verify', 'retract', 'restore'):
         sub = commands.add_parser(name)
         sub.add_argument('--credential-fd', required=True, type=int, help='inherited private FD, never a secret value')
+        if name == 'retract':
+            sub.add_argument('--record-id', required=True)
+            sub.add_argument('--no-recovery-copy', action='store_true')
+        if name == 'restore':
+            sub.add_argument('--recovery', required=True, type=Path)
+            sub.add_argument('--recovery-sha256', required=True)
     args = parser.parse_args(argv)
     os.chdir(ROOT)
     try:
         with run_budget(), locked():
             pin = pinned()
             client = Client(credential(args.credential_fd))
-            result = verify(client, pin) if args.command == 'verify' else publish(client, pin)
+            if args.command == 'retract':
+                result = retract(client, pin, args.record_id, args.no_recovery_copy)
+            elif args.command == 'restore':
+                result = restore(client, pin, args.recovery, args.recovery_sha256)
+            else:
+                result = verify(client, pin) if args.command == 'verify' else publish(client, pin)
             print(json.dumps(dict(result, budget_seconds=BUDGET), sort_keys=True))
         return 0
     except Stop as error:
