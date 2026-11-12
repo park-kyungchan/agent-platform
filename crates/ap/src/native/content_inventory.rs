@@ -68,6 +68,16 @@ pub const OWNED: &[(&str, &str)] = &[
         ),
     ),
     (
+        "skills/hindsight-control/SKILL.md",
+        include_str!("../../../../content/skills/hindsight-control/SKILL.md"),
+    ),
+    (
+        "skills/hindsight-control/references/measured-20261112.md",
+        include_str!(
+            "../../../../content/skills/hindsight-control/references/measured-20261112.md"
+        ),
+    ),
+    (
         "skills/lead-orchestration/SKILL.md",
         include_str!("../../../../content/skills/lead-orchestration/SKILL.md"),
     ),
