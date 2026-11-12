@@ -84,8 +84,8 @@ A required parameter has no `?` below. Numbers after strings are maximum UTF-8 b
 | `record_scope_review` | Scope/design review after latest amendment | plan, reviewer_family:120, review_report:1000; equal latest-writer family refuses `scope_review_same_family`; families are self-declared |
 | `set_hold` | Active blocked effect | task, effect:300, until:300 (lifting condition in prose); effect unique among active holds |
 | `lift_hold` | Lifting an active hold | hold, reason?:300 |
-| `record_decision` | Current task/topic choice | task, topic:120, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300, user_words?:1000, user_form?:`decision`/`question` (both required for user; question refuses `user_question_is_not_a_decision`); one current per topic |
-| `supersede_decision` | Replacement and predecessor | decision, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300, user_words?:1000, user_form?:`decision`/`question` (both required for user; question refused); inherits task/topic |
+| `record_decision` | Current task/topic choice | task, topic:120, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300, user_words?:1000, user_form?:`decision`/`question` (both required for user, user_words must be nonempty; question refuses `user_question_is_not_a_decision`); one current per topic |
+| `supersede_decision` | Replacement and predecessor | decision, text:1000, decided_by:`user`/`lead`, reason?:600, undo?:300, user_words?:1000, user_form?:`decision`/`question` (both required for user, user_words must be nonempty; question refused); inherits task/topic |
 | `define_kpi` | Named task KPI | task, name:120, definition:600, target?:200; name unique within task |
 | `record_measurement` | Immutable observation and latest KPI | kpi, value:200, observed_at:40, evidence:300; `observed_at` is a real UTC time written exactly as `YYYY-MM-DDTHH:MM:SSZ` (`date -u +%Y-%m-%dT%H:%M:%SZ`), not older than history or later than application time |
 | `set_kpi_target` | Desired KPI value | kpi, target:200 |

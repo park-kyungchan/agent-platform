@@ -1282,7 +1282,7 @@
         {
           "code": "user_decision_evidence_required",
           "message": "User attribution requires quoted user_words and user_form.",
-          "any": [{"ne": ["$decided_by", "user"]}, {"all": [{"present": "$user_words"}, {"present": "$user_form"}]}]
+          "any": [{"ne": ["$decided_by", "user"]}, {"all": [{"present": "$user_words"}, {"ne": ["$user_words", ""]}, {"present": "$user_form"}]}]
         },
         {
           "code": "user_question_is_not_a_decision",
@@ -1369,7 +1369,7 @@
         {
           "code": "user_decision_evidence_required",
           "message": "User attribution requires quoted user_words and user_form.",
-          "any": [{"ne": ["$decided_by", "user"]}, {"all": [{"present": "$user_words"}, {"present": "$user_form"}]}]
+          "any": [{"ne": ["$decided_by", "user"]}, {"all": [{"present": "$user_words"}, {"ne": ["$user_words", ""]}, {"present": "$user_form"}]}]
         },
         {
           "code": "user_question_is_not_a_decision",

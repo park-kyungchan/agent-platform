@@ -61,7 +61,7 @@ Task references are authoritative; there is no copied task-directory property.
 Reverse links from a task are `holds`, `decisions`, `kpis`, `worker_runs`;
 from a KPI, `measurements`; from an earlier decision, `successors`.
 `supersede_decision` takes only the old decision reference and the new text,
-`decided_by`, optional reason and undo; user attribution also requires quoted `user_words` and `user_form:decision`. A question refuses `user_question_is_not_a_decision`. Rules read `$decision.task` and
+`decided_by`, optional reason and undo; user attribution also requires nonempty quoted `user_words` and `user_form:decision`. A question refuses `user_question_is_not_a_decision`. Rules read `$decision.task` and
 `$decision.topic` from the original snapshot even after marking it superseded;
 the successor stores `supersedes` as that old decision reference. Two rules in
 one action are atomic, including measurement creation and updating the KPI.
@@ -93,7 +93,7 @@ current_lines > limit_lines requires scope_reviewed, otherwise `plan_over_limit`
 Both stored numbers are read through the required plan reference. No arithmetic,
 review-content inspection or view is added by these criteria.
 `record_decision` and `supersede_decision` accept optional user_words:1000 and
-user_form (`decision`/`question`); user attribution requires both, otherwise
+user_form (`decision`/`question`); user attribution requires both and nonempty user_words, otherwise
 `user_decision_evidence_required`. Lead decisions may quote questions in reason.
 
 ### Times and optional values

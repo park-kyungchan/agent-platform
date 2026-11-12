@@ -170,6 +170,9 @@ gate('amend_plan', 'unknown-plan', dict(plan=missing_plan, current_lines=101, am
 gate('amend_plan', 'first-immutable', dict(plan=plan, current_lines=101, first_lines=1, amended_by_family='family-a'), 'invalid_parameter')
 # A missing required plan parameter uses the native parameter refusal.
 gate('start_worker_run', 'plan-missing', {k: v for k, v in wp.items() if k != 'plan'}, 'invalid_parameter')
+dispatch('thread-unknown', ('unknown_thread', 'thread_of_other_task', 'engine_without_domain_consumer', 'plan_of_other_thread', 'missing_first_use'), thread=missing_thread)
+restarted = created(gate('start_worker_run', 'closed-name', wp), 'worker_run')
+apply('close_worker_run', 'gate-close-restarted', dict(worker_run=restarted, result='gate passed'))
 dispatch('plan-unknown', ('plan_of_other_thread', 'plan_over_limit'), plan=missing_plan)
 other = created(gate('open_thread', 'plan-other-thread', dict(tp, key='plan-other')), 'thread')
 other_plan = created(gate('open_plan', 'plan-other', dict(pp, thread=other)), 'plan')
@@ -195,6 +198,7 @@ assert any(o['fields']['consumer_kind'].get('value') == 'harness' for o in obj(t
 review = dict(plan=plan, reviewer_family='family-a', review_report='fixture/REVIEW.md')
 gate('amend_plan', 'at-limit', dict(plan=plan, current_lines=150, amended_by_family='family-a')); dispatch('at-limit')
 gate('amend_plan', 'over-limit', dict(plan=plan, current_lines=151, amended_by_family='family-a')); dispatch('over-limit', 'plan_over_limit')
+gate('record_scope_review', 'unknown-plan', dict(review, plan=missing_plan), ('unknown_plan', 'scope_review_same_family'))
 gate('record_scope_review', 'same-family', review, 'scope_review_same_family')
 gate('record_scope_review', 'different-family', dict(review, reviewer_family='family-b')); dispatch('reviewed-over-limit')
 assert fields(plan)['scope_reviewed'] and fields(plan)['review_report'] == review['review_report']
@@ -204,6 +208,8 @@ dispatch('amended-after-review', 'plan_over_limit')
 gate('record_scope_review', 'latest-family', dict(review, reviewer_family='family-b'), 'scope_review_same_family')
 for action, params in [('record_decision', dict(dp, topic='gate-user')), ('supersede_decision', dict(sp, decision=successor))]:
     gate(action, action + '-no-evidence', dict(params, decided_by='user'), 'user_decision_evidence_required')
+    gate(action, action + '-form-no-words', dict(params, decided_by='user', user_form='decision'), 'user_decision_evidence_required')
+    gate(action, action + '-empty-words', dict(params, decided_by='user', user_words='', user_form='decision'), 'user_decision_evidence_required')
     gate(action, action + '-words-no-form', dict(params, decided_by='user', user_words='"Use the domain route."'), 'user_decision_evidence_required')
     user = dict(params, decided_by='user', user_words='"Use the domain route."', user_form='question')
     gate(action, action + '-question', user, 'user_question_is_not_a_decision')
