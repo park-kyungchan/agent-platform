@@ -11,22 +11,22 @@ The rules every agent follows for ownership, handoff, receiving work, accepting 
 
 ## 0. The whole view
 
-A Lead sees packets; an objective fails in what no packet shows. Answer these at the named moment, in the plan or the acceptance record.
+A Lead sees packets; an objective fails in what no packet shows. Answer these at the named moment, in the plan or the acceptance record. A plan lists a work thread's packets with an estimate in changed lines; a slice is what one pull request delivers. Where the task allows no reviewer of another model family, answer yourself and mark it self-checked.
 
-Opening or amending a thread or a plan:
+Opening or amending a work thread or its plan, and whenever question 4's limit is passed:
 1. Use: what does it first make usable, for whom (a production route, an agent), by which packet? That packet comes first. With no named user, build no further.
-2. First choice: which one design choice causes most of the planned size, and which clause of the requirement needs it? Write the smallest design that meets the requirement without it, and why you reject it.
+2. First choice: which one design choice causes most of the planned size, and which clause of the requirement needs it? Write the smallest design that meets the requirement without it; take it, or say why not.
 3. One implementation: when a contract, a repository, the engine or the service already holds the logic, consume or share it. A cited contract is pinned, and its vectors run in the consumer's tests.
-4. Growth: record the first estimate. Past one and a half times it, or at a second blocker in the same part, add nothing: a reviewer of another model family, given the requirement and no earlier review, writes the smallest design that meets it; a check that covers every case proves it, where one is possible.
+4. Growth: record the first estimate. When the current estimate or the delivered size passes one and a half times it, or a review finds a second blocker in the same part, add no further special case: a reviewer of another model family, given the requirement and no earlier review, writes the smallest design that meets it, and that part is redesigned; a check that covers every case proves it, where one is possible.
 
 Accepting a packet:
 5. A review covers its packet's range. Name what the packet assumed about the rest and the test that runs that assumption; repair a contradiction of a cited contract before the next packet that builds on it.
 
-Before a slice is made ready:
+Before a slice whose packets section 5 sent to review is made ready:
 6. One reviewer of another model family reads the whole branch against the main branch and its contracts, without the packet reviews; one real run shows the use of question 1.
 
 After every ten accepted packets, after the second compaction of your context, and each working day:
-7. An independent reader answers from the task files and the store alone: do the threads add up to the objective, who uses what, what is out of proportion, what is stale? Report it to the user. If it shows your own summary wrong, hand over to a fresh Lead.
+7. An independent reader answers from the task files alone (and the store, where STATE names it in use): do the threads add up to the objective, who uses what, what is out of proportion, what is stale? Report it to the user. If it shows your picture of the task wrong in a way that changes the plan, hand over to a fresh Lead.
 
 When you broke a rule that exists, add no sentence: make the step a command or a refusal, or record why it cannot be one.
 
@@ -67,12 +67,10 @@ Template and the three shapes: `references/task-packet.md`.
 
 Mechanics: `CONCURRENT-WORK.md` section 5 and skill `herdr`; the commands of each CLI: `/root/.agents/runtime-references/CLI-RUNTIMES.md` section 2. The Lead adds:
 
-- Default to an interactive session (commands: `CONCURRENT-WORK.md` section 5): open the CLI in a new tab with as few flags as it needs (the model), then type the prompt, which names the packet file. The user can watch it. Use a headless run only where an interactive session cannot work.
-- A workspace trust dialog in a pane you started for a worker is answered by the Lead: trust and continue. A dialog that asks to approve one effect is answered by the packet: approve an effect the packet allows, decline any other. A login or a payment stays with the user.
 - At dispatch, record worker, tier, runtime, session, pane, packet, start time and the build-slot owner, from a command's output, never from your hand or an estimate. Before a build, check free disk space against the floor STATE states.
 - A fresh session or the same one: `/root/.agents/runtime-references/CONCURRENT-WORK.md` section 2; read the context a session has left before you reuse it.
-- Never edit a script in place while a command runs it: install the changed file by rename.
-- Before each dispatch, count the task's working worker sessions against the limit STATE states.
+- When a task runs many packets, script the steps you repeat for each one, so that every record and timestamp comes from the script's output. Never edit a script in place while a command runs it: install the changed file by rename.
+- Before each dispatch, count the task's working worker sessions against the limit STATE states; a queued packet counts from the moment its worker starts.
 - Wait in the background with a timeout. Completion needs both the DONE line and a nonempty report; a DONE line that carries the report's SHA-256 shows the file is the finished one.
 - Liveness: set the packet's quiet limit from the expected length of the run, never below the time a comparable run took. A worker whose session record and pane did not change for that long has stalled. Read the pane; end the worker by closing the tab you created or by process ID (a name pattern can match your own shell); reconcile what it already changed (`CONCURRENT-WORK.md` section 4); record the cause, or "unknown". Then `/root/.agents/AGENTS.md` section 4 "Failure" applies.
 - Give a worker the memory conclusions it needs, already verified, with their source.
@@ -81,7 +79,6 @@ Mechanics: `CONCURRENT-WORK.md` section 5 and skill `herdr`; the commands of eac
 
 `CONCURRENT-WORK.md` section 4, and:
 
-- A worker's finding is a pointer. Check it against source before acting on it.
 - Accept, send concrete repairs, or reject, and record which.
 - A condition carried from a review into a later packet is a plan change: check it against the contract and that packet's write set first; if it fails either, make it a decision or a prerequisite packet.
 - A dispatched packet is not edited. A changed decision, including a correction from the user, gets a new packet version, and STATE names the current one.
@@ -102,7 +99,7 @@ An independent review costs a second worker. Use it where a wrong change spreads
 
 ## 7. Closure
 
-For each finished worker: record worker, role, runtime, session, packet, revision and output; reconcile its child processes, builds and uncertain effects; close the tab you created; confirm that no pane, process or waiter of the task remains. Record findings by severity, rework rounds, CI minutes and reported token use; an unknown value stays unknown.
+For each finished worker: record worker, role, runtime, session, packet, revision and output; reconcile its child processes, builds and uncertain effects; close the tab you created; confirm that no pane, process or waiter of the task remains. Record findings by severity, rework rounds, CI minutes and reported token use.
 
 After the pull request is merged and `git status` in the worktree is clean, remove the worktree you created, without force, then its branch, then your disposable build roots after keeping the logs you need. Never remove a worktree or build root of another task.
 
