@@ -504,16 +504,42 @@ class RetractionTests(unittest.TestCase):
                     stack.enter_context(patch.object(P, name, contextlib.nullcontext))
                 stack.enter_context(patch.object(P, 'pinned', return_value=stub.pin))
                 stack.enter_context(patch.object(P, 'credential', return_value=sentinel))
-                stack.enter_context(patch.object(P, 'Client', return_value=stub))
+                def transport(request, timeout):
+                    url = urllib.parse.urlsplit(request.full_url)
+                    body = None if request.data is None else json.loads(request.data)
+                    try:
+                        answer = stub.request(request.get_method(), url.path + ('?' + url.query if url.query else ''), body)
+                    except P.Stop as error:
+                        if str(error) == 'read_404':
+                            raise urllib.error.HTTPError(request.full_url, 404, 'missing', {}, None) from None
+                        raise
+                    response = type('Response', (), {'status': 200,
+                        'read': lambda self, limit: json.dumps(answer).encode()})()
+                    return contextlib.nullcontext(response)
+                opener = type('Transport', (), {'open': staticmethod(transport)})()
+                stack.enter_context(patch.object(P.urllib.request, 'build_opener', return_value=opener))
+                stack.enter_context(patch.object(P.time, 'sleep'))
                 stack.enter_context(patch.object(P, 'unchanged'))
                 if command in ('publish', 'restore'):
                     stack.enter_context(patch.object(P, command, return_value={'result': 'invented'}))
                 stack.enter_context(contextlib.redirect_stdout(output))
                 stack.enter_context(contextlib.redirect_stderr(output))
-                try:
-                    status = P.main(argv)
-                except Exception as error:
-                    self.assertNotIn(sentinel, str(error))
-                    raise
+                with tempfile.TemporaryFile() as descriptors:
+                    saved = [os.dup(fd) for fd in (1, 2)]
+                    try:
+                        for fd in (1, 2):
+                            os.dup2(descriptors.fileno(), fd)
+                        try:
+                            status = P.main(argv)
+                        except Exception as error:
+                            self.assertNotIn(sentinel, str(error))
+                            raise
+                    finally:
+                        for fd, original in zip((1, 2), saved):
+                            os.dup2(original, fd)
+                            os.close(original)
+                    descriptors.seek(0)
+                    descriptor_output = descriptors.read()
             self.assertEqual(status, 0)
             self.assertNotIn(sentinel, output.getvalue())
+            self.assertNotIn(sentinel.encode(), descriptor_output)
