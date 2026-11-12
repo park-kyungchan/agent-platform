@@ -266,5 +266,6 @@ class PublisherTests(unittest.TestCase):
                                 capture_output=True, timeout=15)
         self.assertEqual(result.returncode, 0)
         self.assertIn(b'publish,verify', result.stdout)
+        self.assertIn(b'--credential-fd', result.stdout)
         self.assertNotIn(b'--bank', result.stdout)
         self.assertNotIn(b'--url', result.stdout)

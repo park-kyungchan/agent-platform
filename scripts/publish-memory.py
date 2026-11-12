@@ -324,7 +324,8 @@ def publish(client, pin):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__,
+             epilog='Both subcommands require --credential-fd FD (an inherited private descriptor).')
     commands = parser.add_subparsers(dest='command', required=True)
     for name in ('publish', 'verify'):
         sub = commands.add_parser(name)
