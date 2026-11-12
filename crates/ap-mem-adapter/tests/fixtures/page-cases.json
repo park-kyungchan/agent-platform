@@ -1,0 +1,19 @@
+{
+  "folder":{"test_id":"folder-platform","name":"Synthetic platform"},
+  "page":{
+    "test_id":"page-engineering","test_parent_id":"folder-platform","test_owner":"manual-api",
+    "test_subjects":[{"type":"platform","id":"fixture"}],"test_question":"Which synthetic engineering fact is current?",
+    "tags":["subject:platform:fixture"],"test_tag_match":"strict","fact_types":["world","experience"],
+    "exclude_mental_models":true,"refresh_after_consolidation":false,
+    "test_cron_fields":{"synthetic-cron-a":null,"synthetic-cron-b":null},
+    "body":"PAGE_OLD_SYNTHETIC","document_ids":["eng-a"]
+  },
+  "target":{"body":"PAGE_NEW_SYNTHETIC","document_ids":["eng-new"]},
+  "faults":[
+    {"label":"wrong-flags","patch":{"exclude_mental_models":false,"refresh_after_consolidation":true}},
+    {"label":"scheduled","patch":{"test_cron_fields":{"synthetic-cron-a":"schedule","synthetic-cron-b":null}}},
+    {"label":"status-tag","patch":{"tags":["subject:platform:fixture","status:ready"]}},
+    {"label":"multiple-subjects","patch":{"test_subjects":[{"type":"platform","id":"fixture"},{"type":"task","id":"other"}]}},
+    {"label":"wrong-parent","patch":{"test_parent_id":"page-other"}}
+  ]
+}

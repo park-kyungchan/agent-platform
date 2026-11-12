@@ -44,10 +44,33 @@ pub struct Model {
     pub next_fault: Option<MutationFault>,
     pub retry: RetryPolicy,
     pub pending_deletes: BTreeSet<String>,
+    pub folders: BTreeMap<String, Value>,
+    pub pages: BTreeMap<String, Value>,
+    pub page_jobs: BTreeMap<String, Value>,
+    pub page_deduplicate: bool, // U6: default false; lost-ack retries can duplicate.
+    pub page_reply_override: Option<Value>, // U6: selected wrong metadata; default none.
+    pub refresh_keeps_old: bool, // U7: default true; job success need not mean fresh text.
     disconnect: bool,
 }
 
 impl Model {
+    #[allow(dead_code)]
+    pub fn finish_refresh(&mut self, job_id: &str, success: bool) {
+        let job = self.page_jobs.get_mut(job_id).unwrap();
+        assert_eq!(job["test_state"], "running");
+        job["test_state"] = json!(if success { "succeeded" } else { "failed" });
+        // U7/U14: test-selected result and last-finisher ordering, not a native barrier.
+        if success && !self.refresh_keeps_old {
+            let page = self
+                .pages
+                .get_mut(job["test_page_id"].as_str().unwrap())
+                .unwrap();
+            for key in ["body", "document_ids"] {
+                // U2/U7: synthetic result/source fields.
+                page[key] = job["test_target"][key].clone();
+            }
+        }
+    }
     #[allow(dead_code)]
     pub fn finish_delete(&mut self, id: &str) {
         assert!(self.pending_deletes.remove(id));
@@ -102,6 +125,12 @@ impl Server {
             requests: Vec::new(),
             operations: BTreeMap::new(),
             next_fault: None,
+            folders: BTreeMap::new(),
+            pages: BTreeMap::new(),
+            page_jobs: BTreeMap::new(),
+            page_deduplicate: false,
+            page_reply_override: None,
+            refresh_keeps_old: true,
             retry: RetryPolicy::default(),
             pending_deletes: BTreeSet::new(),
             disconnect: false,
@@ -280,6 +309,9 @@ fn route(model: &mut Model, request: Request) -> Reply {
         status: 404,
         body: json!({"error":"test_not_found"}),
     };
+    if let Some(reply) = page_route(model, &request) {
+        return reply;
+    }
     if request.method == "GET" {
         // U1/U11: root config route/resolved envelope have no verified bank base.
         if request.path == "/config" {
@@ -338,7 +370,17 @@ fn route(model: &mut Model, request: Request) -> Reply {
             let Some(name) = request.body["params"]["name"].as_str() else {
                 return missing();
             };
-            if name == "get_document" {
+            // U2/U6/U8: explicit test aliases for live page/tree reads; no native schema claim.
+            let args = &request.body["params"]["arguments"];
+            if name == "get_knowledge_page" && args["test_page_id"].is_string() {
+                model
+                    .pages
+                    .get(args["test_page_id"].as_str().unwrap())
+                    .cloned()
+                    .unwrap_or(Value::Null)
+            } else if name == "get_knowledge_base_tree" && args["test_live_tree"] == true {
+                json!({"folders":model.folders,"pages":model.pages})
+            } else if name == "get_document" {
                 let Some(id) = request.body["params"]["arguments"]["test_document_id"].as_str()
                 else {
                     return missing();
@@ -442,4 +484,90 @@ fn mutate(model: &mut Model, request: Request, delete: Option<&str>) -> Reply {
     };
     model.disconnect = matches!(fault, Some(MutationFault::LostAck));
     reply
+}
+
+// U6/U7: known create/refresh paths, synthetic field names, job/read aliases and
+// result envelopes. No policy validation is hidden in the fake: override faults
+// must be detected by the later publisher's readback, not an upstream refusal.
+fn page_route(model: &mut Model, request: &Request) -> Option<Reply> {
+    let response = |status, body| Some(Reply { status, body });
+    if request.method == "GET"
+        && let Some(id) = request.path.strip_prefix("/__test__/page-job/")
+    {
+        return response(
+            if model.page_jobs.contains_key(id) {
+                200
+            } else {
+                404
+            },
+            model.page_jobs.get(id).cloned().unwrap_or(Value::Null),
+        );
+    }
+    if request.method != "POST" {
+        return None;
+    }
+    let folder = request.path == "/knowledge-base/folders";
+    let page = request.path == "/knowledge-base/pages";
+    let refresh = request
+        .path
+        .strip_prefix("/mental-models/")
+        .and_then(|s| s.strip_suffix("/refresh"));
+    if !folder && !page && refresh.is_none() {
+        return None;
+    }
+    let fault = model.next_fault.take();
+    if matches!(fault, Some(MutationFault::BeforeAccept)) {
+        return response(503, json!({"error":"test_before_accept"}));
+    }
+    let reply = if let Some(id) = refresh {
+        if !model.pages.contains_key(id) || request.body != json!({"mode":"full"}) {
+            return response(400, json!({"error":"test_invalid_refresh"}));
+        }
+        let job_id = format!("refresh-{}", model.page_jobs.len() + 1);
+        // U7: freeze the selected target at job start; completion can be reordered.
+        model.page_jobs.insert(job_id.clone(), json!({"test_job_id":job_id,"test_page_id":id,"test_state":"running","test_target":model.fixture["page_refresh_result"]}));
+        Reply {
+            status: 202,
+            body: json!({"test_job_id":job_id}),
+        }
+    } else {
+        let Some(id) = request.body["test_id"].as_str() else {
+            return response(400, json!({"error":"test_id_required"}));
+        };
+        if page
+            && !model
+                .folders
+                .contains_key(request.body["test_parent_id"].as_str().unwrap_or(""))
+        {
+            return response(409, json!({"error":"test_parent_not_folder"}));
+        }
+        let entries = if folder {
+            &mut model.folders
+        } else {
+            &mut model.pages
+        };
+        let mut key = id.to_owned();
+        if !model.page_deduplicate {
+            let mut n = 2;
+            while entries.contains_key(&key) {
+                key = format!("{id}#{n}");
+                n += 1;
+            }
+        }
+        let value = if page {
+            model
+                .page_reply_override
+                .clone()
+                .unwrap_or_else(|| request.body.clone())
+        } else {
+            request.body.clone()
+        };
+        let value = entries.entry(key.clone()).or_insert(value).clone();
+        Reply {
+            status: 201,
+            body: json!({"test_id":key,"test_value":value}),
+        }
+    };
+    model.disconnect = matches!(fault, Some(MutationFault::LostAck));
+    Some(reply)
 }
