@@ -7,6 +7,7 @@ are invented U9/UQ4 cases, not a claim that real redirects have been measured.
 """
 import contextlib
 import copy
+import errno
 import hashlib
 import importlib.util
 import io
@@ -375,6 +376,20 @@ class RetractionTests(unittest.TestCase):
             else:
                 self.assertEqual(self.run_retract(stub, True)['result'], 'retracted_on_listed_reads')
 
+    def test_source_drift_immediately_before_delete_stops(self):
+        stub, checks = RetractStub(), []
+        def source_check(pin):
+            checks.append(list(stub.calls))
+            if len(checks) == 2:
+                raise P.Stop('stale_commit')
+        with patch.object(P, 'unchanged', side_effect=source_check), \
+             contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(P.Stop, '^stale_commit$'):
+            P.retract(stub, stub.pin, 'invented')
+        self.assertEqual(len(checks), 2)
+        self.assertEqual(checks[1][-1][:2], ('GET', P.B + '/documents/invented'))
+        self.assertTrue(stub.calls)
+        self.assertTrue(all(call[0] == 'GET' for call in stub.calls))
+
     def test_failed_preconditions_have_nonvacuous_no_mutation_assertions(self):
         for command in ('publish', 'retract', 'restore'):
             for route, failure in [('/version', 'read_404'), ('/config', 'read_uncertain'),
@@ -408,10 +423,34 @@ class RetractionTests(unittest.TestCase):
             P.retract(stub, stub.pin, 'invented')
         self.assertEqual(sum(x[0] == 'DELETE' for x in stub.calls), 1)
         self.assertFalse(any(x[0] == 'POST' for x in stub.calls))
+        deletion = next(i for i, call in enumerate(stub.calls) if call[0] == 'DELETE')
+        self.assertEqual([(method, path) for method, path, _ in stub.calls[deletion + 1:]], [
+            ('GET', P.B + '/documents/invented'),
+            ('GET', P.B + '/memories/list?document_id=invented&limit=100&offset=0'),
+            ('GET', P.B + '/documents/invented/chunks')])
         reads = json.loads(output.getvalue())
         self.assertIs(reads['document_absent'], True)
         self.assertIs(reads['facts_absent'], True)
         self.assertIs(reads['chunks_absent'], True)
+
+        # Each changed readback must independently change its printed evidence.
+        for field, suffix, answer in [
+                ('document_absent', '/documents/invented', stub.doc),
+                ('facts_absent', '/memories/list?document_id=invented&limit=100&offset=0', envelope([stub.fact])),
+                ('chunks_absent', '/documents/invented/chunks', {'chunks': []})]:
+            stub = RetractStub()
+            stub.lost = True
+            original = stub.request
+            def surviving_read(method, path, body=None):
+                if stub.deleted and method == 'GET' and path == P.B + suffix:
+                    stub.calls.append((method, path, body))
+                    return answer
+                return original(method, path, body)
+            stub.request = surviving_read
+            with patch.object(P, 'unchanged'), contextlib.redirect_stdout(io.StringIO()) as changed, \
+                 self.assertRaisesRegex(P.Stop, '^delete_unresolved_route_unavailable_no_resend$'):
+                P.retract(stub, stub.pin, 'invented')
+            self.assertIs(json.loads(changed.getvalue())[field], False)
 
     def test_readback_residue_and_profile_drift_stop(self):
         for residue in ('document', 'facts', 'chunks', 'recall', 'models', 'profile'):
@@ -432,8 +471,12 @@ class RetractionTests(unittest.TestCase):
                 return original(method, path, body)
             stub.request = read
             stub.surviving = residue == 'recall'
-            with self.subTest(residue=residue), self.assertRaises(P.Stop):
+            code = {'document': 'deleted_unproven', 'facts': 'deleted_unproven',
+                    'chunks': 'deleted_unproven', 'recall': 'listed_read_contains_document',
+                    'models': 'models_present', 'profile': 'observations_enabled'}[residue]
+            with self.subTest(residue=residue), self.assertRaisesRegex(P.Stop, '^' + code + '$'):
                 self.run_retract(stub)
+            self.assertEqual(sum(call[0] == 'DELETE' for call in stub.calls), 1)
 
     def test_real_client_no_resend_for_post_and_delete(self):
         for method in ('DELETE', 'POST'):
@@ -474,12 +517,15 @@ class RetractionTests(unittest.TestCase):
             archive.write_bytes(b'invented archive')
             link = Path(directory, 'link.zip')
             link.symlink_to(archive)
-            cases = [(archive, 'bad'), (archive, '0' * 64), (link, P.digest(archive.read_bytes())),
-                     (Path(directory), '0' * 64)]
-            for path, sha in cases:
+            cases = [(archive, 'bad', P.Stop, 'recovery_sha256_invalid'),
+                     (archive, '0' * 64, P.Stop, 'recovery_hash_mismatch'),
+                     (link, P.digest(archive.read_bytes()), OSError, errno.ELOOP),
+                     (Path(directory), '0' * 64, P.Stop, 'recovery_not_regular')]
+            for path, sha, exception, code in cases:
                 stub = Stub()
-                with self.subTest(path=path), self.assertRaises((P.Stop, OSError)):
+                with self.subTest(path=path), patch.object(P, 'unchanged'), self.assertRaises(exception) as stopped:
                     P.restore(stub, stub.pin, path, sha)
+                self.assertEqual(stopped.exception.errno if exception is OSError else str(stopped.exception), code)
                 self.assertEqual(stub.calls, [])
             stub = Stub()
             with patch.object(P, 'unchanged'), self.assertRaisesRegex(P.Stop, '^uq1_restore_unmeasured$'):

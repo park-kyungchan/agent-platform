@@ -185,6 +185,7 @@ readbacks; never rerun DELETE as a timeout recovery step. Failed readback stops.
 The script repeats zero-model/profile/terminal-work checks and, for each pinned
 recall term, sends a recall query with the checker's exact subject tag selector
 and all_strict matching (HC U10). No returned result may name the withdrawn id.
+There is one read per recall term, filtered by the record's subject tags; no separate read by subject alone is sent.
 Only these clean reads permit `retracted_on_listed_reads`; arbitrary index
 completeness remains unknown. Missing pinned source yields
 `listed_reads=not_evaluated` and `deleted_unproven`, even with the override.
