@@ -116,6 +116,8 @@ def due_count(commit):
         with contextlib.redirect_stdout(output):
             P.require(P.CHECK.main() == 0, 'source_invalid')
         return len(load(output.getvalue()))
+    except SystemExit:
+        raise P.Stop('checker_argument_failure') from None
     finally:
         sys.argv = argv
 
@@ -123,6 +125,8 @@ def due_count(commit):
 def collect(client, pin, data, raw, selector, document_ids, held_fd=None, evidence_fd=None):
     P.require(held_fd is None or evidence_fd is not None, 'held_out_evidence_fd_required')
     held = b'' if held_fd is None else read_fd(held_fd)
+    questions = None if held_fd is None else load(held)['questions']
+    P.require(questions is None or bool(questions), 'held_out_empty')
     result = dict(C=pin['commit'], observed_at=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), corpus_sha256=P.digest(raw), profile=profile(client, pin),
                   payload_sha256={rid: w['hash'] for rid, w in pin['expected'].items()},
                   source_pins={q['id']: source_pins(q) for q in data['questions']})
@@ -145,7 +149,6 @@ def collect(client, pin, data, raw, selector, document_ids, held_fd=None, eviden
                   trace_coverage='unknown', embedding_reranker_runtime='unknown', observations=0,
                   slots=gather(client, data['questions'], pin, selector, document_ids))
     if held_fd is not None:
-        questions = load(held)['questions']
         private = dict(questions=questions, input_sha256=P.digest(held),
                        source_pins={q['id']: source_pins(q) for q in questions},
                        slots=gather(client, questions, pin, selector, document_ids))
@@ -172,6 +175,13 @@ def write_fd(fd, raw):
         stream.write(raw)
 
 
+def reference_pin(source, pin):
+    if source['kind'] != 'file': return 'reverify'
+    if pin.get('pin') == 'missing': return 'missing'
+    if source.get('volatile'): return 'reverify'
+    return 'equal' if pin.get('sha256_now') == source['sha256'] else 'source_changed'
+
+
 def check_results(results, evidence, evidence_hash, data):
     required = {(q['id'], f, r) for q in data['questions'] for f in FORMS for r in ROUTES}
     slots = results['slots']
@@ -186,15 +196,14 @@ def check_results(results, evidence, evidence_hash, data):
         pins = evidence['source_pins'][slot['id']]
         question = next(q for q in data['questions'] if q['id'] == slot['id'])
         P.require(len(pins) == len(question['sources']), 'source_pins_incomplete')
-        pins = [dict(p, pin='reverify') if s['kind'] != 'file' else p
+        pins = [dict(p, pin=reference_pin(s, p))
                 for s, p in zip(question['sources'], pins)]
         P.require(all(p.get('pin') in ('equal', 'source_changed', 'reverify', 'missing')
                       for p in pins), 'source_pins_incomplete')
         evidence['source_pins'][slot['id']] = pins
         P.require(slot.get('evidence_sha256') == evidence_hash, 'evidence_hash_mismatch')
         if any(p['pin'] != 'equal' for p in pins):
-            P.require(slot.get('expectation_reverified') is True and slot.get('evidence_sha256') == evidence_hash,
-                      'expectation_not_reverified')
+            P.require(slot.get('expectation_reverified') is True, 'expectation_not_reverified')
         n, current = observed[key]['returned_count'], slot['current_count']
         P.require(type(current) is int and 0 <= current <= n, 'current_count_invalid')
         slot.update({k: v for k, v in observed[key].items() if k not in slot})
@@ -273,6 +282,7 @@ def main(argv=None):
             P.require(evidence['corpus_sha256'] == P.digest(raw), 'corpus_changed')
             result = dict(evidence, **check_results(load(args.check_results.read_bytes()), evidence, P.digest(evidence_raw), data))
             if 'held_out' in evidence:
+                P.require(evidence['held_out']['count'] > 0, 'held_out_empty')
                 P.require(args.held_out_results_fd is not None and args.held_out_evidence_fd is not None,
                           'held_out_judgments_required')
                 private_raw = read_fd(args.held_out_evidence_fd)

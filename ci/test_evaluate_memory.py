@@ -248,3 +248,113 @@ class EvaluationTests(unittest.TestCase):
         due.assert_called_once_with()
         self.assertIs(E.sys.argv, argv)
         self.assertRegex(self.evidence['observed_at'], r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
+
+    def test_empty_held_out_refused_before_evidence_write(self):
+        with tempfile.TemporaryFile() as incoming, tempfile.TemporaryFile() as private:
+            incoming.write(E.encode(dict(questions=[]))); incoming.seek(0)
+            with patch.object(E, 'write_fd') as written, self.assertRaisesRegex(E.P.Stop, '^held_out_empty$'):
+                E.collect(self.stub, self.stub.pin, self.data, self.raw, self.selector, [], incoming.fileno(), private.fileno())
+            written.assert_not_called()
+        evidence = dict(self.evidence, held_out=dict(count=0, sha256='a'*64))
+        fixed = copy.deepcopy(self.results)
+        for slot in fixed['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(evidence))
+        with tempfile.TemporaryFile() as ef, tempfile.TemporaryFile() as rf:
+            ef.write(E.encode(dict(questions=[], slots=[], source_pins={}, input_sha256='a'*64))); ef.seek(0)
+            rf.write(E.encode(dict(target_reached=True, slots=[]))); rf.seek(0)
+            rc, error = self.cli_results(evidence, fixed, ['--held-out-evidence-fd', str(ef.fileno()),
+                                                          '--held-out-results-fd', str(rf.fileno())])
+        self.assertEqual(rc, 1)
+        self.assertIn('held_out_empty', error)
+
+    def test_file_pins_are_recomputed(self):
+        for source, supplied, expected in [
+                (dict(volatile=True), dict(pin='equal'), 'reverify'),
+                (dict(sha256='a'*64), dict(pin='equal', sha256_now='b'*64), 'source_changed'),
+                (dict(sha256='a'*64), dict(pin='equal'), 'source_changed'),
+                (dict(volatile=True), dict(pin='missing'), 'missing'),
+                (dict(sha256='a'*64), dict(pin='equal', sha256_now='a'*64), 'equal')]:
+            with self.subTest(expected=expected):
+                source.update(kind='file', path='invented', anchor='invented')
+                self.data['questions'][0]['sources'] = [source]
+                self.evidence['source_pins']['R01'] = [supplied]
+                self.results['slots'][0]['expectation_reverified'] = False
+                if expected == 'equal':
+                    self.assertTrue(self.check()['target_reached'])
+                else:
+                    with self.assertRaisesRegex(E.P.Stop, '^expectation_not_reverified$'): self.check()
+                self.assertEqual(self.evidence['source_pins']['R01'][0]['pin'], expected)
+
+    def test_held_out_binding_guard(self):
+        for changed in ('hash', 'count'):
+            with self.subTest(changed=changed), tempfile.TemporaryFile() as ef, tempfile.TemporaryFile() as rf:
+                private = dict(questions=[self.data['questions'][0]], slots=self.evidence['slots'][:6],
+                    source_pins={'R01': self.evidence['source_pins']['R01']},
+                    input_sha256='b'*64 if changed == 'hash' else 'a'*64)
+                evidence = dict(self.evidence, held_out=dict(count=2 if changed == 'count' else 1, sha256='a'*64))
+                fixed = copy.deepcopy(self.results)
+                for slot in fixed['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(evidence))
+                judged = dict(target_reached=True, slots=copy.deepcopy(fixed['slots'][:6]))
+                for slot in judged['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(private))
+                ef.write(E.encode(private)); ef.seek(0); rf.write(E.encode(judged)); rf.seek(0)
+                rc, error = self.cli_results(evidence, fixed, ['--held-out-evidence-fd', str(ef.fileno()),
+                                                              '--held-out-results-fd', str(rf.fileno())])
+                self.assertEqual(rc, 1)
+                self.assertIn('held_out_binding', error)
+
+    def test_evidence_slots_guard(self):
+        self.evidence['slots'].pop()
+        with self.assertRaisesRegex(E.P.Stop, '^evidence_slots_incomplete$'): self.check()
+
+    def test_corpus_changed_guard(self):
+        self.evidence['corpus_sha256'] = '0'*64
+        for slot in self.results['slots']: slot['evidence_sha256'] = E.P.digest(E.encode(self.evidence))
+        rc, error = self.cli_results()
+        self.assertEqual(rc, 1)
+        self.assertIn('corpus_changed', error)
+
+    def test_current_count_guard(self):
+        self.results['slots'][0]['current_count'] = -1
+        with self.assertRaisesRegex(E.P.Stop, '^current_count_invalid$'): self.check()
+
+    def test_main_held_out_channel_guard_precedes_corpus_read(self):
+        output = io.StringIO()
+        with patch.object(E.Path, 'read_bytes') as read, contextlib.redirect_stdout(output):
+            self.assertEqual(E.main(['--collect', '--held-out-fd', '3']), 1)
+        self.assertIn('held_out_evidence_fd_required', output.getvalue())
+        read.assert_not_called()
+
+    def test_sixth_recall_item_never_feeds_documents(self):
+        items = [dict(self.stub.fact, id='invented-fact-'+str(i),
+                      document_id='invented' if i < 5 else 'oracle-document-id') for i in range(6)]
+        original = self.stub.request
+        def read(method, path, body=None):
+            return dict(results=items) if method == 'POST' else original(method, path, body)
+        self.stub.calls.clear()
+        with patch.object(self.stub, 'request', side_effect=read):
+            slots = E.gather(self.stub, self.data['questions'][:1], self.stub.pin, self.selector, [])
+        self.assertEqual([p for m, p, _ in self.stub.calls if m == 'GET'], [E.P.B+'/documents/invented']*3)
+        self.assertEqual([s['returned_count'] for s in slots if s['route'] == 'recall'], [5]*3)
+        self.assertEqual([s['native_returned_count'] for s in slots if s['route'] == 'recall'], [6]*3)
+
+    def test_checker_due_arguments_and_system_exit(self):
+        class Clock(E.datetime.datetime):
+            @classmethod
+            def now(cls, tz=None): return cls(2026, 11, 12, 23, 59, 59, tzinfo=E.datetime.timezone.utc)
+        seen, argv = [], E.sys.argv
+        def checker():
+            seen.append(list(E.sys.argv)); print('[]'); return 0
+        with patch.object(E.datetime, 'datetime', Clock), patch.object(E.P.CHECK, 'main', side_effect=checker):
+            self.assertEqual(E.due_count('b'*40), 0)
+        self.assertEqual(seen, [['check-memory-records.py', '--commit', 'b'*40, '--due', '2026-11-12']])
+        self.assertIs(E.sys.argv, argv)
+        output = io.StringIO()
+        with contextlib.ExitStack() as stack:
+            for name, value in [('locked', contextlib.nullcontext), ('run_budget', contextlib.nullcontext),
+                                ('pinned', lambda: self.stub.pin), ('credential', lambda _: 'invented'),
+                                ('Client', lambda _: self.stub)]: stack.enter_context(patch.object(E.P, name, value))
+            stack.enter_context(patch.object(E.P.CHECK, 'load', return_value=(0, {}, {('memory-map', 'engineering'): dict(parent=None)}, [])))
+            stack.enter_context(patch.object(E.P.CHECK, 'main', side_effect=SystemExit(2)))
+            stack.enter_context(contextlib.redirect_stdout(output))
+            self.assertEqual(E.main(['--collect', '--credential-fd', '3']), 1)
+        self.assertIn('checker_argument_failure', output.getvalue())
+        self.assertIs(E.sys.argv, argv)
