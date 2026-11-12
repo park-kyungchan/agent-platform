@@ -28,6 +28,7 @@ encode = lambda value: (json.dumps(value, ensure_ascii=False, sort_keys=True) + 
 def corpus(raw):
     data = load(raw)
     questions = data['questions']
+    unique_questions(questions, 'duplicate_id')
     P.require(data['schema'] == 'd2-question-input/1' and data['canary'] == CANARY
               and [q['id'] for q in questions] == IDS, 'corpus_identities')
     for q in questions:
@@ -129,6 +130,7 @@ def collect(client, pin, data, raw, selector, document_ids, held_fd=None, eviden
     held = b'' if held_fd is None else read_fd(held_fd)
     questions = None if held_fd is None else load(held)['questions']
     P.require(questions is None or bool(questions), 'held_out_empty')
+    P.require(questions is None or all(q.get('sources') for q in questions), 'held_out_sources_required')
     if questions is not None:
         unique_questions(questions)
     result = dict(C=pin['commit'], observed_at=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), corpus_sha256=P.digest(raw), profile=profile(client, pin),
@@ -179,9 +181,9 @@ def write_fd(fd, raw):
         stream.write(raw)
 
 
-def unique_questions(questions):
+def unique_questions(questions, code='held_out_duplicate_id'):
     ids = [q['id'] for q in questions]
-    P.require(len(ids) == len(set(ids)), 'held_out_duplicate_id')
+    P.require(len(ids) == len(set(ids)), code)
 
 
 def reference_pin(source, pin):
@@ -191,7 +193,7 @@ def reference_pin(source, pin):
 
 
 def check_results(results, evidence, evidence_hash, data):
-    unique_questions(data['questions'])
+    unique_questions(data['questions'], 'duplicate_id' if data.get('schema') == 'd2-question-input/1' else 'held_out_duplicate_id')
     required = {(q['id'], f, r) for q in data['questions'] for f in FORMS for r in ROUTES}
     slots = [dict(s) for s in results['slots']]
     keys = [(s['id'], s['form'], s['route']) for s in slots]
@@ -204,7 +206,7 @@ def check_results(results, evidence, evidence_hash, data):
         pins = evidence['source_pins'][question['id']]
         P.require(len(pins) == len(question['sources']), 'source_pins_incomplete')
         fresh = [reference_pin(s, p) for s, p in zip(question['sources'], pins)]
-        changed += sum(a != b for a, b in zip(fresh, pins))
+        changed += sum(a['pin'] != b.get('pin') for a, b in zip(fresh, pins))
         current_pins[question['id']] = fresh
     evidence['source_pins'] = current_pins
     counts, by_status = {}, {}
@@ -217,6 +219,7 @@ def check_results(results, evidence, evidence_hash, data):
         if any(p['pin'] != 'equal' for p in pins):
             P.require(slot.get('expectation_reverified') is True, 'expectation_not_reverified')
         n, current = observed[key]['returned_count'], slot['current_count']
+        P.require(type(n) is int and n == len(observed[key]['items']), 'returned_count_mismatch')
         P.require(type(current) is int and 0 <= current <= n, 'current_count_invalid')
         P.require(verdict != 'supported' or (n > 0 and current > 0), 'supported_without_items')
         slot.update({k: v for k, v in observed[key].items() if k not in slot})
