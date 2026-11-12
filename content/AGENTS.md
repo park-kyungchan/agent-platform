@@ -33,7 +33,8 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I hand work to another agent, receive work, or share a repository or build with one | `CONCURRENT-WORK.md` |
 | I need a task's holds, decisions, KPI values or worker runs from the Ontology store, or I am Lead and record one | `ONTOLOGY-USE.md` |
 | I must decide where a piece of information belongs, or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
-| Memory returns stale or irrelevant results, or I change memory content or pages | `HINDSIGHT-RUNTIME.md` |
+| Memory returns stale or irrelevant results | `HINDSIGHT-RUNTIME.md` |
+| I write, replace, delete or retract Hindsight content, change a page, or must show that such a change took effect | skill `hindsight-control` |
 | I need the official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |
 | I change a shared instruction, a skill or a reference | Section 7 below, then `CLI-RUNTIMES.md` section 7 |
 | I use the Academy tools or prepare a lesson | skill `academy-runtime-routing` for the tools; skill `academy-student-context` for lesson preparation and student status |

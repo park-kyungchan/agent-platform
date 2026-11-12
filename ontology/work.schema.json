@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 3,
+  "version": 4,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -1968,7 +1968,13 @@
         "worker_run",
         "memory_record"
       ],
-      "derive": [],
+      "derive": [
+        "hold",
+        "decision",
+        "kpi",
+        "measurement",
+        "worker_run"
+      ],
       "actions": [
         "set_hold",
         "lift_hold",
