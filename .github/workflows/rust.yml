@@ -45,8 +45,10 @@ jobs:
       - name: Memory record check and tests
         shell: bash
         run: |
+          set -euo pipefail
           python3 -I -B ci/check-memory-records.py
-          python3 -I -B -m unittest discover -s ci -p test_check_memory_records.py
+          python3 -I -B scripts/evaluate-memory.py --check-corpus memory/evaluation/questions.json
+          python3 -I -B -m unittest discover -s ci -p 'test_*memory*.py'
       - name: Install repository-pinned Rust
         if: steps.scope.outputs.run_rust == 'true'
         shell: bash

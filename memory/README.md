@@ -242,3 +242,92 @@ in result slots. A supported verdict needs positive returned and current counts.
 reference pins changed since collection as `pins_changed_since_collect`.
 Run it on the host holding the sources; elsewhere hashed file pins are missing
 and every file-backed slot needs a reverified expectation. No network/store call is added.
+
+## Five-CLI route runbook (V4-4; prepared, not active)
+This is the operational home for engineering memory. Git owns originals/history;
+Hindsight holds their fixed-bank retrieval copy. Installing these source instructions
+neither connects a CLI nor enables publishing. All task/BOARD holds still apply,
+including live-content custody, registration, other-owner sessions and lesson data.
+Before the first population the Lead seals fresh held-out questions/oracles privately;
+only their count/hashes leave private custody. V4-5 qualifies native behavior; V4-6
+owns activation, the announced non-teaching window and private-owner migration.
+
+### Configuration targets and plugin closure
+Read key names/metadata only during preparation; never print these files' values.
+The authorized owner saves private recoverable preimages before a later change.
+| CLI | Configuration file | Hindsight section and registration key names |
+| --- | --- | --- |
+| Claude Code | `/root/.claude.json` | `mcpServers.hindsight`: command, args, env, type |
+| Codex | `/root/.codex/config.toml` | `mcp_servers.hindsight`: command, args, env, enabled |
+| Muse | `/root/.config/muse/settings.json` | `mcpServers.hindsight`: command, args, env |
+| Antigravity | `/root/.gemini/config/mcp_config.json` | `mcpServers.hindsight`: command, args, env, disabled |
+| Grok Build | `/root/.grok/config.toml` | `mcp_servers.hindsight`: command, args, env, enabled |
+Target native MCP route: `/mcp/coding-agent::engineering/`, initialized SSE with
+its returned `mcp-session-id`. Registration shape is not effective routing proof.
+Credentials stay in the authorized caller's private inherited FD, as in the
+publisher runbook above, never agent-visible config/env/argv or copied examples.
+Native authenticated transport/FD capability per CLI remains UQ3; failure leaves
+that CLI disconnected. Conditional X6 transport requires actual E3 failure first.
+
+Proposed plugin policy: default `disabled:true`; except only exact archive-contract
+lesson roots under their owner. Set `paths.<exact-engineering-root>.disabled:true`,
+remove engineering plugin MCP exposure and ensure no bank override reenables it.
+Pin `autoUpdate:false`, `retainSessions:false`, `gitIngest:none`, `autoSeed:false`,
+`codebaseSurvey:false`, `manageBankConfig:false`, `autoInject:none` for engineering.
+These are qualification inputs, not observed host settings. Test precedence and
+hook inertia using isolated synthetic engineering/lesson roots before any cutover;
+no broad lesson-root override or live lesson-registration edit is authorized here.
+
+### Consumer census, stop and proof
+The Lead inventories every interactive/headless/resumable engineering CLI, MCP
+transport, plugin hook/retention worker and direct HTTP evaluator/publisher.
+Use native session listings plus task-owned `herdr agent list`,
+`herdr tab list --workspace <owned-workspace-id>` and `ps -eo pid,ppid,comm`;
+record owner, session/pane/PID, cwd, bank binding and in-flight counts in task evidence.
+Do not dump command environments, credentials or unrelated session bodies.
+For owned active runs, `herdr agent send-keys <owned-pane-id> ctrl+c` is a native
+interrupt, not proof of exit. Confirm the runtime's native cancel/exit procedure
+from installed help, end owned interactive sessions and cancel owned headless work;
+if that procedure is unqualified, postpone the window rather than guess a flag.
+Other owners end/detach their named routes themselves; do not signal their sessions.
+Repeat native listings and `ps -eo pid,ppid,comm`: named transports/hooks must be
+absent, requests drained and all native parent/child operations terminal. Neither
+idle nor a configuration key proves stopped. Account for every consumer or postpone.
+
+### Native read and maintenance qualification
+W0-W9, retraction and recovery above remain the publisher contract: stop consumers,
+verify quiet recovery/custody, rebuild the same fixed bank while native reads are
+denied, verify exact bytes/tags/terms/profile, evaluate, then enable qualified reads.
+Prove `mcp_enabled_tools:[]` denies reads during population even on an already
+initialized session. Then prove `tools/list` is exactly recall/get_document and
+`tools/call` denies retain/delete/reflect/page operations on old and fresh sessions,
+including after same-id recreation. UQ1/UQ2 failures hold publication/activation.
+
+Each fresh CLI must show scoped recall with exact subject (or explicit descendant
+within) tags and `tags_match:all_strict`, world/experience facts, both horizons by
+default, and exact-document reads for returned or caller-named ids only. Inspect
+actual tool-result bodies despite HTTP200/isError=false. Prove sibling/prefix/
+untagged/horizon exclusions, bilingual literals, omission, replacement/retraction
+and synthetic lesson-only exclusion; wrong-scope/private items and observations=0.
+Fresh startup must contain no engineering ingest/capture/Correction write orders,
+automatic retention or page injection. Keep all real lesson bodies with their owner.
+Full fixed/fresh-held-out verdicts qualify activation/API changes; routine rebuilds
+use the fixed canary subset. Missing/drifted evidence keeps the route unavailable.
+API changes rerun X5; unreadable embedding/reranker weights remain an explicit limit.
+
+### Owner cutover and undo
+NOT ACTIVE: only at authorized V4-6 cutover, move the following sentence into the
+single shared instruction home while removing its former plugin/tool-guide home:
+`Before memory retrieval, resolve the request and form an English query from canonical platform, module, host, task and procedure terms; preserve Korean proper nouns verbatim, then retrieve only current records for the resolved subject and verify operational claims at their native owner.`
+The current AGENTS Reading bullet stays unchanged until that coordinated change.
+Start fresh qualified sessions; obsolete saved tool definitions are historical.
+An unqualified CLI stays disconnected. Source acceptance is not native loading.
+
+The owning Lead alone restores exact private configuration preimages after stopping
+its changed consumers and reconciling uncertain effects. Verify restored bindings,
+processes and synthetic lesson continuity before fresh startup. Engineering never
+falls back to the mixed bank or exposes a withdrawn archive as current; recovery
+keeps reads denied until corrected Git source and qualified evaluation pass.
+Do not delete original banks/exports/preimages without recovery, custody expiry,
+residue/consumer checks and the private owner's conditions. Pending work has no
+elapsed-time release. Nothing in this runbook changes host settings by itself.
