@@ -7,6 +7,7 @@ are invented U9/UQ4 cases, not a claim that real redirects have been measured.
 """
 import contextlib
 import copy
+import errno
 import hashlib
 import importlib.util
 import io
@@ -42,7 +43,7 @@ def pin():
     return {'commit': 'a' * 40, 'config': CONFIG, 'config_raw': b'config', 'subjects_raw': b'subjects',
             'expected': {'invented': {'bytes': P.CHECK.publication_bytes(record),
               'hash': P.CHECK.publication_hash(record), 'tags': P.CHECK.derived_tags(record['header'], nodes),
-              'terms': ['ExampleID']}}}
+              'terms': ['ExampleID'], 'recall': P.CHECK.recall_tags(record['header']['subject'])}}}
 
 
 class Stub:
@@ -210,9 +211,12 @@ class PublisherTests(unittest.TestCase):
         for absent in (False, True):
             stub = Stub()
             if absent:
-                stub.request = lambda *args: (_ for _ in ()).throw(P.Stop('read_404'))
+                def missing(route, answer):
+                    raise P.Stop('read_404')
+                stub.mutate = missing
             with patch.object(P, 'unchanged'), self.assertRaisesRegex(P.Stop, 'UQ1'):
                 P.publish(stub, stub.pin)
+            self.assertTrue(stub.calls)
             self.assertTrue(all(x[0] == 'GET' for x in stub.calls))
 
     def test_retain_uses_fresh_ids_and_verifies_acknowledged_parent(self):
@@ -294,3 +298,294 @@ class PublisherTests(unittest.TestCase):
         self.assertIn(b'--credential-fd', result.stdout)
         self.assertNotIn(b'--bank', result.stdout)
         self.assertNotIn(b'--url', result.stdout)
+
+
+class RetractStub(Stub):
+    """HC U5/124-127, U10/062,143; invented content, never a native call."""
+    def __init__(self):
+        super().__init__()
+        self.deleted = False
+        self.lost = False
+        self.surviving = False
+
+    def request(self, method, path, body=None):
+        if method == 'DELETE':
+            self.calls.append((method, path, body))
+            self.deleted = True
+            if self.lost:
+                raise P.Stop('mutation_uncertain')
+            return {'success': True, 'document_id': 'invented', 'memory_units_deleted': 1}
+        if method == 'POST':
+            self.calls.append((method, path, body))
+            return {'results': [self.fact] if self.surviving else [], 'chunks': None}
+        if self.deleted and '/documents/invented' in path:
+            self.calls.append((method, path, body))
+            raise P.Stop('read_404')
+        if self.deleted and '/memories/list?' in path:
+            self.calls.append((method, path, body))
+            return envelope([])
+        return super().request(method, path, body)
+
+
+class RetractionTests(unittest.TestCase):
+    setUp = PublisherTests.setUp
+    tearDown = PublisherTests.tearDown
+
+    def run_retract(self, stub, override=False):
+        with patch.object(P, 'unchanged'), contextlib.redirect_stdout(io.StringIO()):
+            return P.retract(stub, stub.pin, 'invented', override)
+
+    def test_retract_order_and_listed_reads(self):
+        stub = RetractStub()
+        stub.pin['expected']['invented']['terms'].append('OtherID')
+        result = self.run_retract(stub)
+        self.assertEqual(result['result'], 'retracted_on_listed_reads')
+        self.assertEqual(result['route'], 'unavailable')
+        self.assertEqual(result['listed_reads'], 2)
+        calls = stub.calls
+        deletion = next(i for i, x in enumerate(calls) if x[0] == 'DELETE')
+        self.assertEqual(calls[deletion][1:], (P.B + '/documents/invented', None))
+        self.assertTrue(any('/documents/invented' in x[1] for x in calls[:deletion]))
+        self.assertTrue(any('/operations?' in x[1] for x in calls[:deletion]))
+        self.assertTrue(any('/mental-models?' in x[1] for x in calls[:deletion]))
+        self.assertEqual([x[0] for x in calls[deletion:deletion+4]], ['DELETE', 'GET', 'GET', 'GET'])
+        recalls = [x for x in calls if x[0] == 'POST']
+        self.assertEqual([x[2]['query'] for x in recalls], ['ExampleID', 'OtherID'])
+        for _, path, body in recalls:
+            self.assertEqual(path, P.B + '/memories/recall')
+            self.assertEqual(body['tags'], ['subject:memory-map:engineering'])
+            self.assertEqual(body['tags_match'], 'all_strict')
+            self.assertEqual(body['include'], {'entities': None, 'chunks': {'max_tokens': 512}})
+        self.assertEqual(sum(x[0] == 'DELETE' for x in calls), 1)
+
+    def test_recovery_pin_mismatch_and_missing_source(self):
+        for missing in (False, True):
+            stub = RetractStub()
+            if missing:
+                stub.pin['expected'].clear()
+            else:
+                stub.doc['original_text'] = 'different invented bytes'
+            with self.assertRaisesRegex(P.Stop, '^bank_copy_not_in_source$'):
+                self.run_retract(stub)
+            self.assertTrue(stub.calls)
+            self.assertTrue(all(x[0] == 'GET' for x in stub.calls))
+            if missing:
+                with self.assertRaisesRegex(P.Stop, '^deleted_unproven$'):
+                    self.run_retract(stub, True)
+                self.assertFalse(any(x[0] == 'POST' for x in stub.calls))
+            else:
+                self.assertEqual(self.run_retract(stub, True)['result'], 'retracted_on_listed_reads')
+
+    def test_source_drift_immediately_before_delete_stops(self):
+        stub, checks = RetractStub(), []
+        def source_check(pin):
+            checks.append(list(stub.calls))
+            if len(checks) == 2:
+                raise P.Stop('stale_commit')
+        with patch.object(P, 'unchanged', side_effect=source_check), \
+             contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(P.Stop, '^stale_commit$'):
+            P.retract(stub, stub.pin, 'invented')
+        self.assertEqual(len(checks), 2)
+        self.assertEqual(checks[1][-1][:2], ('GET', P.B + '/documents/invented'))
+        self.assertTrue(stub.calls)
+        self.assertTrue(all(call[0] == 'GET' for call in stub.calls))
+
+    def test_failed_preconditions_have_nonvacuous_no_mutation_assertions(self):
+        for command in ('publish', 'retract', 'restore'):
+            for route, failure in [('/version', 'read_404'), ('/config', 'read_uncertain'),
+                                   ('/operations', 'operation_not_completed'),
+                                   ('/mental-models', 'list_incomplete')]:
+                with self.subTest(command=command, route=route), tempfile.TemporaryDirectory() as directory:
+                    stub = RetractStub()
+                    def fail(r, answer):
+                        if r == route:
+                            raise P.Stop(failure)
+                        return answer
+                    stub.mutate = fail
+                    archive = Path(directory, 'recovery.zip')
+                    archive.write_bytes(b'invented archive')
+                    with patch.object(P, 'unchanged'), self.assertRaises(P.Stop):
+                        if command == 'retract':
+                            P.retract(stub, stub.pin, 'invented')
+                        elif command == 'restore':
+                            P.restore(stub, stub.pin, archive, P.digest(archive.read_bytes()))
+                        else:
+                            P.publish(stub, stub.pin)
+                    self.assertTrue(stub.calls)
+                    self.assertFalse(any(x[0] in ('DELETE', 'PUT', 'PATCH', 'POST') for x in stub.calls))
+
+    def test_delete_lost_answer_reads_target_and_facts_never_succeeds(self):
+        stub = RetractStub()
+        stub.lost = True
+        output = io.StringIO()
+        with patch.object(P, 'unchanged'), contextlib.redirect_stdout(output), \
+             self.assertRaisesRegex(P.Stop, '^delete_unresolved_route_unavailable_no_resend$'):
+            P.retract(stub, stub.pin, 'invented')
+        self.assertEqual(sum(x[0] == 'DELETE' for x in stub.calls), 1)
+        self.assertFalse(any(x[0] == 'POST' for x in stub.calls))
+        deletion = next(i for i, call in enumerate(stub.calls) if call[0] == 'DELETE')
+        self.assertEqual([(method, path) for method, path, _ in stub.calls[deletion + 1:]], [
+            ('GET', P.B + '/documents/invented'),
+            ('GET', P.B + '/memories/list?document_id=invented&limit=100&offset=0'),
+            ('GET', P.B + '/documents/invented/chunks')])
+        reads = json.loads(output.getvalue())
+        self.assertIs(reads['document_absent'], True)
+        self.assertIs(reads['facts_absent'], True)
+        self.assertIs(reads['chunks_absent'], True)
+
+        # Each changed readback must independently change its printed evidence.
+        for field, suffix, answer in [
+                ('document_absent', '/documents/invented', stub.doc),
+                ('facts_absent', '/memories/list?document_id=invented&limit=100&offset=0', envelope([stub.fact])),
+                ('chunks_absent', '/documents/invented/chunks', {'chunks': []})]:
+            stub = RetractStub()
+            stub.lost = True
+            original = stub.request
+            def surviving_read(method, path, body=None):
+                if stub.deleted and method == 'GET' and path == P.B + suffix:
+                    stub.calls.append((method, path, body))
+                    return answer
+                return original(method, path, body)
+            stub.request = surviving_read
+            with patch.object(P, 'unchanged'), contextlib.redirect_stdout(io.StringIO()) as changed, \
+                 self.assertRaisesRegex(P.Stop, '^delete_unresolved_route_unavailable_no_resend$'):
+                P.retract(stub, stub.pin, 'invented')
+            self.assertIs(json.loads(changed.getvalue())[field], False)
+
+    def test_readback_residue_and_profile_drift_stop(self):
+        for residue in ('document', 'facts', 'chunks', 'recall', 'models', 'profile'):
+            stub = RetractStub()
+            original = stub.request
+            def read(method, path, body=None):
+                if stub.deleted and method == 'GET':
+                    if residue == 'document' and path.endswith('/documents/invented'):
+                        return stub.doc
+                    if residue == 'chunks' and path.endswith('/chunks'):
+                        return {'chunks': []}
+                    if residue == 'facts' and '/memories/list?' in path:
+                        return envelope([stub.fact])
+                    if residue == 'models' and '/mental-models?' in path:
+                        return envelope([{'id': 'derived'}])
+                    if residue == 'profile' and path.endswith('/config'):
+                        return {'config': {}}
+                return original(method, path, body)
+            stub.request = read
+            stub.surviving = residue == 'recall'
+            code = {'document': 'deleted_unproven', 'facts': 'deleted_unproven',
+                    'chunks': 'deleted_unproven', 'recall': 'listed_read_contains_document',
+                    'models': 'models_present', 'profile': 'observations_enabled'}[residue]
+            with self.subTest(residue=residue), self.assertRaisesRegex(P.Stop, '^' + code + '$'):
+                self.run_retract(stub)
+            self.assertEqual(sum(call[0] == 'DELETE' for call in stub.calls), 1)
+
+    def test_real_client_no_resend_for_post_and_delete(self):
+        for method in ('DELETE', 'POST'):
+            for lost_at in ('open', 'read'):
+                client = P.Client('invented-private-sentinel')
+                with contextlib.ExitStack() as stack:
+                    opened = stack.enter_context(patch.object(client.opener, 'open'))
+                    if lost_at == 'open':
+                        opened.side_effect = TimeoutError('invented')
+                    else:
+                        response = opened.return_value.__enter__.return_value
+                        response.status = 200
+                        response.read.side_effect = TimeoutError('invented')
+                    with self.assertRaisesRegex(P.Stop, '^mutation_uncertain$'):
+                        client.request(method, P.B + '/documents/invented')
+                    self.assertEqual(opened.call_count, 1)
+
+    def test_all_commands_share_lock_before_pinning_or_transport(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(P.CHECK, 'git', return_value=directory.encode()), P.locked():
+            for command in ('publish', 'verify', 'retract', 'restore'):
+                argv = [command, '--credential-fd', '3']
+                if command == 'retract':
+                    argv += ['--record-id', 'invented']
+                if command == 'restore':
+                    argv += ['--recovery', 'unused.zip', '--recovery-sha256', '0' * 64]
+                output = io.StringIO()
+                with patch.object(P, 'pinned') as pinned, patch.object(P, 'Client') as client, \
+                     contextlib.redirect_stdout(output):
+                    self.assertEqual(P.main(argv), 1)
+                self.assertIn('publisher_busy', output.getvalue())
+                pinned.assert_not_called()
+                client.assert_not_called()
+
+    def test_restore_local_pins_before_requests_and_unmeasured_refusal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory, 'recovery.zip')
+            archive.write_bytes(b'invented archive')
+            link = Path(directory, 'link.zip')
+            link.symlink_to(archive)
+            cases = [(archive, 'bad', P.Stop, 'recovery_sha256_invalid'),
+                     (archive, '0' * 64, P.Stop, 'recovery_hash_mismatch'),
+                     (link, P.digest(archive.read_bytes()), OSError, errno.ELOOP),
+                     (Path(directory), '0' * 64, P.Stop, 'recovery_not_regular')]
+            for path, sha, exception, code in cases:
+                stub = Stub()
+                with self.subTest(path=path), patch.object(P, 'unchanged'), self.assertRaises(exception) as stopped:
+                    P.restore(stub, stub.pin, path, sha)
+                self.assertEqual(stopped.exception.errno if exception is OSError else str(stopped.exception), code)
+                self.assertEqual(stub.calls, [])
+            stub = Stub()
+            with patch.object(P, 'unchanged'), self.assertRaisesRegex(P.Stop, '^uq1_restore_unmeasured$'):
+                P.restore(stub, stub.pin, archive, P.digest(archive.read_bytes()))
+            self.assertTrue(stub.calls)
+            self.assertTrue(all(x[0] == 'GET' for x in stub.calls))
+
+    def test_success_output_redaction_each_command(self):
+        sentinel = 'invented-private-sentinel'
+        for command in ('publish', 'verify', 'retract', 'restore'):
+            stub = RetractStub() if command == 'retract' else Stub()
+            output = io.StringIO()
+            argv = [command, '--credential-fd', '3']
+            if command == 'retract':
+                argv += ['--record-id', 'invented']
+            if command == 'restore':
+                argv += ['--recovery', 'unused.zip', '--recovery-sha256', '0' * 64]
+            # publish/restore cannot succeed in this packet: exercise their common
+            # success-output boundary with an invented return, never an import.
+            with contextlib.ExitStack() as stack:
+                for name in ('locked', 'run_budget'):
+                    stack.enter_context(patch.object(P, name, contextlib.nullcontext))
+                stack.enter_context(patch.object(P, 'pinned', return_value=stub.pin))
+                stack.enter_context(patch.object(P, 'credential', return_value=sentinel))
+                def transport(request, timeout):
+                    url = urllib.parse.urlsplit(request.full_url)
+                    body = None if request.data is None else json.loads(request.data)
+                    try:
+                        answer = stub.request(request.get_method(), url.path + ('?' + url.query if url.query else ''), body)
+                    except P.Stop as error:
+                        if str(error) == 'read_404':
+                            raise urllib.error.HTTPError(request.full_url, 404, 'missing', {}, None) from None
+                        raise
+                    response = type('Response', (), {'status': 200,
+                        'read': lambda self, limit: json.dumps(answer).encode()})()
+                    return contextlib.nullcontext(response)
+                opener = type('Transport', (), {'open': staticmethod(transport)})()
+                stack.enter_context(patch.object(P.urllib.request, 'build_opener', return_value=opener))
+                stack.enter_context(patch.object(P.time, 'sleep'))
+                stack.enter_context(patch.object(P, 'unchanged'))
+                if command in ('publish', 'restore'):
+                    stack.enter_context(patch.object(P, command, return_value={'result': 'invented'}))
+                stack.enter_context(contextlib.redirect_stdout(output))
+                stack.enter_context(contextlib.redirect_stderr(output))
+                with tempfile.TemporaryFile() as descriptors:
+                    saved = [os.dup(fd) for fd in (1, 2)]
+                    try:
+                        for fd in (1, 2):
+                            os.dup2(descriptors.fileno(), fd)
+                        try:
+                            status = P.main(argv)
+                        except Exception as error:
+                            self.assertNotIn(sentinel, str(error))
+                            raise
+                    finally:
+                        for fd, original in zip((1, 2), saved):
+                            os.dup2(original, fd)
+                            os.close(original)
+                    descriptors.seek(0)
+                    descriptor_output = descriptors.read()
+            self.assertEqual(status, 0)
+            self.assertNotIn(sentinel, output.getvalue())
+            self.assertNotIn(sentinel.encode(), descriptor_output)
