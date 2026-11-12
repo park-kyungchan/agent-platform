@@ -41,6 +41,21 @@ fn unknown_publish_rpc_no_effect() {
             "tools/call",
             json!({"name":"mem_tree_read","arguments":{}}),
         ),
+        (
+            5,
+            "tools/call",
+            json!({"name":"mem_tree_read","arguments":{},"_meta":{"progressToken":"p1"}}),
+        ),
+        (
+            6,
+            "tools/call",
+            json!({"name":"mem_tree_read","arguments":{},"_meta":"invalid"}),
+        ),
+        (
+            7,
+            "tools/call",
+            json!({"name":"mem_tree_read","arguments":{"_meta":{}}}),
+        ),
     ] {
         input.push_str(
             &(json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}).to_string() + "\n"),
@@ -55,7 +70,7 @@ fn unknown_publish_rpc_no_effect() {
         .lines()
         .map(|s| serde_json::from_str(s).unwrap())
         .collect();
-    assert_eq!(replies.len(), 4);
+    assert_eq!(replies.len(), 7);
     assert_eq!(replies[0]["error"]["code"], -32601);
     assert_eq!(replies[1]["error"]["message"], "unknown_tool");
     assert_eq!(replies[2]["result"]["tools"].as_array().unwrap().len(), 5);
@@ -64,6 +79,9 @@ fn unknown_publish_rpc_no_effect() {
         replies[3]["result"]["content"][0]["text"],
         "current_memory_unavailable"
     );
+    assert_eq!(replies[4]["result"], replies[3]["result"]);
+    assert_eq!(replies[5]["error"]["message"], "invalid_params");
+    assert_eq!(replies[6]["error"]["message"], "invalid_arguments");
     let mut result = Vec::new();
     serve(
         format!("{}\n{{}}\n", "x".repeat(65537)).as_bytes(),

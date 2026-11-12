@@ -31,8 +31,11 @@ pub fn dispatch(request: Value) -> Option<Value> {
             if params
                 .as_object()?
                 .keys()
-                .any(|k| k != "name" && k != "arguments")
+                .any(|k| !matches!(k.as_str(), "name" | "arguments" | "_meta"))
             {
+                return Some(error(id, -32602, "invalid_params"));
+            }
+            if params.get("_meta").is_some_and(|m| !m.is_object()) {
                 return Some(error(id, -32602, "invalid_params"));
             }
             let Some(name) = params.get("name").and_then(Value::as_str) else {
