@@ -146,6 +146,7 @@ pub enum Step {
     RefuseBeforeForward,
     ForwardThenDropAnswer,
     KillPublisherAt(CrashPoint),
+    Manufactured503(Assumption),
     TerminalFailure(Assumption),
     GappedList(Assumption),
     ChangingList(Assumption),
@@ -157,7 +158,10 @@ impl Step {
             Self::RefuseBeforeForward => "transport:refuse_before_forward",
             Self::ForwardThenDropAnswer => "transport:forward_then_drop_answer",
             Self::KillPublisherAt(_) => "transport:kill_owned_publisher",
-            Self::TerminalFailure(a) | Self::GappedList(a) | Self::ChangingList(a) => a.tag(),
+            Self::Manufactured503(_) => "assumption:manufactured_503",
+            Self::TerminalFailure(_) => "assumption:terminal_failure",
+            Self::GappedList(_) => "assumption:gapped_list",
+            Self::ChangingList(_) => "assumption:changing_list",
         }
     }
 }
@@ -274,6 +278,9 @@ impl FaultProxy {
                     crash,
                 };
                 if matches!(step, Step::RefuseBeforeForward) {
+                    // A local refusal emits no native status/no-effect evidence.
+                    event.dropped_answer = true;
+                } else if matches!(step, Step::Manufactured503(_)) {
                     Frame {
                         head: "HTTP/1.1 503 Proxy Refusal".into(),
                         body: Vec::new(),
@@ -298,9 +305,9 @@ impl FaultProxy {
                         event.dropped_answer = true;
                     } else {
                         match &step {
-                            Step::TerminalFailure(a)
-                            | Step::GappedList(a)
-                            | Step::ChangingList(a) => {
+                            Step::TerminalFailure(_)
+                            | Step::GappedList(_)
+                            | Step::ChangingList(_) => {
                                 // These are explicitly unmeasured fault replies, never
                                 // nominal answers or evidence about native finality.
                                 let mut value: Value = serde_json::from_slice(&response.body)
@@ -313,7 +320,7 @@ impl FaultProxy {
                                             return Err(invalid());
                                         }
                                         value["status"] = json!("failed");
-                                        value["error_message"] = json!(a.tag());
+                                        value["error_message"] = json!(step.label());
                                     }
                                     Step::GappedList(_) => {
                                         value["items"].as_array_mut().ok_or_else(invalid)?.pop();

@@ -103,18 +103,37 @@ fn assumption(case: &str) -> Assumption {
 
 #[test]
 fn before_forward_no_effect_in_target() {
-    let (owned, state, joined) = backend(Replay::default(), None);
-    let mut proxy = FaultProxy::start(owned, vec![Step::RefuseBeforeForward]);
-    let reply = send(&proxy, "POST", &format!("{ROOT}/memories"), retain()).unwrap();
-    assert!(reply.head.starts_with("HTTP/1.1 503 "));
-    assert!(reply.body.is_empty());
-    proxy.stop_and_join().unwrap();
-    assert_eq!(state.lock().unwrap().active_operations(), 0);
-    assert!(joined.load(Ordering::SeqCst));
-    let events = proxy.transcript();
-    assert_eq!(events.len(), 1);
-    assert!(!events[0].forwarded);
-    assert!(!events[0].response_received);
+    fn client_and_oracle(retry_as_no_effect: bool) -> bool {
+        let (owned, state, joined) = backend(Replay::default(), None);
+        let mut proxy = FaultProxy::start(owned, vec![Step::RefuseBeforeForward]);
+        let first = send(&proxy, "POST", &format!("{ROOT}/memories"), retain());
+        let mut attempted = vec!["fixture-proxy-operation"];
+        // Negative control: this client wrongly treats a refusal as native no-effect.
+        if retry_as_no_effect {
+            let mut body = retain();
+            body["operation_id"] = json!("fixture-unsafe-new-operation");
+            attempted.push("fixture-unsafe-new-operation");
+            send(&proxy, "POST", &format!("{ROOT}/memories"), body).unwrap();
+        }
+        proxy.stop_and_join().unwrap();
+        assert!(joined.load(Ordering::SeqCst));
+        let events = proxy.transcript();
+        assert!(!events[0].forwarded && !events[0].response_received);
+        if retry_as_no_effect {
+            assert_eq!(state.lock().unwrap().active_operations(), 1);
+            assert_eq!(events.len(), 2);
+            assert!(events[1].forwarded);
+        }
+        first.is_err() && attempted.len() == 1 && state.lock().unwrap().active_operations() == 0
+    }
+    assert!(
+        client_and_oracle(false),
+        "closed refusal is uncertain, so no new identity may be posted"
+    );
+    assert!(
+        !client_and_oracle(true),
+        "the same oracle must reject the new-id retry client"
+    );
 }
 
 #[test]
@@ -149,6 +168,9 @@ fn forwarded_lost_answer() {
 fn assumptions_explicit() {
     assert!(Assumption::new("", "missing case").is_err());
     assert!(Assumption::new("case", "").is_err());
+    let mismatched =
+        Step::GappedList(Assumption::new("pass", "invented mismatch control").unwrap());
+    assert_eq!(mismatched.label(), "assumption:gapped_list");
     for (step, kind) in [
         (Step::GappedList(assumption("gapped_list")), "gapped_list"),
         (
@@ -264,4 +286,18 @@ fn request_cannot_retarget_backend() {
     assert!(joined.load(Ordering::SeqCst));
     assert_eq!(state.lock().unwrap().active_operations(), 0);
     assert!(proxy.transcript().is_empty());
+}
+
+#[test]
+fn manufactured_503_is_explicit_assumption() {
+    let step =
+        Step::Manufactured503(Assumption::new("pass", "Unmeasured native 503 semantics.").unwrap());
+    assert_eq!(step.label(), "assumption:manufactured_503");
+    let (owned, state, _) = backend(Replay::default(), None);
+    let mut proxy = FaultProxy::start(owned, vec![step]);
+    let reply = send(&proxy, "POST", &format!("{ROOT}/memories"), retain()).unwrap();
+    assert!(reply.head.starts_with("HTTP/1.1 503 "));
+    proxy.stop_and_join().unwrap();
+    assert_eq!(state.lock().unwrap().active_operations(), 0);
+    assert_eq!(proxy.transcript()[0].script, "assumption:manufactured_503");
 }

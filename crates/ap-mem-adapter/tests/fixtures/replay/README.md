@@ -40,6 +40,7 @@ All bodies, ids, names, dates and help strings in projection/tests are invented.
 | 012 | 53b73fc993b06d470a63107f2df96080dac6fa5e1c3799a6357240fb5d0aa6e5 |
 | 016 | ed4ad8da057d8ee6bc7753af86cebff076fc04b23adefaaea34327335a8db8aa |
 | 018 | 91d95aa4e8f6d3855ce9b094c3a55341236ce17933555adb1e8b8486613ba4fa |
+| 019 | f6ee26a76e040503770c53284354b2434271e1542d3f56c6cb3debd60626da34 |
 | 021 | 84d75e35aa18dfc673bf99d009ccde44b17f9bfbc9887d55b290a13c1ea412cb |
 | 024 | 8a3855212da77da72573fbb5e4d25248cea486848e3eae55cccd8f591ca16b14 |
 | 025 | 1ecab8710b302e3dc1bf57847a07aba7ef89176bd095f1a95209fac5cadc8319 |
@@ -83,6 +84,6 @@ All four SSE projections/checks use recorded CRLF framing (007/021/036/109).
 `apply` selects the endpoint/mode shape and validates every answer internally.
 `apply`/`project` return `Result<RecordedReply, ReplayStop>`; unknown shapes never
 become wire replies. No operation-lookup HTTP404 exists in the saved inputs:
-019 is HTTP200/status not_found, not the requested404. Unknown operations stop
-with typed NotRecorded until a suitable recorded variant is assigned, rather
-than panicking or inventing that404. This is not native absence/finality proof.
+019 is HTTP200/status not_found, not the requested404. G6 has Lead approval to
+add precisely this root: unknown ids replay019; completed-parent variants stay
+typed NotRecorded. No unrecorded404 or native absence/finality proof is invented.

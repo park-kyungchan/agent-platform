@@ -85,7 +85,7 @@ pub enum TraceStep {
     RefreshCompleted,
     MaintenanceCompleted,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Replay {
     documents: BTreeMap<String, Document>,
     facts: BTreeMap<String, Fact>,
@@ -179,7 +179,7 @@ impl Replay {
             TraceStep::MaintenanceCompleted => self.maintenance = true,
         }
     }
-    pub fn apply(&mut self, request: WireRequest) -> Result<RecordedReply, ReplayStop> {
+    fn stage_request(&mut self, request: &WireRequest) {
         if request.authorized && !self.absent {
             let route = request.path.split('?').next().unwrap();
             if route == "/mcp/fixture-bank/" && request.body["method"] == "initialize" {
@@ -229,20 +229,37 @@ impl Replay {
                 }
             }
         }
-        // DELETE projects the pre-delete count, then applies the measured synchronous removal.
-        let reply = project(self, &request)?;
-        let shape = self
-            .recorded_shape(&request)
+    }
+    pub fn apply(&mut self, request: WireRequest) -> Result<RecordedReply, ReplayStop> {
+        let mut proposed = self.clone();
+        proposed.stage_request(&request);
+        let reply = project(&proposed, &request)?;
+        self.accept_projected(proposed, &request, reply)
+    }
+    fn accept_projected(
+        &mut self,
+        mut proposed: Self,
+        request: &WireRequest,
+        reply: RecordedReply,
+    ) -> Result<RecordedReply, ReplayStop> {
+        let shape = proposed
+            .recorded_shape(request)
             .ok_or(ReplayStop::NotRecorded("response_variant"))?;
         assert_recorded_keys(&reply, &shape).map_err(ReplayStop::ShapeMismatch)?;
-        if request.authorized && !self.absent && request.method == "DELETE" && reply.status == 200 {
+        if request.authorized
+            && !proposed.absent
+            && request.method == "DELETE"
+            && reply.status == 200
+        {
             let id = request
                 .path
                 .strip_prefix(&format!("{PREFIX}/documents/"))
                 .unwrap();
-            self.documents.remove(id);
-            self.facts.retain(|_, f| f.document_id != id);
+            proposed.documents.remove(id);
+            proposed.facts.retain(|_, f| f.document_id != id);
         }
+        // Commit the proposed intent/indices only after the frozen shape accepted it.
+        *self = proposed;
         Ok(reply)
     }
     fn recorded_shape(&self, request: &WireRequest) -> Option<Shape> {
@@ -349,7 +366,7 @@ impl Replay {
                     {
                         "116"
                     } else {
-                        return None;
+                        "019"
                     }
                 }
                 _ => return None,
@@ -456,6 +473,9 @@ pub fn project(replay: &Replay, request: &WireRequest) -> Result<RecordedReply, 
         status = 401;
         json!({"detail":"fixture authentication refusal"})
     } else if replay.absent {
+        if path.starts_with(&format!("{PREFIX}/operations/")) {
+            return Err(ReplayStop::NotRecorded("operation_lookup_http404"));
+        }
         status = 404;
         json!({"detail":"fixture absent bank"})
     } else if path == "/mcp/fixture-bank/" && request.method == "POST" {
@@ -631,25 +651,28 @@ pub fn project(replay: &Replay, request: &WireRequest) -> Result<RecordedReply, 
             }
             ("GET", r) if r.starts_with("/operations/") => {
                 let id = r.strip_prefix("/operations/").unwrap();
-                let (o, child) = replay
-                    .operations
-                    .values()
-                    .find_map(|o| {
-                        if o.id == id {
-                            Some((o, false))
-                        } else if o.child.as_ref().is_some_and(|c| c.0 == id) {
-                            Some((o, true))
-                        } else {
-                            None
-                        }
-                    })
-                    .ok_or(ReplayStop::NotRecorded("operation_lookup_http404"))?;
+                let found = replay.operations.values().find_map(|o| {
+                    if o.id == id {
+                        Some((o, false))
+                    } else if o.child.as_ref().is_some_and(|c| c.0 == id) {
+                        Some((o, true))
+                    } else {
+                        None
+                    }
+                });
+                let Some((o, child)) = found else {
+                    return Ok(RecordedReply {
+                        status: 200,
+                        headers,
+                        body: json!({"operation_id":id,"status":"not_found","operation_type":null,"id":id,"task_type":null,"mental_model_id":null,"created_at":null,"updated_at":null,"completed_at":null,"error_message":null,"retry_count":null,"next_retry_at":null,"progress":null,"result_metadata":null,"details":null,"child_operations":null,"task_payload":null}),
+                    });
+                };
                 let payload = params.get("include_payload").copied() == Some("true");
-                assert!(
-                    (!child && o.status == Status::Pending)
-                        || (child && o.child.as_ref().unwrap().1 == Status::Completed && payload),
-                    "uncaptured lookup variant"
-                );
+                if !((!child && o.status == Status::Pending)
+                    || (child && o.child.as_ref().unwrap().1 == Status::Completed && payload))
+                {
+                    return Err(ReplayStop::NotRecorded("operation_lookup_variant"));
+                }
                 let mut value = json!({"operation_id":id,"status":if child {"completed"} else {"pending"},"operation_type":if child {"retain"} else {"batch_retain"},"id":id,"task_type":if child {"retain"} else {"batch_retain"},"mental_model_id":null,"created_at":STAMP,"updated_at":STAMP,"completed_at":null,"error_message":null,"retry_count":0,"next_retry_at":null,"progress":null,"result_metadata":{"is_parent":true,"document_id":o.accepted[0].id,"items_count":o.accepted.len(),"total_tokens":0,"num_sub_batches":1},"details":null,"child_operations":null,"task_payload":null});
                 if child {
                     value["completed_at"] = json!(STAMP);
@@ -776,4 +799,29 @@ pub fn assert_recorded_keys(reply: &RecordedReply, shape: &Shape) -> Result<(), 
         input["body"].as_u64().expect("known recording") as usize,
         "$",
     )
+}
+
+#[cfg(test)]
+mod atomic_commit {
+    use super::*;
+    #[test]
+    fn post_shape_failure_is_atomic() {
+        let mut replay = Replay::default();
+        let request = WireRequest::new(
+            "POST",
+            &format!("{PREFIX}/memories"),
+            json!({"operation_id":"fixture-atomic-operation","async":true,"items":[{"document_id":"fixture-atomic-document","content":"invented atomic body","tags":[]}]}),
+        );
+        let mut proposed = replay.clone();
+        proposed.stage_request(&request);
+        let mut reply = project(&proposed, &request).unwrap();
+        reply.body["unrecorded_ack_field"] = json!(true);
+        assert!(matches!(
+            replay.accept_projected(proposed, &request, reply),
+            Err(ReplayStop::ShapeMismatch(_))
+        ));
+        assert_eq!(replay.active_operations(), 0);
+        assert!(replay.operations.is_empty());
+        assert!(replay.by_document.is_empty());
+    }
 }

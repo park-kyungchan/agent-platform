@@ -424,23 +424,47 @@ fn recorded_crlf_frames_are_accepted() {
 }
 
 #[test]
-fn unknown_operation_does_not_panic() {
-    let r = Replay::default();
+fn unknown_operation_matches_recording_019() {
+    let mut r = Replay::default();
     let q = request(
         "GET",
         "/operations/fixture-unknown?include_payload=true",
         Value::Null,
     );
-    let result =
-        std::panic::catch_unwind(|| project(&r, &q)).expect("unknown lookup must not panic");
+    let reply = r.apply(q).expect("019 is a recorded lookup");
+    assert_recorded_keys(&reply, &Shape { recording: "019" }).unwrap();
+    assert_eq!(reply.status, 200);
+    assert_eq!(reply.body["status"], "not_found");
+    assert_eq!(reply.body["operation_id"], "fixture-unknown");
     assert!(matches!(
-        result,
+        Replay::absent().apply(request("GET", "/operations/fixture-unknown", Value::Null)),
         Err(ReplayStop::NotRecorded("operation_lookup_http404"))
     ));
-    assert!(matches!(
-        Replay::default().apply(q),
-        Err(ReplayStop::NotRecorded(_))
-    ));
+    for (key, value) in reply.body.as_object().unwrap() {
+        if !["id", "operation_id", "status"].contains(&key.as_str()) {
+            assert!(value.is_null());
+        }
+    }
+}
+#[test]
+fn completed_parent_is_typed_stop() {
+    let mut r = Replay::default();
+    retain(
+        &mut r,
+        "fixture-completed-parent",
+        "invented parent body",
+        false,
+        "010",
+    );
+    complete(&mut r, "fixture-completed-parent");
+    let q = request(
+        "GET",
+        "/operations/fixture-completed-parent?include_payload=true",
+        Value::Null,
+    );
+    let stop =
+        std::panic::catch_unwind(|| project(&r, &q)).expect("completed parent must not panic");
+    assert!(matches!(stop, Err(ReplayStop::NotRecorded(_))));
 }
 
 #[test]
