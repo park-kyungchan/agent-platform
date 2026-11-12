@@ -122,6 +122,12 @@ assert memory_block['rows'] == 1 and not memory_block['truncated']
 assert '| Record id | Document id | Body hash | Status |' in memory_block['markdown']
 assert '| rehearsal-render | rehearsal-render | ' + 'b' * 64 + ' | ready |' in memory_block['markdown']
 print(memory_block['markdown'])
+aggregation = call(['aggregate'], dict(object_type='worker_run', group_by=['status'], metrics=['count']))
+assert aggregation['kind'] == 'aggregation' and aggregation['groups'] == [dict(key=dict(status='running'), count=2), dict(key=dict(status='closed'), count=2)], aggregation
+print('worker_run_aggregate=' + json.dumps(aggregation, sort_keys=True))
+refused = call(['aggregate'], dict(object_type='memory_record', metrics=['count']), 2)
+assert refused['code'] == 'derive_forbidden', refused
+print('memory_record_aggregate=' + json.dumps(refused, sort_keys=True))
 requests = [dict(jsonrpc='2.0', id=i, method='tools/call', params=dict(name=n, arguments={})) for i, n in enumerate(['ont_describe', 'ont_action_list'], 1)]
 wire = subprocess.run([binary, '--store', store, 'mcp'], input='\n'.join(map(json.dumps, requests))+'\n', text=True, capture_output=True, timeout=60); assert wire.returncode == 0, wire.stderr
 for request, line in zip(requests, wire.stdout.splitlines(), strict=True):
