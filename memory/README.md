@@ -203,3 +203,42 @@ and import semantics remain UQ1 for V4-5. No import, lifecycle or polling code
 exists here. The Lead must keep restored reads denied until corrected current
 source passes rebuild and qualification. V4-3 may use only the listed-read claim;
 V4-5 must measure missing dependencies before replacing UQ refusals.
+
+## Fixed evaluation (V4-3; offline tests, no activation)
+`python3 -I -B scripts/evaluate-memory.py --check-corpus memory/evaluation/questions.json`
+checks 45 identities, three forms, two routes and 270 slots without host reads.
+`--collect --credential-fd N --output EVIDENCE.json` gathers evidence under the
+publisher lock from reviewed main; the caller supplies runtime authority.
+`--subject ID` defaults to the vocabulary root, with descendants and both horizons.
+Recall uses publisher U10/062,143 low/512 requests and the first five returned
+items. Document reads use their ids plus repeatable caller `--document-id ID`.
+Every result needs 270 human verdicts and `current_count` per slot; use
+`--check-results RESULTS.json --evidence EVIDENCE.json [--output CHECKED.json]`.
+Without held-out evidence, a full result reports held_out=not_evaluated and
+target_reached=false. Every slot must carry the exact evidence_sha256.
+Non-equal source pins require `expectation_reverified:true` and the exact evidence
+file's `evidence_sha256` on every affected slot. Unresolved source_missing answers
+use their subject expectation; a resolved claim is stale under human review.
+`--held-out-fd N --held-out-evidence-fd M` keeps questions/oracles and native
+results in inherited private descriptors; public output contains only count/hash.
+For checking, pass the sealed input rewound on N, private evidence rewound on M,
+and human slot results on
+`--held-out-results-fd K`; only aggregate held-out verdict counts leave the process.
+`--canary --credential-fd N --baseline EVIDENCE.json` checks English recall for
+R05/R09/R23/R27/R30/N07 and profile/Git hashes; missing reads are unknown. Literal
+checks are drift evidence, never answer verdicts. API changes require X5.
+`--measurement-request PARAMETERS.json --output EXISTING_DIRECTORY` writes
+apply.json and kpi_get.json; it executes no store action. The measurement GET
+uses the created Id returned by apply; no measurement_get.json is written ahead.
+The Lead supplies the existing KPI Id and actual UTC time/value/evidence/request_id,
+applies once, then compares measurement/KPI readbacks. Times use UTC seconds and Z.
+`--corpus PATH` selects an input corpus; tests use invented inputs. Due metadata remains the checker's `--due`.
+Held-out ids and evidence slot keys must be unique. Checking requires the sealed
+input again via `--held-out-fd N`; its bytes/hash and ordered questions/oracles
+must match the private evidence. Only the seven judge fields `id`, `form`, `route`,
+`verdict`, `current_count`, `evidence_sha256`, `expectation_reverified` are allowed
+in result slots. A supported verdict needs positive returned and current counts.
+`--check-results` rereads hashed file sources locally and reports the number of
+reference pins changed since collection as `pins_changed_since_collect`.
+Run it on the host holding the sources; elsewhere hashed file pins are missing
+and every file-backed slot needs a reverified expectation. No network/store call is added.
