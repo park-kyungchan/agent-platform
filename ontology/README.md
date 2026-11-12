@@ -173,7 +173,7 @@ ontology/rehearsal.sh /path/to/ont
 
 It creates a store under `mktemp -d` (set `TMPDIR` to the authorized scratch
 root), checks the frozen v1 pin, installs v1, indexes task/packet/report files,
-installs v2, creates and lifts a v2 hold, then installs v3 and verifies the task
+installs v2, creates and lifts a v2 hold, then installs v4 and verifies the task
 and v2 hold revisions are unchanged. It exercises the version 2 action/time,
 retry, reference, escaping and optional-cell cases; prints six rendered blocks
 (one memory-index block and five program-state blocks); and invokes the
@@ -316,3 +316,33 @@ the shortest path. The summary includes refusal totals per expected code (one
 edge may fail several criteria), unexpected-code count and completed depth.
 At closure, the walk self-test follows native graph edges for both replacement
 sequences and, with three records, the allowed withdrawn-middle example above.
+
+## Version 4: derive grants
+Version 3 remains pinned at
+`e01ac49b6b62a0511d5bf7979cc3e1d8a1fcaa28:ontology/work.schema.json`,
+sha256 `acd5b124d11f2cfb1b82161774b70e060318fd3607f9fb24ef122e12d249e96d`.
+Every existing definition is byte-equal. Apart from the version number, the
+only change is the one `agent` grant's additive `derive` list:
+`hold`, `decision`, `kpi`, `measurement`, `worker_run`. These are the types
+read by the five program-state views, plus `measurement`. Read and action
+grants are unchanged; `memory_record` has no derive grant.
+
+With an engine supporting count aggregation (ontology-platform PR #41), the
+rehearsal runs this request against its disposable store:
+
+```sh
+set -o pipefail
+printf '%s\n' '{"object_type":"worker_run","group_by":["status"],"metrics":["count"]}' | ont --store "$scratch/store.sqlite" aggregate
+```
+
+The observed result shape is below (inside the CLI's `status: ok`, `result`
+envelope). `oldest_observed_at` is the rehearsal fixture's timestamp:
+
+```json
+{"basis":{"oldest_observed_at":1794362461,"partial":0,"qualified":true,"scanned":4,"stale":0,"stale_sources":[],"unresolved_excluded":0},"groups":[{"count":2,"key":{"status":"running"}},{"count":2,"key":{"status":"closed"}}],"kind":"aggregation"}
+```
+
+The rehearsal asserts both exact enum groups and separately checks that
+`{"object_type":"memory_record","metrics":["count"]}` refuses with
+`derive_forbidden`. This source change grants no live-store installation;
+installation remains a separate authorized operation.
