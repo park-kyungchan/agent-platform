@@ -756,3 +756,142 @@ fn proxy_uses_replay_bridge() {
     proxy.stop_and_join().unwrap();
     assert!(proxy.transcript()[0].response_received);
 }
+
+#[test]
+fn no_behaviour_or_model_serializer() {
+    let wire = include_str!("support/upstream.rs");
+    for forbidden in [
+        "struct Behaviour",
+        "enum MutationFault",
+        "struct Model",
+        "Model::",
+        "serde::Serialize",
+        "json!",
+    ] {
+        assert!(
+            !wire.contains(forbidden),
+            "retired model/projection bypass remains"
+        );
+    }
+    assert!(!include_str!("support/mod.rs").contains("fixture_server"));
+    assert_eq!(wire.matches(".apply(request)").count(), 1);
+    assert_eq!(wire.matches("write_reply(&mut stream, &reply)").count(), 1);
+    assert!(!include_str!("support/replay.rs").contains("serde::Serialize"));
+}
+#[test]
+fn key_sets_all_routes() {
+    let one_model = || {
+        Replay::with_models(vec![MentalModel {
+            id: "fixture-route-model".into(),
+            name: "invented route model".into(),
+            tags: vec!["fixture-route-tag".into()],
+        }])
+    };
+    let mut observations = Replay::default();
+    observations.advance(TraceStep::Observations(vec![Fact {
+        id: "fixture-route-observation".into(),
+        document_id: String::new(),
+        text: "invented route observation".into(),
+    }]));
+    let mut refresh = Replay::default();
+    refresh.advance(TraceStep::RefreshCompleted);
+    let mut maintenance = Replay::default();
+    maintenance.advance(TraceStep::MaintenanceCompleted);
+    for (mut comparison, route, shape) in [
+        (Replay::upstream_defaults(), "/config", "161"),
+        (Replay::absent(), "/mental-models", "465"),
+        (one_model(), "/mental-models", "472"),
+        (
+            one_model(),
+            "/mental-models?tags=fixture-route-tag&tags_match=exact&detail=full&limit=1&offset=1&exclude_knowledge_pages=false",
+            "473",
+        ),
+        (observations.clone(), "/stats", "181"),
+        (observations, "/memories/list?type=observation", "190"),
+        (refresh, "/operations", "072"),
+        (maintenance, "/operations", "073"),
+    ] {
+        let mut server = support::upstream::Server::start(comparison.clone());
+        wire_checked(
+            &server,
+            &mut comparison,
+            request("GET", route, Value::Null),
+            shape,
+        );
+        server.stop_and_join().unwrap();
+    }
+    let mut comparison = Replay::default();
+    retain(
+        &mut comparison,
+        "fixture-routes-hash",
+        "invented hashed route body",
+        true,
+        "010",
+    );
+    complete(&mut comparison, "fixture-routes-hash");
+    let mut server = support::upstream::Server::start(comparison.clone());
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("GET", "/documents/fixture-document", Value::Null),
+        "060",
+    );
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("GET", "/memories/list", Value::Null),
+        "061",
+    );
+    wire_checked(
+        &server,
+        &mut comparison,
+        request("POST", "/memories/recall", json!({})),
+        "062",
+    );
+    wire_rpc(&server, &mut comparison, "initialize", json!({}), "007");
+    wire_rpc(
+        &server,
+        &mut comparison,
+        "tools/call",
+        json!({"name":"recall","arguments":{"query":"invented"}}),
+        "036",
+    );
+    server.stop_and_join().unwrap();
+    let mut comparison = Replay::default();
+    retain(
+        &mut comparison,
+        "fixture-routes-pending",
+        "invented pending route body",
+        false,
+        "010",
+    );
+    comparison.advance(TraceStep::ParentPendingChildError {
+        operation_id: "fixture-routes-pending".into(),
+        child_id: "fixture-routes-pending-child".into(),
+    });
+    let mut server = support::upstream::Server::start(comparison.clone());
+    wire_checked(
+        &server,
+        &mut comparison,
+        request(
+            "GET",
+            "/operations/fixture-routes-pending?include_payload=false",
+            Value::Null,
+        ),
+        "434",
+    );
+    server.stop_and_join().unwrap();
+    complete(&mut comparison, "fixture-routes-pending");
+    let mut server = support::upstream::Server::start(comparison.clone());
+    wire_checked(
+        &server,
+        &mut comparison,
+        request(
+            "GET",
+            "/operations/fixture-routes-pending-child?include_payload=true",
+            Value::Null,
+        ),
+        "116",
+    );
+    server.stop_and_join().unwrap();
+}
