@@ -55,12 +55,15 @@ Lead <session>, <time>. Lens rules this rests on: <R numbers>. Decision record: 
 
 ## Design block of a packet
 
+The three lines `Callers searched:`, `Broken tests:` and `Controls:` start at the first column with exactly these names: `ap work start` refuses a packet with a worktree that lacks one of them.
+
 ```markdown
 Design (the Lead's; a mismatch with the code is reported, not resolved by the worker):
-- Change: <item, file:line> -> <the resulting signature, field or schema entry>
-- State and authority: <where each fact lives>
-- Invariant: <sentence>
-- Callers searched: <command>; affected: <file:line list>; each one's fate
-- Tests that must fail on the wrong implementation: <test -> guarantee -> the wrong implementation>
-- Not built: <neighbouring things left out on purpose>
+Change: <item, file:line> -> <the resulting signature, field or schema entry>
+State and authority: <where each fact lives>
+Invariant: <sentence>
+Callers searched: <command>; affected: <file:line list>; each one's fate
+Broken tests: <existing tests the change breaks and what each becomes, or none>
+Controls: <test -> the guarantee it holds -> the wrong implementation it fails on>
+Not built: <neighbouring things left out on purpose>
 ```
