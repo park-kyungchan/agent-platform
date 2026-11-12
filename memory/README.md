@@ -335,7 +335,8 @@ elapsed-time release. Nothing in this runbook changes host settings by itself.
 ## Disposable exercise (V4-5 part A; source only, not run)
 `python3 -I -B scripts/exercise-memory.py --bank zz-conformance-YYYYMMDD-xxxxxxxx --credential-fd 3 --evidence /TASK/NEW.json`
 is an opt-in E1/E2/E4/E5/E6 measurement, using the publisher's fixed origin,
-private FD reader, proxy-free opener and shared lock. It accepts only an initially
+private FD reader, proxy-free opener and shared lock. Credentials shorter than
+eight characters refuse before any request with exit 2 (`credential_too_short`). It accepts only an initially
 absent disposable id; every mutation binds that id. Part A made no live call.
 It enforces <=40 retain attempts (including denial probes), >=1s write gaps,
 one request at a time, <=120s per poll and 900s total; the final 120s are reserved

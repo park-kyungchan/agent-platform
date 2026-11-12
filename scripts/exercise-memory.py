@@ -84,16 +84,16 @@ def strings(value):
 
 
 def credential_matches(raw, secret):
-    prefixes = [secret[:n] for n in range(min(8, len(secret)), len(secret) + 1)]
+    prefixes = [secret[:n] for n in range(8, len(secret) + 1)]
     decoded = list(strings(load(raw)))
     return sum(raw.count(p.encode()) + sum(s.count(p) for s in decoded) for p in prefixes)
 
 
 def private_fallback(value, secret):
     raw = encode(value)
-    # A very short credential can collide even with fixed diagnostic keys.
+    # A fixed diagnostic can itself contain an admitted credential prefix.
     if secret and credential_matches(raw, secret):
-        return b'1' if secret == '0' else b'0'
+        return b'0'
     return raw
 
 
@@ -182,7 +182,7 @@ class Exercise:
         self.interrupted = True  # Signal handlers never interrupt the cleanup boundary.
 
     def no_foreign(self, value, code):
-        P.require(not any(bank in text for text in strings(value) for bank in self.before or {}), code)
+        P.require(not any(bank.casefold() in text.casefold() for text in strings(value) for bank in self.before or {}), code)
 
     def bound(self, retaining=False):
         if self.interrupted and not self.cleaning:
@@ -200,8 +200,7 @@ class Exercise:
                   'mutation_route_rejected')
         self.bound(retaining=route == '/memories' or kwargs.get('retaining', False))
         P.require(not self.uncertain, 'unresolved_mutation')
-        if not isinstance(body, bytes):
-            self.no_foreign(body, 'foreign_bank_in_body')
+        self.no_foreign(body.decode('utf-8', errors='replace') if isinstance(body, bytes) else body, 'foreign_bank_in_body')
         path = self.mcp if route == '@mcp' else self.base + route
         query = dict(query or {})
         if route == '/transfer/import':
@@ -631,6 +630,9 @@ class Exercise:
         status, raw, _ = self.call('GET', self.download)
         P.require(status == 200 and isinstance(raw, bytes), 'archive_unmeasured')
         found, entries = set(), []
+        record = {'subset': subset, 'sha256': P.digest(raw), 'bytes': len(raw), 'entries': entries,
+                  'flags': sorted(query), 'verdict': 'refused_unmeasured', 'answer_shape': keys(meta)}
+        self.evidence.setdefault('archives', []).append(record)
         def inspect(value):
             self.no_foreign(value, 'archive_foreign_bank')
             if isinstance(value, dict):
@@ -646,28 +648,46 @@ class Exercise:
             elif isinstance(value, list):
                 for v in value:
                     inspect(v)
-        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
-            P.require(sum(x.file_size for x in archive.infolist()) <= MAX_BYTES, 'archive_too_large')
+        output = io.BytesIO()
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive, zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_STORED) as rebuilt:
+            record['container_removed'] = {'archive_comment_bytes': len(archive.comment),
+                'entry_comments': sum(bool(e.comment) for e in archive.infolist()), 'entry_extra_fields': sum(bool(e.extra) for e in archive.infolist()),
+                'compression_methods': sorted({e.compress_type for e in archive.infolist()})}
             for entry in archive.infolist():
-                self.no_foreign(entry.filename, 'archive_foreign_bank')
-                entries.append({'name_sha256': P.digest(entry.filename.encode()), 'bytes': entry.file_size})
-                with archive.open(entry) as source:
-                    value = source.read(MAX_BYTES + 1)  # zipfile checks CRC at EOF; the read is capped.
-                P.require(len(value) <= MAX_BYTES, 'archive_too_large')
+                row = {'name_sha256': P.digest(entry.filename.encode()), 'bytes': entry.file_size, 'class': 'binary'}
+                entries.append(row)
+                record['failed_entry_index'] = len(entries) - 1
+                try:
+                    with archive.open(entry) as source:
+                        content = source.read(MAX_BYTES + 1)  # zipfile checks CRC at EOF; the read is capped.
+                except (zipfile.BadZipFile, RuntimeError, NotImplementedError):
+                    raise P.Stop('archive_unmeasured') from None
+                value = content
+                row['class'] = 'empty' if not value else 'zip' if value.startswith(b'PK') else 'gzip' if value.startswith(b'\x1f\x8b') else 'binary'
+                try:
+                    value.decode('utf-8')
+                    if row['class'] == 'binary': row['class'] = 'text'
+                except UnicodeError:
+                    pass
                 try:
                     values = [load(value)]
+                    row['class'] = 'json'
                 except (ValueError, UnicodeError):
                     try:
                         values = [load(line) for line in value.splitlines() if line.strip()]
+                        if values: row['class'] = 'jsonl'
                     except (ValueError, UnicodeError):
-                        raise P.Stop('archive_unmeasured') from None
+                        values = []
+                P.require(sum(e['bytes'] for e in entries) <= MAX_BYTES and len(value) <= MAX_BYTES, 'archive_too_large')
+                self.no_foreign(entry.filename, 'archive_foreign_bank')
                 P.require(bool(values), 'archive_unmeasured')
                 for value in values:
                     inspect(value)
+                rebuilt.writestr(zipfile.ZipInfo(entry.filename, (1980, 1, 1, 0, 0, 0)), content)
         P.require(found == set(expected), 'archive_documents_unmeasured')
-        self.evidence.setdefault('archives', []).append({'subset': subset, 'sha256': P.digest(raw),
-                 'bytes': len(raw), 'entries': entries, 'documents': len(found),
-                 'flags': sorted(query), 'verdict': 'measured', 'answer_shape': keys(meta)})
+        raw = output.getvalue()
+        record.pop('failed_entry_index', None)
+        record.update(archive_rebuilt=True, rebuilt_sha256=P.digest(raw), rebuilt_bytes=len(raw), documents=len(found), verdict='measured')
         return raw
 
     def restore(self, raw, merge=False):
@@ -888,6 +908,9 @@ def main(argv=None):
     try:
         P.require(bool(ID.fullmatch(args.bank)), 'bank_id_rejected')
         secret = P.credential(args.credential_fd)
+        if len(secret) < 8:
+            print('exercise_refused@scripts/exercise-memory.py:1: credential_too_short')
+            return 2
         fd = os.open(args.evidence, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         os.fchmod(fd, 0o600)
         exercise = Exercise(args.bank, Wire(secret))

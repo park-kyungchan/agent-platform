@@ -224,7 +224,8 @@ class ExerciseTests(unittest.TestCase):
             self.assertTrue(failures, prefix + '_removal_survived_' + name)
             trace = failures[0][1]
             locations = X.re.findall(r'test_memory_exercise.py", line ([0-9]+)', trace)
-            message = '' if prefix == 'control' else ' message=' + trace.splitlines()[-1]
+            cause = next((line for line in trace.splitlines() if line.startswith('AssertionError:')), trace.splitlines()[-1])
+            message = '' if prefix == 'control' else ' message=' + cause
             print(prefix + '_removed=' + name + ' failing_line=ci/test_memory_exercise.py:' + locations[-1] + message)
 
     def run_driver(self, action=None):
@@ -920,8 +921,8 @@ class ExerciseTests(unittest.TestCase):
             return code, X.load(raw)
 
     def test_m1_decoded_archive_keys_values_names_and_unmeasured_entries(self):
-        cases = ('partial-escape', 'all-escape-key', 'jsonl-unknown', 'name', 'slash',
-                 'nested-zip', 'gzip', 'bytes', 'empty')
+        cases = ('partial-escape', 'all-escape-key', 'jsonl-unknown', 'name', 'slash', 'upper',
+                 'nested-zip', 'gzip', 'bytes', 'binary', 'empty')
         for kind in cases:
             with self.subTest(kind=kind):
                 clock = Clock(); server = FakeServer(clock)
@@ -941,6 +942,8 @@ class ExerciseTests(unittest.TestCase):
                             data = old.read('data.json')
                             if kind == 'partial-escape':
                                 data = data[:-1] + b',"owner":"\\u0066oreign-bank"}'
+                            elif kind == 'upper':
+                                data = data[:-1] + b',' + X.encode({'owner': FOREIGN.upper()})[1:]
                             new.writestr('data.json', data)
                             name = foreign + '.json' if kind == 'name' else 'opaque.bin'
                             payload = b'{}'
@@ -957,17 +960,28 @@ class ExerciseTests(unittest.TestCase):
                                 payload = nested.getvalue()
                             elif kind == 'gzip':
                                 payload = b'\x1f\x8bnot-json'
-                            elif kind in ('bytes', 'empty'):
-                                payload = b'unmeasured' if kind == 'bytes' else b''
+                            elif kind in ('bytes', 'binary', 'empty'):
+                                payload = b'unmeasured' if kind == 'bytes' else b'\xff\x00' if kind == 'binary' else b''
                             new.writestr(name, payload)
                         server.downloads[key] = output.getvalue()
                     return status, answer, sid
                 server.answer = hostile
                 self.assertEqual(exercise.run(), 3, 'decoded_archive_accepted')
-                expected = 'archive_unmeasured' if kind in ('nested-zip', 'gzip', 'bytes', 'empty') else 'archive_foreign_bank'
+                expected = 'archive_unmeasured' if kind in ('nested-zip', 'gzip', 'bytes', 'binary', 'empty') else 'archive_foreign_bank'
                 self.assertEqual(exercise.evidence['steps']['E1']['failure'], expected, 'archive_refusal_unmeasured')
                 self.assertFalse(any('/transfer/import?' in p for _, p, _, _ in server.calls), 'archive_dispatched')
                 self.assertEqual(exercise.evidence['cleanup'], 'proven')
+                self.assertTrue(exercise.evidence.get('archives'), 'archive_diagnostic_missing')
+                record = exercise.evidence['archives'][-1]
+                index = 0 if kind in ('partial-escape', 'upper') else 1
+                self.assertEqual(record.get('failed_entry_index'), index, 'archive_failure_index_missing')
+                self.assertEqual(len(record['entries']), index + 1)
+                expected_class = {'nested-zip': 'zip', 'gzip': 'gzip', 'bytes': 'text', 'binary': 'binary',
+                                  'empty': 'empty', 'jsonl-unknown': 'jsonl'}.get(kind, 'json')
+                self.assertEqual(record['entries'][-1]['class'], expected_class, 'archive_class_wrong')
+                for entry in record['entries']:
+                    self.assertEqual(set(entry), {'name_sha256', 'bytes', 'class'})
+                    self.assertRegex(entry['name_sha256'], '^[0-9a-f]{64}$')
 
     def test_m2_schema_names_are_hashed_before_evidence(self):
         for kind in ('note', 'credential'):
@@ -984,8 +998,8 @@ class ExerciseTests(unittest.TestCase):
             self.assertIn('sha256:' + X.P.digest(payload.encode()), shapes[0]['params']['arguments'])
             self.assertEqual(evidence['credential_prefix_matches'], 0)
 
-    def test_m2_decoded_and_short_credential_check(self):
-        for secret in ('q"invented-secret-only', 'z"7'):
+    def test_m2_decoded_credential_check(self):
+        for secret in ('q"invented-secret-only',):
             clock = Clock(); server = FakeServer(clock)
             exercise = X.Exercise(BANK, server, clock, clock.sleep)
             e1 = exercise.e1
@@ -999,12 +1013,12 @@ class ExerciseTests(unittest.TestCase):
             self.assertGreater(evidence['credential_prefix_matches'], 0)
             self.assertFalse(any(secret in s for s in X.strings(evidence)), 'credential_disclosed')
 
-    def test_m2_short_credential_colliding_with_diagnostics(self):
-        for secret in ('s', '0', 'prefix'):
+    def test_m2_credential_colliding_with_diagnostics(self):
+        for secret in ('credential', 'prefix_matches'):
             clock = Clock(); server = FakeServer(clock)
             exercise = X.Exercise(BANK, server, clock, clock.sleep)
             code, evidence = self.main_result(exercise, server, secret)
-            self.assertEqual(code, 3, 'short_collision_not_refused')
+            self.assertEqual(code, 3, 'diagnostic_collision_not_refused')
             self.assertEqual(X.credential_matches(X.encode(evidence), secret), 0, 'fallback_disclosed_credential')
 
     def test_m3_successful_initialize_and_exclusive_list_result(self):
@@ -1033,7 +1047,7 @@ class ExerciseTests(unittest.TestCase):
                                      for _, _, b, _ in server.calls), 'rejected_session_used')
 
     def test_m4_foreign_session_id_refused_before_use(self):
-        for sid in (FOREIGN, 'prefix-' + FOREIGN + '-suffix'):
+        for sid in (FOREIGN, 'prefix-' + FOREIGN + '-suffix', FOREIGN.upper()):
             clock = Clock(); server = FakeServer(clock)
             exercise = X.Exercise(BANK, server, clock, clock.sleep)
             original = server.mcp
@@ -1157,6 +1171,138 @@ class ExerciseTests(unittest.TestCase):
                 self.assertEqual(exercise.evidence['other_bank_drift'], 'unattributed', 'growth_attributed')
                 self.assertFalse(exercise.evidence['cleanup_proofs']['other_counts_equal'])
 
+    def test_q1_rebuilds_every_import_and_discards_all_container_metadata(self):
+        original = self.server.answer
+        expected = []
+        payload = b'untrusted ' + FOREIGN.encode()
+        def metadata(method, path, body=None, **kwargs):
+            status, answer, sid = original(method, path, body, **kwargs)
+            if '/transfer/export?' in path:
+                key = self.server.ops[answer['operation_id']]['result_metadata']['download_url']
+                output = io.BytesIO()
+                with zipfile.ZipFile(io.BytesIO(self.server.downloads[key])) as old, zipfile.ZipFile(output, 'w') as new:
+                    info = zipfile.ZipInfo('data.json', (2026, 11, 12, 12, 34, 56))
+                    info.comment = payload
+                    info.extra = b'\xfe\xca' + len(payload).to_bytes(2, 'little') + payload
+                    new.writestr(info, old.read('data.json'))
+                    info = zipfile.ZipInfo('second.opaque', (2025, 1, 2, 3, 4, 6))
+                    info.compress_type = zipfile.ZIP_DEFLATED
+                    new.writestr(info, b'{"safe":1}\n{"safe":2}\n')
+                    new.comment = payload
+                raw = output.getvalue()
+                with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                    expected.append([(e.filename, z.read(e)) for e in z.infolist()])
+                self.server.downloads[key] = raw + b'trailing ' + payload
+            return status, answer, sid
+        self.server.answer = metadata
+        self.assertEqual(self.exercise.run(), 0, 'clean_entries_not_rebuilt')
+        imports = [b[b.index(b'PK'):].rsplit(b'\r\n--', 1)[0] for _, p, b, _ in self.server.calls if '/transfer/import?' in p]
+        self.assertEqual(len(imports), 2)
+        for raw, wanted in zip(imports, (expected[0], expected[2])):
+            self.assertNotIn(payload, raw, 'container_bytes_forwarded')
+            with zipfile.ZipFile(io.BytesIO(raw)) as z:
+                self.assertEqual(z.comment, b'')
+                self.assertEqual([(e.filename, z.read(e)) for e in z.infolist()], wanted, 'entry_bytes_changed')
+                for entry in z.infolist():
+                    self.assertEqual((entry.comment, entry.extra), (b'', b''), 'entry_metadata_forwarded')
+                    self.assertEqual(entry.compress_type, zipfile.ZIP_STORED)
+                    self.assertEqual(entry.date_time, (1980, 1, 1, 0, 0, 0))
+        for record in self.exercise.evidence['archives']:
+            self.assertIs(record['archive_rebuilt'], True)
+            self.assertNotIn('failed_entry_index', record)
+            self.assertEqual(record['container_removed'], {'archive_comment_bytes': len(payload),
+                'entry_comments': 1, 'entry_extra_fields': 1, 'compression_methods': [0, 8]})
+        self.assertNotIn(payload.decode(), json.dumps(self.exercise.evidence))
+
+    def test_q1_raw_guard_and_q4_casefold_before_dispatch(self):
+        self.exercise.preflight()
+        for body in (FOREIGN.encode(), FOREIGN.upper().encode(), b'STRASSE'):
+            if body == b'STRASSE':
+                self.exercise.before = {'Stra\u00dfe': 1}
+            with self.subTest(body_hash=X.P.digest(body)), \
+                 patch.object(self.server, 'exchange', return_value=(200, b'{}', None)) as dispatch:
+                with self.assertRaisesRegex(X.P.Stop, '^foreign_bank_in_body$'):
+                    self.exercise.change('PATCH', '/config', body)
+                dispatch.assert_not_called()
+
+    def test_q2_oversized_entry_keeps_diagnostic(self):
+        self.exercise.preflight(); self.exercise.create()
+        self.exercise.retain('invented-a', self.exercise.marker)
+        original = self.server.answer
+        def oversized(method, path, body=None, **kwargs):
+            status, answer, sid = original(method, path, body, **kwargs)
+            if '/transfer/export?' in path:
+                key = self.server.ops[answer['operation_id']]['result_metadata']['download_url']
+                output = io.BytesIO()
+                with zipfile.ZipFile(io.BytesIO(self.server.downloads[key])) as old, zipfile.ZipFile(output, 'w') as new:
+                    new.writestr('data.json', old.read('data.json'))
+                    new.writestr('oversized', b'x' * (X.MAX_BYTES + 1))
+                self.server.downloads[key] = output.getvalue()
+            return status, answer, sid
+        self.server.answer = oversized
+        with self.assertRaisesRegex(X.P.Stop, '^archive_too_large$'):
+            self.exercise.export({'invented-a': self.exercise.marker})
+        record = self.exercise.evidence['archives'][-1]
+        self.assertEqual(record['failed_entry_index'], 1)
+        self.assertEqual(record['entries'][1]['class'], 'text')
+        self.assertEqual(record['entries'][1]['bytes'], X.MAX_BYTES + 1)
+        self.assertNotIn('oversized', list(X.strings(record)))
+
+    def test_q3_short_credential_refuses_before_any_request(self):
+        for secret in ('a', 'z"7', '1234567'):
+            with tempfile.TemporaryDirectory() as tmp, patch.object(X.P, 'credential', return_value=secret), \
+                 patch.object(X, 'Wire', return_value=self.server) as wire, patch.object(X, 'Exercise', return_value=self.exercise), \
+                 patch.object(X.P, 'locked', contextlib.nullcontext), contextlib.redirect_stdout(io.StringIO()) as output:
+                path = Path(tmp, 'evidence')
+                code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+                self.assertEqual(code, 2, 'short_credential_admitted')
+                self.assertIn('credential_too_short', output.getvalue())
+                wire.assert_not_called()
+                self.assertFalse(path.exists(), 'short_credential_created_evidence')
+                self.assertFalse(self.server.calls)
+
+    def test_q5_unchanged_banks_have_no_unattributed_drift(self):
+        self.assertEqual(self.exercise.run(), 0)
+        self.assertFalse('other_bank_drift' in self.exercise.evidence, 'drift_without_growth')
+
+    def test_q5_summary_and_message_guards_have_admitted_credentials(self):
+        for mode, secret in (('summary', 'credential'), ('message', 'exercise')):
+            clock = Clock(); server = FakeServer(clock)
+            exercise = X.Exercise(BANK, server, clock, clock.sleep)
+            with tempfile.TemporaryDirectory() as tmp, patch.object(X.P, 'credential', return_value=secret), \
+                 patch.object(X, 'Wire', side_effect=RuntimeError if mode == 'message' else None, return_value=server), \
+                 patch.object(X, 'Exercise', return_value=exercise), patch.object(X.P, 'locked', contextlib.nullcontext), \
+                 contextlib.redirect_stdout(io.StringIO()) as output:
+                path = Path(tmp, 'evidence')
+                code = X.main(['--bank', BANK, '--credential-fd', '3', '--evidence', str(path)])
+                self.assertEqual(code, 3 if mode == 'summary' else 2)
+                self.assertFalse(secret in output.getvalue(), mode + '_credential_disclosed')
+                self.assertEqual(X.credential_matches(path.read_bytes(), secret), 0)
+
+    def test_r4_guard_removals_fail_in_process(self):
+        self.check_removals('r4', [
+            ('Q1-rebuild', 'test_q1_rebuilds_every_import_and_discards_all_container_metadata',
+             edited('export', 'raw = output.getvalue()', 'pass')),
+            ('Q1-raw', 'test_q1_raw_guard_and_q4_casefold_before_dispatch',
+             edited('change', "body.decode('utf-8', errors='replace') if isinstance(body, bytes) else body", 'None if isinstance(body, bytes) else body')),
+            ('Q2', 'test_m1_decoded_archive_keys_values_names_and_unmeasured_entries',
+             edited('export', "self.evidence.setdefault('archives', []).append(record)", 'pass')),
+            ('Q3', 'test_q3_short_credential_refuses_before_any_request',
+             edited('main', 'if len(secret) < 8:', 'if False:')),
+            ('Q4-raw', 'test_q1_raw_guard_and_q4_casefold_before_dispatch',
+             edited('no_foreign', 'bank.casefold() in text.casefold()', 'bank in text')),
+            ('Q4-archive', 'test_m1_decoded_archive_keys_values_names_and_unmeasured_entries',
+             edited('no_foreign', 'bank.casefold() in text.casefold()', 'bank in text')),
+            ('Q4-session', 'test_m4_foreign_session_id_refused_before_use',
+             edited('no_foreign', 'bank.casefold() in text.casefold()', 'bank in text')),
+            ('Q5-drift', 'test_q5_unchanged_banks_have_no_unattributed_drift',
+             edited('cleanup', "if any(v in ('grew', 'new') for v in comparison.values()):", 'if True:')),
+            ('Q5-summary', 'test_q5_summary_and_message_guards_have_admitted_credentials',
+             edited('main', 'if not credential_matches(summary, secret):', 'if True:')),
+            ('Q5-message', 'test_q5_summary_and_message_guards_have_admitted_credentials',
+             edited('main', 'if not secret or not credential_matches(encode(message), secret):', 'if True:')),
+        ])
+
     def test_r3_guard_removals_fail_in_process(self):
         original = X.P.require
         bypass = lambda code: patch.object(X.P, 'require', side_effect=lambda condition, actual:
@@ -1165,18 +1311,16 @@ class ExerciseTests(unittest.TestCase):
             ('M1-decoded', 'test_m1_decoded_archive_keys_values_names_and_unmeasured_entries',
              edited('export', "self.no_foreign(value, 'archive_foreign_bank')", 'pass')),
             ('M1-parse', 'test_m1_decoded_archive_keys_values_names_and_unmeasured_entries',
-             edited('export', "raise P.Stop('archive_unmeasured') from None", 'values = [None]')),
+             edited('export', "P.require(bool(values), 'archive_unmeasured')", 'pass')),
             ('M1-name', 'test_m1_decoded_archive_keys_values_names_and_unmeasured_entries',
              edited('export', "self.no_foreign(entry.filename, 'archive_foreign_bank')", 'pass')),
             ('M2-schema', 'test_m2_schema_names_are_hashed_before_evidence',
              edited('call', "'request_keys': keys(body)", "'request_keys': body")),
-            ('M2-decoded', 'test_m2_decoded_and_short_credential_check',
+            ('M2-decoded', 'test_m2_decoded_credential_check',
              edited('credential_matches', 'decoded = list(strings(load(raw)))', 'decoded = []')),
-            ('M2-short', 'test_m2_decoded_and_short_credential_check',
-             edited('credential_matches', 'min(8, len(secret))', '8')),
-            ('M2-fallback', 'test_m2_short_credential_colliding_with_diagnostics',
+            ('M2-fallback', 'test_m2_credential_colliding_with_diagnostics',
              edited('private_fallback', 'if secret and credential_matches(raw, secret):', 'if False:')),
-            ('M2-final-field', 'test_m2_short_credential_colliding_with_diagnostics',
+            ('M2-final-field', 'test_m2_credential_colliding_with_diagnostics',
              edited('main', "exercise.evidence['credential_prefix_matches'] = 0", 'pass')),
             ('M3-init', 'test_m3_successful_initialize_and_exclusive_list_result',
              edited('session', "isinstance(answer.get('result'), dict) and 'error' not in answer", 'True')),
@@ -1217,7 +1361,7 @@ class ExerciseTests(unittest.TestCase):
              edited('filtering', "self.denials[sid] = self.denial(baseline, sentinel)",
                     "self.denials[sid] = next(iter(self.denials.values()), self.denial(baseline, sentinel))")),
             ('L4-escaped', 'test_l4_json_escaped_body_and_cleanup_discovery',
-             edited('change', "self.no_foreign(body, 'foreign_bank_in_body')", 'pass')),
+             edited('change', "self.no_foreign(body.decode('utf-8', errors='replace') if isinstance(body, bytes) else body, 'foreign_bank_in_body')", 'pass')),
             ('L4-cleanup-poll', 'test_l4_json_escaped_body_and_cleanup_discovery',
              edited('cleanup', 'self.poll()  # Read-only discovery', 'pass  # Read-only discovery')),
             ('L4-subject', 'test_l4_recall_subject_and_fixed_catalog_order',
