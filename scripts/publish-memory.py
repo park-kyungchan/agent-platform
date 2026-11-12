@@ -260,6 +260,7 @@ def verify(client, pin):
             require(isinstance(fact.get('text'), str) and isinstance(fact.get('entities'), str), 'fact_shape')
             fact_ids.add(fact['id'])
         for term in want['terms']:
+            # Entities are plain names separated by ", ": HC 025-facts-tags-readback / 032-facts-page1.
             require(any(term in f['text'] or term in f['entities'] for f in facts), 'recall_term_missing')
     require(fact_ids == {x['id'] for x in all_facts}, 'fact_set_mismatch')
     traces = pages(client, '/llm-requests', limit=500)  # HC Profile/538

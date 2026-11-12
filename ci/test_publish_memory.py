@@ -54,7 +54,7 @@ class Stub:
         want = self.pin['expected']['invented']
         self.doc = {'id': 'invented', 'original_text': want['bytes'].decode(), 'tags': want['tags']}
         self.fact = {'id': 'fact-1', 'document_id': 'invented', 'text': 'ExampleID applies when closed.',
-                     'entities': '[]', 'tags': want['tags'], 'fact_type': 'world'}
+                     'entities': '', 'tags': want['tags'], 'fact_type': 'world'}  # Empty string is unmeasured.
         self.trace = {'id': 'trace-1', 'scope': 'retain_extract_facts', 'status': 'success',
                       'provider': 'invented-provider', 'model': 'invented-model',
                       'metadata': {'document_id': 'invented'}}
@@ -112,7 +112,7 @@ class PublisherTests(unittest.TestCase):
     def test_rejects_bytes_tags_terms_profile_trace_and_extra_ids(self):
         changes = [('/documents/invented', lambda a: dict(a, original_text='altered')),
                    ('/documents/invented', lambda a: dict(a, tags=[])),
-                   ('/memories/list', lambda a: dict(a, items=[dict(a['items'][0], text='omitted', entities='[]')])),
+                   ('/memories/list', lambda a: dict(a, items=[dict(a['items'][0], text='omitted', entities='')])),
                    ('/memories/list', lambda a: dict(a, items=[dict(a['items'][0], tags=[])])),
                    ('/memories/list', lambda a: dict(a, items=[dict(a['items'][0], document_id='foreign')])),
                    ('/version', lambda a: dict(a, api_version='unmeasured')),
@@ -131,8 +131,22 @@ class PublisherTests(unittest.TestCase):
 
     def test_entities_preserve_term_without_date_blanket_refusal(self):
         stub = Stub()
-        stub.fact.update(text='Condition applies.', entities='["ExampleID"]', occurred_start='2026-01-01')
+        stub.fact.update(text='Condition applies.', entities='Other entity, ExampleID', occurred_start='2026-01-01')
         with patch.object(P, 'unchanged'):
+            P.verify(stub, stub.pin)
+
+    def test_non_ascii_term_preserved_only_in_entities(self):
+        stub = Stub()
+        stub.pin['expected']['invented']['terms'] = ['\uac00']
+        stub.fact.update(text='Condition applies.', entities='Other entity, \uac00')
+        with patch.object(P, 'unchanged'):
+            P.verify(stub, stub.pin)
+
+    def test_entity_character_does_not_match_json_escape_fragment(self):
+        stub = Stub()
+        stub.pin['expected']['invented']['terms'] = ['uac00']
+        stub.fact.update(text='Condition applies.', entities='Other entity, \uac00')
+        with patch.object(P, 'unchanged'), self.assertRaisesRegex(P.Stop, '^recall_term_missing$'):
             P.verify(stub, stub.pin)
 
     def test_pagination_and_uncertain_lists(self):
