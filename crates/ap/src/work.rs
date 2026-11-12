@@ -130,7 +130,9 @@ fn agents(s: &mut impl System, code: &'static str, ms: u64) -> Result<Vec<Value>
     if !reply.success {
         return Err(error(code, "agents"));
     }
-    parse(reply, code)?["result"]["agents"]
+    let v = parse(reply, code)?;
+    require!(v.get("error").is_none() => code, "agents");
+    v["result"]["agents"]
         .as_array()
         .cloned()
         .ok_or_else(|| error(code, "agents"))
@@ -168,6 +170,54 @@ fn search(s: &mut impl System, r: &Value, kind: &str, filter: Value) -> Result<V
     };
     require!(!found.is_null() => missing, kind);
     Ok(found)
+}
+fn write_binding(pane: &str, tab: &str) -> Option<String> {
+    let binding = format!("ap-work/1:{}", json!([pane, tab]));
+    (!pane.is_empty() && !tab.is_empty() && binding.len() <= 200).then_some(binding)
+}
+fn read_binding(value: &Value) -> Option<(String, String)> {
+    let encoded = value.as_str()?;
+    let [pane, tab]: [String; 2] =
+        serde_json::from_str(encoded.strip_prefix("ap-work/1:")?).ok()?;
+    (write_binding(&pane, &tab)?.as_str() == encoded).then_some((pane, tab))
+}
+fn apply_answer(reply: Reply, code: &'static str) -> Result<Value, Failure> {
+    let success = reply.success;
+    let v = parse(reply, code)?;
+    require!(success || refused(&v) => code, "apply");
+    Ok(v)
+}
+fn applied_run<'a>(v: &'a Value, change: &str) -> Option<&'a Value> {
+    let edits = v["result"]["edits"].as_array()?;
+    let [edit] = edits.as_slice() else {
+        return None;
+    };
+    (v["status"] == "ok"
+        && v.get("error").is_none()
+        && edit["change"] == change
+        && complete_id(&edit["id"])
+        && edit["id"]["object_type"] == "worker_run")
+        .then_some(&edit["id"])
+}
+fn run_fields(s: &mut impl System, r: &Value, code: &'static str) -> Result<Value, Failure> {
+    let reply = ont(s, r, &["get"], &json!({"id":r["run"]})).map_err(|_| error(code, "run"))?;
+    require!(reply.success => code, "run");
+    let v = parse(reply, code)?;
+    require!(v["status"] == "ok" && v.get("code").is_none() && v.get("error").is_none() => code, "run");
+    let objects = v["result"]["objects"]
+        .as_array()
+        .ok_or_else(|| error(code, "run"))?;
+    require!(objects.len() == 1 && objects[0]["id"] == r["run"] => code, "run");
+    let object = &objects[0];
+    let head = text(object, "head").map_err(|_| error(code, "run"))?;
+    let heads: Vec<_> = object["observations"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|o| o["revision"] == head)
+        .collect();
+    require!(heads.len() == 1 && heads[0]["change"] != "retraction" && heads[0]["fields"].is_object() => code, "run");
+    Ok(heads[0]["fields"].clone())
 }
 fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let name = r["name"]
@@ -230,7 +280,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         json!({"all":[{"eq":["task",task]},{"eq":["key",text(r,"thread")?]}]}),
     )?;
     let plan = search(s, r, "plan", json!({"eq":["thread",thread]}))?;
-    let mut body = json!({"action_type":"start_worker_run","parameters":{"task":task,"name":name,"packet":file_id("packet",packet)?,"runtime":"codex","session":"pending","thread":thread,"plan":plan,"tier":text(r,"tier")?,"layer":text(r,"layer")?}});
+    let mut body = json!({"action_type":"start_worker_run","parameters":{"task":task,"name":name,"packet":file_id("packet",packet)?,"runtime":"codex","thread":thread,"plan":plan,"tier":text(r,"tier")?,"layer":text(r,"layer")?}});
     let v = parse(
         ont(s, r, &["action", "validate"], &body)?,
         "store_answer_unreadable",
@@ -244,12 +294,14 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         require!(a.success => "tab_create_failed", "tab");
         parse(a, "tab_create_failed")
     }).map_err(|_| error("tab_create_failed","tab"))?;
+    require!(created.get("error").is_none() => "tab_create_failed", "tab");
     let tab = created["result"]["tab"]["tab_id"]
         .as_str()
         .ok_or_else(|| error("tab_create_failed", "tab"))?;
     let pane = created["result"]["root_pane"]["pane_id"]
         .as_str()
         .ok_or_else(|| error("tab_create_failed", "pane"))?;
+    let binding = write_binding(pane, tab).ok_or_else(|| error("tab_create_failed", "binding"))?;
     let context = json!({"tab":tab,"pane":pane});
     let launch = herdr!(s, 90_000; "agent", "start", name, "--kind", "codex", "--pane", pane, "--timeout", "90000", "--", "--no-daemon", "-C", cwd, "-m", text(r,"model")?, "-c", &format!("model_reasoning_effort={}",text(r,"effort")?), "--dangerously-bypass-approvals-and-sandbox");
     if !acknowledged(launch) {
@@ -259,12 +311,12 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let session = loop {
         let remaining = deadline.saturating_duration_since(s.now()).as_millis() as u64;
         if remaining == 0 {
-            return Err(fail("session_not_reported", "session", context));
+            return Err(fail("agent_not_ready", "agent", context));
         }
-        let list = agents(s, "session_not_reported", remaining.min(5_000))
-            .map_err(|_| fail("session_not_reported", "session", context.clone()))?;
+        let list = agents(s, "agent_not_ready", remaining.min(5_000))
+            .map_err(|_| fail("agent_not_ready", "agent", context.clone()))?;
         if s.now() >= deadline {
-            return Err(fail("session_not_reported", "session", context));
+            return Err(fail("agent_not_ready", "agent", context));
         }
         if list
             .iter()
@@ -272,22 +324,25 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         {
             return Err(fail("agent_identity_conflict", "session", context));
         }
-        if let Some(a) = list
-            .iter()
-            .find(|a| a["name"] == name && a["pane_id"] == pane)
-            && let Some(sid) = a["agent_session"]["value"]
+        if let Some(a) = list.iter().find(|a| {
+            a["name"] == name
+                && a["pane_id"] == pane
+                && a["tab_id"] == tab
+                && a["agent"] == "codex"
+                && a["interactive_ready"] == true
+        }) {
+            break a["agent_session"]["value"]
                 .as_str()
                 .filter(|s| !s.is_empty())
-        {
-            break sid.to_owned();
+                .map(str::to_owned);
         }
         s.pause(Duration::from_millis(250).min(deadline.saturating_duration_since(s.now())));
     };
     let request = format!("start-{name}-{}", &digest(&bytes)[..12]);
-    body["parameters"]["session"] = json!(session);
+    body["parameters"]["session"] = json!(binding);
     body["request_id"] = json!(request);
     let applied = ont(s, r, &["action", "apply", "--client", "lead"], &body)
-        .and_then(|a| parse(a, "store_start_uncertain"));
+        .and_then(|a| apply_answer(a, "store_start_uncertain"));
     let applied = match applied {
         Ok(v) if refused(&v) => {
             let closed = acknowledged(herdr!(s, 5_000; "tab", "close", tab));
@@ -299,13 +354,8 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         Ok(v) => v,
         Err(_) => Value::Null,
     };
-    let run = applied["result"]["edits"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|e| e["change"] == "initial")
-        .and_then(|e| e.get("id"))
-        .filter(|id| complete_id(id) && applied["status"] == "ok");
+    let run =
+        applied_run(&applied, "initial").filter(|_| applied["result"]["outcome"] == "applied");
     let Some(run) = run else {
         return Err(fail(
             "store_start_uncertain",
@@ -315,47 +365,69 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     };
     let prompt = herdr!(s, 30_000; "agent", "prompt", pane, &format!("Read the file {packet} and do exactly what it says. Never open a question dialog and never wait for an answer: a point that only the Lead can decide goes into your report, and you continue with every step that does not depend on it."), "--wait", "--until", "working", "--until", "blocked", "--timeout", "30000");
     Ok(
-        json!({"status":"started","run":run,"session":session,"pane":pane,"tab":tab,"prompt_target":pane,"worktree_head":worktree_head,"prompt":if acknowledged(prompt) {"sent"} else {"uncertain"}}),
+        json!({"status":"started","run":run,"binding":binding,"session":session,"pane":pane,"tab":tab,"prompt_target":pane,"worktree_head":worktree_head,"prompt":if acknowledged(prompt) {"sent"} else {"uncertain"}}),
     )
 }
 fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
-    let name = text(r, "name")?;
-    let tab = text(r, "tab")?;
-    let reply =
-        herdr!(s, 5_000; "tab", "get", tab).map_err(|_| error("herdr_answer_unreadable", "tab"))?;
+    let fields = run_fields(s, r, "store_run_unreadable")?;
+    require!(fields["status"]["value"] == "running" => "worker_run_not_running", "run");
+    let (pane, tab) = read_binding(&fields["session"]["value"])
+        .ok_or_else(|| error("run_binding_missing", "run"))?;
+    let name = text(&fields["name"], "value").map_err(|_| error("store_run_unreadable", "name"))?;
+    require!(r["name"] == name && r["tab"] == tab => "tab_not_owned", "run");
+    let reply = herdr!(s, 5_000; "tab", "get", &tab)
+        .map_err(|_| error("herdr_answer_unreadable", "tab"))?;
     require!(reply.success => "herdr_answer_unreadable", "tab");
     let v = parse(reply, "herdr_answer_unreadable")?;
-    require!(v["result"]["tab"]["label"] == name && v["result"]["tab"]["pane_count"] == 1 => "tab_not_owned", "tab");
+    require!(v.get("error").is_none() => "herdr_answer_unreadable", "tab");
+    require!(v["result"]["tab"]["tab_id"] == tab && v["result"]["tab"]["label"] == name && v["result"]["tab"]["pane_count"] == 1 => "tab_not_owned", "tab");
+    let reply = herdr!(s, 5_000; "pane", "get", &pane)
+        .map_err(|_| error("herdr_answer_unreadable", "pane"))?;
+    require!(reply.success => "herdr_answer_unreadable", "pane");
+    let v = parse(reply, "herdr_answer_unreadable")?;
+    require!(v.get("error").is_none() => "herdr_answer_unreadable", "pane");
+    require!(v["result"]["pane"]["pane_id"] == pane && v["result"]["pane"]["tab_id"] == tab => "tab_not_owned", "pane");
     let list = agents(s, "agent_status_unreadable", 5_000)?;
     if r["agent_gone"] == true {
-        require!(!list.iter().any(|a| a["name"] == name || a["tab_id"] == tab) => "tab_not_owned", "tab");
+        require!(!list.iter().any(|a| a["name"] == name || a["tab_id"] == tab || a["pane_id"] == pane) => "tab_not_owned", "tab");
     }
-    match list.iter().find(|a| a["name"] == name) {
+    let session = match list.iter().find(|a| a["name"] == name) {
         Some(a) => {
-            require!(a["tab_id"] == tab && a["agent_session"]["value"] == r["session"] => "tab_not_owned", "tab");
+            require!(a["tab_id"] == tab && a["pane_id"] == pane => "tab_not_owned", "tab");
             match a["agent_status"].as_str() {
                 Some("idle" | "done" | "blocked") => (),
                 Some("working") => return Err(error("agent_still_working", "name")),
                 _ => return Err(error("agent_status_unknown", "name")),
             }
+            let session = a["agent_session"]["value"]
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| error("session_not_reported", "session"))?;
+            if !r["session"].is_null() {
+                require!(text(r, "session")? == session => "session_mismatch", "session");
+            }
+            session
         }
-        None if r["agent_gone"] == true => (),
+        None if r["agent_gone"] == true => "unavailable (agent_gone)",
         None => return Err(error("agent_not_listed", "name")),
-    }
-    let result = text(r, "result")?;
+    };
+    let result = format!("{}; session={session}", text(r, "result")?);
     require!(result.len() <= 600 => "invalid_input", "result");
     let mut body = json!({"action_type":"close_worker_run","request_id":format!("close-{}", &digest(text(&r["run"],"native_key")?.as_bytes())[..32]),"parameters":{"worker_run":r["run"],"result":result}});
     if let Some(report) = r["report"].as_str() {
         body["parameters"]["report"] = file_id("report", report)?;
     }
     let v = ont(s, r, &["action", "apply", "--client", "lead"], &body)
-        .and_then(|a| parse(a, "store_close_uncertain"))
+        .and_then(|a| apply_answer(a, "store_close_uncertain"))
         .map_err(|_| fail("store_close_uncertain", "apply", Value::Null))?;
     if refused(&v) {
         return Err(fail("store_close_refused", "apply", codes(&v)));
     }
-    require!(v["status"] == "ok" => "store_close_uncertain", "apply");
-    let closed = acknowledged(herdr!(s, 5_000; "tab","close",tab));
+    require!(applied_run(&v, "update") == Some(&r["run"]) => "store_close_uncertain", "apply");
+    let closed_fields = run_fields(s, r, "store_close_uncertain")?;
+    require!(closed_fields["status"]["value"] == "closed" && closed_fields["result"]["value"] == result
+        && closed_fields["name"] == fields["name"] && closed_fields["session"] == fields["session"] => "store_close_uncertain", "run");
+    let closed = acknowledged(herdr!(s, 5_000; "tab","close",&tab));
     Ok(json!({"status":"closed","outcome":v["result"]["outcome"],"tab_closed":closed}))
 }
 fn wait(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
@@ -408,12 +480,12 @@ pub fn execute(s: &mut impl System, verb: &str, r: &Value) -> Result<(Value, u8)
         }
     }
     if verb == "close" {
-        require!(complete_id(&r["run"]) => "invalid_input", "run");
+        require!(complete_id(&r["run"]) && r["run"]["object_type"] == "worker_run" => "invalid_input", "run");
     }
     let required = match verb {
         "start" => "packet report task_dir thread tier layer cwd workspace model effort",
         "wait" => "name report",
-        "close" => "name tab result session",
+        "close" => "name tab result",
         _ => return Err(fail("usage", "args", Value::Null)),
     };
     for key in required.split_whitespace() {
@@ -433,10 +505,18 @@ pub fn execute(s: &mut impl System, verb: &str, r: &Value) -> Result<(Value, u8)
     Ok((value, status))
 }
 fn complete_id(v: &Value) -> bool {
-    v.is_object()
-        && v["object_type"].is_string()
-        && v["native_key"].is_string()
-        && v["namespace"].is_object()
+    [
+        "/object_type",
+        "/native_key",
+        "/namespace/instance",
+        "/namespace/account",
+    ]
+    .iter()
+    .all(|p| {
+        v.pointer(p)
+            .and_then(Value::as_str)
+            .is_some_and(|s| !s.is_empty())
+    })
 }
 fn refused(v: &Value) -> bool {
     v.is_object() && (v["status"].as_str().is_some_and(|s| s != "ok") || v["code"].is_string())

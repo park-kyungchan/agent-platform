@@ -121,6 +121,21 @@ fn row(kind: &str) -> Value {
 fn hash(bytes: &[u8], n: usize) -> String {
     format!("{:x}", Sha256::digest(bytes))[..n].into()
 }
+const BINDING: &str = r#"ap-work/1:["w1:p2","w1:t2"]"#;
+fn codex_fixture(after: bool) -> Value {
+    serde_json::from_str(if after {
+        include_str!("fixtures/work-codex-after.json")
+    } else {
+        include_str!("fixtures/work-codex-before.json")
+    })
+    .unwrap()
+}
+fn run_row(status: &str, result: &str) -> Value {
+    json!({"status":"ok","result":{"objects":[{"id":id("worker_run"),"head":"current","observations":[
+        {"revision":"old","fields":{"session":{"kind":"value","value":"obsolete-session"},"status":{"kind":"value","value":"running"}}},
+        {"revision":"current","change":"update","fields":{"name":{"kind":"value","value":"worker"},"status":{"kind":"value","value":status},"session":{"kind":"value","value":BINDING},"result":{"kind":"value","value":result}}}
+    ]}]}})
+}
 fn start_setup() -> (Value, Vec<Step>) {
     let r = json!({"name":"worker","packet":PACKET,"report":REPORT,"task_dir":"/home/palantirkc/work/example","thread":"P12","layer":"harness","tier":"bounded","cwd":"/example","workspace":"w1","model":"fixture-model","effort":"medium","store":"/scratch/store"});
     let mut prompt = step(
@@ -152,15 +167,16 @@ fn start_setup() -> (Value, Vec<Step>) {
             "agent start worker --kind codex --pane w1:p2 --timeout 90000 -- --no-daemon -C /example -m fixture-model -c model_reasoning_effort=medium --dangerously-bypass-approvals-and-sandbox",
             json!({"result":{}}),
         ),
-        step(
-            "herdr",
-            "agent list",
-            json!({"result":{"agents":[{"name":"other","pane_id":"w1:p9","tab_id":"w1:t9","agent_status":"idle","agent_session":{"value":"wrong-session"}},{"name":"worker","pane_id":"w1:p2","tab_id":"w1:t2","agent_status":"idle","agent_session":{"value":"fixture-session"}}]}}),
-        ),
+        step("herdr", "agent list", {
+            let mut v = codex_fixture(false);
+            v["result"]["agents"].as_array_mut().unwrap().insert(0,
+                    json!({"name":"other","pane_id":"w1:p9","tab_id":"w1:t9","agent_status":"idle","agent_session":{"value":"wrong-session"}}));
+            v
+        }),
         step(
             "ont",
             "action apply --client lead --store /scratch/store",
-            json!({"status":"ok","result":{"edits":[{"change":"initial","id":id("worker_run")}]}}),
+            json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"initial","id":id("worker_run")}]}}),
         ),
         prompt,
     ];
@@ -170,9 +186,9 @@ fn start_setup() -> (Value, Vec<Step>) {
     );
     steps[1].body =
         Some(json!({"object_type":"plan","where":{"eq":["thread",id("thread")]},"limit":200}));
-    let mut body = json!({"action_type":"start_worker_run","parameters":{"task":task,"name":"worker","packet":{"object_type":"packet","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"example/TASK.md"},"runtime":"codex","session":"pending","thread":id("thread"),"plan":id("plan"),"tier":"bounded","layer":"harness"}});
+    let mut body = json!({"action_type":"start_worker_run","parameters":{"task":task,"name":"worker","packet":{"object_type":"packet","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"example/TASK.md"},"runtime":"codex","thread":id("thread"),"plan":id("plan"),"tier":"bounded","layer":"harness"}});
     steps[2].body = Some(body.clone());
-    body["parameters"]["session"] = json!("fixture-session");
+    body["parameters"]["session"] = json!(BINDING);
     body["request_id"] = json!(format!("start-worker-{}", hash(BYTES, 12)));
     steps[7].body = Some(body);
     steps[5].ms = 90_000;
@@ -287,8 +303,8 @@ fn start_answer_refusals_and_controls() {
             "tab_create_failed",
         ),
         (5, Response::Failed, "agent_start_failed"),
-        (6, Response::Unreadable, "session_not_reported"),
-        (6, Response::Failed, "session_not_reported"),
+        (6, Response::Unreadable, "agent_not_ready"),
+        (6, Response::Failed, "agent_not_ready"),
         (7, Response::Unreadable, "store_start_uncertain"),
         (7, Response::Failed, "store_start_uncertain"),
     ];
@@ -302,9 +318,9 @@ fn start_answer_refusals_and_controls() {
         json!({}),
         Value::Null,
         json!({"status":"ok"}),
-        json!({"result":{"edits":[{"change":"initial","id":id("worker_run")}]}}),
-        json!({"status":"ok","result":{"edits":[{"change":"initial","id":null}]}}),
-        json!({"status":"ok","result":{"edits":[{"change":"initial","id":{"native_key":"partial"}}]}}),
+        json!({"result":{"outcome":"applied","edits":[{"change":"initial","id":id("worker_run")}]}}),
+        json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"initial","id":null}]}}),
+        json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"initial","id":{"native_key":"partial"}}]}}),
     ] {
         let (r, mut steps) = start_setup();
         steps.truncate(8);
@@ -350,7 +366,7 @@ fn start_success_prompt_control_and_deadline() {
     let (r, mut steps) = start_setup();
     steps.truncate(7);
     steps[6].elapsed = 60_000;
-    check_error(Script::new(steps), "start", &r, "session_not_reported");
+    check_error(Script::new(steps), "start", &r, "agent_not_ready");
     let (r, mut steps) = start_setup();
     steps.truncate(7);
     steps[6].response = Response::Json(json!({"result":{"agents":[]}}));
@@ -363,7 +379,7 @@ fn start_success_prompt_control_and_deadline() {
     final_read.ms = 750;
     final_read.elapsed = 750;
     steps.push(final_read);
-    check_error(Script::new(steps), "start", &r, "session_not_reported");
+    check_error(Script::new(steps), "start", &r, "agent_not_ready");
 }
 #[test]
 fn pagination_and_ambiguity() {
@@ -400,81 +416,101 @@ fn pagination_and_ambiguity() {
     }
 }
 fn close_setup() -> (Value, Vec<Step>) {
-    let r = json!({"run":id("worker_run"),"name":"worker","tab":"w1:t2","session":"fixture-session","result":"finished","report":REPORT,"store":"/scratch/store"});
+    let r = json!({"run":id("worker_run"),"name":"worker","tab":"w1:t2","result":"finished","report":REPORT,"store":"/scratch/store"});
     let mut steps = vec![
+        step("ont", "get --store /scratch/store", run_row("running", "")),
         step(
             "herdr",
             "tab get w1:t2",
-            json!({"result":{"tab":{"label":"worker","pane_count":1}}}),
+            json!({"result":{"tab":{"tab_id":"w1:t2","label":"worker","pane_count":1}}}),
         ),
         step(
             "herdr",
-            "agent list",
-            json!({"result":{"agents":[{"name":"worker","pane_id":"w1:p2","tab_id":"w1:t2","agent_session":{"value":"fixture-session"},"agent_status":"idle"}]}}),
+            "pane get w1:p2",
+            json!({"result":{"pane":{"pane_id":"w1:p2","tab_id":"w1:t2"}}}),
         ),
+        step("herdr", "agent list", {
+            let mut v = codex_fixture(true);
+            v["result"]["agents"][0]["agent_status"] = json!("idle");
+            v
+        }),
         step(
             "ont",
             "action apply --client lead --store /scratch/store",
-            json!({"status":"ok","result":{"outcome":"applied"}}),
+            json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"update","id":id("worker_run")}]}}),
+        ),
+        step(
+            "ont",
+            "get --store /scratch/store",
+            run_row("closed", "finished; session=fixture-session"),
         ),
         step("herdr", "tab close w1:t2", json!({"result":{}})),
     ];
-    steps[2].ms = 30_000;
-    steps[2].body = Some(
-        json!({"action_type":"close_worker_run","request_id":format!("close-{}",hash(b"worker_run",32)),"parameters":{"worker_run":id("worker_run"),"result":"finished","report":{"object_type":"report","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"example/REPORT.md"}}}),
+    for i in [0, 4, 5] {
+        steps[i].ms = 30_000;
+    }
+    for i in [0, 5] {
+        steps[i].body = Some(json!({"id":id("worker_run")}));
+    }
+    steps[4].body = Some(
+        json!({"action_type":"close_worker_run","request_id":format!("close-{}",hash(b"worker_run",32)),"parameters":{"worker_run":id("worker_run"),"result":"finished; session=fixture-session","report":{"object_type":"report","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"example/REPORT.md"}}}),
     );
     (r, steps)
 }
 #[test]
 fn close_refusals_and_controls() {
     for (at, response, code) in [
-        (0, Response::Unreadable, "herdr_answer_unreadable"),
-        (0, Response::Failed, "herdr_answer_unreadable"),
-        (
-            0,
-            Response::Json(json!({"result":{"tab":{"label":"other","pane_count":1}}})),
-            "tab_not_owned",
-        ),
-        (
-            0,
-            Response::Json(json!({"result":{"tab":{"label":"worker-old","pane_count":1}}})),
-            "tab_not_owned",
-        ),
-        (1, Response::Unreadable, "agent_status_unreadable"),
-        (1, Response::Failed, "agent_status_unreadable"),
+        (1, Response::Unreadable, "herdr_answer_unreadable"),
+        (1, Response::Failed, "herdr_answer_unreadable"),
         (
             1,
+            Response::Json(
+                json!({"result":{"tab":{"tab_id":"w1:t2","label":"other","pane_count":1}}}),
+            ),
+            "tab_not_owned",
+        ),
+        (
+            1,
+            Response::Json(
+                json!({"result":{"tab":{"tab_id":"w1:t2","label":"worker-old","pane_count":1}}}),
+            ),
+            "tab_not_owned",
+        ),
+        (3, Response::Unreadable, "agent_status_unreadable"),
+        (3, Response::Failed, "agent_status_unreadable"),
+        (
+            3,
             Response::Json(json!({"result":{"agents":[]}})),
             "agent_not_listed",
         ),
         (
-            1,
+            3,
             Response::Json(
                 json!({"result":{"agents":[{"name":"worker","pane_id":"w1:p2","tab_id":"w1:t2","agent_session":{"value":"fixture-session"},"agent_status":"working"}]}}),
             ),
             "agent_still_working",
         ),
         (
-            1,
+            3,
             Response::Json(
                 json!({"result":{"agents":[{"name":"worker","pane_id":"w1:p2","tab_id":"w1:t2","agent_session":{"value":"fixture-session"},"agent_status":"unknown"}]}}),
             ),
             "agent_status_unknown",
         ),
         (
-            2,
+            4,
             Response::Json(json!({"status":"error","code":"denied"})),
             "store_close_refused",
         ),
         (
-            2,
+            4,
             Response::Json(json!({"status":"ok","code":"denied"})),
             "store_close_refused",
         ),
-        (2, Response::Json(json!({})), "store_close_uncertain"),
-        (2, Response::Json(Value::Null), "store_close_uncertain"),
-        (2, Response::Failed, "store_close_uncertain"),
-        (2, Response::Unreadable, "store_close_uncertain"),
+        (4, Response::Json(json!({})), "store_close_uncertain"),
+        (4, Response::Json(Value::Null), "store_close_uncertain"),
+        (4, Response::Failed, "store_close_uncertain"),
+        (4, Response::Unreadable, "store_close_uncertain"),
     ] {
         let (r, mut steps) = close_setup();
         steps.truncate(at + 1);
@@ -489,7 +525,7 @@ fn close_refusals_and_controls() {
         let (mut r, mut steps) = close_setup();
         r[key] = v;
         if key == "result" {
-            steps.truncate(2);
+            steps.truncate(4);
         } else {
             steps.clear();
         }
@@ -501,14 +537,19 @@ fn close_success_and_cleanup_failure() {
     for status in ["idle", "done", "blocked", "gone"] {
         for failed in [false, true] {
             let (mut r, mut steps) = close_setup();
-            steps[1].response = Response::Json(if status == "gone" {
+            steps[3].response = Response::Json(if status == "gone" {
                 json!({"result":{"agents":[]}})
             } else {
                 json!({"result":{"agents":[{"name":"worker","pane_id":"w1:p2","tab_id":"w1:t2","agent_session":{"value":"fixture-session"},"agent_status":status}]}})
             });
             r["agent_gone"] = json!(status == "gone");
+            if status == "gone" {
+                let result = "finished; session=unavailable (agent_gone)";
+                steps[4].body.as_mut().unwrap()["parameters"]["result"] = json!(result);
+                steps[5].response = Response::Json(run_row("closed", result));
+            }
             if failed {
-                steps[3].response = Response::Failed;
+                steps[6].response = Response::Failed;
             }
             let mut s = Script::new(steps);
             let (v, exit) = execute(&mut s, "close", &r).unwrap();
@@ -656,13 +697,13 @@ fn input_and_native_exit_refusals() {
     git.success = false;
     check_error(Script::new(vec![git]), "start", &r, "io_error");
     let (r, mut steps) = close_setup();
-    steps.truncate(1);
-    steps[0].success = false;
+    steps.truncate(2);
+    steps[1].success = false;
     check_error(Script::new(steps), "close", &r, "herdr_answer_unreadable");
     let (mut r, steps) = close_setup();
     r["report"] = json!("/outside/REPORT.md");
     check_error(
-        Script::new(steps.into_iter().take(2).collect()),
+        Script::new(steps.into_iter().take(4).collect()),
         "close",
         &r,
         "invalid_input",
@@ -817,26 +858,28 @@ fn work_help_names_commands_without_changing_global_help() {
 }
 #[test]
 fn close_binds_tab_session_and_single_pane() {
-    let (mut r, _) = close_setup();
-    r.as_object_mut().unwrap().remove("session");
-    check_error(Script::new(vec![]), "close", &r, "invalid_input");
+    let (r, steps) = close_setup();
+    let mut s = Script::new(steps);
+    assert_eq!(execute(&mut s, "close", &r).unwrap().0["status"], "closed");
+    s.finish();
     for count in [json!(2), Value::Null] {
         let (r, mut steps) = close_setup();
-        steps.truncate(1);
-        steps[0].response =
-            Response::Json(json!({"result":{"tab":{"label":"worker","pane_count":count}}}));
+        steps.truncate(2);
+        steps[1].response = Response::Json(
+            json!({"result":{"tab":{"tab_id":"w1:t2","label":"worker","pane_count":count}}}),
+        );
         check_error(Script::new(steps), "close", &r, "tab_not_owned");
     }
     for (key, value, gone) in [
         ("tab_id", json!("w1:t9"), false),
-        ("agent_session", json!({"value":"another-session"}), false),
+        ("pane_id", json!("w1:p9"), false),
         ("name", json!("worker"), true),
         ("name", json!("replacement"), true),
     ] {
         let (mut r, mut steps) = close_setup();
         r["agent_gone"] = json!(gone);
-        steps.truncate(2);
-        if let Response::Json(v) = &mut steps[1].response {
+        steps.truncate(4);
+        if let Response::Json(v) = &mut steps[3].response {
             v["result"]["agents"][0][key] = value;
         }
         check_error(Script::new(steps), "close", &r, "tab_not_owned");
@@ -859,13 +902,14 @@ fn start_binds_session_to_created_pane() {
         let invalid = step(
             "herdr",
             "agent list",
-            json!({"result":{"agents":[{"name":"worker","pane_id":"w1:p2","tab_id":"w1:t2","agent_status":"idle","agent_session":session}]}}),
+            json!({"result":{"agents":[{"name":"worker","pane_id":"w1:p2","tab_id":"w1:t2","agent":"codex","interactive_ready":true,"agent_status":"idle","agent_session":session}]}}),
         );
-        steps.insert(6, invalid);
+        steps[6] = invalid;
         let mut s = Script::new(steps);
         let (v, exit) = execute(&mut s, "start", &r).unwrap();
         assert_eq!(exit, 0);
-        assert_eq!(v["session"], "fixture-session");
+        assert_eq!(v["session"], Value::Null);
+        assert_eq!(v["binding"], BINDING);
         s.finish();
     }
 }
@@ -909,8 +953,8 @@ fn prompt_requires_acknowledgement() {
 fn tab_close_requires_acknowledgement() {
     for (response, success) in unacknowledged_replies() {
         let (r, mut steps) = close_setup();
-        steps[3].response = response;
-        steps[3].success = success;
+        steps[6].response = response;
+        steps[6].success = success;
         let mut s = Script::new(steps);
         let (v, exit) = execute(&mut s, "close", &r).unwrap();
         assert_eq!(exit, 3);
@@ -1011,4 +1055,335 @@ fn nonzero_rev_parse_is_io_error() {
     head.response = Response::Raw(vec![]);
     head.success = false;
     check_error(Script::new(vec![status, head]), "start", &r, "io_error");
+}
+
+#[test]
+fn codex_capture_lifecycle_records_before_prompt_and_session_at_close() {
+    let (r, steps) = start_setup();
+    let mut s = Script::new(steps);
+    let (started, status) = execute(&mut s, "start", &r).unwrap();
+    assert_eq!(status, 0);
+    assert_eq!(started["run"], id("worker_run"));
+    assert_eq!(started["session"], Value::Null);
+    assert_eq!(started["binding"], BINDING);
+    assert_eq!(started["pane"], "w1:p2");
+    assert_eq!(started["tab"], "w1:t2");
+    assert_eq!(started["prompt"], "sent");
+    s.finish(); // The script requires apply before exactly one prompt, with no later poll.
+    let (mut r, steps) = close_setup();
+    r["run"] = started["run"].clone();
+    s.steps = steps.into();
+    assert_eq!(execute(&mut s, "close", &r).unwrap().0["status"], "closed");
+    s.finish(); // The close body and readback include the session from the after fixture.
+}
+#[test]
+fn start_requires_one_initial_worker_run_before_prompt() {
+    for edits in [
+        json!([]),
+        json!([{"change":"initial","id":id("plan")}]),
+        json!([{"change":"update","id":id("worker_run")}]),
+        json!([{"change":"initial","id":id("worker_run")},{"change":"initial","id":id("worker_run")}]),
+    ] {
+        let (r, mut steps) = start_setup();
+        steps.truncate(8);
+        steps[7].response =
+            Response::Json(json!({"status":"ok","result":{"outcome":"applied","edits":edits}}));
+        check_error(Script::new(steps), "start", &r, "store_start_uncertain");
+    }
+    let (r, mut steps) = start_setup();
+    steps.truncate(8);
+    steps[7].success = false;
+    check_error(Script::new(steps), "start", &r, "store_start_uncertain");
+}
+#[test]
+fn start_requires_created_tab_kind_and_interactive_readiness() {
+    for (key, value) in [
+        ("tab_id", json!("w1:t9")),
+        ("agent", json!("claude")),
+        ("interactive_ready", json!(false)),
+        ("interactive_ready", Value::Null),
+    ] {
+        let (r, mut steps) = start_setup();
+        steps.truncate(7);
+        if let Response::Json(v) = &mut steps[6].response {
+            v["result"]["agents"][1][key] = value;
+        }
+        steps[6].elapsed = 59_750;
+        check_error(Script::new(steps), "start", &r, "agent_not_ready");
+    }
+    let (r, mut steps) = start_setup();
+    steps[6].response = Response::Json(codex_fixture(true));
+    let mut s = Script::new(steps);
+    let (v, _) = execute(&mut s, "start", &r).unwrap();
+    assert_eq!(v["session"], "fixture-session");
+    assert_eq!(v["binding"], BINDING); // Still stores the binding when a session is known.
+    s.finish();
+}
+#[test]
+fn close_rejects_unbound_and_noncanonical_bindings() {
+    for binding in [
+        Value::Null,
+        json!("01abcdef-fixture-id"),
+        json!("unknown"),
+        json!(""),
+        json!(r#"ap-work/1:["w1:p2","w1:t2","extra"]"#),
+        json!(r#"ap-work/1:["w1:p2", "w1:t2"]"#),
+        json!(r#"ap-work/1:["","w1:t2"]"#),
+        json!(r#"ap-work/1:["w1:p2",2]"#),
+        json!(format!("ap-work/1:{}", json!(["x".repeat(200), "w1:t2"]))),
+    ] {
+        for gone in [false, true] {
+            let (mut r, mut steps) = close_setup();
+            r["agent_gone"] = json!(gone);
+            steps.truncate(1);
+            if let Response::Json(v) = &mut steps[0].response {
+                v["result"]["objects"][0]["observations"][1]["fields"]["session"]["value"] =
+                    binding.clone();
+            }
+            check_error(Script::new(steps), "close", &r, "run_binding_missing");
+        }
+    }
+    let (r, mut steps) = close_setup();
+    steps.truncate(1);
+    if let Response::Json(v) = &mut steps[0].response {
+        v["result"]["objects"][0]["observations"][1]["fields"]
+            .as_object_mut()
+            .unwrap()
+            .remove("session");
+    }
+    check_error(Script::new(steps), "close", &r, "run_binding_missing");
+}
+#[test]
+fn close_checks_exact_run_and_sole_bound_pane_even_when_gone() {
+    let (r, mut steps) = close_setup();
+    steps.truncate(1);
+    steps[0].response = Response::Json(run_row("closed", "finished"));
+    check_error(Script::new(steps), "close", &r, "worker_run_not_running");
+    for gone in [false, true] {
+        let (mut r, mut steps) = close_setup();
+        r["agent_gone"] = json!(gone);
+        steps.truncate(3);
+        steps[2].response =
+            Response::Json(json!({"result":{"pane":{"pane_id":"w1:p2","tab_id":"w1:t9"}}}));
+        check_error(Script::new(steps), "close", &r, "tab_not_owned");
+    }
+    for key in ["name", "tab"] {
+        let (mut r, mut steps) = close_setup();
+        r[key] = json!("different");
+        steps.truncate(1);
+        check_error(Script::new(steps), "close", &r, "tab_not_owned");
+    }
+    let (r, mut steps) = close_setup();
+    steps.truncate(1);
+    if let Response::Json(v) = &mut steps[0].response {
+        v["result"]["objects"][0]["id"]["native_key"] = json!("another-run");
+    }
+    check_error(Script::new(steps), "close", &r, "store_run_unreadable");
+}
+#[test]
+fn close_known_session_must_match_live_before_write() {
+    let (mut r, mut steps) = close_setup();
+    r["session"] = json!("another-session");
+    steps.truncate(4);
+    check_error(Script::new(steps), "close", &r, "session_mismatch");
+    for known in [json!("fixture-session"), Value::Null] {
+        let (mut r, steps) = close_setup();
+        r["session"] = known;
+        let mut s = Script::new(steps);
+        assert_eq!(execute(&mut s, "close", &r).unwrap().0["status"], "closed");
+        s.finish();
+    }
+    for session in [Value::Null, json!({"value":""}), json!("raw-session")] {
+        let (r, mut steps) = close_setup();
+        steps.truncate(4);
+        if let Response::Json(v) = &mut steps[3].response {
+            v["result"]["agents"][0]["agent_session"] = session;
+        }
+        check_error(Script::new(steps), "close", &r, "session_not_reported");
+    }
+}
+#[test]
+fn close_requires_one_updated_run_and_closed_readback_before_tab_close() {
+    for edits in [
+        json!([]),
+        json!([{"change":"initial","id":id("worker_run")}]),
+        json!([{"change":"update","id":id("plan")}]),
+        json!([{"change":"update","id":id("worker_run")},{"change":"update","id":id("worker_run")}]),
+        json!([{"change":"update","id":{"object_type":"worker_run","namespace":{"instance":"fixture","account":"test"},"native_key":"other"}}]),
+    ] {
+        let (r, mut steps) = close_setup();
+        steps.truncate(5);
+        steps[4].response =
+            Response::Json(json!({"status":"ok","result":{"outcome":"applied","edits":edits}}));
+        check_error(Script::new(steps), "close", &r, "store_close_uncertain");
+    }
+    for (key, value) in [
+        ("status", "running"),
+        ("result", "different"),
+        ("session", "unknown"),
+        ("name", "other"),
+    ] {
+        let (r, mut steps) = close_setup();
+        steps.truncate(6);
+        if let Response::Json(v) = &mut steps[5].response {
+            v["result"]["objects"][0]["observations"][1]["fields"][key]["value"] = json!(value);
+        }
+        check_error(Script::new(steps), "close", &r, "store_close_uncertain");
+    }
+}
+#[test]
+fn close_result_byte_limit_includes_observed_session() {
+    for fits in [false, true] {
+        let (mut r, mut steps) = close_setup();
+        let result = format!("{}{}", "é".repeat(287), if fits { "x" } else { "xx" });
+        let stored = format!("{result}; session=fixture-session");
+        assert_eq!(stored.len(), if fits { 600 } else { 601 });
+        r["result"] = json!(result);
+        if fits {
+            steps[4].body.as_mut().unwrap()["parameters"]["result"] = json!(stored);
+            steps[5].response = Response::Json(run_row("closed", &stored));
+            let mut s = Script::new(steps);
+            assert_eq!(execute(&mut s, "close", &r).unwrap().0["status"], "closed");
+            s.finish();
+        } else {
+            steps.truncate(4);
+            check_error(Script::new(steps), "close", &r, "invalid_input");
+        }
+    }
+}
+#[test]
+fn unreadable_run_or_pane_never_advances_close() {
+    for at in [0, 2, 5] {
+        for response in [
+            Response::Failed,
+            Response::Unreadable,
+            Response::Json(json!({"error":{"code":"fixture"}})),
+        ] {
+            let (r, mut steps) = close_setup();
+            steps.truncate(at + 1);
+            steps[at].response = response;
+            check_error(
+                Script::new(steps),
+                "close",
+                &r,
+                match at {
+                    0 => "store_run_unreadable",
+                    2 => "herdr_answer_unreadable",
+                    _ => "store_close_uncertain",
+                },
+            );
+        }
+    }
+    for at in [0, 2, 4, 5] {
+        let (r, mut steps) = close_setup();
+        steps.truncate(at + 1);
+        steps[at].success = false;
+        check_error(
+            Script::new(steps),
+            "close",
+            &r,
+            match at {
+                0 => "store_run_unreadable",
+                2 => "herdr_answer_unreadable",
+                _ => "store_close_uncertain",
+            },
+        );
+    }
+    for at in [0, 5] {
+        for head in [Value::Null, json!("missing")] {
+            let (r, mut steps) = close_setup();
+            steps.truncate(at + 1);
+            if let Response::Json(v) = &mut steps[at].response {
+                v["result"]["objects"][0]["head"] = head;
+            }
+            check_error(
+                Script::new(steps),
+                "close",
+                &r,
+                if at == 0 {
+                    "store_run_unreadable"
+                } else {
+                    "store_close_uncertain"
+                },
+            );
+        }
+    }
+}
+
+#[test]
+fn start_requires_fresh_apply_before_prompt() {
+    for outcome in [
+        Some(json!("already_applied")),
+        None,
+        Some(json!("unknown")),
+        Some(Value::Null),
+    ] {
+        let (r, mut steps) = start_setup();
+        steps.truncate(8);
+        if let Response::Json(v) = &mut steps[7].response {
+            v["result"].as_object_mut().unwrap().remove("outcome");
+            if let Some(outcome) = outcome {
+                v["result"]["outcome"] = outcome;
+            }
+        }
+        check_error(Script::new(steps), "start", &r, "store_start_uncertain");
+    }
+}
+#[test]
+fn agent_list_error_key_refuses_even_with_valid_agents() {
+    for at in [3, 6] {
+        let (r, mut steps) = start_setup();
+        steps.truncate(at + 1);
+        if let Response::Json(v) = &mut steps[at].response {
+            v["error"] = Value::Null;
+        }
+        check_error(
+            Script::new(steps),
+            "start",
+            &r,
+            if at == 3 {
+                "herdr_answer_unreadable"
+            } else {
+                "agent_not_ready"
+            },
+        );
+    }
+}
+#[test]
+fn tab_create_error_key_refuses_even_with_valid_ids() {
+    let (r, mut steps) = start_setup();
+    steps.truncate(5);
+    if let Response::Json(v) = &mut steps[4].response {
+        v["error"] = Value::Null;
+    }
+    check_error(Script::new(steps), "start", &r, "tab_create_failed");
+}
+#[test]
+fn close_replayed_apply_requires_closed_matching_readback() {
+    for mismatch in [
+        None,
+        Some(("status", "running")),
+        Some(("result", "another result")),
+    ] {
+        let (r, mut steps) = close_setup();
+        if let Response::Json(v) = &mut steps[4].response {
+            v["result"]["outcome"] = json!("already_applied");
+        }
+        if let Some((key, value)) = mismatch {
+            steps.truncate(6);
+            if let Response::Json(v) = &mut steps[5].response {
+                v["result"]["objects"][0]["observations"][1]["fields"][key]["value"] = json!(value);
+            }
+            check_error(Script::new(steps), "close", &r, "store_close_uncertain");
+        } else {
+            let mut s = Script::new(steps);
+            let (v, status) = execute(&mut s, "close", &r).unwrap();
+            assert_eq!(status, 0);
+            assert_eq!(
+                v,
+                json!({"status":"closed","outcome":"already_applied","tab_closed":true})
+            );
+            s.finish();
+        }
+    }
 }
