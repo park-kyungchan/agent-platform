@@ -176,7 +176,7 @@ fn start_setup() -> (Value, Vec<Step>) {
         step(
             "ont",
             "action apply --client lead --store /scratch/store",
-            json!({"status":"ok","result":{"edits":[{"change":"initial","id":id("worker_run")}]}}),
+            json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"initial","id":id("worker_run")}]}}),
         ),
         prompt,
     ];
@@ -318,9 +318,9 @@ fn start_answer_refusals_and_controls() {
         json!({}),
         Value::Null,
         json!({"status":"ok"}),
-        json!({"result":{"edits":[{"change":"initial","id":id("worker_run")}]}}),
-        json!({"status":"ok","result":{"edits":[{"change":"initial","id":null}]}}),
-        json!({"status":"ok","result":{"edits":[{"change":"initial","id":{"native_key":"partial"}}]}}),
+        json!({"result":{"outcome":"applied","edits":[{"change":"initial","id":id("worker_run")}]}}),
+        json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"initial","id":null}]}}),
+        json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"initial","id":{"native_key":"partial"}}]}}),
     ] {
         let (r, mut steps) = start_setup();
         steps.truncate(8);
@@ -1086,7 +1086,8 @@ fn start_requires_one_initial_worker_run_before_prompt() {
     ] {
         let (r, mut steps) = start_setup();
         steps.truncate(8);
-        steps[7].response = Response::Json(json!({"status":"ok","result":{"edits":edits}}));
+        steps[7].response =
+            Response::Json(json!({"status":"ok","result":{"outcome":"applied","edits":edits}}));
         check_error(Script::new(steps), "start", &r, "store_start_uncertain");
     }
     let (r, mut steps) = start_setup();
@@ -1212,7 +1213,8 @@ fn close_requires_one_updated_run_and_closed_readback_before_tab_close() {
     ] {
         let (r, mut steps) = close_setup();
         steps.truncate(5);
-        steps[4].response = Response::Json(json!({"status":"ok","result":{"edits":edits}}));
+        steps[4].response =
+            Response::Json(json!({"status":"ok","result":{"outcome":"applied","edits":edits}}));
         check_error(Script::new(steps), "close", &r, "store_close_uncertain");
     }
     for (key, value) in [
@@ -1304,6 +1306,84 @@ fn unreadable_run_or_pane_never_advances_close() {
                     "store_close_uncertain"
                 },
             );
+        }
+    }
+}
+
+#[test]
+fn start_requires_fresh_apply_before_prompt() {
+    for outcome in [
+        Some(json!("already_applied")),
+        None,
+        Some(json!("unknown")),
+        Some(Value::Null),
+    ] {
+        let (r, mut steps) = start_setup();
+        steps.truncate(8);
+        if let Response::Json(v) = &mut steps[7].response {
+            v["result"].as_object_mut().unwrap().remove("outcome");
+            if let Some(outcome) = outcome {
+                v["result"]["outcome"] = outcome;
+            }
+        }
+        check_error(Script::new(steps), "start", &r, "store_start_uncertain");
+    }
+}
+#[test]
+fn agent_list_error_key_refuses_even_with_valid_agents() {
+    for at in [3, 6] {
+        let (r, mut steps) = start_setup();
+        steps.truncate(at + 1);
+        if let Response::Json(v) = &mut steps[at].response {
+            v["error"] = Value::Null;
+        }
+        check_error(
+            Script::new(steps),
+            "start",
+            &r,
+            if at == 3 {
+                "herdr_answer_unreadable"
+            } else {
+                "agent_not_ready"
+            },
+        );
+    }
+}
+#[test]
+fn tab_create_error_key_refuses_even_with_valid_ids() {
+    let (r, mut steps) = start_setup();
+    steps.truncate(5);
+    if let Response::Json(v) = &mut steps[4].response {
+        v["error"] = Value::Null;
+    }
+    check_error(Script::new(steps), "start", &r, "tab_create_failed");
+}
+#[test]
+fn close_replayed_apply_requires_closed_matching_readback() {
+    for mismatch in [
+        None,
+        Some(("status", "running")),
+        Some(("result", "another result")),
+    ] {
+        let (r, mut steps) = close_setup();
+        if let Response::Json(v) = &mut steps[4].response {
+            v["result"]["outcome"] = json!("already_applied");
+        }
+        if let Some((key, value)) = mismatch {
+            steps.truncate(6);
+            if let Response::Json(v) = &mut steps[5].response {
+                v["result"]["objects"][0]["observations"][1]["fields"][key]["value"] = json!(value);
+            }
+            check_error(Script::new(steps), "close", &r, "store_close_uncertain");
+        } else {
+            let mut s = Script::new(steps);
+            let (v, status) = execute(&mut s, "close", &r).unwrap();
+            assert_eq!(status, 0);
+            assert_eq!(
+                v,
+                json!({"status":"closed","outcome":"already_applied","tab_closed":true})
+            );
+            s.finish();
         }
     }
 }

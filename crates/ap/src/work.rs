@@ -354,7 +354,8 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         Ok(v) => v,
         Err(_) => Value::Null,
     };
-    let run = applied_run(&applied, "initial");
+    let run =
+        applied_run(&applied, "initial").filter(|_| applied["result"]["outcome"] == "applied");
     let Some(run) = run else {
         return Err(fail(
             "store_start_uncertain",
