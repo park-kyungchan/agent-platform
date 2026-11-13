@@ -1,0 +1,788 @@
+use ap::{
+    review::execute,
+    work::{Answer, Reply, System},
+};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    path::PathBuf,
+};
+
+const TASK: &str = "/home/palantirkc/work/example";
+const PROMPT: &str = "/home/palantirkc/work/example/prompt.md";
+const REPORT: &str = "/home/palantirkc/work/example/report.md";
+const WT: &str = "/home/palantirkc/work/example/wt/repo";
+const HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const BASE: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const VERDICT: &[u8] = b"Verdict: accept\nEvidence\n";
+fn hash(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+fn id(kind: &str) -> Value {
+    json!({"object_type":kind,"namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":if kind == "task" {"example"} else {kind}})
+}
+struct Step {
+    program: &'static str,
+    argv: Vec<String>,
+    body: Value,
+    bytes: Vec<u8>,
+    success: bool,
+}
+fn raw(program: &'static str, argv: &str, body: Value, bytes: &[u8]) -> Step {
+    Step {
+        program,
+        argv: argv.split_whitespace().map(str::to_owned).collect(),
+        body,
+        bytes: bytes.to_vec(),
+        success: true,
+    }
+}
+fn step(program: &'static str, argv: &str, body: Value, reply: Value) -> Step {
+    raw(program, argv, body, &serde_json::to_vec(&reply).unwrap())
+}
+struct Script {
+    steps: VecDeque<Step>,
+    files: BTreeMap<String, Vec<u8>>,
+    cwd: PathBuf,
+    calls: Vec<(String, Vec<String>, Value)>,
+}
+impl Script {
+    fn new(steps: Vec<Step>) -> Self {
+        Self {
+            steps: steps.into(),
+            files: BTreeMap::from([
+                (PROMPT.into(), b"Review this head\n".to_vec()),
+                (REPORT.into(), VERDICT.to_vec()),
+            ]),
+            cwd: TASK.into(),
+            calls: vec![],
+        }
+    }
+    fn finish(&self) {
+        assert!(self.steps.is_empty(), "expected call omitted");
+    }
+}
+impl System for Script {
+    fn call(&mut self, program: &str, argv: &[String], body: &Value, ms: u64) -> Answer {
+        self.calls
+            .push((program.into(), argv.to_vec(), body.clone()));
+        let expected = self
+            .steps
+            .pop_front()
+            .expect("unexpected call after refusal");
+        assert_eq!(
+            (program, argv, body),
+            (expected.program, expected.argv.as_slice(), &expected.body),
+            "call sequence/arguments/body"
+        );
+        assert_eq!(ms, 30_000);
+        Ok(Reply {
+            success: expected.success,
+            stdout: expected.bytes.clone(),
+            bytes: expected.bytes,
+        })
+    }
+    fn read(&self, path: &str) -> std::io::Result<Vec<u8>> {
+        self.files
+            .get(path)
+            .cloned()
+            .ok_or_else(|| std::io::ErrorKind::NotFound.into())
+    }
+    fn cwd(&self) -> std::io::Result<PathBuf> {
+        Ok(self.cwd.clone())
+    }
+}
+fn get(kind: &str, fields: Value) -> Step {
+    let fields: serde_json::Map<String, Value> = fields
+        .as_object()
+        .unwrap()
+        .iter()
+        .map(|(k, v)| (k.clone(), json!({"kind":"value","value":v})))
+        .collect();
+    step(
+        "ont",
+        "get",
+        json!({"id":id(kind)}),
+        json!({"status":"ok","result":{"objects":[{"id":id(kind),"head":"current","observations":[{"revision":"old","change":"update","fields":{"status":{"kind":"value","value":"running"}}},{"revision":"current","change":"update","fields":fields}]}]}}),
+    )
+}
+fn pr(head: &str, state: &str, base: &str) -> Step {
+    step(
+        "gh",
+        "pr view 12 --repo owner/repo --json state,baseRefName,headRefOid",
+        Value::Null,
+        json!({"state":state,"baseRefName":base,"headRefOid":head}),
+    )
+}
+fn status(state: &str, description: &str) -> Step {
+    let mut s = step(
+        "gh",
+        &format!(
+            "api --method POST repos/owner/repo/statuses/{HEAD} -f state={state} -f context=lead-review -f placeholder"
+        ),
+        Value::Null,
+        json!({"state":state}),
+    );
+    *s.argv.last_mut().unwrap() = format!("description={description}");
+    s
+}
+fn start_request() -> Value {
+    json!({"task_dir":TASK,"kind":"packet","head":HEAD,"base":BASE,"repository":"owner/repo","pull_request":12,"runs":[id("worker_run")],"model":"model","effort":"high","prompt":PROMPT})
+}
+fn apply(action: &str, request: String, parameters: Value) -> Step {
+    step(
+        "ont",
+        "action apply --client lead",
+        json!({"action_type":action,"request_id":request,"parameters":parameters}),
+        json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":if action == "start_review" {"initial"} else {"update"},"id":id("review")}]}}),
+    )
+}
+fn start_apply() -> Step {
+    let prompt_hash = hash(b"Review this head\n");
+    apply(
+        "start_review",
+        format!(
+            "rv-start-{}",
+            &hash(format!("example\npacket\n{HEAD}\n{prompt_hash}").as_bytes())[..40]
+        ),
+        json!({"task":id("task"),"kind":"packet","head":HEAD,"base":BASE,"repository":"owner/repo","pull_request":12,"runs":[id("worker_run")],"model":"model","effort":"high","prompt":PROMPT,"prompt_sha256":prompt_hash}),
+    )
+}
+fn review() -> Value {
+    json!({"task":id("task"),"status":"closed","verdict":"accept","kind":"packet","repository":"owner/repo","pull_request":12,"head":HEAD,"base":BASE,"report":REPORT,"report_sha256":hash(VERDICT),"runs":[id("worker_run")]})
+}
+fn run() -> Value {
+    json!({"task":id("task"),"write_set":["a/b.rs","docs/**"]})
+}
+fn accept_request() -> Value {
+    json!({"review":id("review"),"worktree":WT})
+}
+fn git(argv: &str, bytes: &[u8]) -> Step {
+    raw("git", &format!("-C {WT} {argv}"), Value::Null, bytes)
+}
+fn accept_steps(f: Value, run: Value, diff: &str) -> Vec<Step> {
+    vec![
+        get("review", f),
+        get("worker_run", run),
+        pr(HEAD, "OPEN", "main"),
+        git("fetch origin main", b""),
+        git(
+            &format!("merge-base origin/main {HEAD}"),
+            format!("{BASE}\n").as_bytes(),
+        ),
+        git(&format!("diff --name-only {BASE} {HEAD}"), diff.as_bytes()),
+    ]
+}
+fn refusal(s: &mut Script, verb: &str, r: &Value, code: &str, field: &str) -> Value {
+    let e = execute(s, verb, r).unwrap_err();
+    assert_eq!((e.code, e.field.as_str()), (code, field));
+    s.finish();
+    assert!(!s.calls.iter().any(|(p, a, _)| (p == "ont"
+        && a.starts_with(&["action".into(), "apply".into()]))
+        || (p == "gh" && a.first().is_some_and(|s| s == "api"))));
+    e.detail
+}
+#[test]
+fn start_exact_calls_and_store() {
+    let mut s = Script::new(vec![
+        pr(HEAD, "OPEN", "main"),
+        get("worker_run", run()),
+        start_apply(),
+    ]);
+    let (v, code) = execute(&mut s, "start", &start_request()).unwrap();
+    assert_eq!(
+        (v, code),
+        (
+            json!({"status":"started","review":id("review"),"prompt_sha256":hash(b"Review this head\n")}),
+            0
+        )
+    );
+    s.finish();
+}
+#[test]
+fn close_exact_calls_and_store() {
+    for (verdict, bytes) in [
+        ("accept", VERDICT),
+        ("repair", b"Verdict: repair\nDetails\n".as_slice()),
+    ] {
+        let h = hash(bytes);
+        let a = apply(
+            "close_review",
+            format!(
+                "rv-close-{}",
+                &hash(format!("review\n{h}").as_bytes())[..40]
+            ),
+            json!({"review":id("review"),"verdict":verdict,"report":REPORT,"report_sha256":h,"account":"b","session":"session"}),
+        );
+        let mut s = Script::new(vec![a]);
+        s.files.insert(REPORT.into(), bytes.to_vec());
+        assert_eq!(
+            execute(
+                &mut s,
+                "close",
+                &json!({"review":id("review"),"report":REPORT,"account":"b","session":"session"})
+            )
+            .unwrap(),
+            (
+                json!({"status":"closed","verdict":verdict,"report_sha256":h}),
+                0
+            )
+        );
+        s.finish();
+    }
+}
+#[test]
+fn abandoned_exact_calls_and_store() {
+    let a = apply(
+        "close_review",
+        format!("rv-close-{}", &hash(b"review\nabandoned")[..40]),
+        json!({"review":id("review"),"verdict":"abandoned"}),
+    );
+    let mut s = Script::new(vec![a]);
+    assert_eq!(
+        execute(
+            &mut s,
+            "close",
+            &json!({"review":id("review"),"verdict":"abandoned"})
+        )
+        .unwrap(),
+        (
+            json!({"status":"closed","verdict":"abandoned","report_sha256":null}),
+            0
+        )
+    );
+    s.finish();
+}
+#[test]
+fn accept_exact_calls_and_repeated_post() {
+    let mut steps = accept_steps(review(), run(), "a/b.rs\ndocs/guide.md\n");
+    steps.push(status("success", "review review accept"));
+    let mut s = Script::new(steps);
+    assert_eq!(
+        execute(&mut s, "accept", &accept_request()).unwrap(),
+        (json!({"status":"accepted","head":HEAD,"paths":2}), 0)
+    );
+    s.finish();
+    s.steps = accept_steps(review(), run(), "a/b.rs\ndocs/guide.md\n").into();
+    s.steps.push_back(status("success", "review review accept"));
+    execute(&mut s, "accept", &accept_request()).unwrap();
+    s.finish();
+}
+#[test]
+fn revoke_exact_calls_and_status() {
+    let mut s = Script::new(vec![
+        get("review", review()),
+        status("failure", "revoked: wrong report"),
+    ]);
+    assert_eq!(
+        execute(
+            &mut s,
+            "revoke",
+            &json!({"review":id("review"),"reason":"wrong report"})
+        )
+        .unwrap(),
+        (json!({"status":"revoked","head":HEAD}), 0)
+    );
+    s.finish();
+}
+#[test]
+fn prompt_unreadable() {
+    for path in [PROMPT, "/tmp/prompt", "/home/palantirkc/work/../prompt"] {
+        let mut s = Script::new(vec![]);
+        s.files.clear();
+        let mut r = start_request();
+        r["prompt"] = json!(path);
+        refusal(&mut s, "start", &r, "review_prompt_unreadable", "prompt");
+    }
+}
+#[test]
+fn start_head_differs() {
+    for (head, state) in [(BASE, "OPEN"), (HEAD, "CLOSED")] {
+        let mut s = Script::new(vec![pr(head, state, "main")]);
+        assert_eq!(
+            refusal(
+                &mut s,
+                "start",
+                &start_request(),
+                "review_head_differs",
+                "head"
+            ),
+            head
+        );
+    }
+}
+#[test]
+fn run_unknown_or_other_task() {
+    let mut s = Script::new(vec![
+        pr(HEAD, "OPEN", "main"),
+        step(
+            "ont",
+            "get",
+            json!({"id":id("worker_run")}),
+            json!({"status":"ok","result":{"objects":[]}}),
+        ),
+    ]);
+    refusal(
+        &mut s,
+        "start",
+        &start_request(),
+        "review_run_unknown",
+        "runs",
+    );
+    let mut f = run();
+    f["task"]["native_key"] = json!("other");
+    let mut s = Script::new(vec![pr(HEAD, "OPEN", "main"), get("worker_run", f)]);
+    refusal(
+        &mut s,
+        "start",
+        &start_request(),
+        "review_run_of_other_task",
+        "runs",
+    );
+}
+#[test]
+fn invalid_input_before_calls() {
+    let mut cases = vec![
+        ("start", json!([]), "stdin"),
+        ("close", json!({"review":id("task")}), "review"),
+    ];
+    for key in ["task_dir", "prompt", "report", "worktree", "store"] {
+        let mut r = start_request();
+        r[key] = json!("relative");
+        cases.push(("start", r, key));
+    }
+    for runs in [
+        json!([id("worker_run"), id("worker_run")]),
+        json!([id("task")]),
+        json!("bad"),
+    ] {
+        let mut r = start_request();
+        r["runs"] = runs;
+        cases.push(("start", r, "runs"));
+    }
+    let mut r = start_request();
+    r.as_object_mut().unwrap().remove("repository");
+    cases.push(("start", r, "repository"));
+    for verdict in ["accept", "repair", "unreadable"] {
+        cases.push((
+            "close",
+            json!({"review":id("review"),"verdict":verdict,"report":REPORT}),
+            "verdict",
+        ));
+    }
+    cases.push((
+        "close",
+        json!({"review":id("review"),"verdict":"abandoned","report":REPORT}),
+        "report",
+    ));
+    for reason in ["".into(), " ".into(), "x".repeat(101), "é".repeat(51)] {
+        cases.push((
+            "revoke",
+            json!({"review":id("review"),"reason":reason}),
+            "reason",
+        ));
+    }
+    for (verb, r, field) in cases {
+        refusal(&mut Script::new(vec![]), verb, &r, "invalid_input", field);
+    }
+}
+#[test]
+fn report_unreadable() {
+    for (path, bytes) in [
+        (REPORT, None),
+        ("/tmp/report", Some(VERDICT.to_vec())),
+        (REPORT, Some(vec![b'x'; 1_048_577])),
+    ] {
+        let mut s = Script::new(vec![]);
+        s.files.clear();
+        if let Some(bytes) = bytes {
+            s.files.insert(path.into(), bytes);
+        }
+        refusal(
+            &mut s,
+            "close",
+            &json!({"review":id("review"),"report":path}),
+            "review_report_unreadable",
+            "report",
+        );
+    }
+}
+#[test]
+fn exact_first_line_verdict() {
+    for bytes in [
+        b"Verdict: accepted\n".as_slice(),
+        b"Verdict: accept extra\n",
+        b"Verdict: repair_extra\n",
+        b"\nVerdict: accept\n",
+        b"Verdict: abandoned\n",
+        b"Verdict: accept\r\n",
+    ] {
+        let mut s = Script::new(vec![]);
+        s.files.insert(REPORT.into(), bytes.to_vec());
+        refusal(
+            &mut s,
+            "close",
+            &json!({"review":id("review"),"report":REPORT}),
+            "review_report_lacks_verdict",
+            "report",
+        );
+    }
+}
+#[test]
+fn not_accepting_first_member() {
+    for key in [
+        "status",
+        "verdict",
+        "kind",
+        "repository",
+        "pull_request",
+        "head",
+        "base",
+        "report",
+        "report_sha256",
+    ] {
+        let mut f = review();
+        f[key] = Value::Null;
+        let mut s = Script::new(vec![get("review", f)]);
+        assert_eq!(
+            refusal(
+                &mut s,
+                "accept",
+                &accept_request(),
+                "review_not_accepting",
+                "review"
+            ),
+            key
+        );
+    }
+    for (key, value) in [
+        ("status", "running"),
+        ("verdict", "repair"),
+        ("verdict", "abandoned"),
+        ("kind", "design"),
+        ("kind", "integration"),
+    ] {
+        let mut f = review();
+        f[key] = json!(value);
+        refusal(
+            &mut Script::new(vec![get("review", f)]),
+            "accept",
+            &accept_request(),
+            "review_not_accepting",
+            "review",
+        );
+    }
+}
+#[test]
+fn report_changed() {
+    for bytes in [None, Some(b"Verdict: accept\nChanged\n".to_vec())] {
+        let mut s = Script::new(vec![get("review", review())]);
+        s.files.remove(REPORT);
+        if let Some(bytes) = bytes {
+            s.files.insert(REPORT.into(), bytes);
+        }
+        refusal(
+            &mut s,
+            "accept",
+            &accept_request(),
+            "review_report_changed",
+            "report",
+        );
+    }
+}
+#[test]
+fn runs_required_and_write_set_required() {
+    for runs in [Value::Null, json!([]), json!("bad")] {
+        let mut f = review();
+        f["runs"] = runs;
+        refusal(
+            &mut Script::new(vec![get("review", f)]),
+            "accept",
+            &accept_request(),
+            "review_runs_required",
+            "runs",
+        );
+    }
+    for patterns in [Value::Null, json!([]), json!([""])] {
+        let mut f = run();
+        f["write_set"] = patterns;
+        assert_eq!(
+            refusal(
+                &mut Script::new(vec![get("review", review()), get("worker_run", f)]),
+                "accept",
+                &accept_request(),
+                "review_run_lacks_write_set",
+                "runs"
+            ),
+            "worker_run"
+        );
+    }
+}
+#[test]
+fn accept_head_differs() {
+    for (head, state, base) in [
+        (BASE, "OPEN", "main"),
+        (HEAD, "CLOSED", "main"),
+        (HEAD, "OPEN", "release"),
+    ] {
+        let mut s = Script::new(vec![
+            get("review", review()),
+            get("worker_run", run()),
+            pr(head, state, base),
+        ]);
+        refusal(
+            &mut s,
+            "accept",
+            &accept_request(),
+            "review_head_differs",
+            "head",
+        );
+    }
+}
+#[test]
+fn base_differs() {
+    let mut steps = accept_steps(review(), run(), "");
+    steps.truncate(5);
+    steps[4].bytes = format!("{HEAD}\n").into_bytes();
+    assert_eq!(
+        refusal(
+            &mut Script::new(steps),
+            "accept",
+            &accept_request(),
+            "review_base_differs",
+            "base"
+        ),
+        HEAD
+    );
+}
+#[test]
+fn path_match_table_and_empty_diff() {
+    for (pattern, path, ok) in [
+        ("a/b.rs", "a/b.rs", true),
+        ("a/**", "a/b/c.rs", true),
+        ("a/**", "a", false),
+        ("a/**", "ab/c.rs", false),
+        ("a/b.rs", "a/b.rs.bak", false),
+        ("a/**", "", true),
+    ] {
+        let mut f = run();
+        f["write_set"] = json!([pattern]);
+        let diff = if path.is_empty() {
+            String::new()
+        } else {
+            format!("{path}\n")
+        };
+        let mut steps = accept_steps(review(), f, &diff);
+        if ok {
+            steps.push(status("success", "review review accept"));
+            let mut s = Script::new(steps);
+            assert_eq!(
+                execute(&mut s, "accept", &accept_request()).unwrap().0["paths"],
+                usize::from(!path.is_empty())
+            );
+            s.finish();
+        } else {
+            assert_eq!(
+                refusal(
+                    &mut Script::new(steps),
+                    "accept",
+                    &accept_request(),
+                    "review_path_outside_write_set",
+                    "paths"
+                ),
+                json!({"paths":[path],"count":1})
+            );
+        }
+    }
+}
+#[test]
+fn outside_paths_capped_at_ten() {
+    let names: Vec<_> = (0..12).map(|i| format!("outside/{i}")).collect();
+    let d = refusal(
+        &mut Script::new(accept_steps(review(), run(), &names.join("\n"))),
+        "accept",
+        &accept_request(),
+        "review_path_outside_write_set",
+        "paths",
+    );
+    assert_eq!(d, json!({"paths":names[..10],"count":12}));
+}
+#[test]
+fn caller_worktree_refused_before_status() {
+    for cwd in [
+        WT,
+        "/home/palantirkc/work/example/wt/another",
+        "/home/palantirkc/work/example/wt",
+    ] {
+        let mut s = Script::new(accept_steps(review(), run(), "a/b.rs\n"));
+        s.cwd = cwd.into();
+        refusal(
+            &mut s,
+            "accept",
+            &accept_request(),
+            "review_accept_from_worktree",
+            "cwd",
+        );
+    }
+}
+#[test]
+fn revoke_missing_repository_or_head() {
+    for key in ["repository", "head"] {
+        let mut f = review();
+        f[key] = Value::Null;
+        assert_eq!(
+            refusal(
+                &mut Script::new(vec![get("review", f)]),
+                "revoke",
+                &json!({"review":id("review"),"reason":"wrong"}),
+                "review_not_accepting",
+                "review"
+            ),
+            key
+        );
+    }
+}
+#[test]
+fn store_refusal_preserves_codes() {
+    let mut a = start_apply();
+    a.bytes=serde_json::to_vec(&json!({"status":"refused","result":{"criteria":[{"passed":false,"code":"duplicate_running_review"}]}})).unwrap();
+    a.success = false;
+    let mut s = Script::new(vec![pr(HEAD, "OPEN", "main"), get("worker_run", run()), a]);
+    let e = execute(&mut s, "start", &start_request()).unwrap_err();
+    assert_eq!(
+        (e.code, e.field.as_str(), e.detail),
+        (
+            "store_refused",
+            "apply",
+            json!({"codes":["duplicate_running_review"]})
+        )
+    );
+    s.finish();
+    assert_eq!(
+        s.calls
+            .iter()
+            .filter(|(p, a, _)| p == "ont" && a[0] == "action")
+            .count(),
+        1
+    );
+}
+#[test]
+fn optional_store_forwarded_everywhere() {
+    let mut r = start_request();
+    r["store"] = json!("/home/palantirkc/work/example/store.sqlite");
+    let mut steps = vec![
+        pr(HEAD, "OPEN", "main"),
+        get("worker_run", run()),
+        start_apply(),
+    ];
+    for s in &mut steps {
+        if s.program == "ont" {
+            s.argv
+                .extend(["--store".into(), r["store"].as_str().unwrap().into()]);
+        }
+    }
+    let mut s = Script::new(steps);
+    execute(&mut s, "start", &r).unwrap();
+    s.finish();
+}
+#[test]
+fn malformed_current_review_refused() {
+    let mut g = get("review", review());
+    let mut v: Value = serde_json::from_slice(&g.bytes).unwrap();
+    v["result"]["objects"][0]["observations"][1]["change"] = json!("retraction");
+    g.bytes = serde_json::to_vec(&v).unwrap();
+    refusal(
+        &mut Script::new(vec![g]),
+        "accept",
+        &accept_request(),
+        "store_review_unreadable",
+        "review",
+    );
+}
+
+#[test]
+fn process_failure_and_unreadable_store_stop() {
+    let mut steps = accept_steps(review(), run(), "a/b.rs\n");
+    steps.truncate(4);
+    steps[3].success = false;
+    refusal(
+        &mut Script::new(steps),
+        "accept",
+        &accept_request(),
+        "process_failed",
+        "git",
+    );
+    let mut a = start_apply();
+    a.bytes = b"not JSON".to_vec();
+    let mut s = Script::new(vec![pr(HEAD, "OPEN", "main"), get("worker_run", run()), a]);
+    let e = execute(&mut s, "start", &start_request()).unwrap_err();
+    assert_eq!(
+        (e.code, e.field.as_str()),
+        ("store_answer_unreadable", "answer")
+    );
+    s.finish();
+}
+#[test]
+fn usage_and_cli_envelope() {
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+    };
+    refusal(
+        &mut Script::new(vec![]),
+        "unknown",
+        &json!({}),
+        "usage",
+        "args",
+    );
+    let help = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["review", "--help"])
+        .output()
+        .unwrap();
+    assert!(help.status.success());
+    assert_eq!(
+        help.stdout,
+        b"Usage: ap review <start|close|accept|revoke> < request.json\n"
+    );
+    let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+        .args(["review", "close"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(b"{}").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(3));
+    assert!(out.stdout.is_empty());
+    assert_eq!(
+        serde_json::from_slice::<Value>(&out.stderr).unwrap(),
+        json!({"error":{"code":"invalid_input","field":"review","detail":null}})
+    );
+}
+#[test]
+fn integrated_review_union_of_runs() {
+    let mut f = review();
+    f["kind"] = json!("integrated");
+    let mut second = id("worker_run");
+    second["native_key"] = json!("second");
+    f["runs"] = json!([id("worker_run"), second]);
+    let mut g = get(
+        "worker_run",
+        json!({"task":id("task"),"write_set":["other/**"]}),
+    );
+    g.body["id"] = second.clone();
+    let mut response: Value = serde_json::from_slice(&g.bytes).unwrap();
+    response["result"]["objects"][0]["id"] = second;
+    g.bytes = serde_json::to_vec(&response).unwrap();
+    let mut steps = accept_steps(f, run(), "a/b.rs\nother/c.rs\n");
+    steps.insert(2, g);
+    steps.push(status("success", "review review accept"));
+    let mut s = Script::new(steps);
+    assert_eq!(
+        execute(&mut s, "accept", &accept_request()).unwrap().0["paths"],
+        2
+    );
+    s.finish();
+}

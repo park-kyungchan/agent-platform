@@ -4,27 +4,27 @@ use sha2::{Digest, Sha256};
 use std::{
     ffi::OsString,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, ExitCode, Stdio},
     time::{Duration, Instant},
 };
 
-const LIMIT: u64 = 1_048_576;
-const ROOT: &str = "/home/palantirkc/work/";
+pub(crate) const LIMIT: u64 = 1_048_576;
+pub(crate) const ROOT: &str = "/home/palantirkc/work/";
 #[derive(Debug)]
 pub struct Failure {
     pub code: &'static str,
     pub field: String,
     pub detail: Value,
 }
-fn fail(code: &'static str, field: &str, detail: Value) -> Failure {
+pub(crate) fn fail(code: &'static str, field: &str, detail: Value) -> Failure {
     Failure {
         code,
         field: field.into(),
         detail,
     }
 }
-fn error(code: &'static str, field: &str) -> Failure {
+pub(crate) fn error(code: &'static str, field: &str) -> Failure {
     fail(code, field, Value::Null)
 }
 pub struct Reply {
@@ -42,6 +42,9 @@ pub trait System {
         }
         std::fs::read(path)
     }
+    fn cwd(&self) -> std::io::Result<PathBuf> {
+        std::env::current_dir()
+    }
     fn exists(&self, path: &str) -> std::io::Result<bool> {
         Path::new(path).try_exists()
     }
@@ -52,19 +55,19 @@ pub trait System {
         std::thread::sleep(duration);
     }
 }
-fn args(words: &[&str]) -> Vec<String> {
+pub(crate) fn args(words: &[&str]) -> Vec<String> {
     words.iter().map(|s| (*s).into()).collect()
 }
-fn text<'a>(v: &'a Value, key: &str) -> Result<&'a str, Failure> {
+pub(crate) fn text<'a>(v: &'a Value, key: &str) -> Result<&'a str, Failure> {
     v[key]
         .as_str()
         .filter(|s| !s.is_empty())
         .ok_or_else(|| error("invalid_input", key))
 }
-fn digest(bytes: &[u8]) -> String {
+pub(crate) fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
-fn id(kind: &str, key: &str) -> Value {
+pub(crate) fn id(kind: &str, key: &str) -> Value {
     json!({"object_type":kind,"namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":key})
 }
 fn file_id(kind: &str, path: &str) -> Result<Value, Failure> {
@@ -75,7 +78,7 @@ fn file_id(kind: &str, path: &str) -> Result<Value, Failure> {
             .ok_or_else(|| error("invalid_input", kind))?,
     ))
 }
-fn parse(reply: Reply, code: &'static str) -> Result<Value, Failure> {
+pub(crate) fn parse(reply: Reply, code: &'static str) -> Result<Value, Failure> {
     serde_json::from_slice(&reply.bytes).map_err(|_| error(code, "answer"))
 }
 fn acknowledged(reply: Answer) -> bool {
@@ -85,7 +88,7 @@ fn acknowledged(reply: Answer) -> bool {
                 .is_ok_and(|v| v.is_object() && v["result"].is_object() && v.get("error").is_none())
     })
 }
-fn codes(v: &Value) -> Value {
+pub(crate) fn codes(v: &Value) -> Value {
     let mut found: Vec<String> = v["result"]["criteria"]
         .as_array()
         .into_iter()
@@ -106,7 +109,12 @@ fn codes(v: &Value) -> Value {
     }
     json!({"codes":found})
 }
-fn ont(s: &mut impl System, r: &Value, command: &[&str], body: &Value) -> Result<Reply, Failure> {
+pub(crate) fn ont(
+    s: &mut impl System,
+    r: &Value,
+    command: &[&str],
+    body: &Value,
+) -> Result<Reply, Failure> {
     let mut a = args(command);
     if let Some(store) = r["store"].as_str() {
         a.extend(args(&["--store", store]));
@@ -125,6 +133,7 @@ macro_rules! require {
         }
     };
 }
+pub(crate) use require;
 fn agents(s: &mut impl System, code: &'static str, ms: u64) -> Result<Vec<Value>, Failure> {
     let reply = herdr!(s, ms; "agent", "list").map_err(|_| error(code, "agents"))?;
     if !reply.success {
@@ -181,7 +190,7 @@ fn read_binding(value: &Value) -> Option<(String, String)> {
         serde_json::from_str(encoded.strip_prefix("ap-work/1:")?).ok()?;
     (write_binding(&pane, &tab)?.as_str() == encoded).then_some((pane, tab))
 }
-fn apply_answer(reply: Reply, code: &'static str) -> Result<Value, Failure> {
+pub(crate) fn apply_answer(reply: Reply, code: &'static str) -> Result<Value, Failure> {
     let success = reply.success;
     let v = parse(reply, code)?;
     require!(success || refused(&v) => code, "apply");
@@ -531,7 +540,7 @@ pub fn execute(s: &mut impl System, verb: &str, r: &Value) -> Result<(Value, u8)
     };
     Ok((value, status))
 }
-fn complete_id(v: &Value) -> bool {
+pub(crate) fn complete_id(v: &Value) -> bool {
     [
         "/object_type",
         "/native_key",
@@ -545,7 +554,7 @@ fn complete_id(v: &Value) -> bool {
             .is_some_and(|s| !s.is_empty())
     })
 }
-fn refused(v: &Value) -> bool {
+pub(crate) fn refused(v: &Value) -> bool {
     v.is_object() && (v["status"].as_str().is_some_and(|s| s != "ok") || v["code"].is_string())
 }
 pub struct Host;
@@ -627,6 +636,12 @@ impl System for Host {
     }
 }
 pub fn cli(args: &[OsString]) -> ExitCode {
+    json_cli(args, execute)
+}
+pub(crate) fn json_cli(
+    args: &[OsString],
+    execute: impl FnOnce(&mut Host, &str, &Value) -> Result<(Value, u8), Failure>,
+) -> ExitCode {
     let result = (|| {
         if args.len() != 1 {
             return Err(fail("usage", "args", Value::Null));

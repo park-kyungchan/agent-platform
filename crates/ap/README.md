@@ -24,3 +24,82 @@ An uncertain create/start/apply leaves the tab open for the Lead to reconcile; a
 A missing agent requires `agent_gone: true`, supplied after the Lead observed it ended, the same bound sole-pane membership, and no listed agent with that name, pane or tab. Its result appends `; session=unavailable (agent_gone)`, explicitly recording the absence of a live session. Only an ok apply with one update of that exact `worker_run`, followed by readback of its closed status, result and unchanged binding/name, permits tab closure. A failed tab close returns `tab_closed: false` with exit 3. An uncertain store close or readback leaves the tab open.
 
 `store` forwards `--store <absolute path>` to every Ontology call, permitting disposable-store use. Uncertainty requires readback by the Lead; no command automatically retries a prompt or sends keys.
+
+## One review
+
+`ap review start|close|accept|revoke` reads one JSON object on stdin and writes
+one JSON answer; errors use the same stderr envelope and exit codes as `ap work`.
+Every path is absolute. Optional `store` forwards `--store` to every `ont` call.
+The review object owns the verdict; `lead-review` is a derived commit status.
+The status is required by a ruleset only after the Lead applies it.
+
+`start` reads and hashes a regular prompt file below `/home/palantirkc/work/`.
+With a pull request, it checks that the request is open at exactly `head`.
+Each optional run must exist, belong to the task and occur once. It applies
+`start_review` with a stable request id based on task key, kind, head and prompt
+hash, returning `status: started`, the complete `review` id and `prompt_sha256`.
+It does not launch a reviewer. Example stdin for `ap review start`:
+
+```json
+{"task_dir":"/home/palantirkc/work/example","kind":"packet","head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","base":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","repository":"owner/repo","pull_request":12,"runs":[{"object_type":"worker_run","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"run-key"}],"model":"reviewer-model","effort":"high","prompt":"/home/palantirkc/work/example/prompt.md"}
+```
+
+`close` reads a regular report file below the work root, at most 1 MiB. Its
+first line must be exactly `Verdict: accept` or `Verdict: repair`. It hashes the
+bytes and applies `close_review`; optional `account` and `session` are recorded.
+Alternatively, supply `verdict: abandoned` with no report. The answer contains
+`status: closed`, `verdict` and `report_sha256` (null for abandoned). The stable
+close request id hashes the review key and report hash (`abandoned` without a
+report). Example stdin for `ap review close`:
+
+```json
+{"review":{"object_type":"review","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"review-key"},"report":"/home/palantirkc/work/example/report.md","account":"b","session":"reviewer-session"}
+```
+
+`accept` requires a closed `packet` or `integrated` review with verdict `accept`,
+repository, pull request, head, base and an unchanged report. Every named run
+must have a nonempty write set. It verifies the open pull request targets `main`
+at the review head, fetches `origin main`, checks the merge base and compares
+changed paths to the union of those write sets. A pattern matches its exact
+path; a trailing `/**` matches descendants, not the directory itself or another
+name with the same prefix. The caller must be outside the task's `wt/`.
+Only then does it post `lead-review=success` for that head and return
+`status: accepted`, `head` and the number of `paths`. Repeating it posts again.
+Example stdin for `ap review accept`:
+
+```json
+{"review":{"object_type":"review","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"review-key"},"worktree":"/home/palantirkc/work/example/wt/repo"}
+```
+
+`revoke` reads a review with a repository and head, then posts
+`lead-review=failure` with `revoked: <reason>`. The reason must contain text and
+fit within 100 UTF-8 bytes. It returns `status: revoked` and `head`. Example
+stdin for `ap review revoke`:
+
+```json
+{"review":{"object_type":"review","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"review-key"},"reason":"Report missed a changed path"}
+```
+
+Refusals (local checks precede writes and status posts):
+
+- `invalid_input`: malformed object, id, path, run list, reason or explicit verdict; field identifies the member.
+- `review_prompt_unreadable`: prompt is not a readable regular file below the work root.
+- `review_head_differs`: pull request is closed, has another head, or (at accept) targets another branch.
+- `review_run_unknown`: a start run cannot be read as the exact current object.
+- `review_run_of_other_task`: a start run belongs to another task.
+- `store_refused`: the store refused an attempted action; detail carries its codes; no retry occurs.
+- `review_report_unreadable`: close report is unreadable, outside the work root or larger than 1 MiB.
+- `review_report_lacks_verdict`: the report's first line is not one of the two exact verdict lines.
+- `review_not_accepting`: required review state or evidence is absent; detail names the first failing member.
+- `review_report_changed`: report is unreadable or its current bytes have another digest.
+- `review_runs_required`: an accepting review needs a nonempty array of runs.
+- `review_run_lacks_write_set`: a run is unreadable or lacks a nonempty write set; detail gives its key.
+- `review_base_differs`: fetched merge base differs from the review base; detail gives the merge base.
+- `review_path_outside_write_set`: changed paths escape the union; detail contains at most ten paths and the total count.
+- `review_accept_from_worktree`: caller's working directory is under the reviewed task's `wt/`.
+- `store_review_unreadable`: the exact review's current observation cannot be read.
+- `store_answer_unreadable`: an action reply is malformed or does not confirm the expected create.
+- `process_failed`: an external command failed or returned unreadable Git output; no automatic retry occurs.
+- `io_error`: stdin or the caller's working directory cannot be read.
+- `input_too_large`: stdin exceeds 1 MiB.
+- `usage`: exactly one supported verb is required.
