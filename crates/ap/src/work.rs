@@ -239,6 +239,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     require!(!bytes.is_empty() => "packet_missing", "packet");
     require!(!s.exists(text(r,"report")?).map_err(|_| error("io_error","report"))? => "report_exists", "report");
     let mut worktree_head = Value::Null;
+    let mut write_set = None;
     if let Some(w) = r["worktree"].as_str() {
         let dirty = s.call(
             "git",
@@ -251,6 +252,20 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         let has = |prefix: &[u8]| bytes.split(|b| *b == b'\n').any(|l| l.starts_with(prefix));
         require!(has(b"Callers searched:") && has(b"Broken tests:") => "packet_lacks_callers_or_broken_tests_line", "packet");
         require!(has(b"Controls:") => "packet_lacks_controls_line", "packet");
+        let line = bytes
+            .split(|b| *b == b'\n')
+            .find_map(|l| l.strip_prefix(b"Write set:"))
+            .ok_or_else(|| error("packet_lacks_write_set_line", "packet"))?;
+        let line = std::str::from_utf8(line).map_err(|_| error("write_set_invalid", "packet"))?;
+        let members: Vec<&str> = line.split(',').map(str::trim).collect();
+        require!(members.len() <= 64 && members.iter().all(|member| {
+            let path = member.strip_suffix("/**").unwrap_or(member);
+            !path.is_empty()
+                && member.len() <= 300
+                && !path.contains(['\\', '*', '?', '['])
+                && path.split('/').all(|c| !c.is_empty() && c != "." && c != "..")
+        }) => "write_set_invalid", "packet");
+        write_set = Some(json!(members));
         let head = s
             .call(
                 "git",
@@ -281,6 +296,9 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     )?;
     let plan = search(s, r, "plan", json!({"eq":["thread",thread]}))?;
     let mut body = json!({"action_type":"start_worker_run","parameters":{"task":task,"name":name,"packet":file_id("packet",packet)?,"runtime":"codex","thread":thread,"plan":plan,"tier":text(r,"tier")?,"layer":text(r,"layer")?}});
+    if let Some(write_set) = write_set {
+        body["parameters"]["write_set"] = write_set;
+    }
     let v = parse(
         ont(s, r, &["action", "validate"], &body)?,
         "store_answer_unreadable",

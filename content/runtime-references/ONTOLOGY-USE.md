@@ -33,7 +33,7 @@ An Id is JSON with `object_type`, `namespace` and `native_key`. Use the Id that 
 | `task` | The task directory's name below `/home/palantirkc/work/`, for example `ws-example` |
 | `packet`, `report` | The file path relative to that work root, for example `ws-example/TASK-example.md` |
 | `installed_artifact`, `instruction_file` | The absolute file path |
-| `hold`, `decision`, `kpi`, `measurement`, `worker_run`, `thread`, `plan` | Generated at creation: in the apply answer it is the `id` of the `result.edits[]` entry whose `change` is `initial`; later take `result.objects[].id` from `search`. Do not invent a key |
+| `hold`, `decision`, `kpi`, `measurement`, `worker_run`, `thread`, `plan`, `review` | Generated at creation: in the apply answer it is the `id` of the `result.edits[]` entry whose `change` is `initial`; later take `result.objects[].id` from `search`. Do not invent a key |
 
 ## 4. Reads
 
@@ -81,11 +81,12 @@ Send JSON on standard input to `ont action apply`: `action_type`, `parameters`, 
 | Action | Records | Rule that is easy to miss |
 | --- | --- | --- |
 | `open_thread`, `amend_thread` | A work thread of the task with its first consumer and first use | One thread per task and key |
-| `open_plan`, `amend_plan`, `record_scope_review` | A thread's plan: first estimate, limit and current size in lines; a review that covers a stated size | The opening estimate is immutable; an amendment clears the scope review |
+| `open_plan`, `amend_plan`, `record_scope_review` | A thread's plan: first estimate, limit and current size in lines; a review that covers a stated size | The opening estimate is immutable; an amendment clears the scope review; families are not compared; optional `review` must be closed |
+| `start_review`, `close_review` | A model's review of an exact head, with prompt/report paths and SHA-256 digests | One running review per task/head/kind; closing needs report and digest unless verdict is `abandoned`; `reviews(task)` lists newest first |
 | `set_hold`, `lift_hold` | An effect that is blocked, and the condition that lifts it | The effect is unique among active holds |
 | `record_decision`, `supersede_decision` | The current choice on one topic | One current decision per topic: a second one is a `supersede_decision`. A decision by the user carries the user's words and is refused when they were a question |
 | `define_kpi`, `set_kpi_target`, `record_measurement` | A KPI of the task, its target, a measured value with time and evidence | `observed_at` is a real UTC time from `date -u +%Y-%m-%dT%H:%M:%SZ`, not older than the history and not later than the application time |
-| `start_worker_run`, `note_worker_run`, `close_worker_run` | A dispatched worker, its progress, its final result | The thread and its plan must exist and belong to the task; a plan over its limit without a scope review refuses the start |
+| `start_worker_run`, `note_worker_run`, `close_worker_run` | A dispatched worker, its progress, its final result | The thread and its plan must exist and belong to the task; a plan over its limit without a scope review refuses the start; optional `write_set` stores ordered repository-relative patterns from the packet |
 
 | If | Then |
 | --- | --- |

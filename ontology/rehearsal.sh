@@ -51,7 +51,9 @@ call(['schema', 'install', str(legacy)])
 legacy_thread = created(apply('open_thread', 'legacy-thread', dict(task=task, key='legacy-v5', consumer='fixture', consumer_kind='harness', first_use='upgrade')), 'thread')
 legacy_plan = created(apply('open_plan', 'legacy-plan', dict(thread=legacy_thread, first_lines=100, limit_lines=150, current_lines=151, amended_by_family='family-a')), 'plan')
 apply('record_scope_review', 'legacy-review', dict(plan=legacy_plan, reviewer_family='family-b', review_report='fixture/v5.md'))
-call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+v6 = pathlib.Path(store).with_name('v6.json')
+v6.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', '8ad36bf3cf10e19659965cc2d458a921533cdfae:ontology/work.schema.json'], timeout=10))
+call(['schema', 'install', str(v6)])
 assert obj(probe)['head'] == probe_revision
 assert obj(task)['observations'][-1]['revision'] == revision
 call(['describe'], {})
@@ -233,6 +235,46 @@ for action, params in [('record_decision', dict(dp, topic='gate-user')), ('super
     assert fields(created(answer, 'decision'))['user_words'] == user['user_words']
 gate('record_decision', 'lead-question', dict(dp, topic='gate-lead-question', user_form='question'))
 print('v6_gate_rows_complete')
+old_plan = fields(plan); old_run = fields(w)
+old_views = {view: call(['render'], dict(view=view, args={} if view == 'current_memory_records' else dict(task=task['native_key']))) for view in json.loads(v6.read_text())['views']}
+call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+assert fields(plan) == old_plan and fields(w) == old_run
+for kind, retained in [('plan', plan), ('worker_run', w)]:
+    assert retained in [o['id'] for o in call(['search'], dict(object_type=kind))['objects']]
+    print('gate_row=v6-' + kind + '-get-search expected=admitted')
+for view in json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())['views']:
+    answer = call(['render'], dict(view=view, args={} if view == 'current_memory_records' else dict(task=task['native_key'])))
+    assert not answer['truncated']
+    if view in old_views:
+        assert answer['rows'] == old_views[view]['rows']
+        assert answer['markdown'] == old_views[view]['markdown'].replace('schema=work@6', 'schema=work@7')
+    print('gate_row=v7-view-' + view + ' expected=admitted rows=' + str(answer['rows']))
+gate('amend_plan', 'v6-plan-amend', dict(plan=plan, current_lines=100, amended_by_family='family-b'))
+rp = dict(task=task, kind='packet', head='a' * 40, model='fixture-model', effort='medium', prompt='/home/palantirkc/work/fixture/PROMPT.md', prompt_sha256='b' * 64, runs=[w])
+first_review = created(gate('start_review', 'review-start', rp), 'review')
+assert fields(first_review)['runs'] == [w]
+gate('start_review', 'review-duplicate', rp, 'duplicate_running_review')
+gate('start_review', 'review-another-kind', dict(rp, kind='design'))
+gate('close_review', 'review-report-required', dict(review=first_review, verdict='accept'), 'report_required')
+gate('close_review', 'review-hash-required', dict(review=first_review, verdict='accept', report='/home/palantirkc/work/fixture/REPORT.md'), 'report_required')
+gate('close_review', 'review-abandoned', dict(review=first_review, verdict='abandoned'))
+gate('close_review', 'review-second-close', dict(review=first_review, verdict='abandoned'), 'review_not_running')
+next_review = created(gate('start_review', 'review-after-close', rp), 'review')
+assert fields(first_review)['status'] == 'closed' and fields(first_review)['verdict'] == 'abandoned'
+assert fields(next_review)['status'] == 'running'
+assert render('reviews')['rows'] == 3
+review = dict(review, reviewed_lines=153, reviewer_family='family-b')
+gate('record_scope_review', 'v7-same-family', review)
+gate('record_scope_review', 'v7-running-review', dict(review, review=next_review), 'review_not_closed')
+gate('record_scope_review', 'v7-closed-review', dict(review, review=first_review))
+assert fields(plan)['review'] == first_review
+gate('close_review', 'review-report', dict(review=next_review, verdict='accept', report='/home/palantirkc/work/fixture/REPORT.md', report_sha256='c' * 64, account='fixture', session='fixture-session'))
+assert fields(next_review)['report_sha256'] == 'c' * 64
+for rid, extra in [('write-set', dict(write_set=['crates/ap/src/work.rs', 'ontology/**'])), ('no-write-set', {})]:
+    run = created(gate('start_worker_run', 'v7-' + rid, dict(wp, name='v7-' + rid, **extra)), 'worker_run')
+    if extra: assert fields(run)['write_set'] == extra['write_set']
+    else: assert 'write_set' not in fields(run)
+print('v7_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2
