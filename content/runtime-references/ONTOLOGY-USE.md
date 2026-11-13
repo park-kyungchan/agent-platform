@@ -96,6 +96,16 @@ Send JSON on standard input to `ont action apply`: `action_type`, `parameters`, 
 | An optional parameter is omitted or null | The stored value stays; omission does not clear it |
 | You render a board | `ont render --write <board> --section <view> --arg task=<native key> --preimage-dir <dir>`, then `ont render --check <board> --expect-blocks <n>`. The first block of a section is pasted once from the `markdown` of `ont render` |
 
+`review.running_in` is set by `start_review`, cleared by `close_review`, followed by its duplicate criterion, and never set by a caller.
+`worker_run.running_in` is set by `start_worker_run`, cleared by `close_worker_run`, followed by its duplicate criterion, and never set by a caller.
+`status` remains the running/closed statement for views and other criteria.
+`write_pattern` checks each write-set member's ASCII path characters and length;
+only the caller bounds the count (64 in `ap work start`); the engine has no schema count bound.
+For a new type, a uniqueness criterion links through a reference set only while
+the object is open and cleared by the closing action; see `ontology/README.md` in `agent-platform`.
+Review prompt/report parameters use `file_path`: an absolute printable ASCII path
+without spaces, 2 to 400 bytes.
+
 ## 6. Refusals
 
 Read `code`, `field`, `rule` and `hint` when present and repair that field or precondition. Do not repeat a refused call unchanged.

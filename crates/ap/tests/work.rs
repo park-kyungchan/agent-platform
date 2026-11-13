@@ -1436,6 +1436,12 @@ fn write_set_invalid_members() {
         "a[".into(),
         "a/".into(),
         "a".repeat(301),
+        "src/\u{00e9}.rs".into(),
+        "a:b".into(),
+        "a b".into(),
+        "`a/b.rs`".into(),
+        "a,a".into(),
+        "a\nWrite set: b".into(),
     ] {
         let (mut r, _) = start_setup();
         r["worktree"] = json!("/tree");
@@ -1452,6 +1458,21 @@ fn write_set_invalid_members() {
 }
 #[test]
 fn write_set_sent_in_order() {
+    let schema: Value =
+        serde_json::from_str(include_str!("../../../ontology/work.schema.json")).unwrap();
+    assert_eq!(
+        schema["value_types"]["write_pattern"]["pattern"],
+        r"^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,295}(/\*\*)?$"
+    );
+    for member in ["crates/ap/src/work.rs", "ontology/**"] {
+        let path = member.strip_suffix("/**").unwrap_or(member);
+        assert!((1..=296).contains(&path.len()));
+        assert!(path.as_bytes()[0].is_ascii_alphanumeric() || b"._".contains(&path.as_bytes()[0]));
+        assert!(
+            path.bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"._/+@-".contains(&c))
+        );
+    }
     let (mut r, mut steps) = start_setup();
     r["worktree"] = json!("/tree");
     for i in [2, 7] {

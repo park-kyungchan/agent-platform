@@ -252,17 +252,22 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         let has = |prefix: &[u8]| bytes.split(|b| *b == b'\n').any(|l| l.starts_with(prefix));
         require!(has(b"Callers searched:") && has(b"Broken tests:") => "packet_lacks_callers_or_broken_tests_line", "packet");
         require!(has(b"Controls:") => "packet_lacks_controls_line", "packet");
-        let line = bytes
+        let mut lines = bytes
             .split(|b| *b == b'\n')
-            .find_map(|l| l.strip_prefix(b"Write set:"))
+            .filter_map(|l| l.strip_prefix(b"Write set:"));
+        let line = lines
+            .next()
             .ok_or_else(|| error("packet_lacks_write_set_line", "packet"))?;
+        require!(lines.next().is_none() => "write_set_invalid", "packet");
         let line = std::str::from_utf8(line).map_err(|_| error("write_set_invalid", "packet"))?;
         let members: Vec<&str> = line.split(',').map(str::trim).collect();
-        require!(members.len() <= 64 && members.iter().all(|member| {
+        require!(members.len() <= 64 && members.iter().enumerate().all(|(index, member)| {
             let path = member.strip_suffix("/**").unwrap_or(member);
             !path.is_empty()
                 && member.len() <= 300
-                && !path.contains(['\\', '*', '?', '['])
+                && path.bytes().all(|c| c.is_ascii_alphanumeric() || b"._/+@-".contains(&c))
+                && path.as_bytes().first().is_some_and(|c| c.is_ascii_alphanumeric() || b"._".contains(c))
+                && !members[..index].contains(member)
                 && path.split('/').all(|c| !c.is_empty() && c != "." && c != "..")
         }) => "write_set_invalid", "packet");
         write_set = Some(json!(members));

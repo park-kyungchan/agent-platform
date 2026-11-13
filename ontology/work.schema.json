@@ -81,7 +81,15 @@
     "review_status": {"base": "string", "enum": ["running", "closed"]},
     "review_verdict": {"base": "string", "pattern": "^[a-z_]{1,32}$"},
     "commit_or_digest": {"base": "string", "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"},
-    "sha256_hex": {"base": "string", "pattern": "^[0-9a-f]{64}$"}
+    "sha256_hex": {"base": "string", "pattern": "^[0-9a-f]{64}$"},
+    "write_pattern": {
+      "base": "string",
+      "pattern": "^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,295}(/\\*\\*)?$"
+    },
+    "file_path": {
+      "base": "string",
+      "pattern": "^/[!-~]{1,399}$"
+    }
   },
   "sources": {
     "task_states": {
@@ -855,7 +863,16 @@
           "type": {"ref": "plan"},
           "required": false
         },
-        "write_set": {"type": {"array": "string"}, "required": false, "description": "Repository-relative write patterns; caller limits each to 300 bytes and the array to 64 members."}
+        "write_set": {"type": {"array": {
+          "value_type": "write_pattern"
+        }}, "required": false, "description": "Each member must match write_pattern (ASCII repository-relative path with optional /**); only the caller bounds the count to 64, since the schema language has no member-count bound."},
+        "running_in": {
+          "type": {
+            "ref": "task"
+          },
+          "required": false,
+          "description": "Set only by the start action while running; cleared by the close action for duplicate checks."
+        }
       }
     },
     "memory_record": {
@@ -942,16 +959,27 @@
         "runs": {"type": {"array": {"ref": "worker_run"}}, "required": false},
         "model": {"type": "string", "required": true, "max_bytes": 80},
         "effort": {"type": "string", "required": true, "max_bytes": 20},
-        "prompt": {"type": "string", "required": true, "max_bytes": 400},
+        "prompt": {"type": {
+          "value_type": "file_path"
+        }, "required": true, "max_bytes": 400},
         "prompt_sha256": {"type": {"value_type": "sha256_hex"}, "required": true},
-        "report": {"type": "string", "required": false, "max_bytes": 400},
+        "report": {"type": {
+          "value_type": "file_path"
+        }, "required": false, "max_bytes": 400},
         "report_sha256": {"type": {"value_type": "sha256_hex"}, "required": false},
         "verdict": {"type": {"value_type": "review_verdict"}, "required": false},
         "account": {"type": "string", "required": false, "max_bytes": 40},
         "session": {"type": "string", "required": false, "max_bytes": 200},
         "status": {"type": {"value_type": "review_status"}, "required": true},
         "started_at": {"type": {"value_type": "utc_time"}, "required": true, "max_bytes": 40},
-        "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40}
+        "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40},
+        "running_in": {
+          "type": {
+            "ref": "task"
+          },
+          "required": false,
+          "description": "Set only by the start action while running; cleared by the close action for duplicate checks."
+        }
       }
     }
   },
@@ -1108,7 +1136,27 @@
       "names": {"forward": "thread_task", "reverse": "threads"}
     },
     "review_task": {"from": "review", "via": "task", "to": "task", "cardinality": "many_to_one", "names": {"forward": "review_task", "reverse": "reviews"}},
-    "review_runs": {"from": "review", "via": "runs", "to": "worker_run", "cardinality": "many_to_many", "names": {"forward": "review_runs", "reverse": "run_reviews"}}
+    "review_runs": {"from": "review", "via": "runs", "to": "worker_run", "cardinality": "many_to_many", "names": {"forward": "review_runs", "reverse": "run_reviews"}},
+    "review_running_task": {
+      "from": "review",
+      "via": "running_in",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "review_running_task",
+        "reverse": "running_reviews"
+      }
+    },
+    "worker_run_running_task": {
+      "from": "worker_run",
+      "via": "running_in",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "worker_run_running_task",
+        "reverse": "running_worker_runs"
+      }
+    }
   },
   "action_types": {
     "set_hold": {
@@ -1682,7 +1730,9 @@
           "type": {"ref": "plan"},
           "required": true
         },
-        "write_set": {"type": {"array": "string"}, "required": false, "description": "Repository-relative write patterns; caller limits each to 300 bytes and the array to 64 members."}
+        "write_set": {"type": {"array": {
+          "value_type": "write_pattern"
+        }}, "required": false, "description": "Each member must match write_pattern (ASCII repository-relative path with optional /**); only the caller bounds the count to 64, since the schema language has no member-count bound."}
       },
       "submission_criteria": [
         {
@@ -1701,19 +1751,13 @@
             {
               "linked": {
                 "from": "$task",
-                "link": "worker_runs",
+                "link": "running_worker_runs",
                 "where": {
                   "all": [
                     {
                       "eq": [
                         "name",
                         "$name"
-                      ]
-                    },
-                    {
-                      "eq": [
-                        "status",
-                        "running"
                       ]
                     }
                   ]
@@ -1769,7 +1813,8 @@
             "thread": "$thread",
             "layer": "$layer",
             "plan": "$plan",
-            "write_set": "$write_set"
+            "write_set": "$write_set",
+            "running_in": "$task"
           }
         }
       ]
@@ -1868,6 +1913,12 @@
             "closed_at": "$now",
             "status": "closed",
             "report": "$report"
+          }
+        },
+        {
+          "clear_reference": {
+            "object_type": "worker_run",
+            "property": "running_in"
           }
         }
       ]
@@ -2256,12 +2307,27 @@
         "runs": {"type": {"array": {"ref": "worker_run"}}, "required": false},
         "model": {"type": "string", "required": true, "max_bytes": 80},
         "effort": {"type": "string", "required": true, "max_bytes": 20},
-        "prompt": {"type": "string", "required": true, "max_bytes": 400},
+        "prompt": {"type": {
+          "value_type": "file_path"
+        }, "required": true, "max_bytes": 400},
         "prompt_sha256": {"type": {"value_type": "sha256_hex"}, "required": true}
       },
       "submission_criteria": [
         {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
-        {"code": "duplicate_running_review", "message": "Close the running review of this task, head and kind.", "none": [{"linked": {"from": "$task", "link": "reviews", "where": {"all": [{"eq": ["status", "running"]}, {"eq": ["head", "$head"]}, {"eq": ["kind", "$kind"]}]}}}]}
+        {"code": "duplicate_running_review", "message": "Close the running review of this task, head and kind.", "none": [{"linked": {"from": "$task", "link": "running_reviews", "where": {"all": [
+          {
+            "eq": [
+              "head",
+              "$head"
+            ]
+          },
+          {
+            "eq": [
+              "kind",
+              "$kind"
+            ]
+          }
+        ]}}}]}
       ],
       "rules": [
         {
@@ -2279,7 +2345,8 @@
             "prompt": "$prompt",
             "prompt_sha256": "$prompt_sha256",
             "status": "running",
-            "started_at": "$now"
+            "started_at": "$now",
+            "running_in": "$task"
           }
         }
       ]
@@ -2289,7 +2356,9 @@
       "parameters": {
         "review": {"type": {"ref": "review"}, "required": true},
         "verdict": {"type": {"value_type": "review_verdict"}, "required": true},
-        "report": {"type": "string", "required": false, "max_bytes": 400},
+        "report": {"type": {
+          "value_type": "file_path"
+        }, "required": false, "max_bytes": 400},
         "report_sha256": {"type": {"value_type": "sha256_hex"}, "required": false},
         "account": {"type": "string", "required": false, "max_bytes": 40},
         "session": {"type": "string", "required": false, "max_bytes": 200}
@@ -2309,6 +2378,12 @@
             "session": "$session",
             "status": "closed",
             "closed_at": "$now"
+          }
+        },
+        {
+          "clear_reference": {
+            "object_type": "review",
+            "property": "running_in"
           }
         }
       ]

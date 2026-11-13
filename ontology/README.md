@@ -383,7 +383,8 @@ installation remains a separate authorized operation.
 head and optional base (40-hex commit or 64-hex design digest), optional worker
 runs, model, effort, prompt path/digest, optional report path/digest, verdict,
 account, session, status and application times. Keys come from `$action_id`.
-Paths identify files below `/home/palantirkc/work/`; the caller supplies their
+`file_path` checks an absolute printable ASCII path without spaces, 2 to 400 bytes;
+callers keep paths below `/home/palantirkc/work/` and supply their
 SHA-256 digests (`sha256_hex`). `memory_body_hash` remains unchanged.
 `start_review` refuses `unknown_task` and `duplicate_running_review` for an
 existing running review of the same task, head and kind. `close_review` refuses
@@ -397,8 +398,15 @@ column-1 `Write set:` line for worktree packets, split at commas and trimmed.
 It accepts 1 to 64 members of at most 300 bytes: relative paths without empty,
 `.` or `..` components or backslashes, optionally ending in `/**`, with no other
 `*`, `?` or `[` wildcard. No worktree means no write_set parameter.
-The schema language declares arrays but cannot constrain their member counts
-or string-member byte lengths; these bounds are enforced by this caller only.
+`write_pattern` checks each member against
+`^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,295}(/\*\*)?$`; the schema has no
+member-count bound, so only the caller enforces the count of 64.
+Members use ASCII letters, digits and `._/+@-`, begin with a letter, digit, `.`
+or `_`, and may have a final `/**`; duplicate members and multiple column-1
+`Write set:` lines are refused. The tracked-path character check finds 0
+incompatible paths in `agent-platform`; the Lead measured 0 in `ontology-platform`
+and 27 non-ASCII tracked paths in one directory of `education-platform`, which
+packets name by the directory and `/**`.
 No command yet consumes these stored review or write-set records.
 
 `record_scope_review` retains every existing family field and parameter but
@@ -407,3 +415,15 @@ no longer compares families. Its optional `review` reference must be closed
 properties remain declared; existing objects need no migration. The rehearsal
 runs the old family refusals on version 6 before installing version 7, then
 checks review transitions, write-set dispatch and existing-object compatibility.
+
+`review.running_in` is set by `start_review`, cleared by `close_review`, followed
+only by the duplicate criterion, and never set by a caller.
+`worker_run.running_in` is set by `start_worker_run`, cleared by `close_worker_run`,
+followed only by the duplicate criterion, and never set by a caller.
+`status` remains the running/closed statement used by views and other criteria.
+For a new type, a uniqueness criterion must link through a reference that is
+set only while the object is open and cleared by its closing action (LENS F43).
+Version 6 and earlier version 7 objects without `running_in` can still be noted
+and closed, but do not block a new start with the same name/head/kind; no migration
+is performed. Reverse-link basis size depends on engine postings support; after
+a schema install old-pin heads remain candidates until engine item G3.

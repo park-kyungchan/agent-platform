@@ -235,6 +235,7 @@ for action, params in [('record_decision', dict(dp, topic='gate-user')), ('super
     assert fields(created(answer, 'decision'))['user_words'] == user['user_words']
 gate('record_decision', 'lead-question', dict(dp, topic='gate-lead-question', user_form='question'))
 print('v6_gate_rows_complete')
+v6_running = created(gate('start_worker_run', 'v6-still-running', dict(wp, name='v6-still-running', tier='review')), 'worker_run')
 old_plan = fields(plan); old_run = fields(w)
 old_views = {view: call(['render'], dict(view=view, args={} if view == 'current_memory_records' else dict(task=task['native_key']))) for view in json.loads(v6.read_text())['views']}
 call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
@@ -249,15 +250,26 @@ for view in json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text
         assert answer['rows'] == old_views[view]['rows']
         assert answer['markdown'] == old_views[view]['markdown'].replace('schema=work@6', 'schema=work@7')
     print('gate_row=v7-view-' + view + ' expected=admitted rows=' + str(answer['rows']))
+same_name = gate('start_worker_run', 'v6-running-same-name', dict(wp, name='v6-still-running', tier='review'))
+print('v6_running_same_name=' + same_name['outcome'])
+gate('note_worker_run', 'v6-running-note', dict(worker_run=v6_running, note='upgrade note'))
+gate('close_worker_run', 'v6-running-close', dict(worker_run=v6_running, result='upgrade close'))
+assert fields(v6_running).get('running_in') is None
+gate('close_worker_run', 'v6-same-name-close', dict(worker_run=created(same_name, 'worker_run'), result='done'))
 gate('amend_plan', 'v6-plan-amend', dict(plan=plan, current_lines=100, amended_by_family='family-b'))
 rp = dict(task=task, kind='packet', head='a' * 40, model='fixture-model', effort='medium', prompt='/home/palantirkc/work/fixture/PROMPT.md', prompt_sha256='b' * 64, runs=[w])
 first_review = created(gate('start_review', 'review-start', rp), 'review')
 assert fields(first_review)['runs'] == [w]
+assert fields(first_review)['running_in'] == task
 gate('start_review', 'review-duplicate', rp, 'duplicate_running_review')
 gate('start_review', 'review-another-kind', dict(rp, kind='design'))
 gate('close_review', 'review-report-required', dict(review=first_review, verdict='accept'), 'report_required')
 gate('close_review', 'review-hash-required', dict(review=first_review, verdict='accept', report='/home/palantirkc/work/fixture/REPORT.md'), 'report_required')
+gate('close_review', 'review-empty-report', dict(review=first_review, verdict='accept', report='', report_sha256='c' * 64), 'invalid_parameter')
+for label, prompt in [('empty', ''), ('relative', 'PROMPT.md')]:
+    gate('start_review', 'review-' + label + '-prompt', dict(rp, prompt=prompt), 'invalid_parameter')
 gate('close_review', 'review-abandoned', dict(review=first_review, verdict='abandoned'))
+assert fields(first_review).get('running_in') is None
 gate('close_review', 'review-second-close', dict(review=first_review, verdict='abandoned'), 'review_not_running')
 next_review = created(gate('start_review', 'review-after-close', rp), 'review')
 assert fields(first_review)['status'] == 'closed' and fields(first_review)['verdict'] == 'abandoned'
@@ -272,8 +284,43 @@ gate('close_review', 'review-report', dict(review=next_review, verdict='accept',
 assert fields(next_review)['report_sha256'] == 'c' * 64
 for rid, extra in [('write-set', dict(write_set=['crates/ap/src/work.rs', 'ontology/**'])), ('no-write-set', {})]:
     run = created(gate('start_worker_run', 'v7-' + rid, dict(wp, name='v7-' + rid, **extra)), 'worker_run')
+    assert fields(run)['running_in'] == task
+    gate('start_worker_run', 'v7-duplicate-' + rid, dict(wp, name='v7-' + rid, **extra), 'duplicate_running_worker')
     if extra: assert fields(run)['write_set'] == extra['write_set']
     else: assert 'write_set' not in fields(run)
+    gate('close_worker_run', 'v7-close-' + rid, dict(worker_run=run, result='done'))
+    assert fields(run).get('running_in') is None
+# The schema itself bounds members, even when ap is bypassed.
+for label, member in [('301', 'a' * 301), ('wildcard', 'src/*.rs'), ('absolute', '/etc/passwd'), ('unicode', 'src/\u00e9.rs')]:
+    gate('start_worker_run', 'direct-write-' + label, dict(wp, name='direct-' + label, write_set=[member]), 'invalid_parameter')
+valid_run = created(gate('start_worker_run', 'direct-write-valid', dict(wp, name='direct-valid', write_set=['crates/ap/src/**', 'ontology/work.schema.json'])), 'worker_run')
+gate('close_worker_run', 'direct-write-valid-close', dict(worker_run=valid_run, result='done'))
+# Five closed objects must not enter the sixth start's basis on the G4 engine.
+closed = {}
+for kind in ['review', 'worker_run']:
+    closed[kind] = []
+    params = dict(rp, head='d' * 40) if kind == 'review' else dict(wp, name='basis-fixture')
+    for index in range(5):
+        item = created(gate('start_' + kind, 'basis-' + kind + '-' + str(index), params), kind)
+        close = dict(review=item, verdict='abandoned') if kind == 'review' else dict(worker_run=item, result='done')
+        gate('close_' + kind, 'basis-close-' + kind + '-' + str(index), close)
+        assert fields(item).get('running_in') is None
+        closed[kind].append(item)
+    answer = call(['action', 'validate'], dict(action_type='start_' + kind, parameters=params))
+    assert answer['valid'], answer
+    heads = answer['basis']
+    print('start_' + kind + '_basis_heads=' + str(len(heads)))
+    version = subprocess.check_output([binary, '--version'], text=True, timeout=10).strip()
+    print(version)
+    task_file = pathlib.Path(repo).parents[1] / 'harness-20261112/TASK-P12-1-R1.md'
+    engine_lines = [line.removeprefix('Engine with G4:').strip().split()[0].strip('`') for line in task_file.read_text().splitlines() if line.startswith('Engine with G4:')]
+    if engine_lines and engine_lines[-1] in (version, version.split()[-1]):
+        assert len(heads) == (2 if kind == 'review' else 3), (kind, heads)
+        for item in closed[kind]:
+            assert not any(h['id'] == item for h in heads), (kind, item, heads)
+        print('basis_closed_absent=' + kind)
+    else:
+        print('basis_count_print_only=' + kind)
 print('v7_gate_rows_complete')
 PY
 
