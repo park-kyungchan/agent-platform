@@ -1,20 +1,22 @@
 # Where information belongs
 
-The four-row rule every agent follows is in `/root/.agents/AGENTS.md` section 6; this file is its detail. Read this when you must decide where a piece of information is written, which source answers a question, or whether something may go to memory. This is a convention shared by all CLIs. It is not a loader, a memory engine, a scheduler or a permission system. How to hand context to another agent is in `CONCURRENT-WORK.md`; how the memory server ranks and refreshes is in `HINDSIGHT-RUNTIME.md`.
+Read this when you must decide which source answers a question, who writes a piece of information, or whether something may go to memory. Where each kind of information is written is the four-row table of `/root/.agents/AGENTS.md` section 6; this file does not repeat it. How to hand context to another agent: `CONCURRENT-WORK.md`. How the memory server ranks and refreshes: skill `hindsight-control`, `references/runtime.md`.
 
-## 1. Owner of each kind of information
+## 1. Who writes each kind, and how it is read
 
-| Information | Where it lives | Who writes it | How to read it |
-| --- | --- | --- | --- |
-| The active conversation, reasoning, a resumable session, and notes that matter only to that one CLI | The CLI's own session store and private memory | The CLI | Resume only the exact session you need. Never import another agent's transcript |
-| Owner, authority, holds, next action, task metrics, verification, the brief, and for a task with several work threads the board | The task's `STATE.md`, `TASK.md`, `STRATEGY.md`, and the board file STATE names | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
-| Implemented behaviour, schemas, APIs, tests, build instructions, KPI definitions | The owning repository's source and docs | The implementation owner, through review | Read the current revision. Do not rely on a remembered implementation |
-| Durable decisions and their reasons, lessons, corrections, scoped user preferences, explained terms | Engineering originals in `agent-platform/memory/records/`; Hindsight holds a retrieval copy | The task owner through the closure PR and the native publisher in `agent-platform` `memory/README.md` | Use the authorized current route; the prepared engineering route is native scoped recall/exact-document reads, not pages or reflect |
-| Current operational objects, observations, KPI values and time series, policies, actions, recovery state | The domain or task owner today; `ontology-platform` when its admission is implemented | The trusted domain owner under the task's authority | A fresh authorized read with revision, scope, coverage and freshness. Memory is only a pointer to it |
+The kinds are the rows of `/root/.agents/AGENTS.md` section 6, plus a session's own record.
 
-- A decision another agent needs must not stay only in one CLI's private memory: write its rule in the owning repository; keep a task decision in its admitted store and an engineering rationale in the Git-original contract of `agent-platform` `memory/README.md`.
-- Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off (reason: `HINDSIGHT-RUNTIME.md`, "Session path on this host").
-- A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy, or in the store's `kpi` object when the task's STATE names that object type in use (`ONTOLOGY-USE.md`), never in both; the user corrects them. A measured KPI value is an operational fact and stays with its task or domain owner. Do not turn a strategy document into a second execution table.
+| Kind | Who writes it | How to read it |
+| --- | --- | --- |
+| A session's conversation and a CLI's private memory | That CLI | Resume only the exact session you need. Never import another agent's transcript |
+| Short-term: the task's STATE, packets, the board STATE names | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
+| A rule or contract: source, schemas, tests, KPI definitions | The owner of the implementation, through review | Read the current revision. Do not rely on a remembered implementation |
+| Mid- and long-term: decisions with reasons, lessons, corrections, preferences, explained terms | The task owner, only with the task's authority, by the route of section 4 | Search and read as section 3 says; verify against current source and STATE |
+| An operational fact: deployed state, a KPI value, a domain record, an action and its result | The owner of the domain or the task; the Lead for the object types its STATE names in use in the Ontology store (`ONTOLOGY-USE.md`) | A fresh authorized read. Memory is only a pointer to it |
+
+- A decision another agent needs must not stay only in one CLI's private memory.
+- Session transcripts are short-term. Automatic retention of whole sessions into Hindsight (`retainSessions` in the integration settings) stays off: retained transcripts carry dated status that later competes with corrections.
+- A KPI and its target are set by the Lead from the user's words and recorded in the task's strategy, or in the store's `kpi` object when the task's STATE names that object type in use, never in both; the user corrects them. A measured KPI value is an operational fact.
 
 ## 2. Which source answers a question
 
@@ -34,7 +36,8 @@ When memory and current source disagree, the source wins for current truth. Keep
 
 ## 3. Reading memory
 
-- When to search is in `/root/.agents/AGENTS.md` section 6. Do not search on every tool call; read only the selected pages.
+- When to search is in `/root/.agents/AGENTS.md` section 6: the route in use is the knowledge pages, through a CLI's hooks or the MCP server `hindsight`. Do not search on every tool call; read only the selected pages.
+- The native recall route that `agent-platform` `memory/README.md` prepares for engineering memory is not in use until its owner's task says so.
 - If the memory tool is unavailable or disabled for your task, say so and work from the task's files. Do not start a client or change global configuration to get it back.
 
 ## 4. Writing memory
@@ -47,11 +50,10 @@ When memory and current source disagree, the source wins for current truth. Keep
 
 ## 5. Tags and derived pages
 
-Engineering tags come only from the vocabulary and publisher described in `agent-platform` `memory/README.md`; it has no engineering pages. The following provenance and proposed-page guidance concerns retained historical/private-owner material, not new engineering tag authorship.
-
-- Use real provenance: platform `agent`, `education` or `ontology`, plus the repository. A module carries its owner's platform. Keep genuine `source:*`, `harness:*`, `project:*` and historical tags; never imitate a plugin's attribution.
+- Engineering tags come only from the vocabulary and the publisher of `agent-platform` `memory/README.md`.
+- On retained older material keep the genuine `source:*`, `harness:*`, `project:*` and historical tags; never imitate a plugin's attribution.
 - A tag routes a topic. It is not privacy and not permission. A strict tagged scope can miss shared untagged observations.
-- The pages Lessons ledger, Structural risk review, User glossary, and Conventions and patterns are proposed views; do not assume they are installed. A curator changes them through the official page configuration. Never ingest a generated page as new evidence.
+- A generated page is navigation. Never ingest one as new evidence, and do not assume a page exists: list the pages.
 
 ## 6. What never goes to memory
 

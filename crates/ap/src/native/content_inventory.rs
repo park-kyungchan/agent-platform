@@ -14,10 +14,6 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/runtime-references/GLOSSARY.md"),
     ),
     (
-        "runtime-references/HINDSIGHT-RUNTIME.md",
-        include_str!("../../../../content/runtime-references/HINDSIGHT-RUNTIME.md"),
-    ),
-    (
         "runtime-references/ONTOLOGY-USE.md",
         include_str!("../../../../content/runtime-references/ONTOLOGY-USE.md"),
     ),
@@ -32,6 +28,14 @@ pub const OWNED: &[(&str, &str)] = &[
     (
         "runtime-references/CONCURRENT-WORK.md",
         include_str!("../../../../content/runtime-references/CONCURRENT-WORK.md"),
+    ),
+    (
+        "runtime-references/NAMING.md",
+        include_str!("../../../../content/runtime-references/NAMING.md"),
+    ),
+    (
+        "runtime-references/BUILD-AND-DELIVERY.md",
+        include_str!("../../../../content/runtime-references/BUILD-AND-DELIVERY.md"),
     ),
     (
         "skills/herdr/SKILL.md",
@@ -76,6 +80,10 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!(
             "../../../../content/skills/hindsight-control/references/measured-20261112.md"
         ),
+    ),
+    (
+        "skills/hindsight-control/references/runtime.md",
+        include_str!("../../../../content/skills/hindsight-control/references/runtime.md"),
     ),
     (
         "skills/lead/SKILL.md",
