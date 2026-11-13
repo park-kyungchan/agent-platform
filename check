@@ -16,6 +16,8 @@ python3 -I -B ci/check-memory-records.py
 python3 -I -B scripts/evaluate-memory.py --check-corpus memory/evaluation/questions.json
 python3 -I -B -m unittest discover -s ci -p 'test_*memory*.py'
 bash ci/test-lead-hook.sh
+bash ci/test-lead-review.sh
+bash scripts/test-install-content.sh
 if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
 
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
