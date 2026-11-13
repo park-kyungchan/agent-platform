@@ -1,20 +1,14 @@
 # Hindsight runtime: how storage, retrieval and pages actually work
 
-Read on demand when diagnosing "memory returns old/irrelevant facts". For content control,
-read [hindsight-control](../skills/hindsight-control/SKILL.md), including bank flags and effect proofs.
+Read this when memory returns old or irrelevant facts and you must find out why. To change content, follow [the skill](../SKILL.md), including its bank flags and effect proofs.
 Earlier retrieval/source reading: 2026-11-06, server reference pin 1.2.0
 (image `ghcr.io/vectorize-io/hindsight@sha256:19d0c08f…`, revision `34a1386`), coding-agents 0.8.5.
 **measured** — API/MCP reported 1.2.0 on 2026-11-12; those measurements did not independently
 re-inspect revision `34a1386`. After upgrades, re-check source and remeasure behavioral claims.
 
-## Engineering route and authority
+## Scope
 
-The operational home is `agent-platform` `memory/README.md`: Git originals,
-one native publisher and scoped native recall/exact-document reads. Old mixed-bank
-pages, reflect, direct ingestion and plugin capture are not the engineering route.
-The source runbook is preparation only; registration/content holds remain until
-qualification and owner cutover. Historical/lesson behavior below is not proof of
-an activated engineering route or of current embedding/reranker weights.
+This file describes how the installed server and the CLI integration behave. The route for engineering memory is `agent-platform` `memory/README.md`; nothing below shows that it is in use, or what the current embedding and reranker weights are.
 
 ## Where to look (cheapest first)
 
@@ -38,7 +32,7 @@ Endpoint paths below are relative to `/v1/default/banks/{bank_id}`.
   inside the same resolved **observation scope** (`observation_scopes`: `combined` = the full tag set, default unless the bank sets
   `default_observation_scopes`; `per_tag`, `all_combinations`, `shared` = one global untagged scope; or
   explicit tag lists). A correcting fact in a
-  different scope cannot update a stale observation. For scope changes and verification, use the content-control skill; a scope change alone is not a stale-page repair.
+  different scope cannot update a stale observation. For scope changes and verification, use [the skill](../SKILL.md); a scope change alone is not a stale-page repair.
 - **Mental models** hold synthesized content. A **knowledge page** (`kp-…`) wraps a mental model
   (`mm-…`); create pages with `POST /knowledge-base/pages` (`name`, `source_query`, `tags`,
   `max_tokens`, `trigger`). A page's `tags` SCOPE which memories it reads (`tags_match` defaults to `all_strict` when tags
@@ -76,8 +70,7 @@ Which CLIs have hooks and which have only the MCP server: `CLI-RUNTIMES.md` sect
 
 ## Write semantics and costs
 
-Content-control procedures and their measured limits have one home:
-[hindsight-control](../skills/hindsight-control/SKILL.md). Read it before any write or effect claim.
+Content-control procedures and their measured limits have one home: [the skill](../SKILL.md). Read it before any write or effect claim.
 
 - LLM: provider `chatgpt` (subscription); the model is set in the server configuration. It shares the
   ChatGPT/Codex weekly limit. When that limit is reached, extraction, consolidation, reflect and page
@@ -90,6 +83,5 @@ Content-control procedures and their measured limits have one home:
 
 ## Checks before claiming an effect
 
-Use the operation-specific readbacks and status limits in
-[hindsight-control](../skills/hindsight-control/SKILL.md); this runtime reference supplies no separate
+Use the operation-specific readbacks and status limits of [the skill](../SKILL.md); this file supplies no separate
 content-effect predicate. Session injection and retention paths are described above.

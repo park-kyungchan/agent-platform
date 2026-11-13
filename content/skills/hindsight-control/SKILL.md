@@ -1,9 +1,11 @@
 ---
 name: hindsight-control
-description: Read before any Hindsight write, replace, delete, retraction, page or refresh operation, or before claiming that such an operation took effect.
+description: Read when memory returns stale or irrelevant results, before any Hindsight write, replace, delete, retraction, page or refresh operation, or before claiming that such an operation took effect.
 ---
 
 # Hindsight content control
+
+Memory returned a stale or irrelevant result and you must find out why: read [how storage, retrieval and pages work](references/runtime.md) first; it names where to look, cheapest first. To change content, continue here.
 
 Labels classify server claims; steps are caller obligations. Read [evidence and earlier source notes](references/measured-20261112.md). B=`/v1/default/banks/{bank_id}`; encode path segments.
 

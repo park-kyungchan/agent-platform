@@ -9,7 +9,7 @@ Read this when you hand work to another agent, receive work, or share a reposito
 - Two agents may read the same checkout. Two agents that write need separate Git worktrees or file sets that do not overlap.
 - A worktree separates files only. It does not separate global settings, databases, ports, service accounts or a shared build directory.
 - Shared files have one integrator, the Lead unless STATE names another: `Cargo.lock` and manifests, public schemas, generated outputs, workflow files, repository settings (required checks, branch rules), and global or per-CLI configuration. Everyone else proposes a change to the integrator.
-- One expensive build runs at a time, with its owner named in STATE and the number of parallel build jobs (`-j`) that STATE states (`-j1` when it states none). Each checkout uses its own `CARGO_TARGET_DIR`. Never delete a cache or a lock file to get past a running build. Check CPU, memory and disk before running more at once.
+- One Cargo build or test runs on the host at a time, under the lock and with the target root of `BUILD-AND-DELIVERY.md` section 2.
 
 ## 2. Handing work over
 
@@ -52,7 +52,7 @@ The accepting agent:
 - Reads the report and the actual output or effect. A completion line, an exit code of 0, an `idle` state or a successful prompt submission shows none of these.
 - When a result is in doubt, reads the worker's session record (locations in `CLI-RUNTIMES.md`). A session record shows recorded tool calls; it cannot show that an unrecorded effect did not happen.
 - Integrates only the returned revision. Never fetch, reset or cherry-pick another owner's tree beyond it.
-- Treats commit, push, merge and deploy as separate effects, each needing task authority.
+- Treats commit, push, merge and installation as separate effects, each needing task authority (`BUILD-AND-DELIVERY.md`).
 
 Closure details (roster, owned panes and processes, optional lesson candidate): `/root/.agents/skills/lessons-loop/references/worker-closure.md`.
 
@@ -61,7 +61,7 @@ Closure details (roster, owned panes and processes, optional lesson candidate): 
 Use Herdr only from a pane where `HERDR_ENV=1`, and only when the task authorizes pane control. Command syntax and safety rules: skill `herdr` and its `references/native-control.md`.
 
 - IDs: workspace `wN`, tab `wN:tN`, pane `wN:pN`. A pane is a terminal; an agent is the program Herdr recognizes in it. Address a pane by the ID a command returned, never by a title, a process name or a position.
-- One tab per worker, created with `--no-focus` in the worker's assigned cwd.
+- One tab per worker, created with `--no-focus` in the worker's assigned cwd. Where the task's STATE names the store in use, the Lead does this with `ap work` (skill `lead` section 4).
 - Default to an interactive agent: `herdr agent start <name> --kind <kind> --pane <pane-id> -- <native args>` with as few native arguments as the work needs, then `herdr agent prompt <name> "<text>" --wait --timeout <ms>`; the text names the packet file. The user can watch the pane and the session can take a follow-up. A headless run (one prompt, then exit) uses `herdr pane run <pane-id> "<command>"`; use it only where an interactive session cannot work.
 - `idle` or `done` means ready for input. `blocked` means a dialog or question is on screen: read it before sending anything. A workspace trust dialog in a pane the Lead started for its worker is answered by the Lead: trust and continue. A dialog that asks to approve one effect is answered by the packet: an allowed effect is approved, any other is declined. A login or a payment stays with the user. `unknown` means not classified. None of these states shows that the work finished.
 - After a timeout or an uncertain submission, read the pane before sending anything again.

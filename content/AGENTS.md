@@ -28,17 +28,18 @@ Read one of these only when its situation applies. References are in `/root/.age
 
 | Situation | Read |
 | --- | --- |
-| I do not know where a repository, task, plan or service lives | `CODEBASE-ORIENTATION.md` |
-| I start, resume or configure a CLI, register an MCP server, or must check what a session loaded | `CLI-RUNTIMES.md` |
+| I do not know which area owns a thing or where a repository, crate, task, plan or service lives | `CODEBASE-ORIENTATION.md` |
+| I name a new repository, crate, tool, task, branch or file | `NAMING.md` |
+| I build or test Rust, push, open a pull request, merge or install | `BUILD-AND-DELIVERY.md` |
+| I start, resume or configure a CLI, register an MCP server, or check what a session loaded | `CLI-RUNTIMES.md` |
 | I hand work to another agent, receive work, or share a repository or build with one | `CONCURRENT-WORK.md` |
 | I need a task's holds, decisions, KPI values or worker runs from the Ontology store, or I am Lead and record one | `ONTOLOGY-USE.md` |
-| I must decide where a piece of information belongs, or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
-| Memory returns stale or irrelevant results | `HINDSIGHT-RUNTIME.md` |
-| I write, replace, delete or retract Hindsight content, change a page, or must show that such a change took effect | skill `hindsight-control` |
-| I need the official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |
-| I change a shared instruction, a skill or a reference | Section 7 below, then `CLI-RUNTIMES.md` section 7 |
+| I decide where information belongs or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
+| Memory returns stale or irrelevant results; I write, replace, delete or retract Hindsight content or a page, or must show that such a change took effect | skill `hindsight-control` |
+| I need official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |
+| I change a shared instruction, a skill or a reference | Section 7 below, then `BUILD-AND-DELIVERY.md` section 6 |
 | I use the Academy tools or prepare a lesson | skill `academy-runtime-routing` for the tools; skill `academy-student-context` for lesson preparation and student status |
-| A word in an instruction, a packet or the user's message is unclear, or I am about to use a new term | Section 8 below, then `GLOSSARY.md` |
+| A word in an instruction, a packet or the user's message is unclear, or I use a new term | Section 8 below, then `GLOSSARY.md` |
 | I answer or report to the user | skill `explain-precisely` |
 | STATE names me Lead | skill `lead` |
 | I control Herdr panes or agents | skill `herdr`; for Hermes sessions `herdr-hermes` |

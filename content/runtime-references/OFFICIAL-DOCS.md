@@ -21,8 +21,8 @@ An official page shows what the publisher documents. It does not show what the i
 | Container image, process, Compose, mount, daemon | `docker` and `docker compose` help and inspection of the target | Docker. Hostinger documentation does not define container behaviour |
 | Tailnet reachability, Tailscale SSH, access policy | `tailscale status` and help | Tailscale |
 | SSH host keys, `sshd` | Installed `ssh` and `sshd` man pages | OpenSSH and systemd |
-| Memory recall, retain, page refresh, record update | `CONTEXT-GOVERNANCE.md`, `HINDSIGHT-RUNTIME.md`, `GET http://127.0.0.1:8888/openapi.json` | Hindsight. Hooks of a CLI belong to that CLI |
-| Git, pull requests, builds, toolchain | The task and installed `git`, `gh`, `cargo` help | Git, GitHub CLI, Rust and Cargo |
+| Memory recall, retain, page refresh, record update | `CONTEXT-GOVERNANCE.md`; skill `hindsight-control` and its `references/runtime.md`; `GET http://127.0.0.1:8888/openapi.json` | Hindsight. Hooks of a CLI belong to that CLI |
+| Git, pull requests, builds, toolchain | `BUILD-AND-DELIVERY.md`; installed `git`, `gh`, `cargo` help | Git, GitHub CLI, Rust and Cargo |
 | MCP protocol semantics | The server's own documentation | Model Context Protocol |
 
 ## 3. Indexes

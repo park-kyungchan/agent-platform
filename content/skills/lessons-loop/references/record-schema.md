@@ -6,7 +6,7 @@ field. Verify original-document GET and recall/readback. It does not authorize
 writes, configure the server or establish a validator/loader/runtime gate.
 Official API behavior here was verified against an earlier server version than the
 host runs; the installed versions are stated once, in
-`/root/.agents/runtime-references/HINDSIGHT-RUNTIME.md`. Check installed source before a
+`/root/.agents/skills/hindsight-control/references/runtime.md`. Check installed source before a
 version-dependent operation.
 
 ## Engineering schema home
