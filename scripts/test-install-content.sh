@@ -34,8 +34,25 @@ inst rollback "$tar2"; rc=$?
 rm -rf "$t/dst2"; mkdir -p "$t/dst2/runtime-references"; echo old > "$t/dst2/AGENTS.md"; echo oldref > "$t/dst2/runtime-references/A.md"; echo not-a-directory > "$t/dst2/skills"
 hb=$(tree "$t/dst2"); AP_CONTENT_DST=$t/dst2 inst install "$c2"; rc=$?
 { [ "$rc" -eq 1 ] && [ "$(tree "$t/dst2")" = "$hb" ] && grep -q '^install_failed_restored@' "$t/err"; } && ok "failed swap restores the target" || bad "failed swap rc=$rc $(cat "$t/err")"
+# a path moves into the recovery list only after its move succeeded: a failing move of an EXISTING path
+# (injected by a wrapper of mv on PATH) must leave that path where it was.
+mkdir -p "$t/fakebin"; printf '#!/bin/sh\nif printf "%%s" "$*" | grep -Eq -- "$FAIL_MV_RE"; then exit 1; fi\nexec /bin/mv "$@"\n' > "$t/fakebin/mv"; chmod +x "$t/fakebin/mv"
+rm -rf "$t/dst3"; AP_CONTENT_DST=$t/dst3 inst install "$c2"; hb=$(tree "$t/dst3")
+echo five > content/AGENTS.md; c5=$(commit five)
+PATH="$t/fakebin:$PATH" FAIL_MV_RE="dst3/runtime-references [^ ]*/\.old-" AP_CONTENT_DST=$t/dst3 inst install "$c5"; rc=$?
+{ [ "$rc" -eq 1 ] && [ "$(tree "$t/dst3")" = "$hb" ] && [ -d "$t/dst3/runtime-references" ]; } && ok "failed move of an existing path leaves it in place" || bad "failed old move rc=$rc $(cat "$t/err")"
+# a rollback that fails in the middle puts the target back as it was before the rollback.
+AP_CONTENT_DST=$t/dst3 inst install "$c5"; tar5=$(sed -n 's/.*backup=//p' "$t/out"); hb=$(tree "$t/dst3")
+PATH="$t/fakebin:$PATH" FAIL_MV_RE="/\.new-[^ ]*/runtime-references " AP_CONTENT_DST=$t/dst3 inst rollback "$tar5"; rc=$?
+{ [ "$rc" -eq 1 ] && [ "$(tree "$t/dst3")" = "$hb" ] && grep -q '^rollback_failed_restored@' "$t/err"; } && ok "failed rollback restores the target" || bad "failed rollback rc=$rc $(cat "$t/err")"
+# a skill the content no longer names is removed; a skill this installer never installed stays; rollback brings the retired one back.
+mkdir -p "$t/dst3/skills/third-party"; echo theirs > "$t/dst3/skills/third-party/SKILL.md"
+git rm -q -r content/skills/y; c6=$(commit six); AP_CONTENT_DST=$t/dst3 inst install "$c6"; rc=$?; tar6=$(sed -n 's/.*backup=//p' "$t/out")
+{ [ "$rc" -eq 0 ] && [ ! -e "$t/dst3/skills/y" ] && [ -f "$t/dst3/skills/x/SKILL.md" ] && [ -f "$t/dst3/skills/third-party/SKILL.md" ]; } && ok "retired skill removed, foreign skill kept" || bad "retired skill rc=$rc $(cat "$t/err")"
+AP_CONTENT_DST=$t/dst3 inst rollback "$tar6"; rc=$?
+{ [ "$rc" -eq 0 ] && [ -f "$t/dst3/skills/y/SKILL.md" ] && [ -f "$t/dst3/skills/third-party/SKILL.md" ] && grep -qx 'skills/y' "$t/dst3/.content-paths"; } && ok "rollback brings the retired skill back" || bad "rollback of retirement rc=$rc $(cat "$t/err")"
 # refusals: uncommitted content; a commit that is not on origin/main; a checkout at another commit.
-echo dirty >> content/AGENTS.md; inst install "$c2"; rc=$?; git checkout -q -- content
+echo dirty >> content/AGENTS.md; inst install "$c6"; rc=$?; git checkout -q -- content
 [ "$rc" -eq 2 ] && ok "uncommitted content refused" || bad "uncommitted rc=$rc"
 echo three > content/AGENTS.md; sums; git add -A; git commit -q -m three; c3=$(git rev-parse HEAD)
 inst install "$c3"; rc=$?; [ "$rc" -eq 2 ] && ok "commit not on origin/main refused" || bad "unmerged rc=$rc"

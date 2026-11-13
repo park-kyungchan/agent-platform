@@ -17,23 +17,29 @@ DST=${AP_CONTENT_DST:-/root/.agents}; DST=${DST%/}
 BK=${AP_CONTENT_BACKUP_DIR:-/var/backups/agent-platform-content}
 refuse() { echo "refuse: $*" >&2; exit 2; }
 stamp=$(date -u +%Y%m%dT%H%M%SZ)-$$
-moved=()
+moved_old=(); placed=()
+# Put back what a failed swap changed: remove what was newly placed, then move back what was moved aside.
 restore_moved() { local p
-  for p in "${moved[@]:-}"; do
+  for p in "${placed[@]:-}"; do [ -n "$p" ] || continue; rm -rf -- "$DST/$p" 2>/dev/null || true; done
+  for p in "${moved_old[@]:-}"; do
     [ -n "$p" ] || continue
-    rm -rf -- "$DST/$p" 2>/dev/null || true
-    if [ -e "$DST/.old-$stamp/$p" ]; then mv -- "$DST/.old-$stamp/$p" "$DST/$p" || echo "restore_failed@$DST/$p: its previous bytes are in $DST/.old-$stamp/$p" >&2; fi
-  done; return 0; }
-# swap <staging root> <relative path>...: each path of the staging root replaces the same path of the target.
+    if [ -e "$DST/.old-$stamp/$p" ] && [ ! -e "$DST/$p" ]; then
+      mv -- "$DST/.old-$stamp/$p" "$DST/$p" || echo "restore_failed@$DST/$p: its previous bytes are in $DST/.old-$stamp/$p" >&2
+    fi
+  done
+  rmdir -- "$DST/.old-$stamp/skills" "$DST/.old-$stamp" 2>/dev/null || true
+  return 0; }
+# swap <staging root> <relative path>...: after it, each path is what the staging root holds; a path the staging
+# root does not hold is moved aside (gone from the target). A path enters a list only after its move succeeded.
 swap() { local stage=$1 p; shift
   mkdir -p -- "$DST/.old-$stamp/skills" || return 1
   for p in "$@"; do
+    if [ -e "$DST/$p" ]; then mv -- "$DST/$p" "$DST/.old-$stamp/$p" || return 1; moved_old+=("$p"); fi
     [ -e "$stage/$p" ] || continue
-    moved+=("$p")
-    if [ -e "$DST/$p" ]; then mv -- "$DST/$p" "$DST/.old-$stamp/$p" || return 1; fi
     mkdir -p -- "$(dirname -- "$DST/$p")" || return 1
-    mv -- "$stage/$p" "$DST/$p" || return 1
+    mv -- "$stage/$p" "$DST/$p" || return 1; placed+=("$p")
   done; }
+owned_ok() { case "$1" in *..*|skills/|skills/*/*) return 1 ;; AGENTS.md|runtime-references|skills/*) return 0 ;; esac; return 1; }
 paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, runtime-references, skills/<name>
   cut -c67- "$1" | awk -F/ '$1=="skills"{print "skills/"$2; next} {print $1}' | sort -u; }
 case "${1:-}" in
@@ -44,11 +50,16 @@ install)
   [ -z "$(git -C "$REPO" status --porcelain -- content)" ] || refuse "content/ has uncommitted changes"
   git -C "$REPO" merge-base --is-ancestor "$want" origin/main || refuse "$want is not on origin/main"
   (cd "$SRC" && sha256sum -c --quiet SHA256SUMS) || refuse "content/ does not match its SHA256SUMS"
-  mapfile -t paths < <(paths_of "$SRC/SHA256SUMS")
+  mapfile -t new < <(paths_of "$SRC/SHA256SUMS")
+  # Paths the previous install owned and this content no longer names are removed too (a retired skill);
+  # a skill directory this installer never installed is not touched.
+  prev=(); [ -f "$DST/.content-paths" ] && mapfile -t prev < "$DST/.content-paths"
+  mapfile -t paths < <(printf '%s\n' "${new[@]}" "${prev[@]:-}" | grep . | sort -u)
+  for p in "${paths[@]}"; do owned_ok "$p" || refuse "unexpected owned path: $p"; done
   mkdir -p -- "$DST" "$BK"; chmod 0700 "$BK"
   stage=$DST/.new-$stamp; rm -rf -- "$stage"; mkdir -p -- "$stage/skills"
   trap 'rm -rf -- "$stage"' EXIT
-  for p in "${paths[@]}"; do cp -a -- "$SRC/$p" "$stage/$p"; done
+  for p in "${new[@]}"; do cp -a -- "$SRC/$p" "$stage/$p"; done
   (cd "$stage" && sha256sum -c --quiet "$SRC/SHA256SUMS") || refuse "the staged copy does not match"
   tarball=$BK/agents-before-$stamp.tar; have=()
   for p in "${paths[@]}"; do [ -e "$DST/$p" ] && have+=("$p"); done
@@ -56,8 +67,9 @@ install)
   tar -C "$DST" -cpf "$tarball" --files-from=/dev/null "${have[@]}"
   tar -tf "$tarball" > /dev/null || refuse "the kept copy cannot be read back"
   (cd "$BK" && sha256sum "$(basename "$tarball")" > "$tarball.sha256")
-  if ! swap "$stage" "${paths[@]}" || ! (cd "$DST" && sha256sum -c --quiet "$SRC/SHA256SUMS"); then
-    restore_moved; rmdir -- "$DST/.old-$stamp/skills" "$DST/.old-$stamp" 2>/dev/null || true
+  [ -f "$DST/.content-paths" ] && cp -p -- "$DST/.content-paths" "$tarball.owned-before"
+  if ! swap "$stage" "${paths[@]}" || ! (cd "$DST" && sha256sum -c --quiet "$SRC/SHA256SUMS") || ! printf '%s\n' "${new[@]}" > "$DST/.content-paths"; then
+    restore_moved
     echo "install_failed_restored@$DST: the previous files are back; kept copy $tarball" >&2; exit 1
   fi
   rm -rf -- "$DST/.old-$stamp"
@@ -70,16 +82,17 @@ rollback)
   (cd "$(dirname -- "$tarball")" && sha256sum -c --quiet "$(basename -- "$tarball").sha256") || refuse "the tarball does not match its checksum"
   if tar -tf "$tarball" | grep -Ev '^(AGENTS\.md|runtime-references(/.*)?|skills/[A-Za-z0-9_-]+(/.*)?)$' | grep -q .; then refuse "the tarball lists a path that is not the installer's"; fi
   mapfile -t paths < "$tarball.paths"
+  for p in "${paths[@]}"; do owned_ok "$p" || refuse "unexpected path in .paths: $p"; done
   stage=$DST/.new-$stamp; rm -rf -- "$stage"; mkdir -p -- "$stage"
   trap 'rm -rf -- "$stage"' EXIT
   tar -C "$stage" -xpf "$tarball"
-  # A path the install added (it was not in the kept copy) goes away; every other path is replaced by its kept bytes.
-  mkdir -p -- "$DST/.old-$stamp/skills"
-  for p in "${paths[@]}"; do
-    case "$p" in AGENTS.md|runtime-references|skills/*) ;; *) refuse "unexpected path in .paths: $p" ;; esac
-    if [ -e "$DST/$p" ]; then mv -- "$DST/$p" "$DST/.old-$stamp/$p"; moved+=("$p"); fi
-    if [ -e "$stage/$p" ]; then mkdir -p -- "$(dirname -- "$DST/$p")"; mv -- "$stage/$p" "$DST/$p"; fi
-  done
+  # A path the install added (it is not in the kept copy) goes away; every other path gets its kept bytes back.
+  # A failure in the middle puts the target back as it was before this rollback.
+  if ! swap "$stage" "${paths[@]}"; then
+    restore_moved
+    echo "rollback_failed_restored@$DST: the target is as it was before this rollback" >&2; exit 1
+  fi
+  if [ -f "$tarball.owned-before" ]; then cp -p -- "$tarball.owned-before" "$DST/.content-paths"; else rm -f -- "$DST/.content-paths"; fi
   rm -rf -- "$DST/.old-$stamp"
   echo "rolled back to $tarball"
   ;;

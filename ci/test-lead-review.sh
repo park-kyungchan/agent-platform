@@ -30,6 +30,12 @@ echo limit45 > "$t/a1/mode"; : > "$t/calls.log"; run verify "$t/cwd" "$t/prompt.
 # (c) the resume uses the recorded account and session.
 rm -f "$t/a1/mode"; : > "$t/calls.log"; run verify "$t/cwd" "$t/prompt.md" "$t/v.md" --resume; rc=$?
 { [ "$rc" -eq 0 ] && grep -q "^$t/a1|.*--resume s-a1" "$t/calls.log" && [ -s "$t/v.md" ]; } && ok "resume on the recorded account" || bad "resume: rc=$rc"
+# an earlier answer under the same name does not survive a cut run: it is moved aside.
+echo limit45 > "$t/a1/mode"; : > "$t/calls.log"; run verify "$t/cwd" "$t/prompt.md" "$t/v.md"; rc=$?; rm -f "$t/a1/mode"
+{ [ "$rc" -eq 75 ] && [ ! -e "$t/v.md" ] && grep -q '^Verdict: accept$' "$t/v.md.prev"; } && ok "cut run leaves no earlier answer in place" || bad "stale answer: rc=$rc"
+# a prompt and an out file given relative to the caller's directory work although the runner changes directory.
+( cd "$t" && : > calls.log && bash "$runner" integration "$t/cwd" prompt.md rel.md > stdout 2> stderr ); rc=$?
+{ [ "$rc" -eq 0 ] && [ -s "$t/rel.md" ] && [ "$(wc -l < "$t/calls.log")" -eq 1 ]; } && ok "relative prompt and out paths" || bad "relative paths: rc=$rc $(cat "$t/stderr")"
 # (b2) cut before any work: the next account of the row takes the prompt.
 echo limit1 > "$t/a1/mode"; : > "$t/calls.log"; run verify "$t/cwd" "$t/prompt.md" "$t/w.md"; rc=$?
 { [ "$rc" -eq 0 ] && [ "$(wc -l < "$t/calls.log")" -eq 2 ] && grep -q "\"account\": \"$t/a2\"" "$t/w.md.run.json"; } && ok "cut before work: next account" || bad "next account: rc=$rc"

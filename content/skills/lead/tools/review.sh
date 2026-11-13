@@ -9,7 +9,7 @@
 # overrides the model of the row for one run.
 # Exit: 0 an answer was saved to <out file>; 2 usage or a role that is not in the table; 4 the prompt names the
 # out file (the reader would overwrite it); 75 the session was cut by a usage limit or an error: NO out file is
-# written, and <out>.run.json names the session and the account to resume on; another code is the CLI's own.
+# written (an answer of an earlier run under that name is moved to <out>.prev before every run), and <out>.run.json names the session and the account to resume on; another code is the CLI's own.
 # <out>.run.json is written after every run: {role, account, session, turns, cut, cost_usd}.
 set -uo pipefail
 [ "$#" -ge 4 ] || { echo "usage: review.sh <role> <cwd> <prompt file> <out file> [--resume]" >&2; exit 2; }
@@ -21,6 +21,8 @@ row=$(awk -F'\t' -v r="$ROLE" '$1==r && $0 !~ /^#/ {print; exit}' "$TABLE" 2>/de
 MODEL=${REVIEW_MODEL:-$(printf '%s' "$row" | cut -f2)}; EFFORT=$(printf '%s' "$row" | cut -f3)
 IFS=',' read -r -a ACCOUNTS <<< "$(printf '%s' "$row" | cut -f4)"
 [ -f "$PROMPT" ] || { echo "prompt_missing@$PROMPT" >&2; exit 2; }
+# Paths are resolved before the change of directory: a prompt or an out file given relative to the caller stays valid.
+PROMPT=$(realpath -- "$PROMPT"); OUT=$(realpath -m -- "$OUT")
 if grep -qF "$(basename "$OUT")" "$PROMPT"; then echo "out_path_named_in_prompt@$PROMPT" >&2; exit 4; fi
 cd "$CWD" || exit 2
 J="$OUT.json"; RUN="$OUT.run.json"
@@ -64,6 +66,9 @@ open(out,"w").write(res if res.endswith("\n") else res+"\n")
 print("ok turns=%s" % d.get("num_turns"))
 PY
 }
+# An answer of an earlier run under the same name is moved aside before this run starts (kept as <out>.prev),
+# so that a cut run never leaves an older verdict where a reader expects this run's answer.
+if [ -e "$OUT" ]; then mv -f -- "$OUT" "$OUT.prev"; fi
 n=0
 for ACC in "${ACCOUNTS[@]}"; do
   n=$((n+1)); args=(--print --model "$MODEL" --effort "$EFFORT" --output-format json --strict-mcp-config)
