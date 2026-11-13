@@ -9,10 +9,10 @@ Each stage is a separate fact with its own evidence. A later stage does not show
 | Stage | Where it happens | Evidence |
 | --- | --- | --- |
 | Edit | A task worktree `work/<scope>-<topic>/wt/<repo>/`, on a branch from `origin/main` (`NAMING.md` section 2) | `git status` and the diff against the base revision |
-| Check on the host | The checks the packet names, under the build lock (section 2) | The observed output of each check |
-| Push | The branch on GitHub; a pull request that stays a draft while its packets are still arriving | `gh pr view <pr> --json headRefOid,isDraft` |
+| Check on the host | The repository's check command where it has one, else the checks the packet names, under the build lock (section 2) | The observed output of each check |
+| Push | The branch on GitHub; one pull request per unit of work, a draft until the worker's check passes on the host | `gh pr view <pr> --json headRefOid,isDraft` |
 | Check in CI | The job `rust` on the pushed head (section 3) | `gh pr checks <pr> --required` |
-| Review | One independent review of one frozen head (skill `lead` section 5) | A review file that names that head |
+| Review | The automatic reviewer where the repository has one, then one reviewer session on the head whose required check passed (skill `lead` section 5) | Findings on the pull request that name that head |
 | Merge | `origin/main` | The merge commit; section 4 |
 | Install | The host | The readback of section 5 |
 | Load | A session started after the installation | That session's own record (`CLI-RUNTIMES.md` section 3) |

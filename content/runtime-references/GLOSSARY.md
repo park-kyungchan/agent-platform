@@ -16,8 +16,8 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | Term | Meaning | Example on this host | Do not write |
 | --- | --- | --- | --- |
 | board | The one file of a multi-thread task that shows KPI values, work threads, live workers, decisions and open questions; STATE points to it | `/home/palantirkc/work/<scope>-<topic>/BOARD.md` | `dashboard file` |
-| lens file | The one file of a task in which the Lead keeps the whole view: target structure, measured structure, findings, design decisions | `/home/palantirkc/work/<scope>-<topic>/LENS.md` | `architecture overview` |
-| design note | The Lead's written design of a change that spans more than one packet: use, code today, decision, shape, invariants, tests by guarantee, packets, undo | `/root/.agents/skills/lead/references/design.md` | `design doc` |
+| lens file | The one file of a task, at most two pages, in which the Lead keeps the whole view: target structure and open decisions | `/home/palantirkc/work/<scope>-<topic>/LENS.md` | `architecture overview` |
+| design note | The Lead's written design of a store format, the schema of an authoritative store, or the order of record and effect on a real target: use, decision, invariants as executables, pull requests, undo | `/root/.agents/skills/lead/references/design.md` | `design doc` |
 | checkpoint | The content of STATE at a moment, complete enough for a new session to continue from it | A STATE whose header carries the time it was written | `snapshot file` |
 | work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A row of the board's thread table | `workstream` |
 | tier | The amount of reasoning a piece of work needs: mechanical, bounded judgment, open judgment | A packet line `Tier: mechanical` | `difficulty level` |
@@ -25,11 +25,11 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | dispatch | Starting one worker run with one packet | `herdr agent start <name> --kind <kind> --pane <pane-id>`, then `herdr agent prompt <name> "<text naming the packet>"` | — |
 | progress message | A message to the user that says where the task stands; not a worker's report | The KPI table and what changed | — |
 | acceptance | The Lead reading the report and the whole diff or effect of a worker itself and deciding to use it | Reading the diff and rerunning the check | `sign-off` |
-| review | A second agent, in a fresh context, judging a frozen candidate against the request and the contracts | A reviewer subagent that writes findings by severity | — |
+| review | A second agent, in a fresh context, judging a frozen candidate against the request and the contracts | The one reviewer session of a pull request (the verifier), which posts its findings there | — |
 | candidate | The exact revision that is offered for review or merge | A commit on a task branch | — |
 | handoff | Passing a piece of work, with a packet, to another agent; also one Lead passing a task to the next Lead | `CONCURRENT-WORK.md` section 2 | `hand-off`, `handover` |
 | closure | Ending a worker run or a task: record, reconcile, close what the task created | `lessons-loop/references/worker-closure.md` | — |
-| write set | The files one writer may change | `Exact targets` line of a packet | — |
+| write set | The files one writer may change | The `Write set:` line of a packet | — |
 | build slot | The right to run the one expensive build at a time | Named in STATE at dispatch | — |
 | delegation | Giving a piece of work to a worker | A dispatch | — |
 
