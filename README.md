@@ -13,10 +13,12 @@ pure; installation owns only the selected instruction links/import, preserves
 unrelated native files, and requires explicit writer coordination. Doctor does
 not execute hooks or establish native loading.
 
-Run `bash ci/check-rust-source.sh` in a disposable environment or the task's
-assigned build slot. It runs pinned Cargo formatting, tests, Clippy and the
-frozen finite S02/S03 conformance judges. Python is retained only for those
-independent verification tools; the product implementation is Rust.
+`./check` is the one check of this repository and what the CI job `rust` runs:
+the content check, the memory record checks, the test of the install script,
+format, lints as errors, all tests, and the rehearsal of `ontology/work.schema.json`
+against the engine revision in `ontology/ENGINE-PIN`. `ci/check-rust-source.sh`
+is the older source check with the frozen S02/S03 conformance judges; no job runs it.
+How an agent works here: [AGENTS.md](AGENTS.md). What blocks a pull request: [REVIEW.md](REVIEW.md).
 
 See [migration dispositions](docs/rust-migration-dispositions.md),
 [active CLI coverage](docs/ap-08-dispositions.md) and the

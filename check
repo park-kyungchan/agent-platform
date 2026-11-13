@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# The one check of this repository. An agent runs it before a push; the CI job
+# `rust` runs it unchanged. Outside CI, on the host that has the build lock, it
+# takes that lock (one Cargo build at a time on the host) and refuses to build
+# when the file system has less than 10,240 MiB free.
+#   ./check          everything
+#   ./check content  only the steps that need no Rust build (a change of content/, memory/ or documents)
+set -euo pipefail
+self=$(realpath "$0")
+cd "$(dirname "$self")"
+mode=${1:-all}
+[ "$mode" = all ] || [ "$mode" = content ] || { echo "usage: ./check [content]" >&2; exit 2; }
+
+python3 -I -B ci/check-content.py
+python3 -I -B ci/check-memory-records.py
+python3 -I -B scripts/evaluate-memory.py --check-corpus memory/evaluation/questions.json
+python3 -I -B -m unittest discover -s ci -p 'test_*memory*.py'
+if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
+
+if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
+  lock=${HOST_CARGO_LOCK:-/home/palantirkc/work/ws-replan/wt/.host-cargo.lock}
+  if [ -e "$lock" ]; then
+    free=$(df -BM --output=avail . | tail -n 1 | tr -dc 0-9)
+    if [ "$free" -lt 10240 ]; then
+      echo "disk_floor@check: ${free} MiB free, 10240 needed" >&2
+      exit 3
+    fi
+    export CHECK_LOCKED=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+    export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" RUST_TEST_THREADS="${RUST_TEST_THREADS:-2}"
+    exec flock "$lock" "$self" "$@"
+  fi
+fi
+
+bash scripts/test-install-ap.sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+# The install tests need a private root whose ancestors they can verify.
+AP_S03_TEST_ROOT=$(mktemp -d "$PWD/.ap-rust-test.XXXXXXXX")
+export AP_S03_TEST_ROOT
+chmod 0700 "$AP_S03_TEST_ROOT"
+trap 'rmdir -- "$AP_S03_TEST_ROOT"' EXIT
+cargo test --workspace --locked
+
+# The schema against a real engine: ontology/work.schema.json is installed into a
+# disposable store of the engine revision in ontology/ENGINE-PIN, and every action
+# answer `ap` parses is asserted. The engine is the installed `ont` when it is that
+# revision; otherwise it is built from the pin.
+pin=$(tr -d '[:space:]' < ontology/ENGINE-PIN)
+[[ "$pin" =~ ^[0-9a-f]{40}$ ]] || { echo "engine_pin_invalid@ontology/ENGINE-PIN" >&2; exit 2; }
+ont_bin=$(command -v ont || true)
+if [ -z "$ont_bin" ] || [ "$("$ont_bin" --version 2>/dev/null)" != "ont 0.1.0 $pin" ]; then
+  root=${CARGO_TARGET_DIR:-$PWD/target}/engine-pin
+  cargo install --locked --git https://github.com/park-kyungchan/ontology-platform --rev "$pin" \
+    --root "$root" --target-dir "$root/build" ont
+  ont_bin=$root/bin/ont
+fi
+# The engine admits only uid 0, and the index sources of the schema name absolute
+# paths of the host. On the host the rehearsal reads the real task files. In CI the
+# four files it reads are created at those paths and it runs through sudo.
+if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
+  for f in workspace-strategy-reassessment-20261109/STATE.md ontology-operational-base/STATE.md \
+           ontology-operational-base/TASK-O13.md ontology-operational-base/REPORT-O13.md; do
+    sudo install -d "/home/palantirkc/work/$(dirname "$f")"
+    sudo test -e "/home/palantirkc/work/$f" ||
+      printf '# fixture for ontology/rehearsal.sh\n' | sudo tee "/home/palantirkc/work/$f" > /dev/null
+  done
+  sudo env "PATH=$PATH" GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory "GIT_CONFIG_VALUE_0=$PWD" \
+    bash ontology/rehearsal.sh "$ont_bin" > /dev/null
+else
+  bash ontology/rehearsal.sh "$ont_bin" > /dev/null
+fi
+echo "check: ok"
