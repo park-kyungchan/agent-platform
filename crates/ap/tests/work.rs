@@ -222,15 +222,13 @@ fn start_local_refusals() {
         }
         check_error(s, "start", &r, code);
     }
-    for (dirty, bytes, code) in [("dirty", BYTES, "worktree_dirty")] {
-        let (mut r, _) = start_setup();
-        r["worktree"] = json!("/tree");
-        let mut git = step("git", "-C /tree status --porcelain", Value::Null);
-        git.response = Response::Raw(dirty.as_bytes().to_vec());
-        let mut s = Script::new(vec![git]);
-        s.files.insert(PACKET.into(), bytes.to_vec());
-        check_error(s, "start", &r, code);
-    }
+    let (mut r, _) = start_setup();
+    r["worktree"] = json!("/tree");
+    let mut git = step("git", "-C /tree status --porcelain", Value::Null);
+    git.response = Response::Raw(b"dirty".to_vec());
+    let mut s = Script::new(vec![git]);
+    s.files.insert(PACKET.into(), BYTES.to_vec());
+    check_error(s, "start", &r, "worktree_dirty");
 }
 #[test]
 fn start_answer_refusals_and_controls() {
