@@ -13,7 +13,7 @@
 #   --usage FILE          where the usage line is appended (default <cwd>/usage.jsonl)
 # Without --merge or --merge-if-no-effect it stops after an accept (accepted_not_merged).
 # The last line of stdout is the status. Exit: 0 merged, or accepted and not merged; 2 usage;
-# 10 the head moved; 11 the check failed; 12 the automatic reviewer has unresolved findings or did not
+# 10 the head moved; 11 the check failed or did not answer in DELIVER_CHECK_MINUTES (90); 12 the automatic reviewer has unresolved findings or did not
 # answer; 13 the verdict is not an accept for this head; 14 the merge was not read back; 75 the verifier
 # was cut (run again with --resume). After every run that reached the verifier ONE line is appended to
 # the usage file: time, repository, pull request, head, verdict, verifier cost, merge.
@@ -60,12 +60,16 @@ PY
 [ "$(head_now)" = "$H" ] || stop 10 "head_moved@$R#$N"
 [ "$(gh pr view "$N" -R "$R" --json isDraft --jq .isDraft)" = false ] || gh pr ready "$N" -R "$R" > /dev/null
 
-# 2. The required check on that head.
+# 2. The required check on that head; a head that moves while it runs stops the delivery.
+END=$(( $(date -u +%s) + ${DELIVER_CHECK_MINUTES:-90}*60 ))
 while :; do
+  [ "$(head_now)" = "$H" ] || stop 10 "head_moved@$R#$N"
   s=$(gh pr checks "$N" -R "$R" --json name,state --jq ".[]|select(.name==\"$CHECK\")|.state" 2>/dev/null | head -n 1)
   case "$s" in
     SUCCESS) break ;;
-    ""|PENDING|QUEUED|IN_PROGRESS|WAITING|REQUESTED) sleep "$POLL" ;;
+    ""|PENDING|QUEUED|IN_PROGRESS|WAITING|REQUESTED)
+      [ "$(date -u +%s)" -lt "$END" ] || stop 11 "check_timeout@$R#$N $CHECK"
+      sleep "$POLL" ;;
     *) stop 11 "check_failed@$R#$N $CHECK=$s" ;;
   esac
 done
@@ -74,7 +78,12 @@ done
 # 3. The automatic reviewer on that head: no unresolved finding.
 if [ "$AUTO" = 1 ]; then
   a=$(bash "$HERE/await-autoreview.sh" "$R" "$N" "$H" "${DELIVER_AUTOREVIEW_MINUTES:-40}" 2>&1) || stop 12 "autoreview_unanswered@$R#$N"
-  printf '%s\n' "$a" | tail -n 1 | grep -q '"has_unresolved_findings":true' && stop 12 "autoreview_findings@$R#$N"
+  # The flag is read as JSON: only an explicit false lets the delivery go on.
+  printf '%s\n' "$a" | tail -n 1 | python3 -I -c 'import json, sys
+line = sys.stdin.read()
+try: ok = json.loads(line[line.index("{"):])["code_review"]["has_unresolved_findings"] is False
+except Exception: ok = False
+sys.exit(0 if ok else 1)' || stop 12 "autoreview_findings@$R#$N"
 fi
 
 # 4. ONE verifier in a fresh context (or the cut one, resumed).

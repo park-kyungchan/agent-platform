@@ -15,9 +15,9 @@ case "$a" in
   "pr view"*"headRefOid,isDraft"*) echo "$(cat "$g/head") $(cat "$g/draft")" ;;
   "pr view"*"headRefOid"*) cat "$g/head" ;;
   "pr view"*"isDraft"*) cat "$g/draft" ;;
-  "pr view"*"comments"*) echo "<!-- codex-review-state:v1 {\"code_review\":{\"commit_sha\":\"$(cat "$g/head")\",\"status\":\"completed\",\"has_unresolved_findings\":$(cat "$g/findings")}} -->" ;;
+  "pr view"*"comments"*) echo "<!-- codex-review-state:v1 {\"code_review\":{\"commit_sha\":\"$(cat "$g/head")\",\"status\":\"completed\",\"has_unresolved_findings\":$(cat "$g/sep" 2>/dev/null)$(cat "$g/findings")}} -->" ;;
   "pr view"*"state,mergeCommit"*) [ -e "$g/merged" ] && echo "MERGED $(cat "$g/merged")" || echo "OPEN " ;;
-  "pr checks"*) cat "$g/check" ;;
+  "pr checks"*) cat "$g/check"; [ ! -e "$g/move_at_check" ] || cat "$g/move_at_check" > "$g/head" ;;
   "pr ready"*) echo false > "$g/draft" ;;
   "pr diff"*) cat "$g/paths" ;;
   "pr merge"*"--match-head-commit $(cat "$g/head")"*) [ -e "$g/refuse_merge" ] || echo abc123 > "$g/merged" ;;
@@ -55,6 +55,14 @@ reset; echo FAILURE > "$t/gh/check"; run --merge; rc=$?
 { [ "$rc" -eq 11 ] && [ "$(merges)" -eq 0 ]; } && ok "a failed check stops" || bad "check: rc=$rc $(last)"
 reset; echo true > "$t/gh/findings"; run --merge; rc=$?
 { [ "$rc" -eq 12 ] && [ "$(merges)" -eq 0 ] && last | grep -q '^autoreview_findings@'; } && ok "an unresolved finding of the automatic reviewer stops" || bad "findings: rc=$rc $(last)"
+reset; echo true > "$t/gh/findings"; echo " " > "$t/gh/sep"; run --merge; rc=$?
+{ [ "$rc" -eq 12 ] && [ "$(merges)" -eq 0 ]; } && ok "the finding flag is read as JSON (a space after the colon)" || bad "findings with space: rc=$rc $(last)"
+reset; echo null > "$t/gh/findings"; run --merge; rc=$?
+{ [ "$rc" -eq 12 ] && [ "$(merges)" -eq 0 ]; } && ok "a flag that is not an explicit false stops" || bad "findings null: rc=$rc $(last)"
+reset; echo PENDING > "$t/gh/check"; echo "$O" > "$t/gh/move_at_check"; run --merge; rc=$?
+{ [ "$rc" -eq 10 ] && [ "$(merges)" -eq 0 ] && [ "$(grep -c '^pr checks' "$t/gh/calls")" -eq 1 ]; } && ok "a head that moves while the check is pending stops at once" || bad "moved while pending: rc=$rc $(last)"
+reset; echo PENDING > "$t/gh/check"; DELIVER_CHECK_MINUTES=0 run --merge; rc=$?
+{ [ "$rc" -eq 11 ] && last | grep -q '^check_timeout@'; } && ok "a check that never answers is a timeout" || bad "check timeout: rc=$rc $(last)"
 reset; printf 'Verdict: repair\n%s\n' "$H" > "$t/gh/answer"; run --merge; rc=$?
 { [ "$rc" -eq 13 ] && [ "$(merges)" -eq 0 ] && grep -q '"verdict": "repair"' "$t/cwd/usage.jsonl"; } && ok "a repair verdict stops and is recorded" || bad "repair: rc=$rc $(last)"
 reset; printf 'Verdict: accept\n%s\n' "$O" > "$t/gh/answer"; run --merge; rc=$?
