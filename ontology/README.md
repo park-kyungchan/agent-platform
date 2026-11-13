@@ -421,6 +421,7 @@ checks review transitions, write-set dispatch and existing-object compatibility.
 only by the duplicate criterion, and never set by a caller.
 `worker_run.running_in` is set by `start_worker_run`, cleared by `close_worker_run`,
 followed only by the duplicate criterion, and never set by a caller.
+An applied `close_worker_run` or `close_review` answers two edits of the same object.
 `status` remains the running/closed statement used by views and other criteria.
 For a new type, a uniqueness criterion must link through a reference that is
 set only while the object is open and cleared by its closing action (LENS F43).

@@ -135,7 +135,11 @@ fn apply(action: &str, request: String, parameters: Value) -> Step {
         "ont",
         "action apply --client lead",
         json!({"action_type":action,"request_id":request,"parameters":parameters}),
-        json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":if action == "start_review" {"initial"} else {"update"},"id":id("review")}]}}),
+        json!({"status":"ok","result":{"outcome":"applied","edits":if action == "start_review" {
+            json!([{"change":"initial","id":id("review")}])
+        } else {
+            json!([{"change":"update","id":id("review"),"revision":"close-action#0"},{"change":"update","id":id("review"),"revision":"close-action#1"}])
+        }}}),
     )
 }
 fn start_apply() -> Step {
@@ -171,7 +175,10 @@ fn accept_steps(f: Value, run: Value, diff: &str) -> Vec<Step> {
             &format!("merge-base origin/main {HEAD}"),
             format!("{BASE}\n").as_bytes(),
         ),
-        git(&format!("diff --name-only {BASE} {HEAD}"), diff.as_bytes()),
+        git(
+            &format!("diff --no-renames --name-only {BASE} {HEAD}"),
+            diff.as_bytes(),
+        ),
     ]
 }
 fn refusal(s: &mut Script, verb: &str, r: &Value, code: &str, field: &str) -> Value {
@@ -194,7 +201,7 @@ fn start_exact_calls_and_store() {
     assert_eq!(
         (v, code),
         (
-            json!({"status":"started","review":id("review"),"prompt_sha256":hash(b"Review this head\n")}),
+            json!({"status":"started","outcome":"applied","review":id("review"),"prompt_sha256":hash(b"Review this head\n")}),
             0
         )
     );
@@ -785,4 +792,114 @@ fn integrated_review_union_of_runs() {
         2
     );
     s.finish();
+}
+
+#[test]
+fn accept_argv_disables_rename_detection() {
+    let steps = accept_steps(review(), run(), "a/b.rs\noutside/old.rs\n");
+    assert_eq!(
+        steps[5].argv,
+        ["-C", WT, "diff", "--no-renames", "--name-only", BASE, HEAD]
+    );
+    assert_eq!(
+        refusal(
+            &mut Script::new(steps),
+            "accept",
+            &accept_request(),
+            "review_path_outside_write_set",
+            "paths"
+        ),
+        json!({"paths":["outside/old.rs"],"count":1})
+    );
+}
+#[test]
+fn accept_run_of_other_task() {
+    let mut f = run();
+    f["task"]["native_key"] = json!("other");
+    assert_eq!(
+        refusal(
+            &mut Script::new(vec![get("review", review()), get("worker_run", f)]),
+            "accept",
+            &accept_request(),
+            "review_run_of_other_task",
+            "runs"
+        ),
+        "worker_run"
+    );
+}
+fn repeated_start_steps(status: &str) -> Vec<Step> {
+    let mut a = start_apply();
+    let mut response: Value = serde_json::from_slice(&a.bytes).unwrap();
+    response["result"]["outcome"] = json!("already_applied");
+    a.bytes = serde_json::to_vec(&response).unwrap();
+    vec![
+        pr(HEAD, "OPEN", "main"),
+        get("worker_run", run()),
+        a,
+        get("review", json!({"status":status})),
+    ]
+}
+#[test]
+fn start_repeated_while_running_is_idempotent() {
+    let mut s = Script::new(repeated_start_steps("running"));
+    assert_eq!(
+        execute(&mut s, "start", &start_request()).unwrap(),
+        (
+            json!({"status":"started","outcome":"already_applied","review":id("review"),"prompt_sha256":hash(b"Review this head\n")}),
+            0
+        )
+    );
+    s.finish();
+}
+#[test]
+fn start_repeated_after_close_is_refused() {
+    let mut s = Script::new(repeated_start_steps("closed"));
+    let e = execute(&mut s, "start", &start_request()).unwrap_err();
+    assert_eq!(
+        (e.code, e.field.as_str(), e.detail),
+        ("review_already_closed", "review", id("review"))
+    );
+    s.finish();
+}
+#[test]
+fn start_attempt_changes_request_id() {
+    let first = start_apply().body["request_id"].clone();
+    let mut ids = vec![first];
+    for attempt in [2, 3, 99] {
+        let mut r = start_request();
+        r["attempt"] = json!(attempt);
+        let mut a = start_apply();
+        let prompt_hash = hash(b"Review this head\n");
+        a.body["request_id"] = json!(format!(
+            "rv-start-{}",
+            &hash(format!("example\npacket\n{HEAD}\n{prompt_hash}\n{attempt}").as_bytes())[..40]
+        ));
+        assert!(!ids.contains(&a.body["request_id"]));
+        ids.push(a.body["request_id"].clone());
+        let mut s = Script::new(vec![pr(HEAD, "OPEN", "main"), get("worker_run", run()), a]);
+        assert_eq!(
+            execute(&mut s, "start", &r).unwrap().0["outcome"],
+            "applied"
+        );
+        s.finish();
+    }
+    for attempt in [
+        json!(1),
+        json!(0),
+        json!(100),
+        json!("2"),
+        json!(2.5),
+        Value::Null,
+        json!(-2),
+    ] {
+        let mut r = start_request();
+        r["attempt"] = attempt;
+        refusal(
+            &mut Script::new(vec![]),
+            "start",
+            &r,
+            "invalid_input",
+            "attempt",
+        );
+    }
 }

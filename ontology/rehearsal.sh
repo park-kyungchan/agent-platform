@@ -29,6 +29,14 @@ def apply(action, rid, parameters, failure=None, outcome='applied'):
         assert actual == expected, (expected, r)
     else: assert r['outcome'] == outcome and r['actor_trust'] == 'self_reported', r
     return r
+def shape(r, kind, changes):
+    edits = r['edits']
+    assert [e['change'] for e in edits] == changes, r
+    first = edits[0]['id']
+    assert set(first) == {'object_type', 'namespace', 'native_key'} and first['object_type'] == kind, r
+    assert set(first['namespace']) == {'instance', 'account'} and all(isinstance(v, str) and v for v in [first['native_key'], *first['namespace'].values()]), r
+    assert all(e['id'] == first for e in edits), r
+    print('shape=' + kind + ' changes=' + json.dumps(changes) + ' ids=one')
 def render(view, key=None): return call(['render'], dict(view=view, args=dict(task=key or task['native_key'])))
 def fingerprint(): return [(p.name, hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None) for p in [pathlib.Path(store), pathlib.Path(store).with_name('edits.jsonl')]]
 task = oid('task', 'workspace-strategy-reassessment-20261109'); packet = oid('packet', 'ontology-operational-base/TASK-O13.md'); report = oid('report', 'ontology-operational-base/REPORT-O13.md')
@@ -258,7 +266,10 @@ assert fields(v6_running).get('running_in') is None
 gate('close_worker_run', 'v6-same-name-close', dict(worker_run=created(same_name, 'worker_run'), result='done'))
 gate('amend_plan', 'v6-plan-amend', dict(plan=plan, current_lines=100, amended_by_family='family-b'))
 rp = dict(task=task, kind='packet', head='a' * 40, model='fixture-model', effort='medium', prompt='/home/palantirkc/work/fixture/PROMPT.md', prompt_sha256='b' * 64, runs=[w])
-first_review = created(gate('start_review', 'review-start', rp), 'review')
+review_started = gate('start_review', 'review-start', rp)
+# crates/ap/src/review.rs start parses this shape; change both together.
+shape(review_started, 'review', ['initial'])
+first_review = created(review_started, 'review')
 assert fields(first_review)['runs'] == [w]
 assert fields(first_review)['running_in'] == task
 gate('start_review', 'review-duplicate', rp, 'duplicate_running_review')
@@ -270,7 +281,9 @@ gate('close_review', 'review-hash-required', dict(review=first_review, verdict='
 gate('close_review', 'review-empty-report', dict(review=first_review, verdict='accept', report='', report_sha256='c' * 64), 'invalid_parameter')
 for label, prompt in [('empty', ''), ('relative', 'PROMPT.md')]:
     gate('start_review', 'review-' + label + '-prompt', dict(rp, prompt=prompt), 'invalid_parameter')
-gate('close_review', 'review-abandoned', dict(review=first_review, verdict='abandoned'))
+review_closed = gate('close_review', 'review-abandoned', dict(review=first_review, verdict='abandoned'))
+# crates/ap/src/review.rs start parses this shape; change both together.
+shape(review_closed, 'review', ['update', 'update'])
 assert fields(first_review).get('running_in') is None
 gate('close_review', 'review-second-close', dict(review=first_review, verdict='abandoned'), 'review_not_running')
 next_review = created(gate('start_review', 'review-after-close', rp), 'review')
@@ -290,8 +303,13 @@ for rid, extra in [('write-set', dict(write_set=['crates/ap/src/work.rs', 'ontol
     run = created(gate('start_worker_run', 'v7-' + rid, dict(wp, name='v7-' + rid, **extra)), 'worker_run')
     assert fields(run)['running_in'] == task
     if rid == 'write-set':
-        other = created(gate('start_worker_run', 'v7-another-name', dict(wp, name='v7-another-name')), 'worker_run')
-        gate('close_worker_run', 'v7-another-name-close', dict(worker_run=other, result='done'))
+        worker_started = gate('start_worker_run', 'v7-another-name', dict(wp, name='v7-another-name'))
+        # crates/ap/src/work.rs applied_run parses this shape; change both together.
+        shape(worker_started, 'worker_run', ['initial'])
+        other = created(worker_started, 'worker_run')
+        worker_closed = gate('close_worker_run', 'v7-another-name-close', dict(worker_run=other, result='done'))
+        # crates/ap/src/work.rs applied_run parses this shape; change both together.
+        shape(worker_closed, 'worker_run', ['update', 'update'])
     gate('start_worker_run', 'v7-duplicate-' + rid, dict(wp, name='v7-' + rid, **extra), 'duplicate_running_worker')
     if extra: assert fields(run)['write_set'] == extra['write_set']
     else: assert 'write_set' not in fields(run)

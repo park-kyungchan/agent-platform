@@ -196,17 +196,20 @@ pub(crate) fn apply_answer(reply: Reply, code: &'static str) -> Result<Value, Fa
     require!(success || refused(&v) => code, "apply");
     Ok(v)
 }
-fn applied_run<'a>(v: &'a Value, change: &str) -> Option<&'a Value> {
+// ontology/rehearsal.sh asserts the real engine shape; change both together.
+fn applied_run<'a>(v: &'a Value, changes: &[&str]) -> Option<&'a Value> {
     let edits = v["result"]["edits"].as_array()?;
-    let [edit] = edits.as_slice() else {
-        return None;
-    };
+    let first = edits.first()?;
     (v["status"] == "ok"
         && v.get("error").is_none()
-        && edit["change"] == change
-        && complete_id(&edit["id"])
-        && edit["id"]["object_type"] == "worker_run")
-        .then_some(&edit["id"])
+        && edits.len() == changes.len()
+        && edits.iter().zip(changes).all(|(edit, change)| {
+            edit["change"] == *change
+                && complete_id(&edit["id"])
+                && edit["id"]["object_type"] == "worker_run"
+                && edit["id"] == first["id"]
+        }))
+    .then_some(&first["id"])
 }
 fn run_fields(s: &mut impl System, r: &Value, code: &'static str) -> Result<Value, Failure> {
     let reply = ont(s, r, &["get"], &json!({"id":r["run"]})).map_err(|_| error(code, "run"))?;
@@ -391,7 +394,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         Err(_) => Value::Null,
     };
     let run =
-        applied_run(&applied, "initial").filter(|_| applied["result"]["outcome"] == "applied");
+        applied_run(&applied, &["initial"]).filter(|_| applied["result"]["outcome"] == "applied");
     let Some(run) = run else {
         return Err(fail(
             "store_start_uncertain",
@@ -459,7 +462,7 @@ fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     if refused(&v) {
         return Err(fail("store_close_refused", "apply", codes(&v)));
     }
-    require!(applied_run(&v, "update") == Some(&r["run"]) => "store_close_uncertain", "apply");
+    require!(applied_run(&v, &["update", "update"]) == Some(&r["run"]) => "store_close_uncertain", "apply");
     let closed_fields = run_fields(s, r, "store_close_uncertain")?;
     require!(closed_fields["status"]["value"] == "closed" && closed_fields["result"]["value"] == result
         && closed_fields["name"] == fields["name"] && closed_fields["session"] == fields["session"] => "store_close_uncertain", "run");

@@ -93,6 +93,14 @@ fn pr(s: &mut impl System, repository: &str, number: &Value) -> Result<Value, Fa
     parse(reply, "review_head_differs")
 }
 fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
+    let attempt = r
+        .get("attempt")
+        .map(|v| {
+            v.as_u64()
+                .filter(|n| (2..=99).contains(n))
+                .ok_or_else(|| error("invalid_input", "attempt"))
+        })
+        .transpose()?;
     let task_key = Path::new(text(r, "task_dir")?)
         .file_name()
         .and_then(|p| p.to_str())
@@ -126,16 +134,29 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         let f = fields(s, r, run, "review_run_unknown", "runs")?;
         require!(f["task"] == task => "review_run_of_other_task", "runs");
     }
-    let request = format!(
-        "rv-start-{}",
-        &digest(format!("{task_key}\n{kind}\n{head}\n{prompt_sha256}").as_bytes())[..40]
-    );
+    let mut input = format!("{task_key}\n{kind}\n{head}\n{prompt_sha256}");
+    if let Some(attempt) = attempt {
+        input.push_str(&format!("\n{attempt}"));
+    }
+    let request = format!("rv-start-{}", &digest(input.as_bytes())[..40]);
     let v = apply(s, r, "start_review", request, parameters)?;
     let edits = v["result"]["edits"]
         .as_array()
         .ok_or_else(|| error("store_answer_unreadable", "apply"))?;
     require!(edits.len() == 1 && edits[0]["change"] == "initial" && complete_id(&edits[0]["id"]) && edits[0]["id"]["object_type"] == "review" => "store_answer_unreadable", "apply");
-    Ok(json!({"status":"started","review":edits[0]["id"],"prompt_sha256":prompt_sha256}))
+    if v["result"]["outcome"] != "applied" {
+        let review = &edits[0]["id"];
+        let f = fields(s, r, review, "store_review_unreadable", "review")?;
+        if f["status"] != "running" {
+            return Err(fail("review_already_closed", "review", review.clone()));
+        }
+        return Ok(
+            json!({"status":"started","outcome":"already_applied","review":review,"prompt_sha256":prompt_sha256}),
+        );
+    }
+    Ok(
+        json!({"status":"started","outcome":"applied","review":edits[0]["id"],"prompt_sha256":prompt_sha256}),
+    )
 }
 fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let mut parameters = json!({"review":r["review"]});
@@ -251,6 +272,9 @@ fn accept(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         let failure = || fail("review_run_lacks_write_set", "runs", key.clone());
         require!(complete_id(run) && run["object_type"] == "worker_run" => "invalid_input", "runs");
         let run = fields(s, r, run, "review_run_lacks_write_set", "runs").map_err(|_| failure())?;
+        if run["task"] != f["task"] {
+            return Err(fail("review_run_of_other_task", "runs", key));
+        }
         let write_set = run["write_set"]
             .as_array()
             .filter(|a| !a.is_empty())
@@ -276,10 +300,17 @@ fn accept(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     if base.trim_end() != f["base"] {
         return Err(fail("review_base_differs", "base", json!(base.trim_end())));
     }
+    // Disable rename detection so both the removed and added paths are checked.
     let diff = git(
         s,
         worktree,
-        &["diff", "--name-only", text(&f, "base")?, head],
+        &[
+            "diff",
+            "--no-renames",
+            "--name-only",
+            text(&f, "base")?,
+            head,
+        ],
     )?;
     let paths: Vec<_> = diff.lines().collect();
     let outside: Vec<_> = paths

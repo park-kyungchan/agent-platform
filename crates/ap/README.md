@@ -37,7 +37,11 @@ The status is required by a ruleset only after the Lead applies it.
 With a pull request, it checks that the request is open at exactly `head`.
 Each optional run must exist, belong to the task and occur once. It applies
 `start_review` with a stable request id based on task key, kind, head and prompt
-hash, returning `status: started`, the complete `review` id and `prompt_sha256`.
+hash, returning `status: started`, `outcome: applied`, the complete `review` id
+and `prompt_sha256`. Optional integer `attempt` (2 to 99) appends a newline and
+that number to the digest input; omit it for the first attempt. A repeated request
+reads the review and returns `outcome: already_applied` only while it is running.
+A closed review is refused with `review_already_closed`; retry with a new `attempt`.
 It does not launch a reviewer. Example stdin for `ap review start`:
 
 ```json
@@ -58,9 +62,10 @@ report). Example stdin for `ap review close`:
 
 `accept` requires a closed `packet` or `integrated` review with verdict `accept`,
 repository, pull request, head, base and an unchanged report. Every named run
-must have a nonempty write set. It verifies the open pull request targets `main`
+must belong to the review task and have a nonempty write set. It verifies the open pull request targets `main`
 at the review head, fetches `origin main`, checks the merge base and compares
-changed paths to the union of those write sets. A pattern matches its exact
+changed paths to the union of those write sets. A moved file must have both its
+old and new paths in that union. A pattern matches its exact
 path; a trailing `/**` matches descendants, not the directory itself or another
 name with the same prefix. The caller must be outside the task's `wt/`.
 Only then does it post `lead-review=success` for that head and return
