@@ -1551,6 +1551,7 @@ fn close_refuses_other_shapes() {
         json!([update]),
         json!([update, update, update]),
         json!([update, other]),
+        json!([other, other]),
         json!([update, initial]),
         json!([update, review]),
     ] {

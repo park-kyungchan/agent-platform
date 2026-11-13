@@ -21,7 +21,7 @@ An uncertain create/start/apply leaves the tab open for the Lead to reconcile; a
 
 `close` takes the full `run`, `result`, `name`, `tab`, and optional `session`, `report`, `store`, `agent_gone`. It reads that exact run's current observation, requires `running` and a valid binding, and checks the supplied name/tab against it. It checks the stored tab's label and single-pane count, then reads the stored pane to confirm its tab membership. The live agent with the run's name must occupy both bound ids, be `idle`, `done` or `blocked`, and report a nonempty session id. A caller-known non-null `session` must match (`session_mismatch`); `start`'s null session may be omitted. The stored result appends `; session=<live id>`; the entire result must fit within 600 UTF-8 bytes before any write.
 
-A missing agent requires `agent_gone: true`, supplied after the Lead observed it ended, the same bound sole-pane membership, and no listed agent with that name, pane or tab. Its result appends `; session=unavailable (agent_gone)`, explicitly recording the absence of a live session. Only an ok apply with one update of that exact `worker_run`, followed by readback of its closed status, result and unchanged binding/name, permits tab closure. A failed tab close returns `tab_closed: false` with exit 3. An uncertain store close or readback leaves the tab open.
+A missing agent requires `agent_gone: true`, supplied after the Lead observed it ended, the same bound sole-pane membership, and no listed agent with that name, pane or tab. Its result appends `; session=unavailable (agent_gone)`, explicitly recording the absence of a live session. Only an ok apply with the two updates of that exact `worker_run` (the modification and the cleared `running_in`), followed by readback of its closed status, result and unchanged binding/name, permits tab closure. A failed tab close returns `tab_closed: false` with exit 3. An uncertain store close or readback leaves the tab open.
 
 `store` forwards `--store <absolute path>` to every Ontology call, permitting disposable-store use. Uncertainty requires readback by the Lead; no command automatically retries a prompt or sends keys.
 
@@ -64,7 +64,8 @@ report). Example stdin for `ap review close`:
 repository, pull request, head, base and an unchanged report. Every named run
 must belong to the review task and have a nonempty write set. It verifies the open pull request targets `main`
 at the review head, fetches `origin main`, checks the merge base and compares
-changed paths to the union of those write sets. A moved file must have both its
+changed paths to the union of those write sets, using `git --no-replace-objects`
+and `diff --no-renames --ignore-submodules=none --no-relative --name-only`. A moved file must have both its
 old and new paths in that union. A pattern matches its exact
 path; a trailing `/**` matches descendants, not the directory itself or another
 name with the same prefix. The caller must be outside the task's `wt/`.
@@ -91,7 +92,8 @@ Refusals (local checks precede writes and status posts):
 - `review_prompt_unreadable`: prompt is not a readable regular file below the work root.
 - `review_head_differs`: pull request is closed, has another head, or (at accept) targets another branch.
 - `review_run_unknown`: a start run cannot be read as the exact current object.
-- `review_run_of_other_task`: a start run belongs to another task.
+- `review_run_of_other_task`: a run supplied to `start` or `accept` belongs to another task.
+- `review_already_closed`: `start` repeated after its review closed; repeat with a new `attempt`.
 - `store_refused`: the store refused an attempted action; detail carries its codes; no retry occurs.
 - `review_report_unreadable`: close report is unreadable, outside the work root or larger than 1 MiB.
 - `review_report_lacks_verdict`: the report's first line is not one of the two exact verdict lines.

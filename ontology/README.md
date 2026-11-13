@@ -408,7 +408,8 @@ or `_`, and may have a final `/**`; duplicate members and multiple column-1
 incompatible paths in `agent-platform`; the Lead measured 0 in `ontology-platform`
 and 27 non-ASCII tracked paths in one directory of `education-platform`, which
 packets name by the directory and `/**`.
-No command yet consumes these stored review or write-set records.
+`ap review accept` reads these stored review and write-set records (see
+[One review](../crates/ap/README.md#one-review)).
 
 `record_scope_review` retains every existing family field and parameter but
 no longer compares families. Its optional `review` reference must be closed

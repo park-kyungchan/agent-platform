@@ -282,7 +282,7 @@ gate('close_review', 'review-empty-report', dict(review=first_review, verdict='a
 for label, prompt in [('empty', ''), ('relative', 'PROMPT.md')]:
     gate('start_review', 'review-' + label + '-prompt', dict(rp, prompt=prompt), 'invalid_parameter')
 review_closed = gate('close_review', 'review-abandoned', dict(review=first_review, verdict='abandoned'))
-# crates/ap/src/review.rs start parses this shape; change both together.
+# No ap command parses close_review edits today; ontology/README.md states this shape.
 shape(review_closed, 'review', ['update', 'update'])
 assert fields(first_review).get('running_in') is None
 gate('close_review', 'review-second-close', dict(review=first_review, verdict='abandoned'), 'review_not_running')

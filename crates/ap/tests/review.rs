@@ -163,7 +163,12 @@ fn accept_request() -> Value {
     json!({"review":id("review"),"worktree":WT})
 }
 fn git(argv: &str, bytes: &[u8]) -> Step {
-    raw("git", &format!("-C {WT} {argv}"), Value::Null, bytes)
+    raw(
+        "git",
+        &format!("--no-replace-objects -C {WT} {argv}"),
+        Value::Null,
+        bytes,
+    )
 }
 fn accept_steps(f: Value, run: Value, diff: &str) -> Vec<Step> {
     vec![
@@ -176,7 +181,9 @@ fn accept_steps(f: Value, run: Value, diff: &str) -> Vec<Step> {
             format!("{BASE}\n").as_bytes(),
         ),
         git(
-            &format!("diff --no-renames --name-only {BASE} {HEAD}"),
+            &format!(
+                "diff --no-renames --ignore-submodules=none --no-relative --name-only {BASE} {HEAD}"
+            ),
             diff.as_bytes(),
         ),
     ]
@@ -798,8 +805,34 @@ fn integrated_review_union_of_runs() {
 fn accept_argv_disables_rename_detection() {
     let steps = accept_steps(review(), run(), "a/b.rs\noutside/old.rs\n");
     assert_eq!(
+        steps[3].argv,
+        ["--no-replace-objects", "-C", WT, "fetch", "origin", "main"]
+    );
+    assert_eq!(
+        steps[4].argv,
+        [
+            "--no-replace-objects",
+            "-C",
+            WT,
+            "merge-base",
+            "origin/main",
+            HEAD
+        ]
+    );
+    assert_eq!(
         steps[5].argv,
-        ["-C", WT, "diff", "--no-renames", "--name-only", BASE, HEAD]
+        [
+            "--no-replace-objects",
+            "-C",
+            WT,
+            "diff",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "--no-relative",
+            "--name-only",
+            BASE,
+            HEAD
+        ]
     );
     assert_eq!(
         refusal(
@@ -902,4 +935,70 @@ fn start_attempt_changes_request_id() {
             "attempt",
         );
     }
+}
+
+#[test]
+fn real_git_replace_cannot_hide_changed_paths() {
+    use std::{fs, process::Command, time::SystemTime};
+    let root = PathBuf::from(std::env::var_os("AP_S03_TEST_ROOT").unwrap()).join(format!(
+        "review-git-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir(&root).unwrap();
+    struct Cleanup(PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+    let _cleanup = Cleanup(root.clone());
+    let git = |argv: &[&str]| {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(argv)
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_AUTHOR_NAME", "Fixture")
+            .env("GIT_AUTHOR_EMAIL", "fixture@example.invalid")
+            .env("GIT_COMMITTER_NAME", "Fixture")
+            .env("GIT_COMMITTER_EMAIL", "fixture@example.invalid")
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{argv:?}: {:?}", output.stderr);
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .trim_end()
+            .to_owned()
+    };
+    git(&["init", "--quiet"]);
+    git(&["commit", "--quiet", "--allow-empty", "-m", "base"]);
+    let base = git(&["rev-parse", "HEAD"]);
+    fs::write(root.join("real.rs"), "real\n").unwrap();
+    git(&["add", "real.rs"]);
+    git(&["commit", "--quiet", "-m", "real"]);
+    let head = git(&["rev-parse", "HEAD"]);
+    git(&["checkout", "--quiet", "--detach", &base]);
+    fs::write(root.join("fake.rs"), "fake\n").unwrap();
+    git(&["add", "fake.rs"]);
+    git(&["commit", "--quiet", "-m", "fake"]);
+    let fake = git(&["rev-parse", "HEAD"]);
+    git(&["replace", &head, &fake]);
+    let diff = [
+        "diff",
+        "--no-renames",
+        "--ignore-submodules=none",
+        "--no-relative",
+        "--name-only",
+        &base,
+        &head,
+    ];
+    assert_eq!(git(&diff), "fake.rs");
+    let mut protected = vec!["--no-replace-objects"];
+    protected.extend(diff);
+    assert_eq!(git(&protected), "real.rs");
 }

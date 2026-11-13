@@ -197,7 +197,7 @@ fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     Ok(json!({"status":"closed","verdict":verdict,"report_sha256":report_sha256}))
 }
 fn git(s: &mut impl System, worktree: &str, command: &[&str]) -> Result<String, Failure> {
-    let mut argv = args(&["-C", worktree]);
+    let mut argv = args(&["--no-replace-objects", "-C", worktree]);
     argv.extend(args(command));
     let reply = s.call("git", &argv, &Value::Null, 30_000)?;
     require!(reply.success => "process_failed", "git");
@@ -300,13 +300,15 @@ fn accept(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     if base.trim_end() != f["base"] {
         return Err(fail("review_base_differs", "base", json!(base.trim_end())));
     }
-    // Disable rename detection so both the removed and added paths are checked.
+    // These options make the list independent of replace refs and the worktree's own diff configuration.
     let diff = git(
         s,
         worktree,
         &[
             "diff",
             "--no-renames",
+            "--ignore-submodules=none",
+            "--no-relative",
             "--name-only",
             text(&f, "base")?,
             head,
