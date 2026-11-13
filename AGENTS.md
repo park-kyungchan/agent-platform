@@ -6,15 +6,16 @@ Shared rules of this host: `/root/.agents/AGENTS.md` (its source is `content/AGE
 
 | Path | What it is | Its check |
 | --- | --- | --- |
-| `content/` | The shared instructions every coding CLI of the host loads: `AGENTS.md`, `runtime-references/`, `skills/`. Installed to `/root/.agents` by the Lead | `ci/check-content.py`: checksums in `content/SHA256SUMS` and `crates/ap/src/native/content_inventory.rs`, routes, words the glossary replaces, limits |
+| `content/` | The shared instructions every coding CLI of the host loads: `AGENTS.md`, `runtime-references/`, `skills/`. Installed to `/root/.agents` by `scripts/install-content.sh` | `ci/check-content.py`: checksums in `content/SHA256SUMS` and `crates/ap/src/native/content_inventory.rs`, routes, words the glossary replaces, limits |
 | `crates/ap` | The command `ap`: `work start`, `work wait`, `work close`, `review`, `render`, `install`, `doctor`, `pane` | Its tests; `crates/ap/README.md` is the contract |
 | `ontology/work.schema.json` | The schema of the Lead's own records in the Ontology store. Frozen: no new version without a decision of the Lead | `ontology/rehearsal.sh` installs it into a disposable store of the engine revision in `ontology/ENGINE-PIN` and asserts every action answer that `ap` parses |
 | `memory/` | Originals of engineering memory records | `ci/check-memory-records.py` and its tests |
 | `scripts/install-ap.sh` | Installs `ap` on the host from a commit on `main`; `check`, `rollback` | `scripts/test-install-ap.sh` |
+| `scripts/install-content.sh` | Installs `content/` from a commit on `main`: staged, verified, then swapped; `rollback <tarball>` | `scripts/test-install-content.sh` |
 
 ## The check
 
-`./check` at the repository root, until it prints `check: ok`. The CI job `rust` runs the same file and is the required check of `main`. `./check content` runs only the steps without a Rust build and is enough for a change of `content/`, `memory/` or documents. On the host the script takes the build lock by itself (do not wrap it in `flock`) and builds into `target/` inside your worktree.
+`./check` at the repository root, until it prints `check: ok`. The CI job `rust` runs the same file and is the required check of `main`. `./check content` runs only the steps without a Rust build and is enough for a change of the TEXT of existing files of `content/`, of `memory/` or of documents; a file added to or removed from `content/` changes the inventory compiled into `ap`, so run the whole `./check`. On the host the script takes the build lock by itself (do not wrap it in `flock`) and builds into `target/` inside your worktree.
 
 ## Rules of this repository
 
