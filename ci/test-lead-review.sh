@@ -7,11 +7,12 @@ t=$(mktemp -d); trap 'rm -rf -- "$t"' EXIT
 mkdir -p "$t/bin" "$t/a1" "$t/a2" "$t/lead" "$t/cwd"
 cat > "$t/bin/claude" <<'FAKE'
 #!/usr/bin/env bash
-echo "$CLAUDE_CONFIG_DIR|$*" >> "$FAKE_LOG"; cat > /dev/null
+echo "$CLAUDE_CONFIG_DIR|$*" >> "$FAKE_LOG"; mark=$(grep -o '(review run [0-9-]*)' | tail -n 1)
 id="s-$(basename "$CLAUDE_CONFIG_DIR")"
 case "$(cat "$CLAUDE_CONFIG_DIR/mode" 2>/dev/null)" in
   noout)   exit 1 ;;
-  hang)    mkdir -p "$CLAUDE_CONFIG_DIR/projects/p"; printf '{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: accept"}]}}\n' > "$CLAUDE_CONFIG_DIR/projects/p/$id.jsonl"
+  other)   /bin/bash -c 'sleep 600; :' & wait $! ;;
+  hang)    mkdir -p "$CLAUDE_CONFIG_DIR/projects/p"; printf '{"message":{"role":"user","content":"%s"}}\n{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: accept"}]}}\n' "$mark" > "$CLAUDE_CONFIG_DIR/projects/p/$id.jsonl"
            /bin/bash -c 'sleep 600; :' & wait $!   # two commands: the shell stays a shell and does not become the sleep
            printf '{"is_error":false,"result":"Verdict: accept\\nhead","num_turns":3,"session_id":"%s"}' "$id" ;;
   limit1)  printf '{"is_error":true,"result":"You have hit your 5-hour limit · resets 6:30pm (UTC)","num_turns":1,"session_id":"%s"}' "$id" ;;
@@ -46,6 +47,12 @@ echo limit45 > "$t/a1/mode"; run verify "$t/cwd" "$t/prompt.md" "$t/k.md"; echo 
 # a reviewer that waits for a shell it started: the watchdog ends that shell (below the reviewer) and the answer arrives.
 echo hang > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=60 run integration "$t/cwd" "$t/prompt.md" "$t/h.md"; rc=$?; rm -f "$t/lead/mode"
 { [ "$rc" -eq 0 ] && [ -s "$t/h.md" ] && [ $(( $(date +%s) - s0 )) -lt 40 ]; } && ok "watchdog ends a leftover shell below the reviewer" || bad "watchdog: rc=$rc after $(( $(date +%s) - s0 ))s"
+# another session's record with an idle verdict in the same account does not count: the reviewer's own shell lives on
+# and the run ends by its own timeout (exit 75), not by the watchdog taking the other record for this run's.
+mkdir -p "$t/lead/projects/q"; echo other > "$t/lead/mode"
+( sleep 1; printf '{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: accept"}]}}\n' > "$t/lead/projects/q/other.jsonl" ) &
+s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=6 run integration "$t/cwd" "$t/prompt.md" "$t/o.md"; rc=$?; rm -f "$t/lead/mode"; wait
+{ [ "$rc" -eq 75 ] && [ $(( $(date +%s) - s0 )) -ge 5 ]; } && ok "another session's verdict does not end this run's shells" || bad "foreign record: rc=$rc after $(( $(date +%s) - s0 ))s"
 # (b2) cut before any work: the next account of the row takes the prompt.
 echo limit1 > "$t/a1/mode"; : > "$t/calls.log"; run verify "$t/cwd" "$t/prompt.md" "$t/w.md"; rc=$?
 { [ "$rc" -eq 0 ] && [ "$(wc -l < "$t/calls.log")" -eq 2 ] && grep -q "\"account\": \"$t/a2\"" "$t/w.md.run.json"; } && ok "cut before work: next account" || bad "next account: rc=$rc"

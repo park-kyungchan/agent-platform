@@ -57,8 +57,16 @@ AP_CONTENT_DST=$t/dst4 inst install "$c6"; rc=$?; tar7=$(sed -n 's/.*backup=//p'
 { [ "$rc" -eq 0 ] && [ ! -L "$t/dst4/AGENTS.md" ]; } || bad "install over a link rc=$rc $(cat "$t/err")"
 AP_CONTENT_DST=$t/dst4 inst rollback "$tar7"; rc=$?
 { [ "$rc" -eq 0 ] && [ -L "$t/dst4/AGENTS.md" ] && [ "$(readlink "$t/dst4/AGENTS.md")" = ../original.md ] && [ "$(cat "$t/dst4/AGENTS.md")" = linked ]; } && ok "relative symbolic link restored by rollback" || bad "link rollback rc=$rc $(ls -la "$t/dst4" | tr '\n' ' ')"
+# only the latest kept copy rolls back: an older one would leave a later install's skill in place and unowned.
+rm -rf "$t/dst5"; AP_CONTENT_DST=$t/dst5 inst install "$c6"; tara=$(sed -n 's/.*backup=//p' "$t/out")
+mkdir -p content/skills/z; echo z > content/skills/z/SKILL.md; c7=$(commit seven)
+AP_CONTENT_DST=$t/dst5 inst install "$c7"; tarb=$(sed -n 's/.*backup=//p' "$t/out"); hb=$(tree "$t/dst5")
+AP_CONTENT_DST=$t/dst5 inst rollback "$tara"; rc=$?
+{ [ "$rc" -ne 0 ] && [ "$(tree "$t/dst5")" = "$hb" ] && grep -q 'rollback_not_latest' "$t/err"; } && ok "older kept copy refused while a later install stands" || bad "older rollback rc=$rc $(cat "$t/err")"
+AP_CONTENT_DST=$t/dst5 inst rollback "$tarb"; r1=$?; AP_CONTENT_DST=$t/dst5 inst rollback "$tara"; r2=$?
+{ [ "$r1" -eq 0 ] && [ "$r2" -eq 0 ] && [ ! -e "$t/dst5/skills/z" ] && [ ! -e "$t/dst5/AGENTS.md" ] && [ ! -e "$t/dst5/.content-paths" ]; } && ok "rollbacks in reverse order reach the first state" || bad "reverse rollbacks $r1 $r2 $(cat "$t/err")"
 # refusals: uncommitted content; a commit that is not on origin/main; a checkout at another commit.
-echo dirty >> content/AGENTS.md; inst install "$c6"; rc=$?; git checkout -q -- content
+echo dirty >> content/AGENTS.md; inst install "$c7"; rc=$?; git checkout -q -- content
 [ "$rc" -eq 2 ] && ok "uncommitted content refused" || bad "uncommitted rc=$rc"
 echo three > content/AGENTS.md; sums; git add -A; git commit -q -m three; c3=$(git rev-parse HEAD)
 inst install "$c3"; rc=$?; [ "$rc" -eq 2 ] && ok "commit not on origin/main refused" || bad "unmerged rc=$rc"

@@ -41,9 +41,11 @@ end_leftover_shells() { local r c
   for r in $(pgrep -P "$1" 2>/dev/null); do for c in $(descendants "$r"); do
     if tr '\0' ' ' < "/proc/$c/cmdline" 2>/dev/null | grep -q '^/bin/bash -c '; then kill "$c" 2>/dev/null || true; fi
   done; done; }
+# The session record of THIS run is the one that holds the run's mark (a last line the runner adds to the
+# prompt): another session of the same account never counts.
 watch() { local dir=$1 pid=$2 start=$3 f
   while kill -0 "$pid" 2>/dev/null; do sleep "${REVIEW_WATCH_SLEEP:-30}"
-    f=$(find "$dir/projects" -maxdepth 2 -name '*.jsonl' -newermt "@$start" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | cut -d' ' -f2-)
+    f=$(find "$dir/projects" -maxdepth 2 -name '*.jsonl' -newermt "@$start" -print0 2>/dev/null | xargs -0 -r grep -lF -- "$MARK" 2>/dev/null | head -n 1)
     [ -n "$f" ] || continue
     if [ $(( $(date +%s) - $(stat -c %Y "$f") )) -ge "${REVIEW_IDLE_S:-180}" ] && grep -q '"text":"Verdict:' "$f"; then end_leftover_shells "$pid"; fi
   done; }
@@ -76,12 +78,13 @@ PY
 # An answer of an earlier run under the same name is moved aside before this run starts (kept as <out>.prev),
 # so that a cut run never leaves an older verdict where a reader expects this run's answer.
 if [ -e "$OUT" ]; then mv -f -- "$OUT" "$OUT.prev"; fi
+MARK="(review run $(date +%s)-$$-$RANDOM)"
 n=0
 for ACC in "${ACCOUNTS[@]}"; do
   n=$((n+1)); args=(--print --model "$MODEL" --effort "$EFFORT" --output-format json --strict-mcp-config)
   [ -n "$SESSION" ] && args+=(--resume "$SESSION")
   start=$(date +%s)
-  CLAUDE_CONFIG_DIR="$ACC" timeout "${REVIEW_TIMEOUT:-3300}" "$CLAUDE" "${args[@]}" < "$PROMPT" > "$J" 2> "$OUT.err" & pid=$!
+  CLAUDE_CONFIG_DIR="$ACC" timeout "${REVIEW_TIMEOUT:-3300}" "$CLAUDE" "${args[@]}" < <(cat -- "$PROMPT"; printf '\n%s\n' "$MARK") > "$J" 2> "$OUT.err" & pid=$!
   watch "$ACC" "$pid" "$start" & w=$!
   wait "$pid"; rc=$?; kill "$w" 2>/dev/null; wait "$w" 2>/dev/null
   state=$(envelope "$ACC")

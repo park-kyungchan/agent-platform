@@ -85,6 +85,13 @@ rollback)
   if tar -tf "$tarball" | grep -Ev '^(AGENTS\.md|runtime-references(/.*)?|skills/[A-Za-z0-9_-]+(/.*)?)$' | grep -q .; then refuse "the tarball lists a path that is not the installer's"; fi
   mapfile -t paths < "$tarball.paths"
   for p in "${paths[@]}"; do owned_ok "$p" || refuse "unexpected path in .paths: $p"; done
+  # Only the kept copy of the LATEST install can be rolled back: a path the target owns now and this copy
+  # does not cover came from a later install, which is rolled back first.
+  cur=(); [ -f "$DST/.content-paths" ] && mapfile -t cur < "$DST/.content-paths"
+  for c in "${cur[@]:-}"; do
+    [ -n "$c" ] || continue
+    printf '%s\n' "${paths[@]}" | grep -qxF -- "$c" || refuse "rollback_not_latest: the target owns $c, which this kept copy does not cover; roll back the later install first"
+  done
   stage=$DST/.new-$stamp; rm -rf -- "$stage"; mkdir -p -- "$stage"
   trap 'rm -rf -- "$stage"' EXIT
   tar -C "$stage" -xpf "$tarball"
