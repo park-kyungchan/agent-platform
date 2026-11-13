@@ -10,6 +10,10 @@ cat > "$t/bin/claude" <<'FAKE'
 echo "$CLAUDE_CONFIG_DIR|$*" >> "$FAKE_LOG"; cat > /dev/null
 id="s-$(basename "$CLAUDE_CONFIG_DIR")"
 case "$(cat "$CLAUDE_CONFIG_DIR/mode" 2>/dev/null)" in
+  noout)   exit 1 ;;
+  hang)    mkdir -p "$CLAUDE_CONFIG_DIR/projects/p"; printf '{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: accept"}]}}\n' > "$CLAUDE_CONFIG_DIR/projects/p/$id.jsonl"
+           /bin/bash -c 'sleep 600; :' & wait $!   # two commands: the shell stays a shell and does not become the sleep
+           printf '{"is_error":false,"result":"Verdict: accept\\nhead","num_turns":3,"session_id":"%s"}' "$id" ;;
   limit1)  printf '{"is_error":true,"result":"You have hit your 5-hour limit · resets 6:30pm (UTC)","num_turns":1,"session_id":"%s"}' "$id" ;;
   limit45) printf '{"is_error":true,"result":"You have hit your 5-hour limit · resets 6:30pm (UTC)","num_turns":45,"session_id":"%s"}' "$id" ;;
   *)       printf '{"is_error":false,"result":"Verdict: accept\\nhead","num_turns":3,"session_id":"%s","total_cost_usd":0.1}' "$id" ;;
@@ -36,6 +40,12 @@ echo limit45 > "$t/a1/mode"; : > "$t/calls.log"; run verify "$t/cwd" "$t/prompt.
 # a prompt and an out file given relative to the caller's directory work although the runner changes directory.
 ( cd "$t" && : > calls.log && bash "$runner" integration "$t/cwd" prompt.md rel.md > stdout 2> stderr ); rc=$?
 { [ "$rc" -eq 0 ] && [ -s "$t/rel.md" ] && [ "$(wc -l < "$t/calls.log")" -eq 1 ]; } && ok "relative prompt and out paths" || bad "relative paths: rc=$rc $(cat "$t/stderr")"
+# a resume that returns no envelope keeps the recorded session, so the next resume still works.
+echo limit45 > "$t/a1/mode"; run verify "$t/cwd" "$t/prompt.md" "$t/k.md"; echo noout > "$t/a1/mode"; run verify "$t/cwd" "$t/prompt.md" "$t/k.md" --resume; rc=$?; rm -f "$t/a1/mode"
+{ [ "$rc" -eq 75 ] && grep -q '"session": "s-a1"' "$t/k.md.run.json"; } && ok "failed resume keeps the session" || bad "failed resume: rc=$rc $(cat "$t/k.md.run.json")"
+# a reviewer that waits for a shell it started: the watchdog ends that shell (below the reviewer) and the answer arrives.
+echo hang > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=60 run integration "$t/cwd" "$t/prompt.md" "$t/h.md"; rc=$?; rm -f "$t/lead/mode"
+{ [ "$rc" -eq 0 ] && [ -s "$t/h.md" ] && [ $(( $(date +%s) - s0 )) -lt 40 ]; } && ok "watchdog ends a leftover shell below the reviewer" || bad "watchdog: rc=$rc after $(( $(date +%s) - s0 ))s"
 # (b2) cut before any work: the next account of the row takes the prompt.
 echo limit1 > "$t/a1/mode"; : > "$t/calls.log"; run verify "$t/cwd" "$t/prompt.md" "$t/w.md"; rc=$?
 { [ "$rc" -eq 0 ] && [ "$(wc -l < "$t/calls.log")" -eq 2 ] && grep -q "\"account\": \"$t/a2\"" "$t/w.md.run.json"; } && ok "cut before work: next account" || bad "next account: rc=$rc"

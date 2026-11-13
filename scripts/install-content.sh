@@ -18,12 +18,14 @@ BK=${AP_CONTENT_BACKUP_DIR:-/var/backups/agent-platform-content}
 refuse() { echo "refuse: $*" >&2; exit 2; }
 stamp=$(date -u +%Y%m%dT%H%M%SZ)-$$
 moved_old=(); placed=()
+# A path is there when it exists or is a symbolic link: a relative link need not resolve where it is staged.
+there() { [ -e "$1" ] || [ -L "$1" ]; }
 # Put back what a failed swap changed: remove what was newly placed, then move back what was moved aside.
 restore_moved() { local p
   for p in "${placed[@]:-}"; do [ -n "$p" ] || continue; rm -rf -- "$DST/$p" 2>/dev/null || true; done
   for p in "${moved_old[@]:-}"; do
     [ -n "$p" ] || continue
-    if [ -e "$DST/.old-$stamp/$p" ] && [ ! -e "$DST/$p" ]; then
+    if there "$DST/.old-$stamp/$p" && ! there "$DST/$p"; then
       mv -- "$DST/.old-$stamp/$p" "$DST/$p" || echo "restore_failed@$DST/$p: its previous bytes are in $DST/.old-$stamp/$p" >&2
     fi
   done
@@ -34,8 +36,8 @@ restore_moved() { local p
 swap() { local stage=$1 p; shift
   mkdir -p -- "$DST/.old-$stamp/skills" || return 1
   for p in "$@"; do
-    if [ -e "$DST/$p" ]; then mv -- "$DST/$p" "$DST/.old-$stamp/$p" || return 1; moved_old+=("$p"); fi
-    [ -e "$stage/$p" ] || continue
+    if there "$DST/$p"; then mv -- "$DST/$p" "$DST/.old-$stamp/$p" || return 1; moved_old+=("$p"); fi
+    there "$stage/$p" || continue
     mkdir -p -- "$(dirname -- "$DST/$p")" || return 1
     mv -- "$stage/$p" "$DST/$p" || return 1; placed+=("$p")
   done; }
@@ -62,7 +64,7 @@ install)
   for p in "${new[@]}"; do cp -a -- "$SRC/$p" "$stage/$p"; done
   (cd "$stage" && sha256sum -c --quiet "$SRC/SHA256SUMS") || refuse "the staged copy does not match"
   tarball=$BK/agents-before-$stamp.tar; have=()
-  for p in "${paths[@]}"; do [ -e "$DST/$p" ] && have+=("$p"); done
+  for p in "${paths[@]}"; do there "$DST/$p" && have+=("$p"); done
   printf '%s\n' "${paths[@]}" > "$tarball.paths"
   tar -C "$DST" -cpf "$tarball" --files-from=/dev/null "${have[@]}"
   tar -tf "$tarball" > /dev/null || refuse "the kept copy cannot be read back"

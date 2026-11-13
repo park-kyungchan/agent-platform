@@ -35,20 +35,27 @@ d=json.load(open(sys.argv[1])); print(d["session"], d["account"])' "$RUN" 2>/dev
 elif [ -n "$RESUME" ]; then echo "usage: review.sh <role> <cwd> <prompt file> <out file> [--resume]" >&2; exit 2; fi
 # A headless run does not exit while a shell it started in the background is alive: once the session record
 # holds a message that begins with "Verdict:" and has been idle for 180 s, end the leftover shells.
+descendants() { local p c; for p in "$@"; do for c in $(pgrep -P "$p" 2>/dev/null); do echo "$c"; descendants "$c"; done; done; }
+# $pid is the timeout wrapper; its child is the reviewer; the leftover shells are below the reviewer.
+end_leftover_shells() { local r c
+  for r in $(pgrep -P "$1" 2>/dev/null); do for c in $(descendants "$r"); do
+    if tr '\0' ' ' < "/proc/$c/cmdline" 2>/dev/null | grep -q '^/bin/bash -c '; then kill "$c" 2>/dev/null || true; fi
+  done; done; }
 watch() { local dir=$1 pid=$2 start=$3 f
   while kill -0 "$pid" 2>/dev/null; do sleep "${REVIEW_WATCH_SLEEP:-30}"
     f=$(find "$dir/projects" -maxdepth 2 -name '*.jsonl' -newermt "@$start" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -n 1 | cut -d' ' -f2-)
     [ -n "$f" ] || continue
-    if [ $(( $(date +%s) - $(stat -c %Y "$f") )) -ge 180 ] && grep -q '"text":"Verdict:' "$f"; then pkill -P "$pid" -f '^/bin/bash -c' 2>/dev/null || true; fi
+    if [ $(( $(date +%s) - $(stat -c %Y "$f") )) -ge "${REVIEW_IDLE_S:-180}" ] && grep -q '"text":"Verdict:' "$f"; then end_leftover_shells "$pid"; fi
   done; }
-envelope() { python3 -I - "$J" "$RUN" "$ROLE" "$1" "$OUT" <<'PY'
+envelope() { python3 -I - "$J" "$RUN" "$ROLE" "$1" "$OUT" "$SESSION" <<'PY'
 import json,re,sys,glob,os
-j,run,role,acc,out=sys.argv[1:6]
+j,run,role,acc,out,asked=sys.argv[1:7]
 try: d=json.load(open(j))
 except Exception: d={}
 res=(d.get("result") or "")
 cut=bool(not d or d.get("is_error") or (len(res)<400 and re.search(r"usage limit|hit your .*limit|resets ", res, re.I)))
-json.dump({"role":role,"account":acc,"session":d.get("session_id"),"turns":d.get("num_turns"),"cut":cut,"cost_usd":d.get("total_cost_usd")},open(run,"w"))
+# A resumed run that returns no envelope keeps the session it was asked to resume: the record stays resumable.
+json.dump({"role":role,"account":acc,"session":d.get("session_id") or asked or None,"turns":d.get("num_turns"),"cut":cut,"cost_usd":d.get("total_cost_usd")},open(run,"w"))
 if cut:
     print("cut turns=%s" % d.get("num_turns")); sys.exit(0)
 # The answer is the last message; when a later message hides a verdict, recover it from the session record.

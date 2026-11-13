@@ -51,6 +51,12 @@ git rm -q -r content/skills/y; c6=$(commit six); AP_CONTENT_DST=$t/dst3 inst ins
 { [ "$rc" -eq 0 ] && [ ! -e "$t/dst3/skills/y" ] && [ -f "$t/dst3/skills/x/SKILL.md" ] && [ -f "$t/dst3/skills/third-party/SKILL.md" ]; } && ok "retired skill removed, foreign skill kept" || bad "retired skill rc=$rc $(cat "$t/err")"
 AP_CONTENT_DST=$t/dst3 inst rollback "$tar6"; rc=$?
 { [ "$rc" -eq 0 ] && [ -f "$t/dst3/skills/y/SKILL.md" ] && [ -f "$t/dst3/skills/third-party/SKILL.md" ] && grep -qx 'skills/y' "$t/dst3/.content-paths"; } && ok "rollback brings the retired skill back" || bad "rollback of retirement rc=$rc $(cat "$t/err")"
+# a previous path that is a relative symbolic link survives install and rollback as that link.
+rm -rf "$t/dst4"; mkdir -p "$t/dst4"; echo linked > "$t/original.md"; ln -s ../original.md "$t/dst4/AGENTS.md"
+AP_CONTENT_DST=$t/dst4 inst install "$c6"; rc=$?; tar7=$(sed -n 's/.*backup=//p' "$t/out")
+{ [ "$rc" -eq 0 ] && [ ! -L "$t/dst4/AGENTS.md" ]; } || bad "install over a link rc=$rc $(cat "$t/err")"
+AP_CONTENT_DST=$t/dst4 inst rollback "$tar7"; rc=$?
+{ [ "$rc" -eq 0 ] && [ -L "$t/dst4/AGENTS.md" ] && [ "$(readlink "$t/dst4/AGENTS.md")" = ../original.md ] && [ "$(cat "$t/dst4/AGENTS.md")" = linked ]; } && ok "relative symbolic link restored by rollback" || bad "link rollback rc=$rc $(ls -la "$t/dst4" | tr '\n' ' ')"
 # refusals: uncommitted content; a commit that is not on origin/main; a checkout at another commit.
 echo dirty >> content/AGENTS.md; inst install "$c6"; rc=$?; git checkout -q -- content
 [ "$rc" -eq 2 ] && ok "uncommitted content refused" || bad "uncommitted rc=$rc"
