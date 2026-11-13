@@ -264,7 +264,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         require!(members.len() <= 64 && members.iter().enumerate().all(|(index, member)| {
             let path = member.strip_suffix("/**").unwrap_or(member);
             !path.is_empty()
-                && member.len() <= 300
+                && path.len() <= 297
                 && path.bytes().all(|c| c.is_ascii_alphanumeric() || b"._/+@-".contains(&c))
                 && path.as_bytes().first().is_some_and(|c| c.is_ascii_alphanumeric() || b"._".contains(c))
                 && !members[..index].contains(member)

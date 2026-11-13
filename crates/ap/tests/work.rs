@@ -1436,6 +1436,8 @@ fn write_set_invalid_members() {
         "a[".into(),
         "a/".into(),
         "a".repeat(301),
+        "a".repeat(298),
+        format!("{}/**", "a".repeat(298)),
         "src/\u{00e9}.rs".into(),
         "a:b".into(),
         "a b".into(),
@@ -1462,28 +1464,43 @@ fn write_set_sent_in_order() {
         serde_json::from_str(include_str!("../../../ontology/work.schema.json")).unwrap();
     assert_eq!(
         schema["value_types"]["write_pattern"]["pattern"],
-        r"^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,295}(/\*\*)?$"
+        r"^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,296}(/\*\*)?$"
     );
-    for member in ["crates/ap/src/work.rs", "ontology/**"] {
-        let path = member.strip_suffix("/**").unwrap_or(member);
-        assert!((1..=296).contains(&path.len()));
-        assert!(path.as_bytes()[0].is_ascii_alphanumeric() || b"._".contains(&path.as_bytes()[0]));
-        assert!(
-            path.bytes()
-                .all(|c| c.is_ascii_alphanumeric() || b"._/+@-".contains(&c))
-        );
+    for members in [
+        vec!["crates/ap/src/work.rs".to_owned(), "ontology/**".to_owned()],
+        vec!["a".repeat(297)],
+        vec![format!("{}/**", "a".repeat(297))],
+    ] {
+        for member in &members {
+            let path = member.strip_suffix("/**").unwrap_or(member);
+            assert!((1..=297).contains(&path.len()));
+            assert!(
+                path.as_bytes()[0].is_ascii_alphanumeric() || b"._".contains(&path.as_bytes()[0])
+            );
+            assert!(
+                path.bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"._/+@-".contains(&c))
+            );
+        }
+        let packet_bytes = format!(
+            "Callers searched:\nBroken tests:\nControls:\nWrite set: {}\n",
+            members.join(", ")
+        )
+        .into_bytes();
+        let (mut r, mut steps) = start_setup();
+        r["worktree"] = json!("/tree");
+        for i in [2, 7] {
+            steps[i].body.as_mut().unwrap()["parameters"]["write_set"] = json!(members);
+        }
+        steps[7].body.as_mut().unwrap()["request_id"] =
+            json!(format!("start-worker-{}", hash(&packet_bytes, 12)));
+        let mut calls = worktree_steps();
+        calls.extend(steps);
+        let mut s = Script::new(calls);
+        s.files.insert(PACKET.into(), packet_bytes);
+        assert_eq!(execute(&mut s, "start", &r).unwrap().0["status"], "started");
+        s.finish(); // Exact JSON body assertions inspect validate and apply.
     }
-    let (mut r, mut steps) = start_setup();
-    r["worktree"] = json!("/tree");
-    for i in [2, 7] {
-        steps[i].body.as_mut().unwrap()["parameters"]["write_set"] =
-            json!(["crates/ap/src/work.rs", "ontology/**"]);
-    }
-    let mut calls = worktree_steps();
-    calls.extend(steps);
-    let mut s = Script::new(calls);
-    assert_eq!(execute(&mut s, "start", &r).unwrap().0["status"], "started");
-    s.finish(); // Exact JSON body assertions inspect validate and apply.
 }
 #[test]
 fn no_worktree_sends_no_write_set() {

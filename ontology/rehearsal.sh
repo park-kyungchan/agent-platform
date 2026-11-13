@@ -295,6 +295,16 @@ for label, member in [('301', 'a' * 301), ('wildcard', 'src/*.rs'), ('absolute',
     gate('start_worker_run', 'direct-write-' + label, dict(wp, name='direct-' + label, write_set=[member]), 'invalid_parameter')
 valid_run = created(gate('start_worker_run', 'direct-write-valid', dict(wp, name='direct-valid', write_set=['crates/ap/src/**', 'ontology/work.schema.json'])), 'worker_run')
 gate('close_worker_run', 'direct-write-valid-close', dict(worker_run=valid_run, result='done'))
+# The same path-part boundary must hold without the ap caller.
+for label, member, failure in [
+    ('297-plain', 'a' * 297, None),
+    ('298-plain', 'a' * 298, 'invalid_parameter'),
+    ('297-tree', 'a' * 297 + '/**', None),
+    ('298-tree', 'a' * 298 + '/**', 'invalid_parameter'),
+]:
+    answer = gate('start_worker_run', 'direct-boundary-' + label, dict(wp, name='boundary-' + label, write_set=[member]), failure)
+    if not failure:
+        gate('close_worker_run', 'direct-boundary-close-' + label, dict(worker_run=created(answer, 'worker_run'), result='done'))
 # Five closed objects must not enter the sixth start's basis on the G4 engine.
 closed = {}
 for kind in ['review', 'worker_run']:

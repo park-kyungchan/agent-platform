@@ -84,7 +84,7 @@
     "sha256_hex": {"base": "string", "pattern": "^[0-9a-f]{64}$"},
     "write_pattern": {
       "base": "string",
-      "pattern": "^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,295}(/\\*\\*)?$"
+      "pattern": "^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,296}(/\\*\\*)?$"
     },
     "file_path": {
       "base": "string",
@@ -865,7 +865,7 @@
         },
         "write_set": {"type": {"array": {
           "value_type": "write_pattern"
-        }}, "required": false, "description": "Each member must match write_pattern (ASCII repository-relative path with optional /**); only the caller bounds the count to 64, since the schema language has no member-count bound."},
+        }}, "required": false, "description": "Each member must match write_pattern: ASCII path part at most 297 bytes, optional trailing /** (300 bytes total); only the caller bounds the count to 64; the schema has no member-count bound."},
         "running_in": {
           "type": {
             "ref": "task"
@@ -1732,7 +1732,7 @@
         },
         "write_set": {"type": {"array": {
           "value_type": "write_pattern"
-        }}, "required": false, "description": "Each member must match write_pattern (ASCII repository-relative path with optional /**); only the caller bounds the count to 64, since the schema language has no member-count bound."}
+        }}, "required": false, "description": "Each member must match write_pattern: ASCII path part at most 297 bytes, optional trailing /** (300 bytes total); only the caller bounds the count to 64; the schema has no member-count bound."}
       },
       "submission_criteria": [
         {

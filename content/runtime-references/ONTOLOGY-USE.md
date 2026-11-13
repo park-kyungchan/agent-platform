@@ -99,7 +99,8 @@ Send JSON on standard input to `ont action apply`: `action_type`, `parameters`, 
 `review.running_in` is set by `start_review`, cleared by `close_review`, followed by its duplicate criterion, and never set by a caller.
 `worker_run.running_in` is set by `start_worker_run`, cleared by `close_worker_run`, followed by its duplicate criterion, and never set by a caller.
 `status` remains the running/closed statement for views and other criteria.
-`write_pattern` checks each write-set member's ASCII path characters and length;
+`write_pattern` checks each write-set member's ASCII path characters and a path
+part of at most 297 bytes, excluding optional trailing `/**` (at most 300 bytes total);
 only the caller bounds the count (64 in `ap work start`); the engine has no schema count bound.
 For a new type, a uniqueness criterion links through a reference set only while
 the object is open and cleared by the closing action; see `ontology/README.md` in `agent-platform`.
