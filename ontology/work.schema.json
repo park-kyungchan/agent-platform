@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 6,
+  "version": 7,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -76,6 +76,19 @@
     "consumer_kind": {
       "base": "string",
       "enum": ["domain_route", "harness", "none"]
+    },
+    "review_kind": {"base": "string", "enum": ["packet", "integrated", "design", "integration"]},
+    "review_status": {"base": "string", "enum": ["running", "closed"]},
+    "review_verdict": {"base": "string", "pattern": "^[a-z_]{1,32}$"},
+    "commit_or_digest": {"base": "string", "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"},
+    "sha256_hex": {"base": "string", "pattern": "^[0-9a-f]{64}$"},
+    "write_pattern": {
+      "base": "string",
+      "pattern": "^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,296}(/\\*\\*)?$"
+    },
+    "file_path": {
+      "base": "string",
+      "pattern": "^/[!-~]{1,399}$"
     }
   },
   "sources": {
@@ -849,6 +862,16 @@
         "plan": {
           "type": {"ref": "plan"},
           "required": false
+        },
+        "write_set": {"type": {"array": {
+          "value_type": "write_pattern"
+        }}, "required": false, "description": "Each member must match write_pattern: ASCII path part at most 297 bytes, optional trailing /** (300 bytes total); only the caller bounds the count to 64; the schema has no member-count bound."},
+        "running_in": {
+          "type": {
+            "ref": "task"
+          },
+          "required": false,
+          "description": "Set only by the start action while running; cleared by the close action for duplicate checks."
         }
       }
     },
@@ -903,7 +926,8 @@
         "reviewed_lines": {"type": "integer", "required": false},
         "amended_by_family": {"type": "string", "required": true, "max_bytes": 120},
         "reviewer_family": {"type": "string", "required": false, "max_bytes": 120},
-        "review_report": {"type": "string", "required": false, "max_bytes": 1000}
+        "review_report": {"type": "string", "required": false, "max_bytes": 1000},
+        "review": {"type": {"ref": "review"}, "required": false}
       }
     },
     "thread": {
@@ -918,6 +942,44 @@
         "consumer_kind": {"type": {"value_type": "consumer_kind"}, "required": true},
         "first_use": {"type": "string", "required": true, "max_bytes": 1000},
         "reason": {"type": "string", "required": false, "max_bytes": 600}
+      }
+    },
+    "review": {
+      "description": "Ontology-owned review of one head by one model, written only by actions.",
+      "owner": "ontology",
+      "primary_key": {"from": "$action_id"},
+      "title": "head",
+      "properties": {
+        "task": {"type": {"ref": "task"}, "required": true},
+        "kind": {"type": {"value_type": "review_kind"}, "required": true},
+        "repository": {"type": "string", "required": false, "max_bytes": 200},
+        "pull_request": {"type": "integer", "required": false},
+        "head": {"type": {"value_type": "commit_or_digest"}, "required": true},
+        "base": {"type": {"value_type": "commit_or_digest"}, "required": false},
+        "runs": {"type": {"array": {"ref": "worker_run"}}, "required": false},
+        "model": {"type": "string", "required": true, "max_bytes": 80},
+        "effort": {"type": "string", "required": true, "max_bytes": 20},
+        "prompt": {"type": {
+          "value_type": "file_path"
+        }, "required": true, "max_bytes": 400},
+        "prompt_sha256": {"type": {"value_type": "sha256_hex"}, "required": true},
+        "report": {"type": {
+          "value_type": "file_path"
+        }, "required": false, "max_bytes": 400},
+        "report_sha256": {"type": {"value_type": "sha256_hex"}, "required": false},
+        "verdict": {"type": {"value_type": "review_verdict"}, "required": false},
+        "account": {"type": "string", "required": false, "max_bytes": 40},
+        "session": {"type": "string", "required": false, "max_bytes": 200},
+        "status": {"type": {"value_type": "review_status"}, "required": true},
+        "started_at": {"type": {"value_type": "utc_time"}, "required": true, "max_bytes": 40},
+        "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40},
+        "running_in": {
+          "type": {
+            "ref": "task"
+          },
+          "required": false,
+          "description": "Set only by the start action while running; cleared by the close action for duplicate checks."
+        }
       }
     }
   },
@@ -1072,6 +1134,28 @@
       "to": "task",
       "cardinality": "many_to_one",
       "names": {"forward": "thread_task", "reverse": "threads"}
+    },
+    "review_task": {"from": "review", "via": "task", "to": "task", "cardinality": "many_to_one", "names": {"forward": "review_task", "reverse": "reviews"}},
+    "review_runs": {"from": "review", "via": "runs", "to": "worker_run", "cardinality": "many_to_many", "names": {"forward": "review_runs", "reverse": "run_reviews"}},
+    "review_running_task": {
+      "from": "review",
+      "via": "running_in",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "review_running_task",
+        "reverse": "running_reviews"
+      }
+    },
+    "worker_run_running_task": {
+      "from": "worker_run",
+      "via": "running_in",
+      "to": "task",
+      "cardinality": "many_to_one",
+      "names": {
+        "forward": "worker_run_running_task",
+        "reverse": "running_worker_runs"
+      }
     }
   },
   "action_types": {
@@ -1645,7 +1729,10 @@
         "plan": {
           "type": {"ref": "plan"},
           "required": true
-        }
+        },
+        "write_set": {"type": {"array": {
+          "value_type": "write_pattern"
+        }}, "required": false, "description": "Each member must match write_pattern: ASCII path part at most 297 bytes, optional trailing /** (300 bytes total); only the caller bounds the count to 64; the schema has no member-count bound."}
       },
       "submission_criteria": [
         {
@@ -1664,19 +1751,13 @@
             {
               "linked": {
                 "from": "$task",
-                "link": "worker_runs",
+                "link": "running_worker_runs",
                 "where": {
                   "all": [
                     {
                       "eq": [
                         "name",
                         "$name"
-                      ]
-                    },
-                    {
-                      "eq": [
-                        "status",
-                        "running"
                       ]
                     }
                   ]
@@ -1731,7 +1812,9 @@
             "packet": "$packet",
             "thread": "$thread",
             "layer": "$layer",
-            "plan": "$plan"
+            "plan": "$plan",
+            "write_set": "$write_set",
+            "running_in": "$task"
           }
         }
       ]
@@ -1830,6 +1913,12 @@
             "closed_at": "$now",
             "status": "closed",
             "report": "$report"
+          }
+        },
+        {
+          "clear_reference": {
+            "object_type": "worker_run",
+            "property": "running_in"
           }
         }
       ]
@@ -2187,20 +2276,116 @@
       ]
     },
     "record_scope_review": {
-      "description": "Record scope/design review by a family different from the latest plan writer; both families are self-declared. Actions take the full Id from search; view arguments take the native key.",
+      "description": "Record scope/design review; family values are retained without comparison. Actions take the full Id from search; view arguments take the native key.",
       "parameters": {
         "plan": {"type": {"ref": "plan"}, "required": true},
         "reviewed_lines": {"type": "integer", "required": true},
         "reviewer_family": {"type": "string", "required": true, "max_bytes": 120},
-        "review_report": {"type": "string", "required": true, "max_bytes": 1000}
+        "review_report": {"type": "string", "required": true, "max_bytes": 1000},
+        "review": {"type": {"ref": "review"}, "required": false}
       },
       "submission_criteria": [
         {"code": "unknown_plan", "message": "Choose an existing plan.", "all": [{"exists": "$plan"}]},
         {"code": "reviewed_lines_below_current", "message": "Review must cover at least current_lines.", "all": [{"exists": "$plan"}, {"ge": ["$reviewed_lines", "$plan.current_lines"]}]},
-        {"code": "scope_review_same_family", "message": "Use a different family from the latest plan writer.", "all": [{"exists": "$plan"}, {"ne": ["$reviewer_family", "$plan.amended_by_family"]}]}
+        {"code": "review_not_closed", "message": "Supply a closed review or omit it.", "any": [{"none": [{"present": "$review"}]}, {"all": [{"present": "$review"}, {"exists": "$review"}, {"eq": ["$review.status", "closed"]}]}]}
       ],
       "rules": [
-        {"modify_object": "plan", "set": {"scope_reviewed": true, "reviewed_lines": "$reviewed_lines", "reviewer_family": "$reviewer_family", "review_report": "$review_report"}}
+        {"modify_object": "plan", "set": {"scope_reviewed": true, "reviewed_lines": "$reviewed_lines", "reviewer_family": "$reviewer_family", "review_report": "$review_report",
+            "review": "$review"
+          }}
+      ]
+    },
+    "start_review": {
+      "description": "Start a review of an existing task and exact head.",
+      "parameters": {
+        "task": {"type": {"ref": "task"}, "required": true},
+        "kind": {"type": {"value_type": "review_kind"}, "required": true},
+        "repository": {"type": "string", "required": false, "max_bytes": 200},
+        "pull_request": {"type": "integer", "required": false},
+        "head": {"type": {"value_type": "commit_or_digest"}, "required": true},
+        "base": {"type": {"value_type": "commit_or_digest"}, "required": false},
+        "runs": {"type": {"array": {"ref": "worker_run"}}, "required": false},
+        "model": {"type": "string", "required": true, "max_bytes": 80},
+        "effort": {"type": "string", "required": true, "max_bytes": 20},
+        "prompt": {"type": {
+          "value_type": "file_path"
+        }, "required": true, "max_bytes": 400},
+        "prompt_sha256": {"type": {"value_type": "sha256_hex"}, "required": true}
+      },
+      "submission_criteria": [
+        {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
+        {"code": "duplicate_running_review", "message": "Close the running review of this task, head and kind.", "none": [{"linked": {"from": "$task", "link": "running_reviews", "where": {"all": [
+          {
+            "eq": [
+              "head",
+              "$head"
+            ]
+          },
+          {
+            "eq": [
+              "kind",
+              "$kind"
+            ]
+          }
+        ]}}}]}
+      ],
+      "rules": [
+        {
+          "create_object": "review",
+          "set": {
+            "task": "$task",
+            "kind": "$kind",
+            "repository": "$repository",
+            "pull_request": "$pull_request",
+            "head": "$head",
+            "base": "$base",
+            "runs": "$runs",
+            "model": "$model",
+            "effort": "$effort",
+            "prompt": "$prompt",
+            "prompt_sha256": "$prompt_sha256",
+            "status": "running",
+            "started_at": "$now",
+            "running_in": "$task"
+          }
+        }
+      ]
+    },
+    "close_review": {
+      "description": "Close a running review with a verdict and report evidence.",
+      "parameters": {
+        "review": {"type": {"ref": "review"}, "required": true},
+        "verdict": {"type": {"value_type": "review_verdict"}, "required": true},
+        "report": {"type": {
+          "value_type": "file_path"
+        }, "required": false, "max_bytes": 400},
+        "report_sha256": {"type": {"value_type": "sha256_hex"}, "required": false},
+        "account": {"type": "string", "required": false, "max_bytes": 40},
+        "session": {"type": "string", "required": false, "max_bytes": 200}
+      },
+      "submission_criteria": [
+        {"code": "review_not_running", "message": "Choose a running review.", "all": [{"exists": "$review"}, {"eq": ["$review.status", "running"]}]},
+        {"code": "report_required", "message": "Supply both report and report_sha256 unless abandoned.", "any": [{"eq": ["$verdict", "abandoned"]}, {"all": [{"present": "$report"}, {"present": "$report_sha256"}]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "review",
+          "set": {
+            "verdict": "$verdict",
+            "report": "$report",
+            "report_sha256": "$report_sha256",
+            "account": "$account",
+            "session": "$session",
+            "status": "closed",
+            "closed_at": "$now"
+          }
+        },
+        {
+          "clear_reference": {
+            "object_type": "review",
+            "property": "running_in"
+          }
+        }
       ]
     }
   },
@@ -2222,14 +2407,16 @@
         "worker_run",
         "memory_record",
         "thread",
-        "plan"
+        "plan",
+        "review"
       ],
       "derive": [
         "hold",
         "decision",
         "kpi",
         "measurement",
-        "worker_run"
+        "worker_run",
+        "review"
       ],
       "actions": [
         "set_hold",
@@ -2250,7 +2437,9 @@
         "amend_thread",
         "open_plan",
         "amend_plan",
-        "record_scope_review"
+        "record_scope_review",
+        "start_review",
+        "close_review"
       ]
     }
   ],
@@ -2530,6 +2719,26 @@
           "header": "Status",
           "property": "status"
         }
+      ]
+    },
+    "reviews": {
+      "object_type": "review",
+      "args": [
+        "task"
+      ],
+      "filter": {"all": [{"eq": ["task", "$task"]}]},
+      "order": [
+        {"property": "started_at", "direction": "desc"}
+      ],
+      "columns": [
+        {"header": "Kind", "property": "kind"},
+        {"header": "Repository", "property": "repository"},
+        {"header": "Pull request", "property": "pull_request"},
+        {"header": "Head", "property": "head"},
+        {"header": "Model", "property": "model"},
+        {"header": "Verdict", "property": "verdict"},
+        {"header": "Status", "property": "status"},
+        {"header": "Started", "property": "started_at"}
       ]
     }
   }

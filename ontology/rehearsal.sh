@@ -51,7 +51,9 @@ call(['schema', 'install', str(legacy)])
 legacy_thread = created(apply('open_thread', 'legacy-thread', dict(task=task, key='legacy-v5', consumer='fixture', consumer_kind='harness', first_use='upgrade')), 'thread')
 legacy_plan = created(apply('open_plan', 'legacy-plan', dict(thread=legacy_thread, first_lines=100, limit_lines=150, current_lines=151, amended_by_family='family-a')), 'plan')
 apply('record_scope_review', 'legacy-review', dict(plan=legacy_plan, reviewer_family='family-b', review_report='fixture/v5.md'))
-call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+v6 = pathlib.Path(store).with_name('v6.json')
+v6.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', '8ad36bf3cf10e19659965cc2d458a921533cdfae:ontology/work.schema.json'], timeout=10))
+call(['schema', 'install', str(v6)])
 assert obj(probe)['head'] == probe_revision
 assert obj(task)['observations'][-1]['revision'] == revision
 call(['describe'], {})
@@ -233,6 +235,107 @@ for action, params in [('record_decision', dict(dp, topic='gate-user')), ('super
     assert fields(created(answer, 'decision'))['user_words'] == user['user_words']
 gate('record_decision', 'lead-question', dict(dp, topic='gate-lead-question', user_form='question'))
 print('v6_gate_rows_complete')
+v6_running = created(gate('start_worker_run', 'v6-still-running', dict(wp, name='v6-still-running', tier='review')), 'worker_run')
+old_plan = fields(plan); old_run = fields(w)
+old_views = {view: call(['render'], dict(view=view, args={} if view == 'current_memory_records' else dict(task=task['native_key']))) for view in json.loads(v6.read_text())['views']}
+call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+assert fields(plan) == old_plan and fields(w) == old_run
+for kind, retained in [('plan', plan), ('worker_run', w)]:
+    assert retained in [o['id'] for o in call(['search'], dict(object_type=kind))['objects']]
+    print('gate_row=v6-' + kind + '-get-search expected=admitted')
+for view in json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())['views']:
+    answer = call(['render'], dict(view=view, args={} if view == 'current_memory_records' else dict(task=task['native_key'])))
+    assert not answer['truncated']
+    if view in old_views:
+        assert answer['rows'] == old_views[view]['rows']
+        assert answer['markdown'] == old_views[view]['markdown'].replace('schema=work@6', 'schema=work@7')
+    print('gate_row=v7-view-' + view + ' expected=admitted rows=' + str(answer['rows']))
+same_name = gate('start_worker_run', 'v6-running-same-name', dict(wp, name='v6-still-running', tier='review'))
+print('v6_running_same_name=' + same_name['outcome'])
+gate('note_worker_run', 'v6-running-note', dict(worker_run=v6_running, note='upgrade note'))
+gate('close_worker_run', 'v6-running-close', dict(worker_run=v6_running, result='upgrade close'))
+assert fields(v6_running).get('running_in') is None
+gate('close_worker_run', 'v6-same-name-close', dict(worker_run=created(same_name, 'worker_run'), result='done'))
+gate('amend_plan', 'v6-plan-amend', dict(plan=plan, current_lines=100, amended_by_family='family-b'))
+rp = dict(task=task, kind='packet', head='a' * 40, model='fixture-model', effort='medium', prompt='/home/palantirkc/work/fixture/PROMPT.md', prompt_sha256='b' * 64, runs=[w])
+first_review = created(gate('start_review', 'review-start', rp), 'review')
+assert fields(first_review)['runs'] == [w]
+assert fields(first_review)['running_in'] == task
+gate('start_review', 'review-duplicate', rp, 'duplicate_running_review')
+another_kind = created(gate('start_review', 'review-another-kind', dict(rp, kind='design')), 'review')
+gate('start_review', 'review-space-prompt', dict(rp, prompt='/home/palantirkc/work/fixture/PROMPT space.md'), 'invalid_parameter')
+gate('close_review', 'review-space-report', dict(review=first_review, verdict='accept', report='/home/palantirkc/work/fixture/REPORT space.md', report_sha256='c' * 64), 'invalid_parameter')
+gate('close_review', 'review-report-required', dict(review=first_review, verdict='accept'), 'report_required')
+gate('close_review', 'review-hash-required', dict(review=first_review, verdict='accept', report='/home/palantirkc/work/fixture/REPORT.md'), 'report_required')
+gate('close_review', 'review-empty-report', dict(review=first_review, verdict='accept', report='', report_sha256='c' * 64), 'invalid_parameter')
+for label, prompt in [('empty', ''), ('relative', 'PROMPT.md')]:
+    gate('start_review', 'review-' + label + '-prompt', dict(rp, prompt=prompt), 'invalid_parameter')
+gate('close_review', 'review-abandoned', dict(review=first_review, verdict='abandoned'))
+assert fields(first_review).get('running_in') is None
+gate('close_review', 'review-second-close', dict(review=first_review, verdict='abandoned'), 'review_not_running')
+next_review = created(gate('start_review', 'review-after-close', rp), 'review')
+assert fields(first_review)['status'] == 'closed' and fields(first_review)['verdict'] == 'abandoned'
+assert fields(next_review)['status'] == 'running'
+assert render('reviews')['rows'] == 3
+another_head = created(gate('start_review', 'review-another-head', dict(rp, head='e' * 40)), 'review')
+gate('close_review', 'review-another-head-close', dict(review=another_head, verdict='abandoned'))
+review = dict(review, reviewed_lines=153, reviewer_family='family-b')
+gate('record_scope_review', 'v7-same-family', review)
+gate('record_scope_review', 'v7-running-review', dict(review, review=next_review), 'review_not_closed')
+gate('record_scope_review', 'v7-closed-review', dict(review, review=first_review))
+assert fields(plan)['review'] == first_review
+gate('close_review', 'review-report', dict(review=next_review, verdict='accept', report='/home/palantirkc/work/fixture/REPORT.md', report_sha256='c' * 64, account='fixture', session='fixture-session'))
+assert fields(next_review)['report_sha256'] == 'c' * 64
+for rid, extra in [('write-set', dict(write_set=['crates/ap/src/work.rs', 'ontology/**'])), ('no-write-set', {})]:
+    run = created(gate('start_worker_run', 'v7-' + rid, dict(wp, name='v7-' + rid, **extra)), 'worker_run')
+    assert fields(run)['running_in'] == task
+    if rid == 'write-set':
+        other = created(gate('start_worker_run', 'v7-another-name', dict(wp, name='v7-another-name')), 'worker_run')
+        gate('close_worker_run', 'v7-another-name-close', dict(worker_run=other, result='done'))
+    gate('start_worker_run', 'v7-duplicate-' + rid, dict(wp, name='v7-' + rid, **extra), 'duplicate_running_worker')
+    if extra: assert fields(run)['write_set'] == extra['write_set']
+    else: assert 'write_set' not in fields(run)
+    gate('close_worker_run', 'v7-close-' + rid, dict(worker_run=run, result='done'))
+    assert fields(run).get('running_in') is None
+# The schema itself bounds members, even when ap is bypassed.
+for label, member in [('plus', '+a'), ('301', 'a' * 301), ('wildcard', 'src/*.rs'), ('absolute', '/etc/passwd'), ('unicode', 'src/\u00e9.rs')]:
+    gate('start_worker_run', 'direct-write-' + label, dict(wp, name='direct-' + label, write_set=[member]), 'invalid_parameter')
+valid_run = created(gate('start_worker_run', 'direct-write-valid', dict(wp, name='direct-valid', write_set=['crates/ap/src/**', 'ontology/work.schema.json'])), 'worker_run')
+gate('close_worker_run', 'direct-write-valid-close', dict(worker_run=valid_run, result='done'))
+# The same path-part boundary must hold without the ap caller.
+for label, member, failure in [
+    ('297-plain', 'a' * 297, None),
+    ('298-plain', 'a' * 298, 'invalid_parameter'),
+    ('297-tree', 'a' * 297 + '/**', None),
+    ('298-tree', 'a' * 298 + '/**', 'invalid_parameter'),
+]:
+    answer = gate('start_worker_run', 'direct-boundary-' + label, dict(wp, name='boundary-' + label, write_set=[member]), failure)
+    if not failure:
+        gate('close_worker_run', 'direct-boundary-close-' + label, dict(worker_run=created(answer, 'worker_run'), result='done'))
+# Five closed objects must not enter the sixth start's basis on the G4 engine.
+closed = {}
+for kind in ['review', 'worker_run']:
+    closed[kind] = []
+    params = dict(rp, head='d' * 40) if kind == 'review' else dict(wp, name='basis-fixture')
+    for index in range(5):
+        item = created(gate('start_' + kind, 'basis-' + kind + '-' + str(index), params), kind)
+        close = dict(review=item, verdict='abandoned') if kind == 'review' else dict(worker_run=item, result='done')
+        gate('close_' + kind, 'basis-close-' + kind + '-' + str(index), close)
+        assert fields(item).get('running_in') is None
+        closed[kind].append(item)
+    answer = call(['action', 'validate'], dict(action_type='start_' + kind, parameters=params))
+    assert answer['valid'], answer
+    heads = answer['basis']
+    print('start_' + kind + '_basis_heads=' + str(len(heads)))
+    version = subprocess.check_output([binary, '--version'], text=True, timeout=10).strip()
+    print(version)
+    # Requires an engine reading reverse links from postings (ontology-platform 2654024 or later).
+    expected = [task, another_kind] if kind == 'review' else [task, thread, plan]
+    assert len(heads) == len(expected), (kind, heads, expected)
+    for item in closed[kind]:
+        assert not any(h['id'] == item for h in heads), (kind, item, heads)
+    print('basis_closed_absent=' + kind)
+print('v7_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2

@@ -81,7 +81,7 @@ opening estimates once; Lead supplies limit_lines as 1.5 times first_lines.
 `amend_plan(plan,current_lines,amended_by_family)` clears scope_reviewed but preserves reviewed_lines.
 `record_scope_review(plan,reviewed_lines,reviewer_family,review_report)` records the
 size justified by scope/design review; reviewed_lines below current_lines refuses
-`reviewed_lines_below_current`; equal reviewer/latest-writer families refuse `scope_review_same_family`.
+`reviewed_lines_below_current`; under version 6 equal reviewer/latest-writer families refuse `scope_review_same_family`; version 7 removes that comparison.
 Families are self-declared caller values, not authenticated identities.
 `start_worker_run` additionally requires thread, plan and layer (`engine`/`domain`/`harness`).
 The thread must belong to the task (`thread_of_other_task`); the plan must
@@ -142,8 +142,8 @@ Omission/null skips optional assignments, preserving existing values on modify.
 `set_kpi_target.target`, `note_worker_run.note` and `close_worker_run.result` are
 required. A note writes `last_note`, separate from final `result`, and may also
 attach a report; close preserves that progress note and requires its own final
-outcome. No criterion compares optional parameters, so no presence guard is
-needed. Ordinary scalar values cannot be cleared with null; this would require
+outcome. The version 2 optional assignments need no presence guard; review criteria in
+version 7 guard optional inputs with `present`. Ordinary scalar values cannot be cleared with null; this would require
 a scalar-clear rule.
 
 An action takes the full object Id returned by `search`; a view's task argument
@@ -376,3 +376,56 @@ The rehearsal asserts both exact enum groups and separately checks that
 `{"object_type":"memory_record","metrics":["count"]}` refuses with
 `derive_forbidden`. This source change grants no live-store installation;
 installation remains a separate authorized operation.
+
+## Version 7: reviews and write sets
+`review` is the sole record of a model's verdict on an exact head: task, kind
+(`packet`, `integrated`, `design`, `integration`), optional repository/pull_request,
+head and optional base (40-hex commit or 64-hex design digest), optional worker
+runs, model, effort, prompt path/digest, optional report path/digest, verdict,
+account, session, status and application times. Keys come from `$action_id`.
+`file_path` checks an absolute printable ASCII path without spaces, 2 to 400 bytes;
+callers keep paths below `/home/palantirkc/work/` and supply their
+SHA-256 digests (`sha256_hex`). `memory_body_hash` remains unchanged.
+`start_review` refuses `unknown_task` and `duplicate_running_review` for an
+existing running review of the same task, head and kind. `close_review` refuses
+`review_not_running`, and `report_required` unless both report and digest are
+supplied or verdict is `abandoned`. `reviews(task)` renders newest starts first.
+`agent` may read/derive reviews and apply both actions.
+
+`worker_run.write_set` and the optional `start_worker_run.write_set` parameter
+are ordered arrays of repository-relative patterns. `ap work start` requires a
+column-1 `Write set:` line for worktree packets, split at commas and trimmed.
+It accepts 1 to 64 members whose path part is at most 297 bytes (at most 300
+bytes including optional trailing `/**`): relative paths without empty,
+`.` or `..` components or backslashes, optionally ending in `/**`, with no other
+`*`, `?` or `[` wildcard. No worktree means no write_set parameter.
+`write_pattern` checks each member against
+`^[A-Za-z0-9._][A-Za-z0-9._/+@-]{0,296}(/\*\*)?$`; the schema has no
+member-count bound, so only the caller enforces the count of 64.
+Members use ASCII letters, digits and `._/+@-`, begin with a letter, digit, `.`
+or `_`, and may have a final `/**`; duplicate members and multiple column-1
+`Write set:` lines are refused. The tracked-path character check finds 0
+incompatible paths in `agent-platform`; the Lead measured 0 in `ontology-platform`
+and 27 non-ASCII tracked paths in one directory of `education-platform`, which
+packets name by the directory and `/**`.
+No command yet consumes these stored review or write-set records.
+
+`record_scope_review` retains every existing family field and parameter but
+no longer compares families. Its optional `review` reference must be closed
+(`review_not_closed` otherwise) and is stored in `plan.review`. All version 6
+properties remain declared; existing objects need no migration. The rehearsal
+runs the old family refusals on version 6 before installing version 7, then
+checks review transitions, write-set dispatch and existing-object compatibility.
+
+`review.running_in` is set by `start_review`, cleared by `close_review`, followed
+only by the duplicate criterion, and never set by a caller.
+`worker_run.running_in` is set by `start_worker_run`, cleared by `close_worker_run`,
+followed only by the duplicate criterion, and never set by a caller.
+`status` remains the running/closed statement used by views and other criteria.
+For a new type, a uniqueness criterion must link through a reference that is
+set only while the object is open and cleared by its closing action (LENS F43).
+Version 6 and earlier version 7 objects without `running_in` can still be noted
+and closed, but do not block a new start with the same name/head/kind; no migration
+is performed. Objects written before a schema install add nothing to the basis;
+a cleared `running_in` remains a known value across a later install (measured
+with 300 closed pairs and an install of a higher version).
