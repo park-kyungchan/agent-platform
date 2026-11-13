@@ -2,7 +2,7 @@
 
 ## Board file
 
-One file in the task directory, kept to one screen where possible. It is the one home of the values below; STATE holds the owner, authority, holds, source baseline, effects with their rollback, one next action and the path of this file, and repeats none of the board's values. Values are replaced, not appended. Every measured value carries its source and the time read from the clock.
+One file in the task directory, kept to one screen where possible. It is the one home of the values below, with one exception: in a task that has a `measure` (section "Measured lines and the commit hook"), a value a command can produce has its one home in the measured block of STATE, and the board's KPI row then gives the KPI's definition and target and names that line instead of a value. STATE holds the owner, authority, holds, source baseline, effects with their rollback, one next action and the path of this file, and repeats no other value of the board. Values are replaced, not appended. Every measured value carries its source and the time read from the clock.
 
 ```markdown
 # <task> — BOARD
