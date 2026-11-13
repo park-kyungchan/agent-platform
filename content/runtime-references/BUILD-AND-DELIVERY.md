@@ -35,7 +35,7 @@ flock /home/palantirkc/work/ws-replan/wt/.host-cargo.lock env \
 | You hold the lock | Read free space (`df -BM --output=avail /`) before the build and stop under the floor the task's STATE states |
 | Another build holds the lock | Wait. Never delete the lock file, a target root or a Cargo cache to get past it |
 | You run `scripts/install-ap.sh` or `scripts/install-ont.sh` | Do not wrap it in `flock`: the script takes the lock itself |
-| A test needs a private directory | Use the root the packet names. Tests of `education-platform` refuse a root under `/tmp` |
+| A test needs a private directory | Use the root the packet names |
 | A workspace test run left a synthetic root behind | Remove it when the part is accepted, after checking that no process has a file open in it |
 
 - Each repository pins its toolchain in `rust-toolchain.toml`; do not install or select another one.
@@ -79,7 +79,7 @@ Install from a clean checkout of the merged commit, never from a branch.
 | --- | --- | --- |
 | The engine `ont` | `bash <checkout>/scripts/install-ont.sh install <commit>`; also `check` and `rollback` | `ont --version` names the commit; `install-ont.sh check`; one real read; then `ont index` |
 | The command `ap` | `CARGO_TARGET_DIR=<target root> bash <checkout>/scripts/install-ap.sh install <commit>`; also `check` and `rollback` | `ap --version` names the commit; `install-ap.sh check` |
-| Shared instructions, references and skills of `agent-platform` | The content install route the task's STATE names; it keeps the previous bytes. `ap` embeds the same files, so `ap` is installed from the same commit | In `/root/.agents`: `sha256sum -c <checkout>/content/SHA256SUMS`; then a new session of your own shows the changed text |
+| Shared instructions, references and skills of `agent-platform` | `bash /home/palantirkc/work/agent-harness-slim/install-content.sh <checkout> <commit>`: it verifies the checkout against `content/SHA256SUMS`, keeps the previous bytes as a tar file in its `recovery/` directory, replaces `AGENTS.md`, `runtime-references/` and the owned skill directories as wholes, and verifies every installed file; `rollback` restores the last tar file. `ap` embeds the same files, so `ap` is installed from the same commit | In `/root/.agents`: `sha256sum -c <checkout>/content/SHA256SUMS`; then a new session of your own shows the changed text |
 | Academy skills, the Academy MCP server, memory records | Their own owners and holds; none of the forms above installs them | The owner's record (`CODEBASE-ORIENTATION.md` section 4) |
 
 - Keep the previous binary or bytes and know the rollback command before you install.
