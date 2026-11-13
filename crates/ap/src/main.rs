@@ -55,6 +55,18 @@ fn main() -> ExitCode {
         }
         return ap::work::cli(&args[1..]);
     }
+    if args.first().is_some_and(|arg| arg == "review") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout()
+                .lock()
+                .write_all(b"Usage: ap review <start|close|accept|revoke> < request.json\n")
+            {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::review::cli(&args[1..]);
+    }
     #[cfg(target_os = "linux")]
     if args.first().is_some_and(|arg| arg == "pane") {
         return ap::pane::cli(&args[1..]);

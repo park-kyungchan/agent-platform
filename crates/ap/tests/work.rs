@@ -438,7 +438,7 @@ fn close_setup() -> (Value, Vec<Step>) {
         step(
             "ont",
             "action apply --client lead --store /scratch/store",
-            json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"update","id":id("worker_run")}]}}),
+            json!({"status":"ok","result":{"outcome":"applied","edits":[{"change":"update","id":id("worker_run"),"revision":"close-action#0"},{"change":"update","id":id("worker_run"),"revision":"close-action#1"}]}}),
         ),
         step(
             "ont",
@@ -1212,12 +1212,12 @@ fn close_known_session_must_match_live_before_write() {
     }
 }
 #[test]
-fn close_requires_one_updated_run_and_closed_readback_before_tab_close() {
+fn close_requires_the_two_updates_of_one_run_and_closed_readback_before_tab_close() {
     for edits in [
         json!([]),
         json!([{"change":"initial","id":id("worker_run")}]),
         json!([{"change":"update","id":id("plan")}]),
-        json!([{"change":"update","id":id("worker_run")},{"change":"update","id":id("worker_run")}]),
+        json!([{"change":"update","id":id("worker_run")}]),
         json!([{"change":"update","id":{"object_type":"worker_run","namespace":{"instance":"fixture","account":"test"},"native_key":"other"}}]),
     ] {
         let (r, mut steps) = close_setup();
@@ -1523,4 +1523,43 @@ fn no_worktree_sends_no_write_set() {
     let mut s = Script::new(steps);
     assert_eq!(execute(&mut s, "start", &r).unwrap().0["status"], "started");
     s.finish();
+}
+
+#[test]
+fn close_accepts_the_two_edit_answer() {
+    let (r, steps) = close_setup();
+    let mut s = Script::new(steps);
+    assert_eq!(
+        execute(&mut s, "close", &r).unwrap(),
+        (
+            json!({"status":"closed","outcome":"applied","tab_closed":true}),
+            0
+        )
+    );
+    s.finish();
+}
+#[test]
+fn close_refuses_other_shapes() {
+    let update = json!({"change":"update","id":id("worker_run")});
+    let mut other = update.clone();
+    other["id"]["native_key"] = json!("other");
+    let mut initial = update.clone();
+    initial["change"] = json!("initial");
+    let mut review = update.clone();
+    review["id"] = id("review");
+    for edits in [
+        json!([update]),
+        json!([update, update, update]),
+        json!([update, other]),
+        json!([other, other]),
+        json!([update, initial]),
+        json!([update, review]),
+    ] {
+        let (r, mut steps) = close_setup();
+        steps.truncate(5);
+        if let Response::Json(v) = &mut steps[4].response {
+            v["result"]["edits"] = edits;
+        }
+        check_error(Script::new(steps), "close", &r, "store_close_uncertain");
+    }
 }
