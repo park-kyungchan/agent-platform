@@ -10,8 +10,7 @@ use std::{
 };
 const PACKET: &str = "/home/palantirkc/work/example/TASK.md";
 const REPORT: &str = "/home/palantirkc/work/example/REPORT.md";
-const BYTES: &[u8] =
-    b"Callers searched:\nBroken tests:\nControls:\nWrite set: crates/ap/src/work.rs, ontology/**\n";
+const BYTES: &[u8] = b"Objective: a unit\nWrite set: crates/ap/src/work.rs, ontology/**\n";
 #[derive(Clone)]
 enum Response {
     Json(Value),
@@ -223,27 +222,13 @@ fn start_local_refusals() {
         }
         check_error(s, "start", &r, code);
     }
-    for (dirty, bytes, code) in [
-        ("dirty", BYTES, "worktree_dirty"),
-        (
-            "",
-            b"Controls:\nWrite set: src\n".as_ref(),
-            "packet_lacks_callers_or_broken_tests_line",
-        ),
-        (
-            "",
-            b"Callers searched:\nBroken tests:\nWrite set: src\n".as_ref(),
-            "packet_lacks_controls_line",
-        ),
-    ] {
-        let (mut r, _) = start_setup();
-        r["worktree"] = json!("/tree");
-        let mut git = step("git", "-C /tree status --porcelain", Value::Null);
-        git.response = Response::Raw(dirty.as_bytes().to_vec());
-        let mut s = Script::new(vec![git]);
-        s.files.insert(PACKET.into(), bytes.to_vec());
-        check_error(s, "start", &r, code);
-    }
+    let (mut r, _) = start_setup();
+    r["worktree"] = json!("/tree");
+    let mut git = step("git", "-C /tree status --porcelain", Value::Null);
+    git.response = Response::Raw(b"dirty".to_vec());
+    let mut s = Script::new(vec![git]);
+    s.files.insert(PACKET.into(), BYTES.to_vec());
+    check_error(s, "start", &r, "worktree_dirty");
 }
 #[test]
 fn start_answer_refusals_and_controls() {
@@ -1411,10 +1396,8 @@ fn write_set_line_required() {
     let mut steps = worktree_steps();
     steps.truncate(1);
     let mut s = Script::new(steps);
-    s.files.insert(
-        PACKET.into(),
-        b"Callers searched:\nBroken tests:\nControls:\n".to_vec(),
-    );
+    s.files
+        .insert(PACKET.into(), b"Objective: a unit\n".to_vec());
     let e = execute(&mut s, "start", &r).unwrap_err();
     assert_eq!(e.code, "packet_lacks_write_set_line");
     assert_eq!(e.field, "packet");
@@ -1460,8 +1443,7 @@ fn write_set_invalid_members() {
         let mut s = Script::new(steps);
         s.files.insert(
             PACKET.into(),
-            format!("Callers searched:\nBroken tests:\nControls:\nWrite set: {line}\n")
-                .into_bytes(),
+            format!("Objective: a unit\nWrite set: {line}\n").into_bytes(),
         );
         check_error(s, "start", &r, "write_set_invalid");
     }
@@ -1493,7 +1475,7 @@ fn write_set_sent_in_order() {
         }
         let line_end = if members.len() == 64 { "\r\n" } else { "\n" };
         let packet_bytes = format!(
-            "Callers searched:\nBroken tests:\nControls:\nWrite set: {}{line_end}",
+            "Objective: a unit\nWrite set: {}{line_end}",
             members.join(", ")
         )
         .into_bytes();

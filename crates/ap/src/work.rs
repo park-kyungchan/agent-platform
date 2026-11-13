@@ -261,9 +261,6 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         )?;
         require!(dirty.success => "io_error", "worktree");
         require!(dirty.stdout.is_empty() || r["continue_dirty"] == true => "worktree_dirty", "worktree");
-        let has = |prefix: &[u8]| bytes.split(|b| *b == b'\n').any(|l| l.starts_with(prefix));
-        require!(has(b"Callers searched:") && has(b"Broken tests:") => "packet_lacks_callers_or_broken_tests_line", "packet");
-        require!(has(b"Controls:") => "packet_lacks_controls_line", "packet");
         let mut lines = bytes
             .split(|b| *b == b'\n')
             .filter_map(|l| l.strip_prefix(b"Write set:"));

@@ -1,72 +1,67 @@
 # Task packet
 
-One file per bounded piece of work, with exact values instead of references to a conversation, written in the terms of `/root/.agents/runtime-references/GLOSSARY.md` and never in the user's wording. What a packet must contain and how a worker treats it: `/root/.agents/runtime-references/CONCURRENT-WORK.md` sections 2 and 3. A packet that changes product code carries the Lead's design block (`/root/.agents/skills/lead/references/design.md`): the worker builds that design and reports a mismatch with the code instead of resolving it. The worker run, its model and the build-slot owner are recorded at dispatch (the store's worker run, or STATE), not in the packet.
+One page per unit of work, with exact values instead of references to a conversation, written in the terms of `/root/.agents/runtime-references/GLOSSARY.md` and never in the user's wording. What a handoff must contain and how a worker treats it: `/root/.agents/runtime-references/CONCURRENT-WORK.md` sections 2 and 3. The worker run, its model and the build-slot owner are recorded at dispatch (the store's worker run, or STATE), not in the packet.
 
-## Common part
+The Lead writes on this page nothing about types, functions or line numbers. A fact about the code that the worker needs is given as a command to run. What must stay true is given as an executable.
+
+## A unit that changes product code
+
+One pull request that can merge alone. The line `Write set:` starts at the first column, once: `ap work start` reads it (comma-separated paths, a directory as `dir/**`).
 
 ```markdown
-# TASK: <bounded goal in one line>
+# TASK: <the unit in one line>
 Owner: <Lead>; State: <absolute STATE.md>
 Tier: <mechanical | bounded judgment | open judgment>
-Read first: <absolute TASK.md>, <absolute STATE.md>, <absolute path of each needed SKILL.md or reference>
+Read first: <this file>, <absolute STATE.md>, <absolute path of each needed SKILL.md, reference or contract>
 First output after reading: one line listing the exact files read
-Authority: <the objective the Lead wrote for this task and the user decision it rests on, in English; the task scope>
-Exact targets: <repo, worktree, branch, base revision, files that may be written>
-Design: <the design block, for a packet that changes product code; the path and section of the design note it belongs to>
-Strategy link: <STATE or STRATEGY.md line>; KPI this task moves: <KPI or guardrail, expected effect, how it is measured>
+Objective: <the state to reach, as a sentence that is true or false; who uses it first and the real run that shows it>
+Invariants: <what must hold before and after, each a sentence a test can break>
+Acceptance checks: <executables only: the test that fails on the base and passes on the head, a differential script, a measurement with its bound; then the repository's check command>
+Not built: <neighbouring things left out on purpose>
+Exact targets: <repository, worktree, branch, base revision>
+Write set: <the area: crates and directories>
 Allowed effects: <reads, writes, local commits, push, pull request, build slot>
 Forbidden effects: <holds, other paths, host, domain and remote boundaries>
-Expected output: <absolute report path and its fixed shape; source revision; evidence; limitations>
-Verification: <commands the worker runs on the host and the output or effect to read back; the checks left to the CI job, by name, read on the pushed head>
-Quiet limit: <minutes without output after which the Lead treats the run as stalled; from the expected length of the run>
+Plan: before the first edit, write into the pull request description the files you change, the order, the risks and how each acceptance check is met. <"Wait for the Lead to read it" only for a real effect, a schema or a store format>
+Report: <absolute path; at most 40 lines: the head, the check command's output, each acceptance check with its result, where you left this page and why, what is not verified>
+Quiet limit: <minutes without output after which the Lead treats the run as stalled>
 DONE marker: <unique literal line printed last, ending with the SHA-256 of the report>
 ```
 
+The worker decides what this page does not fix. It leaves the write set only with the reason in its plan. It stops and reports when an invariant or an acceptance check cannot hold; it never changes one.
+
 The shared instructions load through each CLI's own pointer, so a packet does not list them. If a session record shows they were not loaded, repair the pointer (`/root/.agents/runtime-references/CLI-RUNTIMES.md` section 3); do not paste the rules into packets.
 
-## Mechanical tier: add
+## A read-only unit (inventory, measurement, observation of a service)
+
+The common lines above without `Invariants`, `Write set` and `Plan`, plus:
 
 ```markdown
 Inputs: <every absolute path or the exact command that lists them>
-Steps: <numbered commands or operations, each with its expected kind of output>
+Questions: <numbered; each answerable by a path and line, or a command and its output>
 Output schema: <file name; for a table the exact column names and separator; one row per <unit>>
-Do not: interpret, rank, recommend, repair, or read files that are not listed.
-If an instruction does not fit what you find: write the mismatch in the report and stop the steps that depend on it.
+Evidence rule: every answer cites path and line, or command and output; an unanswered question is reported as open with what was tried
+Do not: recommend a structure, repair, or read files that are not listed.
 ```
 
-A mechanical packet is ready when a script could follow it. If a script can do all of it, write the script.
+A mechanical unit is ready when a script could follow it. If a script can do all of it, write the script.
 
-## Bounded judgment tier: add
+## The review of a pull request (the verifier)
 
-The tier of every packet that implements a design.
-
-```markdown
-Contract or criteria: <absolute path and section, or the criteria written out>
-Options: <the allowed outcomes per item>
-Evidence rule: every judgment cites path and line, or command and output
-Out of scope: <neighbouring questions the worker must not settle>
-When the criteria do not decide: report the item as undecided with the evidence for each option.
-If an instruction does not fit what you find: write the mismatch in the report and stop the steps that depend on it.
-```
-
-## Open judgment tier: add
-
-For an inventory, a diagnosis across repositories or an attack on a design. Never for a design the Lead owes: the report gives facts with evidence, never a recommended structure.
+One reviewer session in a fresh context, on the head whose required check passed.
 
 ```markdown
-Goal and acceptance: <what a good result must make true>
-Constraints: <interfaces, budgets and holds that bound the route>
-Assumptions: the report lists every assumption the worker made and what would change the result.
-```
-
-## Review packet: replace the tier part with
-
-```markdown
-Request: <what the change was asked to do>
-Contracts: <absolute paths>
-Candidate: <repository, frozen revision, diff command>
-Raw evidence: <check output paths>
+Request: <absolute path of the packet>
+Candidate: <repository, pull request, head revision, the diff command>
+Policy: <the repository's REVIEW.md; where there is none, the two lines below are the policy>
+Raw evidence: <the check output on that head>
 Questions of the Lead: <what the Lead found in its own reading of the diff, each as a sequence to execute, never as a verdict>
-Report: findings by severity (blocker, major, minor), each with path and line and the smallest repair; then a verdict.
+Blocking, each with the command or test that shows it: wrong behaviour; loss or exposure of data; a broken invariant of the packet or a broken contract; an unguarded irreversible effect on a real target.
+Not blocking: at most five notes (a test gap, a sentence, a name). Write no mutants by hand: the check command runs mutation testing where the repository has it.
+Output: a report whose first line is exactly `Verdict: accept` or `Verdict: repair` (the form `ap review close` reads) and whose second line is the head revision; then the blocking findings, the notes, and one line per question. The findings also go onto the pull request as comments, by the reviewer or by the Lead.
 Not given on purpose: the implementer's reasoning and any suggested verdict.
 ```
+
+## An attack on a design note
+
+Only for a store format, the schema of an authoritative store, or the order of record and effect on a real target. The reviewer gets the design note and the code it rests on, and is asked for a sequence of real commands that breaks an invariant, executed where it can be; opinions do not count.
