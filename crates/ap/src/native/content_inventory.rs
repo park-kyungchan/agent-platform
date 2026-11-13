@@ -90,6 +90,10 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/skills/lead/SKILL.md"),
     ),
     (
+        "skills/lead/hooks/pre-commit",
+        include_str!("../../../../content/skills/lead/hooks/pre-commit"),
+    ),
+    (
         "skills/lead/references/design.md",
         include_str!("../../../../content/skills/lead/references/design.md"),
     ),
@@ -100,6 +104,18 @@ pub const OWNED: &[(&str, &str)] = &[
     (
         "skills/lead/references/program-board.md",
         include_str!("../../../../content/skills/lead/references/program-board.md"),
+    ),
+    (
+        "skills/lead/references/review-attack.md",
+        include_str!("../../../../content/skills/lead/references/review-attack.md"),
+    ),
+    (
+        "skills/lead/references/review-integration.md",
+        include_str!("../../../../content/skills/lead/references/review-integration.md"),
+    ),
+    (
+        "skills/lead/references/review-verify.md",
+        include_str!("../../../../content/skills/lead/references/review-verify.md"),
     ),
     (
         "skills/lead/references/strategy-brief.md",

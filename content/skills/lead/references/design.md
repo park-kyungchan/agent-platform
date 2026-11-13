@@ -37,16 +37,19 @@ Written by the Lead (<session>, <time from the clock>) from source, Git and the 
 
 ## Design note (`DESIGN-<topic>.md` in the task directory)
 
-Written only for a store format, the schema of an authoritative store, or the order of record and effect on a real target; attacked once before the build.
+Written only for a store format, the schema of an authoritative store, or the order of record and effect on a real target; attacked once before the build (prompt: `references/review-attack.md`). A design that fixes structure across repositories is evaluated by an Integration Review instead (prompt: `references/review-integration.md`).
+
+Read before you write. Section 0 is filled first and holds only what a session read or ran TODAY, with the command or the file and line; when you have not read the code, a worker's page produces that list before the design exists. A design written between two dispatches, from the memory of a plan or of code, is the error this section stands against: its reviewer then does the reading at the price of the strongest model.
 
 ```markdown
 # DESIGN: <topic>
 Lead <session>, <time>. Rules this rests on: <R numbers>. Decision record: <topic in the store or STATE>.
+0. Facts this design rests on: each with its command or file and line, and who read it today. The decisions of the user and the rows of the accepted plan on this topic, listed from the store, and every deviation from them.
 1. Use: who uses the result first, by which route, shown by which real run.
-2. The code today, as the commands the Lead ran and what they showed.
-3. Decision: the structure chosen; the alternative refused and why; what is not built.
-4. Invariants, each with the executable that breaks on a wrong implementation; for an effect, the walk through a crash between every two steps and what each leaves.
-5. Pull requests in order, each with what it makes usable and its estimate in changed lines.
-6. Undo, and the point after which undo needs a migration.
-7. Open points only the user can decide.
+2. Decision: the structure chosen; the alternative refused and why; what is not built.
+3. Invariants, each with the executable that breaks on a wrong implementation; for an effect, the walk through a crash between every two steps and what each leaves.
+4. Pull requests in order, each with what it makes usable and its estimate in changed lines.
+5. Undo, and the point after which undo needs a migration.
+6. Open points only the user can decide.
+7. Least sure of: what the reviewer should break first.
 ```
