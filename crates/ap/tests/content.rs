@@ -70,7 +70,7 @@ fn request() -> RenderContentRequest {
 fn pure_render_fixed_complete_inventory_and_idempotence() {
     let mut req = request();
     let plan = content::render(&req).unwrap();
-    assert_eq!(plan.artifacts.len(), 38);
+    assert_eq!(plan.artifacts.len(), 39);
     assert!(
         plan.artifacts
             .iter()
@@ -144,7 +144,7 @@ fn doctor_missing_ready_drift_is_read_only_and_opaque_files_are_untouched() {
     let f = Fixture::new();
     let spec = f.spec();
     let missing = content::doctor(&spec).unwrap();
-    assert_eq!(missing.entries.len(), 38);
+    assert_eq!(missing.entries.len(), 39);
     assert!(missing.entries.iter().all(|e| e.status == "missing"));
     assert!(!f.0.join("agents").exists());
     f.fill();
@@ -170,7 +170,7 @@ fn doctor_missing_ready_drift_is_read_only_and_opaque_files_are_untouched() {
     );
     assert_eq!(
         drift.entries.iter().filter(|e| e.status == "ready").count(),
-        37
+        38
     );
     assert_eq!(fs::read(&path).unwrap(), b"edited\n");
     assert_eq!(fs::read(&opaque).unwrap(), [0xff, 0x00]);
@@ -227,7 +227,7 @@ fn explicit_cli_boundary_rejects_unknown_fields_and_has_no_apply() {
     let result = cmd.wait_with_output().unwrap();
     assert!(result.status.success());
     let report: serde_json::Value = serde_json::from_slice(&result.stdout).unwrap();
-    assert_eq!(report["entries"].as_array().unwrap().len(), 38);
+    assert_eq!(report["entries"].as_array().unwrap().len(), 39);
     let mut value = serde_json::to_value(spec).unwrap();
     value["settings_path"] = "/foreign".into();
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_ap"))

@@ -130,6 +130,10 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/skills/lead/tools/await-autoreview.sh"),
     ),
     (
+        "skills/lead/tools/deliver.sh",
+        include_str!("../../../../content/skills/lead/tools/deliver.sh"),
+    ),
+    (
         "skills/lead/tools/review.sh",
         include_str!("../../../../content/skills/lead/tools/review.sh"),
     ),
