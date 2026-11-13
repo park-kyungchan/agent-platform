@@ -28,7 +28,8 @@ expect refuse measure_failed "failing measure"
 printf '#!/bin/sh\necho "K 2"\n' > measure; git add measure
 printf '# STATE\ntext\n' > STATE.md; git add STATE.md; expect refuse measure_block_missing "no block"
 # a measure that ignores TERM is killed at the bound and the commit is refused, in seconds.
-printf '#!/bin/bash\ntrap "" TERM\nsleep 6\necho "K 2"\n' > measure; git add measure
+# Its child runs in another session, survives the kill and keeps the output open: the hook must not wait for it.
+printf '#!/bin/bash\ntrap "" TERM\nsetsid sleep 6 &\nwait\necho "K 2"\n' > measure; git add measure
 t0=$(date +%s); out=$(MEASURE_TIMEOUT_S=1 git commit -q -m "stuck measure" 2>&1); rc=$?; dt=$(( $(date +%s) - t0 ))
 if [ "$rc" -ne 0 ] && printf '%s' "$out" | grep -q '^measure_failed@' && [ "$dt" -le 5 ]; then echo "ok   stuck measure killed after ${dt}s"; else echo "FAIL stuck measure: rc=$rc dt=$dt out=$out"; fails=$((fails+1)); fi
 printf '#!/bin/sh\necho "K 2"\n' > measure; git add measure

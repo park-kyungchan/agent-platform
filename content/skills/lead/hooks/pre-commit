@@ -21,8 +21,10 @@ if [ "$size" -gt "$limit" ]; then
   echo "state_too_large@STATE.md: ${size} bytes, at most ${limit}. Replace old values; history is in Git." >&2; fail=1
 fi
 if [ -x ./measure ]; then
-  # TERM after the bound, KILL two seconds later: a measure that ignores TERM cannot hold a commit.
-  now=$(timeout --kill-after=2 "${MEASURE_TIMEOUT_S:-10}" ./measure 2>/dev/null); rc=$?
+  # TERM after the bound, KILL two seconds later. The output goes to a file, not through a pipe:
+  # a child of a killed measure that still holds the pipe must not keep the commit waiting.
+  mtmp=$(mktemp); timeout --kill-after=2 "${MEASURE_TIMEOUT_S:-10}" ./measure > "$mtmp" 2>/dev/null; rc=$?
+  now=$(cat "$mtmp"); rm -f -- "$mtmp"
   if [ "$rc" -ne 0 ] || [ -z "$now" ]; then
     echo "measure_failed@measure: exit ${rc} (124 or 137 = over the time bound) or no output" >&2; fail=1
   else
