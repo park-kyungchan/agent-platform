@@ -260,7 +260,11 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
             .ok_or_else(|| error("packet_lacks_write_set_line", "packet"))?;
         require!(lines.next().is_none() => "write_set_invalid", "packet");
         let line = std::str::from_utf8(line).map_err(|_| error("write_set_invalid", "packet"))?;
-        let members: Vec<&str> = line.split(',').map(str::trim).collect();
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        let members: Vec<&str> = line
+            .split(',')
+            .map(|member| member.trim_matches([' ', '\t']))
+            .collect();
         require!(members.len() <= 64 && members.iter().enumerate().all(|(index, member)| {
             let path = member.strip_suffix("/**").unwrap_or(member);
             !path.is_empty()

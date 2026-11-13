@@ -262,7 +262,9 @@ first_review = created(gate('start_review', 'review-start', rp), 'review')
 assert fields(first_review)['runs'] == [w]
 assert fields(first_review)['running_in'] == task
 gate('start_review', 'review-duplicate', rp, 'duplicate_running_review')
-gate('start_review', 'review-another-kind', dict(rp, kind='design'))
+another_kind = created(gate('start_review', 'review-another-kind', dict(rp, kind='design')), 'review')
+gate('start_review', 'review-space-prompt', dict(rp, prompt='/home/palantirkc/work/fixture/PROMPT space.md'), 'invalid_parameter')
+gate('close_review', 'review-space-report', dict(review=first_review, verdict='accept', report='/home/palantirkc/work/fixture/REPORT space.md', report_sha256='c' * 64), 'invalid_parameter')
 gate('close_review', 'review-report-required', dict(review=first_review, verdict='accept'), 'report_required')
 gate('close_review', 'review-hash-required', dict(review=first_review, verdict='accept', report='/home/palantirkc/work/fixture/REPORT.md'), 'report_required')
 gate('close_review', 'review-empty-report', dict(review=first_review, verdict='accept', report='', report_sha256='c' * 64), 'invalid_parameter')
@@ -275,6 +277,8 @@ next_review = created(gate('start_review', 'review-after-close', rp), 'review')
 assert fields(first_review)['status'] == 'closed' and fields(first_review)['verdict'] == 'abandoned'
 assert fields(next_review)['status'] == 'running'
 assert render('reviews')['rows'] == 3
+another_head = created(gate('start_review', 'review-another-head', dict(rp, head='e' * 40)), 'review')
+gate('close_review', 'review-another-head-close', dict(review=another_head, verdict='abandoned'))
 review = dict(review, reviewed_lines=153, reviewer_family='family-b')
 gate('record_scope_review', 'v7-same-family', review)
 gate('record_scope_review', 'v7-running-review', dict(review, review=next_review), 'review_not_closed')
@@ -285,13 +289,16 @@ assert fields(next_review)['report_sha256'] == 'c' * 64
 for rid, extra in [('write-set', dict(write_set=['crates/ap/src/work.rs', 'ontology/**'])), ('no-write-set', {})]:
     run = created(gate('start_worker_run', 'v7-' + rid, dict(wp, name='v7-' + rid, **extra)), 'worker_run')
     assert fields(run)['running_in'] == task
+    if rid == 'write-set':
+        other = created(gate('start_worker_run', 'v7-another-name', dict(wp, name='v7-another-name')), 'worker_run')
+        gate('close_worker_run', 'v7-another-name-close', dict(worker_run=other, result='done'))
     gate('start_worker_run', 'v7-duplicate-' + rid, dict(wp, name='v7-' + rid, **extra), 'duplicate_running_worker')
     if extra: assert fields(run)['write_set'] == extra['write_set']
     else: assert 'write_set' not in fields(run)
     gate('close_worker_run', 'v7-close-' + rid, dict(worker_run=run, result='done'))
     assert fields(run).get('running_in') is None
 # The schema itself bounds members, even when ap is bypassed.
-for label, member in [('301', 'a' * 301), ('wildcard', 'src/*.rs'), ('absolute', '/etc/passwd'), ('unicode', 'src/\u00e9.rs')]:
+for label, member in [('plus', '+a'), ('301', 'a' * 301), ('wildcard', 'src/*.rs'), ('absolute', '/etc/passwd'), ('unicode', 'src/\u00e9.rs')]:
     gate('start_worker_run', 'direct-write-' + label, dict(wp, name='direct-' + label, write_set=[member]), 'invalid_parameter')
 valid_run = created(gate('start_worker_run', 'direct-write-valid', dict(wp, name='direct-valid', write_set=['crates/ap/src/**', 'ontology/work.schema.json'])), 'worker_run')
 gate('close_worker_run', 'direct-write-valid-close', dict(worker_run=valid_run, result='done'))
@@ -322,15 +329,12 @@ for kind in ['review', 'worker_run']:
     print('start_' + kind + '_basis_heads=' + str(len(heads)))
     version = subprocess.check_output([binary, '--version'], text=True, timeout=10).strip()
     print(version)
-    task_file = pathlib.Path(repo).parents[1] / 'harness-20261112/TASK-P12-1-R1.md'
-    engine_lines = [line.removeprefix('Engine with G4:').strip().split()[0].strip('`') for line in task_file.read_text().splitlines() if line.startswith('Engine with G4:')]
-    if engine_lines and engine_lines[-1] in (version, version.split()[-1]):
-        assert len(heads) == (2 if kind == 'review' else 3), (kind, heads)
-        for item in closed[kind]:
-            assert not any(h['id'] == item for h in heads), (kind, item, heads)
-        print('basis_closed_absent=' + kind)
-    else:
-        print('basis_count_print_only=' + kind)
+    # Requires an engine reading reverse links from postings (ontology-platform 2654024 or later).
+    expected = [task, another_kind] if kind == 'review' else [task, thread, plan]
+    assert len(heads) == len(expected), (kind, heads, expected)
+    for item in closed[kind]:
+        assert not any(h['id'] == item for h in heads), (kind, item, heads)
+    print('basis_closed_absent=' + kind)
 print('v7_gate_rows_complete')
 PY
 

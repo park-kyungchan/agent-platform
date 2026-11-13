@@ -426,5 +426,6 @@ For a new type, a uniqueness criterion must link through a reference that is
 set only while the object is open and cleared by its closing action (LENS F43).
 Version 6 and earlier version 7 objects without `running_in` can still be noted
 and closed, but do not block a new start with the same name/head/kind; no migration
-is performed. Reverse-link basis size depends on engine postings support; after
-a schema install old-pin heads remain candidates until engine item G3.
+is performed. Objects written before a schema install add nothing to the basis;
+a cleared `running_in` remains a known value across a later install (measured
+with 300 closed pairs and an install of a higher version).

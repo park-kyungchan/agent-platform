@@ -1429,6 +1429,14 @@ fn write_set_invalid_members() {
         "src/*.rs".into(),
         "a,,b".into(),
         vec!["a"; 65].join(","),
+        (0..65)
+            .map(|i| format!("member{i}"))
+            .collect::<Vec<_>>()
+            .join(","),
+        "-a".into(),
+        "+a".into(),
+        "@a".into(),
+        "a\u{00a0}".into(),
         "".into(),
         "a/./b".into(),
         "a//b".into(),
@@ -1468,6 +1476,7 @@ fn write_set_sent_in_order() {
     );
     for members in [
         vec!["crates/ap/src/work.rs".to_owned(), "ontology/**".to_owned()],
+        (0..64).map(|i| format!("member{i}")).collect(),
         vec!["a".repeat(297)],
         vec![format!("{}/**", "a".repeat(297))],
     ] {
@@ -1482,8 +1491,9 @@ fn write_set_sent_in_order() {
                     .all(|c| c.is_ascii_alphanumeric() || b"._/+@-".contains(&c))
             );
         }
+        let line_end = if members.len() == 64 { "\r\n" } else { "\n" };
         let packet_bytes = format!(
-            "Callers searched:\nBroken tests:\nControls:\nWrite set: {}\n",
+            "Callers searched:\nBroken tests:\nControls:\nWrite set: {}{line_end}",
             members.join(", ")
         )
         .into_bytes();
