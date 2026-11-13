@@ -53,12 +53,12 @@ One reviewer session in a fresh context, on the head whose required check passed
 ```markdown
 Request: <absolute path of the packet>
 Candidate: <repository, pull request, head revision, the diff command>
-Policy: <the repository's REVIEW.md>
+Policy: <the repository's REVIEW.md; where there is none, the two lines below are the policy>
 Raw evidence: <the check output on that head>
 Questions of the Lead: <what the Lead found in its own reading of the diff, each as a sequence to execute, never as a verdict>
 Blocking, each with the command or test that shows it: wrong behaviour; loss or exposure of data; a broken invariant of the packet or a broken contract; an unguarded irreversible effect on a real target.
 Not blocking: at most five notes (a test gap, a sentence, a name). Write no mutants by hand: the check command runs mutation testing where the repository has it.
-Output: the findings as comments on the pull request, then one line `Verdict: accept` or `Verdict: block` with the head revision.
+Output: a report whose first line is exactly `Verdict: accept` or `Verdict: repair` (the form `ap review close` reads) and whose second line is the head revision; then the blocking findings, the notes, and one line per question. The findings also go onto the pull request as comments, by the reviewer or by the Lead.
 Not given on purpose: the implementer's reasoning and any suggested verdict.
 ```
 
