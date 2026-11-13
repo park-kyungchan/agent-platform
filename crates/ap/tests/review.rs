@@ -1,5 +1,5 @@
 use ap::{
-    review::execute,
+    review::{DIFF_OPTIONS, execute},
     work::{Answer, Reply, System},
 };
 use serde_json::{Value, json};
@@ -171,6 +171,13 @@ fn git(argv: &str, bytes: &[u8]) -> Step {
     )
 }
 fn accept_steps(f: Value, run: Value, diff: &str) -> Vec<Step> {
+    let bytes: Vec<_> = diff
+        .lines()
+        .flat_map(|path| path.bytes().chain([0]))
+        .collect();
+    accept_steps_raw(f, run, &bytes)
+}
+fn accept_steps_raw(f: Value, run: Value, diff: &[u8]) -> Vec<Step> {
     vec![
         get("review", f),
         get("worker_run", run),
@@ -182,9 +189,9 @@ fn accept_steps(f: Value, run: Value, diff: &str) -> Vec<Step> {
         ),
         git(
             &format!(
-                "diff --no-renames --ignore-submodules=none --no-relative --name-only {BASE} {HEAD}"
+                "diff --no-renames --ignore-submodules=none --no-relative --name-only -z {BASE} {HEAD}"
             ),
-            diff.as_bytes(),
+            diff,
         ),
     ]
 }
@@ -611,6 +618,61 @@ fn path_match_table_and_empty_diff() {
     }
 }
 #[test]
+fn accept_reads_nul_separated_paths() {
+    let paths = ["dir/x.md", "dir/é.md", "dir/a\nb.md"];
+    for terminated in [true, false] {
+        let mut bytes = paths.join("\0").into_bytes();
+        if terminated {
+            bytes.push(0);
+        }
+        for (pattern, ok) in [("dir/**", true), ("dir/x.md", false)] {
+            let mut f = run();
+            f["write_set"] = json!([pattern]);
+            let mut steps = accept_steps_raw(review(), f, &bytes);
+            if ok {
+                steps.push(status("success", "review review accept"));
+                let mut s = Script::new(steps);
+                assert_eq!(
+                    execute(&mut s, "accept", &accept_request()).unwrap().0["paths"],
+                    3
+                );
+                s.finish();
+            } else {
+                assert_eq!(
+                    refusal(
+                        &mut Script::new(steps),
+                        "accept",
+                        &accept_request(),
+                        "review_path_outside_write_set",
+                        "paths"
+                    ),
+                    json!({"paths":paths[1..],"count":2})
+                );
+            }
+        }
+    }
+    let mut steps = accept_steps_raw(review(), run(), b"");
+    steps.push(status("success", "review review accept"));
+    let mut s = Script::new(steps);
+    assert_eq!(
+        execute(&mut s, "accept", &accept_request()).unwrap().0["paths"],
+        0
+    );
+    s.finish();
+}
+#[test]
+fn accept_refuses_non_utf8_path() {
+    let mut f = run();
+    f["write_set"] = json!(["dir/**"]);
+    refusal(
+        &mut Script::new(accept_steps_raw(review(), f, b"dir/\xff.md\0")),
+        "accept",
+        &accept_request(),
+        "process_failed",
+        "git",
+    );
+}
+#[test]
 fn outside_paths_capped_at_ten() {
     let names: Vec<_> = (0..12).map(|i| format!("outside/{i}")).collect();
     let d = refusal(
@@ -830,6 +892,7 @@ fn accept_argv_disables_rename_detection() {
             "--ignore-submodules=none",
             "--no-relative",
             "--name-only",
+            "-z",
             BASE,
             HEAD
         ]
@@ -979,7 +1042,9 @@ fn real_git_replace_cannot_hide_changed_paths() {
     git(&["commit", "--quiet", "--allow-empty", "-m", "base"]);
     let base = git(&["rev-parse", "HEAD"]);
     fs::write(root.join("real.rs"), "real\n").unwrap();
-    git(&["add", "real.rs"]);
+    fs::create_dir(root.join("dir")).unwrap();
+    fs::write(root.join("dir/é.md"), "unicode\n").unwrap();
+    git(&["add", "real.rs", "dir/é.md"]);
     git(&["commit", "--quiet", "-m", "real"]);
     let head = git(&["rev-parse", "HEAD"]);
     git(&["checkout", "--quiet", "--detach", &base]);
@@ -988,17 +1053,17 @@ fn real_git_replace_cannot_hide_changed_paths() {
     git(&["commit", "--quiet", "-m", "fake"]);
     let fake = git(&["rev-parse", "HEAD"]);
     git(&["replace", &head, &fake]);
-    let diff = [
-        "diff",
-        "--no-renames",
-        "--ignore-submodules=none",
-        "--no-relative",
-        "--name-only",
-        &base,
-        &head,
-    ];
-    assert_eq!(git(&diff), "fake.rs");
+    let mut diff = vec!["diff"];
+    diff.extend(DIFF_OPTIONS);
+    diff.extend([base.as_str(), head.as_str()]);
+    assert_eq!(git(&diff), "fake.rs\0");
     let mut protected = vec!["--no-replace-objects"];
     protected.extend(diff);
-    assert_eq!(git(&protected), "real.rs");
+    assert_eq!(git(&protected), "dir/é.md\0real.rs\0");
+    let quoted: Vec<_> = protected
+        .iter()
+        .copied()
+        .filter(|arg| *arg != "-z")
+        .collect();
+    assert_eq!(git(&quoted), "\"dir/\\303\\251.md\"\nreal.rs");
 }

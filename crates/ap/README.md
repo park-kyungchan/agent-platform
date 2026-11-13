@@ -65,7 +65,10 @@ repository, pull request, head, base and an unchanged report. Every named run
 must belong to the review task and have a nonempty write set. It verifies the open pull request targets `main`
 at the review head, fetches `origin main`, checks the merge base and compares
 changed paths to the union of those write sets, using `git --no-replace-objects`
-and `diff --no-renames --ignore-submodules=none --no-relative --name-only`. A moved file must have both its
+and `diff --no-renames --ignore-submodules=none --no-relative --name-only -z`. Paths are read NUL-separated,
+so non-ASCII names are compared unquoted, including names containing newlines or
+quotes. A path that is not valid UTF-8 ends with `process_failed` (field `git`).
+A moved file must have both its
 old and new paths in that union. A pattern matches its exact
 path; a trailing `/**` matches descendants, not the directory itself or another
 name with the same prefix. The caller must be outside the task's `wt/`.

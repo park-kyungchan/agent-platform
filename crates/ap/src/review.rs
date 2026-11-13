@@ -196,6 +196,14 @@ fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     apply(s, r, "close_review", request, parameters)?;
     Ok(json!({"status":"closed","verdict":verdict,"report_sha256":report_sha256}))
 }
+/// Git diff options shared with the real-Git path controls.
+pub const DIFF_OPTIONS: [&str; 5] = [
+    "--no-renames",
+    "--ignore-submodules=none",
+    "--no-relative",
+    "--name-only",
+    "-z",
+];
 fn git(s: &mut impl System, worktree: &str, command: &[&str]) -> Result<String, Failure> {
     let mut argv = args(&["--no-replace-objects", "-C", worktree]);
     argv.extend(args(command));
@@ -301,20 +309,11 @@ fn accept(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         return Err(fail("review_base_differs", "base", json!(base.trim_end())));
     }
     // These options make the list independent of replace refs and the worktree's own diff configuration.
-    let diff = git(
-        s,
-        worktree,
-        &[
-            "diff",
-            "--no-renames",
-            "--ignore-submodules=none",
-            "--no-relative",
-            "--name-only",
-            text(&f, "base")?,
-            head,
-        ],
-    )?;
-    let paths: Vec<_> = diff.lines().collect();
+    let mut diff_argv = vec!["diff"];
+    diff_argv.extend(DIFF_OPTIONS);
+    diff_argv.extend([text(&f, "base")?, head]);
+    let diff = git(s, worktree, &diff_argv)?;
+    let paths: Vec<_> = diff.split_terminator('\0').collect();
     let outside: Vec<_> = paths
         .iter()
         .filter(|path| {
