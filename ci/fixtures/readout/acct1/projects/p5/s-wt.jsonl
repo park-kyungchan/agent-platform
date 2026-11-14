@@ -1,0 +1,1 @@
+{"type": "assistant", "sessionId": "s-wt", "timestamp": "2026-11-12T14:00:00Z", "cwd": "@WORK@/proj/wt/repo", "gitBranch": "main", "message": {"id": "m11", "model": "claude-opus-9-9", "usage": {"input_tokens": 5000000, "output_tokens": 0, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}, "content": [{"type": "text", "text": "SECRET-TEXT"}]}}

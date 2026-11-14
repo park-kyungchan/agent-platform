@@ -24,6 +24,8 @@ import sys
 from pathlib import Path
 
 KINDS = ("input", "output", "cache_read", "cache_write_5m", "cache_write_1h")
+ROUTES = ("engineering", "lesson", "other")
+UNCOUNTED = (("agy", "no usage record exists under its state directory"),)  # CLIs whose sessions this command cannot count
 REPOS = ("park-kyungchan/agent-platform", "park-kyungchan/ontology-platform", "park-kyungchan/education-platform")
 
 
@@ -102,7 +104,7 @@ def read_claude(projects_dirs, since_epoch):
             rec = msgs.get(m["id"])
             if rec is None:
                 msgs[m["id"]] = {"ts": str(o.get("timestamp") or ""), "model": m.get("model"), "session": o.get("sessionId"),
-                                 "cwd": str(o.get("cwd") or ""), "tool": tool or "none", "tok": tok, "src": "claude"}
+                                 "cwd": str(o.get("cwd") or ""), "tool": tool or "none", "tok": tok, "src": "claude", "file": str(f)}
             else:
                 lines["repeat"] += 1
                 rec["tok"] = {k: max(rec["tok"][k], tok[k]) for k in KINDS}
@@ -136,7 +138,7 @@ def read_codex(codex_dir, since_epoch):
                     cw, cr = d.get("cache_write_input_tokens", 0), d.get("cached_input_tokens", 0)
                     tok = dict(zip(KINDS, (max(0, d.get("input_tokens", 0) - cw - cr), d.get("output_tokens", 0), cr, cw, 0)))
                     out.append({"ts": str(o.get("timestamp") or ""), "model": model, "session": sid, "cwd": cwd,
-                                "tool": "none", "tok": tok, "src": "codex"})
+                                "tool": "none", "tok": tok, "src": "codex", "file": str(f)})
                     lines["events"] += 1
                     continue
                 lines["repeat"] += 1
@@ -170,6 +172,14 @@ def route_of(cwd, work, platforms, lesson):
     return "lesson" if under(lesson) else "engineering" if under(work) or under(platforms) else "other"
 
 
+def role_without_stage(cwd, a):
+    """lead: the Lead's own directory; worker, no record: a task worktree or a platform checkout; else interactive."""
+    work, platforms, here = a.work_root.rstrip("/") + "/", a.platforms_root.rstrip("/") + "/", cwd + "/"
+    if cwd in a.lead_cwd:
+        return "lead"
+    return "worker, no record" if (here.startswith(work) and "/wt/" in here[len(work) - 1:]) or here.startswith(platforms) else "interactive"
+
+
 def week_of(ts, since, until):
     try:
         d = datetime.date.fromisoformat(ts[:10])
@@ -191,6 +201,7 @@ def aggregate(msgs, a):
         by_session[s["session"]].append(s)
     totals, rows = collections.defaultdict(collections.Counter), collections.defaultdict(lambda: collections.defaultdict(collections.Counter))
     leads, outside, session_usd = collections.defaultdict(collections.Counter), 0, collections.defaultdict(float)
+    lesson_files = collections.defaultdict(set)
     for m in msgs:
         usd = cost(m["model"], m["tok"], a.rates)
         session_usd[m["session"]] += usd
@@ -199,16 +210,18 @@ def aggregate(msgs, a):
             outside += 1
             continue
         ss = by_session.get(m["session"])
-        role = ss[max(bisect.bisect_right([s["start"] for s in ss], m["ts"]) - 1, 0)]["role"] if ss else "interactive"
+        role = ss[max(bisect.bisect_right([s["start"] for s in ss], m["ts"]) - 1, 0)]["role"] if ss else role_without_stage(m["cwd"], a)
         route = route_of(m["cwd"], a.work_root, a.platforms_root, a.lesson_dir)
         fam = family(m["model"], a.rates)
         add(totals[(week, route)], m["tok"], usd)
-        add(rows[(week, route)][(role, fam)], m["tok"], usd)
-        if role == "interactive" and m["src"] == "claude" and m["cwd"] in a.lead_cwd:
+        add(rows[(week, route)][("*" if fam == "unknown" else role, fam)], m["tok"], usd)  # one line for every role of an unknown model
+        if route == "lesson":
+            lesson_files[m["src"]].add(m["file"])
+        if role == "lead" and m["src"] == "claude":
             name = "__".join(m["tool"].split("__")[:2])  # mcp__server__tool -> mcp__server
             leads[name]["calls"] += 1
             leads[name]["usd"] += usd
-    return totals, rows, leads, outside, session_usd
+    return totals, rows, leads, outside, session_usd, lesson_files
 
 
 def first_line(path):
@@ -221,20 +234,26 @@ def first_line(path):
 
 
 def k2(prs, stages, branches):
+    """Per merged pull request: the implementer's tier, the first reviewer's tier and verdict line, changed lines."""
     out = []
     for repo, pr in prs:
         def first(role):
             hit = [s for s in stages if s["role"] == role and pr["headRefName"] in branches.get(s["session"], ())]
             return min(hit, key=lambda s: s["start"]) if hit else None
         impl, rev = first("implementer"), first("reviewer")
-        out.append((repo.split("/")[1], pr["number"], impl["model"] if impl else "unknown",
-                    first_line(rev["answer"]) if rev else None))
+        out.append({"repo": repo.split("/")[1], "number": pr["number"], "impl": impl["model"] if impl else "unknown",
+                    "verdict": first_line(rev["answer"]) if rev else None, "verifier": rev["model"] if rev else None,
+                    "lines": num(pr.get("additions")) + num(pr.get("deletions"))})
     return out
+
+
+def bucket(verdict):
+    return "none" if verdict is None else verdict[len("Verdict: "):] if verdict in ("Verdict: accept", "Verdict: repair") else "other"
 
 
 def run_gh(repo, since, until):
     r = subprocess.run(["gh", "pr", "list", "--repo", repo, "--state", "merged", "--limit", "1000", "--search",
-                        f"merged:{since}..{until}", "--json", "number,headRefName,mergedAt"],
+                        f"merged:{since}..{until}", "--json", "number,headRefName,mergedAt,additions,deletions"],
                        capture_output=True, text=True, check=False)
     if r.returncode:
         sys.exit(f"gh_failed@evals/readout.py: gh pr list exit {r.returncode} for {repo}")
@@ -275,6 +294,7 @@ def main(argv=None):
     ap.add_argument("--lead-cwd", action="append", default=[], help="a cwd whose interactive calls are listed by first tool")
     ap.add_argument("--repo", action="append", help="owner/name (default: the three platform repositories)")
     ap.add_argument("--prices", default=str(here / "prices.tsv"))
+    ap.add_argument("--list-no-reviewer", action="store_true", help="list the numbers of merged pull requests without a reviewer stage")
     ap.add_argument("--detail", action="store_true", help="one K2 line per merged pull request")
     ap.add_argument("--calibrate", action="store_true", help="also compare the cost of first-run stages with the CLI's own figure")
     a = ap.parse_args(argv)
@@ -287,7 +307,7 @@ def main(argv=None):
     since_epoch = datetime.datetime.fromisoformat(a.since).replace(tzinfo=datetime.timezone.utc).timestamp()
     c_msgs, branches, c_lines = read_claude([Path(x) / "projects" for x in accounts if (Path(x) / "projects").is_dir()], since_epoch)
     x_msgs, x_lines = read_codex(a.codex_dir, since_epoch)
-    totals, rows, leads, outside, session_usd = aggregate(c_msgs + x_msgs, a)
+    totals, rows, leads, outside, session_usd, lesson_files = aggregate(c_msgs + x_msgs, a)
     prs = [(r, p) for r in (a.repo or REPOS) for p in run_gh(r, a.since, a.until) if a.since <= str(p.get("mergedAt"))[:10] <= a.until]
 
     print(f"readout window {a.since}..{a.until} (UTC, inclusive); weights evals/prices.tsv; weeks start on Monday")
@@ -295,35 +315,54 @@ def main(argv=None):
     print("input codex " + " ".join(f"{k}={v}" for k, v in sorted(x_lines.items())) + f" outside_window={sum(1 for m in x_msgs if week_of(m['ts'], a.since, a.until) is None)}")
     seen = {m["session"] for m in c_msgs + x_msgs}
     print(f"input stages " + " ".join(f"{k}={v}" for k, v in sorted(st_lines.items())) + f" without_session_record={sum(1 for s in a.stages if s['session'] not in seen)}")
-    for key in sorted(totals):
-        print(f"week {key[0]} route {key[1]} TOTAL msgs={totals[key]['msgs']} {fmt(totals[key])}")
-        for (role, fam), c in sorted(rows[key].items()):
-            print(f"  role={role} family={fam} msgs={c['msgs']} {fmt(c)}")
-    weeks = sorted({k[0] for k in totals} | {w for _, p in prs if (w := week_of(str(p["mergedAt"]), a.since, a.until))})
+    days = (datetime.date.fromisoformat(a.until) - datetime.date.fromisoformat(a.since)).days + 1
+    weeks = sorted({week_of((datetime.date.fromisoformat(a.since) + datetime.timedelta(n)).isoformat(), a.since, a.until) for n in range(days)})
+    for w in weeks:
+        for route in ROUTES:
+            key = (w, route)
+            if key not in totals:
+                print(f"week {w} route {route} msgs=0")
+                continue
+            print(f"week {w} route {route} TOTAL msgs={totals[key]['msgs']} {fmt(totals[key])}")
+            for (role, fam), c in sorted(rows[key].items()):
+                print(f"  role={role} family={fam} msgs={c['msgs']} {fmt(c)}")
+    print("route lesson session files in the window: " + " ".join(f"{s}={len(lesson_files[s])}" for s in ("claude", "codex")))
+    print("uncounted: " + "; ".join(f"{cli} ({why})" for cli, why in UNCOUNTED))
     for w in weeks:
         mine = [(r, p) for r, p in prs if week_of(str(p["mergedAt"]), a.since, a.until) == w]
         eng = totals.get((w, "engineering"), collections.Counter())["usd"]
+        lead = sum(c["usd"] for (role, _), c in rows.get((w, "engineering"), {}).items() if role == "lead")
         per_repo = collections.Counter(r.split("/")[1] for r, _ in mine)
         print(f"week {w} merged pull requests {len(mine)} (" + ", ".join(f"{r}={n}" for r, n in sorted(per_repo.items())) + ")"
-              + f" K1 engineering usd per merged pull request = " + (f"{eng / len(mine):.2f}" if mine else "n/a"))
+              + f" K1 engineering usd per merged pull request = " + (f"{eng / len(mine):.2f}" if mine else "n/a")
+              + f"; role lead usd={lead:.2f} share of the route={100 * lead / eng if eng else 0:.1f}%")
     reading = k2(prs, a.stages, branches)
     if a.detail:
-        for repo, number, impl, verdict in sorted(reading):
-            print(f"K2 {repo}#{number} implementer={impl} reviewer={verdict or 'unknown'}")
-    by_impl = collections.defaultdict(collections.Counter)
-    for _, _, impl, verdict in reading:
-        by_impl[impl][verdict or "no reviewer stage"] += 1
-    for impl, c in sorted(by_impl.items()):
-        print(f"K2 implementer={impl} merged={sum(c.values())} first reviewer: " + ", ".join(f"{v}={n}" for v, n in sorted(c.items())))
-    for repo in sorted({r for r, _, _, _ in reading}):
-        print(f"K2 no reviewer stage {repo}: " + (",".join(str(n) for r, n, _, v in sorted(reading) if r == repo and v is None) or "none"))
+        for r in sorted(reading, key=lambda r: (r["repo"], r["number"])):
+            print(f"K2 {r['repo']}#{r['number']} implementer={r['impl']} verifier={r['verifier'] or 'none'} first verdict={bucket(r['verdict'])} lines={r['lines']}")
+    by_impl = collections.defaultdict(lambda: collections.defaultdict(list))
+    for r in reading:
+        by_impl[r["impl"]][bucket(r["verdict"])].append(r)
+    for impl, buckets in sorted(by_impl.items()):
+        every = [r for rs in buckets.values() for r in rs]
+        print(f"K2 implementer={impl} merged={len(every)} lines={sum(r['lines'] for r in every)}: " + ", ".join(
+            f"{b} n={len(rs)} lines={sum(r['lines'] for r in rs)}" for b, rs in sorted(buckets.items()))
+            + "; verifier tiers: " + (", ".join(f"{v}={n}" for v, n in sorted(collections.Counter(r["verifier"] for r in every if r["verifier"]).items())) or "none"))
+    missing = collections.defaultdict(list)
+    for r in sorted(reading, key=lambda r: (r["repo"], r["number"])):
+        if r["verdict"] is None:
+            missing[r["repo"]].append(r["number"])
+    print("K2 no reviewer stage: " + (", ".join(f"{k}={len(v)}" for k, v in sorted(missing.items())) or "none"))
+    if a.list_no_reviewer:
+        for k, v in sorted(missing.items()):
+            print(f"K2 no reviewer stage {k}: " + ",".join(map(str, v)))
     cut = collections.Counter((s["role"], s["model"]) for s in a.stages if s["state"] == "cut" and a.since <= s["start"][:10] <= a.until)
     print("stages cut: " + (", ".join(f"{r}/{m}={n}" for (r, m), n in sorted(cut.items())) or "none"))
     ranked = sorted(leads.items(), key=lambda kv: (-kv[1]["usd"], kv[0]))
-    for tool, c in ranked[:10]:
+    for tool, c in ranked[:6]:
         print(f"lead calls first_tool={tool} calls={c['calls']} usd={c['usd']:.2f}")
-    if ranked[10:]:
-        print(f"lead calls other {len(ranked) - 10} tool names calls={sum(c['calls'] for _, c in ranked[10:])} usd={sum(c['usd'] for _, c in ranked[10:]):.2f}")
+    if ranked[6:]:
+        print(f"lead calls other {len(ranked) - 6} tool names calls={sum(c['calls'] for _, c in ranked[6:])} usd={sum(c['usd'] for _, c in ranked[6:]):.2f}")
     if a.calibrate:
         ratios, shared = collections.defaultdict(list), collections.Counter(s["session"] for s in a.stages)
         for s in a.stages:  # a session that a later record continues holds more than this run's figure
