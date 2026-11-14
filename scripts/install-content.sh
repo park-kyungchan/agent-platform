@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Install content/ of this repository as the shared instructions of the host, or put a kept copy back.
 #   scripts/install-content.sh install <commit>    from this checkout, which must be clean at <commit> on origin/main
-#   scripts/install-content.sh check               the files under the owned paths are exactly the recorded checksum list, unchanged (exit 0; 1 drift; 3 not recorded)
+#   scripts/install-content.sh check               the files under the owned paths of the list AND of the kept copy are exactly the recorded
+#                                                  checksum list, unchanged (THE RULE below; exit 0; 1 drift; 3 not recorded)
 #   scripts/install-content.sh rollback            puts back the kept copy the install record names (one level); it runs only when the
 #                                                  target equals its record (check ok, no .old-* or .new-* directory of an interrupted
 #                                                  run), else it refuses rollback_target_not_recorded_state: use rollback <tarball>
@@ -43,17 +44,33 @@ write_record() { # <file> <commit> <installed_at> <kept copy or empty> <file cou
   local kept=null; [ -z "$4" ] || kept="\"$4\""
   printf '{"commit":"%s","installed_at":"%s","kept":%s,"files":%s}\n' "$2" "$3" "$kept" "$5" > "$1"; }
 REC_RE='^\{"commit":"[0-9a-f]{40,64}","installed_at":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z","kept":(null|"[^"\\[:cntrl:]]*"),"files":[0-9]+\}$'
-# added_files <checksum list>: the files (and links) that lie under the owned paths of that list and are not named by it.
-added_files() { local actual
-  actual=$(cd "$DST" && while IFS= read -r top; do
-    { [ -e "$top" ] || [ -L "$top" ]; } && find -H "$top" \( -type f -o -type l \) -print
-  done < <(paths_of "$1") | LC_ALL=C sort)
-  comm -23 <(printf '%s\n' "$actual") <(cut -c67- "$1" | LC_ALL=C sort); }
+# THE RULE (one place): `check` is ok, `status` says rollback `available` and `rollback` without an argument runs only
+# when, under EVERY path that rollback would replace or remove, the files in the target are exactly the files the
+# current checksum list names, unchanged. Those paths are scope_paths: the owned paths of the current list AND the
+# owned paths of the kept copy the record names (a path the newer version retired is replaced too), plus the three
+# metadata files (.content-paths must equal the owned paths of the list; the record and the list are verified).
+# A file under them that the list does not name, a link, a fifo, a name with a control character, a listed name that
+# is not a regular file: drift. An empty directory holds no bytes and is not drift.
+scope_paths() { local p
+  { paths_of "$DST/$SUMS"
+    if [ -n "$CHK_KEPT" ] && [ ! -e "$CHK_KEPT.consumed" ] && [ -f "$CHK_KEPT.paths" ]; then
+      while IFS= read -r p || [ -n "$p" ]; do
+        case "$p" in *[[:cntrl:]]*) ;; *) if owned_ok "$p"; then printf '%s\n' "$p"; fi ;; esac
+      done < "$CHK_KEPT.paths"
+    fi; } | LC_ALL=C sort -u; }
+# unrecorded <checksum list> <top>...: what lies under the tops and is not what the list names (see THE RULE).
+unrecorded() { local list=$1 top; shift
+  ( cd "$DST" || exit 1
+    for top in "$@"; do
+      { [ -e "$top" ] || [ -L "$top" ]; } || continue
+      find "$top" -name '*[[:cntrl:]]*' -prune -o -type f -print | LC_ALL=C sort | comm -23 - <(cut -c67- "$list" | LC_ALL=C sort)
+      find "$top" -name '*[[:cntrl:]]*' -prune -exec printf '%s\n' "(a name with a control character under $top)" \; -o ! -type d ! -type f -print
+    done ); }
 # content_state: sets CHK (ok|drift|not_recorded), CHK_COMMIT, CHK_AT, CHK_KEPT (only from a well-formed record), CHK_FILES
-# and CHK_BAD (up to 10 paths: changed, missing or ADDED files; the files under the owned paths must be exactly the
-# files the checksum list names). A record that is empty, cut or not the one this script writes, a checksum list with a
+# and CHK_BAD (up to 10 paths: changed, missing or ADDED files; THE RULE above: the files under scope_paths must be
+# exactly the files the checksum list names). A record that is empty, cut or not the one this script writes, a checksum list with a
 # malformed line or a line count other than the record's `files` are drift. Writes nothing.
-content_state() { local out rc=0 n bad f extra
+content_state() { local out rc=0 n bad f extra scope
   CHK_COMMIT=""; CHK_AT=""; CHK_KEPT=""; CHK_BAD=""; CHK_FILES=0
   if [ ! -f "$DST/$REC" ] || [ ! -f "$DST/$SUMS" ]; then CHK=not_recorded; return 0; fi
   CHK=drift
@@ -65,7 +82,9 @@ content_state() { local out rc=0 n bad f extra
   else return 0; fi
   { [ "$n" -gt 0 ] && [ "$bad" -eq 0 ] && [ "$n" = "$f" ]; } || return 0
   out=$(cd "$DST" && sha256sum -c "$DST/$SUMS" 2>/dev/null) || rc=$?
-  extra=$(added_files "$DST/$SUMS" || true)
+  mapfile -t scope < <(scope_paths)
+  extra=$(unrecorded "$DST/$SUMS" "${scope[@]}" || true)
+  { [ -f "$DST/.content-paths" ] && cmp -s <(LC_ALL=C sort "$DST/.content-paths") <(paths_of "$DST/$SUMS" | LC_ALL=C sort -u); } || extra=$(printf '%s\n' "$extra" ".content-paths")
   CHK_BAD=$( { printf '%s\n' "$out" | sed -n 's/: FAILED.*$//p'; printf '%s\n' "$extra"; } | sed -n '/./p' | head -n 10) || true
   if [ "$rc" -eq 0 ] && [ -z "$extra" ]; then CHK=ok; fi
 }

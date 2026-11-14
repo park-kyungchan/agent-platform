@@ -221,6 +221,62 @@ rel status; r4=$?; sout=$(cat "$t/out"); rel rollback; r5=$?; rel check; r6=$?
 { [ "$r1" -eq 0 ] && [ "$r2" -eq 0 ] && [ "$r3" -eq 0 ] && [ "$c3out" = "ok commit=$cr2 files=$n2" ] && [ "$r4" -eq 0 ] && printf '%s' "$sout" | grep -q '"check":"ok","rollback":"available"' \
   && [ "$r5" -eq 0 ] && [ "$r6" -eq 0 ] && [ -f "$t/work/rl.lock" ] && [ -d "$t/work/rb" ] && [ ! -e "$t/work/rd/rd" ]; } \
   && ok "R3 content: a relative target, kept-copy directory and lock work for install, check, status and rollback" || bad "R3 relative rc=$r1/$r2/$r3/$r4/$r5/$r6 [$c3out] [$sout]"
+# --- round 4: one rule for every path the argument-free rollback replaces or removes: under the owned paths of the current
+# checksum list AND of the kept copy it would restore, the files are exactly the listed ones, else drift (check names them,
+# status says rollback none, the rollback refuses and changes nothing). A path the newer version retired is such a path.
+mkdir -p content/skills/y; echo y > content/skills/y/SKILL.md; rwy=$(commit with-y)
+rm -rf content/skills/y; rwo=$(commit without-y)
+rm -f content/AGENTS.md; rwn=$(commit no-agents)
+shape() { (cd "$1" && find . -mindepth 1 ! -path './.new-*' ! -path './.old-*' -printf '%p %y %l\n' | LC_ALL=C sort | sha256sum | cut -c1-16); }
+# refused <label> <expected path named by check or empty>: check drift, status drift/none, the rollback refuses, nothing changed.
+refused() { local label=$1 named=$2 co s rc rcc e hb
+  hb=$(tree "$D")$(shape "$D"); cdst check; rcc=$?; co=$(cat "$t/out"); s=$(st); cdst rollback; rc=$?; e=$(cat "$t/err")
+  { [ "$rcc" -eq 1 ] && { [ -z "$named" ] || printf '%s\n' "$co" | grep -qxF -- "$named"; } && printf '%s' "$s" | grep -q '"check":"drift","rollback":"none"' \
+    && [ "$rc" -eq 2 ] && printf '%s' "$e" | grep -q 'rollback_target_not_recorded_state' && [ "$(tree "$D")$(shape "$D")" = "$hb" ]; } \
+    && ok "R4 content: $label: check drift, status rollback none, rollback without an argument refuses, nothing changed" || bad "R4 $label rc=$rcc/$rc [$s] [$co] [$e]"; }
+# the reviewer's case: install a version that retires skills/y, then create skills/y/local.md.
+rm -rf "$D"; cat_ "$rwy"; cat_ "$rwo"; mkdir -p "$D/skills/y"; echo mine > "$D/skills/y/local.md"
+refused "a file under a retired skill directory" skills/y/local.md
+# the same with a retired top-level file (the new version has no AGENTS.md).
+rm -rf "$D"; cat_ "$rwo"; cat_ "$rwn"; echo mine > "$D/AGENTS.md"
+refused "a file where a retired top-level file was" AGENTS.md
+# a retired path that stays absent is ok, and the rollback restores it.
+rm -rf "$D"; cat_ "$rwy"; cat_ "$rwo"; cdst check; rcc=$?; s=$(st); cdst rollback; rc=$?
+{ [ "$rcc" -eq 0 ] && printf '%s' "$s" | grep -q '"check":"ok","rollback":"available"' && [ "$rc" -eq 0 ] && [ "$(cat "$D/skills/y/SKILL.md")" = y ]; } \
+  && ok "R4 content: a retired skill directory that stays absent is ok and the rollback restores it" || bad "R4 retired absent rc=$rcc/$rc [$s] $(cat "$t/err")"
+rm -rf "$D"; cat_ "$rwo"; cat_ "$rwn"; cdst check; rcc=$?; cdst rollback; rc=$?
+{ [ "$rcc" -eq 0 ] && [ "$rc" -eq 0 ] && [ "$(cat "$D/AGENTS.md")" = r2 ]; } \
+  && ok "R4 content: a retired top-level file that stays absent is ok and the rollback restores it" || bad "R4 retired top-level absent rc=$rcc/$rc $(cat "$t/err")"
+# further states of the target after an install (the one before it: with-y, then without-y).
+m_deep() { mkdir -p "$D/skills/y/sub"; echo mine > "$D/skills/y/sub/deep.md"; }
+m_dirlink() { cp -a "$D/skills/x" "$t/x-elsewhere"; rm -rf "$D/skills/x"; ln -s "$t/x-elsewhere" "$D/skills/x"; }
+m_filedir() { rm -f "$D/AGENTS.md"; mkdir "$D/AGENTS.md"; echo mine > "$D/AGENTS.md/inner"; }
+m_retfile() { echo mine > "$D/skills/y"; }
+m_filelink() { cp "$D/AGENTS.md" "$t/agents-copy"; rm -f "$D/AGENTS.md"; ln -s "$t/agents-copy" "$D/AGENTS.md"; }
+m_fifo() { mkfifo "$D/runtime-references/pipe"; }
+m_paths() { echo skills/zzz >> "$D/.content-paths"; }
+m_newline() { echo mine > "$D/runtime-references/$(printf 'a\nb')"; }
+m_linkadd() { ln -s /nonexistent-target "$D/runtime-references/dangling"; }
+for c in "m_deep:a nested file under a retired skill directory:skills/y/sub/deep.md" \
+         "m_dirlink:a skill directory replaced by a symbolic link:skills/x" \
+         "m_filedir:a file replaced by a directory:AGENTS.md" \
+         "m_retfile:a retired path re-created as a file:skills/y" \
+         "m_filelink:a file replaced by a symbolic link to the same bytes:AGENTS.md" \
+         "m_fifo:a named pipe added:runtime-references/pipe" \
+         "m_paths:an edited owned list (.content-paths):.content-paths" \
+         "m_newline:a file whose name holds a newline:" \
+         "m_linkadd:a dangling symbolic link added:runtime-references/dangling"; do
+  IFS=: read -r fn label named <<< "$c"
+  rm -rf "$D"; cat_ "$rwy"; cat_ "$rwo"; "$fn"; refused "$label" "$named"
+done
+# harmless states: an empty directory holds no bytes; a file beside the owned paths is never touched by the rollback.
+rm -rf "$D"; cat_ "$rwy"; cat_ "$rwo"; mkdir "$D/skills/y" "$D/skills/x/emptydir"; echo mine > "$D/skills/loose.md"; echo mine > "$D/notes.txt"
+cdst check; rcc=$?; cdst rollback; rc=$?
+{ [ "$rcc" -eq 0 ] && [ "$rc" -eq 0 ] && [ "$(cat "$D/skills/y/SKILL.md")" = y ] && [ ! -e "$D/skills/x/emptydir" ] && [ "$(cat "$D/skills/loose.md")" = mine ] && [ "$(cat "$D/notes.txt")" = mine ]; } \
+  && ok "R4 content: an empty directory is ok (no bytes) and files beside the owned paths survive a rollback" || bad "R4 harmless rc=$rcc/$rc $(cat "$t/err")"
+# a rollback that has been made (the kept copy of the record is consumed) reads the paths of the current list only.
+rm -rf "$D"; cat_ "$rwy"; cat_ "$rwo"; cat_ "$rwn"; cdst rollback; mkdir -p "$D/skills/y"; echo mine > "$D/skills/y/f"; cdst check; rcc=$?
+[ "$rcc" -eq 0 ] && ok "R4 content: after a rollback the kept copy of the record is not offered, so its retired paths are not scanned" || bad "R4 consumed rc=$rcc $(cat "$t/out")"
 # check names at most 10 paths.
 for i in $(seq 1 12); do mkdir -p content/skills/m$i; echo m$i > content/skills/m$i/SKILL.md; done; cm=$(commit many)
 rm -rf "$D"; cat_ "$cm"; for i in $(seq 1 12); do rm -f "$D/skills/m$i/SKILL.md"; done
