@@ -87,6 +87,8 @@ chat. These references are CLI-agnostic and do not change task authority.
 
 Check current native source for the requested term/mechanism. Where memory is on, its route is `memory/README.md` of `agent-platform`. Explain in clear Korean with the actual programming terms; use no metaphor. State concrete input, executor and result, then the steps and details needed for the user's learning. Distinguish source fact from inference and do not claim a concept was understood merely because it was explained. Keep a scoped user preference and the terms actually explained, with dated evidence and feedback, in authorized `user-profile`/`glossary` engineering records; do not store the whole conversation, demographics, private payloads or inferred ability. Reuse stable term identity and correct a materially changed meaning with provenance. In a no-write task, make no Hindsight write and leave only the allowed local note. Credit retrieved memory when it contributes.
 
+If memory is disabled for this worker, use its exact source packet and record the
+retrieval gap rather than enabling a client or changing host configuration.
 Do not force a search on every tool call or repeat definitions already established
 in the current context. A recalled definition never replaces current source.
 
