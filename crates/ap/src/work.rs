@@ -62,6 +62,38 @@ pub trait System {
     fn pause(&mut self, duration: Duration) {
         std::thread::sleep(duration);
     }
+    /// Starts one long program without a pipe: `argv[0]` with the rest of `argv`, exactly the
+    /// environment `env`, in `cwd`, stdin read from `files[0]`, stdout and stderr written to
+    /// `files[1]` and `files[2]`. `ap run` passes the whole `systemd-run` command line here; a
+    /// test replaces the unit launcher by overriding this method.
+    fn launch(
+        &mut self,
+        argv: &[String],
+        env: &[(String, String)],
+        cwd: &str,
+        files: [&Path; 3],
+    ) -> std::io::Result<std::process::Child> {
+        let (program, rest) = argv.split_first().ok_or(std::io::ErrorKind::InvalidInput)?;
+        Command::new(program)
+            .args(rest)
+            .env_clear()
+            .envs(env.iter().map(|(k, v)| (k, v)))
+            .current_dir(cwd)
+            .stdin(std::fs::File::open(files[0])?)
+            .stdout(std::fs::File::create(files[1])?)
+            .stderr(std::fs::File::create(files[2])?)
+            .spawn()
+    }
+    /// Whether systemd is this host's init (sd_booted: `/run/systemd/system` is a directory).
+    fn units(&self) -> bool {
+        Path::new("/run/systemd/system").is_dir()
+    }
+    /// This process's environment; `ap run` keeps only a fixed short list of it.
+    fn environment(&self) -> Vec<(String, String)> {
+        std::env::vars_os()
+            .filter_map(|(k, v)| Some((k.into_string().ok()?, v.into_string().ok()?)))
+            .collect()
+    }
 }
 pub(crate) fn args(words: &[&str]) -> Vec<String> {
     words.iter().map(|s| (*s).into()).collect()
@@ -261,7 +293,7 @@ fn word(r: &Value, key: &str, max: usize) -> Result<String, Failure> {
     Ok(value.to_owned())
 }
 /// A fresh UUID from the kernel; Claude Code takes it as `--session-id` and Herdr reports it back.
-fn new_session_id(s: &impl System) -> Result<String, Failure> {
+pub(crate) fn new_session_id(s: &impl System) -> Result<String, Failure> {
     let bytes = s
         .read("/proc/sys/kernel/random/uuid")
         .map_err(|_| error("io_error", "session_id"))?;

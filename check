@@ -44,6 +44,9 @@ export AP_S03_TEST_ROOT
 chmod 0700 "$AP_S03_TEST_ROOT"
 trap 'rmdir -- "$AP_S03_TEST_ROOT"' EXIT
 cargo test --workspace --locked
+# `ap run` against the real systemd: skipped, saying so, where systemctl is absent or this caller
+# cannot start a transient unit in the system manager (the hosted runner is not root).
+bash ci/host-run-scope.sh "${CARGO_TARGET_DIR:-$PWD/target}/debug/ap"
 
 # The schema against a real engine: ontology/work.schema.json is installed into a
 # disposable store of the engine revision in ontology/ENGINE-PIN, and every action
