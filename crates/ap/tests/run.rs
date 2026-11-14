@@ -17,6 +17,7 @@ use std::{
 
 static NEXT: AtomicU32 = AtomicU32::new(0);
 const FAKE: &str = include_str!("fixtures/fake-claude.sh");
+const FAKE_CODEX: &str = include_str!("fixtures/fake-codex.sh");
 
 struct Fake {
     t: PathBuf,
@@ -50,9 +51,11 @@ impl Fake {
         for d in ["bin", "a1", "a2", "cwd"] {
             std::fs::create_dir_all(t.join(d)).unwrap();
         }
-        let fake = t.join("bin/claude");
-        std::fs::write(&fake, FAKE).unwrap();
-        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        for (name, text) in [("claude", FAKE), ("codex", FAKE_CODEX)] {
+            let fake = t.join("bin").join(name);
+            std::fs::write(&fake, text).unwrap();
+            std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         std::fs::write(t.join("prompt.md"), "review this\n").unwrap();
         let env = vec![
             ("PATH".into(), std::env::var("PATH").unwrap_or_default()),
@@ -204,13 +207,13 @@ impl System for Fake {
             ["systemd-run", "--scope", "--quiet", "--collect"]
         );
         assert!(argv[..at].contains(&"--slice=agents.slice".to_owned()));
-        assert_eq!(argv[at + 1], "claude");
+        assert!(["claude", "codex"].contains(&argv[at + 1].as_str()));
         let unit = argv[..at]
             .iter()
             .find_map(|a| a.strip_prefix("--unit="))
             .unwrap()
             .to_owned();
-        let child = Command::new(self.t.join("bin/claude"))
+        let child = Command::new(self.t.join("bin").join(&argv[at + 1]))
             .args(&argv[at + 2..])
             .env_clear()
             .envs(env.iter().map(|(k, v)| (k, v)))
@@ -1572,5 +1575,535 @@ fn gate_a_later_result_does_not_unmake_one_that_met_expect() {
     assert_eq!(
         std::fs::read_to_string(f.p("s2.md")).unwrap(),
         "that notification was the first watch"
+    );
+}
+
+// ---- runtime codex: a stage on the Codex CLI (tests/fixtures/fake-codex.sh) ------------------
+
+/// The flags that leave out the home's configuration, hooks, rules, apps, plugins, memories and
+/// further agents, for a fresh and a resumed stage alike.
+const CODEX_FLAGS: [&str; 21] = [
+    "--json",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--disable",
+    "hooks",
+    "--disable",
+    "apps",
+    "--disable",
+    "plugins",
+    "--disable",
+    "plugin_discovery_prefetch",
+    "--disable",
+    "skill_mcp_dependency_install",
+    "--disable",
+    "memories",
+    "--disable",
+    "multi_agent",
+    "-c",
+    "features.multi_agent_v2.max_concurrent_threads_per_session=1",
+    "--skip-git-repo-check",
+    "--dangerously-bypass-approvals-and-sandbox",
+];
+/// One turn's usage in the fake, as the record maps it (input without the cached and the
+/// cache-write part).
+fn one_turn() -> Value {
+    json!({"input": 18839 - 12288 - 100, "output": 5, "cache_read": 12288, "cache_creation": 100})
+}
+impl Fake {
+    fn codex(&self, out: &str) -> Value {
+        json!({"role":"implementer","runtime":"codex","account":self.p("a1"),"model":"gpt-6.1-terra",
+               "effort":"high","permission_mode":"bypassPermissions","cwd":self.p("cwd"),
+               "prompt":self.p("prompt.md"),"out":self.p(out)})
+    }
+    /// The program and arguments of the last launch after `systemd-run … --`.
+    fn last_cli(&self) -> Vec<String> {
+        let launch = self.launches.last().unwrap();
+        let at = launch.iter().position(|a| a == "--").unwrap();
+        launch[at + 1..].to_vec()
+    }
+    fn env_of_last(&self) -> Vec<String> {
+        let env = std::fs::read_to_string(self.t.join(format!("bin/env.{}", self.count())));
+        env.unwrap().lines().map(str::to_owned).collect()
+    }
+}
+fn codex_cli(head: &[&str], tail: &[&str]) -> Vec<String> {
+    let mut a: Vec<String> = head.iter().map(|s| s.to_string()).collect();
+    a.extend(CODEX_FLAGS.iter().map(|s| s.to_string()));
+    a.extend(tail.iter().map(|s| s.to_string()));
+    a
+}
+
+#[test]
+fn x1_codex_stage_is_started_headless_without_the_user_configuration() {
+    let mut f = Fake::new();
+    // Nothing of the caller's environment chooses another home or another login.
+    f.env.push(("CODEX_HOME".into(), "/root/.codex".into()));
+    f.env.push(("CODEX_SQLITE_HOME".into(), "/var/x".into()));
+    f.env.push(("OPENAI_API_KEY".into(), "not-a-key".into()));
+    let mut r = f.codex("c.md");
+    r["env"] = json!({"CARGO_TARGET_DIR": "/x/target"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let launch = f.launches.last().unwrap();
+    let at = launch.iter().position(|a| a == "--").unwrap();
+    assert_eq!(
+        launch[..at],
+        [
+            "systemd-run",
+            "--scope",
+            "--quiet",
+            "--collect",
+            v["unit"]
+                .as_str()
+                .map(|u| format!("--unit={u}"))
+                .unwrap()
+                .as_str(),
+            "--slice=agents.slice",
+            "-p",
+            "RuntimeMaxSec=5410s",
+            "-p",
+            "TimeoutStopSec=10s",
+        ]
+    );
+    let cwd = f.p("cwd");
+    let want = codex_cli(
+        &["codex", "--no-daemon", "exec"],
+        &[
+            "-m",
+            "gpt-6.1-terra",
+            "-c",
+            "model_reasoning_effort=\"high\"",
+            "-C",
+            &cwd,
+            "-",
+        ],
+    );
+    assert_eq!(f.last_cli(), want);
+    // The prompt on stdin, byte for byte; the home is the request's account, by CODEX_HOME only.
+    assert_eq!(
+        std::fs::read(f.t.join("bin/prompt.1")).unwrap(),
+        b"review this\n"
+    );
+    assert!(f.calls()[0].starts_with(&format!("{}|--no-daemon exec --json ", f.p("a1"))));
+    let env = f.env_of_last();
+    let names: Vec<&str> = env.iter().filter_map(|l| l.split('=').next()).collect();
+    assert!(
+        env.contains(&format!("CODEX_HOME={}", f.p("a1"))),
+        "{env:?}"
+    );
+    assert!(env.contains(&"CARGO_TARGET_DIR=/x/target".to_owned()));
+    for n in &names {
+        assert!(
+            !n.starts_with("CLAUDE_") && !n.starts_with("HERDR_") && !n.starts_with("OPENAI_"),
+            "{n}"
+        );
+        assert!(!n.starts_with("CODEX_") || *n == "CODEX_HOME", "{n}");
+    }
+    assert!(!names.contains(&"FOO"));
+    assert_eq!(v["runtime"], "codex");
+    // `ap` writes no file of the home.
+    assert_eq!(std::fs::read_dir(f.t.join("a1")).unwrap().count(), 0);
+}
+
+#[test]
+fn x1_claude_stage_arguments_are_unchanged() {
+    let mut f = Fake::new();
+    // A Codex stage before it leaves nothing behind in the next Claude stage.
+    assert_eq!(f.run(&f.codex("c.md")).unwrap().0["state"], "ok");
+    for (out, runtime) in [("a.md", None), ("b.md", Some("claude"))] {
+        let mut r = f.request(out);
+        if let Some(rt) = runtime {
+            r["runtime"] = json!(rt);
+        }
+        // CODEX_ and OPENAI_ names stay a Claude stage's own business, as before.
+        r["env"] = json!({"OPENAI_PROBE": "1"});
+        let (v, _) = f.run(&r).unwrap();
+        assert_eq!(
+            (v["state"].as_str(), v["runtime"].as_str()),
+            (Some("ok"), Some("claude"))
+        );
+        let session = v["session"].as_str().unwrap();
+        let settings = r#"{"autoMemoryEnabled":false,"disableAllHooks":true,"env":{"BASH_DEFAULT_TIMEOUT_MS":"2700000","BASH_MAX_TIMEOUT_MS":"2700000","CLAUDE_CODE_DISABLE_BACKGROUND_TASKS":"1"}}"#;
+        let want = [
+            "claude",
+            "--print",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--model",
+            "sonnet",
+            "--effort",
+            "high",
+            "--permission-mode",
+            "auto",
+            "--permission-prompts",
+            "none",
+            "--setting-sources",
+            "user",
+            "--settings",
+            settings,
+            "--disallowedTools",
+            "Monitor",
+            "--strict-mcp-config",
+            "--disable-slash-commands",
+            "--session-id",
+            session,
+        ];
+        assert_eq!(f.last_cli(), want);
+        let env = f.env_of_last();
+        assert!(env.contains(&format!("CLAUDE_CONFIG_DIR={}", f.p("a1"))));
+        assert!(!env.iter().any(|l| l.starts_with("CODEX_")), "{env:?}");
+    }
+}
+
+#[test]
+fn x2_refusals_of_the_codex_runtime_write_nothing() {
+    let mut f = Fake::new();
+    let cases: Vec<(&str, Option<Value>, &str)> = vec![
+        ("role", Some(json!("reviewer")), "invalid_input@role"),
+        (
+            "next_accounts",
+            Some(json!([f.p("a2")])),
+            "invalid_input@next_accounts",
+        ),
+        ("permission_mode", None, "invalid_input@permission_mode"),
+        (
+            "permission_mode",
+            Some(json!("auto")),
+            "invalid_input@permission_mode",
+        ),
+        (
+            "permission_mode",
+            Some(json!("acceptEdits")),
+            "invalid_input@permission_mode",
+        ),
+        (
+            "mcp_config",
+            Some(json!(["/etc/ap-test/mcp.json"])),
+            "invalid_input@mcp_config",
+        ),
+        ("skills", Some(json!(true)), "invalid_input@skills"),
+        ("skills", Some(json!(false)), "invalid_input@skills"),
+        ("memory", Some(json!(false)), "invalid_input@memory"),
+        (
+            "integration",
+            Some(json!(false)),
+            "invalid_input@integration",
+        ),
+        (
+            "env",
+            Some(json!({"CODEX_HOME": "/root/.codex"})),
+            "env_forbidden@env",
+        ),
+        (
+            "env",
+            Some(json!({"CODEX_SQLITE_HOME": "/x"})),
+            "env_forbidden@env",
+        ),
+        (
+            "env",
+            Some(json!({"OPENAI_API_KEY": "x"})),
+            "env_forbidden@env",
+        ),
+        (
+            "env",
+            Some(json!({"CLAUDE_CONFIG_DIR": "/x"})),
+            "env_forbidden@env",
+        ),
+        ("env", Some(json!({"HOME": "/"})), "env_forbidden@env"),
+        (
+            "account",
+            Some(json!(f.p("missing"))),
+            "account_missing@account",
+        ),
+        ("runtime", Some(json!("grok")), "invalid_input@runtime"),
+    ];
+    for (member, value, want) in cases {
+        let mut r = f.codex("r.md");
+        match value {
+            Some(v) => r[member] = v,
+            None => {
+                r.as_object_mut().unwrap().remove(member);
+            }
+        }
+        assert_eq!(code(f.run(&r)), want, "{member}");
+    }
+    // An empty list of next accounts or of MCP files is no member that asks for anything.
+    let mut r = f.codex("ok.md");
+    (r["next_accounts"], r["mcp_config"]) = (json!([]), json!([]));
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+    // Nothing of the refused requests exists: no file, no call, one launch (the last request).
+    let mut names: Vec<String> = std::fs::read_dir(&f.t)
+        .unwrap()
+        .map(|e| e.unwrap().file_name().into_string().unwrap())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            "a1",
+            "a2",
+            "bin",
+            "cwd",
+            "ok.md",
+            "ok.md.run.json",
+            "ok.md.stream.jsonl",
+            "prompt.md"
+        ]
+    );
+    assert_eq!((f.calls().len(), f.launches.len()), (1, 1));
+}
+
+#[test]
+fn x3_stream_becomes_the_record() {
+    let mut f = Fake::new();
+    let mut r = f.codex("s.md");
+    r["expect"] = json!({"first_line": "stage ok"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(v, f.record("s.md"));
+    // The answer is the last agent message of the completed turn, byte for byte.
+    assert_eq!(
+        std::fs::read(f.p("s.md")).unwrap(),
+        b"stage ok\nsecond line"
+    );
+    assert_eq!(v["answer"]["sha256"], f.sha("s.md"));
+    assert_eq!(v["session"], "01a1dc33-d3be-72e3-8ea7-000000000001");
+    assert_eq!(v["tokens"], one_turn());
+    // reasoning, the command, two messages; one turn end; no denial on this runtime.
+    assert_eq!(
+        (v["turns"].as_u64(), v["results"].as_u64()),
+        (Some(4), Some(1))
+    );
+    assert_eq!(v["permission_denials"], json!([]));
+    assert_eq!(
+        (v["expect_met"].as_bool(), v["unmet"].as_str()),
+        (Some(true), None)
+    );
+    assert_eq!(
+        (v["model"].as_str(), v["effort"].as_str()),
+        (Some("gpt-6.1-terra"), Some("high"))
+    );
+    // A CLI that reports no cache-write part gives cache_creation 0.
+    f.mode("a1", "nowrite");
+    let (v, _) = f.run(&f.codex("n.md")).unwrap();
+    assert_eq!(
+        v["tokens"],
+        json!({"input": 18839 - 12288, "output": 5, "cache_read": 12288, "cache_creation": 0})
+    );
+}
+
+#[test]
+fn x3_session_enters_the_record_at_the_thread_start() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("bin/watch"), f.p("w.md.run.json")).unwrap();
+    f.mode("a1", "watch");
+    let (v, status) = f.run(&f.codex("w.md")).unwrap();
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
+    let thread = "01a1dc33-d3be-72e3-8ea7-000000000001";
+    assert_eq!(
+        (seen["state"].as_str(), seen["session"].as_str()),
+        (Some("running"), Some(thread))
+    );
+    // A turn that failed (the CLI without a login) keeps the session in the record.
+    assert_eq!(
+        (status, v["state"].as_str(), v["session"].as_str()),
+        (3, Some("failed"), Some(thread))
+    );
+    // A CLI that names no thread leaves the session null.
+    f.clear("a1");
+    let fake = f.t.join("bin/codex");
+    let text = FAKE_CODEX.replace(
+        "started() { e '{\"type\":\"thread.started\",\"thread_id\":\"'\"$tid\"'\"}';",
+        "started() {",
+    );
+    std::fs::write(&fake, text).unwrap();
+    let (v, _) = f.run(&f.codex("n.md")).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["session"].as_str()),
+        (Some("ok"), None)
+    );
+}
+
+#[test]
+fn x3_a_message_of_an_unfinished_turn_is_no_answer() {
+    let mut f = Fake::new();
+    for (mode, out) in [
+        ("unfinished", "u.md"),
+        ("msgfailed", "m.md"),
+        ("hang", "h.md"),
+    ] {
+        f.mode("a1", mode);
+        let mut r = f.codex(out);
+        r["timeout_seconds"] = json!(2);
+        let (v, status) = f.run(&r).unwrap();
+        let want = if mode == "hang" { "timeout" } else { "failed" };
+        assert_eq!((status, v["state"].as_str()), (3, Some(want)), "{mode} {v}");
+        assert!(
+            !Path::new(&f.p(out)).exists(),
+            "{mode}: the message was written"
+        );
+        assert_eq!(
+            (v["answer"].clone(), v["expect_met"].clone()),
+            (Value::Null, Value::Null),
+            "{mode}"
+        );
+    }
+}
+
+#[test]
+fn x4_failed_turn_is_failed() {
+    let mut f = Fake::new();
+    f.mode("a1", "failed");
+    let (v, status) = f.run(&f.codex("f.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (3, Some("failed")), "{v}");
+    assert_eq!(
+        (v["results"].as_u64(), v["answer"].clone()),
+        (Some(1), Value::Null)
+    );
+    assert!(!Path::new(&f.p("f.md")).exists());
+    // The record keeps no error text; the stream holds it.
+    let record = std::fs::read_to_string(f.p("f.md.run.json")).unwrap();
+    assert!(!record.contains("not supported"), "{record}");
+    let stream = std::fs::read_to_string(f.p("f.md.stream.jsonl")).unwrap();
+    assert!(stream.contains("not supported"));
+}
+
+#[test]
+fn x4_usage_limit_text_is_cut() {
+    let mut f = Fake::new();
+    for (mode, out) in [("limit", "l.md"), ("limit2", "l2.md")] {
+        f.mode("a1", mode);
+        let (v, status) = f.run(&f.codex(out)).unwrap();
+        assert_eq!(
+            (status, v["state"].as_str()),
+            (75, Some("cut")),
+            "{mode} {v}"
+        );
+        assert!(!Path::new(&f.p(out)).exists());
+        assert!(
+            !std::fs::read_to_string(f.p(&format!("{out}.run.json")))
+                .unwrap()
+                .contains("usage limit")
+        );
+    }
+}
+
+#[test]
+fn x4_error_event_alone_decides_nothing() {
+    let mut f = Fake::new();
+    f.mode("a1", "errors");
+    let mut r = f.codex("e.md");
+    r["expect"] = json!({"first_line": "stage ok"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(std::fs::read(f.p("e.md")).unwrap(), b"stage ok");
+    assert_eq!(v["results"], 1);
+}
+
+#[test]
+fn x4_no_turn_end_is_timeout_or_failed() {
+    let mut f = Fake::new();
+    f.mode("a1", "hang");
+    let mut r = f.codex("t.md");
+    r["timeout_seconds"] = json!(2);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("timeout"), None),
+        "{v}"
+    );
+    f.mode("a1", "noend");
+    let (v, status) = f.run(&f.codex("n.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("failed"), Some("result_event")),
+        "{v}"
+    );
+    assert_eq!(
+        (v["results"].as_u64(), v["turns"].clone()),
+        (Some(0), Value::Null)
+    );
+}
+
+#[test]
+fn x4_empty_answer_is_no_result() {
+    let mut f = Fake::new();
+    f.mode("a1", "empty");
+    let (v, status) = f.run(&f.codex("y.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("answer")),
+        "{v}"
+    );
+    assert!(!Path::new(&f.p("y.md")).exists());
+    assert_eq!(v["tokens"], one_turn());
+}
+
+#[test]
+fn x5_resume_continues_the_recorded_session() {
+    let mut f = Fake::new();
+    let (first, _) = f.run(&f.codex("r1.md")).unwrap();
+    let session = first["session"].as_str().unwrap().to_owned();
+    let mut r = f.resume(f.codex("x"), "r2.md", "r1.md");
+    r["role"] = json!("fixer");
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let cwd = f.p("cwd");
+    let want = codex_cli(
+        &["codex", "--no-daemon", "exec", "resume"],
+        &[
+            "-m",
+            "gpt-6.1-terra",
+            "-c",
+            "model_reasoning_effort=\"high\"",
+            &session,
+            "-",
+        ],
+    );
+    assert_eq!(f.last_cli(), want);
+    assert!(f.calls()[1].starts_with(&format!("{}|", f.p("a1"))));
+    assert_eq!(
+        (v["session"].as_str(), v["cwd"].as_str()),
+        (Some(session.as_str()), Some(cwd.as_str()))
+    );
+    assert_eq!(v["resumes"], f.p("r1.md.run.json"));
+    // The CLI reports the thread's usage so far; the record holds this run's own part.
+    assert_eq!(v["tokens"], one_turn());
+    let mut r = f.resume(f.codex("x"), "r3.md", "r2.md");
+    r["role"] = json!("fixer");
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["session"].as_str(), v["tokens"].clone()),
+        (Some(session.as_str()), one_turn())
+    );
+    // A session the CLI would read as a flag is no session.
+    let mut rec = f.record("r1.md");
+    rec["session"] = json!("--last");
+    std::fs::write(f.p("bad.md.run.json"), rec.to_string()).unwrap();
+    let mut r = f.resume(f.codex("x"), "r4.md", "bad.md");
+    r["role"] = json!("fixer");
+    assert_eq!(code(f.run(&r)), "resume_record_missing@resume");
+}
+
+#[test]
+fn x5_resume_of_the_other_runtime_is_refused() {
+    let mut f = Fake::new();
+    let mut claude = f.request("c.md");
+    claude["role"] = json!("implementer");
+    f.run(&claude).unwrap();
+    f.run(&f.codex("x.md")).unwrap();
+    let mut r = f.resume(f.codex("x"), "c2.md", "c.md");
+    r["role"] = json!("fixer");
+    assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime");
+    let mut r = f.resume(claude.clone(), "x2.md", "x.md");
+    r["role"] = json!("fixer");
+    assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime");
+    r["runtime"] = json!("claude");
+    assert_eq!(code(f.run(&r)), "resume_runtime_differs@runtime");
+    assert!(
+        !Path::new(&f.p("c2.md.run.json")).exists() && !Path::new(&f.p("x2.md.run.json")).exists()
     );
 }
