@@ -36,7 +36,7 @@ const MODES: [&str; 6] = [
 const KEEP: [&str; 10] = [
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
 ];
-const MEMBERS: [&str; 17] = [
+const MEMBERS: [&str; 20] = [
     "role",
     "runtime",
     "account",
@@ -54,13 +54,17 @@ const MEMBERS: [&str; 17] = [
     "integration",
     "mcp_config",
     "env",
+    "bind",
+    "skills",
+    "memory",
 ];
 /// The unit's own bound runs this long past the request's: `ap run` stops the unit first, and the
 /// bound still ends it when `ap run` is gone.
 const GRACE: u64 = 10;
 const MAX_TIMEOUT: u64 = 86_400;
-/// Switches off every hook (account, host, project, plugin) of the session.
-const HOOKS_OFF: &str = r#"{"disableAllHooks":true}"#;
+/// The Bash tool's default and maximum time limit, in milliseconds: a check of 40 minutes runs in
+/// the foreground of one call.
+const BASH_MS: &str = "2700000";
 /// Only the account's settings load: a worktree's `.claude/settings*.json`, which an earlier
 /// stage may have written, cannot steer this one (shown live: its `env` reached the shell).
 const SOURCES: &str = "user";
@@ -95,6 +99,11 @@ struct Request {
     expect_before: Value,
     /// The environment of the CLI (and of `git`), without `CLAUDE_CONFIG_DIR`.
     base_env: Vec<(String, String)>,
+    /// The systemd unit whose end stops this stage's unit.
+    bind: Option<String>,
+    /// The account's skills and slash commands, and its auto-memory, load only when asked.
+    skills: bool,
+    memory: bool,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -397,6 +406,22 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
     };
     let base_env = base_env(s, &env);
     require!(s.units() => "systemd_absent", "host");
+    let bind = match r.get("bind") {
+        None => None,
+        Some(v) => {
+            let unit = v.as_str().filter(|u| {
+                u.len() <= 200
+                    && u.contains('.')
+                    && !u.starts_with('-')
+                    && u.bytes().all(|c| c.is_ascii_alphanumeric() || b":_.@-".contains(&c))
+            });
+            let unit = unit.ok_or_else(|| error("invalid_input", "bind"))?;
+            // A unit that is not active now would stop the stage at its launch.
+            let state = s.call("systemctl", &args(&["is-active", unit]), &Value::Null, 10_000);
+            require!(state.is_ok_and(|r| r.stdout == b"active\n") => "bind_inactive", "bind");
+            Some(unit.to_owned())
+        }
+    };
     Ok(Request {
         role: role.to_owned(),
         accounts,
@@ -414,6 +439,9 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
         resume: earlier.map(|(_, r)| r),
         expect_before,
         base_env,
+        bind,
+        skills: flag(r, "skills")?,
+        memory: flag(r, "memory")?,
     })
 }
 
@@ -595,12 +623,7 @@ fn judge(
         record["session"] = json!(id);
     }
     let answer = e["result"].as_str().unwrap_or("");
-    // A finished answer is never read as a cut: without `is_error`, the usage-limit text is a cut
-    // only when the stream also holds a rejected rate-limit event.
-    let cut = (limit_text(answer) && seen.rejected)
-        || (e["is_error"] == true
-            && (seen.rejected || e["api_error_status"] == 429 || limit_text(answer)));
-    if cut {
+    if cut(seen, e) {
         "cut"
     } else if e["is_error"] == true {
         "failed"
@@ -650,6 +673,26 @@ fn stop(s: &mut impl System, unit: &str, child: &mut Child) -> bool {
         let _ = child.wait();
     }
     ended(s, unit)
+}
+/// A finished answer is never read as a cut: without `is_error`, the usage-limit text is a cut
+/// only when the stream also holds a rejected rate-limit event.
+fn cut(seen: &Seen, e: &Value) -> bool {
+    let answer = e["result"].as_str().unwrap_or("");
+    (limit_text(answer) && seen.rejected)
+        || (e["is_error"] == true
+            && (seen.rejected || e["api_error_status"] == 429 || limit_text(answer)))
+}
+/// The result the stage is judged by: the last one whose answer meets `expect` (a later result
+/// does not unmake it), else the last one.
+fn chosen<'a>(q: &Request, seen: &'a Seen) -> Option<&'a Value> {
+    let meets = |e: &&Value| {
+        let answer = e["result"].as_str().unwrap_or("");
+        e["is_error"] != true
+            && !answer.is_empty()
+            && !cut(seen, e)
+            && q.expect_line.as_deref().is_none_or(|p| glob(p, answer.lines().next().unwrap_or("")))
+    };
+    seen.results.iter().rev().find(meets).or(seen.results.last())
 }
 fn limit_text(text: &str) -> bool {
     let t = text.to_lowercase();
@@ -720,6 +763,20 @@ fn attempt(
         &format!("RuntimeMaxSec={}s", q.timeout + GRACE),
         "-p",
         "TimeoutStopSec=10s",
+    ]);
+    if let Some(b) = &q.bind {
+        // The bound unit's end, for any reason, stops this one (`BindsTo` with `After`).
+        argv.extend(args(&["-p", &format!("BindsTo={b}"), "-p", &format!("After={b}")]));
+    }
+    // No hook of any source; no auto-memory unless asked; the Bash tool runs a 40-minute check in
+    // the foreground and never moves a command to the background.
+    let mut settings = json!({"disableAllHooks": true, "env": {
+        "BASH_DEFAULT_TIMEOUT_MS": BASH_MS, "BASH_MAX_TIMEOUT_MS": BASH_MS,
+        "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1"}});
+    if !q.memory {
+        settings["autoMemoryEnabled"] = json!(false);
+    }
+    argv.extend(args(&[
         "--",
         "claude",
         "--print",
@@ -737,9 +794,14 @@ fn attempt(
         "--setting-sources",
         SOURCES,
         "--settings",
-        HOOKS_OFF,
+        &settings.to_string(),
+        "--disallowedTools",
+        "Monitor",
         "--strict-mcp-config",
-    ]);
+    ]));
+    if !q.skills {
+        argv.push("--disable-slash-commands".into());
+    }
     for m in &q.mcp {
         argv.extend(args(&["--mcp-config", m]));
     }
@@ -802,7 +864,7 @@ fn attempt(
     record["end"] = json!(stamp(SystemTime::now()));
     record["results"] = json!(seen.results.len());
     let mut write_failed = false;
-    let state = match seen.results.last() {
+    let state = match chosen(q, &seen) {
         None if timed_out => "timeout",
         None => {
             record["unmet"] = json!("result_event");

@@ -56,5 +56,28 @@ case "$mode" in
            init; python3 -I -c 'import json,sys; print(json.dumps({"type":"result","subtype":"success","is_error":False,"num_turns":2,"result":open(sys.argv[1],encoding="utf-8",newline="").read(),"session_id":sys.argv[2],"usage":{"input_tokens":7,"output_tokens":9},"permission_denials":[]}))' "$here/answer" "$sid" ;;
   denied)  init; tool; result false 'done' 2 '[{"tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":"git push"}}]' ;;
   file)    init; tool; echo ready > a.txt; result false 'done' 2 ;;
+  skeleton) # replays the event skeleton in `skeleton`; the n-th result answers line n of `answers`
+           python3 -I - "$here/skeleton" "$here/answers" "$sid" <<'PY'
+import json, sys
+answers, n = open(sys.argv[2], encoding="utf-8").read().split("\n"), 0
+for line in open(sys.argv[1], encoding="utf-8"):
+    if line.startswith("#") or not line.strip():
+        continue
+    kind, sub = line.split()
+    e = {"type": kind, "session_id": sys.argv[3]}
+    if kind == "result":
+        e.update(subtype=sub, is_error=False, num_turns=1, result=answers[n].replace("\\n", "\n"),
+                 usage={"input_tokens": 1, "output_tokens": 1}, permission_denials=[])
+        n += 1
+    elif kind in ("assistant", "user"):
+        block = {"type": sub, "id": "t1", "name": "Bash", "input": {}} if sub == "tool_use" else {"type": sub}
+        e["message"] = {"role": kind, "content": [block]}
+    elif kind == "rate_limit_event":
+        e["rate_limit_info"] = {"status": "allowed"}
+    elif sub != "-":
+        e["subtype"] = sub
+    print(json.dumps(e), flush=True)
+PY
+           ;;
   *)       init; said "Verdict: accept"; result false 'Verdict: accept\nhead' 3 ;;
 esac
