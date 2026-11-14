@@ -165,6 +165,87 @@ else
   report FAIL backup_refusal_preserves_installed
 fi
 
+# --- the record, status and rollback without an argument, in a temporary repository with a fake cargo.
+# The copy of the script lives in its own repository so that origin/main, the worktree and the build are the test's.
+RREPO="$TMP_ROOT/rrepo"; mkdir -p "$RREPO/scripts" "$TMP_ROOT/fakebin"
+cp "$INSTALL_SCRIPT" "$RREPO/scripts/install-ap.sh"
+git -C "$RREPO" init -q .
+rev_commit() {
+  printf '%s\n' "$1" >"$RREPO/rev"
+  git -C "$RREPO" add -A
+  git -C "$RREPO" -c user.email=t@example.invalid -c user.name=t commit -q -m "$1"
+  git -C "$RREPO" update-ref refs/remotes/origin/main HEAD
+  git -C "$RREPO" rev-parse HEAD
+}
+cat >"$TMP_ROOT/fakebin/cargo" <<'CARGO'
+#!/usr/bin/env bash
+# The build of the test: a binary that prints the commit of the worktree it is built in.
+rev="$(git rev-parse HEAD)"
+mkdir -p "$CARGO_TARGET_DIR/release"
+printf '#!/usr/bin/env bash\nprintf "ap 0.1.0 %%s\\n" "%s"\n' "$rev" >"$CARGO_TARGET_DIR/release/ap"
+chmod +x "$CARGO_TARGET_DIR/release/ap"
+CARGO
+chmod +x "$TMP_ROOT/fakebin/cargo"
+RI="$TMP_ROOT/rinst"; RB="$TMP_ROOT/rbk"; mkdir -p "$RI"; mkdir -m 0755 "$RB"
+apx() {
+  env AP_INSTALL_DIR="$RI" AP_BACKUP_DIR="$RB" AP_INSTALL_LOCK="$TMP_ROOT/r-install.lock" AP_CARGO_LOCK="$TMP_ROOT/r-cargo.lock" \
+    CARGO_TARGET_DIR="$TMP_ROOT/rtarget" PATH="$TMP_ROOT/fakebin:$PATH" bash "$RREPO/scripts/install-ap.sh" "$@"
+}
+status_is() { # <commit> <check> <rollback>
+  local s=""
+  s="$(apx status 2>/dev/null)" || return 1
+  [[ "$(printf '%s\n' "$s" | wc -l)" -eq 1 ]] \
+    && printf '%s\n' "$s" | grep -Eq "^\{\"name\":\"ap\",\"commit\":\"$1\",\"installed_at\":\"[0-9T:Z-]+\",\"check\":\"$2\",\"rollback\":\"$3\"\}$"
+}
+REH_OK=1
+reh_fail() { REH_OK=0; printf 'rehearsal: %s\n' "$1"; }
+C1="$(rev_commit one)"
+apx install "$C1" >"$TMP_ROOT/reh.out" 2>"$TMP_ROOT/reh.err" || reh_fail "install 1 refused: $(cat "$TMP_ROOT/reh.err")"
+SHA1="$(sha256sum "$RI/ap" | awk '{print $1}')"
+status_is "$C1" ok none || reh_fail "status after install 1"
+C2="$(rev_commit two)"
+apx install "$C2" >"$TMP_ROOT/reh.out" 2>"$TMP_ROOT/reh.err" || reh_fail "install 2 refused: $(cat "$TMP_ROOT/reh.err")"
+status_is "$C2" ok available || reh_fail "status after install 2"
+CHECK_OUT="$(apx check 2>&1 || true)"
+[[ "$(printf '%s\n' "$CHECK_OUT" | sed -n 1p)" == "ap 0.1.0 $C2" && "$(printf '%s\n' "$CHECK_OUT" | sed -n 4p)" == equal ]] || reh_fail "check after install 2: $CHECK_OUT"
+apx rollback >"$TMP_ROOT/reh.out" 2>"$TMP_ROOT/reh.err" || reh_fail "rollback refused: $(cat "$TMP_ROOT/reh.err")"
+[[ "$(cat "$TMP_ROOT/reh.out")" == "ap 0.1.0 $C1" ]] || reh_fail "rollback printed $(cat "$TMP_ROOT/reh.out")"
+[[ "$(sha256sum "$RI/ap" | awk '{print $1}')" == "$SHA1" ]] || reh_fail "rollback did not restore the bytes of version 1"
+status_is "$C1" ok none || reh_fail "status after rollback"
+APX_SNAP="$(find "$RI" "$RB" -type f -exec sha256sum {} + | sort)"
+if apx rollback >"$TMP_ROOT/reh.out" 2>"$TMP_ROOT/reh.err"; then reh_fail "second rollback was admitted"; fi
+grep -q '^rollback_not_available@' "$TMP_ROOT/reh.err" || reh_fail "second rollback: $(cat "$TMP_ROOT/reh.err")"
+[[ "$APX_SNAP" == "$(find "$RI" "$RB" -type f -exec sha256sum {} + | sort)" ]] || reh_fail "second rollback changed a file"
+apx install "$C2" >"$TMP_ROOT/reh.out" 2>"$TMP_ROOT/reh.err" || reh_fail "install 2 again refused: $(cat "$TMP_ROOT/reh.err")"
+status_is "$C2" ok available || reh_fail "status after install 2 again"
+CHECK_OUT="$(apx check 2>&1 || true)"
+[[ "$(printf '%s\n' "$CHECK_OUT" | sed -n 1p)" == "ap 0.1.0 $C2" ]] || reh_fail "check after install 2 again: $CHECK_OUT"
+if [[ "$REH_OK" -eq 1 ]]; then report ok rehearsal_install_install_check_status_rollback_refuse_install; else report FAIL rehearsal_install_install_check_status_rollback_refuse_install; fi
+
+# status says drift when the installed binary is not the recorded one, and writes nothing.
+printf '# changed\n' >>"$RI/ap"
+SNAP="$(find "$RI" "$RB" -type f -exec sha256sum {} + | sort)"
+if status_is "$C2" drift available && [[ "$SNAP" == "$(find "$RI" "$RB" -type f -exec sha256sum {} + | sort)" ]]; then report ok status_drift_writes_nothing; else report FAIL status_drift_writes_nothing; fi
+
+# status without a record is not_recorded; an unreadable target is a refusal.
+RI2="$TMP_ROOT/rinst2"; mkdir -p "$RI2"; make_fake_ap "$RI2/ap" dddddddddddddddddddddddddddddddddddddddd
+S2="$(env AP_INSTALL_DIR="$RI2" AP_BACKUP_DIR="$TMP_ROOT/no-record-dir" bash "$INSTALL_SCRIPT" status 2>/dev/null || true)"
+if [[ "$S2" == '{"name":"ap","commit":null,"installed_at":null,"check":"not_recorded","rollback":"none"}' && ! -e "$TMP_ROOT/no-record-dir" ]]; then report ok status_not_recorded; else report FAIL status_not_recorded; fi
+expect_refusal status_unreadable_target target_unreadable \
+  env AP_INSTALL_DIR="$TMP_ROOT/no-such-dir" AP_BACKUP_DIR="$BACKUP_DIR" bash "$INSTALL_SCRIPT" status
+expect_refusal status_takes_no_argument status_takes_no_arguments \
+  env AP_INSTALL_DIR="$RI2" AP_BACKUP_DIR="$BACKUP_DIR" bash "$INSTALL_SCRIPT" status extra
+mkdir -m 0755 "$TMP_ROOT/empty-bk"
+expect_refusal rollback_without_record rollback_not_available \
+  env AP_INSTALL_DIR="$RI2" AP_BACKUP_DIR="$TMP_ROOT/empty-bk" AP_INSTALL_LOCK="$LOCK_FILE" bash "$INSTALL_SCRIPT" rollback
+
+# a failed write of the record puts the before-file back: the installed binary is the previous one and no record is claimed.
+RI="$TMP_ROOT/rinst3"; RB="$TMP_ROOT/rbk3"; mkdir -p "$RI" "$RB/installed.json"; chmod 0755 "$RB"
+make_fake_ap "$RI/ap" ffffffffffffffffffffffffffffffffffffffff
+PREV_SHA="$(sha256sum "$RI/ap" | awk '{print $1}')"
+expect_refusal install_record_write_failed record_write_failed_restored apx install "$C2"
+if [[ "$(sha256sum "$RI/ap" | awk '{print $1}')" == "$PREV_SHA" ]]; then report ok install_record_write_failed_keeps_previous_binary; else report FAIL install_record_write_failed_keeps_previous_binary; fi
+
 if [[ "$FAILURES" -ne 0 ]]; then
   exit 1
 fi

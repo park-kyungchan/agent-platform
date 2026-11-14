@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+# Install `ap` on the host, and answer four verbs:
+#   install <full commit>   build the commit of origin/main in a detached worktree and install it; records the
+#                           commit, the sha256 of the binary, the time and the before-file in $BACKUP_DIR/installed.json
+#   check                   compares the installed binary with origin/main (exit 0; writes nothing)
+#   rollback                installs the before-file the record names (one level); `rollback <before-file>` as before
+#   status                  one JSON line: name, commit, installed_at, check (ok|drift|not_recorded), rollback
+#                           (available|none); no write, no network, no Git call
 set -euo pipefail
 
 INSTALL_DIR="${AP_INSTALL_DIR:-/usr/local/bin}"
@@ -8,7 +15,8 @@ while [[ "$BACKUP_DIR" != / && "$BACKUP_DIR" == */ ]]; do
   BACKUP_DIR="${BACKUP_DIR%/}"
 done
 INSTALLED="$INSTALL_DIR/ap"
-LOCK_FILE="/home/palantirkc/work/ws-replan/wt/.host-cargo.lock"
+RECORD="$BACKUP_DIR/installed.json"
+LOCK_FILE="${AP_CARGO_LOCK:-/home/palantirkc/work/ws-replan/wt/.host-cargo.lock}"
 INSTALL_LOCK_FILE="${AP_INSTALL_LOCK:-/run/lock/ap-install.lock}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -37,6 +45,25 @@ acquire_install_lock() {
   fi
   if ! flock -n 9; then
     refuse "install_busy" "$LINENO"
+  fi
+}
+
+json_field() {
+  # $1 = file, $2 = key; prints the string value or nothing (null and absent both print nothing).
+  sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$1" | head -n 1
+}
+
+# write_record <commit> <sha256 of the installed binary> <before-file or empty> <sha256 of the before-file or empty>
+write_record() {
+  local tmp="" kept=null kept_sha=null
+  [[ -z "$3" ]] || kept="\"$3\""
+  [[ -z "$4" ]] || kept_sha="\"$4\""
+  tmp="$(mktemp "$BACKUP_DIR/.installed.json.XXXXXX")" || return 1
+  if ! printf '{"commit":"%s","sha256":"%s","installed_at":"%s","before":%s,"before_sha256":%s}\n' \
+    "$1" "$2" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$kept" "$kept_sha" >"$tmp" \
+    || ! chmod 0644 "$tmp" || ! mv -T -- "$tmp" "$RECORD"; then
+    rm -f -- "$tmp"
+    return 1
   fi
 }
 
@@ -102,6 +129,74 @@ do_check() {
   exit 0
 }
 
+do_status() {
+  if [[ ! -d "$INSTALL_DIR" || ! -r "$INSTALL_DIR" ]]; then
+    printf 'target_unreadable@install-ap.sh:%s\n' "$LINENO" >&2
+    exit 1
+  fi
+  local commit=null at=null chk=not_recorded rb=none
+  if [[ -f "$RECORD" ]]; then
+    local rc="" rat="" rsha="" before="" bsha="" actual=""
+    rc="$(json_field "$RECORD" commit)"
+    rat="$(json_field "$RECORD" installed_at)"
+    rsha="$(json_field "$RECORD" sha256)"
+    before="$(json_field "$RECORD" before)"
+    bsha="$(json_field "$RECORD" before_sha256)"
+    commit="\"$rc\""
+    at="\"$rat\""
+    chk=drift
+    if [[ -f "$INSTALLED" ]]; then
+      actual="$(sha256sum "$INSTALLED" 2>/dev/null | awk '{print $1}' || true)"
+      if [[ -n "$rsha" && "$actual" == "$rsha" ]]; then
+        chk=ok
+      fi
+    fi
+    if [[ -n "$before" && -n "$bsha" && "$(basename -- "$before")" =~ ^ap\.before-[0-9a-f]{7}$ && -f "$before" && ! -L "$before" ]]; then
+      if [[ "$(sha256sum "$before" 2>/dev/null | awk '{print $1}' || true)" == "$bsha" ]]; then
+        rb=available
+      fi
+    fi
+  fi
+  printf '{"name":"ap","commit":%s,"installed_at":%s,"check":"%s","rollback":"%s"}\n' "$commit" "$at" "$chk" "$rb"
+  exit 0
+}
+
+# restore_previous <had_previous> <before-file> <code>: put the before-file back over the installed binary (or remove
+# a binary that had no predecessor) and refuse with <code>; restore_failed when the before-file cannot be put back.
+restore_previous() {
+  local had_previous="$1" backup="$2" code="$3"
+  if [[ "$had_previous" -eq 1 && -n "$backup" && -f "$backup" ]]; then
+    local restored=0
+    local restore_tmp=""
+    restore_tmp="$(mktemp "$INSTALL_DIR/.ap.restore.XXXXXX" || true)"
+    if [[ -n "$restore_tmp" && -f "$restore_tmp" ]] && install -m 0755 "$backup" "$restore_tmp"; then
+      if mv "$restore_tmp" "$INSTALLED"; then
+        restored=1
+      else
+        rm -f "$restore_tmp"
+      fi
+    else
+      [[ -n "$restore_tmp" ]] && rm -f "$restore_tmp"
+    fi
+    if [[ "$restored" -eq 1 ]]; then
+      local restored_sha=""
+      restored_sha="$(sha256sum "$INSTALLED" 2>/dev/null | awk '{print $1}' || true)"
+      local backup_sha=""
+      backup_sha="$(sha256sum "$backup" 2>/dev/null | awk '{print $1}' || true)"
+      if [[ -n "$restored_sha" && "$restored_sha" == "$backup_sha" ]]; then
+        printf '%s\n' "$backup" >&2
+        refuse "$code" "$LINENO"
+      fi
+    fi
+    printf '%s\n' "$backup" >&2
+    printf '%s\n' "$INSTALLED" >&2
+    refuse "restore_failed" "$LINENO"
+  else
+    rm -f "$INSTALLED"
+  fi
+  refuse "$code" "$LINENO"
+}
+
 do_install() {
   if [[ $# -ne 1 ]]; then
     refuse "install_requires_expected_commit" "$LINENO"
@@ -155,9 +250,9 @@ do_install() {
   fi
   local backup=""
   local had_previous=0
+  local current_sha=""
   if [[ -f "$INSTALLED" ]]; then
     had_previous=1
-    local current_sha=""
     current_sha="$(sha256sum "$INSTALLED" | awk '{print $1}')"
     if [[ -z "$current_sha" ]]; then
       refuse "installed_sha_unavailable" "$LINENO"
@@ -207,36 +302,13 @@ do_install() {
   local new_commit=""
   new_commit="$(version_commit "$new_version")"
   if [[ "$new_commit" != "$expected" ]]; then
-    if [[ "$had_previous" -eq 1 && -n "$backup" && -f "$backup" ]]; then
-      local restored=0
-      local restore_tmp=""
-      restore_tmp="$(mktemp "$INSTALL_DIR/.ap.restore.XXXXXX" || true)"
-      if [[ -n "$restore_tmp" && -f "$restore_tmp" ]] && install -m 0755 "$backup" "$restore_tmp"; then
-        if mv "$restore_tmp" "$INSTALLED"; then
-          restored=1
-        else
-          rm -f "$restore_tmp"
-        fi
-      else
-        [[ -n "$restore_tmp" ]] && rm -f "$restore_tmp"
-      fi
-      if [[ "$restored" -eq 1 ]]; then
-        local restored_sha=""
-        restored_sha="$(sha256sum "$INSTALLED" 2>/dev/null | awk '{print $1}' || true)"
-        local backup_sha=""
-        backup_sha="$(sha256sum "$backup" 2>/dev/null | awk '{print $1}' || true)"
-        if [[ -n "$restored_sha" && "$restored_sha" == "$backup_sha" ]]; then
-          printf '%s\n' "$backup" >&2
-          refuse "installed_version_mismatch_restored" "$LINENO"
-        fi
-      fi
-      printf '%s\n' "$backup" >&2
-      printf '%s\n' "$INSTALLED" >&2
-      refuse "restore_failed" "$LINENO"
-    else
-      rm -f "$INSTALLED"
-    fi
-    refuse "installed_version_mismatch_restored" "$LINENO"
+    restore_previous "$had_previous" "$backup" "installed_version_mismatch_restored"
+  fi
+  # The record is written last, after the installed version was verified; a failed write puts the before-file back.
+  local new_sha=""
+  new_sha="$(sha256sum "$INSTALLED" | awk '{print $1}')"
+  if ! write_record "$expected" "$new_sha" "$backup" "$current_sha"; then
+    restore_previous "$had_previous" "$backup" "record_write_failed_restored"
   fi
   trap - EXIT
   cleanup_worktree
@@ -245,10 +317,26 @@ do_install() {
 
 do_rollback() {
   check_install_dir_usable
-  if [[ $# -ne 1 ]]; then
-    refuse "rollback_requires_before_file" "$LINENO"
+  if [[ $# -gt 1 ]]; then
+    refuse "rollback_takes_at_most_one_argument" "$LINENO"
   fi
-  local before="$1"
+  local before="" recorded_sha="" locked=0
+  if [[ $# -eq 0 ]]; then
+    # Without an argument the before-file is the one the install record names.
+    check_backup_dir_usable
+    acquire_install_lock
+    locked=1
+    if [[ ! -f "$RECORD" ]]; then
+      refuse "rollback_not_available" "$LINENO" "no install record"
+    fi
+    before="$(json_field "$RECORD" before)"
+    recorded_sha="$(json_field "$RECORD" before_sha256)"
+    if [[ -z "$before" ]]; then
+      refuse "rollback_not_available" "$LINENO" "the record names no before-file (rolled back already, or the first install)"
+    fi
+  else
+    before="$1"
+  fi
   if [[ ! -f "$before" || -L "$before" ]]; then
     refuse "rollback_source_missing" "$LINENO"
   fi
@@ -270,7 +358,12 @@ do_rollback() {
   if [[ "${base#ap.before-}" != "${before_sha:0:7}" ]]; then
     refuse "rollback_backup_hash_mismatch" "$LINENO"
   fi
-  acquire_install_lock
+  if [[ -n "$recorded_sha" && "$before_sha" != "$recorded_sha" ]]; then
+    refuse "rollback_backup_hash_mismatch" "$LINENO" "the before-file differs from the record"
+  fi
+  if [[ "$locked" -eq 0 ]]; then
+    acquire_install_lock
+  fi
   local tmp=""
   tmp="$(mktemp "$INSTALL_DIR/.ap.rollback.XXXXXX")"
   if ! install -m 0755 "$before" "$tmp"; then
@@ -288,6 +381,12 @@ do_rollback() {
     printf '%s\n' "$out"
   else
     printf '%s\n' "no_version_output"
+  fi
+  # The record now describes the restored binary and names no before-file: one level of rollback.
+  local restored_commit=""
+  restored_commit="$(version_commit "$out")"
+  if ! write_record "${restored_commit:-unknown}" "$before_sha" "" ""; then
+    refuse "record_write_failed" "$LINENO" "the binary is restored; status will say drift"
   fi
 }
 
@@ -310,6 +409,12 @@ main() {
     rollback)
       shift
       do_rollback "$@"
+      ;;
+    status)
+      if [[ $# -ne 1 ]]; then
+        refuse "status_takes_no_arguments" "$LINENO"
+      fi
+      do_status
       ;;
     *)
       refuse "unknown_mode" "$LINENO"

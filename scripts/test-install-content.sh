@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test of scripts/install-content.sh in temporary directories: install, a second install, rollback,
-# a damaged kept copy, a failure in the middle of the swap, and the refusals. Run by ./check (content part).
+# a damaged kept copy, a failure in the middle of the swap, the record with check, status and rollback without an
+# argument, the lock, the sidecar files of a kept copy, and the refusals. Run by ./check (content part).
 set -uo pipefail
 script=${1:-$(cd "$(dirname "$0")" && pwd -P)/install-content.sh}
 t=$(mktemp -d); trap 'rm -rf -- "$t"' EXIT
@@ -65,6 +66,84 @@ AP_CONTENT_DST=$t/dst5 inst rollback "$tara"; rc=$?
 { [ "$rc" -ne 0 ] && [ "$(tree "$t/dst5")" = "$hb" ] && grep -q 'rollback_not_latest' "$t/err"; } && ok "older kept copy refused while a later install stands" || bad "older rollback rc=$rc $(cat "$t/err")"
 AP_CONTENT_DST=$t/dst5 inst rollback "$tarb"; r1=$?; AP_CONTENT_DST=$t/dst5 inst rollback "$tara"; r2=$?
 { [ "$r1" -eq 0 ] && [ "$r2" -eq 0 ] && [ ! -e "$t/dst5/skills/z" ] && [ ! -e "$t/dst5/AGENTS.md" ] && [ ! -e "$t/dst5/.content-paths" ]; } && ok "rollbacks in reverse order reach the first state" || bad "reverse rollbacks $r1 $r2 $(cat "$t/err")"
+# --- the record, check, status, rollback without an argument, the lock and the kept copy's sidecar files.
+D=$t/rd; cdst() { AP_CONTENT_DST=$D inst "$@"; }
+br=$(git rev-parse --abbrev-ref HEAD)
+# install the commit <c> (the installer wants the checkout at it) into $D.
+cat_() { git checkout -q "$1" && cdst install "$1"; }
+st() { AP_CONTENT_DST=$D bash "$r/scripts/install-content.sh" status 2> "$t/sterr"; }
+tarof() { sed -n 's/.*backup=//p' "$t/out"; }
+echo r1 > content/AGENTS.md; cr1=$(commit r1); n1=$(grep -c . content/SHA256SUMS); cdst install "$cr1"; rc=$?; tk1=$(tarof); h1=$(tree "$D")
+cdst check; rcc=$?
+{ [ "$rc" -eq 0 ] && [ "$rcc" -eq 0 ] && grep -qx "ok commit=$cr1 files=$n1" "$t/out"; } && ok "record: check after the first install names the commit and the file count" || bad "check after first install rc=$rcc $(cat "$t/out" "$t/err")"
+echo r2 > content/AGENTS.md; mkdir -p content/skills/w; echo w > content/skills/w/SKILL.md; cr2=$(commit r2); n2=$(grep -c . content/SHA256SUMS)
+cdst install "$cr2"; rc=$?; tk2=$(tarof); cdst check; rcc=$?; chk_out=$(cat "$t/out"); s2=$(st); rcs=$?
+{ [ "$rc" -eq 0 ] && [ "$rcc" -eq 0 ] && [ "$chk_out" = "ok commit=$cr2 files=$n2" ] && [ "$rcs" -eq 0 ] && [ "$(printf '%s\n' "$s2" | wc -l)" -eq 1 ] \
+  && printf '%s\n' "$s2" | grep -Eq "^\{\"name\":\"content\",\"commit\":\"$cr2\",\"installed_at\":\"[0-9T:Z-]+\",\"check\":\"ok\",\"rollback\":\"available\"\}$"; } \
+  && ok "A1 content: install 1, install 2, check ok, status names version 2 with rollback available" || bad "A1 after install 2 rc=$rc/$rcc/$rcs [$chk_out] [$s2]"
+cdst rollback; rc=$?; hr=$(tree "$D"); cdst check; rcc=$?; s1=$(st)
+{ [ "$rc" -eq 0 ] && [ "$hr" = "$h1" ] && [ "$rcc" -eq 0 ] && grep -qx "ok commit=$cr1 files=$n1" "$t/out" && [ ! -e "$D/skills/w" ] \
+  && printf '%s\n' "$s1" | grep -Eq "^\{\"name\":\"content\",\"commit\":\"$cr1\",\"installed_at\":\"[0-9T:Z-]+\",\"check\":\"ok\",\"rollback\":\"none\"\}$"; } \
+  && ok "A1 content: rollback without an argument restores version 1 and its record, check ok, status names version 1" || bad "A1 rollback rc=$rc/$rcc [$s1] $(cat "$t/err")"
+cdst rollback; rc=$?
+{ [ "$rc" -eq 2 ] && grep -q 'rollback_not_available' "$t/err" && [ "$(tree "$D")" = "$hr" ]; } && ok "A1 content: a second rollback without an argument is refused, target unchanged" || bad "A1 second rollback rc=$rc $(cat "$t/err")"
+cat_ "$cr2"; rc=$?; cdst check; rcc=$?
+{ [ "$rc" -eq 0 ] && [ "$rcc" -eq 0 ] && grep -qx "ok commit=$cr2 files=$n2" "$t/out"; } && ok "A1 content: install version 2 again, check ok" || bad "A1 reinstall rc=$rc/$rcc $(cat "$t/err")"
+# the explicit path of a kept copy still rolls back too (the same bytes as the record-driven one), and a rollback needs a record.
+rm -rf "$t/nr"; AP_CONTENT_DST=$t/nr inst rollback; rc=$?
+{ [ "$rc" -eq 2 ] && grep -q 'rollback_not_available' "$t/err"; } && ok "rollback without a record is refused" || bad "rollback without record rc=$rc"
+# A2: drift. One installed file changed, one removed: check exits 1 and names both; status says drift; neither writes.
+hb=$(tree "$D"); echo zzcontentmark >> "$D/runtime-references/A.md"; rm -f "$D/skills/x/SKILL.md"; hd=$(tree "$D")
+cdst check; rcc=$?; s=$(st); rcs=$?
+{ [ "$rcc" -eq 1 ] && grep -qx 'runtime-references/A.md' "$t/out" && grep -qx 'skills/x/SKILL.md' "$t/out" && [ "$rcs" -eq 0 ] \
+  && printf '%s\n' "$s" | grep -q "\"commit\":\"$cr2\".*\"check\":\"drift\"" && [ "$(tree "$D")" = "$hd" ]; } \
+  && ok "A2 content: a changed and a removed file make check exit 1 naming both and status say drift, nothing written" || bad "A2 drift rc=$rcc/$rcs [$s] $(cat "$t/out")"
+{ ! grep -q zzcontentmark "$t/out" && ! grep -q zzcontentmark "$t/err"; } && ok "check prints paths, never content" || bad "check printed content"
+# not recorded: files that an install of an older version left, no record.
+rm -rf "$t/nr"; mkdir -p "$t/nr"; echo old > "$t/nr/AGENTS.md"
+AP_CONTENT_DST=$t/nr inst check; rcc=$?; s=$(AP_CONTENT_DST=$t/nr bash "$r/scripts/install-content.sh" status); rcs=$?
+{ [ "$rcc" -eq 3 ] && grep -q '^not_recorded' "$t/err" && [ "$rcs" -eq 0 ] \
+  && [ "$s" = '{"name":"content","commit":null,"installed_at":null,"check":"not_recorded","rollback":"none"}' ]; } \
+  && ok "A2 content: a target without a record gives check exit 3 not_recorded and status not_recorded" || bad "not_recorded rc=$rcc/$rcs [$s]"
+# A3: one call at a time. A call made while another holds the lock refuses install_busy and the target is unchanged.
+rm -rf "$D"; cat_ "$cr1"; hb=$(tree "$D"); L=$t/the.lock; rm -f "$t/held"
+( exec 8>"$L"; flock 8; : > "$t/held"; exec sleep 30 ) & hp=$!
+for _ in $(seq 1 50); do [ -f "$t/held" ] && break; sleep 0.1; done
+AP_CONTENT_LOCK=$L cdst install "$cr2"; r1=$?; e1=$(cat "$t/err"); AP_CONTENT_LOCK=$L cdst rollback; r2=$?; e2=$(cat "$t/err")
+AP_CONTENT_LOCK=$L cdst check; r3=$?
+kill "$hp" 2>/dev/null; wait "$hp" 2>/dev/null
+{ [ "$r1" -eq 2 ] && [ "$r2" -eq 2 ] && printf '%s\n%s\n' "$e1" "$e2" | grep -c 'install_busy' | grep -qx 2 && [ "$r3" -eq 0 ] && [ "$(tree "$D")" = "$hb" ]; } \
+  && ok "A3 content: install and rollback refuse install_busy while the lock is held, check still reads, target unchanged" || bad "A3 lock rc=$r1/$r2/$r3 [$e1] [$e2]"
+AP_CONTENT_LOCK=$L cat_ "$cr2"; rc=$?
+[ "$rc" -eq 0 ] && ok "the lock is free again once its holder ends" || bad "after the lock rc=$rc $(cat "$t/err")"
+# A4: the kept copy's sidecar files are inside its checksum file. A changed or missing one makes rollback refuse before any swap.
+rm -rf "$D"; cat_ "$cr1"; cat_ "$cr2"; tk=$(tarof); hb=$(tree "$D"); sc_ok=1
+for sc in paths owned-before record-before sums-before; do
+  cp -p "$tk.$sc" "$t/sc.$sc" || { sc_ok=0; echo "no sidecar $sc"; continue; }
+  echo x >> "$tk.$sc"; cdst rollback; rc=$?; { [ "$rc" -eq 2 ] && grep -q 'checksum' "$t/err" && [ "$(tree "$D")" = "$hb" ]; } || { sc_ok=0; echo "changed $sc rc=$rc"; }
+  cp -p "$t/sc.$sc" "$tk.$sc"
+  rm -f "$tk.$sc"; cdst rollback; rc=$?; { [ "$rc" -eq 2 ] && [ "$(tree "$D")" = "$hb" ]; } || { sc_ok=0; echo "missing $sc rc=$rc"; }
+  cp -p "$t/sc.$sc" "$tk.$sc"
+done
+[ "$sc_ok" -eq 1 ] && ok "A4 content: a changed or missing sidecar file of the kept copy refuses rollback, target unchanged" || bad "A4 sidecars"
+cdst rollback; rc=$?; [ "$rc" -eq 0 ] && ok "the restored sidecar files are accepted again" || bad "A4 restored rc=$rc $(cat "$t/err")"
+# a kept copy of today's form (one checksum line, no record sidecar files) still rolls back by path; the record is then absent.
+rm -rf "$D"; cat_ "$cr1"; cat_ "$cr2"; tk=$(tarof)
+(cd "$(dirname "$tk")" && sha256sum "$(basename "$tk")" > "$tk.sha256"); rm -f "$tk.record-before" "$tk.sums-before"
+cdst rollback "$tk"; rc=$?; cdst check; rcc=$?
+{ [ "$rc" -eq 0 ] && [ "$(cat "$D/AGENTS.md")" = r1 ] && [ ! -e "$D/skills/w" ] && [ ! -e "$D/.content-record.json" ] && [ "$rcc" -eq 3 ]; } \
+  && ok "A4 content: a kept copy of today's form still rolls back by path (the record is then absent)" || bad "A4 old form rc=$rc/$rcc $(cat "$t/err")"
+# A5: an install that fails at the swap leaves the files AND the record of the previous install.
+rm -rf "$D"; cat_ "$cr1"; hb=$(tree "$D"); rb=$(sha256sum "$D/.content-record.json")
+PATH="$t/fakebin:$PATH" FAIL_MV_RE="/\.new-[^ ]*/runtime-references " cat_ "$cr2"; rc=$?; e5=$(cat "$t/err")
+cdst check; rcc=$?; s=$(st)
+{ [ "$rc" -eq 1 ] && printf '%s\n' "$e5" | grep -q '^install_failed_restored@' && [ "$(tree "$D")" = "$hb" ] && [ "$(sha256sum "$D/.content-record.json")" = "$rb" ] && [ "$rcc" -eq 0 ] && printf '%s\n' "$s" | grep -q "\"commit\":\"$cr1\""; } \
+  && ok "A5 content: a failed swap of the files leaves the files and the previous record" || bad "A5 files rc=$rc/$rcc [$s] $e5"
+PATH="$t/fakebin:$PATH" FAIL_MV_RE="/\.new-[^ ]*/\.content-record\.json " cat_ "$cr2"; rc=$?; e5=$(cat "$t/err")
+cdst check; rcc=$?
+{ [ "$rc" -eq 1 ] && printf '%s\n' "$e5" | grep -q '^install_failed_restored@' && [ "$(tree "$D")" = "$hb" ] && [ "$(sha256sum "$D/.content-record.json")" = "$rb" ] && [ "$rcc" -eq 0 ] && grep -qx "ok commit=$cr1 files=$n1" "$t/out"; } \
+  && ok "A5 content: a failure after the files were swapped, at the record, puts files and record back" || bad "A5 record rc=$rc/$rcc $e5"
+git checkout -q "$br"
 # refusals: uncommitted content; a commit that is not on origin/main; a checkout at another commit.
 echo dirty >> content/AGENTS.md; inst install "$c7"; rc=$?; git checkout -q -- content
 [ "$rc" -eq 2 ] && ok "uncommitted content refused" || bad "uncommitted rc=$rc"
