@@ -101,7 +101,7 @@ Do not build
 | An operational fact: what is deployed, a KPI value, a domain record, an action and its result | The domain owner's store; an `ontology-platform` object once STATE says that object type is in use | Hindsight; prose in an instruction file |
 
 - A CLI's private memory (Claude Code auto-memory, Muse memory, Antigravity brain, any other) is visible to one CLI in one directory. Do not put there anything another agent or a later session in another CLI needs. If such an item is already there, move it to its row above and delete the private copy.
-- Reading: each CLI reaches Hindsight through its own hooks or the MCP server `hindsight`. Search the knowledge pages, read the relevant ones and credit what you use: at a new task, a bug report, a test or convention question, integration work, a "why" or "what is left" question, and before a commit. Memory is a past record: verify it against current source and STATE. If the tool is unavailable, say so and continue from the task's files.
+- Reading: long-term memory (Hindsight) is off until it is rebuilt. Call no memory tool; work from the task's files, source and the store. Where a memory hook still prints, its output is a past record: verify it against current source and STATE.
 - Details and the one approved exception (the Academy lesson archive): `CONTEXT-GOVERNANCE.md`.
 
 ## 7. When you write instructions, STATE or a handoff
@@ -115,7 +115,7 @@ Do not build
 
 One word for one thing. More terms, the words not to use, and how the user refers to things: `GLOSSARY.md`.
 
-- **Lead**: the Claude Code session that the task's STATE names as responsible for the task. It talks with the user, keeps the whole view, writes the acceptance checks, starts workers and accepts their results.
+- **Lead**: the session that the task's STATE names as responsible for the task. It talks with the user, keeps the whole view, writes the acceptance checks, starts workers and accepts their results.
 - **Worker**: an agent that carries out one packet for a Lead. It does not talk with the user.
 - **Task directory**: `/home/palantirkc/work/<scope>-<topic>/`, the place of one task's files.
 - **STATE**: the file `STATE.md` in the task directory: owner, authority, holds, exact revisions, effects and the one next action, as of the time it was written.

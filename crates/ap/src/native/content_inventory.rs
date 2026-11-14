@@ -122,18 +122,6 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/skills/lead/references/task-packet.md"),
     ),
     (
-        "skills/lead/tools/await-autoreview.sh",
-        include_str!("../../../../content/skills/lead/tools/await-autoreview.sh"),
-    ),
-    (
-        "skills/lead/tools/deliver.sh",
-        include_str!("../../../../content/skills/lead/tools/deliver.sh"),
-    ),
-    (
-        "skills/lead/tools/review.sh",
-        include_str!("../../../../content/skills/lead/tools/review.sh"),
-    ),
-    (
         "skills/lead/tools/roles.example.tsv",
         include_str!("../../../../content/skills/lead/tools/roles.example.tsv"),
     ),
