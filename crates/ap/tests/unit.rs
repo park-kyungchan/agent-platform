@@ -451,6 +451,12 @@ impl Drop for U {
     }
 }
 impl System for U {
+    fn directory(&self, path: &str) -> std::io::Result<PathBuf> {
+        if path == "/root/.claude" {
+            return Ok(path.into());
+        }
+        Host.directory(path)
+    }
     fn call(&mut self, program: &str, args: &[String], input: &Value, ms: u64) -> Answer {
         match program {
             "gh" => {
@@ -1433,6 +1439,29 @@ fn i2_next_accounts_go_to_ap_run_and_a_cut_before_work_moves_within_the_one_stag
     );
 }
 
+/// A1: the Lead's own account is a stage's account like any other: as the verifier's `account`,
+/// and in its `next_accounts` when the first account is cut before any work.
+#[test]
+fn a1_unit_takes_the_lead_account() {
+    for in_next in [false, true] {
+        let mut u = U::new();
+        std::fs::write(u.t.join("bin/mode-.claude"), "script").unwrap();
+        u.script(".claude", VERIFY_ACCEPT);
+        let mut r = u.request();
+        if in_next {
+            std::fs::write(u.t.join("bin/mode-a2"), "limit1").unwrap();
+            r["verifier"]["next_accounts"] = json!(["/root/.claude"]);
+        } else {
+            r["verifier"]["account"] = json!("/root/.claude");
+        }
+        let (v, code) = u.run(&r).unwrap();
+        assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+        let path = v["stages"]["verifier"].as_str().unwrap();
+        let rec: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        assert_eq!(rec["account"], "/root/.claude");
+    }
+}
+
 #[test]
 fn i1_stage_members_are_judged_by_ap_run_before_any_effect() {
     let mut u = U::new();
@@ -1451,11 +1480,6 @@ fn i1_stage_members_are_judged_by_ap_run_before_any_effect() {
             "account",
             json!(u.p("no-such-account")),
             "account_missing@verifier.account",
-        ),
-        (
-            "account",
-            json!("/root/.claude"),
-            "account_forbidden@verifier.account",
         ),
     ];
     for (member, value, want) in cases {
