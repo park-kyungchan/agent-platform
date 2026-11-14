@@ -8,6 +8,7 @@ const INPUT_LIMIT: u64 = 1_048_576;
 const HELP: &str = "Usage: ap render < request.json\nPure JSON proposal on stdout; no file access or installation.\n";
 const WORK_HELP: &str = "Usage: ap work <start|wait|close> < request.json\nOne JSON request; admission through ont and lifecycle through herdr.\n";
 const RUN_HELP: &str = "Usage: ap run < request.json\nOne headless Claude Code stage in a transient scope of agents.slice; one record <out>.run.json.\n";
+const GATE_HELP: &str = "Usage: ap gate < request.json\nWaits on a pull request's head for its required checks and the automatic review; one JSON answer.\n";
 const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
     Some(value) => value,
     None => "unknown",
@@ -67,6 +68,15 @@ fn main() -> ExitCode {
             };
         }
         return ap::review::cli(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == "gate") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout().lock().write_all(GATE_HELP.as_bytes()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::gate::cli(&args[1..]);
     }
     if args.first().is_some_and(|arg| arg == "run") {
         if args.len() == 2 && args[1] == "--help" {

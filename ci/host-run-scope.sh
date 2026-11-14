@@ -5,7 +5,8 @@
 # sleeper remain; `timeout_seconds: 5` gives state `timeout`; after `kill -9` of `ap run` the unit
 # still ends at its own bound and the record on disk says `running` with the session id; no
 # HERDR_* or inherited CLAUDE_* variable reaches the CLI; a fresh request while the unit of a killed
-# runner lives is refused (by existence; its resume by the live unit). Skipped, saying so, where `systemctl` is
+# runner lives is refused (by existence; its resume by the live unit); a stage bound to a unit stops when
+# that unit is stopped or its main process is killed. Skipped, saying so, where `systemctl` is
 # absent or this caller cannot start a transient unit in the system manager.
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
@@ -16,7 +17,8 @@ if ! systemd-run --scope --quiet --collect --unit="ap-run-probe-$$" --slice=agen
   echo "host-run-scope: skipped (this caller cannot start a transient unit in the system manager)"; exit 0
 fi
 t=$(mktemp -d /tmp/ap-run-XXXXXX); chmod 0755 "$t"
-cleanup() { for p in "$t"/bin/*.pid; do [ -e "$p" ] && kill -KILL "$(cat "$p")" 2> /dev/null; done; rm -rf -- "$t"; }
+cleanup() { for p in "$t"/bin/*.pid; do [ -e "$p" ] && kill -KILL "$(cat "$p")" 2> /dev/null; done; rm -rf -- "$t"
+  systemctl stop "ap-gate-bind-$$-stop.service" "ap-gate-bind-$$-kill.service" 2> /dev/null; }
 trap cleanup EXIT
 mkdir -p "$t/bin" "$t/acct" "$t/cwd"
 cat > "$t/bin/claude" <<'FAKE'
@@ -93,5 +95,23 @@ printf '{"role":"reviewer","account":"%s","model":"haiku","effort":"low","permis
 for _ in $(seq 60); do systemctl is-active --quiet "$unit" || break; sleep 0.5; done; took=$(( $(date +%s) - s0 ))
 { ! systemctl is-active --quiet "$unit" && [ "$took" -ge 14 ] && [ "$took" -le 25 ] && ! alive "$(cat "$t/bin/sleeper.pid")"; } \
   && ok "the unit ended at its own bound after ${took}s, sleeper gone" || bad "bound: active=$(systemctl is-active "$unit") took=${took}s"
+
+# 4. bind: a stage bound to a transient unit stops when that unit is stopped, and when that unit's
+#    main process is killed with SIGKILL; the stage's record says failed (no result) at once.
+for how in stop kill; do
+  b="ap-gate-bind-$$-$how.service"; rm -f "$t/bin/sleeper.pid"
+  systemd-run --quiet --collect --unit="$b" --slice=agents.slice sleep 600
+  req "d$how.md" ",\"timeout_seconds\":120,\"bind\":\"$b\"" | apr > "$t/d.out" 2> "$t/d.err" & pid=$!
+  for _ in $(seq 50); do [ -s "$t/bin/sleeper.pid" ] && break; sleep 0.2; done
+  unit=$(field "$t/d$how.md.run.json" unit); s0=$(date +%s)
+  [ "$(systemctl show -p BindsTo --value "$unit")" = "$b" ] && ok "$unit is bound to $b" || bad "BindsTo of $unit"
+  if [ "$how" = stop ]; then systemctl stop "$b"; else kill -KILL "$(systemctl show -p MainPID --value "$b")"; fi
+  wait "$pid"; rc=$?; took=$(( $(date +%s) - s0 ))
+  { [ "$rc" -eq 3 ] && [ "$(field "$t/d$how.md.run.json" state)" = failed ] && [ "$took" -lt 15 ] \
+    && ! systemctl is-active --quiet "$unit" && ! alive "$(cat "$t/bin/sleeper.pid")"; } \
+    && ok "bound unit ended by $how: the stage stopped after ${took}s, nothing remains" \
+    || bad "bind $how: rc=$rc took=${took}s $(cat "$t/d.err") $(field "$t/d$how.md.run.json" state)"
+  systemctl stop "$b" 2> /dev/null
+done
 
 [ "$fails" -eq 0 ] && echo "host-run-scope: PASS" || { echo "host-run-scope: $fails FAILED"; exit 1; }
