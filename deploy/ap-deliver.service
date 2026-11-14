@@ -1,0 +1,17 @@
+[Unit]
+Description=ap deliver: install the accepted tip of agent-platform (ap and the shared instructions)
+Documentation=https://github.com/park-kyungchan/agent-platform/blob/main/deploy/README.md
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/ap deliver
+StandardInput=file:/etc/agent-platform/deliver.json
+StandardOutput=journal
+Slice=agents.slice
+Nice=10
+TimeoutStartSec=3600
+SuccessExitStatus=2
+# cargo is the rustup proxy, which reads its toolchains under HOME; a system service without User= has none.
+Environment=HOME=/root
