@@ -259,7 +259,7 @@ def repo_of(cwd, names, platforms):
 def k2(prs, stages, branches, session_cwd, platforms):
     """Per merged pull request: the implementer's tier, the first reviewer's tier and verdict line, changed lines.
     A stage joins by repository (its worktree) and head branch; a reviewer on a detached head or on the base joins
-    by the implementer's worktree when it started after the implementer."""
+    by the implementer's worktree when it started after the implementer and not after the merge."""
     names = {r.split("/")[1] for r, _ in prs}
     where = {id(s): (s["cwd"] or session_cwd.get(s["session"], "")) for s in stages}
     out = []
@@ -270,7 +270,7 @@ def k2(prs, stages, branches, session_cwd, platforms):
             return min(hit, key=lambda s: s["start"]) if hit else None
         on_branch = lambda s: pr["headRefName"] in branches.get(s["session"], ())
         impl = pick("implementer", on_branch)
-        rev = pick("reviewer", lambda s: on_branch(s) or bool(impl and where[id(s)] == where[id(impl)] and s["start"] >= impl["start"]
+        rev = pick("reviewer", lambda s: on_branch(s) or bool(impl and where[id(s)] == where[id(impl)] and impl["start"] <= s["start"] <= str(pr["mergedAt"])
                                                               and branches.get(s["session"]) and branches[s["session"]] <= DETACHED))
         out.append({"repo": repo.split("/")[1], "number": pr["number"], "impl": impl["model"] if impl else "unknown",
                     "verdict": first_line(rev["answer"]) if rev else None, "verifier": rev["model"] if rev else None,

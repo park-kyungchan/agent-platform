@@ -11,6 +11,7 @@ import datetime
 import hashlib
 import importlib.util
 import io
+import json
 import os
 import re
 import shutil
@@ -139,6 +140,20 @@ class Readout(unittest.TestCase):
     def test_k2_reviewer_on_a_detached_head_joins_by_the_worktree(self):
         text = self.run_readout("--detail")
         self.assertIn("K2 agent-platform#10 implementer=sonnet verifier=opus first verdict=repair lines=20", text)
+
+    def test_k2_detached_reviewer_after_the_merge_does_not_join_by_the_worktree(self):
+        # a reused worktree: pull request 12 merged on the 12th, a detached reviewer of the same worktree started on the 13th
+        wt = str(self.tmp / "work" / "t5" / "wt" / "agent-platform")
+        stage = lambda role, model, session, start: json.dumps({"role": role, "model": model, "session": session, "cwd": wt, "start": start,
+                                                                "state": "ok", "tokens": {}, "resumes": None, "answer": None}) + "\n"
+        (self.tmp / "work" / "t5").mkdir()
+        (self.tmp / "work" / "t5" / "i.md.run.json").write_text(stage("implementer", "sonnet", "s-late-impl", "2026-11-12T08:00:00Z"))
+        (self.tmp / "work" / "t5" / "r.md.run.json").write_text(stage("reviewer", "opus", "s-late-rev", "2026-11-13T09:00:00Z"))
+        user = lambda sid, branch: json.dumps({"type": "user", "sessionId": sid, "timestamp": "2026-11-12T08:00:00Z", "cwd": wt, "gitBranch": branch}) + "\n"
+        (self.tmp / "acct1" / "projects" / "p8" / "s-late.jsonl").write_text(user("s-late-impl", "feat/late") + user("s-late-rev", "HEAD"))
+        pr = {"number": 12, "headRefName": "feat/late", "mergedAt": "2026-11-12T12:00:00Z", "additions": 1, "deletions": 0}
+        readout.run_gh = lambda repo, since, until: PRS.get(repo, []) + ([pr] if repo.endswith("/agent-platform") else [])
+        self.assertIn("K2 agent-platform#12 implementer=sonnet verifier=none first verdict=none lines=1", self.run_readout("--detail"))
 
     def test_k2_join_uses_a_session_file_older_than_the_window(self):
         text = self.run_readout("--detail")
