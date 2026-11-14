@@ -17,8 +17,6 @@ READ_BY_THE_CHECK = (
     "content",
     "crates/ap/README.md",
     "crates/ap/src/main.rs",
-    "crates/ap/src/native/cli.rs",
-    "crates/ap/src/native/content_inventory.rs",
     "ci/check-content.py",
 )
 TARGET = "runtime-references/NAMING.md"

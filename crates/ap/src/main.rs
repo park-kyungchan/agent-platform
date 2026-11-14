@@ -1,29 +1,12 @@
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::process::ExitCode;
 
-use ap::{ErrorCode, RenderRequest};
 use serde::Serialize;
 
-const INPUT_LIMIT: u64 = 1_048_576;
-const HELP: &str = "Usage: ap render < request.json\nPure JSON proposal on stdout; no file access or installation.\n";
+const HELP: &str = "Usage: ap <verb> [< request.json]\n";
 /// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
 /// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
-const VERBS: [(&str, &str, &str); 11] = [
-    (
-        "render",
-        "render [content] < request.json",
-        "The older verbs",
-    ),
-    (
-        "install",
-        "install <plan|apply|recover> < request.json",
-        "The older verbs",
-    ),
-    (
-        "doctor",
-        "doctor <inspect|content> < spec.json",
-        "The older verbs",
-    ),
+const VERBS: [(&str, &str, &str); 8] = [
     (
         "pane",
         "pane [--exports|--focused|--resume-candidate]",
@@ -97,7 +80,7 @@ fn main() -> ExitCode {
         && args[1] == "--help"
         && let Some((verb, form, heading)) = VERBS
             .iter()
-            .find(|(verb, ..)| matches!(*verb, "render" | "doctor" | "version") && args[0] == *verb)
+            .find(|(verb, ..)| *verb == "version" && args[0] == *verb)
     {
         return match io::stdout()
             .lock()
@@ -168,10 +151,6 @@ fn main() -> ExitCode {
     if args.first().is_some_and(|arg| arg == "pane") {
         return ap::pane::cli(&args[1..]);
     }
-    #[cfg(target_os = "linux")]
-    if let Some(result) = ap::native::cli::dispatch(&args) {
-        return result;
-    }
     if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
         let mut text = format!("{HELP}Verbs; the section is of crates/ap/README.md:\n");
         for (verb, form, heading) in VERBS {
@@ -183,49 +162,5 @@ fn main() -> ExitCode {
             fail("io_error", "stdout", 4)
         };
     }
-    if args.len() != 1 || args[0] != "render" {
-        return fail("usage", "args", 2);
-    }
-    let mut input = Vec::new();
-    if io::stdin()
-        .lock()
-        .take(INPUT_LIMIT + 1)
-        .read_to_end(&mut input)
-        .is_err()
-    {
-        return fail("io_error", "stdin", 4);
-    }
-    if input.len() as u64 > INPUT_LIMIT {
-        return fail("input_too_large", "stdin", 2);
-    }
-    let request: RenderRequest = match serde_json::from_slice(&input) {
-        Ok(request) => request,
-        Err(_) => return fail("invalid_input", "stdin", 2),
-    };
-    match ap::render(&request) {
-        Ok(plan) => {
-            let mut output = match serde_json::to_vec(&plan) {
-                Ok(bytes) => bytes,
-                Err(_) => return fail("internal_error", "stdout", 70),
-            };
-            output.push(b'\n');
-            if io::stdout().lock().write_all(&output).is_err() {
-                return fail("io_error", "stdout", 4);
-            }
-            ExitCode::SUCCESS
-        }
-        Err(error) => {
-            let status = if error.code == ErrorCode::RendererUnimplemented {
-                70
-            } else {
-                3
-            };
-            // Serialization supplies the enum spelling without a second hand-maintained map.
-            let code = match serde_json::to_value(&error.code) {
-                Ok(serde_json::Value::String(code)) => code,
-                _ => return fail("internal_error", "renderer", 70),
-            };
-            fail(&code, &error.field, status)
-        }
-    }
+    fail("usage", "args", 2)
 }

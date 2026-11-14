@@ -36,16 +36,12 @@ for line in (ROOT / "SHA256SUMS").read_text().splitlines():
 owned = sorted(str(p.relative_to(ROOT)) for p in ROOT.rglob("*") if p.is_file() and p.name not in ("SHA256SUMS", "README.md"))
 for name in owned:
     if name not in listed:
-        fail("file_not_in_sha256sums", name, "add it to SHA256SUMS and content_inventory.rs")
+        fail("file_not_in_sha256sums", name, "add it to SHA256SUMS")
     elif hashlib.sha256((ROOT / name).read_bytes()).hexdigest() != listed[name]:
         fail("sha256_mismatch", name, "regenerate SHA256SUMS")
 for name in listed:
     if name not in owned:
         fail("sha256sums_names_missing_file", name, "remove the line or restore the file")
-
-inventory = re.findall(r'^\s*\(?\s*"((?:AGENTS\.md|runtime-references/|skills/)[^"]*)",', (ROOT.parent / "crates/ap/src/native/content_inventory.rs").read_text(), re.M)
-if inventory != list(listed):
-    fail("inventory_differs_from_sha256sums", "SHA256SUMS", "content_inventory.rs and SHA256SUMS must list the same files in the same order")
 
 texts = {name: (ROOT / name).read_text(encoding="utf-8") for name in owned if name.endswith((".md", ".json"))}
 for name, text in texts.items():
@@ -146,7 +142,7 @@ if len(user_rows) - 1 > USER_ROW_LIMIT:
 
 # What content/ says about the command `ap` must exist: a verb in backticks, a section of its README by its heading.
 CRATE = ROOT.parent / "crates/ap"
-VERB_SOURCES = ("src/main.rs", "src/native/cli.rs")  # the dispatch of the command: `arg == "gate"`, `args[0] == "doctor"`
+VERB_SOURCES = ("src/main.rs",)  # the dispatch of the command: `arg == "gate"`, `args[0] == "version"`
 verbs = set()
 for source in VERB_SOURCES:
     for found in re.findall(r'\barg == "([a-z][\w-]*)"|\bargs\[0\] (?:==|!=) "([a-z][\w-]*)"', (CRATE / source).read_text()):
