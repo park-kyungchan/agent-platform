@@ -45,6 +45,7 @@ struct Script {
     clock: Cell<Instant>,
     exists: bool,
     read_error: Option<std::io::ErrorKind>,
+    no_directory: bool,
 }
 impl Script {
     fn new(steps: Vec<Step>) -> Self {
@@ -54,6 +55,7 @@ impl Script {
             clock: Cell::new(Instant::now()),
             exists: false,
             read_error: None,
+            no_directory: false,
         }
     }
     fn finish(&self) {
@@ -104,6 +106,12 @@ impl System for Script {
     }
     fn exists(&self, _: &str) -> std::io::Result<bool> {
         Ok(self.exists)
+    }
+    fn directory(&self, path: &str) -> std::io::Result<std::path::PathBuf> {
+        if self.no_directory {
+            return Err(std::io::ErrorKind::NotFound.into());
+        }
+        Ok(path.into())
     }
     fn now(&self) -> Instant {
         self.clock.get()
@@ -1544,4 +1552,390 @@ fn close_refuses_other_shapes() {
         }
         check_error(Script::new(steps), "close", &r, "store_close_uncertain");
     }
+}
+
+const ACCOUNT: &str = "/accounts/.claude-acct";
+const RECORDED: &str = "claude; model=fixture-model; effort=medium; account=.claude-acct";
+const TRUST_OFF: &str = " Do you trust the files in this folder?\n\n   1. Yes, I trust this folder\n \u{276f} 2. No, exit\n";
+const TRUST_ON: &str = " Do you trust the files in this folder?\n\n \u{276f} 1. Yes, I trust this folder\n   2. No, exit\n";
+fn as_claude(mut v: Value) -> Value {
+    for a in v["result"]["agents"].as_array_mut().unwrap() {
+        if a["name"] == "worker" {
+            a["agent"] = json!("claude");
+        }
+    }
+    v
+}
+fn raw(program: &'static str, argv: &str, text: &str) -> Step {
+    let mut s = step(program, argv, Value::Null);
+    s.response = Response::Raw(text.as_bytes().to_vec());
+    s
+}
+fn trust_get(status: &str) -> Step {
+    step(
+        "herdr",
+        "agent get w1:p2",
+        json!({"result":{"agent":{"pane_id":"w1:p2","tab_id":"w1:t2","agent":"claude","agent_status":status}}}),
+    )
+}
+fn trust_wait(status: &str) -> Step {
+    let mut s = step(
+        "herdr",
+        "agent wait w1:p2 --until idle --until done --timeout 30000",
+        json!({"result":{"agent":{"agent_status":status}}}),
+    );
+    s.ms = 30_000;
+    s
+}
+fn read_step(text: &str) -> Step {
+    raw("herdr", "agent read w1:p2 --source visible", text)
+}
+fn key(k: &str) -> Step {
+    step(
+        "herdr",
+        &format!("agent send-keys w1:p2 {k}"),
+        json!({"result":{}}),
+    )
+}
+/// A Claude start: the Codex sequence with the members of the kind changed. With `dialog` the
+/// start is answered `agent_not_ready` and the trust dialog is answered by Herdr's agent calls.
+fn claude_setup(dialog: bool) -> (Value, Vec<Step>) {
+    let (mut r, mut steps) = start_setup();
+    r["runtime"] = json!("claude");
+    r["config_dir"] = json!(ACCOUNT);
+    for i in [2, 7] {
+        steps[i].body.as_mut().unwrap()["parameters"]["runtime"] = json!(RECORDED);
+    }
+    steps[4].argv = "tab create --workspace w1 --cwd /example --label worker --env CLAUDE_CONFIG_DIR=/accounts/.claude-acct --no-focus".split_whitespace().map(String::from).collect();
+    steps[5] = step(
+        "herdr",
+        "agent start worker --kind claude --pane w1:p2 --timeout 45000 -- --model fixture-model --effort medium --permission-mode auto",
+        json!({"result":{}}),
+    );
+    steps[5].ms = 50_000;
+    if let Response::Json(v) = &mut steps[6].response {
+        *v = as_claude(v.clone());
+    }
+    if dialog {
+        steps[5].response =
+            Response::Json(json!({"error":{"code":"agent_not_ready","message":"blocked"}}));
+        steps[5].success = false;
+        let answer = vec![
+            trust_get("blocked"),
+            read_step(TRUST_OFF),
+            key("down"),
+            read_step(TRUST_ON),
+            key("enter"),
+            trust_wait("idle"),
+        ];
+        steps.splice(6..6, answer);
+    }
+    (r, steps)
+}
+fn tail_of(steps: &[Step]) -> Vec<(String, Vec<String>)> {
+    steps
+        .iter()
+        .map(|s| (s.program.to_owned(), s.argv.clone()))
+        .collect()
+}
+#[test]
+fn claude_start_with_dialog_answers_it_through_agent_calls_and_prompts_once() {
+    let (r, steps) = claude_setup(true);
+    let calls = tail_of(&steps);
+    let words: Vec<String> = calls
+        .iter()
+        .map(|(p, a)| format!("{p} {}", a[..a.len().min(3)].join(" ")))
+        .collect();
+    assert_eq!(
+        words.iter().filter(|w| w.contains("agent prompt")).count(),
+        1
+    );
+    let prompt_at = words
+        .iter()
+        .position(|w| w.contains("agent prompt"))
+        .unwrap();
+    let apply_at = words
+        .iter()
+        .position(|w| w.contains("action apply"))
+        .unwrap();
+    let last_key = words.iter().rposition(|w| w.contains("send-keys")).unwrap();
+    assert!(last_key < apply_at && apply_at + 1 == prompt_at && prompt_at + 1 == words.len());
+    let mut s = Script::new(steps);
+    let (v, status) = execute(&mut s, "start", &r).unwrap();
+    assert_eq!(status, 0);
+    assert_eq!(
+        v,
+        json!({"status":"started","run":id("worker_run"),"binding":BINDING,"session":null,"pane":"w1:p2","tab":"w1:t2","prompt_target":"w1:p2","worktree_head":null,"prompt":"sent"})
+    );
+    s.finish();
+}
+#[test]
+fn claude_start_without_dialog_sends_no_key() {
+    let (r, steps) = claude_setup(false);
+    assert!(
+        steps
+            .iter()
+            .all(|s| !s.argv.iter().any(|a| a == "send-keys"))
+    );
+    assert_eq!(steps.len(), 9);
+    let mut s = Script::new(steps);
+    let (v, status) = execute(&mut s, "start", &r).unwrap();
+    assert_eq!(
+        (status, &v["status"], &v["prompt"]),
+        (0, &json!("started"), &json!("sent"))
+    );
+    s.finish();
+}
+#[test]
+fn claude_dialog_with_the_mark_on_yes_sends_only_enter() {
+    let (r, mut steps) = claude_setup(true);
+    // get, read(off), down, read(on), enter, wait  ->  get, read(on), enter, wait
+    steps.splice(7..9, []);
+    steps[7] = read_step(TRUST_ON);
+    let keys: Vec<_> = steps
+        .iter()
+        .filter(|s| s.argv.iter().any(|a| a == "send-keys"))
+        .collect();
+    assert_eq!(keys.len(), 1);
+    assert_eq!(keys[0].argv.last().unwrap(), "enter");
+    let mut s = Script::new(steps);
+    assert_eq!(execute(&mut s, "start", &r).unwrap().0["status"], "started");
+    s.finish();
+}
+#[test]
+fn claude_request_refusals_open_nothing() {
+    for (key, value, code) in [
+        ("config_dir", Value::Null, "invalid_input"),
+        ("config_dir", json!(""), "invalid_input"),
+        ("config_dir", json!("relative/dir"), "invalid_input"),
+        ("config_dir", json!("/root/.claude"), "config_dir_forbidden"),
+        (
+            "config_dir",
+            json!("/root/.claude/"),
+            "config_dir_forbidden",
+        ),
+        (
+            "config_dir",
+            json!("/root/.claude/projects"),
+            "config_dir_forbidden",
+        ),
+        ("config_dir", json!("/accounts/bad name"), "invalid_input"),
+        ("runtime", json!("gemini"), "invalid_input"),
+        ("runtime", json!("Claude"), "invalid_input"),
+        ("runtime", Value::Null, "invalid_input"),
+        ("runtime", json!(1), "invalid_input"),
+        ("model", json!("a b"), "invalid_input"),
+        ("model", json!("m".repeat(25)), "invalid_input"),
+        ("effort", json!("e".repeat(17)), "invalid_input"),
+    ] {
+        let (mut r, _) = claude_setup(false);
+        r[key] = value;
+        check_error(Script::new(vec![]), "start", &r, code);
+    }
+    let (mut r, _) = claude_setup(false);
+    r.as_object_mut().unwrap().remove("config_dir");
+    check_error(Script::new(vec![]), "start", &r, "invalid_input");
+    let (r, _) = claude_setup(false);
+    let mut s = Script::new(vec![]);
+    s.no_directory = true;
+    check_error(s, "start", &r, "config_dir_missing");
+    let (mut r, _) = start_setup();
+    r["config_dir"] = json!(ACCOUNT);
+    check_error(Script::new(vec![]), "start", &r, "invalid_input");
+    // The directory of another account whose name only begins like the Lead's own is accepted.
+    let (mut r, mut steps) = claude_setup(false);
+    r["config_dir"] = json!("/root/.claude-palantirkc0723");
+    steps.truncate(1);
+    steps[0].response = Response::Unreadable;
+    check_error(Script::new(steps), "start", &r, "store_answer_unreadable");
+}
+#[test]
+fn claude_store_refusals_keep_the_order_of_admission() {
+    let (r, mut steps) = claude_setup(true);
+    steps.truncate(3);
+    steps[2].response = Response::Json(
+        json!({"status":"ok","result":{"valid":false,"criteria":[{"passed":false,"code":"write_set_overlap"}]}}),
+    );
+    check_error(Script::new(steps), "start", &r, "dispatch_stopped_by_store");
+    let (r, mut steps) = claude_setup(true);
+    let at = steps.len() - 2;
+    steps.truncate(at + 1);
+    steps[at].response = Response::Json(json!({"status":"error","code":"denied"}));
+    steps.push(step("herdr", "tab close w1:t2", json!({"result":{}})));
+    let mut s = Script::new(steps);
+    let e = execute(&mut s, "start", &r).unwrap_err();
+    assert_eq!(e.code, "store_start_refused_after_gate");
+    assert_eq!(e.detail["tab_closed"], true);
+    s.finish();
+}
+fn dialog_failure(steps: Vec<Step>, r: &Value, code: &str) {
+    let mut s = Script::new(steps);
+    let e = execute(&mut s, "start", r).unwrap_err();
+    assert_eq!(e.code, code);
+    assert_eq!(e.detail, json!({"tab":"w1:t2","pane":"w1:p2"}));
+    s.finish(); // nothing else was called: no apply, no prompt
+}
+#[test]
+fn claude_dialog_that_cannot_be_answered_fails_the_start_with_tab_and_pane() {
+    // the mark never reaches Yes: three down keys, then the fourth read is the last call
+    let (r, mut steps) = claude_setup(true);
+    steps.truncate(7);
+    for _ in 0..3 {
+        steps.push(read_step(TRUST_OFF));
+        steps.push(key("down"));
+    }
+    steps.push(read_step(TRUST_OFF));
+    dialog_failure(steps, &r, "agent_not_ready");
+    // another dialog is never answered
+    let (r, mut steps) = claude_setup(true);
+    steps.truncate(7);
+    steps.push(read_step(
+        " Allow Claude to run this command?\n \u{276f} 1. Yes\n   2. No\n",
+    ));
+    dialog_failure(steps, &r, "startup_dialog_unexpected");
+    // not blocked: no key
+    for status in ["working", "idle", "unknown"] {
+        let (r, mut steps) = claude_setup(true);
+        steps.truncate(6);
+        steps.push(trust_get(status));
+        dialog_failure(steps, &r, "agent_not_ready");
+    }
+    // another pane, tab or kind under the name
+    for (k, v) in [
+        ("pane_id", "w1:p9"),
+        ("tab_id", "w1:t9"),
+        ("agent", "codex"),
+    ] {
+        let (r, mut steps) = claude_setup(true);
+        steps.truncate(6);
+        let mut get = trust_get("blocked");
+        if let Response::Json(j) = &mut get.response {
+            j["result"]["agent"][k] = json!(v);
+        }
+        steps.push(get);
+        dialog_failure(steps, &r, "agent_not_ready");
+    }
+    // unreadable or failed calls of the dialog: get, read, down, read, enter
+    for at in [6, 7, 8, 9, 10] {
+        for failed in [true, false] {
+            let (r, mut steps) = claude_setup(true);
+            steps.truncate(at + 1);
+            let read = at == 7 || at == 9;
+            steps[at].response = if failed {
+                Response::Failed
+            } else {
+                Response::Unreadable
+            };
+            // an unreadable screen holds no trust line: that is another dialog
+            let code = if read && !failed {
+                "startup_dialog_unexpected"
+            } else {
+                "agent_not_ready"
+            };
+            dialog_failure(steps, &r, code);
+        }
+    }
+    // the settled wait ends in another state or an error answer
+    for answer in [
+        Response::Json(json!({"result":{"agent":{"agent_status":"blocked"}}})),
+        Response::Json(json!({"result":{"agent":{"agent_status":"working"}}})),
+        Response::Json(json!({"error":{"code":"timeout"}})),
+        Response::Failed,
+    ] {
+        let (r, mut steps) = claude_setup(true);
+        steps.truncate(12);
+        steps[11].response = answer;
+        dialog_failure(steps, &r, "agent_not_ready");
+    }
+    // a key that is not acknowledged
+    let (r, mut steps) = claude_setup(true);
+    steps.truncate(9);
+    steps[8].success = false;
+    dialog_failure(steps, &r, "agent_not_ready");
+}
+#[test]
+fn claude_launch_errors_other_than_blocked_fail_without_input() {
+    for (response, success) in [
+        (Response::Failed, true),
+        (
+            Response::Json(json!({"error":{"code":"agent_kind_unavailable"}})),
+            false,
+        ),
+        (Response::Json(json!({"result":{}})), false),
+        (Response::Unreadable, false),
+    ] {
+        let (r, mut steps) = claude_setup(false);
+        steps.truncate(6);
+        steps[5].response = response;
+        steps[5].success = success;
+        dialog_failure(steps, &r, "agent_start_failed");
+    }
+}
+#[test]
+fn claude_readiness_needs_the_claude_kind_in_the_created_pane() {
+    for (k, v) in [
+        ("agent", json!("codex")),
+        ("tab_id", json!("w1:t9")),
+        ("interactive_ready", json!(false)),
+    ] {
+        for dialog in [false, true] {
+            let (r, mut steps) = claude_setup(dialog);
+            let at = steps.len() - 3;
+            steps.truncate(at + 1);
+            if let Response::Json(j) = &mut steps[at].response {
+                j["result"]["agents"][1][k] = v.clone();
+            }
+            steps[at].elapsed = 59_750;
+            dialog_failure(steps, &r, "agent_not_ready");
+        }
+    }
+}
+#[test]
+fn claude_lifecycle_closes_a_run_like_a_codex_run() {
+    let (r, steps) = claude_setup(true);
+    let mut s = Script::new(steps);
+    let (started, _) = execute(&mut s, "start", &r).unwrap();
+    s.finish();
+    let (mut r, mut steps) = close_setup();
+    r["run"] = started["run"].clone();
+    steps[3].response = Response::Json(as_claude(codex_fixture(true)));
+    if let Response::Json(v) = &mut steps[3].response {
+        v["result"]["agents"][0]["agent_status"] = json!("idle");
+    }
+    s.steps = steps.into();
+    assert_eq!(
+        execute(&mut s, "close", &r).unwrap(),
+        (
+            json!({"status":"closed","outcome":"applied","tab_closed":true}),
+            0
+        )
+    );
+    s.finish();
+    // an agent that still works is not closed, and nothing is closed behind it
+    let (r, mut steps) = close_setup();
+    steps.truncate(4);
+    steps[3].response = Response::Json(as_claude(codex_fixture(true)));
+    check_error(Script::new(steps), "close", &r, "agent_still_working");
+}
+#[test]
+fn claude_wait_is_the_same_call_as_codex_wait() {
+    let mut call = step(
+        "herdr",
+        "agent wait worker --until idle --until done --until blocked --timeout 1000",
+        json!({"result":{"agent":{"agent_status":"idle"}}}),
+    );
+    call.ms = 1000;
+    let mut s = Script::new(vec![call]);
+    s.files.insert(REPORT.into(), b"report".to_vec());
+    let (v, exit) = execute(
+        &mut s,
+        "wait",
+        &json!({"name":"worker","report":REPORT,"timeout_seconds":1,"runtime":"claude"}),
+    )
+    .unwrap();
+    assert_eq!(
+        (exit, &v["status"], &v["agent_status"]),
+        (0, &json!("report_present"), &json!("idle"))
+    );
+    s.finish();
 }

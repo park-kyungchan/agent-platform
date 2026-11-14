@@ -48,6 +48,14 @@ pub trait System {
     fn exists(&self, path: &str) -> std::io::Result<bool> {
         Path::new(path).try_exists()
     }
+    /// The resolved path of an existing directory.
+    fn directory(&self, path: &str) -> std::io::Result<PathBuf> {
+        let resolved = std::fs::canonicalize(path)?;
+        if !resolved.is_dir() {
+            return Err(std::io::ErrorKind::InvalidInput.into());
+        }
+        Ok(resolved)
+    }
     fn now(&self) -> Instant {
         Instant::now()
     }
@@ -82,7 +90,10 @@ pub(crate) fn parse(reply: Reply, code: &'static str) -> Result<Value, Failure> 
     serde_json::from_slice(&reply.bytes).map_err(|_| error(code, "answer"))
 }
 fn acknowledged(reply: Answer) -> bool {
-    reply.is_ok_and(|r| {
+    acknowledged_ref(&reply)
+}
+fn acknowledged_ref(reply: &Answer) -> bool {
+    reply.as_ref().is_ok_and(|r| {
         r.success
             && serde_json::from_slice::<Value>(&r.stdout)
                 .is_ok_and(|v| v.is_object() && v["result"].is_object() && v.get("error").is_none())
@@ -231,6 +242,156 @@ fn run_fields(s: &mut impl System, r: &Value, code: &'static str) -> Result<Valu
     require!(heads.len() == 1 && heads[0]["change"] != "retraction" && heads[0]["fields"].is_object() => code, "run");
     Ok(heads[0]["fields"].clone())
 }
+/// The lead's own Claude account; a worker never runs in it.
+const LEAD_ACCOUNT: &str = "/root/.claude";
+/// What differs between the kinds of worker; everything else of `start` is shared.
+struct Kind<'a> {
+    /// The label Herdr reports as `agent` and takes as `--kind`.
+    label: &'static str,
+    /// The store's `runtime` member.
+    runtime: String,
+    /// Claude only: the account directory given to the tab as `CLAUDE_CONFIG_DIR`.
+    config_dir: Option<&'a str>,
+}
+fn word(r: &Value, key: &str, max: usize) -> Result<String, Failure> {
+    let value = text(r, key)?;
+    require!(value.len() <= max && value.bytes().all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c)) => "invalid_input", key);
+    Ok(value.to_owned())
+}
+fn kind_of<'a>(s: &impl System, r: &'a Value) -> Result<Kind<'a>, Failure> {
+    match r.get("runtime") {
+        None => (),
+        Some(v) if v == "codex" || v == "claude" => (),
+        Some(_) => return Err(error("invalid_input", "runtime")),
+    }
+    if r["runtime"] != "claude" {
+        require!(r.get("config_dir").is_none() => "invalid_input", "config_dir");
+        return Ok(Kind {
+            label: "codex",
+            runtime: "codex".into(),
+            config_dir: None,
+        });
+    }
+    let dir = text(r, "config_dir")?;
+    let lead = Path::new(LEAD_ACCOUNT);
+    require!(!Path::new(dir).starts_with(lead) => "config_dir_forbidden", "config_dir");
+    let resolved = s
+        .directory(dir)
+        .map_err(|_| error("config_dir_missing", "config_dir"))?;
+    require!(!resolved.starts_with(lead) => "config_dir_forbidden", "config_dir");
+    let account = Path::new(dir)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .filter(|n| {
+            n.len() <= 40
+                && n.bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
+        })
+        .ok_or_else(|| error("invalid_input", "config_dir"))?;
+    let (model, effort) = (word(r, "model", 24)?, word(r, "effort", 16)?);
+    Ok(Kind {
+        label: "claude",
+        runtime: format!("claude; model={model}; effort={effort}; account={account}"),
+        config_dir: Some(dir),
+    })
+}
+fn agent_status(v: &Value) -> Option<&str> {
+    v.pointer("/result/agent/agent_status")
+        .or_else(|| v.pointer("/result/event/data/agent_status"))
+        .and_then(Value::as_str)
+}
+/// A Claude start that was answered `agent_not_ready` while the agent is `blocked`. Only the
+/// workspace trust dialog is answered, through Herdr's agent surface on the pane this call
+/// created; any other blocked state fails the start. Returns when the agent is settled.
+fn answer_trust_dialog(
+    s: &mut impl System,
+    launch: &Answer,
+    pane: &str,
+    tab: &str,
+    deadline: Instant,
+) -> Result<(), Failure> {
+    trust_dialog(s, launch, pane, tab, deadline)
+        .map_err(|code| fail(code, "agent", json!({"tab":tab,"pane":pane})))
+}
+fn trust_dialog(
+    s: &mut impl System,
+    launch: &Answer,
+    pane: &str,
+    tab: &str,
+    deadline: Instant,
+) -> Result<(), &'static str> {
+    const NOT_READY: &str = "agent_not_ready";
+    let refused_ready = launch.as_ref().is_ok_and(|r| {
+        !r.success
+            && serde_json::from_slice::<Value>(&r.bytes)
+                .is_ok_and(|v| v["error"]["code"] == "agent_not_ready")
+    });
+    if !refused_ready {
+        return Err("agent_start_failed");
+    }
+    let reply = herdr!(s, 5_000; "agent", "get", pane).map_err(|_| NOT_READY)?;
+    let v: Value = serde_json::from_slice(&reply.bytes).map_err(|_| NOT_READY)?;
+    let agent = &v["result"]["agent"];
+    if !(reply.success
+        && v.get("error").is_none()
+        && agent["pane_id"] == pane
+        && agent["tab_id"] == tab
+        && agent["agent"] == "claude"
+        && agent["agent_status"] == "blocked")
+    {
+        return Err(NOT_READY);
+    }
+    let mut downs = 0;
+    loop {
+        if s.now() >= deadline {
+            return Err(NOT_READY);
+        }
+        let reply = herdr!(s, 5_000; "agent", "read", pane, "--source", "visible")
+            .map_err(|_| NOT_READY)?;
+        if !reply.success {
+            return Err(NOT_READY);
+        }
+        let screen = String::from_utf8_lossy(&reply.stdout).into_owned();
+        // The one test of the trust dialog: its accepting line is on the screen.
+        let Some(accept) = screen
+            .lines()
+            .find(|l| l.contains("Yes, I trust this folder"))
+        else {
+            return Err("startup_dialog_unexpected");
+        };
+        let confirm = accept.contains('\u{276f}');
+        downs += usize::from(!confirm);
+        if downs > 3 {
+            return Err(NOT_READY);
+        }
+        let key = if confirm { "enter" } else { "down" };
+        if !acknowledged(herdr!(s, 5_000; "agent", "send-keys", pane, key)) {
+            return Err(NOT_READY);
+        }
+        if confirm {
+            break;
+        }
+        s.pause(Duration::from_millis(250).min(deadline.saturating_duration_since(s.now())));
+    }
+    let ms = deadline
+        .saturating_duration_since(s.now())
+        .as_millis()
+        .min(30_000) as u64;
+    if ms == 0 {
+        return Err(NOT_READY);
+    }
+    let reply = herdr!(s, ms; "agent", "wait", pane, "--until", "idle", "--until", "done", "--timeout", &ms.to_string())
+        .map_err(|_| NOT_READY)?;
+    let v: Value = serde_json::from_slice(&reply.bytes).map_err(|_| NOT_READY)?;
+    if reply.success
+        && v.get("error").is_none()
+        && matches!(agent_status(&v), Some("idle" | "done"))
+    {
+        Ok(())
+    } else {
+        Err(NOT_READY)
+    }
+}
 fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let name = r["name"]
         .as_str()
@@ -244,6 +405,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     {
         return Err(error("name_invalid", "name"));
     }
+    let kind = kind_of(s, r)?;
     let packet = text(r, "packet")?;
     let bytes = s
         .read(packet)
@@ -313,7 +475,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         json!({"all":[{"eq":["task",task]},{"eq":["key",text(r,"thread")?]}]}),
     )?;
     let plan = search(s, r, "plan", json!({"eq":["thread",thread]}))?;
-    let mut body = json!({"action_type":"start_worker_run","parameters":{"task":task,"name":name,"packet":file_id("packet",packet)?,"runtime":"codex","thread":thread,"plan":plan,"tier":text(r,"tier")?,"layer":text(r,"layer")?}});
+    let mut body = json!({"action_type":"start_worker_run","parameters":{"task":task,"name":name,"packet":file_id("packet",packet)?,"runtime":kind.runtime,"thread":thread,"plan":plan,"tier":text(r,"tier")?,"layer":text(r,"layer")?}});
     if let Some(write_set) = write_set {
         body["parameters"]["write_set"] = write_set;
     }
@@ -326,10 +488,27 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     }
     require!(!(agents(s, "herdr_answer_unreadable", 5_000)?.iter().any(|a| a["name"] == name)) => "agent_exists", "name");
     let cwd = text(r, "cwd")?;
-    let created = herdr!(s, 5_000; "tab", "create", "--workspace", text(r,"workspace")?, "--cwd", cwd, "--label", name, "--no-focus").and_then(|a| {
-        require!(a.success => "tab_create_failed", "tab");
-        parse(a, "tab_create_failed")
-    }).map_err(|_| error("tab_create_failed","tab"))?;
+    let mut tab_args = args(&[
+        "tab",
+        "create",
+        "--workspace",
+        text(r, "workspace")?,
+        "--cwd",
+        cwd,
+        "--label",
+        name,
+    ]);
+    if let Some(dir) = kind.config_dir {
+        tab_args.extend(args(&["--env", &format!("CLAUDE_CONFIG_DIR={dir}")]));
+    }
+    tab_args.push("--no-focus".into());
+    let created = s
+        .call("herdr", &tab_args, &Value::Null, 5_000)
+        .and_then(|a| {
+            require!(a.success => "tab_create_failed", "tab");
+            parse(a, "tab_create_failed")
+        })
+        .map_err(|_| error("tab_create_failed", "tab"))?;
     require!(created.get("error").is_none() => "tab_create_failed", "tab");
     let tab = created["result"]["tab"]["tab_id"]
         .as_str()
@@ -339,11 +518,18 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         .ok_or_else(|| error("tab_create_failed", "pane"))?;
     let binding = write_binding(pane, tab).ok_or_else(|| error("tab_create_failed", "binding"))?;
     let context = json!({"tab":tab,"pane":pane});
-    let launch = herdr!(s, 90_000; "agent", "start", name, "--kind", "codex", "--pane", pane, "--timeout", "90000", "--", "--no-daemon", "-C", cwd, "-m", text(r,"model")?, "-c", &format!("model_reasoning_effort={}",text(r,"effort")?), "--dangerously-bypass-approvals-and-sandbox");
-    if !acknowledged(launch) {
-        return Err(fail("agent_start_failed", "agent", context));
-    }
+    let launch = if kind.config_dir.is_some() {
+        herdr!(s, 50_000; "agent", "start", name, "--kind", "claude", "--pane", pane, "--timeout", "45000", "--", "--model", text(r,"model")?, "--effort", text(r,"effort")?, "--permission-mode", "auto")
+    } else {
+        herdr!(s, 90_000; "agent", "start", name, "--kind", "codex", "--pane", pane, "--timeout", "90000", "--", "--no-daemon", "-C", cwd, "-m", text(r,"model")?, "-c", &format!("model_reasoning_effort={}",text(r,"effort")?), "--dangerously-bypass-approvals-and-sandbox")
+    };
     let deadline = s.now() + Duration::from_secs(60);
+    if !acknowledged_ref(&launch) {
+        if kind.config_dir.is_none() {
+            return Err(fail("agent_start_failed", "agent", context));
+        }
+        answer_trust_dialog(s, &launch, pane, tab, deadline)?;
+    }
     let session = loop {
         let remaining = deadline.saturating_duration_since(s.now()).as_millis() as u64;
         if remaining == 0 {
@@ -364,7 +550,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
             a["name"] == name
                 && a["pane_id"] == pane
                 && a["tab_id"] == tab
-                && a["agent"] == "codex"
+                && a["agent"] == kind.label
                 && a["interactive_ready"] == true
         }) {
             break a["agent_session"]["value"]
@@ -503,7 +689,15 @@ pub fn execute(s: &mut impl System, verb: &str, r: &Value) -> Result<(Value, u8)
     if !r.is_object() {
         return Err(fail("invalid_input", "stdin", Value::Null));
     }
-    for key in ["task_dir", "packet", "report", "cwd", "worktree", "store"] {
+    for key in [
+        "task_dir",
+        "packet",
+        "report",
+        "cwd",
+        "worktree",
+        "store",
+        "config_dir",
+    ] {
         if let Some(v) = r.get(key)
             && !v.as_str().is_some_and(|p| Path::new(p).is_absolute())
         {
