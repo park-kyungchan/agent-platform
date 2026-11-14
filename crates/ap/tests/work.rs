@@ -1754,23 +1754,34 @@ fn claude_start_polls_until_the_agent_works_with_the_chosen_session() {
     steps.push(get_step("done", true, true));
     assert_eq!(finished(steps, &r), answer());
 }
+/// A1: the Lead's own directory is a `config_dir` like any other (and so is one under it).
+#[test]
+fn a1_work_takes_the_lead_config_dir() {
+    for (dir, account) in [
+        ("/root/.claude", ".claude"),
+        ("/root/.claude/", ".claude"),
+        ("/root/.claude/projects", "projects"),
+    ] {
+        let (mut r, mut steps) = claude_setup();
+        r["config_dir"] = json!(dir);
+        let recorded = RECORDED.replace(".claude-acct", account);
+        steps[2].body.as_mut().unwrap()["parameters"]["runtime"] = json!(recorded);
+        steps[5].body.as_mut().unwrap()["parameters"]["runtime"] = json!(recorded);
+        let env = format!("CLAUDE_CONFIG_DIR={dir}");
+        steps[4].argv.iter_mut().for_each(|a| {
+            if a.starts_with("CLAUDE_CONFIG_DIR=") {
+                *a = env.clone();
+            }
+        });
+        assert_eq!(finished(steps, &r), answer(), "{dir}");
+    }
+}
 #[test]
 fn claude_request_refusals_open_nothing() {
     for (key, value, code) in [
         ("config_dir", Value::Null, "invalid_input"),
         ("config_dir", json!(""), "invalid_input"),
         ("config_dir", json!("relative/dir"), "invalid_input"),
-        ("config_dir", json!("/root/.claude"), "config_dir_forbidden"),
-        (
-            "config_dir",
-            json!("/root/.claude/"),
-            "config_dir_forbidden",
-        ),
-        (
-            "config_dir",
-            json!("/root/.claude/projects"),
-            "config_dir_forbidden",
-        ),
         ("config_dir", json!("/accounts/bad name"), "invalid_input"),
         ("runtime", json!("gemini"), "invalid_input"),
         ("runtime", json!("Claude"), "invalid_input"),

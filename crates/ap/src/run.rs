@@ -15,8 +15,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-/// The Lead's own account: never an implementer's or a fixer's; a reviewer's only for integration.
-const LEAD_ACCOUNT: &str = "/root/.claude";
 const SLICE: &str = "agents.slice";
 /// The default time bound of each role, in seconds.
 const ROLES: [(&str, u64); 3] = [
@@ -138,25 +136,11 @@ fn paths(r: &Value, key: &str, max: usize) -> Result<Vec<String>, Failure> {
         })
         .collect()
 }
-fn is_lead(p: &Path) -> bool {
-    p.components().eq(Path::new(LEAD_ACCOUNT).components())
-}
-/// The account rule: `/root/.claude`, by path components and after resolving, is refused for an
-/// implementer and a fixer, and admitted for a reviewer only with `integration: true`.
-fn admit(
-    s: &impl System,
-    role: &str,
-    integration: bool,
-    account: &str,
-    field: &str,
-) -> Result<(), Failure> {
-    let allowed = role == "reviewer" && integration;
-    require!(allowed || !is_lead(Path::new(account)) => "account_forbidden", field);
-    let resolved = s
-        .directory(account)
-        .map_err(|_| error("account_missing", field))?;
-    require!(allowed || !is_lead(&resolved) => "account_forbidden", field);
-    Ok(())
+/// The account rule: an existing directory, whichever it is: `/root/.claude` is an account like any other.
+fn admit(s: &impl System, account: &str, field: &str) -> Result<(), Failure> {
+    s.directory(account)
+        .map(|_| ())
+        .map_err(|_| error("account_missing", field))
 }
 fn environment(r: &Value) -> Result<Vec<(String, String)>, Failure> {
     let Some(v) = r.get("env") else {
@@ -318,13 +302,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         }
     }
     for (i, a) in accounts.iter().enumerate() {
-        admit(
-            s,
-            role,
-            integration,
-            a,
-            if i == 0 { "account" } else { "next_accounts" },
-        )?;
+        admit(s, a, if i == 0 { "account" } else { "next_accounts" })?;
     }
     if at_cwd {
         s.directory(&cwd).map_err(|_| error("cwd_missing", "cwd"))?;
@@ -941,9 +919,11 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         for (i, account) in accounts.iter().enumerate() {
             let (record, worked, saved) = attempt(s, &q, account, &files);
             clean &= saved;
-            // A fresh run cut before it did any work (no tool ran) may go to the next account.
+            // A fresh run cut before it did any work (no tool ran), or a reviewer's cut at any point
+            // (it changes no file), may go to the next account.
+            let again = !worked || q.role == "reviewer";
             let next =
-                record["state"] == "cut" && q.resume.is_none() && !worked && i + 1 < accounts.len();
+                record["state"] == "cut" && q.resume.is_none() && again && i + 1 < accounts.len();
             last = record;
             if !next || !saved {
                 break;

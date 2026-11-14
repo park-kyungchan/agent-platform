@@ -397,7 +397,7 @@ fn a3_no_herdr_or_inherited_claude_variable_and_hooks_and_mcp_off() {
 /// (a) "integration on the Lead's account": the account and model come from the request; the
 /// Lead's account is admitted for a reviewer only with `integration`.
 #[test]
-fn a2_account_and_model_from_the_request_and_the_lead_account_rule() {
+fn a2_account_and_model_from_the_request() {
     let mut f = Fake::new();
     f.dirs
         .insert("/root/.claude".into(), "/root/.claude".into());
@@ -420,33 +420,10 @@ fn a2_account_and_model_from_the_request_and_the_lead_account_rule() {
     );
     assert_eq!(v["account"], "/root/.claude");
     f.reset_calls();
-    let alias = f.p("alias");
-    for (role, account, integration) in [
-        ("implementer", "/root/.claude", false),
-        ("fixer", "/root/.claude/", false),
-        ("reviewer", "/root/.claude", false),
-        ("reviewer", "/root/./.claude", false),
-        ("implementer", alias.as_str(), false),
-    ] {
-        let mut r = f.request("j.md");
-        r["role"] = json!(role);
-        r["account"] = json!(account);
-        if integration {
-            r["integration"] = json!(true);
-        }
-        assert_eq!(
-            code(f.run(&r)),
-            "account_forbidden@account",
-            "{role} {account}"
-        );
-    }
     let mut r = f.request("j.md");
     r["role"] = json!("implementer");
     r["integration"] = json!(true);
     assert_eq!(code(f.run(&r)), "invalid_input@integration");
-    let mut r = f.request("j.md");
-    r["next_accounts"] = json!(["/root/.claude"]);
-    assert_eq!(code(f.run(&r)), "account_forbidden@next_accounts");
     assert!(f.calls().is_empty());
     // A name that only begins with the Lead's directory is another account.
     let mut r = f.request("k.md");
@@ -459,6 +436,149 @@ fn a2_account_and_model_from_the_request_and_the_lead_account_rule() {
     assert_eq!(code(f.run(&r)), "invalid_input@account");
 }
 
+/// A1: `/root/.claude` is an account like any other, for every role, as `account` and in
+/// `next_accounts`, by its path and by an alias that resolves to it. A request that names it as
+/// `account` runs there; one that names it in `next_accounts` reaches it when the first account is
+/// cut before any work.
+#[test]
+fn a1_lead_account_is_admitted_for_every_role() {
+    let mut f = Fake::new();
+    // Every spelling is answered by the fake: the test must not read the machine it runs on.
+    for spelling in ["/root/.claude", "/root/.claude/", "/root/./.claude"] {
+        f.dirs.insert(spelling.into(), "/root/.claude".into());
+    }
+    f.dirs.insert(f.p("alias"), "/root/.claude".into());
+    let alias = f.p("alias");
+    let mut n = 0;
+    for (role, integration) in [
+        ("implementer", false),
+        ("fixer", false),
+        ("reviewer", false),
+        ("reviewer", true),
+    ] {
+        for lead in [
+            "/root/.claude",
+            "/root/.claude/",
+            "/root/./.claude",
+            alias.as_str(),
+        ] {
+            // As `account`: the one launch is on it.
+            n += 1;
+            let out = format!("o{n}.md");
+            let mut r = f.request(&out);
+            r["role"] = json!(role);
+            r["account"] = json!(lead);
+            if integration {
+                r["integration"] = json!(true);
+            }
+            f.reset_calls();
+            let (v, status) = f.run(&r).unwrap();
+            assert_eq!(
+                (status, v["state"].as_str()),
+                (0, Some("ok")),
+                "{role} {lead}"
+            );
+            assert_eq!(v["account"], lead);
+            assert_eq!(f.calls().len(), 1, "{role} {lead}");
+            assert!(
+                f.calls()[0].starts_with(&format!("{lead}|")),
+                "{role} {lead}"
+            );
+            // In `next_accounts`: admitted, and the run reaches it when the first is cut early.
+            n += 1;
+            let out = format!("o{n}.md");
+            let mut r = f.request(&out);
+            r["role"] = json!(role);
+            r["next_accounts"] = json!([lead]);
+            if integration {
+                r["integration"] = json!(true);
+            }
+            f.mode("a1", "limit1");
+            f.reset_calls();
+            let (v, status) = f.run(&r).unwrap();
+            assert_eq!(
+                (status, v["state"].as_str()),
+                (0, Some("ok")),
+                "{role} {lead}"
+            );
+            assert_eq!(v["account"], lead);
+            assert_eq!(f.calls().len(), 2, "{role} {lead}");
+            f.clear("a1");
+        }
+    }
+    // `integration` is still a member of the reviewer only.
+    let mut r = f.request("j.md");
+    r["role"] = json!("fixer");
+    r["integration"] = json!(true);
+    assert_eq!(code(f.run(&r)), "invalid_input@integration");
+    // A missing directory is `account_missing`, for the Lead's own account as for any other.
+    let mut r = f.request("k.md");
+    r["next_accounts"] = json!([f.p("no-such-account")]);
+    assert_eq!(code(f.run(&r)), "account_missing@next_accounts");
+}
+
+/// A1: a reviewer changes no file, so a reviewer cut at any point, after tools ran too, is run
+/// again on the next account with a new session, in the same run and its one record.
+#[test]
+fn a1_reviewer_cut_after_work_goes_to_the_next_account() {
+    let mut f = Fake::new();
+    let mut r = f.request("rv.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    f.mode("a1", "limit45");
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    let calls = f.calls();
+    assert_eq!(calls.len(), 2);
+    assert!(calls[0].starts_with(&format!("{}|", f.p("a1"))));
+    assert!(calls[1].starts_with(&format!("{}|", f.p("a2"))));
+    // A new session on the next account.
+    let session = |call: &str| call.split("--session-id ").nth(1).unwrap()[..36].to_owned();
+    assert_ne!(session(&calls[0]), session(&calls[1]));
+    assert!(!calls[1].contains("--resume"));
+    // One record: the account that answered; the stream and the error file hold that run only.
+    assert_eq!(v["account"], f.p("a2"));
+    assert_eq!(f.record("rv.md"), v);
+    assert_eq!(v["session"], session(&calls[1]).as_str());
+    assert!(std::fs::metadata(f.p("rv.md")).unwrap().len() > 0);
+    let stream = std::fs::read_to_string(f.p("rv.md.stream.jsonl")).unwrap();
+    assert!(!stream.contains("rate_limit_event") && !stream.contains("tool_use"));
+    assert!(!Path::new(&f.p("rv.md.err")).exists());
+    // Every account cut: exit 75 on the last, each tried once.
+    f.mode("a2", "limit45");
+    f.reset_calls();
+    let mut r = f.request("rv2.md");
+    r["next_accounts"] = json!([f.p("a2")]);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
+    assert_eq!(f.calls().len(), 2);
+    assert_eq!(v["account"], f.p("a2"));
+    // A resume never changes account.
+    f.reset_calls();
+    let resume = f.resume(r, "rv3.md", "rv2.md");
+    let (_, status) = f.run(&resume).unwrap();
+    assert_eq!(status, 75);
+    assert_eq!(f.calls().len(), 1);
+}
+
+/// A1: an implementer or a fixer cut after a tool ran stays cut: no session on the next account.
+#[test]
+fn a1_implementer_cut_after_work_stays_cut() {
+    let mut f = Fake::new();
+    for (role, out) in [("implementer", "im.md"), ("fixer", "fx.md")] {
+        f.reset_calls();
+        let mut r = f.request(out);
+        r["role"] = json!(role);
+        r["next_accounts"] = json!([f.p("a2")]);
+        f.mode("a1", "limit45");
+        let (v, status) = f.run(&r).unwrap();
+        assert_eq!((status, v["state"].as_str()), (75, Some("cut")), "{role}");
+        assert_eq!(f.calls().len(), 1, "{role}");
+        assert_eq!(v["account"], f.p("a1"));
+        assert!(!Path::new(&f.p(out)).exists());
+        assert!(v["session"].is_string());
+    }
+}
+
 /// (b) cut after work, (c) resume on the recorded account; "an earlier answer under the same
 /// name" becomes: an existing `out` refuses and nothing of it is touched; a failed resume leaves
 /// the session resumable from its own record.
@@ -466,8 +586,11 @@ fn a2_account_and_model_from_the_request_and_the_lead_account_rule() {
 fn a2_cut_after_work_resume_and_an_existing_out_refuses() {
     let mut f = Fake::new();
     let mut r = f.request("v.md");
+    r["role"] = json!("implementer");
     r["next_accounts"] = json!([f.p("a2")]);
-    // (b) a cut after work: exit 75, no answer, a resume record, the next account is NOT tried.
+    // (b) a cut after work, of an implementer (a reviewer's goes on at the next account: see
+    // `a1_reviewer_cut_after_work_goes_to_the_next_account`): exit 75, no answer, a resume record,
+    // the next account is NOT tried.
     f.mode("a1", "limit45");
     let (v, status) = f.run(&r).unwrap();
     assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
