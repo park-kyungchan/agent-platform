@@ -402,7 +402,9 @@ impl U {
             // As the engine: an object's properties under `head.fields`, and `qualified: false` for a
             // filter on an optional property, which a running or abandoned review lacks.
             let optional = ["repository", "verdict", "report_sha256"];
-            let qualified = all.iter().all(|c| !optional.contains(&c["eq"][0].as_str().unwrap()));
+            let qualified = all
+                .iter()
+                .all(|c| !optional.contains(&c["eq"][0].as_str().unwrap()));
             let found: Vec<_> = self
                 .reviews
                 .iter()
@@ -1615,7 +1617,11 @@ fn d14_reuse_reads_by_required_properties() {
         let mut r = u.request();
         r["merge"] = json!(false);
         let (first, code) = u.run(&r).unwrap();
-        assert_eq!((first["state"].as_str(), code), (Some("accepted"), 0), "{first}");
+        assert_eq!(
+            (first["state"].as_str(), code),
+            (Some("accepted"), 0),
+            "{first}"
+        );
         let accepted = u.reviews[0].clone();
         let mut noise = vec![];
         for (k, v) in [
@@ -1640,8 +1646,11 @@ fn d14_reuse_reads_by_required_properties() {
         let before = u.calls.len();
         let mut r = u.request();
         r.as_object_mut().unwrap().remove("verifier");
-        (r["pull_request"], r["verdict"], r["merge"]) =
-            (json!(7), json!(u.p("work/task/u1.verifier.md")), json!(false));
+        (r["pull_request"], r["verdict"], r["merge"]) = (
+            json!(7),
+            json!(u.p("work/task/u1.verifier.md")),
+            json!(false),
+        );
         r["out"] = json!(u.p("work/task/u2"));
         let (v, code) = u.run(&r).unwrap();
         assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
@@ -1658,7 +1667,11 @@ fn d14_reuse_reads_by_required_properties() {
             json!({"object_type":"review","where":{"all":[{"eq":["kind","packet"]},{"eq":["head",head]},
                 {"eq":["status","closed"]},{"eq":["task",task]}]},"limit":200})
         );
-        let review = v["steps"].as_array().unwrap().iter().find(|s| s["name"] == "review");
+        let review = v["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["name"] == "review");
         assert_eq!(review.unwrap()["detail"], json!({"reused": keep}), "{v}");
         if keep {
             assert_eq!(v["review"], accepted["id"]);
