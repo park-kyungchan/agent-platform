@@ -762,7 +762,11 @@ fn refusals_codex_systemd_members() {
     let mut f = Fake::new();
     let mut r = f.request("r.md");
     r["runtime"] = json!("codex");
-    assert_eq!(code(f.run(&r)), "runtime_not_built@runtime");
+    assert_eq!(
+        code(f.run(&r)),
+        "invalid_input@role",
+        "reviewers run on Claude Code"
+    );
     let mut r = f.request("r.md");
     r["roles_file"] = json!("/root/.config/lead/roles.tsv");
     assert_eq!(code(f.run(&r)), "invalid_input@roles_file");
@@ -1945,9 +1949,19 @@ fn x3_a_message_of_an_unfinished_turn_is_no_answer() {
             !Path::new(&f.p(out)).exists(),
             "{mode}: the message was written"
         );
+        // A failed turn is a result that met nothing; without a turn end there is none.
+        let met = if mode == "msgfailed" {
+            json!(false)
+        } else {
+            Value::Null
+        };
         assert_eq!(
-            (v["answer"].clone(), v["expect_met"].clone()),
-            (Value::Null, Value::Null),
+            (
+                v["answer"].clone(),
+                v["expect_met"].clone(),
+                v["results"].clone()
+            ),
+            (Value::Null, met, json!(u64::from(mode == "msgfailed"))),
             "{mode}"
         );
     }

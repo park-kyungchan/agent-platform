@@ -15,7 +15,7 @@ use std::{
 
 const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict";
 const STAGE: &str =
-    "account model effort prompt permission_mode timeout_seconds next_accounts env resume";
+    "account model effort prompt permission_mode timeout_seconds next_accounts env resume runtime";
 /// The files of one call, by suffix of `out`: a stage's answer also has `ap run`'s three files.
 const FILES: &str =
     ".unit.json .implementer.md .verifier.md .verifier.prompt.md .gate.json .accept.log";
@@ -117,7 +117,8 @@ fn stage_request(r: &Value, which: &str, prompt: &str) -> Value {
     if which == "verifier" {
         req["expect"] = json!({"first_line": "Verdict: *"});
     }
-    if req.get("permission_mode").is_none() {
+    // Only a stage on Claude Code has a default mode: a Codex stage states its own or is refused.
+    if req.get("permission_mode").is_none() && req["runtime"] != "codex" {
         req["permission_mode"] = json!("auto");
     }
     req
