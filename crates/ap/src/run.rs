@@ -1,6 +1,6 @@
 //! One stage of a unit: one headless Claude Code session in a transient systemd scope under
-//! `agents.slice`, ended at its first `result` event, its exit or its time bound, after which the
-//! whole scope is stopped. One record `<out>.run.json` per run; no other ledger, no store write.
+//! `agents.slice`, ended at its time bound, its exit or (a reviewer only) its first `result` event,
+//! after which the whole scope is stopped. One record `<out>.run.json` per run; no other ledger, no store write.
 use crate::work::{
     Failure, LIMIT, System, args, digest, error, fail, new_session_id, require, text,
 };
@@ -362,19 +362,28 @@ fn write_record(out: &str, record: &Value) -> Result<(), Failure> {
 /// What the stream of one run showed.
 #[derive(Default)]
 struct Seen {
-    result: Option<Value>,
+    /// Keep only the first `result` (a reviewer's stage ends there).
+    first_only: bool,
+    /// Every `result` event in order; a session that left a shell can emit more than one.
+    results: Vec<Value>,
     /// An assistant message used a tool: the session did work.
     worked: bool,
     /// A rate-limit event said `rejected`.
     rejected: bool,
 }
 impl Seen {
+    fn done(&self) -> bool {
+        self.first_only && !self.results.is_empty()
+    }
     fn line(&mut self, line: &[u8]) {
+        if self.done() {
+            return;
+        }
         let Ok(e) = serde_json::from_slice::<Value>(line) else {
             return;
         };
         match e["type"].as_str() {
-            Some("result") if self.result.is_none() => self.result = Some(e),
+            Some("result") => self.results.push(e),
             Some("assistant") => {
                 let tools = e["message"]["content"].as_array().into_iter().flatten();
                 self.worked |= tools.into_iter().any(|b| b["type"] == "tool_use");
@@ -400,10 +409,72 @@ fn follow(file: &str, offset: &mut u64, partial: &mut Vec<u8>, seen: &mut Seen) 
     while let Some(at) = partial.iter().position(|b| *b == b'\n') {
         let line: Vec<u8> = partial.drain(..=at).collect();
         seen.line(&line);
-        if seen.result.is_some() {
+        if seen.done() {
             return;
         }
     }
+}
+/// The members of the record that come from the `result` events, and the state the LAST
+/// result gives: turns and tokens are the session's totals; the answer and `expect` are the last.
+fn judge(q: &Request, record: &mut Value, seen: &Seen, e: &Value) -> Result<&'static str, Failure> {
+    let sum = |pick: &dyn Fn(&Value) -> &Value| -> Value {
+        seen.results
+            .iter()
+            .map(|r| pick(r).as_u64())
+            .sum::<Option<u64>>()
+            .map_or(Value::Null, Value::from)
+    };
+    record["turns"] = sum(&|r| &r["num_turns"]);
+    record["tokens"] = json!({
+        "input": sum(&|r| &r["usage"]["input_tokens"]),
+        "output": sum(&|r| &r["usage"]["output_tokens"]),
+        "cache_read": sum(&|r| &r["usage"]["cache_read_input_tokens"]),
+        "cache_creation": sum(&|r| &r["usage"]["cache_creation_input_tokens"]),
+    });
+    let mut denials: Vec<Value> = vec![];
+    for d in seen
+        .results
+        .iter()
+        .flat_map(|r| r["permission_denials"].as_array().into_iter().flatten())
+    {
+        let d = json!({"tool_name": d["tool_name"], "tool_use_id": d["tool_use_id"]});
+        if !denials.contains(&d) {
+            denials.push(d);
+        }
+    }
+    record["permission_denials"] = json!(denials);
+    if let Some(id) = e["session_id"].as_str().filter(|id| !id.is_empty()) {
+        record["session"] = json!(id);
+    }
+    let answer = e["result"].as_str().unwrap_or("");
+    // As review.sh: a short answer with the usage-limit text is a cut whether or not the result
+    // says `is_error`, so a limit message is never saved as an answer.
+    let cut = limit_text(answer)
+        || (e["is_error"] == true && (seen.rejected || e["api_error_status"] == 429));
+    Ok(if cut {
+        "cut"
+    } else if e["is_error"] == true {
+        "failed"
+    } else if answer.is_empty() {
+        record["unmet"] = json!("answer");
+        "no_result"
+    } else {
+        write(&q.out, answer.as_bytes())?;
+        record["answer"] = json!({"path": q.out, "sha256": digest(answer.as_bytes())});
+        let first = answer.lines().next().unwrap_or("");
+        if q.expect_file
+            .as_deref()
+            .is_some_and(|f| !std::fs::metadata(f).is_ok_and(|m| m.is_file() && m.len() > 0))
+        {
+            record["unmet"] = json!("file");
+            "no_result"
+        } else if q.expect_line.as_deref().is_some_and(|p| !glob(p, first)) {
+            record["unmet"] = json!("first_line");
+            "no_result"
+        } else {
+            "ok"
+        }
+    })
 }
 enum End {
     Result,
@@ -459,9 +530,6 @@ fn limit_text(text: &str) -> bool {
             || (t.contains("hit your") && t.contains("limit"))
             || t.contains("resets "))
 }
-fn number(v: &Value) -> Value {
-    v.as_u64().map_or(Value::Null, Value::from)
-}
 /// One launch on one account. Returns the final record and whether the session did work.
 fn attempt(
     s: &mut impl System,
@@ -483,7 +551,8 @@ fn attempt(
         "answer": null, "start": stamp(SystemTime::now()), "end": null, "state": "running",
         "turns": null,
         "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
-        "permission_denials": [], "others_at_stop": null, "unmet": null, "refusal": null,
+        "permission_denials": [], "others_at_stop": null, "results": 0, "expect_met": null,
+        "unmet": null, "refusal": null,
     });
     write_record(&q.out, &record)?;
     let mut argv = args(&[
@@ -543,11 +612,17 @@ fn attempt(
         }
     };
     let bound = Duration::from_secs(q.timeout);
-    let (mut offset, mut partial, mut seen) = (0, vec![], Seen::default());
+    // A reviewer's stage ends at its first result; an implementer's or a fixer's only at the
+    // CLI's exit or the bound, because a result is not final while a shell it started lives.
+    let mut seen = Seen {
+        first_only: q.role == "reviewer",
+        ..Seen::default()
+    };
+    let (mut offset, mut partial) = (0, vec![]);
     let end = loop {
         let exited = !matches!(child.try_wait(), Ok(None));
         follow(&stream, &mut offset, &mut partial, &mut seen);
-        if seen.result.is_some() {
+        if seen.done() {
             break End::Result;
         }
         if exited {
@@ -565,53 +640,21 @@ fn attempt(
     record["others_at_stop"] = json!(others(s, &unit, child.id()));
     stop(s, &unit, &mut child);
     record["end"] = json!(stamp(SystemTime::now()));
-    let state = match (end, &seen.result) {
-        (End::Timeout, _) => "timeout",
-        (End::Exit, _) | (End::Result, None) => {
+    record["results"] = json!(seen.results.len());
+    let state = match seen.results.last() {
+        None if matches!(end, End::Timeout) => "timeout",
+        None => {
             record["unmet"] = json!("result_event");
             "failed"
         }
-        (End::Result, Some(e)) => {
-            record["turns"] = number(&e["num_turns"]);
-            let u = &e["usage"];
-            record["tokens"] = json!({
-                "input": number(&u["input_tokens"]), "output": number(&u["output_tokens"]),
-                "cache_read": number(&u["cache_read_input_tokens"]),
-                "cache_creation": number(&u["cache_creation_input_tokens"]),
-            });
-            record["permission_denials"] = json!(
-                e["permission_denials"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .map(|d| json!({"tool_name": d["tool_name"], "tool_use_id": d["tool_use_id"]}))
-                    .collect::<Vec<_>>()
-            );
-            if let Some(id) = e["session_id"].as_str().filter(|id| !id.is_empty()) {
-                record["session"] = json!(id);
-            }
-            let answer = e["result"].as_str().unwrap_or("");
-            if e["is_error"] == true {
-                let cut = seen.rejected || e["api_error_status"] == 429 || limit_text(answer);
-                if cut { "cut" } else { "failed" }
-            } else if answer.is_empty() {
-                record["unmet"] = json!("answer");
-                "no_result"
+        Some(e) => {
+            let judged = judge(q, &mut record, &seen, e)?;
+            record["expect_met"] = json!(judged == "ok");
+            // A session that never exits keeps its last answer, but its state is the bound's.
+            if matches!(end, End::Timeout) {
+                "timeout"
             } else {
-                write(&q.out, answer.as_bytes())?;
-                record["answer"] = json!({"path": q.out, "sha256": digest(answer.as_bytes())});
-                let first = answer.lines().next().unwrap_or("");
-                if q.expect_file.as_deref().is_some_and(|f| {
-                    !std::fs::metadata(f).is_ok_and(|m| m.is_file() && m.len() > 0)
-                }) {
-                    record["unmet"] = json!("file");
-                    "no_result"
-                } else if q.expect_line.as_deref().is_some_and(|p| !glob(p, first)) {
-                    record["unmet"] = json!("first_line");
-                    "no_result"
-                } else {
-                    "ok"
-                }
+                judged
             }
         }
     };
@@ -651,8 +694,8 @@ fn run(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     };
     Ok((last, status))
 }
-/// One `ap run` request. A refusal writes a record with state `refused` only where no record
-/// exists, so a resumable record is never replaced by a refusal.
+/// One `ap run` request. A refusal writes a record with state `refused` unless the existing
+/// record is `cut` or `running`, so a resumable record is never replaced by a refusal.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     run(s, r).inspect_err(|f| {
         let Some(out) = r["out"]
@@ -662,7 +705,13 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             return;
         };
         let parent_ok = Path::new(out).parent().is_some_and(Path::is_dir);
-        if !parent_ok || std::fs::symlink_metadata(record_path(out)).is_ok() {
+        // Only a resumable record (`cut`) or one of a run that may still be alive (`running`)
+        // is kept; any other earlier record is replaced, so a reader never takes it for this one.
+        let kept = std::fs::read(record_path(out))
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .is_some_and(|v| v["state"] == "cut" || v["state"] == "running");
+        if !parent_ok || kept {
             return;
         }
         let now = stamp(SystemTime::now());
@@ -676,7 +725,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 "prompt": {"path": given("prompt"), "sha256": null}, "answer": null,
                 "start": now, "end": now, "state": "refused", "turns": null,
                 "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
-                "permission_denials": [], "others_at_stop": null, "unmet": null,
+                "permission_denials": [], "others_at_stop": null, "results": 0,
+                "expect_met": null, "unmet": null,
                 "refusal": {"code": f.code, "field": f.field},
             }),
         );

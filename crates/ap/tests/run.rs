@@ -236,6 +236,8 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
         "tokens",
         "permission_denials",
         "others_at_stop",
+        "results",
+        "expect_met",
         "unmet",
         "refusal",
     ];
@@ -258,6 +260,10 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
     assert!(rec["start"].as_str().unwrap().ends_with('Z'));
     assert!(rec["end"].as_str().unwrap().ends_with('Z'));
     assert_eq!(rec["turns"], 2);
+    assert_eq!(
+        (rec["results"].as_u64(), rec["expect_met"].as_bool()),
+        (Some(1), Some(true))
+    );
     assert_eq!(
         rec["tokens"],
         json!({"input":7,"output":9,"cache_read":null,"cache_creation":null})
@@ -557,23 +563,28 @@ fn f_request_with_next(f: &Fake, out: &str) -> Value {
 }
 
 /// (d) "unknown role" and "out file named in the prompt": refused, nothing started; a refusal
-/// writes a `refused` record only where no record exists.
+/// writes a `refused` record unless the existing record is `cut` or `running`.
 #[test]
 fn a2_unknown_role_and_out_named_in_prompt() {
     let mut f = Fake::new();
     let mut r = f.request("n.md");
     r["role"] = json!("nobody");
     assert_eq!(code(f.run(&r)), "invalid_input@role");
-    std::fs::write(f.t.join("p2.md"), "write n.md").unwrap();
-    let mut r = f.request("n.md");
-    r["prompt"] = json!(f.p("p2.md"));
-    assert_eq!(code(f.run(&r)), "out_named_in_prompt@prompt");
-    assert!(f.calls().is_empty());
     let rec = f.record("n.md");
     assert_eq!(rec["state"], "refused");
     assert_eq!(
         rec["refusal"],
         json!({"code":"invalid_input","field":"role"})
+    );
+    std::fs::write(f.t.join("p2.md"), "write n.md").unwrap();
+    let mut r = f.request("n.md");
+    r["prompt"] = json!(f.p("p2.md"));
+    assert_eq!(code(f.run(&r)), "out_named_in_prompt@prompt");
+    assert!(f.calls().is_empty());
+    // An earlier final record (here the first refusal) is replaced by the later refusal.
+    assert_eq!(
+        f.record("n.md")["refusal"],
+        json!({"code":"out_named_in_prompt","field":"prompt"})
     );
     // A resumable record is never replaced by a refusal.
     f.mode("a1", "limit45");
@@ -583,6 +594,14 @@ fn a2_unknown_role_and_out_named_in_prompt() {
     r["prompt"] = json!(f.p("p3.md"));
     assert_eq!(code(f.run(&r)), "out_named_in_prompt@prompt");
     assert_eq!(f.record("c.md")["state"], "cut");
+    // A final record (here `ok`) is replaced by the refusal: a reader never takes it for this run.
+    f.clear("a1");
+    f.run(&f.request("q.md")).unwrap();
+    std::fs::write(f.t.join("p4.md"), "write q.md").unwrap();
+    let mut r = f.request("q.md");
+    r["prompt"] = json!(f.p("p4.md"));
+    assert_eq!(code(f.run(&r)), "out_named_in_prompt@prompt");
+    assert_eq!(f.record("q.md")["state"], "refused");
 }
 
 // ---- the other invariants ------------------------------------------------------------------
@@ -672,4 +691,92 @@ fn ok_means_the_expected_result_and_denials_are_recorded() {
             .unwrap()
             .contains("git push")
     );
+}
+
+// ---- repair 1 --------------------------------------------------------------------------------
+
+/// R1: a result is not final while a shell the session started lives. An implementer's stage runs
+/// to the exit and keeps the LAST answer; a reviewer's ends at the first.
+#[test]
+fn r1_an_implementer_runs_to_the_exit_a_reviewer_ends_at_the_first_result() {
+    let mut f = Fake::new();
+    f.mode("a1", "twice");
+    let mut r = f.request("t.md");
+    r["role"] = json!("implementer");
+    r["expect"] = json!({"first_line": "Verdict: accept"});
+    let s0 = Instant::now();
+    let (v, status) = f.run(&r).unwrap();
+    assert!(s0.elapsed().as_secs() >= 3, "it waited for the shell");
+    assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
+    assert_eq!(
+        std::fs::read_to_string(f.p("t.md")).unwrap(),
+        "Verdict: accept\nsecond"
+    );
+    assert_eq!(
+        (v["results"].as_u64(), v["turns"].as_u64()),
+        (Some(2), Some(3))
+    );
+    assert_eq!(
+        v["tokens"]["output"], 8,
+        "usage is per result: the total is the sum"
+    );
+    let mut r = f.request("u.md");
+    r["role"] = json!("reviewer");
+    let s0 = Instant::now();
+    let (v, _) = f.run(&r).unwrap();
+    assert!(
+        s0.elapsed().as_secs() < 3,
+        "the reviewer ended at the first result"
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.p("u.md")).unwrap(),
+        "Verdict: accept\nfirst"
+    );
+    assert_eq!(
+        (v["state"].as_str(), v["results"].as_u64()),
+        (Some("ok"), Some(1))
+    );
+    assert!(gone(&f.t.join("bin/child.pid")));
+}
+
+/// A fixer whose shell never ends runs to the bound: state `timeout`, the last answer saved, and
+/// the record says whether `expect` was met.
+#[test]
+fn r1_a_fixer_whose_shell_never_ends_times_out_with_its_last_answer() {
+    let mut f = Fake::new();
+    f.mode("a1", "hang");
+    let mut r = f.request("z.md");
+    r["role"] = json!("fixer");
+    r["timeout_seconds"] = json!(3);
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (3, Some("timeout")), "{v}");
+    assert_eq!(v["expect_met"], true);
+    assert!(
+        std::fs::read_to_string(f.p("z.md"))
+            .unwrap()
+            .starts_with("Verdict: accept")
+    );
+    assert!(gone(&f.t.join("bin/child.pid")));
+    r["expect"] = json!({"first_line": "Verdict: repair"});
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(
+        (
+            v["state"].as_str(),
+            v["expect_met"].as_bool(),
+            v["unmet"].as_str()
+        ),
+        (Some("timeout"), Some(false), Some("first_line"))
+    );
+}
+
+/// As review.sh: the usage-limit text is a cut even when the result does not say `is_error`; it
+/// is never saved as an answer.
+#[test]
+fn the_limit_text_is_a_cut_without_is_error() {
+    let mut f = Fake::new();
+    f.mode("a1", "limitok");
+    let (v, status) = f.run(&f.request("l.md")).unwrap();
+    assert_eq!((status, v["state"].as_str()), (75, Some("cut")));
+    assert!(!Path::new(&f.p("l.md")).exists());
 }

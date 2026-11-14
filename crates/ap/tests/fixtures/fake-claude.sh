@@ -24,6 +24,12 @@ case "$mode" in
            /bin/bash -c 'echo $$ > "'"$here"'/child.pid"; sleep 600; :' & wait $! ;;
   other)   # no answer ever: only a shell that never ends
            init; /bin/bash -c 'echo $$ > "'"$here"'/child.pid"; sleep 600; :' & wait $! ;;
+  twice)   # an answer, then a shell that ends after 3 s, then a second turn's answer and the exit
+           init; said "first"; result false 'Verdict: accept\nfirst' 2
+           /bin/bash -c 'echo $$ > "'"$here"'/child.pid"; sleep 3; :' & wait $!
+           said "second"; result false 'Verdict: accept\nsecond' 1 ;;
+  limitok) # the usage-limit text in a result that does not say is_error
+           init; result false 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 1 ;;
   limit1)  init; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 1 ;;
   limit45) init; tool; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 45 ;;
   watch)   # the record as it is while the CLI runs
