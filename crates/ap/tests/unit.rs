@@ -1502,3 +1502,64 @@ fn i7_the_path_of_a_stage_record_is_on_disk_before_the_stage_starts() {
         assert_eq!(seen["stages"][stage].as_str(), Some(want.as_str()));
     }
 }
+
+// ---- D8 a revoked review is not reused ---------------------------------------------------------
+
+/// A come-back on a head whose only review was revoked (`revoke_review` set `status: revoked`)
+/// runs exactly as a come-back on a head with no review: it starts and closes a new review and
+/// posts `success` only for that one, never for the revoked review.
+#[test]
+fn d8_unit_does_not_reuse_revoked() {
+    let mut ends = vec![];
+    for revoked in [true, false] {
+        let mut u = U::new();
+        let mut r = u.request();
+        r["merge"] = json!(false);
+        let (first, code) = u.run(&r).unwrap();
+        assert_eq!(
+            (first["state"].as_str(), code),
+            (Some("accepted"), 0),
+            "{first}"
+        );
+        let old = first["review"]["native_key"].as_str().unwrap().to_owned();
+        if revoked {
+            u.reviews[0]["status"] = json!("revoked");
+        } else {
+            u.reviews.clear();
+        }
+        let before = u.calls.len();
+        let verdict = u.p("work/task/u1.verifier.md");
+        let mut r = u.request();
+        r.as_object_mut().unwrap().remove("verifier");
+        (r["pull_request"], r["verdict"]) = (json!(7), json!(verdict));
+        r["out"] = json!(u.p("work/task/u2"));
+        let (v, code) = u.run(&r).unwrap();
+        assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+        let review = v["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["name"] == "review");
+        assert_eq!(review.unwrap()["detail"], json!({"reused": false}));
+        let later = &u.calls[before..];
+        let count = |a: &str| {
+            later
+                .iter()
+                .filter(|(_, _, b)| b["action_type"] == a)
+                .count()
+        };
+        assert_eq!((count("start_review"), count("close_review")), (1, 1));
+        let new = v["review"]["native_key"].as_str().unwrap().to_owned();
+        if revoked {
+            assert_ne!(new, old);
+        }
+        let posted: Vec<_> = later
+            .iter()
+            .filter(|(p, a, _)| p == "gh" && a.iter().any(|x| x.contains("/statuses/")))
+            .map(|(_, a, _)| a.last().unwrap().clone())
+            .collect();
+        assert_eq!(posted, [format!("description=review {new} accept")]);
+        ends.push(steps(&v));
+    }
+    assert_eq!(ends[0], ends[1]);
+}

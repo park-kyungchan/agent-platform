@@ -371,6 +371,14 @@ fn revoke(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
             return Err(fail("review_not_accepting", "review", json!(key)));
         }
     }
+    // The store before the status: a crash between the two leaves `revoked`, and the repeated
+    // command applies nothing and posts. One request id for every revoke of this review.
+    if f["status"] == "closed" {
+        let key = text(&r["review"], "native_key")?;
+        let request = format!("rv-revoke-{}", &digest(key.as_bytes())[..40]);
+        let parameters = json!({"review": r["review"], "reason": reason});
+        apply(s, r, "revoke_review", request, parameters)?;
+    }
     post(s, &f, "failure", &format!("revoked: {reason}"))?;
     Ok(json!({"status":"revoked","head":f["head"]}))
 }

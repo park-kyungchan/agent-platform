@@ -429,3 +429,85 @@ set only while the object is open and cleared by its closing action (LENS F43).
 Version 6 and earlier version 7 objects without `running_in` can still be noted
 and closed, but do not block a new start with the same name/head/kind; no migration
 is performed. The duplicate criteria basis contains only running objects, including after a later schema install; the engine still reads every closed object as a reverse-link candidate because a cleared `running_in` is `missing`, which its candidate index treats as unknown, until engine item G3.
+
+## Version 8: install attempts and revoked reviews
+Version 7 remains pinned at
+`ccb15142dbe19f2e04ad1c5d445048336db60d08:ontology/work.schema.json`,
+sha256 `6f6d2acc4a45ccc7e2f25268d458f9b6fabc5ab10fb85231d0fa81eaf68373f4`.
+Every definition of version 7 reads the same except two additions to `review`
+and one new view: `review_status` gains `revoked`, `review` gains the optional
+`revoked_at` (`utc_time`) and `revoke_reason` (at most 100 bytes), and the view
+`installs` is added. No existing view changes.
+
+`install` is the record of one install attempt on one `installed_artifact`:
+started before an installer runs, closed after a read of the target, so that a
+dead run is found and "once" is decided by the store. It is Ontology-owned, keyed
+by `$action_id`, titled by `commit`. Its properties: `target` (the
+`installed_artifact`), `kind` (`forward`, `rollback`), `repository`
+(`owner/name`), `commit` (installed, or rolled back to), `attempt` (1 for the
+first on this target and commit), `from` (what a read of the target showed
+before), optional `from_sha256` (the digest of the target file before: the name
+of the copy the installer keeps is made of it, and a dead run leaves no other
+handle), `by` (a timer's invocation or a Lead's session), optional `head` (the
+accepted head whose merge is `commit`), `review` (its accepting review),
+`reviews` (every accepting review of the installed range), `past` (commits a
+Lead stepped over, 40 hex each joined by one space, at most 2,049 bytes),
+`reason`, `rolls_back` (for kind `rollback`: the attempt whose install it
+undoes); then `status` (`running`, `closed`), `started_at`, `running_in`, and
+after the close `outcome` (`installed`, `not_started`, `failed_restored`,
+`failed`), `to` (what the read after the installers showed),
+`rollback_binary` (the copy of the file the installer kept) and
+`rollback_content` (the tarball of the content it kept), both `file_path`,
+`code` and `closed_at`. Links: `install_target` (reverse `installs`),
+`install_running_target` (reverse `running_installs`), `install_review`
+(reverse `review_installs`), `install_reviews` (reverse `range_installs`),
+`install_rolls_back` (reverse `rolled_back_by`).
+
+| Action | Parameters | Refusals, in this order |
+| --- | --- | --- |
+| `start_install` | `target`, `kind`, `repository`, `commit`, `attempt`, `from`, `by`; optional `head`, `review`, `reviews`, `past`, `reason`, `from_sha256`, `rolls_back` | `unknown_target` (no such installed file); `install_running` (an `install` of this target is running); `review_not_accepting` unless `kind` is `rollback` or `review` and `head` are given, the review exists and is closed, of kind `packet`, with verdict `accept`, of `repository` and of exactly `head`; `unknown_rolled_back` (`rolls_back` names no `install`) |
+| `close_install` | `install`, `outcome`, `to`; optional `rollback_binary`, `rollback_content`, `code` | `install_not_running` |
+| `revoke_review` | `review`, `reason` (at most 100 bytes) | `review_not_closed`: a running review, and one already revoked |
+
+`start_install` creates the object with every parameter, `status: running`,
+`started_at: $now` and `running_in: $target`; `close_install` sets the five
+values, `status: closed`, `closed_at: $now` and clears `running_in`, and answers
+two edits of the same object. `running_in` follows the rule of version 7 for a
+new type: set by the start, cleared by the close, followed only by the duplicate
+criterion. A second running attempt of one target is refused; another target is
+admitted; a closed attempt cannot be closed again; the same request id with the
+same parameters answers `already_applied` and creates no second object.
+`reviews`, `past` and `rolls_back` are the caller's words: no criterion reads
+the elements of `reviews` or `past`, and `rolls_back` is only checked to exist;
+the store holds the rule for `review` alone. A search has no order, so the newest
+attempt of a target is found by reading its attempts and ordering them by
+`started_at` (one attempt runs per target at a time). The view `installs` takes
+no argument and shows one row per attempt, newest `started_at` first, with the
+columns Started, Kind, Commit, Attempt, Status, Outcome, To and By.
+
+`revoke_review` sets `status: revoked`, `revoked_at: $now` and
+`revoke_reason`; `verdict`, report and `closed_at` stay. A revoke of a review
+that is still `running` applies nothing (`ap review revoke` posts the failure as
+before); that review can still be closed. Every reader of a closed review reads
+`status` `closed`, so none finds a revoked one: `record_scope_review` refuses
+it with `review_not_closed`, `start_install` with `review_not_accepting`,
+`ap review accept` with `review_not_accepting` and the come-back of `ap unit`
+does not reuse it (see [One review](../crates/ap/README.md#one-review)).
+`agent` reads and derives `install` and applies the three actions. No caller of
+`start_install` or `close_install` exists in this version.
+
+The rehearsal runs the rows of version 7 on that pinned file, starts a review
+and closes two reviews with `accept` there, installs this file, closes the
+running review, revokes one closed review and later names the other as the
+`review` of a forward attempt. `installed_artifact` is owned by a source of four
+paths under `/usr/local/bin` that need not exist where the rehearsal runs, so the
+install rows run on a copy that differs from this file only in those paths (two
+files of the rehearsal's own directory) and in its version (9); the rehearsal
+asserts that every other member is equal. It prints the basis of the search of
+`ap unit` for the review closed under version 7: on this engine a review that
+lacks a filtered optional property (`repository`, `verdict`, `report_sha256`) is
+counted in `unresolved_excluded`, and the answer is not qualified, whatever the
+schema version of the review. The read a caller can rely on is the row
+`v8-upgrade-closed-review-qualified`: a search by properties that every review
+has (`kind`, `head`, `status`) is qualified, and `verdict`, `repository` and the
+report's digest are compared on the objects of the answer.

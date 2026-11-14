@@ -109,10 +109,20 @@ Example stdin for `ap review accept`:
 {"review":{"object_type":"review","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"review-key"},"worktree":"/home/palantirkc/work/example/wt/repo"}
 ```
 
-`revoke` reads a review with a repository and head, then posts
-`lead-review=failure` with `revoked: <reason>`. The reason must contain text and
-fit within 100 UTF-8 bytes. It returns `status: revoked` and `head`. Example
-stdin for `ap review revoke`:
+`revoke` reads a review with a repository and head. When its `status` is
+`closed` it applies `revoke_review` with the reason, under the request id
+`rv-revoke-` and the first 40 hex of the SHA-256 of the review's key, the same
+for every revoke of that review; a refusal or a failure of the store ends the
+command with `store_refused` or `store_answer_unreadable` and nothing is posted.
+When the `status` already is `revoked` it applies nothing. Only then does it post
+`lead-review=failure` with `revoked: <reason>`. The object changes before the
+status, because the store is what a later reader asks: a come-back of `ap unit`
+and `start_install` read `status: closed`, so a revoked review is not found
+again, while a status alone would be overwritten by the next `success`. A crash
+between the two leaves a revoked object and no posted failure; the repeated
+command finds `revoked` and posts it. A running review is not changed. The
+reason must contain text and fit within 100 UTF-8 bytes. It returns
+`status: revoked` and `head`. Example stdin for `ap review revoke`:
 
 ```json
 {"review":{"object_type":"review","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"review-key"},"reason":"Report missed a changed path"}
@@ -164,7 +174,7 @@ The sequence. Each step is recorded before it begins and after it ends; the firs
 | `acceptance` | `acceptance` in `worktree`, no arguments, stdin `/dev/null`, under `timeout -k 10 <acceptance_seconds>`; stdout and stderr to `<out>.accept.log` | `digest_differs`, `worktree_dirty`, `head_differs`, `git_failed`, `acceptance_failed` (`detail`: `{"exit": <code>}`, null when no exit was read; an executable that ignores SIGTERM is killed 10 s after the bound and ends here with exit 137), `acceptance_timeout` (exit 124, also when the executable itself exits 124) |
 | `write_set` | `git fetch origin main` in `clone`, in a fresh call too; the fetched `origin/main` must be an ancestor of the head (the rulesets require an up-to-date branch, so the merge would fail after the verifier was paid) and becomes `base`; the changed paths of `git diff <base> <head>` (the options of `ap review accept`) against the page's write set | `fetch_failed`, `git_failed`, `behind_main` (`detail`: the commit of `origin/main`), `path_outside_write_set` (at most ten paths and the count in `detail`) |
 | `verifier` | ONE `ap run` stage, role `reviewer`, cwd `worktree`, `expect.first_line` `Verdict: *`, prompt `<out>.verifier.prompt.md`: the Lead's prompt file unchanged followed by a block of facts (repository, pull request, head, the diff command, the paths of the gate's answer and of the acceptance output); answer `<out>.verifier.md`. Come-back with `verdict`: skipped, that file is the report and `stages.verifier` names the record beside it | `digest_differs`, `worktree_dirty`, `head_differs`, `git_failed`, `stage_refused`, a state not `ok`, `verdict_repair`, `verdict_unreadable`, `verdict_head_differs` (the second line is not the head) |
-| `review` | when the store holds a closed review of kind `packet` with verdict `accept` for this task, repository and head whose report digest is the report's, that review is used: its id goes into the record, `detail` `{"reused": true}`, and no second one starts. Otherwise `ap review start` (kind `packet`, the head, `base`, the pull request; `model`, `effort` and `prompt` of the verifier's `ap run` record) and `ap review close` with the report and that record's `account` and `session` (`detail` `{"reused": false}`) | `verdict_unreadable` (the record of the verifier cannot be read), the codes of `ap review` (`review_head_differs`, `store_refused`, …) |
+| `review` | when the store holds a closed (not revoked: `status` is `closed`) review of kind `packet` with verdict `accept` for this task, repository and head whose report digest is the report's, that review is used: its id goes into the record, `detail` `{"reused": true}`, and no second one starts. Otherwise `ap review start` (kind `packet`, the head, `base`, the pull request; `model`, `effort` and `prompt` of the verifier's `ap run` record) and `ap review close` with the report and that record's `account` and `session` (`detail` `{"reused": false}`) | `verdict_unreadable` (the record of the verifier cannot be read), the codes of `ap review` (`review_head_differs`, `store_refused`, …) |
 | `status` | the pull request is read open against `main` at the head, then `lead-review=success` on the head through the code of `ap review` | `github_unreadable`, `head_differs`, `status_failed` |
 | `merge` | `gh pr merge --merge --match-head-commit <head>`, then a read of the pull request, also after a call that failed: `merged` only when it says merged at the head and names the merge commit | `merge_failed` (the call failed), `merge_unconfirmed` (the call succeeded) |
 | `cleanup` | in `clone`: `git fetch origin main`, `git worktree remove` without force, then, only after the removal, `git branch -d` (the branch tracks `origin/main`, which now holds the merge). The remote branch is not touched: the repositories delete the branch of a merged pull request themselves | none: a failure is recorded in the step (`result: failed`, `detail` `{fetch, worktree: removed|failed, branch: deleted|failed|kept}`) and the state stays `merged` |
