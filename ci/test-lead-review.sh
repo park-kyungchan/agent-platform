@@ -15,6 +15,13 @@ case "$(cat "$CLAUDE_CONFIG_DIR/mode" 2>/dev/null)" in
   hang)    mkdir -p "$CLAUDE_CONFIG_DIR/projects/p"; printf '{"message":{"role":"user","content":"%s"}}\n{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: accept"}]}}\n' "$mark" > "$CLAUDE_CONFIG_DIR/projects/p/$id.jsonl"
            /bin/bash -c 'sleep 600; :' & wait $!   # two commands: the shell stays a shell and does not become the sleep
            printf '{"is_error":false,"result":"Verdict: accept\\nhead","num_turns":3,"session_id":"%s"}' "$id" ;;
+  rhang)   f="$CLAUDE_CONFIG_DIR/projects/p/$id.jsonl"; printf '{"message":{"role":"user","content":"%s"}}\n' "$mark" >> "$f"
+           /bin/bash -c 'sleep 600; :' & wait $! ;;
+  rhang2)  f="$CLAUDE_CONFIG_DIR/projects/p/$id.jsonl"; printf '{"message":{"role":"user","content":"%s"}}\n{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: accept"}]}}\n' "$mark" >> "$f"
+           /bin/bash -c 'sleep 600; :' & wait $!
+           printf '{"is_error":false,"result":"Verdict: accept\\nhead","num_turns":4,"session_id":"%s"}' "$id" ;;
+  resets)  printf '{"is_error":false,"result":"Verdict: repair\\nhead\\nthe retry counter resets on every call","num_turns":3,"session_id":"%s"}' "$id" ;;
+  errverdict) printf '{"is_error":true,"result":"Verdict: accept\\nhead\\nresets 6:30pm","num_turns":3,"session_id":"%s"}' "$id" ;;
   limit1)  printf '{"is_error":true,"result":"You have hit your 5-hour limit · resets 6:30pm (UTC)","num_turns":1,"session_id":"%s"}' "$id" ;;
   limit45) printf '{"is_error":true,"result":"You have hit your 5-hour limit · resets 6:30pm (UTC)","num_turns":45,"session_id":"%s"}' "$id" ;;
   *)       printf '{"is_error":false,"result":"Verdict: accept\\nhead","num_turns":3,"session_id":"%s","total_cost_usd":0.1}' "$id" ;;
@@ -65,4 +72,26 @@ echo limit1 > "$t/a2/mode"; run verify "$t/cwd" "$t/prompt.md" "$t/x.md"; rc=$?
 # the prompt names the out file: exit 4, nothing started.
 echo "write n.md" > "$t/p2.md"; run integration "$t/cwd" "$t/p2.md" "$t/n.md"; rc=$?
 { [ "$rc" -eq 4 ] && [ ! -s "$t/calls.log" ]; } && ok "out file named in the prompt" || bad "out named: rc=$rc"
+# (I7) the runner starts claude in auto permission mode, fresh and resumed.
+: > "$t/calls.log"; run integration "$t/cwd" "$t/prompt.md" "$t/pm.md"; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$(grep -c -- '--permission-mode auto' "$t/calls.log")" -eq 1 ] && [ "$(wc -l < "$t/calls.log")" -eq 1 ]; } && ok "a fresh run uses --permission-mode auto" || bad "permission mode (fresh): $(cat "$t/calls.log")"
+: > "$t/calls.log"; run integration "$t/cwd" "$t/prompt.md" "$t/pm.md" --resume; rc=$?
+{ [ "$rc" -eq 0 ] && grep -q -- '--permission-mode auto.*--resume s-lead' "$t/calls.log"; } && ok "a resumed run uses --permission-mode auto" || bad "permission mode (resume): $(cat "$t/calls.log")"
+# (#155 fourth pass b, I9) a short answer that begins with Verdict: and holds the word "resets " is an answer, never a cut.
+echo resets > "$t/lead/mode"; run integration "$t/cwd" "$t/prompt.md" "$t/rs.md"; rc=$?; rm -f "$t/lead/mode"
+{ [ "$rc" -eq 0 ] && head -n 1 "$t/rs.md" | grep -q '^Verdict: repair$' && grep -q '"cut": false' "$t/rs.md.run.json"; } && ok "a verdict that holds the word resets is not cut" || bad "resets: rc=$rc $(cat "$t/rs.md.run.json" 2>/dev/null)"
+echo errverdict > "$t/lead/mode"; run integration "$t/cwd" "$t/prompt.md" "$t/ev.md"; rc=$?; rm -f "$t/lead/mode"
+{ [ "$rc" -eq 75 ] && [ ! -e "$t/ev.md" ] && grep -q '"cut": true' "$t/ev.md.run.json"; } && ok "an error answer is cut even if it begins with Verdict:" || bad "error verdict: rc=$rc"
+# (#155 fourth pass a, I8) a resumed session that already holds a verdict: the OLD verdict does not end this run's shells.
+echo limit45 > "$t/lead/mode"; run integration "$t/cwd" "$t/prompt.md" "$t/rh.md"; rm -f "$t/lead/mode"   # a cut run: the record to resume
+mkdir -p "$t/lead/projects/p"; printf '{"message":{"role":"user","content":"earlier prompt (review run 1-1-1)"}}\n{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: repair"}]}}\n' > "$t/lead/projects/p/s-lead.jsonl"
+echo rhang > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=6 run integration "$t/cwd" "$t/prompt.md" "$t/rh.md" --resume; rc=$?; rm -f "$t/lead/mode"
+{ [ "$rc" -eq 75 ] && [ $(( $(date +%s) - s0 )) -ge 5 ]; } && ok "an earlier run's verdict does not end this run's shells" || bad "old verdict: rc=$rc after $(( $(date +%s) - s0 ))s"
+printf '{"message":{"role":"user","content":"earlier prompt (review run 1-1-1)"}}\n{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: repair"}]}}\n' > "$t/lead/projects/p/s-lead.jsonl"
+echo rhang2 > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=60 run integration "$t/cwd" "$t/prompt.md" "$t/rh.md" --resume; rc=$?; rm -f "$t/lead/mode"
+{ [ "$rc" -eq 0 ] && [ -s "$t/rh.md" ] && [ $(( $(date +%s) - s0 )) -lt 40 ]; } && ok "a verdict written after this run's mark ends the leftover shell" || bad "new verdict: rc=$rc after $(( $(date +%s) - s0 ))s"
+# the out file is refused as a whole name only: its companion files may be named in the prompt (I4).
+echo "read /x/n.md.earlier-findings.md and say it in a sentence ending n.md.earlier-findings.md." > "$t/p3.md"; run integration "$t/cwd" "$t/p3.md" "$t/n.md"; rc=$?
+[ "$rc" -eq 0 ] && ok "a companion file name in the prompt is allowed" || bad "companion name: rc=$rc"
+for w in "write n.md" "write n.md." "(n.md)" "n.md, then"; do echo "$w" > "$t/p4.md"; run integration "$t/cwd" "$t/p4.md" "$t/n.md"; rc=$?; [ "$rc" -eq 4 ] && ok "the out file named as '$w' is refused" || bad "out named as '$w': rc=$rc"; done
 [ "$fails" -eq 0 ] && echo "test-lead-review: PASS" || { echo "test-lead-review: $fails FAILED"; cat "$t/stdout" "$t/stderr"; exit 1; }

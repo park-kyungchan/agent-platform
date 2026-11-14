@@ -23,7 +23,9 @@ IFS=',' read -r -a ACCOUNTS <<< "$(printf '%s' "$row" | cut -f4)"
 [ -f "$PROMPT" ] || { echo "prompt_missing@$PROMPT" >&2; exit 2; }
 # Paths are resolved before the change of directory: a prompt or an out file given relative to the caller stays valid.
 PROMPT=$(realpath -- "$PROMPT"); OUT=$(realpath -m -- "$OUT")
-if grep -qF "$(basename "$OUT")" "$PROMPT"; then echo "out_path_named_in_prompt@$PROMPT" >&2; exit 4; fi
+# The out file is named as a whole name: a companion such as <out>.earlier-findings.md is not the out file.
+base=$(basename "$OUT"); base_re=$(printf '%s' "$base" | sed 's/[][\.*^$/+?(){}|]/\\&/g')
+if grep -qE -- "${base_re}(\$|[^A-Za-z0-9._-]|\.(\$|[^A-Za-z0-9_-]))" "$PROMPT"; then echo "out_path_named_in_prompt@$PROMPT" >&2; exit 4; fi
 cd "$CWD" || exit 2
 J="$OUT.json"; RUN="$OUT.run.json"
 SESSION=""
@@ -34,7 +36,7 @@ d=json.load(open(sys.argv[1])); print(d["session"], d["account"])' "$RUN" 2>/dev
   ACCOUNTS=("$ACC")
 elif [ -n "$RESUME" ]; then echo "usage: review.sh <role> <cwd> <prompt file> <out file> [--resume]" >&2; exit 2; fi
 # A headless run does not exit while a shell it started in the background is alive: once the session record
-# holds a message that begins with "Verdict:" and has been idle for 180 s, end the leftover shells.
+# holds a message that begins with "Verdict:" AFTER this run's mark and has been idle for 180 s, end the leftover shells.
 descendants() { local p c; for p in "$@"; do for c in $(pgrep -P "$p" 2>/dev/null); do echo "$c"; descendants "$c"; done; done; }
 # $pid is the timeout wrapper; its child is the reviewer; the leftover shells are below the reviewer.
 end_leftover_shells() { local r c
@@ -47,7 +49,7 @@ watch() { local dir=$1 pid=$2 start=$3 f
   while kill -0 "$pid" 2>/dev/null; do sleep "${REVIEW_WATCH_SLEEP:-30}"
     f=$(find "$dir/projects" -maxdepth 2 -name '*.jsonl' -newermt "@$start" -print0 2>/dev/null | xargs -0 -r grep -lF -- "$MARK" 2>/dev/null | head -n 1)
     [ -n "$f" ] || continue
-    if [ $(( $(date +%s) - $(stat -c %Y "$f") )) -ge "${REVIEW_IDLE_S:-180}" ] && grep -q '"text":"Verdict:' "$f"; then end_leftover_shells "$pid"; fi
+    if [ $(( $(date +%s) - $(stat -c %Y "$f") )) -ge "${REVIEW_IDLE_S:-180}" ] && awk -v m="$MARK" 'seen {print} index($0, m) {seen=1}' "$f" | grep -q '"text":"Verdict:'; then end_leftover_shells "$pid"; fi
   done; }
 envelope() { python3 -I - "$J" "$RUN" "$ROLE" "$1" "$OUT" "$SESSION" <<'PY'
 import json,re,sys,glob,os
@@ -55,7 +57,8 @@ j,run,role,acc,out,asked=sys.argv[1:7]
 try: d=json.load(open(j))
 except Exception: d={}
 res=(d.get("result") or "")
-cut=bool(not d or d.get("is_error") or (len(res)<400 and re.search(r"usage limit|hit your .*limit|resets ", res, re.I)))
+# An answer that begins with "Verdict:" and is not an error is an answer, whatever words it holds.
+cut=bool(not d or d.get("is_error") or (len(res)<400 and not res.lstrip().startswith("Verdict:") and re.search(r"usage limit|hit your .*limit|resets ", res, re.I)))
 # A resumed run that returns no envelope keeps the session it was asked to resume: the record stays resumable.
 json.dump({"role":role,"account":acc,"session":d.get("session_id") or asked or None,"turns":d.get("num_turns"),"cut":cut,"cost_usd":d.get("total_cost_usd")},open(run,"w"))
 if cut:
@@ -81,7 +84,7 @@ if [ -e "$OUT" ]; then mv -f -- "$OUT" "$OUT.prev"; fi
 MARK="(review run $(date +%s)-$$-$RANDOM)"
 n=0
 for ACC in "${ACCOUNTS[@]}"; do
-  n=$((n+1)); args=(--print --model "$MODEL" --effort "$EFFORT" --output-format json --strict-mcp-config)
+  n=$((n+1)); args=(--print --model "$MODEL" --effort "$EFFORT" --permission-mode auto --output-format json --strict-mcp-config)
   [ -n "$SESSION" ] && args+=(--resume "$SESSION")
   start=$(date +%s)
   CLAUDE_CONFIG_DIR="$ACC" timeout "${REVIEW_TIMEOUT:-3300}" "$CLAUDE" "${args[@]}" < <(cat -- "$PROMPT"; printf '\n%s\n' "$MARK") > "$J" 2> "$OUT.err" & pid=$!
