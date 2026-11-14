@@ -294,6 +294,7 @@ fn accept_exact_calls_and_repeated_post() {
 fn revoke_exact_calls_and_status() {
     let mut s = Script::new(vec![
         get("review", review()),
+        revoke_apply("wrong report"),
         status("failure", "revoked: wrong report"),
     ]);
     assert_eq!(
