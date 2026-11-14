@@ -36,7 +36,7 @@ const MODES: [&str; 6] = [
 const KEEP: [&str; 10] = [
     "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ",
 ];
-const MEMBERS: [&str; 20] = [
+const MEMBERS: [&str; 21] = [
     "role",
     "runtime",
     "account",
@@ -57,6 +57,7 @@ const MEMBERS: [&str; 20] = [
     "bind",
     "skills",
     "memory",
+    "schema",
 ];
 /// The unit's own bound runs this long past the request's: `ap run` stops the unit first, and the
 /// bound still ends it when `ap run` is gone.
@@ -104,6 +105,8 @@ struct Request {
     /// The account's skills and slash commands, and its auto-memory, load only when asked.
     skills: bool,
     memory: bool,
+    /// The JSON Schema of the structured output: its answer is the object that validates.
+    schema: Option<Value>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -188,7 +191,7 @@ fn record_path(out: &str) -> String {
 }
 /// What `systemctl is-active` answered for `unit`: false unless it answered a state in which
 /// nothing of the unit lives (a call that fails, times out or prints nothing is no answer).
-fn ended(s: &mut impl System, unit: &str) -> bool {
+pub(crate) fn ended(s: &mut impl System, unit: &str) -> bool {
     let reply = s.call(
         "systemctl",
         &args(&["is-active", unit]),
@@ -404,6 +407,18 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
         }
         (Some(f), _) => snapshot(f),
     };
+    let schema = match r.get("schema") {
+        None => None,
+        Some(_) => {
+            let file = path(r, "schema")?;
+            let v = s.read(&file).ok().filter(|b| b.len() <= 65_536);
+            let v = v.and_then(|b| serde_json::from_slice::<Value>(&b).ok());
+            Some(
+                v.filter(crate::schema::supported)
+                    .ok_or_else(|| error("invalid_input", "schema"))?,
+            )
+        }
+    };
     let base_env = base_env(s, &env);
     require!(s.units() => "systemd_absent", "host");
     let bind = match r.get("bind") {
@@ -448,11 +463,12 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
         bind,
         skills: flag(r, "skills")?,
         memory: flag(r, "memory")?,
+        schema,
     })
 }
 
 /// UTC RFC 3339 to the second.
-fn stamp(t: SystemTime) -> String {
+pub(crate) fn stamp(t: SystemTime) -> String {
     let secs = t.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let (days, rem) = ((secs / 86_400) as i64, secs % 86_400);
     // Days since 1970-01-01 to the civil date (proleptic Gregorian).
@@ -497,7 +513,7 @@ fn glob(pattern: &str, line: &str) -> bool {
 /// Writes through a temporary name and a rename: a reader never sees half a file.
 /// The temporary name is unique per write and created exclusively, so it is never a file of
 /// another run (whose `out` may be any name).
-fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
+pub(crate) fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
@@ -547,6 +563,8 @@ struct Seen {
     worked: bool,
     /// A rate-limit event said `rejected`.
     rejected: bool,
+    /// The `resetsAt` (Unix seconds) of the last rejected rate-limit event.
+    resets_at: Option<u64>,
 }
 impl Seen {
     fn done(&self) -> bool {
@@ -566,7 +584,11 @@ impl Seen {
                 self.worked |= tools.into_iter().any(|b| b["type"] == "tool_use");
             }
             Some("rate_limit_event") => {
-                self.rejected |= e["rate_limit_info"]["status"] == "rejected";
+                let info = &e["rate_limit_info"];
+                if info["status"] == "rejected" {
+                    self.rejected = true;
+                    self.resets_at = info["resetsAt"].as_u64().or(self.resets_at);
+                }
             }
             _ => (),
         }
@@ -628,8 +650,16 @@ fn judge(
     if let Some(id) = e["session_id"].as_str().filter(|id| !id.is_empty()) {
         record["session"] = json!(id);
     }
-    let answer = e["result"].as_str().unwrap_or("");
+    let object = &e["structured_output"];
+    let text = e["result"].as_str().unwrap_or("");
+    let shown = q.schema.as_ref().filter(|_| object.is_object()).map(|_| {
+        let mut bytes = serde_json::to_vec_pretty(object).unwrap_or_default();
+        bytes.push(b'\n');
+        String::from_utf8(bytes).unwrap_or_default()
+    });
+    let answer = shown.as_deref().unwrap_or(text);
     if cut(seen, e) {
+        record["resets_at"] = json!(seen.resets_at);
         "cut"
     } else if e["is_error"] == true {
         "failed"
@@ -643,7 +673,18 @@ fn judge(
     } else {
         record["answer"] = json!({"path": q.out, "sha256": digest(answer.as_bytes())});
         let first = answer.lines().next().unwrap_or("");
-        if q.expect_file
+        if q.schema.is_some() && !object.is_object() {
+            record["unmet"] = json!("structured_output");
+            "no_result"
+        } else if q
+            .schema
+            .as_ref()
+            .is_some_and(|sc| !crate::schema::valid(sc, object))
+        {
+            record["unmet"] = json!("schema");
+            "no_result"
+        } else if q
+            .expect_file
             .as_deref()
             .is_some_and(|f| !written(f, &q.expect_before))
         {
@@ -696,6 +737,9 @@ fn chosen<'a>(q: &Request, seen: &'a Seen) -> Option<&'a Value> {
         e["is_error"] != true
             && !answer.is_empty()
             && !cut(seen, e)
+            && q.schema
+                .as_ref()
+                .is_none_or(|sc| crate::schema::valid(sc, &e["structured_output"]))
             && q.expect_line
                 .as_deref()
                 .is_none_or(|p| glob(p, answer.lines().next().unwrap_or("")))
@@ -730,7 +774,7 @@ fn attempt(
         "turns": null,
         "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
         "permission_denials": [], "results": 0, "expect_met": null,
-        "expect_file_before": q.expect_before, "unmet": null,
+        "expect_file_before": q.expect_before, "unmet": null, "resets_at": null,
         "resumes": q.resume.as_ref().map(|(_, _, file)| file),
     });
     let not_launched = |mut record: Value, unmet: &str| {
@@ -816,6 +860,9 @@ fn attempt(
         "Monitor",
         "--strict-mcp-config",
     ]));
+    if let Some(schema) = &q.schema {
+        argv.extend(args(&["--json-schema", &schema.to_string()]));
+    }
     for m in &q.mcp {
         argv.extend(args(&["--mcp-config", m]));
     }

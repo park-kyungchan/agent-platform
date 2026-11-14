@@ -18,7 +18,7 @@ if ! systemd-run --scope --quiet --collect --unit="ap-run-probe-$$" --slice=agen
 fi
 t=$(mktemp -d /tmp/ap-run-XXXXXX); chmod 0755 "$t"
 cleanup() { for p in "$t"/bin/*.pid; do [ -e "$p" ] && kill -KILL "$(cat "$p")" 2> /dev/null; done; rm -rf -- "$t"
-  systemctl stop "ap-gate-bind-$$-stop.service" "ap-gate-bind-$$-kill.service" 2> /dev/null; }
+  systemctl stop "ap-gate-bind-$$-stop.service" "ap-gate-bind-$$-kill.service" ${uunit:+"$uunit"} 2> /dev/null; }
 trap cleanup EXIT
 mkdir -p "$t/bin" "$t/acct" "$t/cwd"
 cat > "$t/bin/claude" <<'FAKE'
@@ -113,5 +113,71 @@ for how in stop kill; do
     || bad "bind $how: rc=$rc took=${took}s $(cat "$t/d.err") $(field "$t/d$how.md.run.json" state)"
   systemctl stop "$b" 2> /dev/null
 done
+
+# 5. ap unit: a real chain unit under agents.slice whose stages are a fake `claude` and whose GitHub
+#    is a fake `gh`. Stopped while its implementer runs: nothing of the chain or of its stage remains
+#    and the record says `stopped`. A killed caller (`ap unit wait`) leaves a chain that reaches its end.
+mkdir -p "$t/repo" "$t/uout" "$t/uout2" "$t/acct2"
+git -C "$t/repo" init -q -b ap/probe && git -C "$t/repo" -c user.email=t@example.invalid -c user.name=t commit -q --allow-empty -m base
+echo "$t/repo" > "$t/bin/repo"
+cat > "$t/bin/claude" <<'FAKE'
+#!/usr/bin/env bash
+here=$(cd "$(dirname "$0")" && pwd); cat > /dev/null
+sid=; prev=; schema=; for a in "$@"; do case "$prev" in --session-id|--resume) sid=$a ;; --json-schema) schema=$a ;; esac; prev=$a; done
+printf '{"type":"system","subtype":"init","session_id":"%s"}\n' "$sid"
+res() { printf '{"type":"result","subtype":"success","is_error":false,"num_turns":1,"result":"done","session_id":"%s","usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]%s}\n' "$sid" "$1"; }
+case "$schema" in
+  *verdict*) res ",\"structured_output\":{\"verdict\":\"accept\",\"head\":\"$(git rev-parse HEAD)\",\"blocking\":[],\"notes\":[]}" ;;
+  *) /bin/bash -c 'echo $$ > "'"$here"'/stage.pid"; sleep "$(cat "'"$here"'/umode")"; :' & wait $!; res "" ;;
+esac
+FAKE
+cat > "$t/bin/gh" <<'FAKE'
+#!/usr/bin/python3 -I
+import json, subprocess, sys, os
+a = sys.argv[1:]
+if a[:1] in (["--version"], ["pr"]):
+    sys.exit(0)
+repo = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "repo")).read().strip()
+head = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+q = [x for x in a if x.startswith("query=")][-1]
+pr = {"number": 7, "state": "OPEN", "headRefOid": head, "baseRefName": "main", "headRepository": {"nameWithOwner": "o/r"}, "isDraft": False}
+if "reviewThreads" in q:
+    pr = {"reviewThreads": {"pageInfo": {"hasNextPage": False}, "nodes": []}}
+elif "statusCheckRollup" in q:
+    marker = "codex-review-state:v1 " + json.dumps({"code_review": {"commit_sha": head, "status": "completed"}})
+    pr["commits"] = {"nodes": [{"commit": {"oid": head, "statusCheckRollup": {"contexts": {"pageInfo": {"hasNextPage": False},
+        "nodes": [{"__typename": "CheckRun", "name": "rust", "status": "COMPLETED", "conclusion": "SUCCESS", "isRequired": True}]}}}}]}
+    pr["comments"] = {"nodes": [{"author": {"__typename": "Bot", "login": "chatgpt-codex-connector"}, "body": marker}]}
+elif "pullRequests(" in q:
+    print(json.dumps({"data": {"repository": {"pullRequests": {"nodes": [pr]}}}})); sys.exit(0)
+print(json.dumps({"data": {"repository": {"pullRequest": pr}}}))
+FAKE
+chmod 0755 "$t/bin/claude" "$t/bin/gh"
+ureq() { printf '{"repository":"o/r","cwd":"%s","out":"%s","implementer":{"account":"%s","model":"haiku","effort":"low","prompt":"%s"},"reviewer":{"account":"%s","model":"haiku","effort":"low","prompt":"%s"},"bound_minutes":10}' \
+  "$t/repo" "$1" "$t/acct" "$t/prompt.md" "$t/acct2" "$t/prompt.md"; }
+apu() { env -i PATH="$t/bin:$PATH" HOME="${HOME:-/root}" LANG=C.UTF-8 "$ap" unit "$@"; }
+echo 600 > "$t/bin/umode"; rm -f "$t/bin/stage.pid"
+ureq "$t/uout" | apu > "$t/u.out" 2> "$t/u.err"; rc=$?
+uunit=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["unit"])' "$t/u.out" 2> /dev/null)
+{ [ "$rc" -eq 0 ] && [ "$(systemctl show -p Slice --value "$uunit")" = agents.slice ]; } \
+  && ok "ap unit started $uunit under agents.slice and returned" || bad "ap unit: rc=$rc $(cat "$t/u.err")"
+for _ in $(seq 100); do [ -s "$t/bin/stage.pid" ] && break; sleep 0.2; done
+sunit=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["unit"])' "$t/uout/1-implementer.md.run.json" 2> /dev/null)
+[ "$(systemctl show -p BindsTo --value "$sunit")" = "$uunit" ] && ok "its implementer $sunit is bound to the chain's unit" || bad "BindsTo of $sunit"
+ureq "$t/uout2" | apu > /dev/null 2> "$t/u2.err"; rc=$?
+{ [ "$rc" -eq 2 ] && grep -q chain_active "$t/u2.err"; } && ok "a second chain on the worktree is refused chain_active" || bad "second chain: rc=$rc $(cat "$t/u2.err")"
+systemctl stop "$uunit"
+{ ! systemctl is-active --quiet "$uunit" && ! systemctl is-active --quiet "$sunit" && ! alive "$(cat "$t/bin/stage.pid")" \
+  && [ -z "$(systemctl list-units --all --no-legend "$uunit" "$sunit")" ]; } \
+  && ok "the stopped chain: no unit and no process of it or of its stage remains" || bad "after stop: $(systemctl list-units --all --no-legend "$uunit" "$sunit")"
+[ "$(field "$t/uout/unit.json" state)" = stopped ] && ok "its record says stopped" || bad "record: $(field "$t/uout/unit.json" state)"
+echo 3 > "$t/bin/umode"; rm -f "$t/bin/stage.pid"
+ureq "$t/uout2" | apu > "$t/u.out" 2> "$t/u.err"
+printf '{"record":"%s","timeout_seconds":120}' "$t/uout2/unit.json" | apu wait > /dev/null & wpid=$!
+for _ in $(seq 100); do [ -s "$t/bin/stage.pid" ] && break; sleep 0.2; done
+kill -KILL "$wpid"; wait "$wpid" 2> /dev/null
+printf '{"record":"%s","timeout_seconds":120}' "$t/uout2/unit.json" | apu wait > "$t/w.out"; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$(field "$t/uout2/unit.json" state)" = accepted ] && ! systemctl is-active --quiet "$uunit"; } \
+  && ok "after the waiter was killed the chain reached its end: accepted" || bad "killed caller: rc=$rc $(cut -c1-300 "$t/w.out")"
 
 [ "$fails" -eq 0 ] && echo "host-run-scope: PASS" || { echo "host-run-scope: $fails FAILED"; exit 1; }

@@ -13,7 +13,7 @@ mode=$(cat "$here/mode-$(basename "$CLAUDE_CONFIG_DIR")" 2>/dev/null)
 init() { printf '{"type":"system","subtype":"init","session_id":"%s","mcp_servers":[]}\n' "$sid"; }
 tool() { printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"true"}}]},"session_id":"%s"}\n' "$sid"; }
 said() { printf '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"%s"}]},"session_id":"%s"}\n' "$1" "$sid"; }
-rejected() { printf '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"five_hour"},"session_id":"%s"}\n' "$sid"; }
+rejected() { printf '{"type":"rate_limit_event","rate_limit_info":{"status":"rejected","rateLimitType":"five_hour","resetsAt":1794648600},"session_id":"%s"}\n' "$sid"; }
 # result <is_error> <text, JSON-escaped> <turns> [permission denials]
 result() { printf '{"type":"result","subtype":"%s","is_error":%s,"num_turns":%s,"result":"%s","session_id":"%s","usage":{"input_tokens":2,"cache_creation_input_tokens":14047,"cache_read_input_tokens":9064,"output_tokens":4},"permission_denials":%s,"api_error_status":null}\n' \
   "$([ "$1" = true ] && echo error_during_execution || echo success)" "$1" "$3" "$2" "$sid" "${4:-[]}"; }
@@ -77,6 +77,69 @@ for line in open(sys.argv[1], encoding="utf-8"):
     elif sub != "-":
         e["subtype"] = sub
     print(json.dumps(e), flush=True)
+PY
+           ;;
+  object)  # a result whose structured output is the file `object` (none without it)
+           init; python3 -I -c 'import json,os,sys; e={"type":"result","subtype":"success","is_error":False,"num_turns":1,"result":"Verdict: accept","session_id":sys.argv[2],"usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}
+if os.path.exists(sys.argv[1]): e["structured_output"]=json.load(open(sys.argv[1]))
+print(json.dumps(e))' "$here/object" "$sid" ;;
+  script)  # `ap unit`'s stages: line n of `script` is the n-th call's word (see crates/ap/tests/unit.rs)
+           python3 -I - "$here" "$n" "$sid" <<'PY'
+import json, subprocess, sys, time
+here, n, sid = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+word = open(here + "/script").read().split("\n")[n - 1].strip()
+git = lambda *a: subprocess.run(["git", *a], capture_output=True, text=True, check=True).stdout.strip()
+head = lambda: git("rev-parse", "HEAD")
+emit = lambda e: print(json.dumps(e), flush=True)
+def commit():
+    open("work.txt", "a").write(f"{n}\n"); git("add", "-A"); git("commit", "-q", "-m", f"stage {n}")
+def result(obj=None, text="done", error=False):
+    e = {"type": "result", "subtype": "error_during_execution" if error else "success", "is_error": error,
+         "num_turns": 2, "result": text if obj is None else json.dumps(obj), "session_id": sid,
+         "usage": {"input_tokens": 10, "output_tokens": 5, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 1},
+         "permission_denials": []}
+    if obj is not None:
+        e["structured_output"] = obj
+    emit(e)
+emit({"type": "system", "subtype": "init", "session_id": sid})
+if word.startswith("impl"):
+    commit()
+    if word == "impl-red":
+        open(here + "/red", "w").write(head())
+    result()
+elif word.startswith("cut"):
+    reset = int(time.time()) + (300 if word == "cut-in" else 30 * 86400)
+    emit({"type": "rate_limit_event", "rate_limit_info": {"status": "rejected", "resetsAt": reset}, "session_id": sid})
+    result(text="You have hit your 5-hour limit", error=True)
+elif word == "fail":
+    sys.exit(1)
+elif word.startswith("fix"):
+    items = json.loads([l for l in open(f"{here}/prompt.{n}") if l.startswith("Items: ")][-1][7:])
+    if word == "fix-test":
+        git("rm", "-q", "tests/x_test.rs")
+    commit()
+    open(here + "/answered", "w").write("1")
+    d = [{"id": i["id"], "disposition": "taken", "reason": "fixed", "commit": head()} for i in items]
+    if word == "fix-refuse":
+        d[0].update(disposition="refused", commit=None, reason="not a defect")
+    if word == "fix-red":
+        open(here + "/red", "w").write(head())
+    if word == "fix-short":
+        d = d[1:]
+    result({"head": head(), "dispositions": d})
+else:
+    v = {"verdict": "accept", "head": head(), "blocking": [], "notes": []}
+    if word.startswith("repair"):
+        v.update(verdict="repair", blocking=[{"id": "B1", "kind": 1, "path": "work.txt", "line": 1, "claim": "wrong", "shown_by": "cat work.txt"}])
+    if word.endswith("notes"):
+        v["notes"] = [{"id": "N1", "text": "a name"}]
+    if word == "other-head":
+        v["head"] = "0" * 40
+    if word == "merge":
+        open(here + "/merged", "w").write("1")
+    if word == "moved":
+        open(here + "/moved", "w").write("9" * 40)
+    result(v)
 PY
            ;;
   *)       init; said "Verdict: accept"; result false 'Verdict: accept\nhead' 3 ;;

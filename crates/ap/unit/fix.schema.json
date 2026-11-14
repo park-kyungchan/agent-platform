@@ -1,0 +1,10 @@
+{"type": "object", "additionalProperties": false, "required": ["head", "dispositions"],
+ "properties": {
+  "head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+  "dispositions": {"type": "array", "maxItems": 60, "items": {"type": "object", "additionalProperties": false,
+    "required": ["id", "disposition", "reason", "commit"],
+    "properties": {
+     "id": {"type": "string", "minLength": 1},
+     "disposition": {"enum": ["taken", "refused"]},
+     "reason": {"type": "string", "minLength": 1},
+     "commit": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$"}}}}}}

@@ -285,6 +285,7 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
         "expect_met",
         "unmet",
         "resumes",
+        "resets_at",
     ];
     want.sort_unstable();
     assert_eq!(keys, want);
@@ -1447,5 +1448,105 @@ fn gate_a_later_result_does_not_unmake_one_that_met_expect() {
     assert_eq!(
         std::fs::read_to_string(f.p("s2.md")).unwrap(),
         "that notification was the first watch"
+    );
+}
+
+// ---- P2: structured output (`schema`) and the reset of a cut ----------------------------------
+
+fn with_schema(f: &Fake, out: &str, object: Option<Value>) -> Value {
+    let schema = json!({"type": "object", "additionalProperties": false, "required": ["verdict", "head"],
+        "properties": {"verdict": {"enum": ["accept", "repair"]}, "head": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}});
+    std::fs::write(f.t.join("schema.json"), schema.to_string()).unwrap();
+    match object {
+        Some(o) => std::fs::write(f.t.join("bin/object"), o.to_string()).unwrap(),
+        None => {
+            let _ = std::fs::remove_file(f.t.join("bin/object"));
+        }
+    }
+    f.mode("a1", "object");
+    let mut r = f.request(out);
+    r["schema"] = json!(f.p("schema.json"));
+    r
+}
+
+#[test]
+fn schema_a_result_with_an_object_that_validates() {
+    let mut f = Fake::new();
+    let object = json!({"verdict": "accept", "head": "a".repeat(40)});
+    let r = with_schema(&f, "s.md", Some(object.clone()));
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), status), (Some("ok"), 0), "{v}");
+    // The answer file is the object; the launch passed the schema.
+    let answer: Value = serde_json::from_slice(&std::fs::read(f.p("s.md")).unwrap()).unwrap();
+    assert_eq!(answer, object);
+    let launch = &f.launches[0];
+    let at = launch.iter().position(|a| a == "--json-schema").unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&launch[at + 1]).unwrap()["required"],
+        json!(["verdict", "head"])
+    );
+}
+
+#[test]
+fn schema_a_result_without_an_object() {
+    let mut f = Fake::new();
+    let r = with_schema(&f, "s.md", None);
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str(), status),
+        (Some("no_result"), Some("structured_output"), 3),
+        "{v}"
+    );
+    // The text is still saved.
+    assert_eq!(
+        std::fs::read_to_string(f.p("s.md")).unwrap(),
+        "Verdict: accept"
+    );
+}
+
+#[test]
+fn schema_a_result_whose_object_does_not_validate() {
+    let mut f = Fake::new();
+    // Free text in a revision field: the pattern stops it.
+    let r = with_schema(
+        &f,
+        "s.md",
+        Some(json!({"verdict": "accept", "head": "the head of the branch"})),
+    );
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str(), status),
+        (Some("no_result"), Some("schema"), 3),
+        "{v}"
+    );
+    let r = with_schema(
+        &f,
+        "t.md",
+        Some(json!({"verdict": "maybe", "head": "a".repeat(40)})),
+    );
+    assert_eq!(f.run(&r).unwrap().0["unmet"], "schema");
+}
+
+#[test]
+fn schema_with_a_keyword_the_validator_lacks_is_refused() {
+    let mut f = Fake::new();
+    std::fs::write(f.t.join("schema.json"), r#"{"type":"object","oneOf":[]}"#).unwrap();
+    let mut r = f.request("s.md");
+    r["schema"] = json!(f.p("schema.json"));
+    assert_eq!(code(f.run(&r)), "invalid_input@schema");
+    r["schema"] = json!("schema.json");
+    assert_eq!(code(f.run(&r)), "invalid_input@schema");
+    assert!(!f.t.join("s.md.run.json").exists());
+}
+
+#[test]
+fn a_cut_records_the_reset_the_stream_reported() {
+    let mut f = Fake::new();
+    f.mode("a1", "limit1");
+    let (v, status) = f.run(&f.request("c.md")).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["resets_at"].as_u64(), status),
+        (Some("cut"), Some(1_794_648_600), 75),
+        "{v}"
     );
 }
