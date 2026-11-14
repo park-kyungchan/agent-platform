@@ -109,7 +109,7 @@ AP_CONTENT_DST=$t/nr inst check; rcc=$?; s=$(AP_CONTENT_DST=$t/nr bash "$r/scrip
 rm -rf "$D"; cat_ "$cr1"; hb=$(tree "$D"); L=$t/the.lock; rm -f "$t/held"
 ( exec 8>"$L"; flock 8; : > "$t/held"; exec sleep 30 ) & hp=$!
 for _ in $(seq 1 50); do [ -f "$t/held" ] && break; sleep 0.1; done
-AP_CONTENT_LOCK=$L cdst install "$cr2"; r1=$?; e1=$(cat "$t/err"); AP_CONTENT_LOCK=$L cdst rollback; r2=$?; e2=$(cat "$t/err")
+git checkout -q "$cr2"; AP_CONTENT_LOCK=$L cdst install "$cr2"; r1=$?; e1=$(cat "$t/err"); AP_CONTENT_LOCK=$L cdst rollback; r2=$?; e2=$(cat "$t/err")
 AP_CONTENT_LOCK=$L cdst check; r3=$?
 kill "$hp" 2>/dev/null; wait "$hp" 2>/dev/null
 { [ "$r1" -eq 2 ] && [ "$r2" -eq 2 ] && printf '%s\n%s\n' "$e1" "$e2" | grep -c 'install_busy' | grep -qx 2 && [ "$r3" -eq 0 ] && [ "$(tree "$D")" = "$hb" ]; } \
@@ -143,6 +143,58 @@ PATH="$t/fakebin:$PATH" FAIL_MV_RE="/\.new-[^ ]*/\.content-record\.json " cat_ "
 cdst check; rcc=$?
 { [ "$rc" -eq 1 ] && printf '%s\n' "$e5" | grep -q '^install_failed_restored@' && [ "$(tree "$D")" = "$hb" ] && [ "$(sha256sum "$D/.content-record.json")" = "$rb" ] && [ "$rcc" -eq 0 ] && grep -qx "ok commit=$cr1 files=$n1" "$t/out"; } \
   && ok "A5 content: a failure after the files were swapped, at the record, puts files and record back" || bad "A5 record rc=$rc/$rcc $e5"
+# --- round 2: rollback without an argument runs only when the target equals its record; one decision for status and rollback.
+mkdir -p "$t/killbin"; printf '#!/bin/sh\n/bin/mv "$@" || exit $?\nif printf "%%s" "$*" | grep -Eq -- "$KILL_AFTER_MV_RE"; then kill -9 "$PPID"; fi\nexit 0\n' > "$t/killbin/mv"; chmod +x "$t/killbin/mv"
+js_ok() { printf '%s' "$1" | python3 -I -c 'import json,sys; d=json.loads(sys.stdin.read()); assert d["name"]=="content"' 2> /dev/null; }
+# a kill inside the swap of install 2 leaves new files under the record of install 1: rollback without an argument refuses.
+rm -rf "$D"; cat_ "$cr1"
+PATH="$t/killbin:$PATH" KILL_AFTER_MV_RE="/\.new-[^ ]*/runtime-references " cat_ "$cr2"; rk9=$?; hk=$(tree "$D")
+cdst check; rcc=$?; s=$(st); cdst rollback; rc=$?; ek=$(cat "$t/err")
+{ [ "$rk9" -eq 137 ] && [ "$rcc" -eq 1 ] && printf '%s' "$s" | grep -q '"check":"drift","rollback":"none"' && [ "$rc" -eq 2 ] \
+  && printf '%s' "$ek" | grep -q 'rollback_target_not_recorded_state' && printf '%s' "$ek" | grep -q 'rollback <tarball>' && [ "$(tree "$D")" = "$hk" ]; } \
+  && ok "R2 content: after a kill inside the swap, rollback without an argument refuses rollback_target_not_recorded_state and changes nothing" || bad "R2 kill rc=$rk9/$rcc/$rc [$s] [$ek]"
+# the leftover directory of an interrupted run alone is enough: the target equals its record (check ok) but rollback refuses until it is gone.
+rm -rf "$D"; cat_ "$cr1"; cat_ "$cr2"; mkdir "$D/.old-leftover"; hl=$(tree "$D")
+cdst check; rcc=$?; s=$(st); cdst rollback; rc=$?
+{ [ "$rcc" -eq 0 ] && printf '%s' "$s" | grep -q '"check":"ok","rollback":"none"' && [ "$rc" -eq 2 ] && grep -q 'rollback_target_not_recorded_state' "$t/err" && [ "$(tree "$D")" = "$hl" ]; } \
+  && ok "R2 content: a .old-* directory of an interrupted run blocks rollback without an argument (check ok, status none)" || bad "R2 leftover rc=$rcc/$rc [$s]"
+rmdir "$D/.old-leftover"; s=$(st); cdst rollback; rc=$?
+{ printf '%s' "$s" | grep -q '"rollback":"available"' && [ "$rc" -eq 0 ]; } && ok "R2 content: without the leftover status says available and rollback runs" || bad "R2 clean rc=$rc [$s]"
+# status and rollback decide alike: a record naming a kept copy outside the backup directory.
+rm -rf "$D" "$t/elsewhere"; cat_ "$cr1"; cat_ "$cr2"; tk2=$(tarof); mkdir "$t/elsewhere"; cp -p "$tk2"* "$t/elsewhere/"
+sed -i "s|\"kept\":\"[^\"]*/|\"kept\":\"$t/elsewhere/|" "$D/.content-record.json"; hb=$(tree "$D")
+s=$(st); cdst rollback; rc=$?
+{ printf '%s' "$s" | grep -q '"check":"ok","rollback":"none"' && [ "$rc" -eq 2 ] && grep -q 'rollback_not_available' "$t/err" && [ "$(tree "$D")" = "$hb" ]; } \
+  && ok "R2 content: a kept copy outside the backup directory is none in status and refused by rollback" || bad "R2 outside rc=$rc [$s] $(cat "$t/err")"
+# a damaged record or checksum list is drift, never ok; status stays one valid JSON line.
+rm -rf "$D"; cat_ "$cr1"; cat_ "$cr2"; cp -p "$D/.content-record.json" "$t/rec.good"; cp -p "$D/.content-sums" "$t/sums.good"; dm_ok=1
+damage() { # <name> <record command or ->  <sums command or ->
+  cp -p "$t/rec.good" "$D/.content-record.json"; cp -p "$t/sums.good" "$D/.content-sums"
+  [ "$2" = - ] || eval "$2"; [ "$3" = - ] || eval "$3"
+  cdst check; local c=$?; local sj; sj=$(st); local rs=$?
+  { [ "$c" -eq 1 ] && [ "$rs" -eq 0 ] && [ "$(printf '%s\n' "$sj" | wc -l)" -eq 1 ] && js_ok "$sj" && printf '%s' "$sj" | grep -q '"check":"drift"' && printf '%s' "$sj" | grep -q '"rollback":"none"'; } || { dm_ok=0; echo "damage $1: check rc=$c [$sj]"; }
+}
+damage empty-record ': > "$D/.content-record.json"' -
+damage cut-record 'head -c 40 "$t/rec.good" > "$D/.content-record.json"' -
+damage not-json 'echo garbage > "$D/.content-record.json"' -
+damage control-characters 'sed "s/\"installed_at\":\"[^\"]*\"/\"installed_at\":\"a\\\\b\"/" "$t/rec.good" > "$D/.content-record.json"' -
+damage tab-and-quote 'printf "{\"commit\":\"x\ty\",\"installed_at\":\"a\\\"b\",\"kept\":null,\"files\":1}\n" > "$D/.content-record.json"' -
+damage cut-sums-mid-line - 'head -c -10 "$t/sums.good" > "$D/.content-sums"'
+damage cut-sums-at-line - 'head -n 2 "$t/sums.good" > "$D/.content-sums"'
+damage empty-sums - ': > "$D/.content-sums"'
+damage files-differs 'sed "s/\"files\":[0-9]*/\"files\":99/" "$t/rec.good" > "$D/.content-record.json"' -
+[ "$dm_ok" -eq 1 ] && ok "R2 content: an empty, cut or non-JSON record and a cut or short checksum list are drift, status stays valid JSON" || bad "R2 damaged state"
+cp -p "$t/rec.good" "$D/.content-record.json"; cp -p "$t/sums.good" "$D/.content-sums"; cdst check; [ $? -eq 0 ] && ok "R2 content: the undamaged record is ok again" || bad "R2 restored record"
+# a refused install creates neither the kept-copy directory nor the lock file (the refusals come first).
+rm -rf "$t/bk-fresh" "$t/dst-fresh"
+AP_CONTENT_BACKUP_DIR=$t/bk-fresh AP_CONTENT_DST=$t/dst-fresh inst install "$cr1"; rc=$?
+echo dirty >> content/AGENTS.md; AP_CONTENT_BACKUP_DIR=$t/bk-fresh AP_CONTENT_DST=$t/dst-fresh inst install "$(git rev-parse HEAD)"; rd=$?; git checkout -q -- content
+{ [ "$rc" -eq 2 ] && [ "$rd" -eq 2 ] && [ ! -e "$t/bk-fresh" ] && [ ! -e "$t/dst-fresh" ]; } && ok "R2 content: a refused install creates no kept-copy directory, no lock file and no target" || bad "R2 refusal side effects rc=$rc/$rd"
+# a rollback that completed but could not write its marker exits 4 and says the rollback completed.
+rm -rf "$D"; cat_ "$cr1"; tk1=$(tarof); cat_ "$cr2"; mkdir "$tk1.consumed"
+cdst rollback; rc=$?; e4=$(cat "$t/err"); cdst check; rcc=$?
+{ [ "$rc" -eq 4 ] && printf '%s' "$e4" | grep -q 'rollback_completed_marker_failed' && printf '%s' "$e4" | grep -q 'rollback itself completed' && [ "$(cat "$D/AGENTS.md")" = r1 ] && [ "$rcc" -eq 0 ]; } \
+  && ok "R2 content: a failed marker after a completed rollback exits 4 and says the rollback itself completed" || bad "R2 marker rc=$rc/$rcc [$e4]"
 # check names at most 10 paths.
 for i in $(seq 1 12); do mkdir -p content/skills/m$i; echo m$i > content/skills/m$i/SKILL.md; done; cm=$(commit many)
 rm -rf "$D"; cat_ "$cm"; for i in $(seq 1 12); do rm -f "$D/skills/m$i/SKILL.md"; done

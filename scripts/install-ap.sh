@@ -3,9 +3,16 @@
 #   install <full commit>   build the commit of origin/main in a detached worktree and install it; records the
 #                           commit, the sha256 of the binary, the time and the before-file in $BACKUP_DIR/installed.json
 #   check                   compares the installed binary with origin/main (exit 0; writes nothing)
-#   rollback                installs the before-file the record names (one level); `rollback <before-file>` as before
+#   rollback                installs the before-file the record names (one level); it runs only when the installed
+#                           binary is the one the record holds (sha256), else it refuses
+#                           rollback_target_not_recorded_state: use `rollback <before-file>`; `rollback <before-file>` as before
 #   status                  one JSON line: name, commit, installed_at, check (ok|drift|not_recorded), rollback
-#                           (available|none); no write, no network, no Git call
+#                           (available|none); no write, no network, no Git call. `available` exactly when `rollback`
+#                           without an argument would run: both ask rollback_plan.
+# A rollback whose binary was put back but whose record could not be written exits 4 with
+# `rollback_completed_record_write_failed`: the rollback itself completed (the installed binary is the before-file), the
+# record still describes the binary that was rolled back, so `status` says drift and a rollback without an argument is
+# refused until an install writes a record; the operator reads `status` and uses `rollback <before-file>` if needed.
 set -euo pipefail
 
 INSTALL_DIR="${AP_INSTALL_DIR:-/usr/local/bin}"
@@ -129,6 +136,34 @@ do_check() {
   exit 0
 }
 
+# rollback_plan: the ONE decision of whether `rollback` without an argument runs; `status` asks the same function.
+# Success sets RB_BEFORE and RB_SHA. Failure sets RB_CODE and RB_MSG. Writes nothing.
+rollback_plan() {
+  RB_CODE=rollback_not_available; RB_MSG=""; RB_BEFORE=""; RB_SHA=""
+  if [[ ! -f "$RECORD" ]]; then RB_MSG="no install record"; return 1; fi
+  local rsha="" before="" bsha="" actual="" base="" dir=""
+  rsha="$(json_field "$RECORD" sha256)"
+  before="$(json_field "$RECORD" before)"
+  bsha="$(json_field "$RECORD" before_sha256)"
+  if [[ -f "$INSTALLED" ]]; then actual="$(sha256sum "$INSTALLED" 2>/dev/null | awk '{print $1}' || true)"; fi
+  if [[ -z "$rsha" || "$actual" != "$rsha" ]]; then
+    RB_CODE=rollback_target_not_recorded_state
+    RB_MSG="the installed binary is not the one the record holds (an interrupted or foreign change); read status, then use rollback <before-file> with the file you mean"
+    return 1
+  fi
+  if [[ -z "$before" ]]; then RB_MSG="the record names no before-file (rolled back already, or the first install)"; return 1; fi
+  if [[ -z "$bsha" ]]; then RB_MSG="the record holds no before_sha256"; return 1; fi
+  base="$(basename -- "$before")"
+  if [[ ! "$base" =~ ^ap\.before-[0-9a-f]{7}$ ]]; then RB_MSG="the record names a file that is not a before-file"; return 1; fi
+  if [[ ! -f "$before" || -L "$before" ]]; then RB_MSG="the before-file is missing"; return 1; fi
+  dir="$(cd -- "$(dirname -- "$before")" && pwd -P)"
+  if [[ "$dir" != "$(realpath -m -- "$BACKUP_DIR")" ]]; then RB_MSG="the record names a before-file outside $(realpath -m -- "$BACKUP_DIR")"; return 1; fi
+  local actual_before=""
+  actual_before="$(sha256sum "$before" 2>/dev/null | awk '{print $1}' || true)"
+  if [[ "$actual_before" != "$bsha" || "${base#ap.before-}" != "${actual_before:0:7}" ]]; then RB_MSG="the before-file does not match its recorded sha256"; return 1; fi
+  RB_BEFORE="$before"; RB_SHA="$bsha"
+}
+
 do_status() {
   if [[ ! -d "$INSTALL_DIR" || ! -r "$INSTALL_DIR" ]]; then
     printf 'target_unreadable@install-ap.sh:%s\n' "$LINENO" >&2
@@ -136,25 +171,24 @@ do_status() {
   fi
   local commit=null at=null chk=not_recorded rb=none
   if [[ -f "$RECORD" ]]; then
-    local rc="" rat="" rsha="" before="" bsha="" actual=""
+    local rc="" rat="" rsha="" actual=""
     rc="$(json_field "$RECORD" commit)"
     rat="$(json_field "$RECORD" installed_at)"
     rsha="$(json_field "$RECORD" sha256)"
-    before="$(json_field "$RECORD" before)"
-    bsha="$(json_field "$RECORD" before_sha256)"
-    commit="\"$rc\""
-    at="\"$rat\""
     chk=drift
-    if [[ -f "$INSTALLED" ]]; then
-      actual="$(sha256sum "$INSTALLED" 2>/dev/null | awk '{print $1}' || true)"
-      if [[ -n "$rsha" && "$actual" == "$rsha" ]]; then
-        chk=ok
+    # Only values of the shape this script writes are printed, so the line is valid JSON whatever the record holds.
+    if [[ "$rc" =~ ^([0-9a-f]{7,64}|unknown)$ && "$rat" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then
+      commit="\"$rc\""
+      at="\"$rat\""
+      if [[ -f "$INSTALLED" && -n "$rsha" ]]; then
+        actual="$(sha256sum "$INSTALLED" 2>/dev/null | awk '{print $1}' || true)"
+        if [[ "$actual" == "$rsha" ]]; then
+          chk=ok
+        fi
       fi
     fi
-    if [[ -n "$before" && -n "$bsha" && "$(basename -- "$before")" =~ ^ap\.before-[0-9a-f]{7}$ && -f "$before" && ! -L "$before" ]]; then
-      if [[ "$(sha256sum "$before" 2>/dev/null | awk '{print $1}' || true)" == "$bsha" ]]; then
-        rb=available
-      fi
+    if rollback_plan; then
+      rb=available
     fi
   fi
   printf '{"name":"ap","commit":%s,"installed_at":%s,"check":"%s","rollback":"%s"}\n' "$commit" "$at" "$chk" "$rb"
@@ -322,18 +356,15 @@ do_rollback() {
   fi
   local before="" recorded_sha="" locked=0
   if [[ $# -eq 0 ]]; then
-    # Without an argument the before-file is the one the install record names.
+    # Without an argument: only when the installed binary is the one the record holds (rollback_plan), under the lock.
     check_backup_dir_usable
     acquire_install_lock
     locked=1
-    if [[ ! -f "$RECORD" ]]; then
-      refuse "rollback_not_available" "$LINENO" "no install record"
+    if ! rollback_plan; then
+      refuse "$RB_CODE" "$LINENO" "$RB_MSG"
     fi
-    before="$(json_field "$RECORD" before)"
-    recorded_sha="$(json_field "$RECORD" before_sha256)"
-    if [[ -z "$before" ]]; then
-      refuse "rollback_not_available" "$LINENO" "the record names no before-file (rolled back already, or the first install)"
-    fi
+    before="$RB_BEFORE"
+    recorded_sha="$RB_SHA"
   else
     before="$1"
   fi
@@ -385,8 +416,12 @@ do_rollback() {
   # The record now describes the restored binary and names no before-file: one level of rollback.
   local restored_commit=""
   restored_commit="$(version_commit "$out")"
+  if [[ ! "$restored_commit" =~ ^[0-9a-f]{7,64}$ ]]; then
+    restored_commit=unknown
+  fi
   if ! write_record "${restored_commit:-unknown}" "$before_sha" "" ""; then
-    refuse "record_write_failed" "$LINENO" "the binary is restored; status will say drift"
+    printf 'rollback_completed_record_write_failed@install-ap.sh:%s: the rollback itself completed (the installed binary is the before-file); only the record could not be written, so status says drift and a rollback without an argument is refused\n' "$LINENO" >&2
+    exit 4
   fi
 }
 

@@ -2,14 +2,20 @@
 # Install content/ of this repository as the shared instructions of the host, or put a kept copy back.
 #   scripts/install-content.sh install <commit>    from this checkout, which must be clean at <commit> on origin/main
 #   scripts/install-content.sh check               every file of the recorded checksum list is in the target (exit 0; 1 drift; 3 not recorded)
-#   scripts/install-content.sh rollback            puts back the kept copy the install record names (one level)
+#   scripts/install-content.sh rollback            puts back the kept copy the install record names (one level); it runs only when the
+#                                                  target equals its record (check ok, no .old-* or .new-* directory of an interrupted
+#                                                  run), else it refuses rollback_target_not_recorded_state: use rollback <tarball>
 #   scripts/install-content.sh rollback <tarball>  a tarball this script wrote before an install
 #   scripts/install-content.sh status              one JSON line: name, commit, installed_at, check, rollback
 # The file list is content/SHA256SUMS (no fixed skill list). Target ${AP_CONTENT_DST:-/root/.agents}; kept copies
 # in ${AP_CONTENT_BACKUP_DIR:-/var/backups/agent-platform-content} (mode 0700). `install` and `rollback` hold one
 # lock (${AP_CONTENT_LOCK:-<kept copy directory>/.install.lock}) for their whole run. The target holds the record of
 # the install (.content-record.json: commit, installed_at, kept, files) and the checksum list it was made from
-# (.content-sums); they are swapped in with the files, so a failed install leaves the previous record.
+# (.content-sums); they are swapped in with the files, so a failed install leaves the previous record. `status` says
+# `available` exactly when `rollback` without an argument would run: both ask rollback_plan.
+# A rollback that completed but could not write its marker <kept>.consumed (the only write after the swap) exits 4 with
+# `rollback_completed_marker_failed`: the files, the record and the owned list ARE the previous install's, and a second
+# rollback without an argument is not blocked, so it must not be run. Exit 2 is a refusal, exit 1 a failure that was undone.
 # Order, so that a failure never leaves a half-installed tree:
 #   install : verify the checkout's checksums; copy everything to a staging directory beside the target and verify
 #             it THERE; write the tarball of what will be replaced and read it back; only then swap path by path,
@@ -34,21 +40,44 @@ json_field() { sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p"
 write_record() { # <file> <commit> <installed_at> <kept copy or empty> <file count>
   local kept=null; [ -z "$4" ] || kept="\"$4\""
   printf '{"commit":"%s","installed_at":"%s","kept":%s,"files":%s}\n' "$2" "$3" "$kept" "$5" > "$1"; }
-# content_state: sets CHK (ok|drift|not_recorded), CHK_COMMIT, CHK_AT, CHK_FILES and CHK_BAD (up to 10 paths). Writes nothing.
-content_state() { local out rc=0
-  CHK_COMMIT=""; CHK_AT=""; CHK_BAD=""; CHK_FILES=0
+REC_RE='^\{"commit":"[0-9a-f]{40,64}","installed_at":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z","kept":(null|"[^"\\[:cntrl:]]*"),"files":[0-9]+\}$'
+# content_state: sets CHK (ok|drift|not_recorded), CHK_COMMIT, CHK_AT, CHK_KEPT (only from a well-formed record), CHK_FILES
+# and CHK_BAD (up to 10 paths). A record that is empty, cut or not the one this script writes, a checksum list with a
+# malformed line or a line count other than the record's `files` are drift. Writes nothing.
+content_state() { local out rc=0 n bad f
+  CHK_COMMIT=""; CHK_AT=""; CHK_KEPT=""; CHK_BAD=""; CHK_FILES=0
   if [ ! -f "$DST/$REC" ] || [ ! -f "$DST/$SUMS" ]; then CHK=not_recorded; return 0; fi
-  CHK_COMMIT=$(json_field "$DST/$REC" commit); CHK_AT=$(json_field "$DST/$REC" installed_at)
-  CHK_FILES=$(grep -c . "$DST/$SUMS" || true)
+  CHK=drift
+  n=$(grep -c '' "$DST/$SUMS" || true); CHK_FILES=$n
+  bad=$(grep -vcE '^[0-9a-f]{64}  [^[:cntrl:]]+$' "$DST/$SUMS" || true)
+  if [ "$(grep -c '' "$DST/$REC" || true)" -eq 1 ] && grep -Eq "$REC_RE" "$DST/$REC"; then
+    CHK_COMMIT=$(json_field "$DST/$REC" commit); CHK_AT=$(json_field "$DST/$REC" installed_at); CHK_KEPT=$(json_field "$DST/$REC" kept)
+    f=$(sed 's/.*"files":\([0-9]*\)}$/\1/' "$DST/$REC")
+  else return 0; fi
+  { [ "$n" -gt 0 ] && [ "$bad" -eq 0 ] && [ "$n" = "$f" ]; } || return 0
   out=$(cd "$DST" && sha256sum -c "$DST/$SUMS" 2>/dev/null) || rc=$?
   CHK_BAD=$(printf '%s\n' "$out" | sed -n 's/: FAILED.*$//p' | head -n 10) || true
-  if [ "$rc" -eq 0 ] && [ "$CHK_FILES" -gt 0 ]; then CHK=ok; else CHK=drift; fi
+  if [ "$rc" -eq 0 ]; then CHK=ok; fi
 }
-# kept_available: the record names a kept copy and the copy and every sidecar still match their checksum file.
-kept_available() { local k
-  [ -f "$DST/$REC" ] || return 1
-  k=$(json_field "$DST/$REC" kept); [ -n "$k" ] && [ -f "$k" ] && [ -f "$k.sha256" ] && [ ! -e "$k.consumed" ] || return 1
-  (cd "$(dirname -- "$k")" && sha256sum -c --quiet "$(basename -- "$k").sha256") > /dev/null 2>&1; }
+# rollback_plan: the ONE decision of whether `rollback` without an argument runs; `status` asks the same function.
+# Success sets RB_KEPT. Failure sets RB_CODE and RB_MSG (it does not touch anything).
+rollback_plan() { local k
+  RB_KEPT=""; RB_CODE=rollback_not_available; RB_MSG=""
+  content_state
+  [ "$CHK" != not_recorded ] || { RB_MSG="$DST has no install record"; return 1; }
+  if [ "$CHK" != ok ] || compgen -G "$DST/.old-*" > /dev/null || compgen -G "$DST/.new-*" > /dev/null; then
+    RB_CODE=rollback_target_not_recorded_state
+    RB_MSG="the target does not equal its install record (check says $CHK) or holds the leftovers of an interrupted run (.old-* or .new-*); read check, then use rollback <tarball> with the kept copy you mean"
+    return 1
+  fi
+  k=$CHK_KEPT
+  [ -n "$k" ] || { RB_MSG="the record names no kept copy"; return 1; }
+  [ ! -e "$k.consumed" ] || { RB_MSG="a rollback was made already; the record now in force names $k, which is not offered again"; return 1; }
+  case "$(basename -- "$k")" in agents-before-*.tar) ;; *) RB_MSG="the record names a path that is not a kept copy"; return 1 ;; esac
+  [ "$(realpath -m -- "$(dirname -- "$k")")" = "$(realpath -m -- "$BK")" ] || { RB_MSG="the record names a kept copy outside $BK"; return 1; }
+  { [ -f "$k" ] && [ -f "$k.sha256" ] && [ -f "$k.paths" ]; } || { RB_MSG="the kept copy or one of its files is missing"; return 1; }
+  (cd "$(dirname -- "$k")" && sha256sum -c --quiet "$(basename -- "$k").sha256") > /dev/null 2>&1 || { RB_MSG="the kept copy (tarball or a sidecar file) does not match its checksum"; return 1; }
+  RB_KEPT=$k; }
 stamp=$(date -u +%Y%m%dT%H%M%SZ)-$$
 moved_old=(); placed=()
 # A path is there when it exists or is a symbolic link: a relative link need not resolve where it is staged.
@@ -82,13 +111,15 @@ paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, runtime-referen
 case "${1:-}" in
 install)
   [ "$#" -eq 2 ] || refuse "usage: install <commit>"
-  take_lock
   want=$2; SRC=$REPO/content
   [ "$(git -C "$REPO" rev-parse HEAD)" = "$want" ] || refuse "checkout is not at $want"
   [ -z "$(git -C "$REPO" status --porcelain -- content)" ] || refuse "content/ has uncommitted changes"
   git -C "$REPO" merge-base --is-ancestor "$want" origin/main || refuse "$want is not on origin/main"
   (cd "$SRC" && sha256sum -c --quiet SHA256SUMS) || refuse "content/ does not match its SHA256SUMS"
   mapfile -t new < <(paths_of "$SRC/SHA256SUMS")
+  for p in "${new[@]}"; do owned_ok "$p" || refuse "unexpected owned path: $p"; done
+  # Every refusal above comes before anything is created; from here on the lock is held for every write.
+  take_lock
   # Paths the previous install owned and this content no longer names are removed too (a retired skill);
   # a skill directory this installer never installed is not touched.
   prev=(); [ -f "$DST/.content-paths" ] && mapfile -t prev < "$DST/.content-paths"
@@ -128,30 +159,31 @@ check)
   case $CHK in
     not_recorded) echo "not_recorded: $DST has no install record (an install made before this version, or none)" >&2; exit 3 ;;
     ok) echo "ok commit=$CHK_COMMIT files=$CHK_FILES"; exit 0 ;;
-    *) echo "drift commit=$CHK_COMMIT: changed or missing:"; if [ -n "$CHK_BAD" ]; then printf '%s\n' "$CHK_BAD"; else echo "(the recorded checksum list cannot be read)"; fi; exit 1 ;;
+    *) echo "drift commit=${CHK_COMMIT:-unknown}: changed or missing:"; if [ -n "$CHK_BAD" ]; then printf '%s\n' "$CHK_BAD"; else echo "(the install record or its checksum list is damaged)"; fi; exit 1 ;;
   esac
   ;;
 status)
   [ "$#" -eq 1 ] || refuse "usage: status"
   [ -d "$DST" ] && [ -r "$DST" ] || { echo "target_unreadable: $DST" >&2; exit 1; }
   content_state
-  rb=none; ! kept_available || rb=available
-  if [ "$CHK" = not_recorded ]; then c=null; a=null; else c="\"$CHK_COMMIT\""; a="\"$CHK_AT\""; fi
+  rb=none; ! rollback_plan || rb=available
+  if [ -n "$CHK_COMMIT" ] && [ -n "$CHK_AT" ]; then c="\"$CHK_COMMIT\""; a="\"$CHK_AT\""; else c=null; a=null; fi
   printf '{"name":"content","commit":%s,"installed_at":%s,"check":"%s","rollback":"%s"}\n' "$c" "$a" "$CHK" "$rb"
   ;;
 rollback)
   [ "$#" -le 2 ] || refuse "usage: rollback [<tarball>]"
-  take_lock
-  if [ "$#" -eq 2 ]; then tarball=$2
+  if [ "$#" -eq 2 ]; then
+    tarball=$2
+    { [ -f "$tarball" ] && [ -f "$tarball.sha256" ] && [ -f "$tarball.paths" ]; } || refuse "tarball, .sha256 or .paths missing"
+    take_lock
   else
-    [ -f "$DST/$REC" ] || refuse "rollback_not_available: $DST has no install record"
-    tarball=$(json_field "$DST/$REC" kept)
-    [ -n "$tarball" ] || refuse "rollback_not_available: the record names no kept copy"
-    [ ! -e "$tarball.consumed" ] || refuse "rollback_not_available: a rollback was made already; the record now in force names $tarball, which is not offered again"
-    case "$(basename -- "$tarball")" in agents-before-*.tar) ;; *) refuse "rollback_not_available: the record names a path that is not a kept copy" ;; esac
-    [ "$(realpath -m -- "$(dirname -- "$tarball")")" = "$(realpath -m -- "$BK")" ] || refuse "rollback_not_available: the record names a kept copy outside $BK"
+    # Without an argument: only when the target equals its record (rollback_plan), under the lock.
+    [ -d "$BK" ] || refuse "rollback_not_available: $BK does not exist"
+    take_lock
+    rollback_plan || refuse "$RB_CODE: $RB_MSG"
+    tarball=$RB_KEPT
   fi
-  [ -f "$tarball" ] && [ -f "$tarball.sha256" ] && [ -f "$tarball.paths" ] || refuse "tarball, .sha256 or .paths missing"
+  { [ -f "$tarball" ] && [ -f "$tarball.sha256" ] && [ -f "$tarball.paths" ]; } || refuse "tarball, .sha256 or .paths missing"
   # One checksum file covers the tarball and every sidecar file; a changed or missing one refuses before any swap.
   (cd "$(dirname -- "$tarball")" && sha256sum -c --quiet "$(basename -- "$tarball").sha256") || refuse "the kept copy (tarball or a sidecar file) does not match its checksum"
   if tar -tf "$tarball" | grep -Ev '^(AGENTS\.md|runtime-references(/.*)?|skills/[A-Za-z0-9_-]+(/.*)?)$' | grep -q .; then refuse "the tarball lists a path that is not the installer's"; fi
@@ -180,7 +212,9 @@ rollback)
     echo "rollback_failed_restored@$DST: the target is as it was before this rollback" >&2; exit 1
   fi
   rm -rf -- "$DST/.old-$stamp"
-  if [ -n "$rk" ] && [ -f "$rk" ]; then : > "$rk.consumed" || { echo "consumed_marker_failed@$rk.consumed: the target is rolled back; a second rollback is not blocked" >&2; exit 1; }; fi
+  if [ -n "$rk" ] && [ -f "$rk" ]; then
+    : > "$rk.consumed" || { echo "rollback_completed_marker_failed@$rk.consumed: the rollback itself completed (files, record and owned list are the previous install's); only the marker could not be written, so a second rollback without an argument is not blocked: do not run it" >&2; exit 4; }
+  fi
   echo "rolled back to $tarball"
   ;;
 *) echo "usage: $0 (install <commit>|check|rollback [<tarball>]|status)" >&2; exit 2 ;;
