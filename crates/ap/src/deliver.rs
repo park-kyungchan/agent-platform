@@ -386,19 +386,23 @@ fn repair(s: &mut impl System, c: &mut Call, a: &Value, request: &str) -> bool {
         c,
         &["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"],
     );
-    let mut ran = vec![];
+    // The content handle is taken before any installer: the dead call's oldest tarball, else the
+    // repair's own only when the tree was at `from` (a tarball of a tree at no manifest never is).
+    let early = oldest(&c.bk, &f("started_at"));
+    let at_from = early.is_none() && tree_at(s, c, &from);
+    let (mut ran, mut printed) = (vec![], None);
     if origin.as_deref().map(str::trim) == Some(commit.as_str()) {
         if version(s, c).as_deref() != Some(commit.as_str()) {
             ran.push(installer(s, c, "ap", &["install", &commit]));
         }
         if ran.iter().all(|r| r.exit == Some(0)) && !tree_at(s, c, &commit) {
-            ran.push(installer(s, c, "content", &["install", &commit]));
+            let r = installer(s, c, "content", &["install", &commit]);
+            printed = r.tarball.clone().filter(|_| at_from);
+            ran.push(r);
         }
     }
-    let h = (
-        kept_copy(s, c, &f("from_sha256")),
-        oldest(&c.bk, &f("started_at")),
-    );
+    let tarball = early.or(printed.filter(|t| s.exists(t).unwrap_or(false)));
+    let h = (kept_copy(s, c, &f("from_sha256")), tarball);
     let file = version(s, c);
     let (outcome, to) = if pair_at(s, c, &file, &commit) {
         ("installed", commit.as_str())
@@ -637,7 +641,7 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
             return Ok(());
         }
         Some(v) => v,
-        None => return Err(No("pair_differs", Value::Null)),
+        None => return Err(differs(s, c, &target)),
     };
     c.rec["from"] = json!(from);
     // 5. The engine and the schema the tip names.
@@ -692,7 +696,9 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
     )?;
     let attempt = same.len() + 1;
     let from_sha256 = s.read(&format!("{}/ap", c.dir)).map(|b| digest(&b));
-    let from_sha256 = from_sha256.map_err(|_| No("pair_differs", Value::Null))?;
+    let Ok(from_sha256) = from_sha256 else {
+        return Err(differs(s, c, &target));
+    };
     let mut p = json!({"target": target, "kind": "forward", "repository": c.r["repository"], "commit": tip,
         "attempt": attempt, "from": from, "from_sha256": from_sha256, "by": c.by, "reason": c.r["reason"],
         "head": head, "review": review, "reviews": reviews});
@@ -765,9 +771,26 @@ fn start(
     Ok(())
 }
 /// The timer's limits, from the attempts of the target newest first (README "Delivery").
-fn limits(s: &mut impl System, c: &Call, target: &Value, tip: &str) -> Step<()> {
+/// Every attempt of the target, newest first, as the view `installs` orders them.
+fn attempts(s: &mut impl System, c: &Call, target: &Value) -> Step<Vec<Value>> {
     let (mut all, _) = search(s, c, "install", &[("target", target.clone())])?;
     all.sort_by_key(|a| std::cmp::Reverse((prop(a, "started_at"), prop(a, "closed_at"))));
+    Ok(all)
+}
+/// `pair_differs`; for the timer it names the newest attempt that did not end `not_started` (exit 3).
+fn differs(s: &mut impl System, c: &Call, target: &Value) -> No {
+    let timer = c.r.get("by").is_none();
+    let all = if timer {
+        attempts(s, c, target).unwrap_or_default()
+    } else {
+        vec![]
+    };
+    let ended = |a: &&Value| !matches!(prop(a, "outcome").as_str(), "" | "not_started");
+    let newest = all.iter().find(ended).map(|a| json!({"install": a["id"]}));
+    No("pair_differs", newest.unwrap_or(Value::Null))
+}
+fn limits(s: &mut impl System, c: &Call, target: &Value, tip: &str) -> Step<()> {
+    let all = attempts(s, c, target)?;
     let is = |a: &Value, k: &str, v: &[&str]| v.contains(&prop(a, k).as_str());
     let no = |code, a: &Value| Err(No(code, json!({"install": a["id"]})));
     let ended = ["installed", "failed_restored", "failed"];
@@ -946,6 +969,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         (_, true) => 4,
         (Some("installed" | "current"), _) => 0,
         (Some("refused"), _) if ["suppressed", "attempts_exhausted"].contains(&code) => 3,
+        (Some("refused"), _) if code == "pair_differs" && r.get("by").is_none() => 3,
         (Some("refused"), _) => 2,
         (Some("not_started" | "failed_restored"), _) => 3,
         _ => 5,
