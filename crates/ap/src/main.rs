@@ -9,6 +9,7 @@ const HELP: &str = "Usage: ap render < request.json\nPure JSON proposal on stdou
 const WORK_HELP: &str = "Usage: ap work <start|wait|close> < request.json\nOne JSON request; admission through ont and lifecycle through herdr.\n";
 const RUN_HELP: &str = "Usage: ap run < request.json\nOne headless Claude Code stage in a transient scope of agents.slice; one record <out>.run.json.\n";
 const GATE_HELP: &str = "Usage: ap gate < request.json\nWaits on a pull request's head for its required checks and the automatic review; one JSON answer.\n";
+const UNIT_HELP: &str = "Usage: ap unit < request.json\nOne unit of work once from its page to the merge; one record <out>.unit.json.\n";
 const BUILD_REVISION: &str = match option_env!("AP_BUILD_REVISION") {
     Some(value) => value,
     None => "unknown",
@@ -86,6 +87,15 @@ fn main() -> ExitCode {
             };
         }
         return ap::run::cli(&args[1..]);
+    }
+    if args.first().is_some_and(|arg| arg == "unit") {
+        if args.len() == 2 && args[1] == "--help" {
+            return match io::stdout().lock().write_all(UNIT_HELP.as_bytes()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
+        return ap::unit::cli(&args[1..]);
     }
     #[cfg(target_os = "linux")]
     if args.first().is_some_and(|arg| arg == "pane") {

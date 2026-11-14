@@ -42,6 +42,10 @@ pub trait System {
         }
         std::fs::read(path)
     }
+    /// The work root (`/home/palantirkc/work/`); a test replaces it by a temporary directory.
+    fn work_root(&self) -> PathBuf {
+        PathBuf::from(ROOT)
+    }
     fn cwd(&self) -> std::io::Result<PathBuf> {
         std::env::current_dir()
     }

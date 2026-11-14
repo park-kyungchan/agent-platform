@@ -11,7 +11,7 @@ use std::{
 };
 
 fn file(s: &impl System, path: &str, field: &str, code: &'static str) -> Result<Vec<u8>, Failure> {
-    require!(Path::new(path).starts_with(ROOT)
+    require!(Path::new(path).starts_with(s.work_root())
         && !Path::new(path).components().any(|c| matches!(c, Component::ParentDir)) => code, field);
     s.read(path).map_err(|_| error(code, field))
 }
@@ -74,7 +74,7 @@ fn apply(
     require!(v["status"] == "ok" && v.get("error").is_none() => "store_answer_unreadable", "apply");
     Ok(v)
 }
-fn pr(s: &mut impl System, repository: &str, number: &Value) -> Result<Value, Failure> {
+pub(crate) fn pr(s: &mut impl System, repository: &str, number: &Value) -> Result<Value, Failure> {
     let reply = s.call(
         "gh",
         &args(&[
@@ -92,7 +92,7 @@ fn pr(s: &mut impl System, repository: &str, number: &Value) -> Result<Value, Fa
     require!(reply.success => "review_head_differs", "pull_request");
     parse(reply, "review_head_differs")
 }
-fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
+pub(crate) fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let attempt = r
         .get("attempt")
         .map(|v| {
@@ -158,7 +158,7 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
         json!({"status":"started","outcome":"applied","review":edits[0]["id"],"prompt_sha256":prompt_sha256}),
     )
 }
-fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
+pub(crate) fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let mut parameters = json!({"review":r["review"]});
     let report_sha256;
     let verdict = if let Some(v) = r.get("verdict") {
@@ -204,14 +204,23 @@ pub const DIFF_OPTIONS: [&str; 5] = [
     "--name-only",
     "-z",
 ];
-fn git(s: &mut impl System, worktree: &str, command: &[&str]) -> Result<String, Failure> {
+pub(crate) fn git(
+    s: &mut impl System,
+    worktree: &str,
+    command: &[&str],
+) -> Result<String, Failure> {
     let mut argv = args(&["--no-replace-objects", "-C", worktree]);
     argv.extend(args(command));
     let reply = s.call("git", &argv, &Value::Null, 30_000)?;
     require!(reply.success => "process_failed", "git");
     String::from_utf8(reply.stdout).map_err(|_| error("process_failed", "git"))
 }
-fn post(s: &mut impl System, f: &Value, state: &str, description: &str) -> Result<(), Failure> {
+pub(crate) fn post(
+    s: &mut impl System,
+    f: &Value,
+    state: &str,
+    description: &str,
+) -> Result<(), Failure> {
     require!(description.len() <= 140 => "invalid_input", "description");
     let reply = s.call(
         "gh",
@@ -236,6 +245,23 @@ fn post(s: &mut impl System, f: &Value, state: &str, description: &str) -> Resul
     )?;
     require!(reply.success => "process_failed", "gh");
     Ok(())
+}
+/// The paths no pattern covers: a pattern matches its exact path; a trailing `/**` matches
+/// descendants, not the directory itself or another name with the same prefix.
+pub(crate) fn outside<'a>(patterns: &[String], paths: &[&'a str]) -> Vec<&'a str> {
+    paths
+        .iter()
+        .filter(|path| {
+            !patterns.iter().any(|pattern| {
+                pattern == **path
+                    || pattern.strip_suffix("/**").is_some_and(|dir| {
+                        path.strip_prefix(dir)
+                            .is_some_and(|tail| tail.starts_with('/') && tail.len() > 1)
+                    })
+            })
+        })
+        .copied()
+        .collect()
 }
 fn accept(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let f = fields(s, r, &r["review"], "store_review_unreadable", "review")?;
@@ -314,19 +340,7 @@ fn accept(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     diff_argv.extend([text(&f, "base")?, head]);
     let diff = git(s, worktree, &diff_argv)?;
     let paths: Vec<_> = diff.split_terminator('\0').collect();
-    let outside: Vec<_> = paths
-        .iter()
-        .filter(|path| {
-            !patterns.iter().any(|pattern| {
-                pattern == **path
-                    || pattern.strip_suffix("/**").is_some_and(|dir| {
-                        path.strip_prefix(dir)
-                            .is_some_and(|tail| tail.starts_with('/') && tail.len() > 1)
-                    })
-            })
-        })
-        .copied()
-        .collect();
+    let outside = outside(&patterns, &paths);
     if !outside.is_empty() {
         return Err(fail(
             "review_path_outside_write_set",

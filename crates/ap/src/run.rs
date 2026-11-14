@@ -245,6 +245,14 @@ fn written(path: &str, before: &Value) -> bool {
         && (now["sha256"] != before["sha256"] || now["modified"] != before["modified"])
 }
 fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
+    request_at(s, r, true)
+}
+/// Every check of a request but those that need its `cwd` to exist: for a caller that admits a
+/// stage before the stage's worktree exists (`ap unit`).
+pub(crate) fn admit_stage(s: &mut impl System, r: &Value) -> Result<(), Failure> {
+    request_at(s, r, false).map(|_| ())
+}
+fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, Failure> {
     let object = r
         .as_object()
         .ok_or_else(|| error("invalid_input", "stdin"))?;
@@ -318,7 +326,9 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
             if i == 0 { "account" } else { "next_accounts" },
         )?;
     }
-    s.directory(&cwd).map_err(|_| error("cwd_missing", "cwd"))?;
+    if at_cwd {
+        s.directory(&cwd).map_err(|_| error("cwd_missing", "cwd"))?;
+    }
     let bytes = s
         .read(&prompt)
         .map_err(|_| error("prompt_unreadable", "prompt"))?;
@@ -374,7 +384,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
             ))
         }
     };
-    if earlier.is_none() && role == "implementer" {
+    if at_cwd && earlier.is_none() && role == "implementer" {
         // Fails closed: only "not a repository" lets an implementer start without the check. Git
         // gets the fixed short list only: the request's `env` (a `GIT_DIR`) cannot skip it.
         let clean = base_env(s, &[]);
@@ -452,7 +462,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
 }
 
 /// UTC RFC 3339 to the second.
-fn stamp(t: SystemTime) -> String {
+pub(crate) fn stamp(t: SystemTime) -> String {
     let secs = t.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let (days, rem) = ((secs / 86_400) as i64, secs % 86_400);
     // Days since 1970-01-01 to the civil date (proleptic Gregorian).
@@ -497,7 +507,7 @@ fn glob(pattern: &str, line: &str) -> bool {
 /// Writes through a temporary name and a rename: a reader never sees half a file.
 /// The temporary name is unique per write and created exclusively, so it is never a file of
 /// another run (whose `out` may be any name).
-fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
+pub(crate) fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
@@ -956,6 +966,13 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     Ok((last, status))
 }
 pub fn cli(argv: &[OsString]) -> ExitCode {
+    cli_with(argv, execute)
+}
+/// One JSON request on stdin, the answer on stdout, a refusal on stderr with exit 2.
+pub(crate) fn cli_with(
+    argv: &[OsString],
+    execute: impl FnOnce(&mut crate::work::Host, &Value) -> Result<(Value, u8), Failure>,
+) -> ExitCode {
     let result = (|| {
         require!(argv.is_empty() => "usage", "args");
         let mut bytes = vec![];

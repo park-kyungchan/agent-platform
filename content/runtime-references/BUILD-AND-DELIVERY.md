@@ -69,6 +69,8 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with o
 | After the merge | `git -C <main checkout> fetch origin`; move a main checkout only with `merge --ff-only`, and not at all while it holds someone's uncommitted edits |
 | Worktree and branch | Remove only your own merged worktree, without force, then its branch |
 
+The rulesets of the three platform repositories require the commit status `lead-review` on the head beside the check `rust`. It is posted by the Lead's accept (`ap unit`, section "One unit" of `crates/ap/README.md` in `agent-platform`), never by a worker.
+
 Commit, push, merge and installation are four effects; each needs the task's authority.
 
 ## 5. Installing and reading back

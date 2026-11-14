@@ -8,6 +8,7 @@ use std::{ffi::OsString, io::Read, io::Write, process::ExitCode, time::Duration}
 
 /// The login of the automatic reviewer whose summary comment carries the marker.
 const LOGIN: &str = "chatgpt-codex-connector[bot]";
+const LEAD_REVIEW: &str = "lead-review";
 const MARKER: &str = "codex-review-state:v1";
 const POLL: Duration = Duration::from_secs(30);
 const MEMBERS: [&str; 6] = [
@@ -40,7 +41,8 @@ struct View {
     state: String,
     draft: bool,
     head: String,
-    /// Every entry of a required check on the head: `{name, state, run}`.
+    /// Every entry of a required check on the head (`{name, state, run}`), and the status
+    /// `lead-review` with `judged: false`.
     checks: Vec<Value>,
     /// The `code_review` member of the last marker in a comment of the reviewer's login.
     marker: Value,
@@ -102,6 +104,10 @@ fn request(r: &Value) -> Result<Request, Failure> {
 /// A failed reading: `Some(cause)` when waiting cannot make it pass, `None` when it can.
 type Unread = Option<&'static str>;
 /// One GraphQL read of the pull request.
+/// The request check alone, for a caller that validates before its first effect.
+pub(crate) fn check(r: &Value) -> Result<(), Failure> {
+    request(r).map(|_| ())
+}
 fn graphql(
     s: &mut impl System,
     q: &Request,
@@ -159,11 +165,13 @@ fn view(s: &mut impl System, q: &Request) -> Result<View, Unread> {
     while commit["oid"] == head.as_str() {
         let contexts = &commit["statusCheckRollup"]["contexts"];
         let nodes = contexts["nodes"].as_array();
-        for c in nodes
-            .into_iter()
-            .flatten()
-            .filter(|c| c["isRequired"] == true)
-        {
+        // The status `lead-review` is the output of the accept, not a check before the review: it
+        // is listed with `judged: false` and not judged. A check run of that name is judged.
+        for c in nodes.into_iter().flatten() {
+            let status = c["__typename"] == "StatusContext" && c["context"] == LEAD_REVIEW;
+            if c["isRequired"] != true && !status {
+                continue;
+            }
             let state = match (c["status"].as_str(), c["state"].as_str()) {
                 (Some("COMPLETED"), _) => c["conclusion"].clone(),
                 (Some(_), _) | (None, Some("PENDING" | "EXPECTED")) => json!("PENDING"),
@@ -176,7 +184,11 @@ fn view(s: &mut impl System, q: &Request) -> Result<View, Unread> {
             } else {
                 run
             };
-            checks.push(json!({"name": name, "state": state, "run": run}));
+            let mut entry = json!({"name": name, "state": state, "run": run});
+            if status {
+                entry["judged"] = json!(false);
+            }
+            checks.push(entry);
         }
         if contexts["pageInfo"]["hasNextPage"] != true {
             break;
@@ -312,15 +324,15 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         // The checks are judged at every reading, also while the gate waits for the review: a
         // rerun that is pending is waited for (until the bound of the phase).
         a["checks"] = json!(v.checks);
-        let bad = v
-            .checks
+        let judged: Vec<_> = v.checks.iter().filter(|c| c["judged"] != false).collect();
+        let bad = judged
             .iter()
             .find(|c| c["state"] != "SUCCESS" && c["state"] != "PENDING");
         if let Some(c) = bad {
-            a["failed_check"] = c.clone();
+            a["failed_check"] = (*c).clone();
             break "check_failed";
         }
-        if v.checks.is_empty() || v.checks.iter().any(|c| c["state"] == "PENDING") {
+        if judged.is_empty() || judged.iter().any(|c| c["state"] == "PENDING") {
             if s.now() >= deadline {
                 break "check_timeout";
             }
