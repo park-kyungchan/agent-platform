@@ -1,7 +1,7 @@
 {
   "format": "ontology-schema/v1",
   "domain": "work",
-  "version": 7,
+  "version": 8,
   "namespace": {
     "instance": "vps://palantirkc",
     "account": "root"
@@ -78,7 +78,10 @@
       "enum": ["domain_route", "harness", "none"]
     },
     "review_kind": {"base": "string", "enum": ["packet", "integrated", "design", "integration"]},
-    "review_status": {"base": "string", "enum": ["running", "closed"]},
+    "review_status": {"base": "string", "enum": ["running", "closed", "revoked"]},
+    "install_kind": {"base": "string", "enum": ["forward", "rollback"]},
+    "install_status": {"base": "string", "enum": ["running", "closed"]},
+    "install_outcome": {"base": "string", "enum": ["installed", "not_started", "failed_restored", "failed"]},
     "review_verdict": {"base": "string", "pattern": "^[a-z_]{1,32}$"},
     "commit_or_digest": {"base": "string", "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"},
     "sha256_hex": {"base": "string", "pattern": "^[0-9a-f]{64}$"},
@@ -979,7 +982,37 @@
           },
           "required": false,
           "description": "Set only by the start action while running; cleared by the close action for duplicate checks."
-        }
+        },
+        "revoked_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40},
+        "revoke_reason": {"type": "string", "required": false, "max_bytes": 100}
+      }
+    },
+    "install": {
+      "description": "Ontology-owned record of one install attempt on one installed file, written only by actions: started before an installer runs, closed after a read of the target.",
+      "owner": "ontology",
+      "primary_key": {"from": "$action_id"},
+      "title": "commit",
+      "properties": {
+        "target": {"type": {"ref": "installed_artifact"}, "required": true, "description": "The installed file the attempt changes."},
+        "kind": {"type": {"value_type": "install_kind"}, "required": true},
+        "repository": {"type": "string", "required": true, "max_bytes": 200, "description": "owner/name of the repository of the commit."},
+        "commit": {"type": {"value_type": "commit_or_digest"}, "required": true, "description": "The commit the attempt installs, or rolls back to."},
+        "attempt": {"type": "integer", "required": true, "description": "1 for the first attempt on this target and commit."},
+        "from": {"type": {"value_type": "commit_or_digest"}, "required": true, "description": "What a read of the target showed before the attempt."},
+        "by": {"type": "string", "required": true, "max_bytes": 200, "description": "Who ran it: a timer's invocation or a Lead's session."},
+        "head": {"type": {"value_type": "commit_or_digest"}, "required": false, "description": "The accepted head whose merge is the commit."},
+        "review": {"type": {"ref": "review"}, "required": false, "description": "The accepting review of head."},
+        "reviews": {"type": {"array": {"ref": "review"}}, "required": false, "description": "Every accepting review of the installed range."},
+        "past": {"type": "string", "required": false, "max_bytes": 2049, "description": "Commits a Lead stepped over, 40 hex each, joined by one space."},
+        "reason": {"type": "string", "required": false, "max_bytes": 400, "description": "A Lead's reason."},
+        "status": {"type": {"value_type": "install_status"}, "required": true},
+        "started_at": {"type": {"value_type": "utc_time"}, "required": true, "max_bytes": 40},
+        "running_in": {"type": {"ref": "installed_artifact"}, "required": false, "description": "Set only by the start action while running; cleared by the close action for the duplicate check."},
+        "outcome": {"type": {"value_type": "install_outcome"}, "required": false},
+        "to": {"type": "string", "required": false, "max_bytes": 200, "description": "What the read after the installers showed."},
+        "rollback": {"type": "string", "required": false, "max_bytes": 800, "description": "The handles the installers left."},
+        "code": {"type": "string", "required": false, "max_bytes": 100},
+        "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40}
       }
     }
   },
@@ -1156,7 +1189,11 @@
         "forward": "worker_run_running_task",
         "reverse": "running_worker_runs"
       }
-    }
+    },
+    "install_target": {"from": "install", "via": "target", "to": "installed_artifact", "cardinality": "many_to_one", "names": {"forward": "install_target", "reverse": "installs"}},
+    "install_running_target": {"from": "install", "via": "running_in", "to": "installed_artifact", "cardinality": "many_to_one", "names": {"forward": "install_running_target", "reverse": "running_installs"}},
+    "install_review": {"from": "install", "via": "review", "to": "review", "cardinality": "many_to_one", "names": {"forward": "install_review", "reverse": "review_installs"}},
+    "install_reviews": {"from": "install", "via": "reviews", "to": "review", "cardinality": "many_to_many", "names": {"forward": "install_reviews", "reverse": "range_installs"}}
   },
   "action_types": {
     "set_hold": {
@@ -2387,6 +2424,111 @@
           }
         }
       ]
+    },
+    "start_install": {
+      "description": "Start one install attempt on an existing installed file, before any installer runs.",
+      "parameters": {
+        "target": {"type": {"ref": "installed_artifact"}, "required": true},
+        "kind": {"type": {"value_type": "install_kind"}, "required": true},
+        "repository": {"type": "string", "required": true, "max_bytes": 200},
+        "commit": {"type": {"value_type": "commit_or_digest"}, "required": true},
+        "attempt": {"type": "integer", "required": true},
+        "from": {"type": {"value_type": "commit_or_digest"}, "required": true},
+        "by": {"type": "string", "required": true, "max_bytes": 200},
+        "head": {"type": {"value_type": "commit_or_digest"}, "required": false},
+        "review": {"type": {"ref": "review"}, "required": false},
+        "reviews": {"type": {"array": {"ref": "review"}}, "required": false},
+        "past": {"type": "string", "required": false, "max_bytes": 2049},
+        "reason": {"type": "string", "required": false, "max_bytes": 400}
+      },
+      "submission_criteria": [
+        {"code": "unknown_target", "message": "Choose an existing installed file.", "all": [{"exists": "$target"}]},
+        {"code": "install_running", "message": "Close the running install attempt of this target.", "none": [{"linked": {"from": "$target", "link": "running_installs"}}]},
+        {"code": "review_not_accepting", "message": "A forward attempt needs the closed accepting packet review of exactly head in repository.", "any": [
+          {"eq": ["$kind", "rollback"]},
+          {"all": [
+            {"present": "$review"},
+            {"present": "$head"},
+            {"exists": "$review"},
+            {"eq": ["$review.status", "closed"]},
+            {"present": "$review.verdict"},
+            {"eq": ["$review.verdict", "accept"]},
+            {"eq": ["$review.kind", "packet"]},
+            {"present": "$review.repository"},
+            {"eq": ["$review.repository", "$repository"]},
+            {"eq": ["$review.head", "$head"]}
+          ]}
+        ]}
+      ],
+      "rules": [
+        {
+          "create_object": "install",
+          "set": {
+            "target": "$target",
+            "kind": "$kind",
+            "repository": "$repository",
+            "commit": "$commit",
+            "attempt": "$attempt",
+            "from": "$from",
+            "by": "$by",
+            "head": "$head",
+            "review": "$review",
+            "reviews": "$reviews",
+            "past": "$past",
+            "reason": "$reason",
+            "status": "running",
+            "started_at": "$now",
+            "running_in": "$target"
+          }
+        }
+      ]
+    },
+    "close_install": {
+      "description": "Close a running install attempt after a read of its target.",
+      "parameters": {
+        "install": {"type": {"ref": "install"}, "required": true},
+        "outcome": {"type": {"value_type": "install_outcome"}, "required": true},
+        "to": {"type": "string", "required": true, "max_bytes": 200},
+        "rollback": {"type": "string", "required": false, "max_bytes": 800},
+        "code": {"type": "string", "required": false, "max_bytes": 100}
+      },
+      "submission_criteria": [
+        {"code": "install_not_running", "message": "Choose a running install attempt.", "all": [{"exists": "$install"}, {"eq": ["$install.status", "running"]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "install",
+          "set": {
+            "outcome": "$outcome",
+            "to": "$to",
+            "rollback": "$rollback",
+            "code": "$code",
+            "status": "closed",
+            "closed_at": "$now"
+          }
+        },
+        {"clear_reference": {"object_type": "install", "property": "running_in"}}
+      ]
+    },
+    "revoke_review": {
+      "description": "Revoke the acceptance of a closed review; no reader of a closed review finds it again.",
+      "parameters": {
+        "review": {"type": {"ref": "review"}, "required": true},
+        "reason": {"type": "string", "required": true, "max_bytes": 100}
+      },
+      "submission_criteria": [
+        {"code": "review_not_closed", "message": "Choose a closed review.", "all": [{"exists": "$review"}, {"eq": ["$review.status", "closed"]}]}
+      ],
+      "rules": [
+        {
+          "modify_object": "review",
+          "set": {
+            "status": "revoked",
+            "revoked_at": "$now",
+            "revoke_reason": "$reason"
+          }
+        }
+      ]
     }
   },
   "functions": {},
@@ -2408,7 +2550,8 @@
         "memory_record",
         "thread",
         "plan",
-        "review"
+        "review",
+        "install"
       ],
       "derive": [
         "hold",
@@ -2416,7 +2559,8 @@
         "kpi",
         "measurement",
         "worker_run",
-        "review"
+        "review",
+        "install"
       ],
       "actions": [
         "set_hold",
@@ -2439,7 +2583,10 @@
         "amend_plan",
         "record_scope_review",
         "start_review",
-        "close_review"
+        "close_review",
+        "start_install",
+        "close_install",
+        "revoke_review"
       ]
     }
   ],
