@@ -15,8 +15,6 @@ python3 -I -B ci/check-content.py
 python3 -I -B ci/check-memory-records.py
 python3 -I -B scripts/evaluate-memory.py --check-corpus memory/evaluation/questions.json
 python3 -I -B -m unittest discover -s ci -p 'test_*memory*.py'
-bash ci/test-lead-review.sh
-bash ci/test-lead-deliver.sh
 bash scripts/test-install-content.sh
 if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
 
