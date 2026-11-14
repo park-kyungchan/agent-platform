@@ -2415,3 +2415,48 @@ fn c7_a_killed_case_call_leaves_a_record_naming_the_step_begun() {
     );
     assert_eq!(v, u.record("c2"));
 }
+
+#[test]
+fn c8_a_case_file_changed_by_the_stage_stops_the_call_before_the_evaluator() {
+    let mut u = U::new();
+    let c = case(&u);
+    // The stage turns the case's commands into `true`, which would pass anything.
+    let mut changed: Value = serde_json::from_slice(&std::fs::read(&c.file).unwrap()).unwrap();
+    changed["commands"] = json!([["true"]]);
+    let staged = u.p("case-true.json");
+    std::fs::write(&staged, serde_json::to_vec(&changed).unwrap()).unwrap();
+    u.script("a1", &format!("cp {staged} {}; {CANDIDATE}", c.file));
+    let (v, end) = ended(u.run(&case_request(&u, &c)));
+    assert_eq!(
+        (end.0.as_str(), end.1, &end.2, &end.3),
+        ("stopped", 3, &json!("acceptance"), &json!("digest_differs"))
+    );
+    assert!(
+        !u.t.join("work/task/c1.accept.log").exists(),
+        "the evaluator ran"
+    );
+    assert!(v["files"]["acceptance_output"].is_null());
+}
+
+#[test]
+fn c9_a_test_path_that_is_a_link_at_head_is_refused_before_any_effect() {
+    let mut u = U::new();
+    let c = case(&u);
+    let clone = u.t.join("clone");
+    git(&clone, &["checkout", "-q", "accepted"]);
+    std::os::unix::fs::symlink("t.sh", clone.join("tests/link.sh")).unwrap();
+    git(&clone, &["add", "-A"]);
+    git(&clone, &["commit", "-qm", "a link"]);
+    let head = git(&clone, &["rev-parse", "HEAD"]);
+    git(&clone, &["checkout", "-q", "main"]);
+    let mut v: Value = serde_json::from_slice(&std::fs::read(&c.file).unwrap()).unwrap();
+    (v["head"], v["tests"]) = (json!(head), json!(["tests/t.sh", "tests/link.sh"]));
+    std::fs::write(&c.file, serde_json::to_vec(&v).unwrap()).unwrap();
+    let before = clone_state(&u);
+    let r = case_request(&u, &c);
+    assert_eq!(code(u.run(&r)), "case_commit_missing@case.tests");
+    assert_eq!(code(u.run(&no_stage(r))), "case_commit_missing@case.tests");
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md", "case.md"]);
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+    assert_eq!(clone_state(&u), before);
+}

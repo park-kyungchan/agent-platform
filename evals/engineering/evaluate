@@ -28,15 +28,19 @@ def git(clone, *words):
     return subprocess.run(["git", "-C", clone, *words], stdin=subprocess.DEVNULL, capture_output=True, check=False)
 
 
-def restore(clone, head, path, root):
-    """Writes `path` with its bytes and mode at `head`, whatever the candidate made of it."""
+def entry(clone, head, path):
+    """The mode and blob of `path` at `head`; a judging file is a regular file, never a link."""
     listed = git(clone, "ls-tree", "-z", head, "--", path)
-    entry = listed.stdout.split(b"\0")[0].decode("utf-8", "replace")
-    meta, _, name = entry.partition("\t")
+    meta, _, name = listed.stdout.split(b"\0")[0].decode("utf-8", "replace").partition("\t")
     parts = meta.split()
-    if listed.returncode != 0 or name != path or len(parts) != 3 or parts[1] != "blob":
-        cannot("%s is not a file at head" % path)
-    blob = git(clone, "cat-file", "blob", parts[2])
+    if listed.returncode != 0 or name != path or len(parts) != 3 or parts[0] not in ("100644", "100755"):
+        cannot("%s is not a regular file at head" % path)
+    return parts[0], parts[2]
+
+
+def restore(clone, path, mode, sha, root):
+    """Writes `path` with its bytes and mode at `head`, whatever the candidate made of it."""
+    blob = git(clone, "cat-file", "blob", sha)
     if blob.returncode != 0:
         cannot("%s cannot be read from the clone" % path)
     target = os.path.join(root, path)
@@ -51,7 +55,7 @@ def restore(clone, head, path, root):
         shutil.rmtree(target)
     with open(target, "xb") as f:
         f.write(blob.stdout)
-    os.chmod(target, 0o755 if parts[0] == "100755" else 0o644)
+    os.chmod(target, 0o755 if mode == "100755" else 0o644)
 
 
 def main():
@@ -78,7 +82,10 @@ def main():
     for path in tests:
         if os.path.isabs(path) or ".." in path.split("/"):
             cannot("%s is not a relative path" % path)
-        restore(clone, head, path, root)
+    # Every path is judged before any is written: a refused case writes nothing.
+    entries = [(path, *entry(clone, head, path)) for path in tests]
+    for path, mode, sha in entries:
+        restore(clone, path, mode, sha, root)
     for n, words in enumerate(commands, 1):
         free = shutil.disk_usage(root).free // (1024 * 1024)
         if free < FLOOR_MIB:

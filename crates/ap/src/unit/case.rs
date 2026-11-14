@@ -146,9 +146,13 @@ fn request(s: &mut impl System, r: &Value) -> Result<(Value, String), Failure> {
     for (k, commit) in [("case.base", base), ("case.head", head)] {
         require!(has(s, &format!("{commit}^{{commit}}")).is_ok() => "case_commit_missing", k);
     }
+    // A judging file is a regular file at `head`: a link's target would be the candidate's.
     for t in texts(&c["tests"]) {
-        let kind = has(s, &format!("{head}:{t}"));
-        require!(kind.is_ok_and(|k| k.trim() == "blob") => "case_commit_missing", "case.tests");
+        let entry = crate::review::git(s, clone, &["ls-tree", head, "--", t]).unwrap_or_default();
+        let regular = ["100644 blob ", "100755 blob "]
+            .iter()
+            .any(|m| entry.starts_with(m));
+        require!(regular && entry.trim_end().ends_with(&format!("\t{t}")) => "case_commit_missing", "case.tests");
     }
     for suffix in FILES.split(' ') {
         for extra in RUN_FILES {
@@ -205,9 +209,11 @@ fn steps(s: &mut impl System, r: &Value, c: &Value, u: &mut Unit) -> End {
     if failed.is_none() {
         u.begin("acceptance");
         unchanged(&u.rec["acceptance"], acceptance)?;
+        // The case file names the judging files and the commands: the stage cannot change it.
+        let file = r["case"].as_str().unwrap_or_default();
+        unchanged(&u.rec["case"], file)?;
         let log = format!("{out}.accept.log");
         u.rec["files"]["acceptance_output"] = json!(log);
-        let file = r["case"].as_str().unwrap_or_default();
         let exit = accept(s, wt, acceptance, &log, seconds(r)?, &[file, clone]);
         let detail = json!({"exit": exit});
         if exit == Some(0) {
