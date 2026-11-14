@@ -1,4 +1,4 @@
-# Brief, options, proposal and record formats
+# Brief, options and proposal formats
 
 Copy the block you need. Values in angle brackets are placeholders; a filled block lives in the task's STATE or `STRATEGY.md`, never in this file. Terms: `/root/.agents/skills/lead/references/measurement.md`.
 
@@ -31,25 +31,4 @@ Expected effect: <estimate, labelled as an estimate>
 Cost or risk: <what it uses or could break>
 Undo: <route>
 Status: <added as a work thread of the current objective | a different objective, offered to the user>
-```
-
-## Decision record (latest per topic)
-
-```text
-<date> Lead: <decision>; reason <measurement>; undo <route>; supersedes <decision or none>
-<date> user: "<their words>" (English: <reading>) -> changes <intent | KPI or target | guardrail | way of working | fact>; reach <this task | every task>; written in <file>; supersedes <decision or none>
-```
-
-## Kept in STATE
-
-```text
-Words the user used: "<expression>" -> <glossary term and path>
-Fact from the user: <fact> (<date>)
-```
-
-## Kept for the user (in STATE)
-
-```text
-Irreversible action taken: <what> | cannot be undone: <what> | reason <measurement> | <date>
-Reminder owed: <what> | when <condition that triggers it> | context <file>
 ```

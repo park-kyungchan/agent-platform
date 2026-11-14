@@ -93,5 +93,5 @@ Install from a clean checkout of the merged commit, never from a branch.
 1. Find the source: `CLI-RUNTIMES.md` section 7 names the repository of each skill; `AGENTS.md` and `runtime-references/` are in `agent-platform` `content/`. Never edit only the installed copy.
 2. Apply `/root/.agents/AGENTS.md` section 7: one home per fact, no changing value in always-loaded text.
 3. In `agent-platform`, a file added to or removed from `content/` is also added to or removed from `content/SHA256SUMS` and `crates/ap/src/native/content_inventory.rs`, in the same order; every changed file gets its new checksum. A new reference gets a row in `AGENTS.md` section 3.
-4. Run `python3 -I -B ci/check-content.py`. It refuses a checksum mismatch, a route to a missing file or section, a word the glossary replaces, a model name, and a file over its limit.
+4. Run `python3 -I -B ci/check-content.py`. It refuses a checksum mismatch, a route to a missing file or section, a verb of `ap` or a section of its README that does not exist, a word the glossary replaces, a model name, and a file over its limit.
 5. Deliver through sections 3 to 5. The review is by a fresh session whose tier is not below the writer's.

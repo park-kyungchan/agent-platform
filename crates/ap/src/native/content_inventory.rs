@@ -122,10 +122,6 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/skills/lead/references/task-packet.md"),
     ),
     (
-        "skills/lead/tools/roles.example.tsv",
-        include_str!("../../../../content/skills/lead/tools/roles.example.tsv"),
-    ),
-    (
         "skills/lessons-loop/SKILL.md",
         include_str!("../../../../content/skills/lessons-loop/SKILL.md"),
     ),

@@ -12,6 +12,7 @@ mode=${1:-all}
 [ "$mode" = all ] || [ "$mode" = content ] || { echo "usage: ./check [content]" >&2; exit 2; }
 
 python3 -I -B ci/check-content.py
+python3 -I -B -m unittest discover -s ci -p 'test_check_content.py'
 python3 -I -B ci/check-memory-records.py
 python3 -I -B scripts/evaluate-memory.py --check-corpus memory/evaluation/questions.json
 python3 -I -B -m unittest discover -s ci -p 'test_*memory*.py'

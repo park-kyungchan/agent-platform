@@ -1,4 +1,0 @@
-# role	model	effort	configuration directories in the order they are tried (host paths; this file is an example)
-verify	sonnet	high	/path/to/reviewer-account-1,/path/to/reviewer-account-2
-attack	opus	high	/path/to/reviewer-account-1,/path/to/reviewer-account-2
-integration	fable	high	/path/to/the-leads-own-configuration-directory

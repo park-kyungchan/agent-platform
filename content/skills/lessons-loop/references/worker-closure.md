@@ -15,12 +15,7 @@ outputs retain their domain format. Link these contracts; do not copy them.
 
 ## Task-local report template
 
-The first block is a KPI table. Keep baseline provenance and observation time,
-current value, delta, target and measurement status explicit:
-
-| KPI / guardrail | baseline (source/time) | current | delta | target | measured / expected / unknown |
-| --- | --- | --- | --- | --- | --- |
-| <task's adopted KPI/guardrail> | <native evidence or unknown> | <value or unknown> | <value or unknown> | <adopted target> | <status> |
+The first block is the KPI table of skill `lead` section 3.
 
 Then include only applicable evidence:
 
@@ -32,8 +27,8 @@ Then include only applicable evidence:
   still needs authoritative target reconciliation. Do not call exit zero alone
   an accepted outcome.
 - Independent review status and findings by severity (unknown if unavailable),
-  rework rounds, PR URL/head and required checks for that exact head. Record CI
-  wall time and billed minutes separately; do not infer billing from wall time.
+  PR URL/head and required checks for that exact head. Cost comes from the
+  read-out `evals/readout.py`; copy no value of it here.
 - Current holds, remaining work and exact next owner/action. A PR-only assignment
   leaves merge/deploy with its owner and does not claim installation or loading.
 - Worker/runtime/model/effort and native pane/tab/session identities only when
