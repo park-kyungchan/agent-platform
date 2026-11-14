@@ -5,6 +5,7 @@
 use ap::run::execute;
 use ap::work::{Answer, Failure, Host, Reply, System};
 use serde_json::{Value, json};
+use sha2::Digest;
 use std::{
     collections::BTreeMap,
     os::unix::{fs::PermissionsExt, process::CommandExt},
@@ -26,6 +27,8 @@ struct Fake {
     alive: std::collections::BTreeSet<String>,
     /// `systemctl stop` does nothing (a stop that fails).
     stop_fails: bool,
+    /// `systemctl is-active` does not answer (the call fails).
+    silent: bool,
     /// The answer to `git rev-parse` in place of the real one.
     rev_parse: Option<(bool, Vec<u8>)>,
     /// Every `env -i … git …` call.
@@ -66,6 +69,7 @@ impl Fake {
             groups: BTreeMap::new(),
             alive: std::collections::BTreeSet::new(),
             stop_fails: false,
+            silent: false,
             rev_parse: None,
             git_calls: vec![],
             launches: vec![],
@@ -94,6 +98,18 @@ impl Fake {
     fn request(&self, out: &str) -> Value {
         json!({"role":"reviewer","account":self.p("a1"),"model":"sonnet","effort":"high",
                "permission_mode":"auto","cwd":self.p("cwd"),"prompt":self.p("prompt.md"),"out":self.p(out)})
+    }
+    /// A request on `out` that continues the run whose out was `earlier`.
+    fn resume(&self, mut r: Value, out: &str, earlier: &str) -> Value {
+        r["out"] = json!(self.p(out));
+        r["resume"] = json!({"record": self.p(&format!("{earlier}.run.json"))});
+        r
+    }
+    fn sha(&self, rel: &str) -> String {
+        format!(
+            "{:x}",
+            sha2::Sha256::digest(std::fs::read(self.p(rel)).unwrap())
+        )
     }
     fn record(&self, out: &str) -> Value {
         serde_json::from_slice(&std::fs::read(self.p(&format!("{out}.run.json"))).unwrap()).unwrap()
@@ -140,7 +156,15 @@ impl System for Fake {
                 self.alive.remove(unit);
                 (true, vec![])
             }
-            "is-active" => (self.alive.contains(unit), vec![]),
+            "is-active" if self.silent => {
+                return Err(Failure {
+                    code: "process_failed",
+                    field: "systemctl".into(),
+                    detail: Value::Null,
+                });
+            }
+            "is-active" if self.alive.contains(unit) => (true, b"active\n".to_vec()),
+            "is-active" => (false, b"inactive\n".to_vec()),
             _ => (false, vec![]),
         };
         Ok(Reply {
@@ -249,7 +273,7 @@ fn a1_answer_is_saved_byte_for_byte_and_the_record_has_every_member() {
         "results",
         "expect_met",
         "unmet",
-        "refusal",
+        "resumes",
     ];
     want.sort_unstable();
     assert_eq!(keys, want);
@@ -424,10 +448,11 @@ fn a2_account_and_model_from_the_request_and_the_lead_account_rule() {
     assert_eq!(code(f.run(&r)), "invalid_input@account");
 }
 
-/// (b) cut after work, (c) resume on the recorded account, the earlier answer moved aside, and
-/// a failed resume keeps the session.
+/// (b) cut after work, (c) resume on the recorded account; "an earlier answer under the same
+/// name" becomes: an existing `out` refuses and nothing of it is touched; a failed resume leaves
+/// the session resumable from its own record.
 #[test]
-fn a2_cut_after_work_resume_and_stale_answer() {
+fn a2_cut_after_work_resume_and_an_existing_out_refuses() {
     let mut f = Fake::new();
     let mut r = f.request("v.md");
     r["next_accounts"] = json!([f.p("a2")]);
@@ -442,37 +467,40 @@ fn a2_cut_after_work_resume_and_stale_answer() {
     let session = rec["session"].as_str().unwrap().to_owned();
     assert!(rec["answer"].is_null());
     assert_eq!(rec["turns"], 45);
-    // (c) the resume uses the recorded account and session.
+    let before = (f.sha("v.md.run.json"), f.sha("v.md.stream.jsonl"));
+    // (c) the resume names the earlier record; its own out and record; the recorded account.
     f.clear("a1");
     f.reset_calls();
-    let mut resume = r.clone();
-    resume["resume"] = json!(true);
-    let (v, status) = f.run(&resume).unwrap();
+    let (v, status) = f.run(&f.resume(r.clone(), "v2.md", "v.md")).unwrap();
     assert_eq!(status, 0);
     let calls = f.calls();
     assert_eq!(calls.len(), 1);
     assert!(calls[0].starts_with(&format!("{}|", f.p("a1"))));
     assert!(calls[0].ends_with(&format!("--resume {session}")));
     assert_eq!(v["session"], session.as_str());
-    assert!(std::fs::metadata(f.p("v.md")).unwrap().len() > 0);
-    // An earlier answer under the same name does not survive a cut run: it is moved aside.
-    f.mode("a1", "limit45");
-    let (_, status) = f.run(&r).unwrap();
-    assert_eq!(status, 75);
-    assert!(!Path::new(&f.p("v.md")).exists());
-    assert!(
-        std::fs::read_to_string(f.p("v.md.prev"))
-            .unwrap()
-            .starts_with("Verdict: accept")
+    assert_eq!(v["resumes"], f.p("v.md.run.json"));
+    assert_eq!(f.record("v2.md"), v);
+    assert!(std::fs::metadata(f.p("v2.md")).unwrap().len() > 0);
+    assert_eq!(
+        before,
+        (f.sha("v.md.run.json"), f.sha("v.md.stream.jsonl")),
+        "run 1 untouched"
     );
-    // A resume that ends without a result event keeps the recorded session for the next resume.
-    let session = f.record("v.md")["session"].as_str().unwrap().to_owned();
+    // An existing out (its answer, or only its record) refuses; nothing of it is touched.
+    f.mode("a1", "limit45");
+    let mut again = r.clone();
+    again["out"] = json!(f.p("v2.md"));
+    assert_eq!(code(f.run(&again)), "out_exists@out");
+    assert_eq!(f.record("v2.md"), v);
+    assert_eq!(code(f.run(&r)), "out_exists@out");
+    // A resume that ends without a result event: its own record keeps the session, and the next
+    // resume names that record.
     f.mode("a1", "noout");
-    let (v, status) = f.run(&resume).unwrap();
+    let (v, status) = f.run(&f.resume(r.clone(), "v3.md", "v.md")).unwrap();
     assert_eq!((status, v["state"].as_str()), (3, Some("failed")));
-    assert_eq!(f.record("v.md")["session"], session.as_str());
+    assert_eq!(f.record("v3.md")["session"], session.as_str());
     f.clear("a1");
-    let (v, _) = f.run(&resume).unwrap();
+    let (v, _) = f.run(&f.resume(r.clone(), "v4.md", "v3.md")).unwrap();
     assert_eq!(
         (v["state"].as_str(), v["session"].as_str()),
         (Some("ok"), Some(session.as_str()))
@@ -559,8 +587,7 @@ fn a2_cut_before_work_tries_the_next_account() {
     assert!(!Path::new(&f.p("x.md")).exists());
     // A resume never goes to another account.
     f.reset_calls();
-    let mut resume = f_request_with_next(&f, "x.md");
-    resume["resume"] = json!(true);
+    let resume = f.resume(f_request_with_next(&f, "x.md"), "x2.md", "x.md");
     let (_, status) = f.run(&resume).unwrap();
     assert_eq!(status, 75);
     assert_eq!(f.calls().len(), 1);
@@ -571,46 +598,22 @@ fn f_request_with_next(f: &Fake, out: &str) -> Value {
     r
 }
 
-/// (d) "unknown role" and "out file named in the prompt": refused, nothing started; a refusal
-/// writes a `refused` record unless the existing record is `cut` or `running`.
+/// (d) "unknown role" and "out file named in the prompt": refused, nothing started, and a
+/// refusal writes no file at all.
 #[test]
 fn a2_unknown_role_and_out_named_in_prompt() {
     let mut f = Fake::new();
     let mut r = f.request("n.md");
     r["role"] = json!("nobody");
     assert_eq!(code(f.run(&r)), "invalid_input@role");
-    let rec = f.record("n.md");
-    assert_eq!(rec["state"], "refused");
-    assert_eq!(
-        rec["refusal"],
-        json!({"code":"invalid_input","field":"role"})
-    );
     std::fs::write(f.t.join("p2.md"), "write n.md").unwrap();
     let mut r = f.request("n.md");
     r["prompt"] = json!(f.p("p2.md"));
     assert_eq!(code(f.run(&r)), "out_named_in_prompt@prompt");
     assert!(f.calls().is_empty());
-    // An earlier final record (here the first refusal) is replaced by the later refusal.
-    assert_eq!(
-        f.record("n.md")["refusal"],
-        json!({"code":"out_named_in_prompt","field":"prompt"})
-    );
-    // A resumable record is never replaced by a refusal.
-    f.mode("a1", "limit45");
-    f.run(&f.request("c.md")).unwrap();
-    std::fs::write(f.t.join("p3.md"), "write c.md").unwrap();
-    let mut r = f.request("c.md");
-    r["prompt"] = json!(f.p("p3.md"));
-    assert_eq!(code(f.run(&r)), "out_named_in_prompt@prompt");
-    assert_eq!(f.record("c.md")["state"], "cut");
-    // A final record (here `ok`) is replaced by the refusal: a reader never takes it for this run.
-    f.clear("a1");
-    f.run(&f.request("q.md")).unwrap();
-    std::fs::write(f.t.join("p4.md"), "write q.md").unwrap();
-    let mut r = f.request("q.md");
-    r["prompt"] = json!(f.p("p4.md"));
-    assert_eq!(code(f.run(&r)), "out_named_in_prompt@prompt");
-    assert_eq!(f.record("q.md")["state"], "refused");
+    for name in ["n.md", "n.md.run.json", "n.md.stream.jsonl", "n.md.err"] {
+        assert!(!Path::new(&f.p(name)).exists(), "{name}");
+    }
 }
 
 // ---- the other invariants ------------------------------------------------------------------
@@ -670,6 +673,7 @@ fn ok_means_the_expected_result_and_denials_are_recorded() {
     r["expect"] = json!({"file": f.p("cwd/a.txt"), "first_line": "done"});
     assert_eq!(f.run(&r).unwrap().0["state"], "ok");
     r["expect"] = json!({"file": f.p("cwd/missing.txt")});
+    r["out"] = json!(f.p("f2.md"));
     let (v, status) = f.run(&r).unwrap();
     assert_eq!(
         (status, v["state"].as_str(), v["unmet"].as_str()),
@@ -688,6 +692,7 @@ fn ok_means_the_expected_result_and_denials_are_recorded() {
         "the answer is kept for the reader"
     );
     r["expect"] = json!({"first_line": "Verdict: *"});
+    r["out"] = json!(f.p("g2.md"));
     assert_eq!(f.run(&r).unwrap().0["state"], "ok");
     f.mode("a1", "denied");
     let (v, _) = f.run(&f.request("p.md")).unwrap();
@@ -768,6 +773,7 @@ fn r1_a_fixer_whose_shell_never_ends_times_out_with_its_last_answer() {
     );
     assert!(gone(&f.t.join("bin/child.pid")));
     r["expect"] = json!({"first_line": "Verdict: repair"});
+    r["out"] = json!(f.p("z2.md"));
     let (v, _) = f.run(&r).unwrap();
     assert_eq!(
         (
@@ -826,8 +832,9 @@ fn item02_expect_file_is_met_only_by_a_file_the_session_wrote() {
     std::thread::sleep(std::time::Duration::from_millis(20));
     f.mode("a1", "file");
     r["expect"] = json!({"file": f.p("cwd/a.txt")});
+    r["out"] = json!(f.p("e2.md"));
     assert_eq!(f.run(&r).unwrap().0["state"], "ok");
-    // Resume: the reference is the first launch's (the file was absent), not the resume's.
+    // A resume of the same unfinished stage keeps the earlier run's reference (absent), not its own.
     std::fs::remove_file(f.t.join("cwd/a.txt")).unwrap();
     f.mode("a1", "limit45");
     let mut r = f.request("g.md");
@@ -840,15 +847,14 @@ fn item02_expect_file_is_met_only_by_a_file_the_session_wrote() {
     );
     std::fs::write(f.t.join("cwd/a.txt"), "written before the cut\n").unwrap();
     f.clear("a1");
-    r["resume"] = json!(true);
-    let (v, _) = f.run(&r).unwrap();
+    let (v, _) = f.run(&f.resume(r, "g2.md", "g.md")).unwrap();
     assert_eq!(v["state"], "ok", "{v}");
 }
 
-/// Item 3: a fresh run is refused while the record of the same `out` says `running` and its
-/// unit is active; the record is unchanged.
+/// Item 3 (repair 3): a fresh run on an `out` whose record exists is refused by existence; a
+/// resume of a `running` record is refused while its unit is active.
 #[test]
-fn item03_a_fresh_run_is_refused_while_a_running_record_has_a_live_unit() {
+fn item03_an_existing_record_refuses_and_a_live_unit_refuses_its_resume() {
     let mut f = Fake::new();
     let rec = json!({"state":"running","unit":"ap-run-live.scope","session":"11111111-2222-3333-4444-555555555555",
                      "account":f.p("a1"),"cwd":f.p("cwd"),"role":"implementer"});
@@ -856,18 +862,18 @@ fn item03_a_fresh_run_is_refused_while_a_running_record_has_a_live_unit() {
     f.alive.insert("ap-run-live.scope".into());
     let mut r = f.request("r.md");
     r["role"] = json!("implementer");
-    assert_eq!(code(f.run(&r)), "run_still_active@out");
+    assert_eq!(code(f.run(&r)), "out_exists@out");
     assert_eq!(
         std::fs::read_to_string(f.p("r.md.run.json")).unwrap(),
         rec.to_string()
     );
+    let resume = f.resume(r, "r2.md", "r.md");
+    assert_eq!(code(f.run(&resume)), "run_still_active@resume");
     assert!(f.launches.is_empty());
     f.alive.clear();
-    assert_eq!(
-        f.run(&r).unwrap().0["state"],
-        "ok",
-        "the unit has ended: admitted"
-    );
+    let (v, _) = f.run(&resume).unwrap();
+    assert_eq!(v["state"], "ok", "the unit has ended: admitted");
+    assert_eq!(v["session"], "11111111-2222-3333-4444-555555555555");
 }
 
 /// Item 4: the stream is read through the handle opened before the launch: a file put under its
@@ -923,17 +929,16 @@ fn item06_a_write_failure_after_the_launch_is_not_a_refusal() {
         "{v}"
     );
     assert_eq!(f.record("w.md")["state"], "failed");
-    // The record itself cannot be written: still not a refusal, and nothing was launched.
+    // (Repair 3: a directory at the record's path is no longer a write failure but an existing
+    // record: `out_exists`, a refusal before any effect.)
     std::fs::create_dir(f.t.join("x.md.run.json")).unwrap();
-    let (v, status) = f.run(&f.request("x.md")).unwrap();
-    assert_eq!((status, v["unmet"].as_str()), (5, Some("write")));
+    assert_eq!(code(f.run(&f.request("x.md"))), "out_exists@out");
     assert_eq!(f.launches.len(), 1);
 }
 
-/// Item 7: a refusal replaces only an `ok` or a `refused` record; every other one names a
-/// session someone may resume.
+/// Item 7 (repair 3): a refusal writes no file; the earlier record and its session stay.
 #[test]
-fn item07_a_refusal_keeps_every_record_that_is_not_ok_or_refused() {
+fn item07_a_refusal_writes_no_file_and_keeps_the_earlier_record() {
     let mut f = Fake::new();
     f.mode("a1", "other");
     let mut r = f.request("k.md");
@@ -941,18 +946,18 @@ fn item07_a_refusal_keeps_every_record_that_is_not_ok_or_refused() {
     r["timeout_seconds"] = json!(1);
     let (v, _) = f.run(&r).unwrap();
     assert_eq!(v["state"], "timeout");
-    let mut bad = r.clone();
-    bad["resume"] = json!(true);
+    let before = f.sha("k.md.run.json");
+    let mut bad = f.resume(r.clone(), "k2.md", "k.md");
     bad["env"] = json!({"CLAUDE_X": "1"});
     assert_eq!(code(f.run(&bad)), "env_forbidden@env");
-    assert_eq!(f.record("k.md")["state"], "timeout");
-    assert_eq!(f.record("k.md")["session"], v["session"]);
-    f.mode("a1", "noout");
-    assert_eq!(f.run(&f.request("m.md")).unwrap().0["state"], "failed");
-    let mut bad = f.request("m.md");
-    bad["role"] = json!("nobody");
-    code(f.run(&bad));
-    assert_eq!(f.record("m.md")["state"], "failed");
+    assert_eq!(f.sha("k.md.run.json"), before);
+    assert!(!Path::new(&f.p("k2.md.run.json")).exists());
+    f.clear("a1");
+    let (w, _) = f.run(&f.resume(r, "k2.md", "k.md")).unwrap();
+    assert_eq!(
+        (w["state"].as_str(), &w["session"]),
+        (Some("ok"), &v["session"])
+    );
 }
 
 /// Item 8: the dirty-worktree rule fails closed and runs `git` in the CLI's clean environment.
@@ -1021,8 +1026,7 @@ fn item10_a_resume_keeps_the_cwd_and_the_role() {
     f.mode("a1", "limit45");
     f.run(&f.request("v.md")).unwrap();
     f.clear("a1");
-    let mut r = f.request("v.md");
-    r["resume"] = json!(true);
+    let mut r = f.resume(f.request("x"), "v2.md", "v.md");
     r["cwd"] = json!(f.p("cwd2"));
     assert_eq!(code(f.run(&r)), "resume_cwd_differs@cwd");
     r["cwd"] = json!(f.p("cwd"));
@@ -1032,18 +1036,22 @@ fn item10_a_resume_keeps_the_cwd_and_the_role() {
         "resume_role_differs@role",
         "a reviewer's session"
     );
+    for bad in [
+        json!(true),
+        json!({"record": "relative.json"}),
+        json!({"record": f.p("v.md.run.json"), "x": 1}),
+    ] {
+        r["resume"] = bad;
+        assert_eq!(code(f.run(&r)), "invalid_input@resume");
+    }
     f.mode("a1", "limit45");
     let mut i = f.request("i.md");
     i["role"] = json!("implementer");
     f.run(&i).unwrap();
     f.clear("a1");
-    i["resume"] = json!(true);
     i["role"] = json!("fixer");
-    assert_eq!(
-        f.run(&i).unwrap().0["state"],
-        "ok",
-        "a fixer continues an implementer"
-    );
+    let (v, _) = f.run(&f.resume(i, "i2.md", "i.md")).unwrap();
+    assert_eq!(v["state"], "ok", "a fixer continues an implementer");
 }
 
 /// Item 11: a result line without a final newline at the CLI's exit is parsed.
@@ -1069,4 +1077,147 @@ fn item12_project_and_local_settings_are_not_loaded() {
     for call in f.calls() {
         assert!(call.contains("--setting-sources user"), "{call}");
     }
+}
+
+// ---- repair 3: the five sequences of the resumed attack on b026ac8 ---------------------------
+
+/// "Two runs start at the same instant on one `out`": the exclusive creation of the record lets
+/// exactly one pass; the record and the answer are the winner's.
+#[test]
+fn same_instant_on_one_out_only_one_run_passes() {
+    let (mut a, mut b) = (Fake::new(), Fake::new());
+    a.mode("a1", "twice");
+    let out = a.p("o.md");
+    let ra = a.request("o.md");
+    let mut rb = b.request("unused");
+    rb["out"] = json!(out);
+    let gate = std::sync::Arc::new(std::sync::Barrier::new(2));
+    let g = gate.clone();
+    let tb = std::thread::spawn(move || {
+        g.wait();
+        let r = execute(&mut b, &rb)
+            .map(|(v, _)| v["session"].clone())
+            .map_err(|f| f.code);
+        (r, b)
+    });
+    gate.wait();
+    let first = execute(&mut a, &ra)
+        .map(|(v, _)| v["session"].clone())
+        .map_err(|f| f.code);
+    let (second, b) = tb.join().unwrap();
+    let results = [first, second];
+    assert_eq!(
+        results.iter().filter(|r| r == &&Err("out_exists")).count(),
+        1,
+        "{results:?}"
+    );
+    let won = results.iter().find_map(|r| r.clone().ok()).unwrap();
+    let rec: Value =
+        serde_json::from_slice(&std::fs::read(format!("{out}.run.json")).unwrap()).unwrap();
+    assert_eq!(rec["session"], won);
+    assert_eq!(rec["state"], "ok");
+    drop(b);
+}
+
+/// "`is-active` does not answer": a resume of a `running` record is refused, and a stop whose
+/// state cannot be read is `failed` with `unmet: stop`.
+#[test]
+fn is_active_that_does_not_answer_refuses_and_fails_the_stop() {
+    let mut f = Fake::new();
+    let rec = json!({"state":"running","unit":"ap-run-quiet.scope","session":"11111111-2222-3333-4444-555555555555",
+                     "account":f.p("a1"),"cwd":f.p("cwd"),"role":"reviewer"});
+    std::fs::write(f.p("q.md.run.json"), rec.to_string()).unwrap();
+    f.silent = true;
+    let resume = f.resume(f.request("x"), "q2.md", "q.md");
+    assert_eq!(code(f.run(&resume)), "run_still_active@resume");
+    assert!(f.launches.is_empty());
+    let (v, status) = f.run(&f.request("s.md")).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("failed"), Some("stop"))
+    );
+    f.silent = false;
+    assert_eq!(f.run(&resume).unwrap().0["state"], "ok");
+}
+
+/// "A fixer over an `ok` implementer that writes nothing": its reference is its own launch's, so
+/// the implementer's file does not meet its `expect`: `no_result`.
+#[test]
+fn a_fixer_over_an_ok_implementer_that_writes_nothing_is_no_result() {
+    let mut f = Fake::new();
+    f.mode("a1", "file");
+    let mut r = f.request("im.md");
+    r["role"] = json!("implementer");
+    r["expect"] = json!({"file": f.p("cwd/a.txt")});
+    assert_eq!(f.run(&r).unwrap().0["state"], "ok");
+    f.clear("a1");
+    let mut fix = f.resume(r, "fx.md", "im.md");
+    fix["role"] = json!("fixer");
+    let (v, status) = f.run(&fix).unwrap();
+    assert_eq!(
+        (status, v["state"].as_str(), v["unmet"].as_str()),
+        (3, Some("no_result"), Some("file")),
+        "{v}"
+    );
+}
+
+/// "A refused request leaves the earlier record and its session resumable".
+#[test]
+fn a_refused_request_leaves_the_earlier_record_resumable() {
+    let mut f = Fake::new();
+    let mut r = f.request("ok.md");
+    r["role"] = json!("implementer");
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok");
+    let before = (
+        f.sha("ok.md.run.json"),
+        f.sha("ok.md"),
+        f.sha("ok.md.stream.jsonl"),
+    );
+    let mut fix = f.resume(r, "fx.md", "ok.md");
+    fix["role"] = json!("fixer");
+    let mut bad = fix.clone();
+    bad["timeout_seconds"] = json!(0);
+    assert_eq!(code(f.run(&bad)), "invalid_input@timeout_seconds");
+    assert_eq!(
+        before,
+        (
+            f.sha("ok.md.run.json"),
+            f.sha("ok.md"),
+            f.sha("ok.md.stream.jsonl")
+        )
+    );
+    let (w, _) = f.run(&fix).unwrap();
+    assert_eq!(
+        (w["state"].as_str(), &w["session"]),
+        (Some("ok"), &v["session"])
+    );
+}
+
+/// "The request's `GIT_DIR` does not skip the dirty check" (nor `GIT_CEILING_DIRECTORIES`).
+#[test]
+fn the_requests_git_dir_does_not_skip_the_dirty_check() {
+    let mut f = Fake::new();
+    let git = |args: &[&str]| {
+        assert!(
+            Command::new("git")
+                .args(args)
+                .current_dir(f.p("cwd"))
+                .output()
+                .unwrap()
+                .status
+                .success()
+        );
+    };
+    git(&["init", "-q"]);
+    std::fs::create_dir(f.t.join("cwd/sub")).unwrap();
+    std::fs::write(f.t.join("cwd/half.txt"), "half").unwrap();
+    let mut r = f.request("g.md");
+    r["role"] = json!("implementer");
+    r["env"] = json!({"GIT_DIR": "/nonexistent"});
+    assert_eq!(code(f.run(&r)), "worktree_dirty@cwd");
+    r["env"] = json!({"GIT_CEILING_DIRECTORIES": f.p("cwd")});
+    r["cwd"] = json!(f.p("cwd/sub"));
+    assert_eq!(code(f.run(&r)), "worktree_dirty@cwd");
+    assert!(f.launches.is_empty());
 }

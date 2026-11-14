@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use std::{
     ffi::OsString,
     fs::File,
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     os::unix::fs::{FileExt, MetadataExt},
     path::Path,
     process::{Child, ExitCode},
@@ -66,6 +66,14 @@ const HOOKS_OFF: &str = r#"{"disableAllHooks":true}"#;
 const SOURCES: &str = "user";
 /// The exit of a run whose stage may have run but whose answer or record could not be written.
 const WRITE_FAILED: u8 = 5;
+/// The states `systemctl is-active` answers while something of a unit may live.
+const ALIVE: [&str; 5] = [
+    "active",
+    "activating",
+    "deactivating",
+    "reloading",
+    "refreshing",
+];
 
 struct Request {
     role: String,
@@ -81,8 +89,8 @@ struct Request {
     expect_file: Option<String>,
     expect_line: Option<String>,
     mcp: Vec<String>,
-    /// The session and account of the record to continue.
-    resume: Option<(String, String)>,
+    /// The session, account and record path of the earlier run this one continues.
+    resume: Option<(String, String, String)>,
     /// The expected file as it was before the session's first launch.
     expect_before: Value,
     /// The environment of the CLI (and of `git`), without `CLAUDE_CONFIG_DIR`.
@@ -169,10 +177,17 @@ fn environment(r: &Value) -> Result<Vec<(String, String)>, Failure> {
 fn record_path(out: &str) -> String {
     format!("{out}.run.json")
 }
-fn existing(out: &str) -> Option<Value> {
-    std::fs::read(record_path(out))
-        .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok())
+/// What `systemctl is-active` answered for `unit`: false unless it answered a state in which
+/// nothing of the unit lives (a call that fails, times out or prints nothing is no answer).
+fn ended(s: &mut impl System, unit: &str) -> bool {
+    let reply = s.call(
+        "systemctl",
+        &args(&["is-active", unit]),
+        &Value::Null,
+        10_000,
+    );
+    let state = reply.map(|r| String::from_utf8_lossy(&r.stdout).trim().to_owned());
+    state.is_ok_and(|st| !st.is_empty() && !ALIVE.contains(&st.as_str()))
 }
 /// The fixed short list of this process's variables, then the request's `env`.
 fn base_env(s: &impl System, extra: &[(String, String)]) -> Vec<(String, String)> {
@@ -241,7 +256,15 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
         .ok_or_else(|| error("invalid_input", "role"))?;
     let integration = flag(r, "integration")?;
     require!(!integration || role == "reviewer" => "invalid_input", "integration");
-    let (resume, continue_dirty) = (flag(r, "resume")?, flag(r, "continue_dirty")?);
+    let continue_dirty = flag(r, "continue_dirty")?;
+    let resume = match r.get("resume") {
+        None => None,
+        Some(v) => {
+            let keys = v.as_object().map(|o| o.keys().all(|k| k == "record"));
+            require!(keys == Some(true) => "invalid_input", "resume");
+            Some(path(v, "record").map_err(|_| error("invalid_input", "resume"))?)
+        }
+    };
     let (model, effort) = (word(r, "model", 40)?, word(r, "effort", 16)?);
     let mode = text(r, "permission_mode")?;
     require!(MODES.contains(&mode) => "invalid_input", "permission_mode");
@@ -305,40 +328,48 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
     require!(!out_path.is_dir() && out != prompt => "out_unwritable", "out");
     // A prompt that names the out file could make the session write the answer it is judged by.
     require!(!bytes.windows(name.len()).any(|w| w == name.as_bytes()) => "out_named_in_prompt", "prompt");
-    let previous = existing(&out);
-    // A record of a run whose unit is still alive is never run over, fresh or resumed.
-    if let Some(rec) = previous.as_ref().filter(|r| r["state"] == "running") {
-        let unit = text(rec, "unit").map_err(|_| error("resume_record_missing", "out"))?;
-        let active = s.call(
-            "systemctl",
-            &args(&["is-active", "--quiet", unit]),
-            &Value::Null,
-            10_000,
-        );
-        require!(!active.is_ok_and(|a| a.success) => "run_still_active", "out");
-    }
-    let resume = if resume {
-        let rec = previous
-            .as_ref()
-            .ok_or_else(|| error("resume_record_missing", "out"))?;
-        let session = text(rec, "session").map_err(|_| error("resume_record_missing", "out"))?;
-        let account = text(rec, "account").map_err(|_| error("resume_record_missing", "out"))?;
-        require!(accounts.iter().any(|a| a == account) => "resume_account_differs", "account");
-        require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
-        let same = rec["role"] == role;
-        let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
-        require!(same || fixes => "resume_role_differs", "role");
-        Some((session.to_owned(), account.to_owned()))
-    } else {
-        None
+    // Every run has its own files: nothing of an earlier run is run over.
+    let names = [
+        &out,
+        &record_path(&out),
+        &format!("{out}.stream.jsonl"),
+        &format!("{out}.err"),
+    ];
+    require!(names.iter().all(|n| std::fs::symlink_metadata(n).is_err()) => "out_exists", "out");
+    let earlier = match &resume {
+        None => None,
+        Some(file) => {
+            let rec: Value = std::fs::read(file)
+                .ok()
+                .and_then(|b| serde_json::from_slice(&b).ok())
+                .ok_or_else(|| error("resume_record_missing", "resume"))?;
+            let missing = |_| error("resume_record_missing", "resume");
+            let (session, account) = (
+                text(&rec, "session").map_err(missing)?,
+                text(&rec, "account").map_err(missing)?,
+            );
+            require!(accounts.iter().any(|a| a == account) => "resume_account_differs", "account");
+            require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
+            let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
+            require!(rec["role"] == role || fixes => "resume_role_differs", "role");
+            if rec["state"] == "running" {
+                let unit = text(&rec, "unit").map_err(missing)?;
+                require!(ended(s, unit) => "run_still_active", "resume");
+            }
+            Some((
+                rec.clone(),
+                (session.to_owned(), account.to_owned(), file.clone()),
+            ))
+        }
     };
-    let base_env = base_env(s, &env);
-    if resume.is_none() && role == "implementer" {
-        // Fails closed: only "not a repository" lets an implementer start without the check.
-        let inside = git(s, &base_env, &cwd, &["rev-parse", "--is-inside-work-tree"])
+    if earlier.is_none() && role == "implementer" {
+        // Fails closed: only "not a repository" lets an implementer start without the check. Git
+        // gets the fixed short list only: the request's `env` (a `GIT_DIR`) cannot skip it.
+        let clean = base_env(s, &[]);
+        let inside = git(s, &clean, &cwd, &["rev-parse", "--is-inside-work-tree"])
             .map_err(|_| error("worktree_unreadable", "cwd"))?;
         if inside.success && inside.stdout == b"true\n" {
-            let status = git(s, &base_env, &cwd, &["status", "--porcelain"])
+            let status = git(s, &clean, &cwd, &["status", "--porcelain"])
                 .map_err(|_| error("worktree_unreadable", "cwd"))?;
             require!(status.success => "worktree_unreadable", "cwd");
             require!(status.stdout.is_empty() || continue_dirty => "worktree_dirty", "cwd");
@@ -348,16 +379,20 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
             require!(not_a_repository => "worktree_unreadable", "cwd");
         }
     }
-    // The reference for `expect.file`: before the first launch; a resume keeps the first's.
-    let expect_before = match &expect_file {
-        None => Value::Null,
-        Some(f) => match previous.as_ref().filter(|_| resume.is_some()) {
-            Some(rec) if rec["expect_file_before"]["path"] == f.as_str() => {
-                rec["expect_file_before"].clone()
-            }
-            _ => snapshot(f),
-        },
+    // The reference for `expect.file` is the file before THIS run's launch; only a run that
+    // continues the same unfinished stage (same role, earlier state not `ok`) takes the earlier one.
+    let expect_before = match (&expect_file, &earlier) {
+        (None, _) => Value::Null,
+        (Some(f), Some((rec, _)))
+            if rec["role"] == role
+                && rec["state"] != "ok"
+                && rec["expect_file_before"]["path"] == f.as_str() =>
+        {
+            rec["expect_file_before"].clone()
+        }
+        (Some(f), _) => snapshot(f),
     };
+    let base_env = base_env(s, &env);
     require!(s.units() => "systemd_absent", "host");
     Ok(Request {
         role: role.to_owned(),
@@ -373,7 +408,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
         expect_file,
         expect_line,
         mcp,
-        resume,
+        resume: earlier.map(|(_, r)| r),
         expect_before,
         base_env,
     })
@@ -444,21 +479,6 @@ fn persist(out: &str, record: &Value) -> bool {
         File::create(record_path(out)).is_ok_and(|mut f| f.write_all(&bytes).is_ok())
     }
 }
-/// A new file under `path`, never an earlier file, link or pipe of that name: the name is
-/// removed and the file created exclusively; the handle is the only way it is read after.
-fn fresh(path: &str) -> std::io::Result<File> {
-    match std::fs::remove_file(path) {
-        Ok(()) => (),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
-        Err(e) => return Err(e),
-    }
-    std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create_new(true)
-        .open(path)
-}
-
 /// What the stream of one run showed.
 #[derive(Default)]
 struct Seen {
@@ -606,14 +626,7 @@ fn stop(s: &mut impl System, unit: &str, child: &mut Child) -> bool {
         let _ = child.kill();
         let _ = child.wait();
     }
-    let active = s.call(
-        "systemctl",
-        &args(&["is-active", "--quiet", unit]),
-        &Value::Null,
-        10_000,
-    );
-    // `is-active` exits nonzero for an inactive or unknown (collected) unit.
-    active.is_ok_and(|a| !a.success)
+    ended(s, unit)
 }
 fn limit_text(text: &str) -> bool {
     let t = text.to_lowercase();
@@ -628,8 +641,9 @@ fn attempt(
     s: &mut impl System,
     q: &Request,
     account: &str,
-    resume: Option<&str>,
+    (output, errs): &(File, File),
 ) -> (Value, bool, bool) {
+    let resume = q.resume.as_ref().map(|(session, _, _)| session.as_str());
     let mut record = json!({
         "role": q.role, "runtime": "claude", "model": q.model, "effort": q.effort,
         "account": account, "session": resume, "cwd": q.cwd, "unit": null,
@@ -638,7 +652,8 @@ fn attempt(
         "turns": null,
         "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
         "permission_denials": [], "results": 0, "expect_met": null,
-        "expect_file_before": q.expect_before, "unmet": null, "refusal": null,
+        "expect_file_before": q.expect_before, "unmet": null,
+        "resumes": q.resume.as_ref().map(|(_, _, file)| file),
     });
     let not_launched = |mut record: Value, unmet: &str| {
         record["state"] = json!("failed");
@@ -656,15 +671,17 @@ fn attempt(
     let unit = format!("ap-run-{unit}.scope");
     record["session"] = json!(session);
     record["unit"] = json!(unit);
-    let stream = format!("{}.stream.jsonl", q.out);
-    let errors = format!("{}.err", q.out);
-    let files = (File::open(&q.prompt), fresh(&stream), fresh(&errors));
-    let (Ok(prompt), Ok(output), Ok(errs)) = files else {
+    // The run's own stream and error files, emptied for a next account's attempt.
+    let empty = |mut f: &File| {
+        f.set_len(0)?;
+        f.seek(SeekFrom::Start(0))?;
+        f.try_clone()
+    };
+    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (File::open(&q.prompt), empty(output), empty(errs))
+    else {
         return not_launched(record, "launch");
     };
-    let Ok(reader) = output.try_clone() else {
-        return not_launched(record, "launch");
-    };
+    let reader = output;
     // The record names the session BEFORE the launch.
     if !persist(&q.out, &record) {
         return not_launched(record, "write");
@@ -714,7 +731,7 @@ fn attempt(
     let mut env = q.base_env.clone();
     env.push(("CLAUDE_CONFIG_DIR".into(), account.into()));
     let started = s.now();
-    let mut child = match s.launch(&argv, &env, &q.cwd, [prompt, output, errs]) {
+    let mut child = match s.launch(&argv, &env, &q.cwd, [prompt, stdout, stderr]) {
         Ok(child) => child,
         Err(_) => return not_launched(record, "launch"),
     };
@@ -728,7 +745,7 @@ fn attempt(
     let (mut offset, mut partial) = (0, vec![]);
     let end = loop {
         let exited = !matches!(child.try_wait(), Ok(None));
-        follow(&reader, &mut offset, &mut partial, &mut seen);
+        follow(reader, &mut offset, &mut partial, &mut seen);
         if seen.done() {
             break End::Result;
         }
@@ -746,12 +763,9 @@ fn attempt(
     };
     let stopped = stop(s, &unit, &mut child);
     // Once more after the stop: what came in the last moment, and a last line without newline.
-    follow(&reader, &mut offset, &mut partial, &mut seen);
+    follow(reader, &mut offset, &mut partial, &mut seen);
     if !partial.is_empty() {
         seen.line(&partial);
-    }
-    if std::fs::metadata(&errors).is_ok_and(|m| m.len() == 0) {
-        let _ = std::fs::remove_file(&errors);
     }
     // A reviewer whose first result was written before the stop has ended at it.
     let timed_out = matches!(end, End::Timeout) && !seen.done();
@@ -780,29 +794,49 @@ fn attempt(
     let saved = persist(&q.out, &record);
     (record, seen.worked, saved && !write_failed)
 }
-fn run(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
+/// One `ap run` request. A refusal (exit 2) comes before any effect and writes no file.
+pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let q = request(s, r)?;
-    // An answer of an earlier run under this name never stays where this run's answer is expected.
-    if std::fs::symlink_metadata(&q.out).is_ok() {
-        std::fs::rename(&q.out, format!("{}.prev", q.out)).map_err(|_| error("io_error", "out"))?;
-    }
-    // From here on every outcome is a record, never a refusal.
+    // The claim: the record is created exclusively, so of two requests on one `out` started at
+    // the same instant only one passes. Every effect comes after it.
+    let create = |p: &str| {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .read(true)
+            .create_new(true)
+            .open(p)
+    };
+    create(&record_path(&q.out)).map_err(|e| match e.kind() {
+        std::io::ErrorKind::AlreadyExists => error("out_exists", "out"),
+        _ => error("out_unwritable", "out"),
+    })?;
+    let errors = format!("{}.err", q.out);
+    let files = (create(&format!("{}.stream.jsonl", q.out)), create(&errors));
     let accounts = match &q.resume {
-        Some((_, account)) => vec![account.clone()],
+        Some((_, account, _)) => vec![account.clone()],
         None => q.accounts.clone(),
     };
     let (mut last, mut clean) = (Value::Null, true);
-    for (i, account) in accounts.iter().enumerate() {
-        let resume = q.resume.as_ref().map(|(session, _)| session.as_str());
-        let (record, worked, saved) = attempt(s, &q, account, resume);
-        clean &= saved;
-        // A fresh run cut before it did any work (no tool ran) may go to the next account.
-        let next =
-            record["state"] == "cut" && q.resume.is_none() && !worked && i + 1 < accounts.len();
-        last = record;
-        if !next || !saved {
-            break;
+    if let (Ok(output), Ok(errs)) = files {
+        let files = (output, errs);
+        for (i, account) in accounts.iter().enumerate() {
+            let (record, worked, saved) = attempt(s, &q, account, &files);
+            clean &= saved;
+            // A fresh run cut before it did any work (no tool ran) may go to the next account.
+            let next =
+                record["state"] == "cut" && q.resume.is_none() && !worked && i + 1 < accounts.len();
+            last = record;
+            if !next || !saved {
+                break;
+            }
         }
+    } else {
+        last = json!({"state": "failed", "unmet": "launch", "account": accounts[0]});
+        let _ = persist(&q.out, &last);
+        clean = false;
+    }
+    if std::fs::metadata(&errors).is_ok_and(|m| m.len() == 0) {
+        let _ = std::fs::remove_file(&errors);
     }
     let status = match last["state"].as_str() {
         _ if !clean => WRITE_FAILED,
@@ -811,43 +845,6 @@ fn run(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         _ => 3,
     };
     Ok((last, status))
-}
-/// One `ap run` request. A refusal (exit 2, before any effect) replaces an existing record only
-/// when that record says `ok` or `refused`: every other record names a session someone may resume.
-pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
-    run(s, r).inspect_err(|f| {
-        let Some(out) = r["out"]
-            .as_str()
-            .filter(|o| Path::new(o).is_absolute() && !o.contains('\0'))
-        else {
-            return;
-        };
-        let parent_ok = Path::new(out).parent().is_some_and(Path::is_dir);
-        let replaceable = match std::fs::symlink_metadata(record_path(out)) {
-            Err(e) => e.kind() == std::io::ErrorKind::NotFound,
-            Ok(_) => existing(out).is_some_and(|v| v["state"] == "ok" || v["state"] == "refused"),
-        };
-        let kept = !replaceable;
-        if !parent_ok || kept {
-            return;
-        }
-        let now = stamp(SystemTime::now());
-        let given = |k: &str| r.get(k).filter(|v| v.is_string()).cloned().unwrap_or(Value::Null);
-        let _ = write_record(
-            out,
-            &json!({
-                "role": given("role"), "runtime": r.get("runtime").cloned().unwrap_or(json!("claude")),
-                "model": given("model"), "effort": given("effort"), "account": given("account"),
-                "session": null, "cwd": given("cwd"), "unit": null,
-                "prompt": {"path": given("prompt"), "sha256": null}, "answer": null,
-                "start": now, "end": now, "state": "refused", "turns": null,
-                "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
-                "permission_denials": [], "results": 0, "expect_met": null,
-                "expect_file_before": null, "unmet": null,
-                "refusal": {"code": f.code, "field": f.field},
-            }),
-        );
-    })
 }
 pub fn cli(argv: &[OsString]) -> ExitCode {
     let result = (|| {
