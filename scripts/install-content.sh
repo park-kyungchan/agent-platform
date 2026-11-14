@@ -2,6 +2,8 @@
 # Install content/ of this repository as the shared instructions of the host, or put a kept copy back.
 #   scripts/install-content.sh install <commit>    from this checkout, which must be clean at <commit> on origin/main
 #   scripts/install-content.sh rollback <tarball>  a tarball this script wrote before an install
+#   scripts/install-content.sh rollback-check <tarball>  every check of rollback that does not read the target;
+#                                                  writes nothing; exit 0, or 2 with the line rollback prints
 # The file list is content/SHA256SUMS (no fixed skill list). Target ${AP_CONTENT_DST:-/root/.agents}; kept copies
 # in ${AP_CONTENT_BACKUP_DIR:-/var/backups/agent-platform-content} (mode 0700).
 # Order, so that a failure never leaves a half-installed tree:
@@ -44,6 +46,13 @@ swap() { local stage=$1 p; shift
 owned_ok() { case "$1" in *..*|skills/|skills/*/*) return 1 ;; AGENTS.md|runtime-references|skills/*) return 0 ;; esac; return 1; }
 paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, runtime-references, skills/<name>
   cut -c67- "$1" | awk -F/ '$1=="skills"{print "skills/"$2; next} {print $1}' | sort -u; }
+# The checks of a rollback that do not read the target (rollback-check runs these and nothing else); it sets paths.
+kept_copy_ok() { local p tarball=$1
+  [ -f "$tarball" ] && [ -f "$tarball.sha256" ] && [ -f "$tarball.paths" ] || refuse "tarball, .sha256 or .paths missing"
+  (cd "$(dirname -- "$tarball")" && sha256sum -c --quiet "$(basename -- "$tarball").sha256") || refuse "the tarball does not match its checksum"
+  if tar -tf "$tarball" | grep -Ev '^(AGENTS\.md|runtime-references(/.*)?|skills/[A-Za-z0-9_-]+(/.*)?)$' | grep -q .; then refuse "the tarball lists a path that is not the installer's"; fi
+  mapfile -t paths < "$tarball.paths"
+  for p in "${paths[@]}"; do owned_ok "$p" || refuse "unexpected path in .paths: $p"; done; }
 case "${1:-}" in
 install)
   [ "$#" -eq 2 ] || refuse "usage: install <commit>"
@@ -80,11 +89,7 @@ install)
 rollback)
   [ "$#" -eq 2 ] || refuse "usage: rollback <tarball>"
   tarball=$2
-  [ -f "$tarball" ] && [ -f "$tarball.sha256" ] && [ -f "$tarball.paths" ] || refuse "tarball, .sha256 or .paths missing"
-  (cd "$(dirname -- "$tarball")" && sha256sum -c --quiet "$(basename -- "$tarball").sha256") || refuse "the tarball does not match its checksum"
-  if tar -tf "$tarball" | grep -Ev '^(AGENTS\.md|runtime-references(/.*)?|skills/[A-Za-z0-9_-]+(/.*)?)$' | grep -q .; then refuse "the tarball lists a path that is not the installer's"; fi
-  mapfile -t paths < "$tarball.paths"
-  for p in "${paths[@]}"; do owned_ok "$p" || refuse "unexpected path in .paths: $p"; done
+  kept_copy_ok "$tarball"
   # Only the kept copy of the LATEST install can be rolled back: a path the target owns now and this copy
   # does not cover came from a later install, which is rolled back first.
   cur=(); [ -f "$DST/.content-paths" ] && mapfile -t cur < "$DST/.content-paths"
@@ -105,5 +110,9 @@ rollback)
   rm -rf -- "$DST/.old-$stamp"
   echo "rolled back to $tarball"
   ;;
-*) echo "usage: $0 (install <commit>|rollback <tarball>)" >&2; exit 2 ;;
+rollback-check)
+  [ "$#" -eq 2 ] || refuse "usage: rollback-check <tarball>"
+  kept_copy_ok "$2"
+  ;;
+*) echo "usage: $0 (install <commit>|rollback <tarball>|rollback-check <tarball>)" >&2; exit 2 ;;
 esac

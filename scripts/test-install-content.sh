@@ -71,4 +71,25 @@ echo dirty >> content/AGENTS.md; inst install "$c7"; rc=$?; git checkout -q -- c
 echo three > content/AGENTS.md; sums; git add -A; git commit -q -m three; c3=$(git rev-parse HEAD)
 inst install "$c3"; rc=$?; [ "$rc" -eq 2 ] && ok "commit not on origin/main refused" || bad "unmerged rc=$rc"
 inst install "$c1"; rc=$?; [ "$rc" -eq 2 ] && ok "checkout at another commit refused" || bad "other commit rc=$rc"
+# rollback-check: every check of rollback that does not read the target, writing nothing. A kept copy this script
+# wrote passes; each refusal is the line and the exit rollback prints for the same inputs; no file changes.
+snap() { (cd "$1" && find . -type f -o -type d | sort | xargs -d '\n' stat -c '%n %s %Y' | sha256sum | cut -c1-16); }
+ck=$t/ck; mkdir -p "$ck"; absent=$t/no-such-target
+fresh() { rm -f "$ck"/k.tar*; cp "$tar2" "$ck/k.tar"; cp "$tar2.paths" "$ck/k.tar.paths"; (cd "$ck" && sha256sum k.tar > k.tar.sha256); }
+rcheck() { # <name> <expected stderr prefix>: rollback-check refuses as rollback does, and changes nothing
+  local before after rc1 rc2 e1 e2; before=$(snap "$ck")
+  AP_CONTENT_DST=$absent inst rollback-check "$ck/k.tar"; rc1=$?; e1=$(cat "$t/err")
+  AP_CONTENT_DST=$t/dstx inst rollback "$ck/k.tar"; rc2=$?; e2=$(cat "$t/err"); after=$(snap "$ck")
+  { [ "$rc1" -eq 2 ] && [ "$rc2" -eq 2 ] && [ -n "$e1" ] && [ "$e1" = "$e2" ] && [[ "$e1" == *"refuse: $2"* ]] && [ "$before" = "$after" ] && [ ! -e "$absent" ] && [ ! -e "$t/dstx" ]; } \
+    && ok "rollback-check refuses $1 as rollback does, changes nothing" || bad "rollback-check $1 rc=$rc1/$rc2 [$e1] [$e2]"
+}
+fresh; before=$(snap "$ck"); AP_CONTENT_DST=$absent inst rollback-check "$ck/k.tar"; rc=$?
+{ [ "$rc" -eq 0 ] && [ "$before" = "$(snap "$ck")" ] && [ ! -e "$absent" ] && [ ! -s "$t/err" ]; } && ok "rollback-check takes a kept copy this script wrote" || bad "rollback-check of a kept copy rc=$rc $(cat "$t/err")"
+fresh; rm "$ck/k.tar.sha256"; rcheck "a missing .sha256" "tarball, .sha256 or .paths missing"
+fresh; rm "$ck/k.tar.paths"; rcheck "a missing .paths" "tarball, .sha256 or .paths missing"
+fresh; echo x >> "$ck/k.tar"; rcheck "a wrong checksum" "the tarball does not match its checksum"
+fresh; mkdir -p "$t/evil" && echo e > "$t/evil/evil.txt" && tar -C "$t/evil" -cf "$ck/k.tar" evil.txt && (cd "$ck" && sha256sum k.tar > k.tar.sha256); rcheck "a member that is not the installer's" "the tarball lists a path that is not the installer's"
+fresh; echo '../escape' >> "$ck/k.tar.paths"; rcheck "an entry of .paths that is not owned" "unexpected path in .paths"
+fresh; rm "$ck/k.tar"; rcheck "a missing tarball" "tarball, .sha256 or .paths missing"
+AP_CONTENT_DST=$absent inst rollback-check; rc=$?; [ "$rc" -eq 2 ] && grep -q '^refuse: usage: rollback-check' "$t/err" && ok "rollback-check wants one tarball" || bad "rollback-check usage rc=$rc"
 [ "$fails" -eq 0 ] && echo "test-install-content: PASS" || { echo "test-install-content: $fails FAILED"; exit 1; }

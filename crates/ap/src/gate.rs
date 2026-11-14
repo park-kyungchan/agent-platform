@@ -26,7 +26,7 @@ commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$aft
 comments(last:100){nodes{author{__typename login} body}}}}}";
 const THREADS: &str = "query($owner:String!,$name:String!,$n:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$n){
 reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{id isResolved path line
-first:comments(first:1){nodes{author{__typename login}}} last:comments(last:1){nodes{author{__typename login}}}}}}}}";
+first:comments(first:1){nodes{author{__typename login} originalCommit{oid}}} last:comments(last:1){nodes{author{__typename login}}}}}}}}";
 
 struct Request {
     repository: String,
@@ -229,15 +229,26 @@ fn view(s: &mut impl System, q: &Request) -> Result<View, Unread> {
         marker,
     })
 }
-/// Every unresolved review thread; `null` when a page could not be read.
-fn threads(s: &mut impl System, q: &Request) -> Value {
-    let (mut list, mut after) = (vec![], None::<String>);
+/// Every unresolved review thread, and the number of threads, resolved or not, whose first comment
+/// is the reviewer's and was made on `head` (`originalCommit`: the commit the comment was made on,
+/// where `commit` follows it to a later head); both `null` when a page could not be read, and the
+/// number also without a reviewer's login.
+fn threads(s: &mut impl System, q: &Request, head: &str) -> (Value, Value) {
+    let (mut list, mut after, mut on_head) = (vec![], None::<String>, 0);
     for _ in 0..50 {
         let Ok(pr) = graphql(s, q, THREADS, after.as_deref()) else {
-            return Value::Null;
+            return (Value::Null, Value::Null);
         };
         let page = &pr["reviewThreads"];
         for t in page["nodes"].as_array().into_iter().flatten() {
+            let first = &t["first"]["nodes"][0];
+            if q.login
+                .as_deref()
+                .is_some_and(|l| login(&first["author"]) == l)
+                && first["originalCommit"]["oid"] == head
+            {
+                on_head += 1;
+            }
             if t["isResolved"] == true {
                 continue;
             }
@@ -248,10 +259,15 @@ fn threads(s: &mut impl System, q: &Request) -> Value {
         }
         match page["pageInfo"]["endCursor"].as_str() {
             Some(c) if page["pageInfo"]["hasNextPage"] == true => after = Some(c.to_owned()),
-            _ => return json!(list),
+            _ => {
+                return (
+                    json!(list),
+                    q.login.as_ref().map_or(Value::Null, |_| json!(on_head)),
+                );
+            }
         }
     }
-    Value::Null
+    (Value::Null, Value::Null)
 }
 fn ready(s: &mut impl System, q: &Request, undo: bool) -> bool {
     let mut a = args(&["pr", "ready", &q.number.to_string(), "-R", &q.repository]);
@@ -277,7 +293,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let mut a = json!({"end": null, "repository": q.repository, "pull_request": q.number,
         "head": null, "marked_ready": false, "checks": [],
         "autoreview": {"login": q.login, "state": if q.login.is_some() { "waiting" } else { "off" },
-            "commit": null, "has_unresolved_findings": null, "toggled": false}});
+            "commit": null, "has_unresolved_findings": null, "toggled": false, "threads_on_head": null}});
     let mut deadline = s.now() + q.check;
     // The head GitHub reported at the first reading; a caller's `head` is only compared with it.
     let (mut head, mut reviewing) = (None::<String>, false);
@@ -381,10 +397,9 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         s.pause(POLL);
     };
     a["end"] = json!(end);
-    a["threads"] = if end == "github_unreadable" {
-        Value::Null
-    } else {
-        threads(s, &q)
+    (a["threads"], a["autoreview"]["threads_on_head"]) = match &head {
+        Some(head) if end != "github_unreadable" => threads(s, &q, head),
+        _ => (Value::Null, Value::Null),
     };
     Ok((a, status(end)))
 }

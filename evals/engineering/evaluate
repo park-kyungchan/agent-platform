@@ -5,8 +5,9 @@ It restores every path of `tests` with its bytes (and mode) at `head`, read from
 each array of `commands` in order with stdin /dev/null and stops at the first that does not exit 0.
 After each command it prints `evaluate: command=<n> exit=<code> seconds=<s>`. Exit 0: all passed;
 1: one did not; 2: it could not judge (the case or the clone unreadable, a path missing, less than
-10,240 MiB free before a command, or an error of the evaluator itself: exit 1 is a statement about
-the candidate and nothing else). No model judges. Under the host's build rule it runs itself again
+10,240 MiB free before a command, a command whose first word holds no `/` and cannot be started, or
+an error of the evaluator itself: exit 1 is a statement about the candidate and nothing else). Every
+`git` it starts ignores `refs/replace/`. No model judges. Under the host's build rule it runs itself again
 under `flock` on HOST_CARGO_LOCK, as the `check` of every platform repository does.
 """
 import json
@@ -26,7 +27,9 @@ def cannot(why):
 
 
 def git(clone, *words):
-    return subprocess.run(["git", "-C", clone, *words], stdin=subprocess.DEVNULL, capture_output=True, check=False)
+    # A `refs/replace/` entry of the clone must change neither a judging file nor the tree read.
+    env = dict(os.environ, GIT_NO_REPLACE_OBJECTS="1")
+    return subprocess.run(["git", "-C", clone, *words], stdin=subprocess.DEVNULL, capture_output=True, check=False, env=env)
 
 
 def entry(clone, head, path):
@@ -100,6 +103,10 @@ def main():
         try:
             code = subprocess.run(words, stdin=subprocess.DEVNULL, check=False).returncode
         except OSError:
+            # A program of the search path that cannot start is the host's cause, no statement about
+            # the candidate; one with a `/` is the candidate's tree: a failed command.
+            if "/" not in words[0]:
+                cannot("%s cannot be started" % words[0])
             code = 127
         if code < 0:
             code = 128 - code

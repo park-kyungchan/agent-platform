@@ -421,7 +421,11 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         u.rec["files"]["gate"] = json!(file);
         ensure!(answer["end"] == "passed" => answer["end"].as_str().unwrap_or("github_unreadable"));
         u.rec["head"] = answer["head"].clone();
-        ensure!(answer["autoreview"]["has_unresolved_findings"] != true => "unresolved_findings");
+        // The reviewer's summary says `true` until a push, whoever answered. Only a finding with no
+        // thread of the reviewer on the head to show for it stops on the summary; else the threads decide.
+        let on_head = &answer["autoreview"]["threads_on_head"];
+        let unseen = on_head.is_null() || on_head == 0;
+        ensure!(!(answer["autoreview"]["has_unresolved_findings"] == true && unseen) => "unresolved_findings");
         let threads = &answer["threads"];
         ensure!(threads.as_array().is_some_and(Vec::is_empty) => "unresolved_threads", json!({"threads": threads}));
         // The status `lead-review` the gate lists and does not judge: a revoked acceptance is seen.
