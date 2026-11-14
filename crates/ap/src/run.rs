@@ -352,8 +352,8 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
             require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
             let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
             require!(rec["role"] == role || fixes => "resume_role_differs", "role");
-            if rec["state"] == "running" {
-                let unit = text(&rec, "unit").map_err(missing)?;
+            // Whatever the record says (`failed` with `unmet: stop` too): nothing of its unit may live.
+            if let Some(unit) = rec["unit"].as_str() {
                 require!(ended(s, unit) => "run_still_active", "resume");
             }
             Some((
@@ -458,12 +458,32 @@ fn glob(pattern: &str, line: &str) -> bool {
     p[i..].iter().all(|c| *c == '*')
 }
 /// Writes through a temporary name and a rename: a reader never sees half a file.
+/// The temporary name is unique per write and created exclusively, so it is never a file of
+/// another run (whose `out` may be any name).
 fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
-    let tmp = format!("{path}.tmp");
-    std::fs::File::create(&tmp)
-        .and_then(|mut f| f.write_all(bytes).and_then(|()| f.sync_all()))
-        .and_then(|()| std::fs::rename(&tmp, path))
-        .map_err(|_| error("io_error", "out"))
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    for n in 0..8 {
+        let tmp = format!("{path}.{}-{nanos}-{n}.ap-tmp", std::process::id());
+        let created = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp);
+        match created {
+            Ok(mut f) => {
+                let done = f.write_all(bytes).and_then(|()| f.sync_all());
+                let done = done.and_then(|()| std::fs::rename(&tmp, path));
+                if done.is_err() {
+                    let _ = std::fs::remove_file(&tmp);
+                }
+                return done.map_err(|_| error("io_error", "out"));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => (),
+            Err(_) => break,
+        }
+    }
+    Err(error("io_error", "out"))
 }
 fn write_record(out: &str, record: &Value) -> Result<(), Failure> {
     let mut bytes = serde_json::to_vec_pretty(record).map_err(|_| error("io_error", "record"))?;

@@ -40,6 +40,8 @@ case "$mode" in
            sleep 0.5; result false 'Verdict: accept\nown' 1 ;;
   fifo)    # the stream's name becomes a named pipe that nobody writes
            init; p=$(readlink "/proc/$$/fd/1"); rm -f "$p"; mkfifo "$p"; sleep 0.5; result false 'Verdict: accept\nown' 1 ;;
+  blockout) # a directory appears where the answer goes: the answer cannot be written
+           init; p=$(readlink "/proc/$$/fd/1"); mkdir "${p%.stream.jsonl}"; result false 'Verdict: accept' 1 ;;
   nonl)    # the last result line has no newline
            init; result false 'Verdict: accept' 1 | tr -d '\n' ;;
   limit1)  init; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 1 ;;

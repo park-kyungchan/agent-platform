@@ -921,7 +921,7 @@ fn item05_a_stop_that_is_not_confirmed_is_failed() {
 #[test]
 fn item06_a_write_failure_after_the_launch_is_not_a_refusal() {
     let mut f = Fake::new();
-    std::fs::create_dir(f.t.join("w.md.tmp")).unwrap();
+    f.mode("a1", "blockout");
     let (v, status) = f.run(&f.request("w.md")).unwrap();
     assert_eq!(
         (status, v["state"].as_str(), v["unmet"].as_str()),
@@ -1220,4 +1220,52 @@ fn the_requests_git_dir_does_not_skip_the_dirty_check() {
     r["cwd"] = json!(f.p("cwd/sub"));
     assert_eq!(code(f.run(&r)), "worktree_dirty@cwd");
     assert!(f.launches.is_empty());
+}
+
+// ---- closing fix: the third attack on 1c95517 ---------------------------------------------------
+
+/// "A later run deletes an earlier run's answer": a run whose `out` is another run's old
+/// temporary name (`a.md.tmp`, `b.md.run.json.tmp`) keeps its files when that other run writes.
+#[test]
+fn a_later_run_never_removes_a_file_named_like_its_temporary() {
+    let mut f = Fake::new();
+    for (earlier, later) in [("a.md.tmp", "a.md"), ("b.md.run.json.tmp", "b.md")] {
+        let (y, _) = f.run(&f.request(earlier)).unwrap();
+        assert_eq!(y["state"], "ok");
+        let (x, _) = f.run(&f.request(later)).unwrap();
+        assert_eq!(x["state"], "ok");
+        assert_eq!(
+            f.sha(earlier),
+            y["answer"]["sha256"].as_str().unwrap(),
+            "{earlier}"
+        );
+    }
+    let leftovers: Vec<_> = std::fs::read_dir(&f.t)
+        .unwrap()
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|n| n.ends_with(".ap-tmp"))
+        .collect();
+    assert!(leftovers.is_empty(), "{leftovers:?}");
+}
+
+/// "A record that says something may still live can be resumed": a resume asks `is-active` for
+/// the earlier unit whatever the record's state (here `failed`, `unmet: stop`).
+#[test]
+fn a_resume_of_a_failed_stop_is_refused_while_its_unit_lives() {
+    let mut f = Fake::new();
+    f.stop_fails = true;
+    let (v, _) = f.run(&f.request("st.md")).unwrap();
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str()),
+        (Some("failed"), Some("stop"))
+    );
+    f.stop_fails = false;
+    let resume = f.resume(f.request("x"), "st2.md", "st.md");
+    assert_eq!(code(f.run(&resume)), "run_still_active@resume");
+    assert!(!Path::new(&f.p("st2.md.run.json")).exists());
+    for pgid in f.groups.values() {
+        kill_group(*pgid);
+    }
+    f.alive.clear();
+    assert_eq!(f.run(&resume).unwrap().0["state"], "ok");
 }
