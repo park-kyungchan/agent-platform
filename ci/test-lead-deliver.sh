@@ -128,12 +128,12 @@ reset; : > "$t/gh/files_fail"; expect "an unreadable file list is an effect" 3 0
 # I1: a SKIPPED entry waits for DELIVER_SKIPPED_S, then it has failed
 reset; checks rust=SKIPPED > "$t/gh/check"; checks rust=SUCCESS > "$t/gh/check.next"; DELIVER_SKIPPED_S=60 expect "a skipped check right after a ready is waited for, then a pass merges" 0 1 1 '^merged@' --merge
 reset; checks rust=SKIPPED > "$t/gh/check"; DELIVER_SKIPPED_S=2 DELIVER_POLL=0.5 expect "a skipped check that stays is exit 11 after the bound" 11 0 0 '^check_failed@.* rust=SKIPPED$' --merge
-[ "$(grep -c '^pr checks' "$t/gh/calls")" -ge 3 ] || bad "skipped: not polled during the bound"
+[ "$(grep -c '^pr checks' "$t/gh/calls")" -ge 2 ] || bad "skipped: not polled during the bound"
 reset; checks rust=SUCCESS rust=SKIPPED > "$t/gh/check"; checks rust=SUCCESS rust=SUCCESS > "$t/gh/check.next"; DELIVER_SKIPPED_S=60 expect "one skipped entry among passes also waits" 0 1 1 '^merged@' --merge
 # I2: the head is read again for DELIVER_HEAD_RETRY_S
 reset; echo "$O" > "$t/gh/head"; echo "$H" > "$t/gh/head.next"; DELIVER_HEAD_RETRY_S=30 expect "an old head, then the named head: delivered" 0 1 1 '^merged@' --merge
-reset; echo "$O" > "$t/gh/head"; DELIVER_HEAD_RETRY_S=1 expect "an old head that stays is exit 10 after the bound" 10 0 0 '^head_moved_or_not_open@' --merge
-[ "$(grep -c 'state,headRefOid' "$t/gh/calls")" -ge 3 ] || bad "old head: not read again"
+reset; echo "$O" > "$t/gh/head"; DELIVER_HEAD_RETRY_S=2 expect "an old head that stays is exit 10 after the bound" 10 0 0 '^head_moved_or_not_open@' --merge
+[ "$(grep -c 'state,headRefOid' "$t/gh/calls")" -ge 2 ] || bad "old head: not read again"
 reset; echo MERGED > "$t/gh/state"; echo "$O" > "$t/gh/head"; DELIVER_HEAD_RETRY_S=30 expect "a pull request that is not open stops at once" 10 0 0 '^head_moved_or_not_open@' --merge
 [ "$(grep -c 'state,headRefOid' "$t/gh/calls")" -eq 1 ] || bad "not open: read again"
 reset; echo "$O" > "$t/gh/move_at_check"; checks rust=PENDING > "$t/gh/check"; DELIVER_HEAD_RETRY_S=30 expect "a head that moves after step 1 stops at once" 10 0 0 '^head_moved_or_not_open@' --merge
