@@ -1051,7 +1051,11 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         (_, true) => 4,
         (Some("installed" | "current"), _) => 0,
         (Some("refused"), _) if ["suppressed", "attempts_exhausted"].contains(&code) => 3,
-        (Some("refused"), _) if code == "pair_differs" && r.get("by").is_none() => 3,
+        (Some("refused"), _)
+            if ["pair_differs", "attempt_running"].contains(&code) && r.get("by").is_none() =>
+        {
+            3
+        }
         (Some("refused"), _) => 2,
         (Some("not_started" | "failed_restored"), _) => 3,
         _ => 5,

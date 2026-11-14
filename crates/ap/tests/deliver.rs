@@ -2239,6 +2239,54 @@ fn d2_pair_differs_of_the_timer_exits_3_and_names_the_attempt() {
     assert_eq!(v["detail"], Value::Null);
 }
 
+/// A running attempt that a call could not settle ends the timer's call with exit 3, as
+/// `pair_differs` does, so that `ap-deliver.service` stays failed until a call settled it; a Lead's
+/// request keeps exit 2. The three ways: a dead rollback at neither commit, a clone that cannot
+/// answer, a close the store did not apply.
+#[test]
+fn d2_attempt_running_of_the_timer_exits_3() {
+    type Setup = fn(&mut W) -> Value;
+    let setups: [(&str, Setup); 3] = [
+        ("a dead rollback at neither commit", |w| {
+            let id = w.dead_attempt(&c(2), &c(0), "0");
+            w.installs[0]["kind"] = json!("rollback");
+            (w.file, w.tree) = (Some(c(1)), Some(c(1)));
+            id
+        }),
+        ("a clone that cannot answer", |w| {
+            let id = dead_forward(w, Some(1), Some(1));
+            w.lost = true;
+            id
+        }),
+        ("a close the store did not apply", |w| {
+            let id = dead_forward(w, Some(0), Some(0));
+            w.close_fails = true;
+            id
+        }),
+    ];
+    for (what, setup) in setups {
+        let mut w = W::new();
+        let id = setup(&mut w);
+        let (v, exit) = tick(&mut w);
+        assert_eq!(
+            (end(&v), exit),
+            (("refused", "attempt_running"), 3),
+            "{what}: {v}"
+        );
+        assert_eq!(v["detail"], json!({"install": id}), "{what}");
+        assert!(
+            w.launched().is_empty() && w.installs[0]["status"] == "running",
+            "{what}"
+        );
+        assert_eq!(w.last().as_ref(), Some(&v), "{what}");
+        // The same state, a Lead's request: exit 2, as before.
+        let mut w = W::new();
+        setup(&mut w);
+        let (v, exit) = w.run();
+        refused(&w, &v, exit, "attempt_running");
+    }
+}
+
 #[test]
 fn d2_exit_codes_of_the_limits() {
     type Setup = fn(&mut W);

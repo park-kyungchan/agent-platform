@@ -36,6 +36,8 @@ python3 -m json.tool /var/lib/agent-platform/deliver/last.json
 printf '{"view":"installs","args":{}}' | ont render   # the first row is the newest attempt
 ```
 
+A run that exited 3 because of `attempt_running` (an attempt is `running` that a call could not settle: a dead rollback at neither commit, a clone that cannot answer, a close the store did not apply) keeps the service failed until a call settled that attempt; a Lead's own request ends the same way with exit 2.
+
 `last.json` is the record of the last call (`end`, `code`, `detail`, `at`, `by`); what each end asks of a Lead is in `crates/ap/README.md`, "What a Lead does after each end".
 
 ## A Lead's call
@@ -62,7 +64,7 @@ Start it again afterwards: `systemctl start ap-deliver.timer`.
 
 ## After `failed`
 
-An end `failed` leaves the pair at no single commit, and every later request refuses `pair_differs`. The timer's runs then exit 3 and keep `ap-deliver.service` failed: a pair at no one commit is never repaired by waiting. Each such run replaces `last.json` with its refusal, whose `detail.install` names the failed attempt; the handles to restore (`from`, `rollback_content`, `rollback_binary`) are then that attempt's in the store. With the clone `C=/var/lib/agent-platform/deliver/agent-platform`:
+An end `failed` leaves the pair at no single commit, and every later request refuses `pair_differs`. The timer's runs then exit 3 and keep `ap-deliver.service` failed: a pair at no one commit is never repaired by waiting. Each such run replaces `last.json` with its refusal, whose `detail.install` names the failed attempt (`detail` is null when the call found none: the snippet below then reads the newest attempt of the target from the store, by `started_at`, and says so); the handles to restore (`from`, `rollback_content`, `rollback_binary`) are then that attempt's in the store. With the clone `C=/var/lib/agent-platform/deliver/agent-platform`:
 
 ```sh
 systemctl stop ap-deliver.timer
@@ -70,10 +72,21 @@ systemctl is-active ap-deliver.service       # until it answers inactive or fail
 C=/var/lib/agent-platform/deliver/agent-platform
 python3 -I - <<'PY'   # from, rollback_content, rollback_binary: of the record, or of the attempt it names
 import json, subprocess
+def ont(verb, request):
+    return json.loads(subprocess.run(['ont', verb], input=json.dumps(request), capture_output=True, text=True).stdout)
 r = json.load(open('/var/lib/agent-platform/deliver/last.json'))
 if r['end'] != 'failed':
-    a = json.loads(subprocess.run(['ont', 'get'], input=json.dumps({'id': r['detail']['install']}), capture_output=True, text=True).stdout)
-    r = {k: v.get('value') for k, v in a['result']['objects'][0]['observations'][-1]['fields'].items()}
+    named = (r.get('detail') or {}).get('install')
+    if named:
+        a = ont('get', {'id': named})
+        r = {k: v.get('value') for k, v in a['result']['objects'][0]['observations'][-1]['fields'].items()}
+    else:
+        # `detail` is null: no attempt is named, so read the newest attempt of the target from the store.
+        target = {'object_type': 'installed_artifact', 'namespace': {'instance': 'vps://palantirkc', 'account': 'root'}, 'native_key': '/usr/local/bin/ap'}
+        found = ont('search', {'object_type': 'install', 'where': {'all': [{'eq': ['target', target]}]}, 'limit': 1000})
+        rows = [{k: v.get('value') for k, v in o['head']['fields'].items()} for o in found['result']['objects']]
+        r = max(rows, key=lambda x: x['started_at'], default={})
+        print('detail is null: the newest attempt of the target in the store, started', r.get('started_at'))
 print({k: r.get(k) for k in ('from', 'rollback_content', 'rollback_binary')})
 PY
 bash "$C/scripts/install-content.sh" rollback '<rollback_content>'   # when it is not null
@@ -82,13 +95,15 @@ ap --version                                                         # names <fr
 git -C "$C" show '<from>:content/SHA256SUMS' > /tmp/deliver-sums && (cd /root/.agents && sha256sum -c --quiet /tmp/deliver-sums)
 ```
 
-A recorded `rollback_content` holds the tree of `from`: the command checked the archive against the manifest of `from` before it recorded it (`crates/ap/README.md`, "Delivery"), and records none when no tarball does. When a handle is null, that part cannot go back to `<from>`: bring the pair to the clone's `origin/main` instead (`install-ap.sh` installs only that commit): `T=$(git -C "$C" rev-parse origin/main)`, `git -C "$C" checkout --quiet --force --detach "$T"`, then `CARGO_TARGET_DIR=/var/lib/agent-platform/deliver/target bash "$C/scripts/install-ap.sh" install "$T"` and `bash "$C/scripts/install-content.sh" install "$T"`, and read the pair against `$T` as above. When the attempt is still `running` (an end `unrecorded`), close it by hand as `crates/ap/README.md` says. Then a Lead's install call (above), and `systemctl start ap-deliver.timer`.
+A recorded `rollback_content` holds the tree of `from` and is a tarball `scripts/install-content.sh rollback` takes back: the command checked the archive against the manifest of `from`, and asked `install-content.sh rollback-check` of it, before it recorded it (`crates/ap/README.md`, "Delivery"), and records none when no tarball does. When a handle is null, that part cannot go back to `<from>`: bring the pair to the clone's `origin/main` instead (`install-ap.sh` installs only that commit): `T=$(git -C "$C" rev-parse origin/main)`, `git -C "$C" checkout --quiet --force --detach "$T"`, then `CARGO_TARGET_DIR=/var/lib/agent-platform/deliver/target bash "$C/scripts/install-ap.sh" install "$T"` and `bash "$C/scripts/install-content.sh" install "$T"`, and read the pair against `$T` as above. When the attempt is still `running` (an end `unrecorded`), close it by hand as `crates/ap/README.md` says. Then a Lead's install call (above), and `systemctl start ap-deliver.timer`.
 
 ## Undo
 
+Disable the timer, and wait until a run that is going on has ended: a run is not stopped while it installs: a killed call leaves an attempt `running` that the next call has to settle.
+
 ```sh
 systemctl disable --now ap-deliver.timer
-systemctl stop ap-deliver.service
+systemctl is-active ap-deliver.service       # until it answers inactive or failed, not activating
 rm -f /etc/systemd/system/ap-deliver.service /etc/systemd/system/ap-deliver.timer
 systemctl daemon-reload
 rm -f /etc/agent-platform/deliver.json
