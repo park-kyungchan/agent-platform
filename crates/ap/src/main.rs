@@ -93,19 +93,19 @@ fn main() -> ExitCode {
         };
     }
     // The verbs without a help of their own answer with their line of the table.
-    if args.len() == 2 && args[1] == "--help" {
-        if let Some((verb, form, heading)) = VERBS
+    if args.len() == 2
+        && args[1] == "--help"
+        && let Some((verb, form, heading)) = VERBS
             .iter()
             .find(|(verb, ..)| matches!(*verb, "render" | "doctor" | "version") && args[0] == *verb)
+    {
+        return match io::stdout()
+            .lock()
+            .write_all(verb_line(verb, form, heading).as_bytes())
         {
-            return match io::stdout()
-                .lock()
-                .write_all(verb_line(verb, form, heading).as_bytes())
-            {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(_) => fail("io_error", "stdout", 4),
-            };
-        }
+            Ok(()) => ExitCode::SUCCESS,
+            Err(_) => fail("io_error", "stdout", 4),
+        };
     }
     if args.first().is_some_and(|arg| arg == "work") {
         if args.len() == 2 && args[1] == "--help" {
