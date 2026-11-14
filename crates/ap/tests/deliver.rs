@@ -1497,6 +1497,44 @@ fn d6_handle_ignores_a_tarball_of_the_start_second() {
 }
 
 #[test]
+fn d6_repair_never_records_its_own_tarball_of_a_partial_tree() {
+    // No tarball of the dead call, and the tree at no manifest: the repair's content install keeps a
+    // tarball of the half-swapped tree, which is never the handle.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), None);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(w.launched(), ["content"]);
+    assert!(std::fs::exists(w.tarball()).unwrap());
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)})
+    );
+    // The same with the fallback: no content rollback with that tarball.
+    let mut w = W::new();
+    dead_forward(&mut w, Some(2), None);
+    let content = w.inst.get_mut("content").unwrap();
+    content.tree = None;
+    let (v, _) = w.run();
+    assert_eq!(w.launched()[..2], ["content", "ap-rollback"], "{v}");
+    let close = &w.applies("close_install")[0]["parameters"];
+    assert_eq!(
+        (close["outcome"].clone(), close.get("rollback_content")),
+        (json!("failed"), None),
+        "{v}"
+    );
+    // The tree at `from` when the repair began: its own printed tarball holds that tree.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(0));
+    w.run();
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w),
+            "rollback_content": w.tarball()})
+    );
+}
+
+#[test]
 fn d3_first_installer_fails_after_it_replaced_the_file() {
     // Different manifests: the file is rolled back; the pair is at `from`.
     let mut w = W::new();
@@ -2071,6 +2109,37 @@ fn d2_timer_by_is_the_invocation() {
         assert!(start.get("reason").is_none(), "{start}");
         assert_eq!(w.installs[0]["by"], by);
     }
+}
+
+#[test]
+fn d2_pair_differs_of_the_timer_exits_3_and_names_the_attempt() {
+    // After `failed` the pair is at no commit: the timer's call ends at step 4, exit 3, and names the
+    // newest attempt that did not end `not_started`.
+    let mut w = W::new();
+    let failed = w.closed("forward", &c(2), &c(0), "failed", "timer:1");
+    w.closed("forward", &c(2), &c(0), "not_started", "session-0");
+    w.tree = None;
+    let (v, exit) = tick(&mut w);
+    assert_eq!((end(&v), exit), (("refused", "pair_differs"), 3), "{v}");
+    assert_eq!(v["detail"], json!({ "install": failed }));
+    assert!(w.launched().is_empty() && w.applies("start_install").is_empty());
+    assert_eq!(w.last().as_ref(), Some(&v));
+    // No such attempt: null.
+    let mut w = W::new();
+    w.closed("forward", &c(2), &c(0), "not_started", "timer:1");
+    w.tree = None;
+    let (v, exit) = tick(&mut w);
+    assert_eq!(
+        (end(&v), exit, v["detail"].clone()),
+        (("refused", "pair_differs"), 3, Value::Null)
+    );
+    // A Lead's request keeps exit 2 and no detail.
+    let mut w = W::new();
+    w.closed("forward", &c(2), &c(0), "failed", "timer:1");
+    w.tree = None;
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "pair_differs");
+    assert_eq!(v["detail"], Value::Null);
 }
 
 #[test]
