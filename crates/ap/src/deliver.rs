@@ -166,14 +166,10 @@ fn tree_at(s: &mut impl System, c: &Call, commit: &str) -> bool {
             _ => false,
         })
 }
-/// The pair's two reads: the file's commit, and the first of `commits` the tree is at.
-fn reads(s: &mut impl System, c: &Call, commits: [&str; 2]) -> (Option<String>, Option<String>) {
-    let file = version(s, c);
-    let tree = commits
-        .into_iter()
-        .find(|x| tree_at(s, c, x))
-        .map(str::to_owned);
-    (file, tree)
+/// Whether the pair is at `commit`: the file names it and the tree passes its manifest. A tree can
+/// pass the manifests of several commits, so every read names the one commit it asks about.
+fn pair_at(s: &mut impl System, c: &Call, file: &Option<String>, commit: &str) -> bool {
+    file.as_deref() == Some(commit) && tree_at(s, c, commit)
 }
 /// The store's code of an answer that did not apply.
 fn store_code(v: &Value) -> Value {
@@ -544,16 +540,14 @@ fn deliver(s: &mut impl System, c: &mut Call, lock: &File) -> Step<()> {
     let _ = rustix::io::fcntl_setfd(lock, rustix::io::FdFlags::empty());
     let ap = installer(s, c, "ap", &["install", &tip]);
     let content = (ap.exit == Some(0)).then(|| installer(s, c, "content", &["install", &tip]));
-    // 10. The reads decide the outcome.
-    let both = |f: &Option<String>, t: &Option<String>, x: &str| {
-        f.as_deref() == Some(x) && t.as_deref() == Some(x)
-    };
-    let (mut file, mut tree) = reads(s, c, [&tip, &from]);
+    // 10. The reads decide the outcome: is the pair at the tip, is it at `from`; each rollback
+    // on its own question (the file names `from`; the tree passes the manifest of `from`).
+    let mut file = version(s, c);
     let copy = kept(c, &from_sha256);
     let tarball = content.as_ref().and_then(|r| r.tarball.clone());
-    let outcome = if both(&file, &tree, &tip) {
+    let outcome = if pair_at(s, c, &file, &tip) {
         "installed"
-    } else if both(&file, &tree, &from) {
+    } else if pair_at(s, c, &file, &from) {
         if ap.code == "install_busy" {
             "not_started"
         } else {
@@ -563,14 +557,13 @@ fn deliver(s: &mut impl System, c: &mut Call, lock: &File) -> Step<()> {
         if file.as_deref() != Some(from.as_str()) {
             installer(s, c, "ap-rollback", &["rollback", &copy]);
         }
-        if let Some(t) = tarball
-            .as_ref()
-            .filter(|_| tree.as_deref() != Some(from.as_str()))
+        if let Some(t) = &tarball
+            && !tree_at(s, c, &from)
         {
             installer(s, c, "content-rollback", &["rollback", t]);
         }
-        (file, tree) = reads(s, c, [&tip, &from]);
-        if both(&file, &tree, &from) {
+        file = version(s, c);
+        if pair_at(s, c, &file, &from) {
             "failed_restored"
         } else {
             "failed"
@@ -578,10 +571,12 @@ fn deliver(s: &mut impl System, c: &mut Call, lock: &File) -> Step<()> {
     };
     // The installers have their own copies of the lock; later programs need none.
     let _ = rustix::io::fcntl_setfd(lock, rustix::io::FdFlags::CLOEXEC);
-    let to = [tip.as_str(), from.as_str()]
-        .into_iter()
-        .find(|x| both(&file, &tree, x))
-        .unwrap_or("neither");
+    let to = match outcome {
+        "installed" => tip.as_str(),
+        "failed" if pair_at(s, c, &file, &tip) => tip.as_str(),
+        "failed" => "neither",
+        _ => from.as_str(),
+    };
     // 11. The close, after the read.
     let code = [Some(&ap), content.as_ref()]
         .into_iter()
