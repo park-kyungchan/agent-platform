@@ -1,0 +1,20 @@
+{
+ "role": "implementer",
+ "runtime": "claude",
+ "model": "haiku",
+ "session": "s-early",
+ "cwd": "@WORK@/t3/wt/agent-platform",
+ "start": "2026-11-10T10:00:00Z",
+ "end": null,
+ "state": "ok",
+ "turns": 3,
+ "tokens": {
+  "input": 7000000,
+  "output": 7000000,
+  "cache_read": 7000000,
+  "cache_creation": 7000000
+ },
+ "resumes": null,
+ "answer": null,
+ "unmet": null
+}

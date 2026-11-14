@@ -1,0 +1,2 @@
+{"type": "assistant", "message": {"content": "total_cost_usd mention"}}
+{"type": "result", "total_cost_usd": 2.0, "usage": {}}

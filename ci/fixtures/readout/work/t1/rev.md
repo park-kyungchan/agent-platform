@@ -1,0 +1,2 @@
+Verdict: accept
+SECRET-ANSWER

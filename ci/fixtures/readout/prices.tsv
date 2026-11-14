@@ -1,0 +1,22 @@
+# Invented rates for the tests, USD per million tokens.
+claude-opus-9-9	input	1
+claude-opus-9-9	output	2
+claude-opus-9-9	cache_read	0.5
+claude-opus-9-9	cache_write_5m	3
+claude-opus-9-9	cache_write_1h	4
+claude-haiku-9-9	long_over_tokens	1000000
+claude-haiku-9-9	input	1
+claude-haiku-9-9	output	1
+claude-haiku-9-9	cache_read	1
+claude-haiku-9-9	cache_write_5m	1
+claude-haiku-9-9	cache_write_1h	1
+claude-haiku-9-9+long	input	10
+claude-haiku-9-9+long	output	10
+claude-haiku-9-9+long	cache_read	10
+claude-haiku-9-9+long	cache_write_5m	10
+claude-haiku-9-9+long	cache_write_1h	10
+gpt-9-x	input	1
+gpt-9-x	output	2
+gpt-9-x	cache_read	0.5
+gpt-9-x	cache_write_5m	3
+gpt-9-x	cache_write_1h	4

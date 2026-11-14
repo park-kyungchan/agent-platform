@@ -1,0 +1,5 @@
+{"timestamp": "2026-11-12T08:00:00Z", "type": "session_meta", "payload": {"id": "cx-1", "cwd": "@WORK@/t1"}}
+{"timestamp": "2026-11-12T08:00:01Z", "type": "turn_context", "payload": {"model": "gpt-9-x", "cwd": "@WORK@/t1"}}
+{"timestamp": "2026-11-12T08:01:00Z", "type": "event_msg", "ordinal": 1, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 1000000, "cached_input_tokens": 400000, "cache_write_input_tokens": 0, "output_tokens": 100000, "reasoning_output_tokens": 0, "total_tokens": 1100000}}}}
+{"timestamp": "2026-11-12T08:01:01Z", "type": "event_msg", "ordinal": 2, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 1000000, "cached_input_tokens": 400000, "cache_write_input_tokens": 0, "output_tokens": 100000, "reasoning_output_tokens": 0, "total_tokens": 1100000}}}}
+{"timestamp": "2026-11-12T08:02:00Z", "type": "event_msg", "ordinal": 3, "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 3000000, "cached_input_tokens": 1000000, "cache_write_input_tokens": 0, "output_tokens": 300000, "reasoning_output_tokens": 0, "total_tokens": 3300000}}}}
