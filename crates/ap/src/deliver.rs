@@ -234,7 +234,8 @@ fn members(b: &[u8]) -> Option<HashMap<String, String>> {
     None
 }
 /// The content handle of an attempt from `from` (README "Delivery"): a tarball that holds the tree
-/// of `from`, by the check the tree is read with. The tarball `given` (printed by the installer in
+/// of `from`, by the check the tree is read with, and that the installer takes back (`takes_back`).
+/// The tarball `given` (printed by the installer in
 /// this call, or recorded) when it passes; with none given, the oldest tarball of the content backup
 /// directory stamped not older than `since` that passes. A tarball that does not pass never is one.
 fn content_handle(
@@ -251,8 +252,17 @@ fn content_handle(
     };
     candidates.into_iter().find(|t| {
         let files = s.read(t).ok().and_then(|b| members(&b));
-        files.is_some_and(|f| passes(s, c, from, |_, p| f.get(p).cloned()))
+        files.is_some_and(|f| passes(s, c, from, |_, p| f.get(p).cloned())) && takes_back(s, c, t)
     })
+}
+/// Whether the content installer of the clone, the script a rollback would call, takes the tarball
+/// back: `install-content.sh rollback-check` reads nothing of the target and writes nothing. A script
+/// that does not know the verb answers exit 2, so the tarball is no handle.
+fn takes_back(s: &mut impl System, c: &Call, tarball: &str) -> bool {
+    let script = format!("{}/scripts/install-content.sh", c.clone);
+    let argv = args(&[&script, "rollback-check", tarball]);
+    s.call("bash", &argv, &Value::Null, 60_000)
+        .is_ok_and(|r| r.success)
 }
 /// Whether the pair is at `commit`: the file names it and the tree passes its manifest. A tree can
 /// pass the manifests of several commits, so every read names the one commit it asks about.
@@ -1041,7 +1051,11 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
         (_, true) => 4,
         (Some("installed" | "current"), _) => 0,
         (Some("refused"), _) if ["suppressed", "attempts_exhausted"].contains(&code) => 3,
-        (Some("refused"), _) if code == "pair_differs" && r.get("by").is_none() => 3,
+        (Some("refused"), _)
+            if ["pair_differs", "attempt_running"].contains(&code) && r.get("by").is_none() =>
+        {
+            3
+        }
         (Some("refused"), _) => 2,
         (Some("not_started" | "failed_restored"), _) => 3,
         _ => 5,

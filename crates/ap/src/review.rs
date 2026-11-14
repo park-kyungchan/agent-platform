@@ -1,6 +1,6 @@
 //! Store-owned reviews; a derived GitHub status is posted only after local checks.
 use crate::work::{
-    Failure, LIMIT, ROOT, System, apply_answer, args, codes, complete_id, digest, error, fail, id,
+    Failure, LIMIT, System, apply_answer, args, codes, complete_id, digest, error, fail, id,
     json_cli, ont, parse, refused, require, text,
 };
 use serde_json::{Value, json};
@@ -323,105 +323,6 @@ pub(crate) fn outside<'a>(patterns: &[String], paths: &[&'a str]) -> Vec<&'a str
         .copied()
         .collect()
 }
-fn accept(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
-    let f = fields(s, r, &r["review"], "store_review_unreadable", "review")?;
-    for (key, valid) in [
-        ("status", f["status"] == "closed"),
-        ("verdict", f["verdict"] == "accept"),
-        (
-            "kind",
-            matches!(f["kind"].as_str(), Some("packet" | "integrated")),
-        ),
-    ] {
-        if !valid {
-            return Err(fail("review_not_accepting", "review", json!(key)));
-        }
-    }
-    for key in [
-        "repository",
-        "pull_request",
-        "head",
-        "base",
-        "report",
-        "report_sha256",
-    ] {
-        let valid = if key == "pull_request" {
-            f[key].as_u64().is_some_and(|n| n > 0)
-        } else {
-            f[key].as_str().is_some_and(|s| !s.is_empty())
-        };
-        if !valid {
-            return Err(fail("review_not_accepting", "review", json!(key)));
-        }
-    }
-    let bytes = file(s, text(&f, "report")?, "report", "review_report_changed")?;
-    require!(digest(&bytes) == f["report_sha256"] => "review_report_changed", "report");
-    let runs = f["runs"]
-        .as_array()
-        .filter(|a| !a.is_empty())
-        .ok_or_else(|| error("review_runs_required", "runs"))?;
-    let mut patterns = vec![];
-    for run in runs {
-        let key = run["native_key"].clone();
-        let failure = || fail("review_run_lacks_write_set", "runs", key.clone());
-        require!(complete_id(run) && run["object_type"] == "worker_run" => "invalid_input", "runs");
-        let run = fields(s, r, run, "review_run_lacks_write_set", "runs").map_err(|_| failure())?;
-        if run["task"] != f["task"] {
-            return Err(fail("review_run_of_other_task", "runs", key));
-        }
-        let write_set = run["write_set"]
-            .as_array()
-            .filter(|a| !a.is_empty())
-            .ok_or_else(failure)?;
-        for pattern in write_set {
-            patterns.push(
-                pattern
-                    .as_str()
-                    .filter(|s| !s.is_empty())
-                    .ok_or_else(failure)?
-                    .to_owned(),
-            );
-        }
-    }
-    let head = text(&f, "head")?;
-    let p = pr(s, text(&f, "repository")?, &f["pull_request"])?;
-    if p["state"] != "OPEN" || p["baseRefName"] != "main" || p["headRefOid"] != head {
-        return Err(fail("review_head_differs", "head", p["headRefOid"].clone()));
-    }
-    let worktree = text(r, "worktree")?;
-    git(s, worktree, &["fetch", "origin", "main"])?;
-    let base = git(s, worktree, &["merge-base", "origin/main", head])?;
-    if base.trim_end() != f["base"] {
-        return Err(fail("review_base_differs", "base", json!(base.trim_end())));
-    }
-    // These options make the list independent of replace refs and the worktree's own diff configuration.
-    let mut diff_argv = vec!["diff"];
-    diff_argv.extend(DIFF_OPTIONS);
-    diff_argv.extend([text(&f, "base")?, head]);
-    let diff = git(s, worktree, &diff_argv)?;
-    let paths: Vec<_> = diff.split_terminator('\0').collect();
-    let outside = outside(&patterns, &paths);
-    if !outside.is_empty() {
-        return Err(fail(
-            "review_path_outside_write_set",
-            "paths",
-            json!({"paths":outside.iter().take(10).collect::<Vec<_>>(),"count":outside.len()}),
-        ));
-    }
-    let task = &f["task"];
-    require!(complete_id(task) && task["object_type"] == "task" => "review_not_accepting", "task");
-    let task_key = text(task, "native_key")?;
-    require!(Path::new(task_key).components().count() == 1 && matches!(Path::new(task_key).components().next(),Some(Component::Normal(_))) => "review_not_accepting", "task");
-    let cwd = s.cwd().map_err(|_| error("io_error", "cwd"))?;
-    require!(!cwd.starts_with(Path::new(ROOT).join(task_key).join("wt")) => "review_accept_from_worktree", "cwd");
-    post(
-        s,
-        &f,
-        "success",
-        &format!("review {} accept", text(&r["review"], "native_key")?),
-    )?;
-    Ok(json!({"status":"accepted","head":head,"paths":paths.len()}))
-}
 fn revoke(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
     let reason = text(r, "reason")?;
     require!(reason.len() <= 100 && !reason.trim().is_empty() => "invalid_input", "reason");
@@ -445,21 +346,17 @@ fn revoke(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
 /// Execute one request with every subprocess supplied by the caller.
 pub fn execute(s: &mut impl System, verb: &str, r: &Value) -> Result<(Value, u8), Failure> {
     require!(r.is_object() => "invalid_input", "stdin");
-    for key in ["task_dir", "prompt", "report", "worktree", "store"] {
+    for key in ["task_dir", "prompt", "report", "store"] {
         if let Some(v) = r.get(key) {
             require!(v.as_str().is_some_and(|p| Path::new(p).is_absolute()) => "invalid_input", key);
         }
     }
-    if matches!(verb, "close" | "accept" | "revoke") {
+    if matches!(verb, "close" | "revoke") {
         require!(complete_id(&r["review"]) && r["review"]["object_type"] == "review" => "invalid_input", "review");
-    }
-    if verb == "accept" {
-        text(r, "worktree")?;
     }
     let value = match verb {
         "start" => start(s, r)?,
         "close" => close(s, r)?,
-        "accept" => accept(s, r)?,
         "revoke" => revoke(s, r)?,
         _ => return Err(error("usage", "args")),
     };

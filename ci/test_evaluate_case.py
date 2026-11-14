@@ -34,8 +34,8 @@ class EvaluateCase(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def evaluate(self, tests):
-        self.case.write_text(json.dumps({"head": self.head, "tests": tests, "commands": [["./tests/t.sh"]]}))
+    def evaluate(self, tests, commands=(("./tests/t.sh",),)):
+        self.case.write_text(json.dumps({"head": self.head, "tests": tests, "commands": [list(c) for c in commands]}))
         env = {k: v for k, v in os.environ.items() if k not in ("HOST_CARGO_LOCK", "CHECK_LOCKED")}
         return subprocess.run([str(EVALUATE), str(self.case), str(self.clone)], cwd=self.copy, env=env,
                               stdin=subprocess.DEVNULL, capture_output=True, text=True)
@@ -75,6 +75,32 @@ class EvaluateCase(unittest.TestCase):
         self.assertEqual(done.returncode, 2, done.stderr)
         self.assertIn("evaluate: cannot judge", done.stderr)
         self.assertNotIn("evaluate: command=", done.stdout)
+
+    def test_c10_a_replace_ref_in_the_clone_changes_nothing_the_evaluator_restores(self):
+        # A replace ref makes Git read another commit, so another tree and another blob, for `head`.
+        git(self.clone, "checkout", "-q", "--detach", self.head)
+        (self.clone / "tests" / "t.sh").write_text("#!/bin/sh\nexit 1\n")
+        git(self.clone, "commit", "-qam", "fake")
+        git(self.clone, "replace", self.head, git(self.clone, "rev-parse", "HEAD"))
+        self.assertIn("exit 1", git(self.clone, "show", self.head + ":tests/t.sh"))
+        done = self.evaluate(["tests/t.sh"])
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual((self.copy / "tests" / "t.sh").read_text(), "#!/bin/sh\nexit 0\n")
+
+    def test_c12_a_search_path_program_that_cannot_start_is_exit_2(self):
+        # The host has no such program: no statement about the candidate, so not exit 1.
+        done = self.evaluate(["tests/t.sh"], [["./tests/t.sh"], ["no-such-program-of-the-host"]])
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn("evaluate: cannot judge", done.stderr)
+        self.assertRegex(done.stdout, r"(?m)^evaluate: command=1 exit=0 ")
+        self.assertNotIn("command=2", done.stdout)
+
+    def test_c12_a_program_of_the_copy_that_cannot_start_is_a_fail(self):
+        # A program with a `/` is the candidate's tree: a missing one is a failed command.
+        done = self.evaluate(["tests/t.sh"], [["./tests/not-there.sh"]])
+        self.assertEqual(done.returncode, 1, done.stderr)
+        self.assertRegex(done.stdout, r"(?m)^evaluate: command=1 exit=127 ")
+
 
 if __name__ == "__main__":
     unittest.main()

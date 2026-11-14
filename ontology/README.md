@@ -408,8 +408,8 @@ or `_`, and may have a final `/**`; duplicate members and multiple column-1
 incompatible paths in `agent-platform`; the Lead measured 0 in `ontology-platform`
 and 27 non-ASCII tracked paths in one directory of `education-platform`, which
 packets name by the directory and `/**`.
-`ap review accept` reads these stored review and write-set records (see
-[One review](../crates/ap/README.md#one-review)).
+`ap unit` checks a unit's changed paths against the write set of its page, not
+against stored records (see [One unit](../crates/ap/README.md#one-unit)).
 
 `record_scope_review` retains every existing family field and parameter but
 no longer compares families. Its optional `review` reference must be closed
@@ -490,9 +490,8 @@ columns Started, Kind, Commit, Attempt, Status, Outcome, To and By.
 that is still `running` applies nothing (`ap review revoke` posts the failure as
 before); that review can still be closed. Every reader of a closed review reads
 `status` `closed`, so none finds a revoked one: `record_scope_review` refuses
-it with `review_not_closed`, `start_install` with `review_not_accepting`,
-`ap review accept` with `review_not_accepting` and the come-back of `ap unit`
-does not reuse it (see [One review](../crates/ap/README.md#one-review)).
+it with `review_not_closed`, `start_install` with `review_not_accepting`, and
+the come-back of `ap unit` does not reuse it (see [One review](../crates/ap/README.md#one-review)).
 `agent` reads and derives `install` and applies the three actions. The caller of
 `start_install` and `close_install` is `ap deliver`, with the client and agent
 `ap-deliver` (see [Delivery](../crates/ap/README.md#delivery)).
