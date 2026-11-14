@@ -1550,6 +1550,10 @@ fn d6_repair_that_fails_ends_the_call_failed() {
         (json!("failed"), json!("neither"), id.clone())
     );
     assert_eq!(
+        (v["from"].clone(), v["tip"].clone()),
+        (json!(c(0)), Value::Null)
+    );
+    assert_eq!(
         (v["rollback_binary"].clone(), v["rollback_content"].clone()),
         (json!(kept(&w)), json!(tarball))
     );

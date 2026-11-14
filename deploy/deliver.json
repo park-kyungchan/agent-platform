@@ -1,0 +1,6 @@
+{
+  "repository": "park-kyungchan/agent-platform",
+  "url": "https://github.com/park-kyungchan/agent-platform.git",
+  "state": "/var/lib/agent-platform/deliver",
+  "build_lock": "/home/palantirkc/work/ws-replan/wt/.host-cargo.lock"
+}

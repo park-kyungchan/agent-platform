@@ -416,9 +416,10 @@ fn repair(s: &mut impl System, c: &mut Call, a: &Value, request: &str) -> bool {
     };
     let p = json!({"install": a["id"], "outcome": outcome, "to": to, "code": first_code(&ran)});
     close(s, c, request, p, h);
-    (c.rec["closed"], c.rec["attempt"]) = (
+    (c.rec["closed"], c.rec["attempt"], c.rec["from"]) = (
         json!({"install": a["id"], "outcome": outcome}),
         field(a, "attempt").clone(),
+        json!(from),
     );
     c.rec["index"] = json!({"before": null, "after": index(s, c)});
     let ends = c.rec["end"] != "installed" && c.rec["end"] != "failed_restored";
@@ -426,6 +427,7 @@ fn repair(s: &mut impl System, c: &mut Call, a: &Value, request: &str) -> bool {
         for k in [
             "install",
             "attempt",
+            "from",
             "outcome",
             "to",
             "code",
