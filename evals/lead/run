@@ -42,13 +42,15 @@ def read(path):
         return f.read()
 
 def tree_digest(root):
-    """The SHA-256 of one line `<sha256>  <relative path>` per regular file below `root`, sorted by path bytes."""
+    """The SHA-256 of one line `<sha256>  <relative path>` per regular file below `root`, sorted by path bytes.
+    Anything below it that is not a directory or a regular file (a link, a device) is refused `not_regular`."""
     rows = []
-    for d, _, files in os.walk(root):
-        for f in files:
+    for d, dirs, files in os.walk(root):
+        for f in dirs + files:
             p = os.path.join(d, f)
-            if os.path.isfile(p) and not os.path.islink(p):
-                rows.append((os.path.relpath(p, root).encode(), sha(read(p))))
+            if os.path.islink(p) or not (os.path.isdir(p) or os.path.isfile(p)):
+                refuse("not_regular", os.path.relpath(p, root))
+        rows += [(os.path.relpath(os.path.join(d, f), root).encode(), sha(read(os.path.join(d, f)))) for f in files]
     return sha(b"".join(h.encode() + b"  " + r + b"\n" for r, h in sorted(rows)))
 
 def write_atomic(path, text):

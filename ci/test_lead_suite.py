@@ -485,6 +485,42 @@ class LeadSuite(unittest.TestCase):
         self.assertNotIn("c-two", one)
         self.assertNotIn("quote of", one)
 
+    def test_l1_a_link_below_a_case_or_the_instructions_is_refused(self):
+        w = self.w
+        task = w.cases / "c-one" / "TASK"
+        for make in (lambda p: os.symlink("../EXPECTED.md", p), lambda p: os.symlink("sub", p), lambda p: os.mkfifo(p)):
+            link = task / "sub" / "l"
+            make(link)
+            for verb in ("answers", "score"):
+                out = self.out(verb)
+                if verb == "answers":
+                    done = w.answers(out)
+                else:
+                    done = w.score(out, w.t / "nowhere")
+                self.assertEqual((done.returncode, err_code(done)), (2, "not_regular"), (verb, done.stderr))
+                self.assertIn("TASK/sub/l", done.stderr)
+                self.assertNotIn(str(w.cases), done.stderr)
+                self.assertFalse(out.exists())
+            os.unlink(link)
+        # a link at the top of a case, and a link to a directory, are refused as well
+        os.symlink("TASK", w.cases / "c-two" / "alias")
+        done = w.answers(self.out())
+        self.assertEqual((done.returncode, err_code(done)), (2, "not_regular"))
+        self.assertIn("alias", done.stderr)
+        os.unlink(w.cases / "c-two" / "alias")
+        self.assertEqual(w.answers(self.out("ok"), "--case", "c-one").returncode, 0)
+        # a link below the instructions, whatever it points to
+        for target in ("AGENTS.md", "/nonexistent"):
+            os.symlink(target, w.instr / "skills" / "lead" / "extra.md")
+            done = w.answers(self.out("ok"))
+            self.assertEqual((done.returncode, err_code(done)), (2, "not_regular"))
+            self.assertIn("skills/lead/extra.md", done.stderr)
+            done = w.answers(self.out("fresh"))
+            self.assertEqual((done.returncode, err_code(done)), (2, "not_regular"))
+            self.assertFalse(self.out("fresh").exists())
+            os.unlink(w.instr / "skills" / "lead" / "extra.md")
+        self.assertEqual(len(w.rows()), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
