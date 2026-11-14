@@ -1133,7 +1133,7 @@ fn i9_calls_on_one_head_with_one_report_leave_one_review() {
 fn i10_a_branch_behind_main_stops_at_the_write_set() {
     let mut u = U::new();
     // `main` moves while the unit runs: the branch no longer contains it.
-    let other = "git push -q origin $(git commit-tree origin/main^{tree} -p origin/main -m other):refs/heads/main";
+    let other = "git push -q origin $(git -c user.name=t -c user.email=t@e commit-tree origin/main^{tree} -p origin/main -m other):refs/heads/main";
     u.script("a1", &format!("{IMPLEMENT}; {other}"));
     let v = u.stop(&u.request(), "write_set", "behind_main");
     let main = git(&u.t.join("origin.git"), &["rev-parse", "main"]);
