@@ -90,10 +90,6 @@ pub const OWNED: &[(&str, &str)] = &[
         include_str!("../../../../content/skills/lead/SKILL.md"),
     ),
     (
-        "skills/lead/hooks/pre-commit",
-        include_str!("../../../../content/skills/lead/hooks/pre-commit"),
-    ),
-    (
         "skills/lead/references/design.md",
         include_str!("../../../../content/skills/lead/references/design.md"),
     ),

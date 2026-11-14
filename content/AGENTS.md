@@ -107,7 +107,7 @@ Do not build
 ## 7. When you write instructions, STATE or a handoff
 
 - One home per fact: write a rule, decision or fact in one file and name that file elsewhere.
-- Keep changing values out of this file and out of skill descriptions: model names, effort, versions, counts, token windows, quotas, SHAs, pane and session IDs, dates of approvals. They belong in the task's STATE with the time they were observed.
+- Keep changing values out of this file and out of skill descriptions: model names, effort, versions, counts, token windows, quotas, SHAs, pane and session IDs, dates of approvals. They belong in the task's STATE, timed, unless a command reprints them.
 - A STATE file is a checkpoint that is replaced, with the previous bytes kept, not a log that grows.
 - "Loaded" means the session's own record shows the text. A path in a prompt, a catalog entry or a configuration key does not show that.
 

@@ -1,6 +1,6 @@
 # Using the Ontology work store
 
-Read this when you need a task's holds, decisions, KPI values or worker runs from the store, or when you are Lead and record one. The store holds these for a task only when that task's STATE names the object type in use; STATE then points to the store and does not copy it. For any other task they are in its STATE or the board STATE names. Task files, packets, reports, installed binaries and instruction files stay the originals: the store indexes them as observations.
+Read this when you need a task's holds, decisions, KPI values or worker runs from the store, or when you are Lead and record one. The store holds these for a task only when that task's STATE names the object type in use; STATE then points to the store and does not copy it. For any other task they are in its STATE's pointers and in Git. Task files, packets, reports, installed binaries and instruction files stay the originals: the store indexes them as observations.
 
 ## 1. Who may do what
 

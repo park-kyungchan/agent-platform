@@ -9,7 +9,7 @@ The kinds are the rows of `/root/.agents/AGENTS.md` section 6, plus a session's 
 | Kind | Who writes it | How to read it |
 | --- | --- | --- |
 | A session's conversation and a CLI's private memory | That CLI | Resume only the exact session you need. Never import another agent's transcript |
-| Short-term: the task's STATE, packets, the board STATE names | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
+| Short-term: the task's STATE, packets, the files STATE points to | The assigned owner, replacing old values | On entry, after a reset, at a handoff, and before an effect when it changed |
 | A rule or contract: source, schemas, tests, KPI definitions | The owner of the implementation, through review | Read the current revision. Do not rely on a remembered implementation |
 | Mid- and long-term: decisions with reasons, lessons, corrections, preferences, explained terms | The task owner, only with the task's authority, by the route of section 4 | Search and read as section 3 says; verify against current source and STATE |
 | An operational fact: deployed state, a KPI value, a domain record, an action and its result | The owner of the domain or the task; the Lead for the object types its STATE names in use in the Ontology store (`ONTOLOGY-USE.md`) | A fresh authorized read. Memory is only a pointer to it |

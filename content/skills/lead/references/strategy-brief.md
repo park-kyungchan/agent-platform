@@ -1,6 +1,6 @@
 # Brief, options, proposal and record formats
 
-Copy the block you need. Values in angle brackets are placeholders; a filled block lives in the task's STATE, `STRATEGY.md` or board, never in this file. Terms: `/root/.agents/skills/lead/references/measurement.md`.
+Copy the block you need. Values in angle brackets are placeholders; a filled block lives in the task's STATE or `STRATEGY.md`, never in this file. Terms: `/root/.agents/skills/lead/references/measurement.md`.
 
 ## Brief (the Lead's record of its interpretation)
 
@@ -47,7 +47,7 @@ Words the user used: "<expression>" -> <glossary term and path>
 Fact from the user: <fact> (<date>)
 ```
 
-## Kept for the user (board, or STATE when there is no board)
+## Kept for the user (in STATE)
 
 ```text
 Irreversible action taken: <what> | cannot be undone: <what> | reason <measurement> | <date>

@@ -50,7 +50,7 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with t
 | --- | --- |
 | Any task | `/home/palantirkc/work/<scope>-<topic>/STATE.md` |
 | Directory standard and where an old path went | `/home/palantirkc/work/ws-layout-standard/LAYOUT.md` and `PATH-MAP.tsv` beside it |
-| Whole-host improvement program (threads, order, board) | `/home/palantirkc/work/workspace-strategy-reassessment-20261109/STATE.md` |
+| Whole-host improvement program (threads, order) | `/home/palantirkc/work/workspace-strategy-reassessment-20261109/STATE.md` |
 | Rust migration plan and Academy parity | `/home/palantirkc/work/ws-replan/STATE.md`, with the plan and strategy files beside it |
 | Academy lessons | `/home/palantirkc/work/edu-lessons/STATE.md` |
 | Memory selection and evaluation | `/home/palantirkc/work/mem-host-memory/STATE.md` |

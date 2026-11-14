@@ -15,11 +15,11 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 
 | Term | Meaning | Example on this host | Do not write |
 | --- | --- | --- | --- |
-| board | The one file of a multi-thread task that shows KPI values, work threads, live workers, decisions and open questions; STATE points to it | `/home/palantirkc/work/<scope>-<topic>/BOARD.md` | `dashboard file` |
+| board | An optional file of a multi-thread task that lists work threads and live workers; a Lead is not required to keep one and it holds no value a command can produce (`/root/.agents/skills/lead/references/program-board.md`) | `/home/palantirkc/work/<scope>-<topic>/BOARD.md` | `dashboard file` |
 | lens file | The one file of a task, at most two pages, in which the Lead keeps the whole view: target structure and open decisions | `/home/palantirkc/work/<scope>-<topic>/LENS.md` | `architecture overview` |
 | design note | The Lead's written design of a store format, the schema of an authoritative store, or the order of record and effect on a real target: use, decision, invariants as executables, pull requests, undo | `/root/.agents/skills/lead/references/design.md` | `design doc` |
 | checkpoint | The content of STATE at a moment, complete enough for a new session to continue from it | A STATE whose header carries the time it was written | `snapshot file` |
-| work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A row of the board's thread table | `workstream` |
+| work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A line of STATE's open threads, or a row of a board file where the task keeps one | `workstream` |
 | tier | The amount of reasoning a piece of work needs: mechanical, bounded judgment, open judgment | A packet line `Tier: mechanical` | `difficulty level` |
 | assignment file | The one file of a task that says which runtime and model serves which tier and in which order; STATE names it | A section of a task's orchestration document | `routing table` |
 | dispatch | Starting one worker run with one packet | `herdr agent start <name> --kind <kind> --pane <pane-id>`, then `herdr agent prompt <name> "<text naming the packet>"` | — |
@@ -76,7 +76,7 @@ Only the Lead needs this section. The user speaks Korean, shortens names, and so
 | 지침, 인스트럭션 | The shared instructions; sometimes one skill or one packet | Which file: `AGENTS.md`, a reference, a skill, or a task's packet |
 | 런타임 레퍼런스, runtime-reference | `/root/.agents/runtime-references/` (plural) | — |
 | 스킬 | A shared skill under `/root/.agents/skills/`; sometimes a skill a single CLI installed | A misspelled skill name means the nearest existing one |
-| 메모리 | One of three: the task's STATE and board, long-term memory, private memory | "단기" is the task's STATE and board, "중장기" is long-term memory, "CLI의 메모리" is private memory |
+| 메모리 | One of three: the task's STATE and the files it points to, long-term memory, private memory | "단기" is the task's STATE and the files it points to, "중장기" is long-term memory, "CLI의 메모리" is private memory |
 | 하인드사이트, HindSight | Hindsight: the long-term memory server and its MCP tools | — |
 | 온톨로지, Ontology | Ontology in Palantir's sense: object types, links and actions in `ontology-platform` | Not a general word list or taxonomy |
 | REA, Ghidra Framework | REA, the reverse-engineering tool cloned at `/home/palantirkc/tools/rea`, with Ghidra beside it as its backend for native binaries | `CODEBASE-ORIENTATION.md` section External tools: static or dynamic use, and whether it is built |
