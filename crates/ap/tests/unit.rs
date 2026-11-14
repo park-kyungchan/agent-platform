@@ -399,14 +399,27 @@ impl U {
                 all.iter()
                     .all(|c| r[c["eq"][0].as_str().unwrap()] == c["eq"][1])
             };
+            // As the engine: an object's properties under `head.fields`, and `qualified: false` for a
+            // filter on an optional property, which a running or abandoned review lacks.
+            let optional = ["repository", "verdict", "report_sha256"];
+            let qualified = all.iter().all(|c| !optional.contains(&c["eq"][0].as_str().unwrap()));
             let found: Vec<_> = self
                 .reviews
                 .iter()
                 .filter(matches)
-                .map(|r| json!({"id": r["id"]}))
+                .map(|r| {
+                    let fields: serde_json::Map<String, Value> = r
+                        .as_object()
+                        .unwrap()
+                        .iter()
+                        .filter(|(k, _)| *k != "id")
+                        .map(|(k, v)| (k.clone(), json!({"kind": "value", "value": v})))
+                        .collect();
+                    json!({"id": r["id"], "head": {"fields": fields}})
+                })
                 .collect();
             return reply(
-                json!({"status":"ok","result":{"basis":{"qualified":true},"objects":found,"continuation":null}}),
+                json!({"status":"ok","result":{"basis":{"qualified":qualified},"objects":found,"continuation":null}}),
             );
         }
         assert_eq!(&a[..4], ["action", "apply", "--client", "lead"], "{a:?}");
@@ -1586,4 +1599,71 @@ fn d8_unit_does_not_reuse_revoked() {
         ends.push(steps(&v));
     }
     assert_eq!(ends[0], ends[1]);
+}
+
+// ---- D14 one reader of an accepting review ------------------------------------------------------
+
+/// A come-back reads its closed accepting review by properties every review has (`kind`, `head`,
+/// `status`, the task) and compares `repository`, `verdict` and the report's digest on the answer:
+/// it reuses the review that matches in all three, never one that differs in one of them, and a
+/// review without a verdict elsewhere in the store does not stop it (the fake answers
+/// `qualified: false` to a filter on an optional property, as the engine does).
+#[test]
+fn d14_reuse_reads_by_required_properties() {
+    for keep in [true, false] {
+        let mut u = U::new();
+        let mut r = u.request();
+        r["merge"] = json!(false);
+        let (first, code) = u.run(&r).unwrap();
+        assert_eq!((first["state"].as_str(), code), (Some("accepted"), 0), "{first}");
+        let accepted = u.reviews[0].clone();
+        let mut noise = vec![];
+        for (k, v) in [
+            ("repository", json!("x/other")),
+            ("verdict", json!("repair")),
+            ("report_sha256", json!("0".repeat(64))),
+        ] {
+            let mut row = accepted.clone();
+            row[k] = v;
+            row["id"]["native_key"] = json!(format!("rv-{k}"));
+            noise.push(row);
+        }
+        let mut running = accepted.clone();
+        running.as_object_mut().unwrap().remove("verdict");
+        running.as_object_mut().unwrap().remove("report_sha256");
+        (running["status"], running["id"]["native_key"]) = (json!("running"), json!("rv-running"));
+        noise.push(running);
+        if keep {
+            noise.push(accepted.clone());
+        }
+        u.reviews = noise;
+        let before = u.calls.len();
+        let mut r = u.request();
+        r.as_object_mut().unwrap().remove("verifier");
+        (r["pull_request"], r["verdict"], r["merge"]) =
+            (json!(7), json!(u.p("work/task/u1.verifier.md")), json!(false));
+        r["out"] = json!(u.p("work/task/u2"));
+        let (v, code) = u.run(&r).unwrap();
+        assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
+        let search = u.calls[before..]
+            .iter()
+            .find(|(p, a, _)| p == "ont" && a[0] == "search")
+            .unwrap()
+            .2
+            .clone();
+        let head = accepted["head"].clone();
+        let task = json!({"object_type":"task","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"store-task"});
+        assert_eq!(
+            search,
+            json!({"object_type":"review","where":{"all":[{"eq":["kind","packet"]},{"eq":["head",head]},
+                {"eq":["status","closed"]},{"eq":["task",task]}]},"limit":200})
+        );
+        let review = v["steps"].as_array().unwrap().iter().find(|s| s["name"] == "review");
+        assert_eq!(review.unwrap()["detail"], json!({"reused": keep}), "{v}");
+        if keep {
+            assert_eq!(v["review"], accepted["id"]);
+        } else {
+            assert_eq!(u.store("start_review").len(), 2);
+        }
+    }
 }
