@@ -52,6 +52,28 @@ fn content(commit: &str, file: &str) -> Vec<u8> {
 fn binary(commit: &str) -> Vec<u8> {
     format!("ap binary of {commit}").into_bytes()
 }
+/// A tar archive (ustar) of the content tree of `label` (None: a half-swapped tree), as
+/// install-content.sh keeps one of the tree it replaces.
+fn tar(label: Option<&str>) -> Vec<u8> {
+    let mut out = vec![];
+    for f in ["AGENTS.md", "skills/a/SKILL.md"] {
+        let data = label.map_or(b"half swapped".to_vec(), |l| content(l, f));
+        let mut h = [0u8; 512];
+        h[..f.len()].copy_from_slice(f.as_bytes());
+        h[100..108].copy_from_slice(b"0000644\0");
+        h[124..136].copy_from_slice(format!("{:011o}\0", data.len()).as_bytes());
+        h[156] = b'0';
+        h[257..265].copy_from_slice(b"ustar\x0000");
+        h[148..156].copy_from_slice(b"        ");
+        let sum: u32 = h.iter().map(|b| u32::from(*b)).sum();
+        h[148..156].copy_from_slice(format!("{sum:06o}\0 ").as_bytes());
+        out.extend(h);
+        out.extend(&data);
+        out.resize(out.len().div_ceil(512) * 512, 0);
+    }
+    out.extend([0u8; 1024]);
+    out
+}
 fn args(words: &[&str]) -> Vec<String> {
     words.iter().map(|w| (*w).to_owned()).collect()
 }
@@ -652,11 +674,13 @@ impl System for W {
             std::fs::write(kept, &self.bytes).unwrap();
         }
         if name == "content" && inst.exit != 2 {
-            // The tarball it prints, or the fixture's.
+            // The tarball it prints, or the fixture's: the tree it replaces.
             let printed = [(&inst.out, "backup="), (&inst.err, "kept copy ")]
                 .into_iter()
                 .find_map(|(text, marker)| Some(text.split_once(marker)?.1.trim().to_owned()));
-            std::fs::write(printed.unwrap_or_else(|| self.tarball()), b"tar").unwrap();
+            let before = self.tree.as_deref().map(|t| self.label(t));
+            let path = printed.unwrap_or_else(|| self.tarball());
+            std::fs::write(path, tar(before.as_deref())).unwrap();
         }
         if let Some(f) = inst.file {
             self.bytes = binary(f.as_deref().unwrap_or("none"));
@@ -1322,19 +1346,20 @@ fn d6_dead_call_at_commit_records_the_oldest_tarball() {
     let mut w = W::new();
     let id = w.dead_attempt(&c(2), &c(0), &sha(&binary(&c(0))));
     (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    // Older than `started_at` (10:00:00); of the start's second but of another tree; then the oldest
+    // that holds the tree of `from`, then a later one; and files that are not tarballs.
+    tarball_at(&w, "095959Z-1", Some(0));
+    tarball_at(&w, "100000Z-2", Some(1));
+    let oldest = tarball_at(&w, "100500Z-3", Some(0));
+    tarball_at(&w, "100600Z-4", Some(0));
     for name in [
-        "agents-before-20261114T095959Z-1.tar",
-        "agents-before-20261114T100000Z-2.tar",
         "agents-before-20261114T100000Z-2.tar.sha256",
-        "agents-before-20261114T100500Z-3.tar",
         "agents-before-20261114T093000Z-4.tar.paths",
     ] {
         std::fs::write(w.p(&format!("content-backup/{name}")), b"x").unwrap();
     }
     let (v, _) = w.run();
     let close = &w.applies("close_install")[0]["parameters"];
-    // Stamped LATER than `started_at` (10:00:00): a tarball of the start's second is not the handle.
-    let oldest = w.p("content-backup/agents-before-20261114T100500Z-3.tar");
     assert_eq!(
         *close,
         json!({"install": id, "outcome": "installed", "to": c(2), "rollback_content": oldest}),
@@ -1352,11 +1377,12 @@ fn dead_forward(w: &mut W, file: Option<u32>, tree: Option<u32>) -> Value {
     w.bytes = binary(w.file.as_deref().unwrap_or("none"));
     id
 }
-fn tarball_at(w: &W, stamp: &str) -> String {
+/// A tarball stamped `stamp` that holds the tree of `c(n)` (None: a half-swapped tree).
+fn tarball_at(w: &W, stamp: &str, n: Option<u32>) -> String {
     let path = w.p(&format!(
         "content-backup/agents-before-20261114T{stamp}.tar"
     ));
-    std::fs::write(&path, b"tar").unwrap();
+    std::fs::write(&path, tar(n.map(c).as_deref())).unwrap();
     path
 }
 
@@ -1407,7 +1433,7 @@ fn d6_repair_falls_back_to_the_rollback() {
     // The clone's origin/main is not the attempt's commit: no installer, the command's rollback.
     let mut w = W::new();
     let id = dead_forward(&mut w, Some(2), None);
-    let tarball = tarball_at(&w, "100003Z-9");
+    let tarball = tarball_at(&w, "100003Z-9", Some(0));
     w.origin_once = Some(c(1));
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
@@ -1427,7 +1453,7 @@ fn d6_repair_falls_back_to_the_rollback() {
     // The installer called again leaves the tree off the commit: the same rollback.
     let mut w = W::new();
     let id = dead_forward(&mut w, Some(2), None);
-    let tarball = tarball_at(&w, "100003Z-9");
+    let tarball = tarball_at(&w, "100003Z-9", Some(0));
     let content = w.inst.get_mut("content").unwrap();
     (content.tree, content.exit, content.out) = (None, 2, String::new());
     let (v, exit) = w.run();
@@ -1450,13 +1476,14 @@ fn d6_repair_falls_back_to_the_rollback() {
 
 #[test]
 fn d6_repair_uses_the_oldest_tarball() {
-    // The dead call's tarball (10:00:05) is the handle: not the previous call's of the start's
+    // The dead call's tarball (10:00:05) is the handle: not a tarball of another tree in the start's
     // second, not the one the second install printed (a tarball of a half-swapped tree).
     for fallback in [false, true] {
         let mut w = W::new();
         let id = dead_forward(&mut w, Some(2), None);
-        tarball_at(&w, "100000Z-1");
-        let first = tarball_at(&w, "100005Z-2");
+        // A tarball of the start's second that holds another tree is passed over.
+        tarball_at(&w, "100000Z-1", Some(1));
+        let first = tarball_at(&w, "100005Z-2", Some(0));
         let second = w.p("content-backup/agents-before-20261114T100009Z-3.tar");
         w.inst.get_mut("content").unwrap().out = format!("installed backup={second}\n");
         if fallback {
@@ -1478,22 +1505,56 @@ fn d6_repair_uses_the_oldest_tarball() {
 }
 
 #[test]
-fn d6_handle_ignores_a_tarball_of_the_start_second() {
+fn d6_handle_is_the_tarball_that_holds_the_tree_of_from() {
+    // Two tarballs of the second of `started_at`: the one of another tree is passed over, the one
+    // that holds the tree of `from` is the handle.
     let mut w = W::new();
     let id = dead_forward(&mut w, Some(2), Some(2));
-    tarball_at(&w, "100000Z-2");
+    tarball_at(&w, "100000Z-1", Some(1));
+    let held = tarball_at(&w, "100000Z-2", Some(0));
+    w.run();
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w),
+            "rollback_content": held})
+    );
+    // None that passes (another tree, a half-swapped tree, no archive at all): no handle.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(2));
+    tarball_at(&w, "100000Z-1", Some(1));
+    tarball_at(&w, "100001Z-2", None);
+    std::fs::write(
+        w.p("content-backup/agents-before-20261114T100002Z-3.tar"),
+        b"tar",
+    )
+    .unwrap();
     w.run();
     assert_eq!(
         w.applies("close_install")[0]["parameters"],
         json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)})
     );
+}
+
+#[test]
+fn d6_a_close_after_an_unrecorded_repair_records_no_partial_tree() {
+    // The repair keeps a tarball of the half-swapped tree, installs the tree, and its close is not
+    // applied: `unrecorded`. The next call closes the attempt by the read at its commit; the
+    // tarball of the partial tree is never its handle.
     let mut w = W::new();
-    dead_forward(&mut w, Some(2), Some(2));
-    tarball_at(&w, "100000Z-2");
-    let later = tarball_at(&w, "100001Z-3");
-    w.run();
-    let close = &w.applies("close_install")[0]["parameters"];
-    assert_eq!(close["rollback_content"], json!(later));
+    let id = dead_forward(&mut w, Some(2), None);
+    w.close_fails = true;
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("unrecorded", ""), 5), "{v}");
+    assert!(std::fs::exists(w.tarball()).unwrap());
+    assert_eq!(v["rollback_content"], Value::Null);
+    w.close_fails = false;
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    let closes = w.applies("close_install");
+    assert_eq!(
+        closes.last().unwrap()["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)})
+    );
 }
 
 #[test]
@@ -1572,7 +1633,7 @@ fn d3_first_installer_fails_after_it_replaced_the_file() {
 fn d6_repair_that_fails_ends_the_call_failed() {
     let mut w = W::new();
     let id = dead_forward(&mut w, Some(2), None);
-    let tarball = tarball_at(&w, "100003Z-9");
+    let tarball = tarball_at(&w, "100003Z-9", Some(0));
     w.origin_once = Some(c(1));
     let back = w.inst.get_mut("ap-rollback").unwrap();
     (back.file, back.exit, back.err) = (None, 1, "rollback_move_failed@install-ap.sh:9\n".into());
@@ -1662,7 +1723,7 @@ fn installed_by_a(w: &mut W) -> Value {
     let a = w.closed("forward", &c(2), &c(0), "installed", "session-0");
     let (copy, tarball) = (kept(w), w.tarball());
     std::fs::write(&copy, binary(&c(0))).unwrap();
-    std::fs::write(&tarball, b"tar").unwrap();
+    std::fs::write(&tarball, tar(Some(&c(0)))).unwrap();
     let row = w.installs.last_mut().unwrap();
     (row["rollback_binary"], row["rollback_content"]) = (json!(copy), json!(tarball));
     a
@@ -1846,6 +1907,26 @@ fn d12_no_content_handle_and_content_differs() {
         .as_object_mut()
         .unwrap()
         .remove("rollback_content");
+    let (v, exit) = rolls(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(w.launched(), ["ap-rollback"]);
+}
+
+#[test]
+fn d12_recorded_tarball_that_does_not_hold_the_tree_counts_as_absent() {
+    // The recorded tarball holds another tree: absent; the manifests differ, so nothing to roll back.
+    for other in [Some(c(1)), None] {
+        let mut w = W::new();
+        installed_by_a(&mut w);
+        std::fs::write(w.tarball(), tar(other.as_deref())).unwrap();
+        let (v, exit) = rolls(&mut w);
+        refused(&w, &v, exit, "nothing_to_roll_back");
+    }
+    // The same manifest at both commits: the file alone, never a content rollback with that tarball.
+    let mut w = W::new();
+    w.same_content = true;
+    installed_by_a(&mut w);
+    std::fs::write(w.tarball(), tar(None)).unwrap();
     let (v, exit) = rolls(&mut w);
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
     assert_eq!(w.launched(), ["ap-rollback"]);
