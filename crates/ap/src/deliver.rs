@@ -6,6 +6,8 @@ use crate::run::{stamp, write};
 use crate::work::{Host, LIMIT, System, args, complete_id, digest, id, ont, refused};
 use serde_json::{Value, json};
 use std::{
+    cell::RefCell,
+    collections::HashMap,
     ffi::OsString,
     fs::{File, OpenOptions},
     io::{Read, Seek, Write},
@@ -42,6 +44,8 @@ struct Call<'a> {
     by: Value,
     /// The host lock; installers inherit it.
     lock: Option<File>,
+    /// `content/SHA256SUMS` of each commit read so far: a commit's file never changes.
+    sums: RefCell<HashMap<String, String>>,
 }
 /// What one installer did: its exit (128 plus the signal for a signal), its code, and for the
 /// content installer the tarball it printed.
@@ -162,19 +166,93 @@ fn version(s: &mut impl System, c: &Call) -> Option<String> {
     let words: Vec<&str> = out.lines().next()?.split_whitespace().collect();
     (words.len() == 3 && words[0] == "ap" && hex40(words[2])).then(|| words[2].to_owned())
 }
-/// Whether the content tree passes `content/SHA256SUMS` of `commit`, read from the clone.
-fn tree_at(s: &mut impl System, c: &Call, commit: &str) -> bool {
-    let Some(sums) = git(s, c, &["show", &format!("{commit}:content/SHA256SUMS")]) else {
+/// `content/SHA256SUMS` of `commit`, read from the clone; a failed read is read again next time.
+fn manifest(s: &mut impl System, c: &Call, commit: &str) -> Option<String> {
+    if let Some(m) = c.sums.borrow().get(commit) {
+        return Some(m.clone());
+    }
+    let m = git(s, c, &["show", &format!("{commit}:content/SHA256SUMS")])?;
+    c.sums.borrow_mut().insert(commit.into(), m.clone());
+    Some(m)
+}
+/// Whether `digest_of(path)` is the digest of every line of the manifest of `commit` (at least one).
+fn passes<S: System>(
+    s: &mut S,
+    c: &Call,
+    commit: &str,
+    digest_of: impl Fn(&S, &str) -> Option<String>,
+) -> bool {
+    let Some(sums) = manifest(s, c, commit) else {
         return false;
     };
     let mut lines = sums.lines().filter(|l| !l.is_empty()).peekable();
     lines.peek().is_some()
         && lines.all(|l| match (l.get(..64), l.get(64..66), l.get(66..)) {
-            (Some(hash), Some("  " | " *"), Some(path)) => s
-                .read(&format!("{}/{path}", c.dst))
-                .is_ok_and(|b| digest(&b) == hash),
+            (Some(hash), Some("  " | " *"), Some(path)) => {
+                digest_of(s, path).as_deref() == Some(hash)
+            }
             _ => false,
         })
+}
+/// Whether the content tree passes `content/SHA256SUMS` of `commit`, read from the clone.
+fn tree_at(s: &mut impl System, c: &Call, commit: &str) -> bool {
+    let dst = c.dst.clone();
+    passes(s, c, commit, |s, p| {
+        s.read(&format!("{dst}/{p}")).ok().map(|b| digest(&b))
+    })
+}
+/// The regular files of a tar archive (GNU, ustar or pax names) and their digests; None when it
+/// cannot be read to its end. The archive is read, never extracted.
+fn members(b: &[u8]) -> Option<HashMap<String, String>> {
+    let (mut out, mut at, mut long) = (HashMap::new(), 0, None);
+    let text =
+        |b: &[u8]| String::from_utf8_lossy(b.split(|x| *x == 0).next().unwrap_or(b)).into_owned();
+    while let Some(h) = b.get(at..at + 512) {
+        if h.iter().all(|x| *x == 0) {
+            return Some(out);
+        }
+        let size = usize::from_str_radix(text(&h[124..136]).trim(), 8).ok()?;
+        let data = b.get(at + 512..at + 512 + size)?;
+        let name = long
+            .take()
+            .unwrap_or_else(|| match (&h[257..263], text(&h[345..500])) {
+                (b"ustar\0", p) if !p.is_empty() => format!("{p}/{}", text(&h[..100])),
+                _ => text(&h[..100]),
+            });
+        match h[156] {
+            b'L' => long = Some(text(data)),
+            b'x' => {
+                long = text(data)
+                    .lines()
+                    .find_map(|l| Some(l.split_once(" path=")?.1.to_owned()))
+            }
+            b'0' | 0 => drop(out.insert(name.trim_start_matches("./").to_owned(), digest(data))),
+            _ => {}
+        }
+        at += 512 + size.div_ceil(512) * 512;
+    }
+    None
+}
+/// The content handle of an attempt from `from` (README "Delivery"): a tarball that holds the tree
+/// of `from`, by the check the tree is read with. The tarball `given` (printed by the installer in
+/// this call, or recorded) when it passes; with none given, the oldest tarball of the content backup
+/// directory stamped not older than `since` that passes. A tarball that does not pass never is one.
+fn content_handle(
+    s: &mut impl System,
+    c: &Call,
+    from: &str,
+    given: Option<String>,
+    since: Option<&str>,
+) -> Option<String> {
+    let candidates = match (given, since) {
+        (Some(t), _) => vec![t],
+        (None, Some(since)) => tarballs(&c.bk, since),
+        (None, None) => vec![],
+    };
+    candidates.into_iter().find(|t| {
+        let files = s.read(t).ok().and_then(|b| members(&b));
+        files.is_some_and(|f| passes(s, c, from, |_, p| f.get(p).cloned()))
+    })
 }
 /// Whether the pair is at `commit`: the file names it and the tree passes its manifest. A tree can
 /// pass the manifests of several commits, so every read names the one commit it asks about.
@@ -244,24 +322,24 @@ fn kept(c: &Call, sha: &str) -> String {
         sha.get(..7).unwrap_or_default()
     )
 }
-/// The oldest tarball of the content backup directory stamped later than `since` (UTC, RFC 3339; both
-/// to the second), by the stamp in its name `agents-before-<YYYYmmddTHHMMSSZ>-<pid>.tar`. A tarball of
-/// the second of `since` may be the previous call's, so it is never the handle.
-fn oldest(dir: &str, since: &str) -> Option<String> {
+/// The tarballs `agents-before-<YYYYmmddTHHMMSSZ>-<pid>.tar` of the content backup directory stamped
+/// not older than `since` (UTC, RFC 3339), oldest first.
+fn tarballs(dir: &str, since: &str) -> Vec<String> {
     let since: String = since.chars().filter(|c| *c != '-' && *c != ':').collect();
-    let names = std::fs::read_dir(dir)
-        .ok()?
-        .flatten()
-        .filter_map(|e| e.file_name().into_string().ok());
-    let stamped = names.filter_map(|n| {
-        let stamp = n
-            .strip_prefix("agents-before-")?
-            .strip_suffix(".tar")?
-            .split('-')
-            .next()?;
-        (stamp.len() == 16 && stamp > since.as_str()).then(|| (stamp.to_owned(), n.clone()))
-    });
-    stamped.min().map(|(_, n)| format!("{dir}/{n}"))
+    let names = std::fs::read_dir(dir).into_iter().flatten().flatten();
+    let mut stamped: Vec<(String, String)> = names
+        .filter_map(|e| {
+            let n = e.file_name().into_string().ok()?;
+            let stamp = n.strip_prefix("agents-before-")?.strip_suffix(".tar")?;
+            let stamp = stamp.split('-').next()?.to_owned();
+            (stamp.len() == 16 && stamp >= since).then_some((stamp, n))
+        })
+        .collect();
+    stamped.sort();
+    stamped
+        .into_iter()
+        .map(|(_, n)| format!("{dir}/{n}"))
+        .collect()
 }
 /// The file handle of an attempt: the kept copy named by `from_sha256`, only when its whole digest
 /// is `from_sha256`.
@@ -357,15 +435,14 @@ fn dead(s: &mut impl System, c: &mut Call, a: &Value) -> Step<bool> {
             p["outcome"] = json!("installed");
             (p["rollback_binary"], p["rollback_content"]) = (
                 json!(kept_copy(s, c, &f("from_sha256"))),
-                json!(oldest(&c.bk, &f("started_at"))),
+                json!(content_handle(s, c, &from, None, Some(&f("started_at")))),
             );
             drop_nulls(&mut p);
         }
         None => {
             // A dead rollback, or a clone with no manifest of either commit, is not repaired.
-            let sums =
-                |s: &mut _, x: &str| git(s, c, &["show", &format!("{x}:content/SHA256SUMS")]);
-            if kind != "forward" || sums(s, &commit).is_none() || sums(s, &from).is_none() {
+            let none = |s: &mut _, x: &str| manifest(s, c, x).is_none();
+            if kind != "forward" || none(s, &commit) || none(s, &from) {
                 return Err(running());
             }
             return Ok(repair(s, c, a, &request));
@@ -386,22 +463,17 @@ fn repair(s: &mut impl System, c: &mut Call, a: &Value, request: &str) -> bool {
         c,
         &["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"],
     );
-    // The content handle is taken before any installer: the dead call's oldest tarball, else the
-    // repair's own only when the tree was at `from` (a tarball of a tree at no manifest never is).
-    let early = oldest(&c.bk, &f("started_at"));
-    let at_from = early.is_none() && tree_at(s, c, &from);
-    let (mut ran, mut printed) = (vec![], None);
+    let mut ran = vec![];
     if origin.as_deref().map(str::trim) == Some(commit.as_str()) {
         if version(s, c).as_deref() != Some(commit.as_str()) {
             ran.push(installer(s, c, "ap", &["install", &commit]));
         }
         if ran.iter().all(|r| r.exit == Some(0)) && !tree_at(s, c, &commit) {
-            let r = installer(s, c, "content", &["install", &commit]);
-            printed = r.tarball.clone().filter(|_| at_from);
-            ran.push(r);
+            ran.push(installer(s, c, "content", &["install", &commit]));
         }
     }
-    let tarball = early.or(printed.filter(|t| s.exists(t).unwrap_or(false)));
+    // A tarball the repair made of a half-swapped tree does not hold the tree of `from`.
+    let tarball = content_handle(s, c, &from, None, Some(&f("started_at")));
     let h = (kept_copy(s, c, &f("from_sha256")), tarball);
     let file = version(s, c);
     let (outcome, to) = if pair_at(s, c, &file, &commit) {
@@ -714,11 +786,11 @@ fn deliver(s: &mut impl System, c: &mut Call) -> Step<()> {
         ran.push(installer(s, c, "content", &["install", &tip]));
     }
     let file = version(s, c);
+    let printed = ran.get(1).and_then(|r| r.tarball.clone());
     let h = (
         kept_copy(s, c, &from_sha256),
-        ran.get(1).and_then(|r| r.tarball.clone()),
+        content_handle(s, c, &from, printed, None),
     );
-    let h = (h.0, h.1.filter(|t| s.exists(t).unwrap_or(false)));
     let (outcome, to) = if pair_at(s, c, &file, &tip) {
         ("installed", tip.as_str())
     } else if pair_at(s, c, &file, &from) {
@@ -843,11 +915,10 @@ fn rollback(s: &mut impl System, c: &mut Call, target: &Value) -> Step<()> {
         .ok_or_else(nothing)?;
     let back = prop(a, "from");
     let bin = kept_copy(s, c, &prop(a, "from_sha256")).ok_or_else(nothing)?;
-    let tar = field(a, "rollback_content").as_str().map(str::to_owned);
-    let tar = tar.filter(|t| s.exists(t).unwrap_or(false));
+    let recorded = field(a, "rollback_content").as_str().map(str::to_owned);
+    let tar = recorded.and_then(|t| content_handle(s, c, &back, Some(t), None));
     if tar.is_none() {
-        let sums = |s: &mut _, x: &str| git(s, c, &["show", &format!("{x}:content/SHA256SUMS")]);
-        let (one, two) = (sums(s, &back), sums(s, &here));
+        let (one, two) = (manifest(s, c, &back), manifest(s, c, &here));
         if one.is_none() || one != two {
             return Err(nothing());
         }
@@ -952,6 +1023,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> (Value, u8) {
             json!(id.map_or("timer".into(), |(_, v)| format!("timer:{v}")))
         }),
         lock: None,
+        sums: RefCell::default(),
         env,
     };
     (c.rec["by"], c.rec["repository"]) = (c.by.clone(), r["repository"].clone());

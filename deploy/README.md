@@ -82,7 +82,7 @@ ap --version                                                         # names <fr
 git -C "$C" show '<from>:content/SHA256SUMS' > /tmp/deliver-sums && (cd /root/.agents && sha256sum -c --quiet /tmp/deliver-sums)
 ```
 
-When a handle is null, that part cannot go back to `<from>`: bring the pair to the clone's `origin/main` instead (`install-ap.sh` installs only that commit): `T=$(git -C "$C" rev-parse origin/main)`, `git -C "$C" checkout --quiet --force --detach "$T"`, then `CARGO_TARGET_DIR=/var/lib/agent-platform/deliver/target bash "$C/scripts/install-ap.sh" install "$T"` and `bash "$C/scripts/install-content.sh" install "$T"`, and read the pair against `$T` as above. When the attempt is still `running` (an end `unrecorded`), close it by hand as `crates/ap/README.md` says. Then a Lead's install call (above), and `systemctl start ap-deliver.timer`.
+A recorded `rollback_content` holds the tree of `from`: the command checked the archive against the manifest of `from` before it recorded it (`crates/ap/README.md`, "Delivery"), and records none when no tarball does. When a handle is null, that part cannot go back to `<from>`: bring the pair to the clone's `origin/main` instead (`install-ap.sh` installs only that commit): `T=$(git -C "$C" rev-parse origin/main)`, `git -C "$C" checkout --quiet --force --detach "$T"`, then `CARGO_TARGET_DIR=/var/lib/agent-platform/deliver/target bash "$C/scripts/install-ap.sh" install "$T"` and `bash "$C/scripts/install-content.sh" install "$T"`, and read the pair against `$T` as above. When the attempt is still `running` (an end `unrecorded`), close it by hand as `crates/ap/README.md` says. Then a Lead's install call (above), and `systemctl start ap-deliver.timer`.
 
 ## Undo
 

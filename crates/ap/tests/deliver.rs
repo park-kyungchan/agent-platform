@@ -1797,6 +1797,9 @@ fn d12_rollback_exact_calls() {
             eq("commit", json!(here)),
             eq("kind", json!("forward")),
         ]),
+        // The recorded tarball is checked against the manifest of the commit it rolls back to; the
+        // read after the installers uses the same manifest (one read per commit and call).
+        show(&back),
         index.clone(),
         search(vec![
             eq("target", target()),
@@ -1812,7 +1815,6 @@ fn d12_rollback_exact_calls() {
         launch("install-content.sh", &w.tarball()),
         launch("install-ap.sh", &kept(&w)),
         version,
-        show(&back),
         apply(
             json!({"action_type": "close_install", "request_id": format!("ap.{back}.rb1.close"), "agent": "ap-deliver",
             "parameters": {"install": id, "outcome": "installed", "to": back}}),
