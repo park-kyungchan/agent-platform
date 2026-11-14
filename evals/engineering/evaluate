@@ -5,7 +5,8 @@ It restores every path of `tests` with its bytes (and mode) at `head`, read from
 each array of `commands` in order with stdin /dev/null and stops at the first that does not exit 0.
 After each command it prints `evaluate: command=<n> exit=<code> seconds=<s>`. Exit 0: all passed;
 1: one did not; 2: it could not judge (the case or the clone unreadable, a path missing, less than
-10,240 MiB free before a command). No model judges. Under the host's build rule it runs itself again
+10,240 MiB free before a command, or an error of the evaluator itself: exit 1 is a statement about
+the candidate and nothing else). No model judges. Under the host's build rule it runs itself again
 under `flock` on HOST_CARGO_LOCK, as the `check` of every platform repository does.
 """
 import json
@@ -39,16 +40,20 @@ def entry(clone, head, path):
 
 
 def restore(clone, path, mode, sha, root):
-    """Writes `path` with its bytes and mode at `head`, whatever the candidate made of it."""
+    """Writes `path` with its bytes and mode at `head`, whatever the candidate made of it or of a parent."""
     blob = git(clone, "cat-file", "blob", sha)
     if blob.returncode != 0:
         cannot("%s cannot be read from the clone" % path)
+    # Every parent inside the copy is a real directory afterwards: a file or a link the candidate
+    # put there is removed, so nothing is written through a link and nothing stands in the way.
+    at = root
+    for part in [p for p in path.split("/")[:-1] if p not in ("", ".")]:
+        at = os.path.join(at, part)
+        if os.path.islink(at) or (os.path.lexists(at) and not os.path.isdir(at)):
+            os.unlink(at)
+        if not os.path.lexists(at):
+            os.mkdir(at)
     target = os.path.join(root, path)
-    parent = os.path.dirname(target)
-    # The file is written inside the copy only: a parent the candidate made a link out of it is refused.
-    if os.path.commonpath([os.path.realpath(parent), root]) != root:
-        cannot("%s lies outside the copy" % path)
-    os.makedirs(parent, exist_ok=True)
     if os.path.lexists(target) and (os.path.islink(target) or not os.path.isdir(target)):
         os.unlink(target)
     elif os.path.isdir(target):
@@ -105,4 +110,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:  # An error of the evaluator itself is never the candidate's exit 1.
+        cannot("%s: %s" % (type(e).__name__, e))

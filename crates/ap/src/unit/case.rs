@@ -122,6 +122,8 @@ fn request(s: &mut impl System, r: &Value) -> Result<(Value, String), Failure> {
     if staged {
         stage(r, "implementer")?;
         require!(r["implementer"].get("resume").is_none() => "invalid_input", "implementer.resume");
+        // A stage that is asked for is admitted or refused, never dropped.
+        require!(r["implementer"]["prompt"].is_string() => "invalid_input", "implementer.prompt");
     }
     let (c, sha) = read_case(file)?;
     let root = s.work_root();

@@ -52,6 +52,29 @@ class EvaluateCase(unittest.TestCase):
         self.assertTrue(os.access(self.copy / "tests" / "t.sh", os.X_OK))
         self.assertRegex(done.stdout, r"(?m)^evaluate: command=1 exit=0 seconds=\d+$")
 
+    def test_c6_a_parent_the_candidate_made_a_file_is_replaced_and_the_case_is_judged(self):
+        (self.copy / "tests").write_text("not a directory")
+        done = self.evaluate(["tests/t.sh"])
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertTrue(os.access(self.copy / "tests" / "t.sh", os.X_OK))
+
+    def test_c6_nothing_is_written_through_a_parent_the_candidate_made_a_link(self):
+        outside = Path(self.tmp.name) / "outside"
+        outside.mkdir()
+        os.symlink(outside, self.copy / "tests")
+        done = self.evaluate(["tests/t.sh"])
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(os.listdir(outside), [])
+        self.assertFalse(os.path.islink(self.copy / "tests"))
+        self.assertTrue(os.access(self.copy / "tests" / "t.sh", os.X_OK))
+
+    def test_c6_an_error_of_the_evaluator_itself_exits_2_not_1(self):
+        # A path no program can be started with (a NUL byte) raises inside the evaluator: that is
+        # no statement about the candidate.
+        done = self.evaluate(["tests/t\0.sh"])
+        self.assertEqual(done.returncode, 2, done.stderr)
+        self.assertIn("evaluate: cannot judge", done.stderr)
+        self.assertNotIn("evaluate: command=", done.stdout)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1859,6 +1859,15 @@ fn c2_a_refused_case_call_leaves_nothing_behind() {
     let mut r = r0.clone();
     r["implementer"]["timeout_seconds"] = json!(0);
     cases.push((r, "invalid_input@implementer.timeout_seconds".into()));
+    // An `implementer` without a prompt is no validity call: it is refused.
+    for prompt in [Value::Null, json!(7)] {
+        let mut r = r0.clone();
+        r["implementer"] = json!({"prompt": prompt});
+        cases.push((r, "invalid_input@implementer.prompt".into()));
+    }
+    let mut r = r0.clone();
+    r["implementer"] = json!({});
+    cases.push((r, "invalid_input@implementer.prompt".into()));
 
     // The case file: each member missing, unknown or malformed; the file named after another id.
     let good: Value = serde_json::from_slice(&std::fs::read(&c.file).unwrap()).unwrap();
