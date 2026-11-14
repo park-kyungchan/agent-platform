@@ -74,6 +74,8 @@ A task's current holds, decisions, KPI values and worker runs are in the Ontolog
 
 Third-party tools are under `/home/palantirkc/tools/`; pinned third-party source is under `/home/palantirkc/external/`. They are not first-party source: do not edit them, and read the version and build state from the directory.
 
+Local copies of the Anthropic, Palantir and Rust design sources are under `/home/palantirkc/external/reference-docs/`; the entry is `OFFICIAL-DOCS.md` section 4.
+
 | Tool | Path | Use here |
 | --- | --- | --- |
 | REA (package `rea-agents`, clone of `https://github.com/morluto/rea`) | `/home/palantirkc/tools/rea` | A command and MCP server with which an agent inspects binaries, JavaScript applications, web bundles, saved captures and running processes. Started with `node scripts/rea.mjs mcp` in the clone, and only when the clone is built (`dist/` exists) |

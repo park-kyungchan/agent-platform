@@ -36,7 +36,7 @@ Read one of these only when its situation applies. References are in `/root/.age
 | I need a task's holds, decisions, KPI values or worker runs from the Ontology store, or I am Lead and record one | `ONTOLOGY-USE.md` |
 | I decide where information belongs or whether it may go to memory | `CONTEXT-GOVERNANCE.md` |
 | Memory returns stale or irrelevant results; I write, replace, delete or retract Hindsight content or a page, or must show that such a change took effect | skill `hindsight-control` |
-| I need official documentation of a CLI, Herdr, Docker, Tailscale, Hostinger or Hindsight | `OFFICIAL-DOCS.md` |
+| I need official documentation of a CLI or another tool, or what Anthropic, Palantir or a Rust source says | `OFFICIAL-DOCS.md`, section 4 for those sources |
 | I change a shared instruction, a skill or a reference | Section 7 below, then `BUILD-AND-DELIVERY.md` section 6 |
 | I use the Academy tools or prepare a lesson | skill `academy-runtime-routing` for the tools; skill `academy-student-context` for lesson preparation and student status |
 | A word in an instruction, a packet or the user's message is unclear, or I use a new term | Section 8 below, then `GLOSSARY.md` |
@@ -87,7 +87,7 @@ Do not build
 ## 5. Communication and data
 
 - The user's prompts are short and narrow, and may name a thing by the wrong word. The Lead resolves what is meant, says so in its first sentence, reads the prompt against the whole goal, and proposes the direction and any better alternative without being asked. Packets, STATE and reports use the terms of section 8 and `GLOSSARY.md`, not the user's wording.
-- Language. Everything except a message to the user is written in English only, by every agent in every CLI, down to prompts typed into another agent and notes; one language for work removes ambiguity. Korean appears only in a message addressed to the user, in a stored field whose content is text for the user, and in a quotation of the user's own words, which is followed by its English reading. A worker reports in English; the Lead writes for the user.
+- Language. Everything except a message to the user is in English only, by every agent in every CLI, down to prompts typed into another agent and notes. Korean appears only in a message addressed to the user, in a stored field whose content is text for the user, and in a quotation of the user's own words, which is followed by its English reading. A worker reports in English; the Lead writes for the user.
 - A message to the user follows the skill `explain-precisely`: Korean prose that keeps every term, name, command and value in its original English form, a concrete definition at a term's first use, no metaphor.
 - Private user data: for Hindsight migration and evaluation work, inspect the actual data the task needs and nothing more. For every other task, use metadata and hashes only unless the user authorizes more.
 
