@@ -493,8 +493,9 @@ before); that review can still be closed. Every reader of a closed review reads
 it with `review_not_closed`, `start_install` with `review_not_accepting`,
 `ap review accept` with `review_not_accepting` and the come-back of `ap unit`
 does not reuse it (see [One review](../crates/ap/README.md#one-review)).
-`agent` reads and derives `install` and applies the three actions. No caller of
-`start_install` or `close_install` exists in this version.
+`agent` reads and derives `install` and applies the three actions. The caller of
+`start_install` and `close_install` is `ap deliver`, with the client and agent
+`ap-deliver` (see [Delivery](../crates/ap/README.md#delivery)).
 
 The rehearsal runs the rows of version 7 on that pinned file, starts a review
 and closes two reviews with `accept` there, installs this file, closes the
@@ -504,10 +505,14 @@ paths under `/usr/local/bin` that need not exist where the rehearsal runs, so th
 install rows run on a copy that differs from this file only in those paths (two
 files of the rehearsal's own directory) and in its version (9); the rehearsal
 asserts that every other member is equal. It prints the basis of the search of
-`ap unit` for the review closed under version 7: on this engine a review that
-lacks a filtered optional property (`repository`, `verdict`, `report_sha256`) is
-counted in `unresolved_excluded`, and the answer is not qualified, whatever the
-schema version of the review. The read a caller can rely on is the row
-`v8-upgrade-closed-review-qualified`: a search by properties that every review
-has (`kind`, `head`, `status`) is qualified, and `verdict`, `repository` and the
-report's digest are compared on the objects of the answer.
+`ap unit` made before this change, for the review closed under version 7
+(`v8_upgrade_search_basis=`): on this engine a filter on an optional property
+(`repository`, `verdict`, `report_sha256`) answers `qualified: false` as soon as
+one scanned review lacks that property (a running or an abandoned review,
+whatever its schema version), while `unresolved_excluded` stays 0, so the basis
+does not name the object that made it unqualified. The read a caller can rely on
+is the row `v8-upgrade-closed-review-qualified`: a search by properties that
+every review has (`kind`, `head`, `status`, and a task) is qualified, and
+`verdict`, `repository` and the report's digest are compared on the objects of
+the answer. `ap unit` and `ap deliver` read an accepting review only this way,
+through one function (`accepting` in `crates/ap/src/review.rs`).
