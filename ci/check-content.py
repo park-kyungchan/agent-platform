@@ -144,6 +144,34 @@ user_rows = [l for l in texts.get(GLOSSARY, "").split("## 7. ")[-1].splitlines()
 if len(user_rows) - 1 > USER_ROW_LIMIT:
     fail("user_table_over_limit", GLOSSARY, f"{len(user_rows) - 1} rows, limit {USER_ROW_LIMIT}")
 
+# What content/ says about the command `ap` must exist: a verb in backticks, a section of its README by its heading.
+CRATE = ROOT.parent / "crates/ap"
+VERB_SOURCES = ("src/main.rs", "src/native/cli.rs")  # the dispatch of the command: `arg == "gate"`, `args[0] == "doctor"`
+verbs = set()
+for source in VERB_SOURCES:
+    for found in re.findall(r'\barg == "([a-z][\w-]*)"|\bargs\[0\] (?:==|!=) "([a-z][\w-]*)"', (CRATE / source).read_text()):
+        verbs.update(v for v in found if v)
+headings = set(re.findall(r"^## (.+?)\s*$", (CRATE / "README.md").read_text(), re.M))
+if not verbs or not headings:
+    fail("ap_interface_unreadable", "SHA256SUMS", "no verb of `ap` or no `##` heading of its README was found")
+QUOTED = r'"([^"\n]+)"'
+QUOTED_LIST = QUOTED + r'(?:(?:,|,? and|,? or) ' + QUOTED + r')*'
+SECTION_REFERENCES = (  # `crates/ap/README.md` "A" and "B" | README sections "A" | section "A" of `crates/ap/README.md`
+    r"`crates/ap/README\.md`,? (?:sections? )?(" + QUOTED_LIST + ")",
+    r"\bREADME,? (?:sections? )?(" + QUOTED_LIST + ")",
+    r"\bsections? (" + QUOTED_LIST + r") of `crates/ap/README\.md`",
+)
+for name, text in texts.items():
+    line_of = lambda at: text.count("\n", 0, at) + 1
+    for m in re.finditer(r"`ap ([a-z][\w-]*)(?=[\s`])", text):
+        if m.group(1) not in verbs:
+            fail("unknown_ap_verb", f"{name}:{line_of(m.start())}", f"`ap {m.group(1)}`; the verbs of the command: {', '.join(sorted(verbs))}")
+    for rx in SECTION_REFERENCES:
+        for m in re.finditer(rx, text):
+            for quoted in re.finditer(QUOTED, m.group(1)):
+                if quoted.group(1) not in headings:
+                    fail("unknown_readme_section", f"{name}:{line_of(m.start(1) + quoted.start())}", f'"{quoted.group(1)}"; the headings of crates/ap/README.md: {", ".join(sorted(headings))}')
+
 for e in errors:
     print(e)
 print(f"content check: {len(owned)} files, {len(errors)} errors")
