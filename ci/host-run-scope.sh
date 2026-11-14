@@ -4,7 +4,8 @@
 # Shows: the CLI runs in a scope under agents.slice; after the return no unit and no forked
 # sleeper remain; `timeout_seconds: 5` gives state `timeout`; after `kill -9` of `ap run` the unit
 # still ends at its own bound and the record on disk says `running` with the session id; no
-# HERDR_* or inherited CLAUDE_* variable reaches the CLI. Skipped, saying so, where `systemctl` is
+# HERDR_* or inherited CLAUDE_* variable reaches the CLI; a fresh request while the unit of a killed
+# runner lives is refused. Skipped, saying so, where `systemctl` is
 # absent or this caller cannot start a transient unit in the system manager.
 set -uo pipefail
 ap=$(realpath -- "${1:-${CARGO_TARGET_DIR:-$(cd "$(dirname "$0")/.." && pwd -P)/target}/debug/ap}")
@@ -54,8 +55,6 @@ grep -q "^0::/agents.slice/$unit\$" "$t/bin/cgroup" && ok "the CLI ran in $unit 
 { ! systemctl is-active --quiet "$unit" && [ -z "$(systemctl list-units --all --no-legend "$unit")" ]; } \
   && ok "no unit remains after the return" || bad "unit remains: $(systemctl list-units --all --no-legend "$unit")"
 sleeper=$(cat "$t/bin/sleeper.pid"); ! alive "$sleeper" && ok "the forked sleeper $sleeper is gone" || bad "sleeper $sleeper alive"
-[ "$(field "$t/a.md.run.json" others_at_stop)" -ge 1 ] && ok "the record says others were alive at the stop" \
-  || bad "others_at_stop: $(field "$t/a.md.run.json" others_at_stop)"
 { ! grep -q '^HERDR_' "$t/bin/env" && [ "$(grep '^CLAUDE_' "$t/bin/env")" = "CLAUDE_CONFIG_DIR=$t/acct" ]; } \
   && ok "no HERDR_* and no inherited CLAUDE_* reached the CLI" || bad "environment: $(grep -E '^(HERDR|CLAUDE)_' "$t/bin/env")"
 
@@ -80,6 +79,12 @@ unit=$(field "$t/c.md.run.json" unit); apid=$(cat "$t/bin/parent")
 kill -KILL "$apid"; wait "$pid" 2> /dev/null
 { [ "$(field "$t/c.md.run.json" state)" = running ] && [ "$(field "$t/c.md.run.json" session | wc -c)" -eq 37 ]; } \
   && ok "after kill -9 the record says running with session $(field "$t/c.md.run.json" session)" || bad "record after kill: $(cat "$t/c.md.run.json")"
+# A second fresh request on the same out while that unit lives is refused; the record is unchanged.
+before=$(sha256sum < "$t/c.md.run.json")
+req c.md ',"timeout_seconds":5' | apr > "$t/c2.out" 2> "$t/c2.err"; rc=$?
+{ [ "$rc" -eq 2 ] && grep -q '"code":"run_still_active"' "$t/c2.err" && [ "$(sha256sum < "$t/c.md.run.json")" = "$before" ] \
+  && systemctl is-active --quiet "$unit"; } \
+  && ok "a fresh request while $unit lives is refused run_still_active, record unchanged" || bad "second request: rc=$rc $(cat "$t/c2.err")"
 for _ in $(seq 60); do systemctl is-active --quiet "$unit" || break; sleep 0.5; done; took=$(( $(date +%s) - s0 ))
 { ! systemctl is-active --quiet "$unit" && [ "$took" -ge 14 ] && [ "$took" -le 25 ] && ! alive "$(cat "$t/bin/sleeper.pid")"; } \
   && ok "the unit ended at its own bound after ${took}s, sleeper gone" || bad "bound: active=$(systemctl is-active "$unit") took=${took}s"

@@ -7,7 +7,9 @@ use crate::work::{
 use serde_json::{Value, json};
 use std::{
     ffi::OsString,
-    io::{Read, Seek, SeekFrom, Write},
+    fs::File,
+    io::{Read, Write},
+    os::unix::fs::{FileExt, MetadataExt},
     path::Path,
     process::{Child, ExitCode},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -59,6 +61,11 @@ const GRACE: u64 = 10;
 const MAX_TIMEOUT: u64 = 86_400;
 /// Switches off every hook (account, host, project, plugin) of the session.
 const HOOKS_OFF: &str = r#"{"disableAllHooks":true}"#;
+/// Only the account's settings load: a worktree's `.claude/settings*.json`, which an earlier
+/// stage may have written, cannot steer this one (shown live: its `env` reached the shell).
+const SOURCES: &str = "user";
+/// The exit of a run whose stage may have run but whose answer or record could not be written.
+const WRITE_FAILED: u8 = 5;
 
 struct Request {
     role: String,
@@ -74,9 +81,12 @@ struct Request {
     expect_file: Option<String>,
     expect_line: Option<String>,
     mcp: Vec<String>,
-    env: Vec<(String, String)>,
     /// The session and account of the record to continue.
     resume: Option<(String, String)>,
+    /// The expected file as it was before the session's first launch.
+    expect_before: Value,
+    /// The environment of the CLI (and of `git`), without `CLAUDE_CONFIG_DIR`.
+    base_env: Vec<(String, String)>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -145,7 +155,9 @@ fn environment(r: &Value) -> Result<Vec<(String, String)>, Failure> {
                     .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == b'_')
                 && !k.as_bytes()[0].is_ascii_digit();
             require!(name_ok => "invalid_input", "env");
-            require!(!k.starts_with("HERDR_") && !k.starts_with("CLAUDE_") => "env_forbidden", "env");
+            // The account named in the record must be the account that answers.
+            require!(!k.starts_with("HERDR_") && !k.starts_with("CLAUDE_")
+                && !k.starts_with("ANTHROPIC_") && k != "HOME" => "env_forbidden", "env");
             let v = v
                 .as_str()
                 .filter(|v| !v.contains('\0') && v.len() <= 4096)
@@ -156,6 +168,57 @@ fn environment(r: &Value) -> Result<Vec<(String, String)>, Failure> {
 }
 fn record_path(out: &str) -> String {
     format!("{out}.run.json")
+}
+fn existing(out: &str) -> Option<Value> {
+    std::fs::read(record_path(out))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+}
+/// The fixed short list of this process's variables, then the request's `env`.
+fn base_env(s: &impl System, extra: &[(String, String)]) -> Vec<(String, String)> {
+    let mut env: Vec<(String, String)> = s
+        .environment()
+        .into_iter()
+        .filter(|(k, _)| KEEP.contains(&k.as_str()))
+        .filter(|(k, _)| !extra.iter().any(|(name, _)| name == k))
+        .collect();
+    env.extend(extra.iter().cloned());
+    env
+}
+/// `git -C <cwd> …` in the CLI's clean environment (no `GIT_DIR` of the caller), messages in C.
+fn git(
+    s: &mut impl System,
+    env: &[(String, String)],
+    cwd: &str,
+    command: &[&str],
+) -> Result<crate::work::Reply, Failure> {
+    let mut a = vec!["-i".to_owned()];
+    a.extend(
+        env.iter()
+            .filter(|(k, _)| k != "LC_ALL")
+            .map(|(k, v)| format!("{k}={v}")),
+    );
+    a.extend(args(&["LC_ALL=C", "git", "-C", cwd]));
+    a.extend(args(command));
+    s.call("env", &a, &Value::Null, 10_000)
+}
+/// The expected file as it is now: its digest and modification time, or nulls when absent.
+fn snapshot(path: &str) -> Value {
+    match std::fs::metadata(path) {
+        Ok(m) if m.is_file() => json!({
+            "path": path,
+            "sha256": std::fs::read(path).ok().map(|b| digest(&b)),
+            "modified": m.mtime().saturating_mul(1_000_000_000).saturating_add(m.mtime_nsec()),
+        }),
+        _ => json!({"path": path, "sha256": null, "modified": null}),
+    }
+}
+/// Met only by a nonempty file this session wrote: one that lay there unchanged since before the
+/// session's first launch does not meet it.
+fn written(path: &str, before: &Value) -> bool {
+    let now = snapshot(path);
+    std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() > 0)
+        && (now["sha256"] != before["sha256"] || now["modified"] != before["modified"])
 }
 fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
     let object = r
@@ -242,46 +305,59 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
     require!(!out_path.is_dir() && out != prompt => "out_unwritable", "out");
     // A prompt that names the out file could make the session write the answer it is judged by.
     require!(!bytes.windows(name.len()).any(|w| w == name.as_bytes()) => "out_named_in_prompt", "prompt");
+    let previous = existing(&out);
+    // A record of a run whose unit is still alive is never run over, fresh or resumed.
+    if let Some(rec) = previous.as_ref().filter(|r| r["state"] == "running") {
+        let unit = text(rec, "unit").map_err(|_| error("resume_record_missing", "out"))?;
+        let active = s.call(
+            "systemctl",
+            &args(&["is-active", "--quiet", unit]),
+            &Value::Null,
+            10_000,
+        );
+        require!(!active.is_ok_and(|a| a.success) => "run_still_active", "out");
+    }
     let resume = if resume {
-        let rec: Value = std::fs::read(record_path(&out))
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
+        let rec = previous
+            .as_ref()
             .ok_or_else(|| error("resume_record_missing", "out"))?;
-        let session = text(&rec, "session").map_err(|_| error("resume_record_missing", "out"))?;
-        let account = text(&rec, "account").map_err(|_| error("resume_record_missing", "out"))?;
+        let session = text(rec, "session").map_err(|_| error("resume_record_missing", "out"))?;
+        let account = text(rec, "account").map_err(|_| error("resume_record_missing", "out"))?;
         require!(accounts.iter().any(|a| a == account) => "resume_account_differs", "account");
-        if rec["state"] == "running" {
-            let unit = text(&rec, "unit").map_err(|_| error("resume_record_missing", "out"))?;
-            let active = s.call(
-                "systemctl",
-                &args(&["is-active", "--quiet", unit]),
-                &Value::Null,
-                10_000,
-            );
-            require!(!active.is_ok_and(|a| a.success) => "run_still_active", "out");
-        }
+        require!(rec["cwd"] == cwd.as_str() => "resume_cwd_differs", "cwd");
+        let same = rec["role"] == role;
+        let fixes = role == "fixer" && (rec["role"] == "implementer" || rec["role"] == "fixer");
+        require!(same || fixes => "resume_role_differs", "role");
         Some((session.to_owned(), account.to_owned()))
     } else {
         None
     };
+    let base_env = base_env(s, &env);
     if resume.is_none() && role == "implementer" {
-        let inside = s.call(
-            "git",
-            &args(&["-C", &cwd, "rev-parse", "--is-inside-work-tree"]),
-            &Value::Null,
-            10_000,
-        );
-        if inside.is_ok_and(|a| a.success && a.stdout.starts_with(b"true")) {
-            let status = s.call(
-                "git",
-                &args(&["-C", &cwd, "status", "--porcelain"]),
-                &Value::Null,
-                10_000,
-            )?;
-            require!(status.success => "io_error", "cwd");
+        // Fails closed: only "not a repository" lets an implementer start without the check.
+        let inside = git(s, &base_env, &cwd, &["rev-parse", "--is-inside-work-tree"])
+            .map_err(|_| error("worktree_unreadable", "cwd"))?;
+        if inside.success && inside.stdout == b"true\n" {
+            let status = git(s, &base_env, &cwd, &["status", "--porcelain"])
+                .map_err(|_| error("worktree_unreadable", "cwd"))?;
+            require!(status.success => "worktree_unreadable", "cwd");
             require!(status.stdout.is_empty() || continue_dirty => "worktree_dirty", "cwd");
+        } else {
+            let not_a_repository = !inside.success
+                && String::from_utf8_lossy(&inside.bytes).contains("not a git repository");
+            require!(not_a_repository => "worktree_unreadable", "cwd");
         }
     }
+    // The reference for `expect.file`: before the first launch; a resume keeps the first's.
+    let expect_before = match &expect_file {
+        None => Value::Null,
+        Some(f) => match previous.as_ref().filter(|_| resume.is_some()) {
+            Some(rec) if rec["expect_file_before"]["path"] == f.as_str() => {
+                rec["expect_file_before"].clone()
+            }
+            _ => snapshot(f),
+        },
+    };
     require!(s.units() => "systemd_absent", "host");
     Ok(Request {
         role: role.to_owned(),
@@ -297,8 +373,9 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
         expect_file,
         expect_line,
         mcp,
-        env,
         resume,
+        expect_before,
+        base_env,
     })
 }
 
@@ -358,6 +435,29 @@ fn write_record(out: &str, record: &Value) -> Result<(), Failure> {
     bytes.push(b'\n');
     write(&record_path(out), &bytes)
 }
+/// After an effect: the record through the rename, else written in place. False when neither
+/// write succeeded.
+fn persist(out: &str, record: &Value) -> bool {
+    write_record(out, record).is_ok() || {
+        let mut bytes = serde_json::to_vec_pretty(record).unwrap_or_default();
+        bytes.push(b'\n');
+        File::create(record_path(out)).is_ok_and(|mut f| f.write_all(&bytes).is_ok())
+    }
+}
+/// A new file under `path`, never an earlier file, link or pipe of that name: the name is
+/// removed and the file created exclusively; the handle is the only way it is read after.
+fn fresh(path: &str) -> std::io::Result<File> {
+    match std::fs::remove_file(path) {
+        Ok(()) => (),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+        Err(e) => return Err(e),
+    }
+    std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(path)
+}
 
 /// What the stream of one run showed.
 #[derive(Default)]
@@ -395,28 +495,33 @@ impl Seen {
         }
     }
 }
-/// Reads what the CLI appended to its output file since the last call; whole lines only.
-fn follow(file: &str, offset: &mut u64, partial: &mut Vec<u8>, seen: &mut Seen) {
-    let Ok(mut f) = std::fs::File::open(file) else {
-        return;
-    };
-    let mut chunk = vec![];
-    if f.seek(SeekFrom::Start(*offset)).is_err() || f.read_to_end(&mut chunk).is_err() {
-        return;
-    }
-    *offset += chunk.len() as u64;
-    partial.extend_from_slice(&chunk);
-    while let Some(at) = partial.iter().position(|b| *b == b'\n') {
-        let line: Vec<u8> = partial.drain(..=at).collect();
-        seen.line(&line);
-        if seen.done() {
-            return;
+/// Reads what the CLI appended to its output since the last call, through the handle opened
+/// before the launch (`read_at` leaves the CLI's file offset alone); whole lines only.
+fn follow(file: &File, offset: &mut u64, partial: &mut Vec<u8>, seen: &mut Seen) {
+    let mut chunk = vec![0; 1 << 16];
+    // At most 16 MiB per call, so the caller's clock is read again.
+    for _ in 0..256 {
+        let n = match file.read_at(&mut chunk, *offset) {
+            Ok(0) | Err(_) => return,
+            Ok(n) => n,
+        };
+        *offset += n as u64;
+        partial.extend_from_slice(&chunk[..n]);
+        while let Some(at) = partial.iter().position(|b| *b == b'\n') {
+            let line: Vec<u8> = partial.drain(..=at).collect();
+            seen.line(&line);
         }
     }
 }
 /// The members of the record that come from the `result` events, and the state the LAST
 /// result gives: turns and tokens are the session's totals; the answer and `expect` are the last.
-fn judge(q: &Request, record: &mut Value, seen: &Seen, e: &Value) -> Result<&'static str, Failure> {
+fn judge(
+    q: &Request,
+    record: &mut Value,
+    seen: &Seen,
+    e: &Value,
+    write_failed: &mut bool,
+) -> &'static str {
     let sum = |pick: &dyn Fn(&Value) -> &Value| -> Value {
         seen.results
             .iter()
@@ -447,24 +552,28 @@ fn judge(q: &Request, record: &mut Value, seen: &Seen, e: &Value) -> Result<&'st
         record["session"] = json!(id);
     }
     let answer = e["result"].as_str().unwrap_or("");
-    // As review.sh: a short answer with the usage-limit text is a cut whether or not the result
-    // says `is_error`, so a limit message is never saved as an answer.
-    let cut = limit_text(answer)
-        || (e["is_error"] == true && (seen.rejected || e["api_error_status"] == 429));
-    Ok(if cut {
+    // A finished answer is never read as a cut: without `is_error`, the usage-limit text is a cut
+    // only when the stream also holds a rejected rate-limit event.
+    let cut = (limit_text(answer) && seen.rejected)
+        || (e["is_error"] == true
+            && (seen.rejected || e["api_error_status"] == 429 || limit_text(answer)));
+    if cut {
         "cut"
     } else if e["is_error"] == true {
         "failed"
     } else if answer.is_empty() {
         record["unmet"] = json!("answer");
         "no_result"
+    } else if write(&q.out, answer.as_bytes()).is_err() {
+        *write_failed = true;
+        record["unmet"] = json!("write");
+        "failed"
     } else {
-        write(&q.out, answer.as_bytes())?;
         record["answer"] = json!({"path": q.out, "sha256": digest(answer.as_bytes())});
         let first = answer.lines().next().unwrap_or("");
         if q.expect_file
             .as_deref()
-            .is_some_and(|f| !std::fs::metadata(f).is_ok_and(|m| m.is_file() && m.len() > 0))
+            .is_some_and(|f| !written(f, &q.expect_before))
         {
             record["unmet"] = json!("file");
             "no_result"
@@ -474,54 +583,37 @@ fn judge(q: &Request, record: &mut Value, seen: &Seen, e: &Value) -> Result<&'st
         } else {
             "ok"
         }
-    })
+    }
 }
 enum End {
     Result,
     Exit,
     Timeout,
 }
-/// The processes in the unit other than the CLI at the moment of the stop; `None` when the
-/// unit's control group cannot be read.
-fn others(s: &mut impl System, unit: &str, cli: u32) -> Option<u64> {
-    let reply = s
-        .call(
-            "systemctl",
-            &args(&["show", "--property=ControlGroup", "--value", unit]),
-            &Value::Null,
-            10_000,
-        )
-        .ok()?;
-    let group = String::from_utf8(reply.stdout).ok()?;
-    let group = group.trim();
-    if !reply.success {
-        return None;
-    }
-    if group.is_empty() {
-        // The unit is gone: everything in it has ended.
-        return Some(0);
-    }
-    let procs = s
-        .read(&format!("/sys/fs/cgroup{group}/cgroup.procs"))
-        .ok()?;
-    let text = String::from_utf8(procs).ok()?;
-    Some(
-        text.split_whitespace()
-            .filter(|p| p.parse::<u32>().is_ok_and(|p| p != cli))
-            .count() as u64,
-    )
-}
-/// Stops the whole unit (every process in its control group) and reaps the CLI.
-fn stop(s: &mut impl System, unit: &str, child: &mut Child) {
+/// Stops the whole unit (every process in its control group), reaps the CLI and confirms the
+/// unit is no longer active. False when that cannot be confirmed.
+fn stop(s: &mut impl System, unit: &str, child: &mut Child) -> bool {
     let _ = s.call("systemctl", &args(&["stop", unit]), &Value::Null, 60_000);
+    let mut reaped = false;
     for _ in 0..200 {
         if !matches!(child.try_wait(), Ok(None)) {
-            return;
+            reaped = true;
+            break;
         }
         s.pause(Duration::from_millis(100));
     }
-    let _ = child.kill();
-    let _ = child.wait();
+    if !reaped {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+    let active = s.call(
+        "systemctl",
+        &args(&["is-active", "--quiet", unit]),
+        &Value::Null,
+        10_000,
+    );
+    // `is-active` exits nonzero for an inactive or unknown (collected) unit.
+    active.is_ok_and(|a| !a.success)
 }
 fn limit_text(text: &str) -> bool {
     let t = text.to_lowercase();
@@ -530,31 +622,53 @@ fn limit_text(text: &str) -> bool {
             || (t.contains("hit your") && t.contains("limit"))
             || t.contains("resets "))
 }
-/// One launch on one account. Returns the final record and whether the session did work.
+/// One launch on one account. Returns the final record, whether the session did work, and
+/// whether every write after the first effect succeeded.
 fn attempt(
     s: &mut impl System,
     q: &Request,
     account: &str,
-    session: &str,
-    resume: bool,
-) -> Result<(Value, bool), Failure> {
-    let unit = format!(
-        "ap-run-{}.scope",
-        new_session_id(s).map_err(|_| error("io_error", "unit"))?
-    );
-    let stream = format!("{}.stream.jsonl", q.out);
-    let errors = format!("{}.err", q.out);
+    resume: Option<&str>,
+) -> (Value, bool, bool) {
     let mut record = json!({
         "role": q.role, "runtime": "claude", "model": q.model, "effort": q.effort,
-        "account": account, "session": session, "cwd": q.cwd, "unit": unit,
+        "account": account, "session": resume, "cwd": q.cwd, "unit": null,
         "prompt": {"path": q.prompt, "sha256": q.prompt_sha256},
         "answer": null, "start": stamp(SystemTime::now()), "end": null, "state": "running",
         "turns": null,
         "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
-        "permission_denials": [], "others_at_stop": null, "results": 0, "expect_met": null,
-        "unmet": null, "refusal": null,
+        "permission_denials": [], "results": 0, "expect_met": null,
+        "expect_file_before": q.expect_before, "unmet": null, "refusal": null,
     });
-    write_record(&q.out, &record)?;
+    let not_launched = |mut record: Value, unmet: &str| {
+        record["state"] = json!("failed");
+        record["unmet"] = json!(unmet);
+        record["end"] = json!(stamp(SystemTime::now()));
+        let saved = persist(&q.out, &record);
+        (record, false, saved)
+    };
+    let (Ok(session), Ok(unit)) = (
+        resume.map_or_else(|| new_session_id(s), |r| Ok(r.to_owned())),
+        new_session_id(s),
+    ) else {
+        return not_launched(record, "launch");
+    };
+    let unit = format!("ap-run-{unit}.scope");
+    record["session"] = json!(session);
+    record["unit"] = json!(unit);
+    let stream = format!("{}.stream.jsonl", q.out);
+    let errors = format!("{}.err", q.out);
+    let files = (File::open(&q.prompt), fresh(&stream), fresh(&errors));
+    let (Ok(prompt), Ok(output), Ok(errs)) = files else {
+        return not_launched(record, "launch");
+    };
+    let Ok(reader) = output.try_clone() else {
+        return not_launched(record, "launch");
+    };
+    // The record names the session BEFORE the launch.
+    if !persist(&q.out, &record) {
+        return not_launched(record, "write");
+    }
     let mut argv = args(&[
         "systemd-run",
         "--scope",
@@ -580,6 +694,8 @@ fn attempt(
         &q.mode,
         "--permission-prompts",
         "none",
+        "--setting-sources",
+        SOURCES,
         "--settings",
         HOOKS_OFF,
         "--strict-mcp-config",
@@ -588,28 +704,19 @@ fn attempt(
         argv.extend(args(&["--mcp-config", m]));
     }
     argv.extend(args(&[
-        if resume { "--resume" } else { "--session-id" },
-        session,
+        if resume.is_some() {
+            "--resume"
+        } else {
+            "--session-id"
+        },
+        &session,
     ]));
-    let mut env: Vec<(String, String)> = s
-        .environment()
-        .into_iter()
-        .filter(|(k, _)| KEEP.contains(&k.as_str()))
-        .filter(|(k, _)| !q.env.iter().any(|(name, _)| name == k))
-        .collect();
-    env.extend(q.env.iter().cloned());
+    let mut env = q.base_env.clone();
     env.push(("CLAUDE_CONFIG_DIR".into(), account.into()));
-    let files = [Path::new(&q.prompt), Path::new(&stream), Path::new(&errors)];
     let started = s.now();
-    let mut child = match s.launch(&argv, &env, &q.cwd, files) {
+    let mut child = match s.launch(&argv, &env, &q.cwd, [prompt, output, errs]) {
         Ok(child) => child,
-        Err(_) => {
-            record["state"] = json!("failed");
-            record["unmet"] = json!("launch");
-            record["end"] = json!(stamp(SystemTime::now()));
-            write_record(&q.out, &record)?;
-            return Ok((record, false));
-        }
+        Err(_) => return not_launched(record, "launch"),
     };
     let bound = Duration::from_secs(q.timeout);
     // A reviewer's stage ends at its first result; an implementer's or a fixer's only at the
@@ -621,7 +728,7 @@ fn attempt(
     let (mut offset, mut partial) = (0, vec![]);
     let end = loop {
         let exited = !matches!(child.try_wait(), Ok(None));
-        follow(&stream, &mut offset, &mut partial, &mut seen);
+        follow(&reader, &mut offset, &mut partial, &mut seen);
         if seen.done() {
             break End::Result;
         }
@@ -637,30 +744,41 @@ fn attempt(
         }
         s.pause(Duration::from_millis(100));
     };
-    record["others_at_stop"] = json!(others(s, &unit, child.id()));
-    stop(s, &unit, &mut child);
+    let stopped = stop(s, &unit, &mut child);
+    // Once more after the stop: what came in the last moment, and a last line without newline.
+    follow(&reader, &mut offset, &mut partial, &mut seen);
+    if !partial.is_empty() {
+        seen.line(&partial);
+    }
+    if std::fs::metadata(&errors).is_ok_and(|m| m.len() == 0) {
+        let _ = std::fs::remove_file(&errors);
+    }
+    // A reviewer whose first result was written before the stop has ended at it.
+    let timed_out = matches!(end, End::Timeout) && !seen.done();
     record["end"] = json!(stamp(SystemTime::now()));
     record["results"] = json!(seen.results.len());
+    let mut write_failed = false;
     let state = match seen.results.last() {
-        None if matches!(end, End::Timeout) => "timeout",
+        None if timed_out => "timeout",
         None => {
             record["unmet"] = json!("result_event");
             "failed"
         }
         Some(e) => {
-            let judged = judge(q, &mut record, &seen, e)?;
+            let judged = judge(q, &mut record, &seen, e, &mut write_failed);
             record["expect_met"] = json!(judged == "ok");
             // A session that never exits keeps its last answer, but its state is the bound's.
-            if matches!(end, End::Timeout) {
-                "timeout"
-            } else {
-                judged
-            }
+            if timed_out { "timeout" } else { judged }
         }
     };
     record["state"] = json!(state);
-    write_record(&q.out, &record)?;
-    Ok((record, seen.worked))
+    if !stopped {
+        // Something of the stage may still live: never `ok`.
+        record["state"] = json!("failed");
+        record["unmet"] = json!("stop");
+    }
+    let saved = persist(&q.out, &record);
+    (record, seen.worked, saved && !write_failed)
 }
 fn run(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let q = request(s, r)?;
@@ -668,34 +786,34 @@ fn run(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     if std::fs::symlink_metadata(&q.out).is_ok() {
         std::fs::rename(&q.out, format!("{}.prev", q.out)).map_err(|_| error("io_error", "out"))?;
     }
+    // From here on every outcome is a record, never a refusal.
     let accounts = match &q.resume {
         Some((_, account)) => vec![account.clone()],
         None => q.accounts.clone(),
     };
-    let mut last = Value::Null;
+    let (mut last, mut clean) = (Value::Null, true);
     for (i, account) in accounts.iter().enumerate() {
-        let session = match &q.resume {
-            Some((session, _)) => session.clone(),
-            None => new_session_id(s)?,
-        };
-        let (record, worked) = attempt(s, &q, account, &session, q.resume.is_some())?;
+        let resume = q.resume.as_ref().map(|(session, _)| session.as_str());
+        let (record, worked, saved) = attempt(s, &q, account, resume);
+        clean &= saved;
         // A fresh run cut before it did any work (no tool ran) may go to the next account.
         let next =
             record["state"] == "cut" && q.resume.is_none() && !worked && i + 1 < accounts.len();
         last = record;
-        if !next {
+        if !next || !saved {
             break;
         }
     }
     let status = match last["state"].as_str() {
+        _ if !clean => WRITE_FAILED,
         Some("ok") => 0,
         Some("cut") => 75,
         _ => 3,
     };
     Ok((last, status))
 }
-/// One `ap run` request. A refusal writes a record with state `refused` unless the existing
-/// record is `cut` or `running`, so a resumable record is never replaced by a refusal.
+/// One `ap run` request. A refusal (exit 2, before any effect) replaces an existing record only
+/// when that record says `ok` or `refused`: every other record names a session someone may resume.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     run(s, r).inspect_err(|f| {
         let Some(out) = r["out"]
@@ -705,12 +823,11 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             return;
         };
         let parent_ok = Path::new(out).parent().is_some_and(Path::is_dir);
-        // Only a resumable record (`cut`) or one of a run that may still be alive (`running`)
-        // is kept; any other earlier record is replaced, so a reader never takes it for this one.
-        let kept = std::fs::read(record_path(out))
-            .ok()
-            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
-            .is_some_and(|v| v["state"] == "cut" || v["state"] == "running");
+        let replaceable = match std::fs::symlink_metadata(record_path(out)) {
+            Err(e) => e.kind() == std::io::ErrorKind::NotFound,
+            Ok(_) => existing(out).is_some_and(|v| v["state"] == "ok" || v["state"] == "refused"),
+        };
+        let kept = !replaceable;
         if !parent_ok || kept {
             return;
         }
@@ -725,8 +842,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
                 "prompt": {"path": given("prompt"), "sha256": null}, "answer": null,
                 "start": now, "end": now, "state": "refused", "turns": null,
                 "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
-                "permission_denials": [], "others_at_stop": null, "results": 0,
-                "expect_met": null, "unmet": null,
+                "permission_denials": [], "results": 0, "expect_met": null,
+                "expect_file_before": null, "unmet": null,
                 "refusal": {"code": f.code, "field": f.field},
             }),
         );

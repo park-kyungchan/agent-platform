@@ -28,8 +28,20 @@ case "$mode" in
            init; said "first"; result false 'Verdict: accept\nfirst' 2
            /bin/bash -c 'echo $$ > "'"$here"'/child.pid"; sleep 3; :' & wait $!
            said "second"; result false 'Verdict: accept\nsecond' 1 ;;
-  limitok) # the usage-limit text in a result that does not say is_error
+  limitok) # the usage-limit text in a result that does not say is_error, no rejected event
            init; result false 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 1 ;;
+  limitrej) # the same with a rejected rate-limit event
+           init; rejected; result false 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 1 ;;
+  resets)  # a finished review that happens to say "resets"
+           init; result false 'Verdict: accept\nThe guard resets the counter before each retry; no defect found.' 2 ;;
+  swap)    # the stream's name is replaced by a file with another run's lines; this run answers on
+           init; p=$(readlink "/proc/$$/fd/1"); rm -f "$p"
+           { printf '%01000d\n' 0; printf '{"type":"result","is_error":false,"num_turns":1,"result":"ANSWER OF RUN A","session_id":"other"}\n'; } > "$p"
+           sleep 0.5; result false 'Verdict: accept\nown' 1 ;;
+  fifo)    # the stream's name becomes a named pipe that nobody writes
+           init; p=$(readlink "/proc/$$/fd/1"); rm -f "$p"; mkfifo "$p"; sleep 0.5; result false 'Verdict: accept\nown' 1 ;;
+  nonl)    # the last result line has no newline
+           init; result false 'Verdict: accept' 1 | tr -d '\n' ;;
   limit1)  init; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 1 ;;
   limit45) init; tool; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 45 ;;
   watch)   # the record as it is while the CLI runs

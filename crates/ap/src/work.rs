@@ -63,25 +63,26 @@ pub trait System {
         std::thread::sleep(duration);
     }
     /// Starts one long program without a pipe: `argv[0]` with the rest of `argv`, exactly the
-    /// environment `env`, in `cwd`, stdin read from `files[0]`, stdout and stderr written to
-    /// `files[1]` and `files[2]`. `ap run` passes the whole `systemd-run` command line here; a
-    /// test replaces the unit launcher by overriding this method.
+    /// environment `env`, in `cwd`, with `files` as stdin, stdout and stderr (files the caller
+    /// opened). `ap run` passes the whole `systemd-run` command line here; a test replaces the
+    /// unit launcher by overriding this method.
     fn launch(
         &mut self,
         argv: &[String],
         env: &[(String, String)],
         cwd: &str,
-        files: [&Path; 3],
+        files: [std::fs::File; 3],
     ) -> std::io::Result<std::process::Child> {
         let (program, rest) = argv.split_first().ok_or(std::io::ErrorKind::InvalidInput)?;
+        let [stdin, stdout, stderr] = files;
         Command::new(program)
             .args(rest)
             .env_clear()
             .envs(env.iter().map(|(k, v)| (k, v)))
             .current_dir(cwd)
-            .stdin(std::fs::File::open(files[0])?)
-            .stdout(std::fs::File::create(files[1])?)
-            .stderr(std::fs::File::create(files[2])?)
+            .stdin(stdin)
+            .stdout(stdout)
+            .stderr(stderr)
             .spawn()
     }
     /// Whether systemd is this host's init (sd_booted: `/run/systemd/system` is a directory).
