@@ -108,6 +108,12 @@ struct W {
     lock: String,
     /// The tip's `content/` is the installed commit's: both have the same `content/SHA256SUMS`.
     same_content: bool,
+    /// The clone's `origin/main` at its first read, when it is not the tip (a dead call's clone).
+    origin_once: Option<String>,
+    /// The clone cannot answer: `git show` and `rev-parse` fail.
+    lost: bool,
+    /// `INVOCATION_ID` of the environment.
+    invocation: Option<String>,
 }
 
 impl W {
@@ -167,6 +173,9 @@ impl W {
             nested_result: None,
             lock: String::new(),
             same_content: false,
+            origin_once: None,
+            lost: false,
+            invocation: None,
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -262,6 +271,20 @@ impl W {
     fn run_with(&mut self, r: &Value) -> (Value, u8) {
         execute(self, r)
     }
+    /// The timer's request: none of `by`, `reason`, `past`, `rollback`.
+    fn timer(&self) -> Value {
+        let mut r = self.request();
+        let o = r.as_object_mut().unwrap();
+        o.remove("by");
+        o.remove("reason");
+        r
+    }
+    /// A Lead's rollback request.
+    fn rollback(&self) -> Value {
+        let mut r = self.request();
+        r["rollback"] = json!(true);
+        r
+    }
     /// A running attempt of the target that a dead call left.
     fn dead_attempt(&mut self, commit: &str, from: &str, from_sha256: &str) -> Value {
         let id = oid("install", "act-dead");
@@ -269,6 +292,19 @@ impl W {
             json!({"id": id, "target": target(), "kind": "forward", "repository": "o/r",
             "commit": commit, "attempt": 1, "from": from, "from_sha256": from_sha256, "by": "dead",
             "status": "running", "started_at": STARTED, "running_in": target()}),
+        );
+        id
+    }
+    /// A closed attempt of the target, older than every attempt a call starts and than a dead
+    /// call's; each one newer than the one before.
+    fn closed(&mut self, kind: &str, commit: &str, from: &str, outcome: &str, by: &str) -> Value {
+        let n = self.installs.len();
+        let id = oid("install", &format!("act-closed-{n}"));
+        self.installs.push(
+            json!({"id": id, "target": target(), "kind": kind, "repository": "o/r", "commit": commit,
+            "attempt": 1, "from": from, "from_sha256": sha(&binary(from)), "by": by, "status": "closed",
+            "started_at": format!("2026-11-14T09:{n:02}:00Z"), "outcome": outcome,
+            "closed_at": format!("2026-11-14T09:{n:02}:30Z")}),
         );
         id
     }
@@ -351,8 +387,10 @@ impl W {
         let rest: Vec<&str> = a[2..].iter().map(String::as_str).collect();
         match rest.as_slice() {
             ["fetch", ..] => Self::text(!self.fetch_fails, ""),
+            ["show" | "rev-parse", ..] if self.lost => Self::text(false, ""),
             ["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"] => {
-                Self::text(!self.fetch_fails, &format!("{}\n", self.tip()))
+                let origin = self.origin_once.take().unwrap_or_else(|| self.tip());
+                Self::text(!self.fetch_fails, &format!("{origin}\n"))
             }
             ["checkout", "--quiet", "--force", "--detach", _] => Self::text(true, ""),
             ["show", spec] => {
@@ -468,8 +506,9 @@ impl W {
                         );
                     }
                     let mut row = p.clone();
+                    let started = format!("2026-11-14T11:00:{:02}Z", self.installs.len());
                     (row["id"], row["status"], row["started_at"]) =
-                        (id.clone(), json!("running"), json!(STARTED));
+                        (id.clone(), json!("running"), json!(started));
                     row["running_in"] = p["target"].clone();
                     self.installs.push(row);
                     return Self::ok(
@@ -613,7 +652,11 @@ impl System for W {
             std::fs::write(kept, &self.bytes).unwrap();
         }
         if name == "content" && inst.exit != 2 {
-            std::fs::write(self.tarball(), b"tar").unwrap();
+            // The tarball it prints, or the fixture's.
+            let printed = [(&inst.out, "backup="), (&inst.err, "kept copy ")]
+                .into_iter()
+                .find_map(|(text, marker)| Some(text.split_once(marker)?.1.trim().to_owned()));
+            std::fs::write(printed.unwrap_or_else(|| self.tarball()), b"tar").unwrap();
         }
         if let Some(f) = inst.file {
             self.bytes = binary(f.as_deref().unwrap_or("none"));
@@ -645,6 +688,9 @@ impl System for W {
             ("AP_CONTENT_BACKUP_DIR".into(), self.p("content-backup")),
             ("AP_DELIVER_LOCK".into(), self.lock.clone()),
         ]
+        .into_iter()
+        .chain(self.invocation.clone().map(|v| ("INVOCATION_ID".into(), v)))
+        .collect()
     }
 }
 
@@ -1090,7 +1136,9 @@ fn d5_refusals_apply_nothing() {
     type Setup = fn(&mut W) -> Value;
     let cases: Vec<(&str, Setup)> = vec![
         ("attempt_running", |w| {
+            // A dead rollback at neither of its commits is not repaired.
             w.dead_attempt(&c(2), &c(0), "0");
+            w.installs[0]["kind"] = json!("rollback");
             (w.file, w.tree) = (Some(c(1)), Some(c(1)));
             w.request()
         }),
@@ -1256,7 +1304,8 @@ fn d6_dead_call_at_commit_is_closed_installed() {
     let from_sha = sha(&binary(&c(0)));
     let id = w.dead_attempt(&c(2), &c(0), &from_sha);
     (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
-    std::fs::write(kept(&w), b"kept").unwrap();
+    // The file handle counts only when the kept copy's whole digest is `from_sha256`.
+    std::fs::write(kept(&w), binary(&c(0))).unwrap();
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
     let close = &w.applies("close_install")[0]["parameters"];
@@ -1284,7 +1333,8 @@ fn d6_dead_call_at_commit_records_the_oldest_tarball() {
     }
     let (v, _) = w.run();
     let close = &w.applies("close_install")[0]["parameters"];
-    let oldest = w.p("content-backup/agents-before-20261114T100000Z-2.tar");
+    // Stamped LATER than `started_at` (10:00:00): a tarball of the start's second is not the handle.
+    let oldest = w.p("content-backup/agents-before-20261114T100500Z-3.tar");
     assert_eq!(
         *close,
         json!({"install": id, "outcome": "installed", "to": c(2), "rollback_content": oldest}),
@@ -1292,21 +1342,773 @@ fn d6_dead_call_at_commit_records_the_oldest_tarball() {
     );
 }
 
+// ---- D6 the repair of a dead install call ------------------------------------------------------
+
+/// A dead call's attempt of c(2) from c(0); the kept copy of c(0)'s file is on disk.
+fn dead_forward(w: &mut W, file: Option<u32>, tree: Option<u32>) -> Value {
+    let id = w.dead_attempt(&c(2), &c(0), &sha(&binary(&c(0))));
+    std::fs::write(kept(w), binary(&c(0))).unwrap();
+    (w.file, w.tree) = (file.map(c), tree.map(c));
+    w.bytes = binary(w.file.as_deref().unwrap_or("none"));
+    id
+}
+fn tarball_at(w: &W, stamp: &str) -> String {
+    let path = w.p(&format!(
+        "content-backup/agents-before-20261114T{stamp}.tar"
+    ));
+    std::fs::write(&path, b"tar").unwrap();
+    path
+}
+
 #[test]
-fn d6_dead_call_at_neither_refuses() {
-    for (file, tree) in [
-        (Some(c(1)), Some(c(1))),
-        (Some(c(2)), Some(c(0))),
-        (None, None),
-    ] {
+fn d6_repair_forward_installs_the_missing_part() {
+    // The file at the commit and the tree at `from`: only the content installer.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(0));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(w.launched(), ["content"]);
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w),
+            "rollback_content": w.tarball()})
+    );
+    assert_eq!(v["closed"], json!({"install": id, "outcome": "installed"}));
+    // The file at `from` and the tree at the commit: only the file installer.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(0), Some(2));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(w.launched(), ["ap"]);
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)})
+    );
+    // Both at neither: both installers, for the attempt's commit.
+    let mut w = W::new();
+    dead_forward(&mut w, None, None);
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
+    assert_eq!(w.launched(), ["ap", "content"]);
+    let words: Vec<_> = w
+        .calls
+        .iter()
+        .filter(|(p, _, _)| p == "bash")
+        .map(|(_, a, _)| a[1..].to_vec())
+        .collect();
+    assert_eq!(
+        words,
+        [args(&["install", &c(2)]), args(&["install", &c(2)])]
+    );
+}
+
+#[test]
+fn d6_repair_falls_back_to_the_rollback() {
+    // The clone's origin/main is not the attempt's commit: no installer, the command's rollback.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), None);
+    let tarball = tarball_at(&w, "100003Z-9");
+    w.origin_once = Some(c(1));
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(
+        w.launched(),
+        ["ap-rollback", "content-rollback", "ap", "content"]
+    );
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "failed_restored", "to": c(0), "rollback_binary": kept(&w),
+            "rollback_content": tarball})
+    );
+    assert_eq!(
+        v["closed"],
+        json!({"install": id, "outcome": "failed_restored"})
+    );
+    // The installer called again leaves the tree off the commit: the same rollback.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), None);
+    let tarball = tarball_at(&w, "100003Z-9");
+    let content = w.inst.get_mut("content").unwrap();
+    (content.tree, content.exit, content.out) = (None, 2, String::new());
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "content_refused"), 3),
+        "{v}"
+    );
+    assert_eq!(
+        w.launched()[..3],
+        ["content", "ap-rollback", "content-rollback"]
+    );
+    let close = &w.applies("close_install")[0]["parameters"];
+    assert_eq!(
+        *close,
+        json!({"install": id, "outcome": "failed_restored", "to": c(0), "rollback_binary": kept(&w),
+            "rollback_content": tarball, "code": "content_refused"})
+    );
+}
+
+#[test]
+fn d6_repair_uses_the_oldest_tarball() {
+    // The dead call's tarball (10:00:05) is the handle: not the previous call's of the start's
+    // second, not the one the second install printed (a tarball of a half-swapped tree).
+    for fallback in [false, true] {
         let mut w = W::new();
-        let id = w.dead_attempt(&c(2), &c(0), &sha(&binary(&c(0))));
-        (w.file, w.tree) = (file, tree);
+        let id = dead_forward(&mut w, Some(2), None);
+        tarball_at(&w, "100000Z-1");
+        let first = tarball_at(&w, "100005Z-2");
+        let second = w.p("content-backup/agents-before-20261114T100009Z-3.tar");
+        w.inst.get_mut("content").unwrap().out = format!("installed backup={second}\n");
+        if fallback {
+            w.origin_once = Some(c(1));
+        }
+        let (v, _) = w.run();
+        let close = &w.applies("close_install")[0]["parameters"];
+        assert_eq!(close["install"], id);
+        assert_eq!(close["rollback_content"], json!(first), "{v}");
+        if fallback {
+            let rollback = w
+                .calls
+                .iter()
+                .find(|(p, a, _)| p == "bash" && a[0].ends_with("install-content.sh"))
+                .unwrap();
+            assert_eq!(rollback.1[1..], [String::from("rollback"), first.clone()]);
+        }
+    }
+}
+
+#[test]
+fn d6_handle_ignores_a_tarball_of_the_start_second() {
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(2));
+    tarball_at(&w, "100000Z-2");
+    w.run();
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)})
+    );
+    let mut w = W::new();
+    dead_forward(&mut w, Some(2), Some(2));
+    tarball_at(&w, "100000Z-2");
+    let later = tarball_at(&w, "100001Z-3");
+    w.run();
+    let close = &w.applies("close_install")[0]["parameters"];
+    assert_eq!(close["rollback_content"], json!(later));
+}
+
+#[test]
+fn d3_first_installer_fails_after_it_replaced_the_file() {
+    // Different manifests: the file is rolled back; the pair is at `from`.
+    let mut w = W::new();
+    let ap = w.inst.get_mut("ap").unwrap();
+    (ap.exit, ap.err) = (1, "restore_failed@install-ap.sh:250\n".into());
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "restore_failed"), 3),
+        "{v}"
+    );
+    assert_eq!(
+        rows(&v),
+        [
+            row("ap", 1, Some("restore_failed")),
+            row("ap-rollback", 0, None)
+        ]
+    );
+    assert_eq!(w.file.as_deref(), Some(c(0).as_str()));
+    // Identical manifests: the pair is at the tip, the read decides; the record keeps the code.
+    let mut w = W::new();
+    w.same_content = true;
+    let ap = w.inst.get_mut("ap").unwrap();
+    (ap.exit, ap.err) = (1, "restore_failed@install-ap.sh:250\n".into());
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("installed", "restore_failed"), 0), "{v}");
+    assert_eq!(rows(&v), [row("ap", 1, Some("restore_failed"))]);
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"]["code"],
+        "restore_failed"
+    );
+}
+
+#[test]
+fn d6_repair_that_fails_ends_the_call_failed() {
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), None);
+    let tarball = tarball_at(&w, "100003Z-9");
+    w.origin_once = Some(c(1));
+    let back = w.inst.get_mut("ap-rollback").unwrap();
+    (back.file, back.exit, back.err) = (None, 1, "rollback_move_failed@install-ap.sh:9\n".into());
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed", "rollback_move_failed"), 4),
+        "{v}"
+    );
+    assert_eq!(v["closed"], json!({"install": id, "outcome": "failed"}));
+    assert_eq!(
+        (v["outcome"].clone(), v["to"].clone(), v["install"].clone()),
+        (json!("failed"), json!("neither"), id.clone())
+    );
+    assert_eq!(
+        (v["rollback_binary"].clone(), v["rollback_content"].clone()),
+        (json!(kept(&w)), json!(tarball))
+    );
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"]["outcome"],
+        "failed"
+    );
+    // The call ended there: no fetch, no attempt.
+    assert!(
+        !w.calls
+            .iter()
+            .any(|(p, a, _)| p == "git" && a[2] == "fetch")
+    );
+    assert!(w.applies("start_install").is_empty());
+    assert_eq!(w.last(), Some(v));
+}
+
+#[test]
+fn d6_dead_rollback_at_neither_refuses() {
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), None);
+    (
+        w.installs[0]["kind"],
+        w.installs[0]["commit"],
+        w.installs[0]["from"],
+    ) = (json!("rollback"), json!(c(0)), json!(c(2)));
+    let (v, exit) = w.run();
+    refused(&w, &v, exit, "attempt_running");
+    assert_eq!(v["detail"], json!({"install": id}));
+    assert!(w.applies("close_install").is_empty());
+    // A dead rollback at its `from` is closed by the read, under its own request id.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(2));
+    (
+        w.installs[0]["kind"],
+        w.installs[0]["commit"],
+        w.installs[0]["from"],
+    ) = (json!("rollback"), json!(c(0)), json!(c(2)));
+    let (v, _) = w.run();
+    let close = &w.applies("close_install")[0];
+    assert_eq!(close["request_id"], format!("ap.{}.rb1.close", c(0)));
+    assert_eq!(
+        close["parameters"],
+        json!({"install": id, "outcome": "not_started", "to": c(2), "code": "dead_call"}),
+        "{v}"
+    );
+}
+
+#[test]
+fn d6_clone_that_cannot_answer_refuses() {
+    for (file, tree) in [(Some(1), Some(1)), (Some(2), Some(0)), (None, None)] {
+        let mut w = W::new();
+        let id = dead_forward(&mut w, file, tree);
+        w.lost = true;
         let (v, exit) = w.run();
         refused(&w, &v, exit, "attempt_running");
         assert_eq!(v["detail"], json!({"install": id}));
         assert!(w.applies("close_install").is_empty());
         assert_eq!(w.installs[0]["status"], "running");
+    }
+}
+
+// ---- D12 a Lead's rollback ---------------------------------------------------------------------
+
+/// The pair at c(2), installed by attempt A (forward, from c(0)) that kept both handles.
+fn installed_by_a(w: &mut W) -> Value {
+    (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+    let a = w.closed("forward", &c(2), &c(0), "installed", "session-0");
+    let (copy, tarball) = (kept(w), w.tarball());
+    std::fs::write(&copy, binary(&c(0))).unwrap();
+    std::fs::write(&tarball, b"tar").unwrap();
+    let row = w.installs.last_mut().unwrap();
+    (row["rollback_binary"], row["rollback_content"]) = (json!(copy), json!(tarball));
+    a
+}
+fn rolls(w: &mut W) -> (Value, u8) {
+    let r = w.rollback();
+    w.run_with(&r)
+}
+
+#[test]
+fn d12_rollback_exact_calls() {
+    let mut w = W::new();
+    let a = installed_by_a(&mut w);
+    let (v, exit) = rolls(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    let (back, here) = (c(0), c(2));
+    let clone = w.p("state/r");
+    let eq = |k: &str, v: Value| json!({"eq": [k, v]});
+    let search = |all: Vec<Value>| {
+        (
+            "ont".to_owned(),
+            args(&["search"]),
+            json!({"object_type": "install", "where": {"all": all}, "limit": 200}),
+        )
+    };
+    let show = |commit: &str| {
+        (
+            "git".to_owned(),
+            args(&[
+                "-C",
+                &clone,
+                "show",
+                &format!("{commit}:content/SHA256SUMS"),
+            ]),
+            Value::Null,
+        )
+    };
+    let version = (w.p("bin/ap"), args(&["--version"]), Value::Null);
+    let apply = |body: Value| {
+        (
+            "ont".to_owned(),
+            args(&["action", "apply", "--client", "ap-deliver"]),
+            body,
+        )
+    };
+    let index = (
+        "ont".to_owned(),
+        args(&["index", "--source", "installed_binaries"]),
+        Value::Null,
+    );
+    let mut env: serde_json::Map<String, Value> = w
+        .environment()
+        .into_iter()
+        .map(|(k, v)| (k, json!(v)))
+        .collect();
+    env.insert("CARGO_TARGET_DIR".into(), json!(w.p("state/target")));
+    let launch = |script: &str, handle: &str| {
+        (
+            "bash".to_owned(),
+            args(&[&format!("{clone}/scripts/{script}"), "rollback", handle]),
+            json!({"cwd": clone, "env": env}),
+        )
+    };
+    let id = oid("install", &format!("act-ap.{back}.rb1"));
+    let want = vec![
+        search(vec![eq("target", target()), eq("status", json!("running"))]),
+        version.clone(),
+        show(&here),
+        search(vec![
+            eq("target", target()),
+            eq("commit", json!(here)),
+            eq("kind", json!("forward")),
+        ]),
+        index.clone(),
+        search(vec![
+            eq("target", target()),
+            eq("commit", json!(back)),
+            eq("kind", json!("rollback")),
+        ]),
+        apply(
+            json!({"action_type": "start_install", "request_id": format!("ap.{back}.rb1"), "agent": "ap-deliver",
+            "parameters": {"target": target(), "kind": "rollback", "repository": "o/r", "commit": back, "attempt": 1,
+                "from": here, "from_sha256": sha(&binary(&here)), "rolls_back": a, "by": "session-1",
+                "reason": "after a merge"}}),
+        ),
+        launch("install-content.sh", &w.tarball()),
+        launch("install-ap.sh", &kept(&w)),
+        version,
+        show(&back),
+        apply(
+            json!({"action_type": "close_install", "request_id": format!("ap.{back}.rb1.close"), "agent": "ap-deliver",
+            "parameters": {"install": id, "outcome": "installed", "to": back}}),
+        ),
+        index,
+    ];
+    assert_eq!(w.calls.len(), want.len(), "{:#?}", w.calls);
+    for (n, (got, want)) in w.calls.iter().zip(&want).enumerate() {
+        assert_eq!(got, want, "call {n}");
+    }
+    let rec = json!({"by": "session-1", "tip": null, "from": here, "end": "installed", "outcome": "installed",
+        "code": null, "install": id, "attempt": 1, "to": back, "rollback_binary": null, "rollback_content": null,
+        "index": {"before": "ok", "after": "ok"}, "closed": null});
+    for (k, value) in rec.as_object().unwrap() {
+        assert_eq!(&v[k], value, "{k}");
+    }
+    assert_eq!(
+        rows(&v),
+        [
+            row("content-rollback", 0, None),
+            row("ap-rollback", 0, None)
+        ]
+    );
+    assert_eq!(members(&v), sorted());
+}
+
+#[test]
+fn d12_nothing_to_roll_back() {
+    let setups: [fn(&mut W); 4] = [
+        // No attempt at all.
+        |_| (),
+        // A forward attempt of the commit that did not end installed.
+        |w| {
+            w.closed("forward", &c(2), &c(0), "failed_restored", "s");
+        },
+        // An installed forward attempt of another commit.
+        |w| {
+            w.closed("forward", &c(1), &c(0), "installed", "s");
+        },
+        // An installed attempt of the commit of kind rollback.
+        |w| {
+            w.closed("rollback", &c(2), &c(1), "installed", "s");
+        },
+    ];
+    for setup in setups {
+        let mut w = W::new();
+        (w.file, w.tree, w.bytes) = (Some(c(2)), Some(c(2)), binary(&c(2)));
+        std::fs::write(kept(&w), binary(&c(0))).unwrap();
+        setup(&mut w);
+        let (v, exit) = rolls(&mut w);
+        refused(&w, &v, exit, "nothing_to_roll_back");
+        assert!(w.applies("start_install").is_empty());
+        assert_eq!(v["detail"], Value::Null);
+    }
+    // The pair at no single commit.
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    w.tree = Some(c(1));
+    let (v, exit) = rolls(&mut w);
+    refused(&w, &v, exit, "pair_differs");
+}
+
+#[test]
+fn d12_kept_copy_digest_differs() {
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    std::fs::write(kept(&w), b"other bytes").unwrap();
+    let (v, exit) = rolls(&mut w);
+    refused(&w, &v, exit, "nothing_to_roll_back");
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    std::fs::remove_file(kept(&w)).unwrap();
+    let (v, exit) = rolls(&mut w);
+    refused(&w, &v, exit, "nothing_to_roll_back");
+}
+
+#[test]
+fn d12_no_content_handle_and_content_differs() {
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    w.installs[0]
+        .as_object_mut()
+        .unwrap()
+        .remove("rollback_content");
+    let (v, exit) = rolls(&mut w);
+    refused(&w, &v, exit, "nothing_to_roll_back");
+    // The same manifest at both commits: the file alone is rolled back.
+    let mut w = W::new();
+    w.same_content = true;
+    installed_by_a(&mut w);
+    w.installs[0]
+        .as_object_mut()
+        .unwrap()
+        .remove("rollback_content");
+    let (v, exit) = rolls(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(w.launched(), ["ap-rollback"]);
+}
+
+#[test]
+fn d12_content_refusal_is_not_started() {
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    let back = w.inst.get_mut("content-rollback").unwrap();
+    (back.tree, back.exit, back.err) = (None, 2, "refuse: tarball missing\n".into());
+    let (v, exit) = rolls(&mut w);
+    assert_eq!(
+        (end(&v), exit),
+        (("not_started", "content_refused"), 3),
+        "{v}"
+    );
+    assert_eq!(w.launched(), ["content-rollback"]);
+    let close = &w.applies("close_install")[0]["parameters"];
+    assert_eq!(
+        (close["outcome"].clone(), close["to"].clone()),
+        (json!("not_started"), json!(c(2)))
+    );
+}
+
+#[test]
+fn d12_content_exit_1_skips_the_binary() {
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    let back = w.inst.get_mut("content-rollback").unwrap();
+    (back.tree, back.exit) = (None, 1);
+    let (v, exit) = rolls(&mut w);
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "content_failed_restored"), 3),
+        "{v}"
+    );
+    assert_eq!(w.launched(), ["content-rollback"]);
+    // Exit 1 with the tree at no commit: failed, and still no file rollback.
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    let back = w.inst.get_mut("content-rollback").unwrap();
+    (back.tree, back.exit) = (Some(None), 1);
+    let (v, exit) = rolls(&mut w);
+    assert_eq!(
+        (end(&v), exit, v["to"].clone()),
+        (("failed", "content_failed_restored"), 4, json!("neither")),
+        "{v}"
+    );
+    assert_eq!(w.launched(), ["content-rollback"]);
+}
+
+#[test]
+fn d12_binary_failure_ends_failed() {
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    let back = w.inst.get_mut("ap-rollback").unwrap();
+    (back.file, back.exit, back.err) = (None, 1, "rollback_move_failed@install-ap.sh:9\n".into());
+    let (v, exit) = rolls(&mut w);
+    assert_eq!(
+        (end(&v), exit, v["to"].clone()),
+        (("failed", "rollback_move_failed"), 4, json!("neither")),
+        "{v}"
+    );
+    assert_eq!(w.launched(), ["content-rollback", "ap-rollback"]);
+}
+
+#[test]
+fn d12_request_forms() {
+    let cases: [(&[&str], Value, &str); 9] = [
+        (&["by", "reason"], json!({"rollback": true}), "by"),
+        (&["reason"], json!({"rollback": true}), "reason"),
+        (&[], json!({"rollback": true, "past": [c(1)]}), "past"),
+        (&[], json!({"rollback": false}), "rollback"),
+        (&[], json!({"rollback": "yes"}), "rollback"),
+        (&["reason"], json!({}), "reason"),
+        (&["by"], json!({}), "by"),
+        (&["by", "reason"], json!({"past": [c(1)]}), "by"),
+        (&["by", "reason"], json!({"rollback": null}), "rollback"),
+    ];
+    for (remove, add, field) in cases {
+        let mut w = W::new();
+        let mut r = w.request();
+        for k in remove {
+            r.as_object_mut().unwrap().remove(*k);
+        }
+        for (k, v) in add.as_object().unwrap() {
+            r[k] = v.clone();
+        }
+        let (v, exit) = w.run_with(&r);
+        assert_eq!(
+            (v["code"].as_str(), exit, v["detail"].clone()),
+            (Some("invalid_input"), 2, json!({ "field": field })),
+            "{r}"
+        );
+        assert!(w.calls.is_empty());
+    }
+    // The three forms that are admitted.
+    let forms: [fn(&W) -> Value; 3] = [W::request, W::timer, W::rollback];
+    for form in forms {
+        let mut w = W::new();
+        let r = form(&w);
+        let (v, _) = w.run_with(&r);
+        assert_ne!(v["code"], "invalid_input", "{r}");
+    }
+}
+
+// ---- D2 the timer's limits ---------------------------------------------------------------------
+
+/// The timer's call ended on a limit: no installer, no attempt, nothing after step 6.
+fn limited(w: &W, v: &Value, exit: u8, code: &str, want: u8, install: &Value) {
+    assert_eq!((end(v), exit), (("refused", code), want), "{v}");
+    assert_eq!(v["detail"], json!({ "install": install }));
+    assert!(w.launched().is_empty());
+    assert!(w.applies("start_install").is_empty());
+    assert!(!w.calls.iter().any(|(p, _, _)| p == "df"), "{v}");
+    assert_eq!(w.last().as_ref(), Some(v));
+}
+fn tick(w: &mut W) -> (Value, u8) {
+    let r = w.timer();
+    w.run_with(&r)
+}
+/// The pair at c(1), which a Lead's install call installed last.
+fn at_one(w: &mut W) {
+    (w.file, w.tree, w.bytes) = (Some(c(1)), Some(c(1)), binary(&c(1)));
+}
+
+#[test]
+fn d2_timer_is_suppressed_after_a_failure() {
+    for outcome in ["failed_restored", "failed"] {
+        let mut w = W::new();
+        let id = w.closed("forward", &c(2), &c(0), outcome, "timer:1");
+        let (v, exit) = tick(&mut w);
+        limited(&w, &v, exit, "suppressed", 3, &id);
+    }
+    // Lifted by a Lead's install call that ended installed.
+    let mut w = W::with(3);
+    at_one(&mut w);
+    w.closed("forward", &c(1), &c(0), "failed_restored", "timer:1");
+    w.closed("forward", &c(1), &c(0), "installed", "session-0");
+    let (v, exit) = tick(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+}
+
+#[test]
+fn d2_not_started_does_not_lift_the_suppression() {
+    let mut w = W::new();
+    let failed = w.closed("forward", &c(2), &c(0), "failed", "timer:1");
+    w.closed("forward", &c(2), &c(0), "not_started", "session-0");
+    w.closed("rollback", &c(0), &c(2), "not_started", "session-0");
+    let (v, exit) = tick(&mut w);
+    limited(&w, &v, exit, "suppressed", 3, &failed);
+}
+
+#[test]
+fn d2_timer_is_held_by_a_rollback() {
+    let mut w = W::new();
+    w.closed("forward", &c(1), &c(0), "installed", "session-0");
+    let rb = w.closed("rollback", &c(0), &c(1), "installed", "session-0");
+    w.closed("forward", &c(2), &c(0), "not_started", "timer:1");
+    let (v, exit) = tick(&mut w);
+    limited(&w, &v, exit, "held_by_rollback", 2, &rb);
+    // Lifted by a Lead's install call that ended installed.
+    let mut w = W::with(3);
+    at_one(&mut w);
+    w.closed("rollback", &c(0), &c(1), "installed", "session-0");
+    w.closed("forward", &c(1), &c(0), "installed", "session-0");
+    let (v, exit) = tick(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+}
+
+#[test]
+fn d2_timer_attempt_exists() {
+    for outcome in ["installed", "failed_restored", "failed"] {
+        let mut w = W::new();
+        at_one(&mut w);
+        let id = w.closed("forward", &c(2), &c(0), outcome, "timer:1");
+        w.closed("forward", &c(1), &c(0), "installed", "session-0");
+        let (v, exit) = tick(&mut w);
+        limited(&w, &v, exit, "attempt_exists", 2, &id);
+    }
+}
+
+#[test]
+fn d2_timer_attempts_exhausted() {
+    let mut w = W::new();
+    for _ in 0..2 {
+        w.closed("forward", &c(2), &c(0), "not_started", "timer:1");
+    }
+    let third = w.closed("forward", &c(2), &c(0), "not_started", "timer:1");
+    let (v, exit) = tick(&mut w);
+    limited(&w, &v, exit, "attempts_exhausted", 3, &third);
+    // Two are not three: the third attempt runs.
+    let mut w = W::new();
+    for _ in 0..2 {
+        w.closed("forward", &c(2), &c(0), "not_started", "timer:1");
+    }
+    let (v, exit) = tick(&mut w);
+    assert_eq!(
+        (end(&v), exit, v["attempt"].clone()),
+        (("installed", ""), 0, json!(3)),
+        "{v}"
+    );
+}
+
+#[test]
+fn d2_limits_count_forward_attempts_only() {
+    let mut w = W::new();
+    w.closed("rollback", &c(2), &c(1), "installed", "session-0");
+    w.closed("forward", &c(0), &c(2), "installed", "session-0");
+    for _ in 0..3 {
+        w.closed("rollback", &c(2), &c(0), "not_started", "session-0");
+    }
+    let (v, exit) = tick(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+}
+
+#[test]
+fn d2_lead_request_has_no_limits() {
+    let setups: [fn(&mut W); 4] = [
+        |w| {
+            w.closed("forward", &c(2), &c(0), "failed", "timer:1");
+        },
+        |w| {
+            w.closed("rollback", &c(0), &c(1), "installed", "session-0");
+        },
+        |w| {
+            w.closed("forward", &c(2), &c(0), "installed", "timer:1");
+        },
+        |w| {
+            for _ in 0..3 {
+                w.closed("forward", &c(2), &c(0), "not_started", "timer:1");
+            }
+        },
+    ];
+    for setup in setups {
+        let mut w = W::new();
+        setup(&mut w);
+        let (v, exit) = w.run();
+        assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+        assert_eq!(v["by"], "session-1");
+    }
+}
+
+#[test]
+fn d2_timer_by_is_the_invocation() {
+    for (invocation, by) in [
+        (Some("6a1f0c"), "timer:6a1f0c"),
+        (None, "timer"),
+        (Some(""), "timer"),
+    ] {
+        let mut w = W::new();
+        w.invocation = invocation.map(str::to_owned);
+        let (v, exit) = tick(&mut w);
+        assert_eq!(
+            (end(&v), exit, v["by"].clone()),
+            (("installed", ""), 0, json!(by))
+        );
+        let start = &w.applies("start_install")[0]["parameters"];
+        assert_eq!(start["by"], by);
+        assert!(start.get("reason").is_none(), "{start}");
+        assert_eq!(w.installs[0]["by"], by);
+    }
+}
+
+#[test]
+fn d2_exit_codes_of_the_limits() {
+    type Setup = fn(&mut W);
+    let setups: [(Setup, &str, u8); 4] = [
+        (
+            |w| {
+                w.closed("forward", &c(2), &c(0), "failed_restored", "timer:1");
+            },
+            "suppressed",
+            3,
+        ),
+        (
+            |w| {
+                w.closed("rollback", &c(0), &c(1), "installed", "session-0");
+            },
+            "held_by_rollback",
+            2,
+        ),
+        (
+            |w| {
+                w.closed("forward", &c(2), &c(0), "installed", "timer:1");
+            },
+            "attempt_exists",
+            2,
+        ),
+        (
+            |w| {
+                for _ in 0..3 {
+                    w.closed("forward", &c(2), &c(0), "not_started", "timer:1");
+                }
+            },
+            "attempts_exhausted",
+            3,
+        ),
+    ];
+    for (setup, code, want) in setups {
+        let mut w = W::new();
+        setup(&mut w);
+        let (v, exit) = tick(&mut w);
+        assert_eq!((end(&v), exit), (("refused", code), want), "{v}");
     }
 }
 
