@@ -319,6 +319,9 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
         .file_name()
         .and_then(|n| n.to_str())
         .ok_or_else(|| error("invalid_input", "out"))?;
+    // No run's answer path can be another run's derived file.
+    let derived = [".run.json", ".stream.jsonl", ".err", ".ap-tmp"];
+    require!(!derived.iter().any(|d| name.ends_with(d)) => "invalid_input", "out");
     let parent = out_path
         .parent()
         .and_then(|p| p.to_str())
@@ -782,13 +785,20 @@ fn attempt(
         s.pause(Duration::from_millis(100));
     };
     let stopped = stop(s, &unit, &mut child);
-    // Once more after the stop: what came in the last moment, and a last line without newline.
-    follow(reader, &mut offset, &mut partial, &mut seen);
+    // The writer is stopped: the stream is read to its end, a last line without newline included.
+    loop {
+        let read = offset;
+        follow(reader, &mut offset, &mut partial, &mut seen);
+        if offset == read {
+            break;
+        }
+    }
     if !partial.is_empty() {
         seen.line(&partial);
     }
-    // A reviewer whose first result was written before the stop has ended at it.
-    let timed_out = matches!(end, End::Timeout) && !seen.done();
+    // The bound decides for every role: a result read during the shutdown gives the saved answer
+    // and `expect_met`, never another state.
+    let timed_out = matches!(end, End::Timeout);
     record["end"] = json!(stamp(SystemTime::now()));
     record["results"] = json!(seen.results.len());
     let mut write_failed = false;

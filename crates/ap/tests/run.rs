@@ -29,6 +29,8 @@ struct Fake {
     stop_fails: bool,
     /// `systemctl is-active` does not answer (the call fails).
     silent: bool,
+    /// `systemctl stop` waits this long before it kills (a slow shutdown).
+    stop_delay: std::time::Duration,
     /// The answer to `git rev-parse` in place of the real one.
     rev_parse: Option<(bool, Vec<u8>)>,
     /// Every `env -i … git …` call.
@@ -70,6 +72,7 @@ impl Fake {
             alive: std::collections::BTreeSet::new(),
             stop_fails: false,
             silent: false,
+            stop_delay: std::time::Duration::ZERO,
             rev_parse: None,
             git_calls: vec![],
             launches: vec![],
@@ -150,6 +153,7 @@ impl System for Fake {
         let (success, stdout) = match args[0].as_str() {
             "stop" if self.stop_fails => (false, vec![]),
             "stop" => {
+                std::thread::sleep(self.stop_delay);
                 if let Some(pgid) = self.groups.get(unit) {
                     kill_group(*pgid);
                 }
@@ -1268,4 +1272,59 @@ fn a_resume_of_a_failed_stop_is_refused_while_its_unit_lives() {
     }
     f.alive.clear();
     assert_eq!(f.run(&resume).unwrap().0["state"], "ok");
+}
+
+// ---- automatic review of 02a619e -----------------------------------------------------------------
+
+/// "Preserve the timeout decision through shutdown": a reviewer whose result arrives only while
+/// the stage is being stopped is `timeout`; the late answer is saved and `expect_met` set.
+#[test]
+fn a_result_written_during_the_shutdown_keeps_the_timeout() {
+    let mut f = Fake::new();
+    f.mode("a1", "late");
+    f.stop_delay = std::time::Duration::from_millis(1500);
+    let mut r = f.request("late.md");
+    r["timeout_seconds"] = json!(2);
+    r["expect"] = json!({"first_line": "Verdict: *"});
+    let (v, status) = f.run(&r).unwrap();
+    assert_eq!((status, v["state"].as_str()), (3, Some("timeout")), "{v}");
+    assert_eq!(
+        (v["results"].as_u64(), v["expect_met"].as_bool()),
+        (Some(1), Some(true))
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.p("late.md")).unwrap(),
+        "Verdict: accept\nlate"
+    );
+}
+
+/// "Drain the stopped stream completely": a result after 40 MiB of other lines is read.
+#[test]
+fn the_stopped_stream_is_read_to_its_end() {
+    let mut f = Fake::new();
+    f.mode("a1", "big");
+    let mut r = f.request("big.md");
+    r["role"] = json!("implementer");
+    let (v, _) = f.run(&r).unwrap();
+    assert_eq!(v["state"], "ok", "{v}");
+    assert_eq!(
+        std::fs::read_to_string(f.p("big.md")).unwrap(),
+        "Verdict: accept\nafter 40 MiB"
+    );
+}
+
+/// "Reserve the answer path against overlapping concurrent runs": an `out` named like a file
+/// `ap run` derives from another `out` is refused, so no answer path is another run's file.
+#[test]
+fn an_out_named_like_a_derived_file_is_refused() {
+    let mut f = Fake::new();
+    for name in [
+        "answer.run.json",
+        "a.stream.jsonl",
+        "a.err",
+        "a.md.1-2-0.ap-tmp",
+    ] {
+        assert_eq!(code(f.run(&f.request(name))), "invalid_input@out", "{name}");
+    }
+    assert!(f.launches.is_empty());
 }

@@ -42,6 +42,10 @@ case "$mode" in
            init; p=$(readlink "/proc/$$/fd/1"); rm -f "$p"; mkfifo "$p"; sleep 0.5; result false 'Verdict: accept\nown' 1 ;;
   blockout) # a directory appears where the answer goes: the answer cannot be written
            init; p=$(readlink "/proc/$$/fd/1"); mkdir "${p%.stream.jsonl}"; result false 'Verdict: accept' 1 ;;
+  late)    # no result before the bound; one is written while the stage is being stopped
+           init; sleep 2.5; result false 'Verdict: accept\nlate' 1; sleep 600 ;;
+  big)     # 40 MiB of other lines, then the result, then the exit
+           init; python3 -I -c 'import sys; sys.stdout.write(("x" * 1023 + "\n") * 40960)'; result false 'Verdict: accept\nafter 40 MiB' 1 ;;
   nonl)    # the last result line has no newline
            init; result false 'Verdict: accept' 1 | tr -d '\n' ;;
   limit1)  init; rejected; result true 'You have hit your 5-hour limit · resets 6:30pm (UTC)' 1 ;;
