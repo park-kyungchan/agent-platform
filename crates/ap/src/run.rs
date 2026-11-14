@@ -17,7 +17,7 @@ use std::{
 
 const SLICE: &str = "agents.slice";
 /// The default time bound of each role, in seconds.
-const ROLES: [(&str, u64); 3] = [
+pub(crate) const ROLES: [(&str, u64); 3] = [
     ("implementer", 5_400),
     ("fixer", 3_600),
     ("reviewer", 3_300),

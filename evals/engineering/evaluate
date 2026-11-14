@@ -1,0 +1,116 @@
+#!/usr/bin/env -S python3 -I -B
+"""The evaluator of an engineering case: `evaluate <case> <clone>`, cwd the case's copy.
+
+It restores every path of `tests` with its bytes (and mode) at `head`, read from `clone`, then runs
+each array of `commands` in order with stdin /dev/null and stops at the first that does not exit 0.
+After each command it prints `evaluate: command=<n> exit=<code> seconds=<s>`. Exit 0: all passed;
+1: one did not; 2: it could not judge (the case or the clone unreadable, a path missing, less than
+10,240 MiB free before a command, or an error of the evaluator itself: exit 1 is a statement about
+the candidate and nothing else). No model judges. Under the host's build rule it runs itself again
+under `flock` on HOST_CARGO_LOCK, as the `check` of every platform repository does.
+"""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+FLOOR_MIB = 10240
+LOCKED = {"CHECK_LOCKED": "1", "CARGO_INCREMENTAL": "0", "CARGO_PROFILE_DEV_DEBUG": "0", "CARGO_PROFILE_TEST_DEBUG": "0"}
+
+
+def cannot(why):
+    print("evaluate: cannot judge: %s" % why, file=sys.stderr, flush=True)
+    sys.exit(2)
+
+
+def git(clone, *words):
+    return subprocess.run(["git", "-C", clone, *words], stdin=subprocess.DEVNULL, capture_output=True, check=False)
+
+
+def entry(clone, head, path):
+    """The mode and blob of `path` at `head`; a judging file is a regular file, never a link."""
+    listed = git(clone, "ls-tree", "-z", head, "--", path)
+    meta, _, name = listed.stdout.split(b"\0")[0].decode("utf-8", "replace").partition("\t")
+    parts = meta.split()
+    if listed.returncode != 0 or name != path or len(parts) != 3 or parts[0] not in ("100644", "100755"):
+        cannot("%s is not a regular file at head" % path)
+    return parts[0], parts[2]
+
+
+def restore(clone, path, mode, sha, root):
+    """Writes `path` with its bytes and mode at `head`, whatever the candidate made of it or of a parent."""
+    blob = git(clone, "cat-file", "blob", sha)
+    if blob.returncode != 0:
+        cannot("%s cannot be read from the clone" % path)
+    # Every parent inside the copy is a real directory afterwards: a file or a link the candidate
+    # put there is removed, so nothing is written through a link and nothing stands in the way.
+    at = root
+    for part in [p for p in path.split("/")[:-1] if p not in ("", ".")]:
+        at = os.path.join(at, part)
+        if os.path.islink(at) or (os.path.lexists(at) and not os.path.isdir(at)):
+            os.unlink(at)
+        if not os.path.lexists(at):
+            os.mkdir(at)
+    target = os.path.join(root, path)
+    if os.path.lexists(target) and (os.path.islink(target) or not os.path.isdir(target)):
+        os.unlink(target)
+    elif os.path.isdir(target):
+        shutil.rmtree(target)
+    with open(target, "xb") as f:
+        f.write(blob.stdout)
+    os.chmod(target, 0o755 if mode == "100755" else 0o644)
+
+
+def main():
+    if len(sys.argv) != 3:
+        cannot("usage: evaluate <case> <clone>")
+    lock = os.environ.get("HOST_CARGO_LOCK", "")
+    if lock and os.path.exists(lock) and not os.environ.get("CHECK_LOCKED"):
+        os.environ.update(LOCKED)
+        os.execvp("flock", ["flock", lock, os.path.realpath(sys.argv[0]), *sys.argv[1:]])
+    case_path, clone = sys.argv[1], sys.argv[2]
+    try:
+        with open(case_path, encoding="utf-8") as f:
+            case = json.load(f)
+        head, tests, commands = case["head"], case["tests"], case["commands"]
+        assert isinstance(head, str) and len(head) == 40
+        assert isinstance(tests, list) and tests and all(isinstance(p, str) for p in tests)
+        assert isinstance(commands, list) and commands
+        assert all(isinstance(c, list) and c and all(isinstance(w, str) for w in c) for c in commands)
+    except (OSError, ValueError, KeyError, TypeError, AssertionError):
+        cannot("the case file is unreadable")
+    if git(clone, "cat-file", "-e", head + "^{commit}").returncode != 0:
+        cannot("the clone does not hold head")
+    root = os.path.realpath(os.getcwd())
+    for path in tests:
+        if os.path.isabs(path) or ".." in path.split("/"):
+            cannot("%s is not a relative path" % path)
+    # Every path is judged before any is written: a refused case writes nothing.
+    entries = [(path, *entry(clone, head, path)) for path in tests]
+    for path, mode, sha in entries:
+        restore(clone, path, mode, sha, root)
+    for n, words in enumerate(commands, 1):
+        free = shutil.disk_usage(root).free // (1024 * 1024)
+        if free < FLOOR_MIB:
+            cannot("disk floor: %d MiB free, %d needed" % (free, FLOOR_MIB))
+        start = time.monotonic()
+        sys.stdout.flush()
+        try:
+            code = subprocess.run(words, stdin=subprocess.DEVNULL, check=False).returncode
+        except OSError:
+            code = 127
+        if code < 0:
+            code = 128 - code
+        print("evaluate: command=%d exit=%d seconds=%d" % (n, code, time.monotonic() - start), flush=True)
+        if code != 0:
+            sys.exit(1)
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:  # An error of the evaluator itself is never the candidate's exit 1.
+        cannot("%s: %s" % (type(e).__name__, e))

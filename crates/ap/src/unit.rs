@@ -15,14 +15,14 @@ use std::{
 
 const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict";
 const STAGE: &str =
-    "account model effort prompt permission_mode timeout_seconds next_accounts resume";
+    "account model effort prompt permission_mode timeout_seconds next_accounts env resume";
 /// The files of one call, by suffix of `out`: a stage's answer also has `ap run`'s three files.
 const FILES: &str =
     ".unit.json .implementer.md .verifier.md .verifier.prompt.md .gate.json .accept.log";
 const RUN_FILES: [&str; 4] = ["", ".run.json", ".stream.jsonl", ".err"];
-/// The acceptance executable runs in the worktree under `timeout`; its exit is printed last.
-const ACCEPT: &str =
-    "cd \"$1\" || exit 0; timeout -k 10 \"$4\" \"$2\" > \"$3\" 2>&1 < /dev/null; echo \"$?\"";
+/// The acceptance executable runs in the worktree under `timeout`, with the arguments after the
+/// fourth; its exit is printed last.
+const ACCEPT: &str = "cd \"$1\" || exit 0; a=$2 o=$3 t=$4; shift 4; timeout -k 10 \"$t\" \"$a\" \"$@\" > \"$o\" 2>&1 < /dev/null; echo \"$?\"";
 
 /// The first step that did not pass.
 struct Stop {
@@ -50,6 +50,7 @@ macro_rules! ensure {
         }
     };
 }
+mod case;
 
 fn absolute(p: &str) -> bool {
     let path = Path::new(p);
@@ -77,6 +78,20 @@ fn stage(r: &Value, key: &str) -> Result<(), Failure> {
         return Err(error("invalid_input", &field(k)));
     }
     Ok(())
+}
+/// `acceptance_seconds`: 1 to 86400, default 2700.
+fn seconds(r: &Value) -> Result<u64, Failure> {
+    let Some(v) = r.get("acceptance_seconds") else {
+        return Ok(2700);
+    };
+    let n = v.as_u64().filter(|n| (1..=86_400).contains(n));
+    n.ok_or_else(|| error("invalid_input", "acceptance_seconds"))
+}
+fn executable(acceptance: &str) -> Result<(), Failure> {
+    let executable = std::fs::metadata(acceptance)
+        .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
+    require!(executable => "acceptance_unreadable", "acceptance");
+    regular(acceptance, "acceptance_unreadable", "acceptance").map(|_| ())
 }
 fn record(path: &str) -> Option<Value> {
     serde_json::from_slice(&std::fs::read(path).ok()?).ok()
@@ -129,10 +144,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
         |(i, c): (usize, u8)| c.is_ascii_lowercase() || c.is_ascii_digit() || (i > 0 && c == b'-');
     require!(key.len() <= 64 && key.bytes().enumerate().all(key_char) => "invalid_input", "task_key");
     require!(r.get("merge").is_none_or(Value::is_boolean) => "invalid_input", "merge");
-    if let Some(v) = r.get("acceptance_seconds") {
-        let ok = v.as_u64().is_some_and(|n| (1..=86_400).contains(&n));
-        require!(ok => "invalid_input", "acceptance_seconds");
-    }
+    seconds(r)?;
     if let Some(v) = r.get("pull_request") {
         require!(v.as_u64().is_some_and(|n| n > 0) => "invalid_input", "pull_request");
     }
@@ -195,10 +207,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
         let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
         require!(size + room <= LIMIT => "prompt_unreadable", "verifier.prompt");
     }
-    let executable = std::fs::metadata(acceptance)
-        .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
-    require!(executable => "acceptance_unreadable", "acceptance");
-    regular(acceptance, "acceptance_unreadable", "acceptance")?;
+    executable(acceptance)?;
     // A verdict is taken only as the answer of a reviewer's stage: its `ap run` record lies beside.
     if let Some(v) = verdict {
         let bytes = regular(v, "verdict_unreadable", "verdict")?;
@@ -300,6 +309,20 @@ fn stage_run(s: &mut impl System, u: &mut Unit, which: &str, r: Value) -> Step {
     let state = rec["state"].as_str().unwrap_or("failed");
     ensure!(state == "ok" => state);
     Ok(json!({"session": rec["session"]}))
+}
+/// `acceptance` in `wt` with `extra` arguments under the bound; its exit, when one was read.
+fn accept(
+    s: &mut impl System,
+    wt: &str,
+    a: &str,
+    log: &str,
+    n: u64,
+    extra: &[&str],
+) -> Option<i64> {
+    let mut a = args(&["-c", ACCEPT, "sh", wt, a, log, &n.to_string()]);
+    a.extend(args(extra));
+    let reply = s.call("sh", &a, &Value::Null, (n + 30) * 1000).ok();
+    reply.and_then(|r| String::from_utf8_lossy(&r.stdout).trim().parse().ok())
 }
 /// A verdict report: `Verdict: accept`, then the head.
 fn verdict(bytes: &[u8], head: &str) -> Result<(), Stop> {
@@ -412,12 +435,7 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         unchanged(&u.rec["acceptance"], acceptance)?;
         at_head(s, wt, &head)?;
         u.rec["files"]["acceptance_output"] = json!(log);
-        let seconds = r["acceptance_seconds"].as_u64().unwrap_or(2700);
-        let secs = seconds.to_string();
-        let a = args(&["-c", ACCEPT, "sh", wt, acceptance, &log, &secs]);
-        let reply = s.call("sh", &a, &Value::Null, (seconds + 30) * 1000).ok();
-        let number = |r: crate::work::Reply| String::from_utf8_lossy(&r.stdout).trim().parse().ok();
-        let exit: Option<i64> = reply.and_then(number);
+        let exit = accept(s, wt, acceptance, &log, seconds(r)?, &[]);
         ensure!(exit != Some(124) => "acceptance_timeout", json!({"exit": 124}));
         ensure!(exit == Some(0) => "acceptance_failed", json!({"exit": exit}));
         Ok(json!({"exit": 0}))
@@ -551,13 +569,16 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
 
 /// One `ap unit` request. A refusal (exit 2) comes before any effect and writes no file.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
+    if r.get("case").is_some() {
+        return case::execute(s, r);
+    }
     let write_set = request(s, r)?;
     let file = |p: Option<&str>| match p {
         Some(p) => regular(p, "io_error", "file").map(|b| json!({"path": p, "sha256": digest(&b)})),
         None => Ok(Value::Null),
     };
     let verifier_prompt = r["verifier"]["prompt"].as_str();
-    let rec = json!({"repository": r["repository"], "clone": r["clone"], "worktree": r["worktree"],
+    let rec = json!({"mode": "unit", "repository": r["repository"], "clone": r["clone"], "worktree": r["worktree"],
         "branch": r["branch"], "task_key": r["task_key"], "base": null, "page": file(r["page"].as_str())?,
         "write_set": write_set, "acceptance": file(r["acceptance"].as_str())?,
         "verifier_prompt": file(verifier_prompt)?, "verdict_file": file(r["verdict"].as_str())?,
@@ -565,6 +586,14 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         "review": null, "merge_commit": null, "stages": {"implementer": null, "verifier": null},
         "files": {"gate": null, "acceptance_output": null, "report": null}, "state": "running",
         "step": null, "stopped_at": null, "cause": null, "detail": null, "steps": [], "start": now(), "end": null});
+    claimed(r, rec, |u| steps(s, r, &write_set, u))
+}
+/// The claim, the steps and the end, of a unit call and a case call alike.
+fn claimed(
+    r: &Value,
+    rec: Value,
+    steps: impl FnOnce(&mut Unit) -> End,
+) -> Result<(Value, u8), Failure> {
     let path = format!("{}.unit.json", text(r, "out")?);
     // The claim: created exclusively before any effect.
     let mut options = std::fs::OpenOptions::new();
@@ -584,7 +613,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         started,
     };
     u.save();
-    let state = match steps(s, r, &write_set, &mut u) {
+    let state = match steps(&mut u) {
         Ok(state) => state,
         Err(Stop { cause, detail }) => {
             u.rec["stopped_at"] = u.rec["step"].clone();
@@ -598,6 +627,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let status = match state {
         _ if !u.clean => 5,
         "stopped" => 3,
+        "failed" => 4,
         _ => 0,
     };
     Ok((u.rec, status))
