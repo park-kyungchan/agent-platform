@@ -2,7 +2,9 @@
 //! `ap run`'s code, the gate is `ap gate`'s, the review and the status are `ap review`'s.
 use crate::review::{self, DIFF_OPTIONS};
 use crate::run::{stamp, write};
-use crate::work::{Failure, LIMIT, System, args, digest, error, fail, require, text};
+use crate::work::{
+    Failure, LIMIT, System, args, digest, error, fail, id, ont, parse, require, text,
+};
 use serde_json::{Value, json};
 use std::{
     ffi::OsString,
@@ -13,10 +15,12 @@ use std::{
     time::SystemTime,
 };
 
-const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store mechanical merge pull_request verdict";
-const STAGE: &str = "account model effort prompt permission_mode timeout_seconds next_accounts";
+const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict";
+const STAGE: &str =
+    "account model effort prompt permission_mode timeout_seconds next_accounts resume";
 /// The files of one call, by suffix of `out`: a stage's answer also has `ap run`'s three files.
-const FILES: &str = ".unit.json .implementer.md .verifier.md .verifier.prompt.md .gate.json .accept.log .verdict.md .facts.md";
+const FILES: &str =
+    ".unit.json .implementer.md .verifier.md .verifier.prompt.md .gate.json .accept.log";
 const RUN_FILES: [&str; 4] = ["", ".run.json", ".stream.jsonl", ".err"];
 /// The acceptance executable runs in the worktree under `timeout`; its exit is printed last.
 const ACCEPT: &str =
@@ -76,6 +80,17 @@ fn stage(r: &Value, key: &str) -> Result<(), Failure> {
     }
     Ok(())
 }
+fn record(path: &str) -> Option<Value> {
+    serde_json::from_slice(&std::fs::read(path).ok()?).ok()
+}
+/// The block of facts appended to the verifier's prompt.
+fn facts(r: &Value, number: u64, head: &str, base: &str) -> String {
+    let f = |k: &str| r[k].as_str().unwrap_or_default();
+    let (repo, wt, out) = (f("repository"), f("worktree"), f("out"));
+    format!(
+        "\n## Facts of this unit (ap unit)\n\nRepository: {repo}\nPull request: {number}\nHead: {head}\nBase: {base}\nDiff: git -C {wt} diff {base} {head}\nGate answer: {out}.gate.json\nAcceptance output: {out}.accept.log\n"
+    )
+}
 /// The `ap run` request of a stage, the same when it is admitted and when it starts.
 fn stage_request(r: &Value, which: &str, prompt: &str) -> Value {
     let (mut req, out) = (r[which].clone(), r["out"].as_str().unwrap_or_default());
@@ -115,10 +130,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     let key_char =
         |(i, c): (usize, u8)| c.is_ascii_lowercase() || c.is_ascii_digit() || (i > 0 && c == b'-');
     require!(key.len() <= 64 && key.bytes().enumerate().all(key_char) => "invalid_input", "task_key");
-    for k in ["mechanical", "merge"] {
-        require!(r.get(k).is_none_or(Value::is_boolean) => "invalid_input", k);
-    }
-    let mechanical = r["mechanical"] == true;
+    require!(r.get("merge").is_none_or(Value::is_boolean) => "invalid_input", "merge");
     if let Some(v) = r.get("acceptance_seconds") {
         let ok = v.as_u64().is_some_and(|n| (1..=86_400).contains(&n));
         require!(ok => "invalid_input", "acceptance_seconds");
@@ -129,20 +141,18 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     let verdict = match r.get("verdict") {
         None => None,
         Some(_) => {
-            require!(r.get("pull_request").is_some() && !mechanical => "invalid_input", "verdict");
+            require!(r.get("pull_request").is_some() => "invalid_input", "verdict");
             Some(path(r, "verdict", "verdict")?)
         }
     };
     if let Some(store) = r.get("store") {
         require!(store.as_str().is_some_and(absolute) => "invalid_input", "store");
     }
+    // Every call has a verdict of a model: a verifier stage, or the answer of an earlier one.
+    require!(r.get("verifier").is_some() != verdict.is_some() => "invalid_input", "verifier");
     stage(r, "implementer")?;
-    match r.get("verifier") {
-        Some(_) => {
-            require!(!mechanical => "invalid_input", "verifier");
-            stage(r, "verifier")?;
-        }
-        None => require!(mechanical || verdict.is_some() => "invalid_input", "verifier"),
+    if r.get("verifier").is_some() {
+        stage(r, "verifier")?;
     }
     let mut gate = r.get("gate").cloned().unwrap_or_else(|| json!({}));
     require!(gate.is_object() => "invalid_input", "gate");
@@ -181,12 +191,27 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
         let field = |f: Failure| fail(f.code, &format!("{k}.{}", f.field), f.detail);
         crate::run::admit_stage(s, &stage_request(r, k, lead)).map_err(field)?;
     }
+    // The stage refuses a prompt over the limit once the block of facts is appended: room for it.
+    if let Some(lead) = r["verifier"]["prompt"].as_str() {
+        let room = facts(r, u64::MAX, &"0".repeat(40), &"0".repeat(40)).len() as u64 + 1;
+        let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
+        require!(size + room <= LIMIT => "prompt_unreadable", "verifier.prompt");
+    }
     let executable = std::fs::metadata(acceptance)
         .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
     require!(executable => "acceptance_unreadable", "acceptance");
     regular(acceptance, "acceptance_unreadable", "acceptance")?;
+    // A verdict is taken only as the answer of a reviewer's stage: its `ap run` record lies beside.
     if let Some(v) = verdict {
-        regular(v, "verdict_unreadable", "verdict")?;
+        let bytes = regular(v, "verdict_unreadable", "verdict")?;
+        let run = record(&format!("{v}.run.json")).unwrap_or_default();
+        let prompt = run["prompt"]["path"].as_str().unwrap_or_default();
+        let asked = regular(prompt, "verdict_unreadable", "verdict").map(|b| digest(&b));
+        let ok = run["role"] == "reviewer" && run["state"] == "ok" && run["answer"]["path"] == v;
+        let ok = ok
+            && run["answer"]["sha256"] == digest(&bytes).as_str()
+            && Path::new(prompt).starts_with(&root);
+        require!(ok && asked.is_ok_and(|d| run["prompt"]["sha256"] == d.as_str()) => "verdict_unreadable", "verdict");
     }
     for suffix in FILES.split(' ') {
         for extra in RUN_FILES {
@@ -303,6 +328,32 @@ fn gh(s: &mut impl System, words: &[&str]) -> Result<Value, Stop> {
     value.ok_or_else(|| stop("github_unreadable", Value::Null))
 }
 
+/// The closed review of kind `packet` that accepted this head of this repository for this task by
+/// this report, when the store holds one.
+fn reviewed(
+    s: &mut impl System,
+    r: &Value,
+    key: &str,
+    repo: &str,
+    head: &str,
+    sha: &str,
+) -> Result<Option<Value>, Stop> {
+    let eq = |k: &str, v: Value| json!({"eq": [k, v]});
+    let filter = [
+        ("kind", json!("packet")),
+        ("repository", json!(repo)),
+        ("head", json!(head)),
+        ("status", json!("closed")),
+        ("verdict", json!("accept")),
+        ("report_sha256", json!(sha)),
+    ];
+    let mut all: Vec<_> = filter.into_iter().map(|(k, v)| eq(k, v)).collect();
+    all.push(eq("task", id("task", key)));
+    let q = json!({"object_type": "review", "where": {"all": all}, "limit": 1});
+    let v = parse(ont(s, r, &["search"], &q)?, "store_answer_unreadable")?;
+    ensure!(v["status"] == "ok" && v["result"]["basis"]["qualified"] == true => "store_answer_unreadable");
+    Ok(v["result"]["objects"][0].get("id").cloned())
+}
 /// Words separated by single spaces (names without spaces: validated before).
 fn w(words: &str) -> Vec<&str> {
     words.split(' ').collect()
@@ -364,7 +415,10 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         ensure!(answer["autoreview"]["has_unresolved_findings"] != true => "unresolved_findings");
         let threads = &answer["threads"];
         ensure!(threads.as_array().is_some_and(Vec::is_empty) => "unresolved_threads", json!({"threads": threads}));
-        Ok(Value::Null)
+        // The status `lead-review` the gate lists and does not judge: a revoked acceptance is seen.
+        let mut checks = answer["checks"].as_array().into_iter().flatten();
+        let lead = checks.find(|c| c["judged"] == false).map(|c| c["state"].clone());
+        Ok(json!({"lead_review": lead}))
     })?;
     let head = u.rec["head"].as_str().unwrap_or_default().to_owned();
     let log = format!("{out}.accept.log");
@@ -383,11 +437,12 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         Ok(json!({"exit": 0}))
     })?;
     u.step("write_set", |u| {
-        if u.rec["base"].is_null() {
-            ensure!(ok(s, clone, &["fetch", "origin", "main"]) => "fetch_failed");
-            u.rec["base"] = json!(git(s, wt, &["merge-base", "origin/main", &head])?);
-        }
-        let base = u.rec["base"].as_str().unwrap_or_default().to_owned();
+        // The rulesets require an up-to-date branch: one behind `main` would not merge.
+        ensure!(ok(s, clone, &["fetch", "origin", "main"]) => "fetch_failed");
+        let base = git(s, wt, &["rev-parse", "origin/main"])?;
+        let ancestor = ok(s, wt, &["merge-base", "--is-ancestor", &base, &head]);
+        ensure!(ancestor => "behind_main", json!(base));
+        u.rec["base"] = json!(base);
         let mut words = vec!["diff"];
         words.extend(DIFF_OPTIONS);
         words.extend([base.as_str(), head.as_str()]);
@@ -400,35 +455,17 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         Ok(json!({"paths": paths.len()}))
     })?;
     let base = u.rec["base"].as_str().unwrap_or_default().to_owned();
-    let facts = format!(
-        "\n## Facts of this unit (ap unit)\n\nRepository: {repo}\nPull request: {number}\nHead: {head}\nBase: {base}\nDiff: git -C {wt} diff {base} {head}\nGate answer: {out}.gate.json\nAcceptance output: {log}\n"
-    );
-    let (mut session, mut prompt) = (Value::Null, format!("{out}.facts.md"));
-    let report = match (r["verdict"].as_str(), r["mechanical"] == true) {
-        (Some(file), _) => {
+    let report = match r["verdict"].as_str() {
+        Some(file) => {
             u.begin("verifier");
             unchanged(&u.rec["verdict_file"], file)?;
             verdict(&regular(file, "verdict_unreadable", "verdict")?, &head)?;
+            u.rec["stages"]["verifier"] = json!(format!("{file}.run.json"));
             u.end("skipped", Value::Null);
             file.to_owned()
         }
-        (None, true) => {
-            u.begin("verifier");
-            let report = format!("{out}.verdict.md");
-            let log_sha = regular(&log, "io_error", "log")
-                .map(|b| digest(&b))
-                .unwrap_or_default();
-            let sha = u.rec["acceptance"]["sha256"].as_str().unwrap_or_default();
-            let text = format!(
-                "Verdict: accept\n{head}\n\nMechanical unit: the acceptance executable {acceptance} (sha256 {sha}) exited 0 in {wt} at this head; output {log} (sha256 {log_sha}).\n"
-            );
-            create(&report, text.as_bytes())?;
-            u.end("skipped", Value::Null);
-            report
-        }
-        (None, false) => {
+        None => {
             let report = format!("{out}.verifier.md");
-            prompt = format!("{out}.verifier.prompt.md");
             u.step("verifier", |u| {
                 let lead = text(&r["verifier"], "prompt")?;
                 unchanged(&u.rec["verifier_prompt"], lead)?;
@@ -437,42 +474,48 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
                 if !bytes.ends_with(b"\n") {
                     bytes.push(b'\n');
                 }
-                bytes.extend(facts.as_bytes());
+                bytes.extend(facts(r, number, &head, &base).as_bytes());
+                let prompt = format!("{out}.verifier.prompt.md");
                 create(&prompt, &bytes)?;
-                let req = stage_request(r, "verifier", &prompt);
-                session = stage_run(s, u, "verifier", req)?["session"].take();
+                let session = stage_run(s, u, "verifier", stage_request(r, "verifier", &prompt))?;
                 u.rec["files"]["report"] = json!(report);
                 verdict(&regular(&report, "verdict_unreadable", "report")?, &head)?;
-                Ok(Value::Null)
+                Ok(session)
             })?;
             report
         }
     };
     u.rec["files"]["report"] = json!(report);
     u.step("review", |u| {
-        if !Path::new(&prompt).exists() {
-            create(&prompt, facts.trim_start().as_bytes())?;
-        }
-        let v = &r["verifier"];
-        let (model, effort) = match prompt.ends_with(".verifier.prompt.md") {
-            true => (v["model"].clone(), v["effort"].clone()),
-            false => (json!("none"), json!("none")),
+        let store = |mut v: Value| {
+            if let Some(store) = r.get("store") {
+                v["store"] = store.clone();
+            }
+            v
         };
-        let task_dir = s.work_root().join(text(r, "task_key")?);
-        let mut start = json!({"task_dir": task_dir, "kind": "packet", "head": head, "base": base, "repository": repo,
-            "pull_request": number, "model": model, "effort": effort, "prompt": prompt});
-        let mut close = json!({"report": report});
-        if let Some(store) = r.get("store") {
-            (start["store"], close["store"]) = (store.clone(), store.clone());
+        let key = text(r, "task_key")?;
+        let sha = digest(&regular(&report, "review_report_unreadable", "report")?);
+        // One accepted head has one review object: a closed one that accepted this report is used.
+        if let Some(id) = reviewed(s, &store(json!({})), key, repo, &head, &sha)? {
+            u.rec["review"] = id;
+            return Ok(json!({"reused": true}));
         }
+        // The reviewer is the stage that wrote the report: its record names model, effort, account,
+        // session and prompt.
+        let path = u.rec["stages"]["verifier"].as_str().unwrap_or_default();
+        let run = record(path).ok_or_else(|| stop("verdict_unreadable", json!({"path": path})))?;
+        let start = store(
+            json!({"task_dir": s.work_root().join(key), "kind": "packet", "head": head,
+            "base": base, "repository": repo, "pull_request": number, "model": run["model"],
+            "effort": run["effort"], "prompt": run["prompt"]["path"]}),
+        );
         let started = review::start(s, &start)?;
-        (u.rec["review"], close["review"]) = (started["review"].clone(), started["review"].clone());
+        u.rec["review"] = started["review"].clone();
         u.save();
-        if session.is_string() {
-            close["session"] = session.clone();
-        }
+        let close = store(json!({"review": started["review"], "report": report,
+            "account": run["account"], "session": run["session"]}));
         ensure!(review::close(s, &close)?["verdict"] == "accept" => "verdict_repair");
-        Ok(Value::Null)
+        Ok(json!({"reused": false}))
     })?;
     if r["merge"] == false {
         return Ok("accepted");
@@ -527,14 +570,12 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         Some(p) => regular(p, "io_error", "file").map(|b| json!({"path": p, "sha256": digest(&b)})),
         None => Ok(Value::Null),
     };
-    let verifier_prompt = r["verifier"]["prompt"]
-        .as_str()
-        .filter(|_| r.get("verdict").is_none());
+    let verifier_prompt = r["verifier"]["prompt"].as_str();
     let rec = json!({"repository": r["repository"], "clone": r["clone"], "worktree": r["worktree"],
         "branch": r["branch"], "task_key": r["task_key"], "base": null, "page": file(r["page"].as_str())?,
         "write_set": write_set, "acceptance": file(r["acceptance"].as_str())?,
         "verifier_prompt": file(verifier_prompt)?, "verdict_file": file(r["verdict"].as_str())?,
-        "mechanical": r["mechanical"] == true, "merge": r["merge"] != false, "pull_request": null, "head": null,
+        "merge": r["merge"] != false, "pull_request": null, "head": null,
         "review": null, "merge_commit": null, "stages": {"implementer": null, "verifier": null},
         "files": {"gate": null, "acceptance_output": null, "report": null}, "state": "running",
         "step": null, "stopped_at": null, "cause": null, "detail": null, "steps": [], "start": now(), "end": null});

@@ -707,9 +707,31 @@ fn lead_review_failed_or_pending_does_not_block_the_checks() {
         );
         assert_eq!(
             v["checks"],
-            json!([{"name":"rust","state":"SUCCESS","run":"https://github.com/o/r/actions/runs/rust"}])
+            json!([{"name":"rust","state":"SUCCESS","run":"https://github.com/o/r/actions/runs/rust"},
+                   {"name":"lead-review","state":state,"run":null,"judged":false}])
         );
     }
+}
+
+/// Only the STATUS `lead-review` is left out of the judgment: a required check run of that name
+/// is judged like any other.
+#[test]
+fn a_check_run_named_lead_review_is_judged() {
+    let checks = vec![
+        check("rust", "COMPLETED", Some("SUCCESS"), true),
+        check("lead-review", "COMPLETED", Some("FAILURE"), true),
+    ];
+    let mut gh = Gh::new(vec![view(
+        "OPEN",
+        false,
+        H,
+        checks,
+        vec![bot(H, "completed")],
+    )]);
+    let (v, code) = gate(&mut gh, json!({}));
+    assert_eq!((v["end"].as_str(), code), (Some("check_failed"), 11), "{v}");
+    assert_eq!(v["failed_check"]["name"], "lead-review");
+    assert!(v["failed_check"].get("judged").is_none());
 }
 
 /// Leaving out `lead-review` changes nothing for the other checks: a failed `rust` still ends

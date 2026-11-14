@@ -52,6 +52,16 @@ struct U {
     dirty_on_merge: bool,
     /// Someone pushes another commit to the branch right after the acceptance executable ran.
     move_head_after_acceptance: bool,
+    /// Someone pushes another commit to the branch right after the review was closed.
+    move_head_on_close: bool,
+    /// `gh pr merge` merges and still exits non-zero.
+    merge_call_fails: bool,
+    /// The state of the status `lead-review` on the head, when it has one.
+    lead_review: Option<&'static str>,
+    /// The store refuses `start_review`.
+    store_refuses: bool,
+    /// The fake store's reviews: the parameters of `start_review`, `id`, then those of the close.
+    reviews: Vec<Value>,
 }
 
 fn git(dir: &PathBuf, args: &[&str]) -> String {
@@ -141,6 +151,11 @@ impl U {
             merge_unconfirmed: false,
             dirty_on_merge: false,
             move_head_after_acceptance: false,
+            move_head_on_close: false,
+            merge_call_fails: false,
+            lead_review: None,
+            store_refuses: false,
+            reviews: vec![],
         }
     }
     fn p(&self, rel: &str) -> String {
@@ -168,6 +183,17 @@ impl U {
             &std::fs::read(self.p(&format!("work/task/{out}.unit.json"))).unwrap(),
         )
         .unwrap()
+    }
+    /// Pushes another commit (the same tree) onto the branch in the origin.
+    fn move_head(&self) {
+        let origin = self.t.join("origin.git");
+        let head = self.head().unwrap();
+        let tree = git(&origin, &["rev-parse", &format!("{head}^{{tree}}")]);
+        let moved = git(&origin, &["commit-tree", &tree, "-p", &head, "-m", "moved"]);
+        git(
+            &origin,
+            &["update-ref", &format!("refs/heads/{BRANCH}"), &moved],
+        );
     }
     /// The origin's head of the branch, when it was pushed.
     fn head(&self) -> Option<String> {
@@ -315,6 +341,13 @@ impl U {
                 if self.dirty_on_merge {
                     std::fs::write(self.wt().join("left.txt"), "x").unwrap();
                 }
+                if self.merge_call_fails {
+                    return Ok(Reply {
+                        success: false,
+                        bytes: b"merge failed".to_vec(),
+                        stdout: vec![],
+                    });
+                }
                 ok(json!({}))
             }
             ("pr", "ready") => ok(json!({})),
@@ -329,10 +362,15 @@ impl U {
                 let check = json!({"__typename":"CheckRun","name":"rust","status":"COMPLETED",
                     "conclusion":self.check,"isRequired":true,
                     "checkSuite":{"workflowRun":{"url":"https://github.com/o/r/actions/runs/1"}}});
+                let mut nodes = vec![check];
+                if let Some(state) = self.lead_review {
+                    nodes.push(json!({"__typename":"StatusContext","context":"lead-review",
+                        "state":state,"isRequired":true,"targetUrl":null}));
+                }
                 ok(
                     json!({"data":{"repository":{"pullRequest":{"state":self.pr_state,"isDraft":false,
                     "headRefOid":head,"commits":{"nodes":[{"commit":{"oid":head,
-                    "statusCheckRollup":{"contexts":{"nodes":[check]}}}}]},
+                    "statusCheckRollup":{"contexts":{"nodes":nodes}}}}]},
                     "comments":{"nodes":self.comments}}}}}),
                 )
             }
@@ -343,23 +381,62 @@ impl U {
             _ => panic!("unexpected gh call {a:?}"),
         }
     }
+    /// A store of reviews: `search` by `all` of `eq`, `start_review` creates `rv-<n>`,
+    /// `close_review` closes it.
     fn ont(&mut self, a: &[String], body: &Value) -> Answer {
+        let reply = |v: Value| {
+            let stdout = serde_json::to_vec(&v).unwrap();
+            Ok(Reply {
+                success: true,
+                bytes: stdout.clone(),
+                stdout,
+            })
+        };
+        if a[0] == "search" {
+            assert_eq!(body["object_type"], "review");
+            let all = body["where"]["all"].as_array().unwrap();
+            let matches = |r: &&Value| {
+                all.iter()
+                    .all(|c| r[c["eq"][0].as_str().unwrap()] == c["eq"][1])
+            };
+            let found: Vec<_> = self
+                .reviews
+                .iter()
+                .filter(matches)
+                .map(|r| json!({"id": r["id"]}))
+                .collect();
+            return reply(
+                json!({"status":"ok","result":{"basis":{"qualified":true},"objects":found,"continuation":null}}),
+            );
+        }
         assert_eq!(&a[..4], ["action", "apply", "--client", "lead"], "{a:?}");
-        let review = json!({"object_type":"review","namespace":{"instance":"vps://palantirkc","account":"root"},"native_key":"rv-1"});
+        let p = &body["parameters"];
         let edits = if body["action_type"] == "start_review" {
+            if self.store_refuses {
+                return reply(json!({"status":"error","code":"refused"}));
+            }
+            let review = json!({"object_type":"review","namespace":{"instance":"vps://palantirkc","account":"root"},
+                "native_key":format!("rv-{}", self.reviews.len() + 1)});
+            let mut row = p.clone();
+            (row["id"], row["status"]) = (review.clone(), json!("running"));
+            self.reviews.push(row);
             json!([{"change":"initial","id":review}])
         } else {
-            json!([{"change":"update","id":review,"revision":"c#0"},{"change":"update","id":review,"revision":"c#1"}])
+            let row = self
+                .reviews
+                .iter_mut()
+                .find(|r| r["id"] == p["review"])
+                .unwrap();
+            for k in ["verdict", "report_sha256", "account", "session"] {
+                row[k] = p[k].clone();
+            }
+            row["status"] = json!("closed");
+            if self.move_head_on_close {
+                self.move_head();
+            }
+            json!([{"change":"update","id":p["review"],"revision":"c#0"},{"change":"update","id":p["review"],"revision":"c#1"}])
         };
-        let stdout = serde_json::to_vec(
-            &json!({"status":"ok","result":{"outcome":"applied","edits":edits}}),
-        )
-        .unwrap();
-        Ok(Reply {
-            success: true,
-            bytes: stdout.clone(),
-            stdout,
-        })
+        reply(json!({"status":"ok","result":{"outcome":"applied","edits":edits}}))
     }
 }
 impl Drop for U {
@@ -414,14 +491,7 @@ impl System for U {
                     || args.iter().any(|a| a.ends_with("judge/accept.sh"));
                 let answer = Host.call(program, args, input, ms);
                 if accepting && self.move_head_after_acceptance {
-                    let origin = self.t.join("origin.git");
-                    let head = self.head().unwrap();
-                    let tree = git(&origin, &["rev-parse", &format!("{head}^{{tree}}")]);
-                    let moved = git(&origin, &["commit-tree", &tree, "-p", &head, "-m", "moved"]);
-                    git(
-                        &origin,
-                        &["update-ref", &format!("refs/heads/{BRANCH}"), &moved],
-                    );
+                    self.move_head();
                 }
                 answer
             }
@@ -562,7 +632,7 @@ fn i1_unusable_requests_are_refused_before_any_effect() {
             json!(u.p("work/task/wt/repo/accept.sh")),
             "inside_worktree@acceptance",
         ),
-        ("mechanical", json!(true), "invalid_input@verifier"),
+        ("mechanical", json!(true), "invalid_input@mechanical"),
         (
             "verdict",
             json!(u.p("work/task/v.md")),
@@ -678,7 +748,7 @@ fn i2_a_repair_verdict_ends_the_call_with_one_implementer_and_one_verifier() {
 }
 
 #[test]
-fn i2_a_come_back_call_starts_no_stage_and_continues_no_record() {
+fn i2_a_come_back_call_starts_no_implementer_and_resumes_the_verifier_that_reviewed() {
     let mut u = U::new();
     u.script(
         "a2",
@@ -686,7 +756,7 @@ fn i2_a_come_back_call_starts_no_stage_and_continues_no_record() {
     );
     u.stop(&u.request(), "verifier", "verdict_repair");
     let first = std::fs::read(u.t.join("work/task/u1.unit.json")).unwrap();
-    // The Lead repairs by hand, pushes, and writes its own verdict on the new head.
+    // The Lead repairs by hand and pushes; the repaired head returns to the reviewer's session.
     let wt = u.wt();
     std::fs::write(wt.join("notes.md"), "fixed\n").unwrap();
     git(&wt, &["add", "-A"]);
@@ -696,19 +766,16 @@ fn i2_a_come_back_call_starts_no_stage_and_continues_no_record() {
         &["push", "-q", "origin", &format!("HEAD:refs/heads/{BRANCH}")],
     );
     let head = u.head().unwrap();
-    std::fs::write(
-        u.t.join("work/task/lead-verdict.md"),
-        format!("Verdict: accept\n{head}\n"),
-    )
-    .unwrap();
+    u.script("a2", VERIFY_ACCEPT);
     let launches = u.launches;
+    let earlier = u.p("work/task/u1.verifier.md.run.json");
     let mut r = u.request();
     r["out"] = json!(u.p("work/task/u2"));
     r["pull_request"] = json!(7);
-    r["verdict"] = json!(u.p("work/task/lead-verdict.md"));
+    r["verifier"]["resume"] = json!({"record": earlier});
     let (v, code) = u.run(&r).unwrap();
     assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
-    assert_eq!(u.launches, launches, "a come-back starts no stage");
+    assert_eq!(u.launches, launches + 1, "the verifier only");
     assert_eq!(v["head"], head);
     assert_eq!(
         steps(&v)[..4],
@@ -719,15 +786,22 @@ fn i2_a_come_back_call_starts_no_stage_and_continues_no_record() {
             ("gate", "passed")
         ])
     );
-    assert_eq!(steps(&v)[6], ("verifier".to_owned(), "skipped".to_owned()));
+    let rec: Value =
+        serde_json::from_slice(&std::fs::read(v["stages"]["verifier"].as_str().unwrap()).unwrap())
+            .unwrap();
+    let old: Value = serde_json::from_slice(&std::fs::read(&earlier).unwrap()).unwrap();
+    assert_eq!(rec["resumes"], json!(earlier));
+    assert_eq!(rec["session"], old["session"]);
     assert_eq!(
         std::fs::read(u.t.join("work/task/u1.unit.json")).unwrap(),
         first,
         "the earlier record is untouched"
     );
+    let close = &u.store("close_review")[0]["parameters"];
+    assert_eq!(close["report"], u.p("work/task/u2.verifier.md"));
     assert_eq!(
-        u.store("close_review")[0]["parameters"]["report"],
-        u.p("work/task/lead-verdict.md")
+        (&close["account"], &close["session"]),
+        (&json!(u.p("a2")), &old["session"])
     );
 }
 
@@ -740,6 +814,32 @@ fn i3_a_head_that_moves_after_the_gate_ends_without_status_or_merge() {
     let v = u.stop(&u.request(), "review", "review_head_differs");
     assert_eq!(u.launches, 2);
     assert_ne!(v["head"].as_str(), u.head().as_deref());
+}
+
+/// GitHub's head moves after the review was closed: the step `status` reads it, posts nothing.
+#[test]
+fn i3_a_head_that_moves_after_the_review_closed_ends_at_the_status() {
+    let mut u = U::new();
+    u.move_head_on_close = true;
+    let v = u.stop(&u.request(), "status", "head_differs");
+    assert_eq!(u.store("close_review").len(), 1);
+    assert_eq!(v["detail"], json!({"head": u.head(), "state": "OPEN"}));
+    assert_ne!(v["head"].as_str(), u.head().as_deref());
+}
+
+/// The acceptance executable commits in the worktree: the verifier is not launched.
+#[test]
+fn i3_a_local_head_that_moves_after_the_acceptance_starts_no_verifier() {
+    let mut u = U::new();
+    let commit = "git -c user.name=t -c user.email=t@e commit -q --allow-empty -m local";
+    write_exec(
+        &u.t.join("judge/accept.sh"),
+        &format!("#!/bin/sh\n{commit}\n"),
+    );
+    let v = u.stop(&u.request(), "verifier", "head_differs");
+    assert_eq!(u.launches, 1);
+    assert_ne!(v["detail"]["head"], v["head"]);
+    assert!(v["stages"]["verifier"].is_null());
 }
 
 #[test]
@@ -861,24 +961,185 @@ fn i4_a_verdict_must_accept_and_name_the_head() {
     assert!(v["stages"]["verifier"].is_string());
 }
 
+/// The status `lead-review` on the head is not judged by the gate; its state is in the step's
+/// detail, so that a revoked acceptance is seen.
 #[test]
-fn i4_a_mechanical_unit_is_judged_by_its_acceptance_without_a_verifier() {
+fn i4_the_gate_step_names_the_state_of_lead_review() {
     let mut u = U::new();
+    let (v, _) = u.run(&u.request()).unwrap();
+    assert_eq!(v["steps"][3]["detail"], json!({"lead_review": null}));
+    let mut u = U::new();
+    u.lead_review = Some("FAILURE");
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(v["steps"][3]["detail"], json!({"lead_review": "FAILURE"}));
+}
+
+// ---- I8 one verdict of a model per accept ------------------------------------------------------
+
+/// Writes `<verdict>.run.json` as `ap run` writes a reviewer's record and returns it.
+fn reviewer_record(u: &U, verdict: &str, prompt: &str) -> Value {
+    let (v, p) = (u.p(verdict), u.p(prompt));
+    let rec = json!({"role":"reviewer","state":"ok","model":"fable","effort":"max","account":u.p("a2"),
+        "session":"s-1","answer":{"path":v,"sha256":sha(&std::fs::read(&v).unwrap())},
+        "prompt":{"path":p,"sha256":sha(&std::fs::read(&p).unwrap())}});
+    std::fs::write(format!("{v}.run.json"), rec.to_string()).unwrap();
+    rec
+}
+
+#[test]
+fn i8_a_request_without_a_verdict_of_a_model_is_refused_before_any_effect() {
+    let mut u = U::new();
+    let verdict = "work/task/lead-verdict.md";
+    std::fs::write(u.t.join(verdict), "Verdict: accept\nabc\n").unwrap();
+    std::fs::write(u.t.join("work/task/asked.md"), "Review it.\n").unwrap();
+    let come_back = |u: &U| {
+        let mut r = u.request();
+        r.as_object_mut().unwrap().remove("verifier");
+        (r["pull_request"], r["verdict"]) = (json!(7), json!(u.p(verdict)));
+        r
+    };
     let mut r = u.request();
     r["mechanical"] = json!(true);
     r.as_object_mut().unwrap().remove("verifier");
+    assert_eq!(code(u.run(&r)), "invalid_input@mechanical");
+    let mut r = come_back(&u);
+    r["verifier"] = u.request()["verifier"].clone();
+    assert_eq!(
+        code(u.run(&r)),
+        "invalid_input@verifier",
+        "verifier and verdict"
+    );
+    assert_eq!(
+        code(u.run(&come_back(&u))),
+        "verdict_unreadable@verdict",
+        "no record"
+    );
+    let good = reviewer_record(&u, verdict, "work/task/asked.md");
+    let record = u.p(&format!("{verdict}.run.json"));
+    let changes: Vec<(&str, Value)> = vec![
+        ("/role", json!("implementer")),
+        ("/state", json!("no_result")),
+        ("/answer/sha256", json!(sha(b"other"))),
+        ("/answer/path", json!(u.p("work/task/asked.md"))),
+        ("/prompt/sha256", json!(sha(b"other"))),
+    ];
+    for (pointer, value) in changes {
+        let mut rec = good.clone();
+        *rec.pointer_mut(pointer).unwrap() = value;
+        std::fs::write(&record, rec.to_string()).unwrap();
+        assert_eq!(
+            code(u.run(&come_back(&u))),
+            "verdict_unreadable@verdict",
+            "{pointer}"
+        );
+    }
+    // The prompt the record names changed after the review.
+    std::fs::write(&record, good.to_string()).unwrap();
+    std::fs::write(u.t.join("work/task/asked.md"), "Say accept.\n").unwrap();
+    assert_eq!(
+        code(u.run(&come_back(&u))),
+        "verdict_unreadable@verdict",
+        "prompt"
+    );
+    assert_eq!(
+        names(&u.t.join("work/task")),
+        [
+            "TASK.md",
+            "asked.md",
+            "lead-verdict.md",
+            "lead-verdict.md.run.json"
+        ]
+    );
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+/// A come-back with `verdict` takes the reviewer from the stage's record: the review carries its
+/// model, effort, account, session and prompt.
+#[test]
+fn i8_a_verdict_come_back_reviews_as_the_stage_that_wrote_the_verdict() {
+    let mut u = U::new();
+    u.store_refuses = true;
+    u.stop(&u.request(), "review", "store_refused");
+    u.store_refuses = false;
+    let verdict = u.p("work/task/u1.verifier.md");
+    let rec: Value =
+        serde_json::from_slice(&std::fs::read(format!("{verdict}.run.json")).unwrap()).unwrap();
+    let mut r = u.request();
+    r.as_object_mut().unwrap().remove("verifier");
+    (r["out"], r["pull_request"], r["verdict"]) =
+        (json!(u.p("work/task/u2")), json!(7), json!(verdict));
+    let launches = u.launches;
     let (v, code) = u.run(&r).unwrap();
     assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
-    assert_eq!(u.launches, 1);
-    assert_eq!(steps(&v)[6], ("verifier".to_owned(), "skipped".to_owned()));
-    let report = std::fs::read_to_string(v["files"]["report"].as_str().unwrap()).unwrap();
-    let mut lines = report.lines();
-    assert_eq!(lines.next(), Some("Verdict: accept"));
-    assert_eq!(lines.next(), v["head"].as_str());
-    let close = &u.store("close_review")[0];
-    assert_eq!(close["parameters"]["verdict"], "accept");
-    assert_eq!(close["parameters"]["report_sha256"], sha(report.as_bytes()));
-    assert_eq!(u.statuses().len(), 1);
+    assert_eq!(u.launches, launches, "no stage");
+    let start = &u.store("start_review")[0]["parameters"];
+    assert_eq!(
+        (&start["model"], &start["effort"], &start["prompt"]),
+        (
+            &json!("sonnet"),
+            &json!("high"),
+            &json!(u.p("work/task/u1.verifier.prompt.md"))
+        )
+    );
+    let close = &u.store("close_review")[0]["parameters"];
+    assert_eq!(
+        (&close["account"], &close["session"], &close["report"]),
+        (&json!(u.p("a2")), &rec["session"], &json!(verdict))
+    );
+}
+
+// ---- I9 one review per head --------------------------------------------------------------------
+
+/// `merge: false`, then two come-backs with the verifier's answer: one review object; each later
+/// record names it and its step `review` says `reused`.
+#[test]
+fn i9_calls_on_one_head_with_one_report_leave_one_review() {
+    let mut u = U::new();
+    let mut r = u.request();
+    r["merge"] = json!(false);
+    let (first, code) = u.run(&r).unwrap();
+    assert_eq!(
+        (first["state"].as_str(), code),
+        (Some("accepted"), 0),
+        "{first}"
+    );
+    let verdict = u.p("work/task/u1.verifier.md");
+    let mut r = u.request();
+    r.as_object_mut().unwrap().remove("verifier");
+    (r["pull_request"], r["verdict"], r["merge"]) = (json!(7), json!(verdict), json!(false));
+    for (out, merge, end) in [("u2", false, "accepted"), ("u3", true, "merged")] {
+        (r["out"], r["merge"]) = (json!(u.p(&format!("work/task/{out}"))), json!(merge));
+        let (v, code) = u.run(&r).unwrap();
+        assert_eq!((v["state"].as_str(), code), (Some(end), 0), "{v}");
+        assert_eq!(v["review"], first["review"]);
+        let review = v["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["name"] == "review");
+        assert_eq!(review.unwrap()["detail"], json!({"reused": true}));
+    }
+    assert_eq!(u.reviews.len(), 1);
+    assert_eq!(u.store("start_review").len(), 1);
+    assert_eq!(u.store("close_review").len(), 1);
+    assert_eq!((u.statuses().len(), u.merges().len()), (1, 1));
+}
+
+// ---- I10 a branch behind main ------------------------------------------------------------------
+
+#[test]
+fn i10_a_branch_behind_main_stops_at_the_write_set() {
+    let mut u = U::new();
+    // `main` moves while the unit runs: the branch no longer contains it.
+    let other = "git push -q origin $(git commit-tree origin/main^{tree} -p origin/main -m other):refs/heads/main";
+    u.script("a1", &format!("{IMPLEMENT}; {other}"));
+    let v = u.stop(&u.request(), "write_set", "behind_main");
+    let main = git(&u.t.join("origin.git"), &["rev-parse", "main"]);
+    assert_eq!(v["detail"], json!(main));
+    assert_eq!(u.launches, 1, "no verifier");
+    assert!(u.calls.iter().all(|(p, _, _)| p != "ont"), "no review");
 }
 
 // ---- I5 the merge ------------------------------------------------------------------------------
@@ -921,6 +1182,15 @@ fn i5_an_accepted_unit_merges_once_on_its_head_and_removes_worktree_and_branch()
         })
         .collect();
     assert_eq!(order, ["start_review", "close_review", "status", "merge"]);
+    // The review names the reviewer: the verifier stage's account and session.
+    let rec: Value =
+        serde_json::from_slice(&std::fs::read(v["stages"]["verifier"].as_str().unwrap()).unwrap())
+            .unwrap();
+    let close = &u.store("close_review")[0]["parameters"];
+    assert_eq!(
+        (&close["account"], &close["session"]),
+        (&json!(u.p("a2")), &rec["session"])
+    );
     assert!(!u.wt().exists(), "worktree removed");
     assert_eq!(branches(&u), "* main", "branch deleted");
 }
@@ -955,6 +1225,19 @@ fn i5_a_merge_that_does_not_read_back_is_not_merged_and_removes_nothing() {
     assert!(v["merge_commit"].is_null());
     assert!(u.wt().exists());
     assert!(branches(&u).contains(BRANCH));
+}
+
+/// The merge call fails but the read shows the pull request merged at the head: merged.
+#[test]
+fn i5_a_failed_merge_call_that_reads_merged_is_merged() {
+    let mut u = U::new();
+    u.merge_call_fails = true;
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(v["steps"][9]["name"], "merge");
+    assert_eq!(v["steps"][9]["detail"], json!({"call": false}));
+    assert_eq!(v["merge_commit"].as_str(), u.merge_commit.as_deref());
+    assert_eq!(u.merges().len(), 1, "no second merge call");
 }
 
 #[test]
@@ -1083,7 +1366,6 @@ fn i7_the_record_names_the_steps_done_and_the_step_begun_while_the_call_runs() {
         "acceptance",
         "verifier_prompt",
         "verdict_file",
-        "mechanical",
         "merge",
         "pull_request",
         "head",
@@ -1184,6 +1466,16 @@ fn i1_stage_members_are_judged_by_ap_run_before_any_effect() {
     let mut r = u.request();
     r["implementer"]["next_accounts"] = json!(["relative"]);
     assert_eq!(code(u.run(&r)), "invalid_input@implementer.next_accounts");
+    let mut r = u.request();
+    r["verifier"]["resume"] = json!({"record": u.p("judge/none.run.json")});
+    assert_eq!(code(u.run(&r)), "resume_record_missing@verifier.resume");
+    // A verifier prompt the stage would refuse once the block of facts is appended (`ap run`
+    // takes at most 1 MiB): refused here, not at the verifier after the implementer ran.
+    let big = u.p("judge/big.md");
+    std::fs::write(&big, vec![b'x'; 1_048_576 - 19]).unwrap();
+    let mut r = u.request();
+    r["verifier"]["prompt"] = json!(big);
+    assert_eq!(code(u.run(&r)), "prompt_unreadable@verifier.prompt");
     // Nothing exists afterwards: no file of the call, no worktree, no branch, no process, no call.
     assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
     assert!(!u.wt().exists());
