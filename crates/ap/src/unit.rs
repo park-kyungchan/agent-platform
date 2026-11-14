@@ -74,20 +74,28 @@ fn stage(r: &Value, key: &str) -> Result<(), Failure> {
     if let Some(k) = o.keys().find(|k| !STAGE.split(' ').any(|m| m == *k)) {
         return Err(error("invalid_input", &field(k)));
     }
-    for k in ["account", "prompt"] {
-        path(&r[key], k, &field(k))?;
-    }
-    for k in ["model", "effort"] {
-        text(&r[key], k).map_err(|_| error("invalid_input", &field(k)))?;
-    }
-    if let Some(list) = o.get("next_accounts") {
-        let all = |l: &Vec<Value>| l.iter().all(|p| p.as_str().is_some_and(absolute));
-        require!(list.as_array().is_some_and(all) => "invalid_input", &field("next_accounts"));
-    }
     Ok(())
 }
+/// The `ap run` request of a stage, the same when it is admitted and when it starts.
+fn stage_request(r: &Value, which: &str, prompt: &str) -> Value {
+    let (mut req, out) = (r[which].clone(), r["out"].as_str().unwrap_or_default());
+    (req["cwd"], req["prompt"]) = (r["worktree"].clone(), json!(prompt));
+    req["out"] = json!(format!("{out}.{which}.md"));
+    req["role"] = json!(if which == "verifier" {
+        "reviewer"
+    } else {
+        which
+    });
+    if which == "verifier" {
+        req["expect"] = json!({"first_line": "Verdict: *"});
+    }
+    if req.get("permission_mode").is_none() {
+        req["permission_mode"] = json!("auto");
+    }
+    req
+}
 /// The checks before any effect; the answer is the page's write set.
-fn request(s: &impl System, r: &Value) -> Result<Vec<String>, Failure> {
+fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     let o = r
         .as_object()
         .ok_or_else(|| error("invalid_input", "stdin"))?;
@@ -164,10 +172,14 @@ fn request(s: &impl System, r: &Value) -> Result<Vec<String>, Failure> {
     let parts = lines.next().unwrap_or_default().split(',').map(str::trim);
     let write_set: Vec<String> = parts.filter(|p| !p.is_empty()).map(String::from).collect();
     require!(lines.next().is_none() && !write_set.is_empty() => "write_set_missing", "page");
-    for k in ["implementer", "verifier"] {
-        if let Some(prompt) = r[k]["prompt"].as_str() {
-            regular(prompt, "prompt_unreadable", &format!("{k}.prompt"))?;
-        }
+    // Every member `ap run` can judge before its stage's worktree exists, by its own code.
+    for k in ["implementer", "verifier"]
+        .into_iter()
+        .filter(|k| r.get(*k).is_some())
+    {
+        let lead = r[k]["prompt"].as_str().unwrap_or_default();
+        let field = |f: Failure| fail(f.code, &format!("{k}.{}", f.field), f.detail);
+        crate::run::admit_stage(s, &stage_request(r, k, lead)).map_err(field)?;
     }
     let executable = std::fs::metadata(acceptance)
         .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0);
@@ -256,13 +268,12 @@ fn unchanged(rec: &Value, path: &str) -> Result<(), Stop> {
     Ok(())
 }
 /// One `ap run` stage; its record's path goes into the unit record before its state is judged.
-fn stage_run(s: &mut impl System, u: &mut Unit, which: &str, mut r: Value) -> Step {
-    if r.get("permission_mode").is_none() {
-        r["permission_mode"] = json!("auto");
-    }
+fn stage_run(s: &mut impl System, u: &mut Unit, which: &str, r: Value) -> Step {
+    // The record's path is on disk before the stage starts: a killed call names it.
+    u.rec["stages"][which] = json!(format!("{}.run.json", text(&r, "out")?));
+    u.save();
     let refused = |f: Failure| stop("stage_refused", json!({"code": f.code, "field": f.field}));
     let (rec, _) = crate::run::execute(s, &r).map_err(refused)?;
-    u.rec["stages"][which] = json!(format!("{}.run.json", text(&r, "out")?));
     let state = rec["state"].as_str().unwrap_or("failed");
     ensure!(state == "ok" => state);
     Ok(json!({"session": rec["session"]}))
@@ -317,10 +328,8 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
             Ok(Value::Null)
         })?;
         u.step("implementer", |u| {
-            let mut req = r["implementer"].clone();
-            (req["role"], req["cwd"]) = (json!("implementer"), json!(wt));
-            req["out"] = json!(format!("{out}.implementer.md"));
-            stage_run(s, u, "implementer", req)
+            let lead = text(&r["implementer"], "prompt")?;
+            stage_run(s, u, "implementer", stage_request(r, "implementer", lead))
         })?;
         u.step("pull_request", |u| {
             let fields = "number,headRefOid,headRefName,baseRefName";
@@ -430,10 +439,7 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
                 }
                 bytes.extend(facts.as_bytes());
                 create(&prompt, &bytes)?;
-                let mut req = r["verifier"].clone();
-                (req["role"], req["cwd"], req["prompt"]) =
-                    (json!("reviewer"), json!(wt), json!(prompt));
-                (req["out"], req["expect"]) = (json!(report), json!({"first_line": "Verdict: *"}));
+                let req = stage_request(r, "verifier", &prompt);
                 session = stage_run(s, u, "verifier", req)?["session"].take();
                 u.rec["files"]["report"] = json!(report);
                 verdict(&regular(&report, "verdict_unreadable", "report")?, &head)?;

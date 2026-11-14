@@ -8,6 +8,7 @@ use std::{ffi::OsString, io::Read, io::Write, process::ExitCode, time::Duration}
 
 /// The login of the automatic reviewer whose summary comment carries the marker.
 const LOGIN: &str = "chatgpt-codex-connector[bot]";
+const LEAD_REVIEW: &str = "lead-review";
 const MARKER: &str = "codex-review-state:v1";
 const POLL: Duration = Duration::from_secs(30);
 const MEMBERS: [&str; 6] = [
@@ -163,10 +164,13 @@ fn view(s: &mut impl System, q: &Request) -> Result<View, Unread> {
     while commit["oid"] == head.as_str() {
         let contexts = &commit["statusCheckRollup"]["contexts"];
         let nodes = contexts["nodes"].as_array();
+        // `lead-review` is the output of the accept, not a check before the review: left out.
+        let judged = |c: &&Value| c.get("name").unwrap_or(&c["context"]) != LEAD_REVIEW;
         for c in nodes
             .into_iter()
             .flatten()
             .filter(|c| c["isRequired"] == true)
+            .filter(judged)
         {
             let state = match (c["status"].as_str(), c["state"].as_str()) {
                 (Some("COMPLETED"), _) => c["conclusion"].clone(),

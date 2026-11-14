@@ -245,6 +245,14 @@ fn written(path: &str, before: &Value) -> bool {
         && (now["sha256"] != before["sha256"] || now["modified"] != before["modified"])
 }
 fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
+    request_at(s, r, true)
+}
+/// Every check of a request but those that need its `cwd` to exist: for a caller that admits a
+/// stage before the stage's worktree exists (`ap unit`).
+pub(crate) fn admit_stage(s: &mut impl System, r: &Value) -> Result<(), Failure> {
+    request_at(s, r, false).map(|_| ())
+}
+fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, Failure> {
     let object = r
         .as_object()
         .ok_or_else(|| error("invalid_input", "stdin"))?;
@@ -318,7 +326,9 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
             if i == 0 { "account" } else { "next_accounts" },
         )?;
     }
-    s.directory(&cwd).map_err(|_| error("cwd_missing", "cwd"))?;
+    if at_cwd {
+        s.directory(&cwd).map_err(|_| error("cwd_missing", "cwd"))?;
+    }
     let bytes = s
         .read(&prompt)
         .map_err(|_| error("prompt_unreadable", "prompt"))?;
@@ -374,7 +384,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
             ))
         }
     };
-    if earlier.is_none() && role == "implementer" {
+    if at_cwd && earlier.is_none() && role == "implementer" {
         // Fails closed: only "not a repository" lets an implementer start without the check. Git
         // gets the fixed short list only: the request's `env` (a `GIT_DIR`) cannot skip it.
         let clean = base_env(s, &[]);

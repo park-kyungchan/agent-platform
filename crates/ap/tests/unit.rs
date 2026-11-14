@@ -1150,3 +1150,63 @@ fn i2_next_accounts_go_to_ap_run_and_a_cut_before_work_moves_within_the_one_stag
         ("implementer".to_owned(), "passed".to_owned())
     );
 }
+
+#[test]
+fn i1_stage_members_are_judged_by_ap_run_before_any_effect() {
+    let mut u = U::new();
+    let cases: Vec<(&str, Value, &str)> = vec![
+        (
+            "timeout_seconds",
+            json!(0),
+            "invalid_input@verifier.timeout_seconds",
+        ),
+        (
+            "permission_mode",
+            json!("invalid"),
+            "invalid_input@verifier.permission_mode",
+        ),
+        (
+            "account",
+            json!(u.p("no-such-account")),
+            "account_missing@verifier.account",
+        ),
+        (
+            "account",
+            json!("/root/.claude"),
+            "account_forbidden@verifier.account",
+        ),
+    ];
+    for (member, value, want) in cases {
+        let mut r = u.request();
+        r["verifier"][member] = value;
+        assert_eq!(code(u.run(&r)), want, "{member}");
+    }
+    let mut r = u.request();
+    r["implementer"]["next_accounts"] = json!(["relative"]);
+    assert_eq!(code(u.run(&r)), "invalid_input@implementer.next_accounts");
+    // Nothing exists afterwards: no file of the call, no worktree, no branch, no process, no call.
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
+    assert!(!u.wt().exists());
+    assert_eq!(branches(&u), "* main");
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn i7_the_path_of_a_stage_record_is_on_disk_before_the_stage_starts() {
+    let mut u = U::new();
+    let record = u.p("work/task/u1.unit.json");
+    let t = u.t.display().to_string();
+    u.script("a1", &format!("cp {record} {t}/seen-i.json; {IMPLEMENT}"));
+    u.script(
+        "a2",
+        &format!("cp {record} {t}/seen-v.json; {VERIFY_ACCEPT}"),
+    );
+    let (v, code) = u.run(&u.request()).unwrap();
+    assert_eq!(code, 0, "{v}");
+    for (file, stage) in [("seen-i.json", "implementer"), ("seen-v.json", "verifier")] {
+        let seen: Value = serde_json::from_slice(&std::fs::read(u.t.join(file)).unwrap()).unwrap();
+        assert_eq!(seen["step"], stage);
+        let want = u.p(&format!("work/task/u1.{stage}.md.run.json"));
+        assert_eq!(seen["stages"][stage].as_str(), Some(want.as_str()));
+    }
+}

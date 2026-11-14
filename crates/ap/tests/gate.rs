@@ -676,3 +676,67 @@ fn the_last_marker_that_parses_counts() {
         "{v}"
     );
 }
+
+/// A commit status entry (`StatusContext`), as the rollup lists `lead-review`.
+fn status(context: &str, state: &str) -> Value {
+    json!({"__typename":"StatusContext","context":context,"state":state,"isRequired":true,
+           "targetUrl":null})
+}
+
+/// The required status `lead-review` is the output of the accept, not a check before the review:
+/// failed (a revoked acceptance) or pending, it does not stop the phase of the checks.
+#[test]
+fn lead_review_failed_or_pending_does_not_block_the_checks() {
+    for state in ["FAILURE", "PENDING"] {
+        let checks = vec![
+            check("rust", "COMPLETED", Some("SUCCESS"), true),
+            status("lead-review", state),
+        ];
+        let mut gh = Gh::new(vec![view(
+            "OPEN",
+            false,
+            H,
+            checks,
+            vec![bot(H, "completed")],
+        )]);
+        let (v, code) = gate(&mut gh, json!({}));
+        assert_eq!(
+            (v["end"].as_str(), code),
+            (Some("passed"), 0),
+            "{state}: {v}"
+        );
+        assert_eq!(
+            v["checks"],
+            json!([{"name":"rust","state":"SUCCESS","run":"https://github.com/o/r/actions/runs/rust"}])
+        );
+    }
+}
+
+/// Leaving out `lead-review` changes nothing for the other checks: a failed `rust` still ends
+/// `check_failed`, and `lead-review` alone is no required check (`check_timeout`).
+#[test]
+fn lead_review_does_not_stand_for_a_required_check() {
+    let checks = vec![
+        check("rust", "COMPLETED", Some("FAILURE"), true),
+        status("lead-review", "SUCCESS"),
+    ];
+    let mut gh = Gh::new(vec![view("OPEN", false, H, checks, vec![])]);
+    let (v, code) = gate(&mut gh, json!({}));
+    assert_eq!((v["end"].as_str(), code), (Some("check_failed"), 11), "{v}");
+    assert_eq!(v["failed_check"]["name"], "rust");
+
+    let checks = vec![status("lead-review", "SUCCESS")];
+    let mut gh = Gh::new(vec![view(
+        "OPEN",
+        false,
+        H,
+        checks,
+        vec![bot(H, "completed")],
+    )]);
+    let (v, code) = gate(&mut gh, json!({"check_minutes": 1}));
+    assert_eq!(
+        (v["end"].as_str(), code),
+        (Some("check_timeout"), 11),
+        "{v}"
+    );
+}
