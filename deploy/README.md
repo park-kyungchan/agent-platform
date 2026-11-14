@@ -82,9 +82,9 @@ if r['end'] != 'failed':
         r = {k: v.get('value') for k, v in a['result']['objects'][0]['observations'][-1]['fields'].items()}
     else:
         # `detail` is null: no attempt is named, so read the newest attempt of the target from the store.
-        target = {'object_type': 'installed_artifact', 'namespace': {'instance': 'vps://palantirkc', 'account': 'root'}, 'native_key': '/usr/local/bin/ap'}
-        found = ont('search', {'object_type': 'install', 'where': {'all': [{'eq': ['target', target]}]}, 'limit': 1000})
+        found = ont('search', {'object_type': 'install', 'limit': 1000})
         rows = [{k: v.get('value') for k, v in o['head']['fields'].items()} for o in found['result']['objects']]
+        rows = [x for x in rows if (x.get('target') or {}).get('native_key') == '/usr/local/bin/ap']
         r = max(rows, key=lambda x: x['started_at'], default={})
         print('detail is null: the newest attempt of the target in the store, started', r.get('started_at'))
 print({k: r.get(k) for k in ('from', 'rollback_content', 'rollback_binary')})
