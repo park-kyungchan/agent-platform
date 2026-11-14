@@ -84,6 +84,7 @@ if [ -e "$OUT" ]; then mv -f -- "$OUT" "$OUT.prev"; fi
 MARK="(review run $(date +%s)-$$-$RANDOM)"
 n=0
 for ACC in "${ACCOUNTS[@]}"; do
+  # Auto permission mode (store decision worker-permission-mode); the host's settings.json already gives it, the flag keeps the runner independent of that file.
   n=$((n+1)); args=(--print --model "$MODEL" --effort "$EFFORT" --permission-mode auto --output-format json --strict-mcp-config)
   [ -n "$SESSION" ] && args+=(--resume "$SESSION")
   start=$(date +%s)
