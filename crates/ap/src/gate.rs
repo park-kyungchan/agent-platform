@@ -178,10 +178,11 @@ fn view(s: &mut impl System, q: &Request) -> Result<View, Unread> {
             };
             checks.push(json!({"name": name, "state": state, "run": run}));
         }
-        let next = contexts["pageInfo"]["endCursor"].as_str();
-        let Some(cursor) = next.filter(|_| contexts["pageInfo"]["hasNextPage"] == true) else {
+        if contexts["pageInfo"]["hasNextPage"] != true {
             break;
-        };
+        }
+        // More entries and no cursor to read them with: no reading.
+        let cursor = contexts["pageInfo"]["endCursor"].as_str().ok_or(None)?;
         pages += 1;
         if pages == 50 {
             return Err(None);
