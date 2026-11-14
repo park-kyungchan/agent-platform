@@ -54,6 +54,9 @@ case "$mode" in
            init; cp "$(cat "$here/watch")" "$here/seen.json"; result false 'Verdict: accept' 2 ;;
   answer)  # the bytes of the file `answer`, JSON-encoded
            init; python3 -I -c 'import json,sys; print(json.dumps({"type":"result","subtype":"success","is_error":False,"num_turns":2,"result":open(sys.argv[1],encoding="utf-8",newline="").read(),"session_id":sys.argv[2],"usage":{"input_tokens":7,"output_tokens":9},"permission_denials":[]}))' "$here/answer" "$sid" ;;
+  script)  # runs `script-<account basename>.sh` in the cwd; its stdout is the answer (tests/unit.rs)
+           init; tool; text=$(bash "$here/script-$(basename "$CLAUDE_CONFIG_DIR").sh")
+           python3 -I -c 'import json,sys; print(json.dumps({"type":"result","subtype":"success","is_error":False,"num_turns":2,"result":sys.argv[1],"session_id":sys.argv[2],"usage":{"input_tokens":1,"output_tokens":1},"permission_denials":[]}))' "$text" "$sid" ;;
   denied)  init; tool; result false 'done' 2 '[{"tool_name":"Bash","tool_use_id":"t1","tool_input":{"command":"git push"}}]' ;;
   file)    init; tool; echo ready > a.txt; result false 'done' 2 ;;
   skeleton) # replays the event skeleton in `skeleton`; the n-th result answers line n of `answers`
