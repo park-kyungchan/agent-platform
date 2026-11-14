@@ -6,6 +6,48 @@ use serde::Serialize;
 
 const INPUT_LIMIT: u64 = 1_048_576;
 const HELP: &str = "Usage: ap render < request.json\nPure JSON proposal on stdout; no file access or installation.\n";
+/// Every verb the dispatch below knows: the verb, its request form, the heading of the section of
+/// `crates/ap/README.md` that documents it. `ap --help` prints one line of this table per verb.
+const VERBS: [(&str, &str, &str); 11] = [
+    (
+        "render",
+        "render [content] < request.json",
+        "The older verbs",
+    ),
+    (
+        "install",
+        "install <plan|apply|recover> < request.json",
+        "The older verbs",
+    ),
+    (
+        "doctor",
+        "doctor <inspect|content> < spec.json",
+        "The older verbs",
+    ),
+    (
+        "pane",
+        "pane [--exports|--focused|--resume-candidate]",
+        "The older verbs",
+    ),
+    ("version", "version | --version", "The older verbs"),
+    (
+        "work",
+        "work <start|wait|close> < request.json",
+        "One worker run",
+    ),
+    ("run", "run < request.json", "One stage"),
+    ("gate", "gate < request.json", "The gate"),
+    (
+        "review",
+        "review <start|close|revoke> < request.json",
+        "One review",
+    ),
+    ("unit", "unit < request.json", "One unit"),
+    ("deliver", "deliver < request.json", "Delivery"),
+];
+fn verb_line(verb: &str, form: &str, heading: &str) -> String {
+    format!("  {verb}: ap {form} (README \"{heading}\")\n")
+}
 const WORK_HELP: &str = "Usage: ap work <start|wait|close> < request.json\nOne JSON request; admission through ont and lifecycle through herdr.\n";
 const RUN_HELP: &str = "Usage: ap run < request.json\nOne headless Claude Code stage in a transient scope of agents.slice; one record <out>.run.json.\n";
 const GATE_HELP: &str = "Usage: ap gate < request.json\nWaits on a pull request's head for its required checks and the automatic review; one JSON answer.\n";
@@ -49,6 +91,21 @@ fn main() -> ExitCode {
         } else {
             fail("io_error", "stdout", 4)
         };
+    }
+    // The verbs without a help of their own answer with their line of the table.
+    if args.len() == 2 && args[1] == "--help" {
+        if let Some((verb, form, heading)) = VERBS
+            .iter()
+            .find(|(verb, ..)| matches!(*verb, "render" | "doctor" | "version") && args[0] == *verb)
+        {
+            return match io::stdout()
+                .lock()
+                .write_all(verb_line(verb, form, heading).as_bytes())
+            {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(_) => fail("io_error", "stdout", 4),
+            };
+        }
     }
     if args.first().is_some_and(|arg| arg == "work") {
         if args.len() == 2 && args[1] == "--help" {
@@ -116,7 +173,11 @@ fn main() -> ExitCode {
         return result;
     }
     if args.len() == 1 && (args[0] == "--help" || args[0] == "-h") {
-        return if io::stdout().lock().write_all(HELP.as_bytes()).is_ok() {
+        let mut text = format!("{HELP}Verbs; the section is of crates/ap/README.md:\n");
+        for (verb, form, heading) in VERBS {
+            text.push_str(&verb_line(verb, form, heading));
+        }
+        return if io::stdout().lock().write_all(text.as_bytes()).is_ok() {
             ExitCode::SUCCESS
         } else {
             fail("io_error", "stdout", 4)

@@ -142,7 +142,9 @@ def check_binary(binary, cases, cli_cases):
             count += 1
         help_bytes = b"Usage: ap render < request.json\nPure JSON proposal on stdout; no file access or installation.\n"
         for flag in ["--help", "-h"]:
-            compare(execute(binary, [flag], b"", cwd), (0, help_bytes, b""))
+            code, out, err = execute(binary, [flag], b"", cwd)
+            # The help keeps its first two lines; the lines of the verbs follow (`tests/help.rs`).
+            compare((code, out[: len(help_bytes)], err), (0, help_bytes, b""))
             count += 1
     print(f"candidate: {count} exact CLI transcripts matched")
 

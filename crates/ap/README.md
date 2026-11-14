@@ -5,6 +5,10 @@
 For `install`, `origin/main` means the local ref, so run `git fetch` first; the previous binary is backed up as `ap.before-<first 7 hex of its sha256>` in `AP_BACKUP_DIR` (default `/var/lib/agent-platform/install`), and `rollback` accepts only that name in that directory and prints the restored version (or `no_version_output`). The script lock is `AP_INSTALL_LOCK` (default `/run/lock/ap-install.lock`).
 Limitation: a source tarball nested inside another Git repository reports the outer repository's revision, because the build derives the revision from the enclosing repository.
 
+## The older verbs
+
+`ap --help` (or `-h`) prints one line per verb the command dispatches: the verb, its request form and the heading of the section of this file that documents it; `ap <verb> --help` prints that verb's own usage. The verbs of the first generation: `ap render < request.json` is a pure proposal for the instruction files (`ap render content` is the pure proposal for the fixed owned set of public content, `ap doctor content` the diagnosis of explicit host paths against it); `ap install plan|apply|recover < request.json` and `ap doctor inspect < spec.json` are the scoped Linux installation of those files and its inspection, for disposable or externally coordinated writers, with no hook run; `ap pane [--exports|--focused|--resume-candidate]` prints the caller's Herdr pane; `ap version` is `--version`, above. Their contracts are `crates/ap/DESIGN.md`, `crates/ap/s03/` and `crates/ap/pane/README.md`; every other verb has its own section below.
+
 ## One worker run
 
 `ap work --help` lists the commands. `ap work start`, `ap work wait` and `ap work close` each read one JSON object from stdin (at most 1 MiB) and emit one JSON object. Refusals emit `{"error":{"code","field","detail"}}` on stderr with a nonzero exit. These commands execute the installed `ont` and `herdr`; they do not install either program.
