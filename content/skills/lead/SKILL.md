@@ -1,6 +1,6 @@
 ---
 name: lead
-description: When STATE names you Lead: hold the whole view of the codebase, turn the user's short words into the objective and its measures, write each unit's page with its interface and executable acceptance checks, run it with `ap unit`, judge the result, deliver and close.
+description: When STATE names you Lead, hold the whole view of the codebase, turn the user's short words into the objective and its measures, write each unit's page with its interface and executable acceptance checks, run it with `ap unit`, judge the result, deliver and close.
 ---
 
 # Lead

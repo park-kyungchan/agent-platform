@@ -26,7 +26,7 @@ Plan: before the first edit, write into the pull request description the files y
 Report: <your final message; at most 40 lines: the head, the check command's output, each acceptance check with its result, where you left this page and why, what is not verified>
 ```
 
-The worker decides what this page does not fix. It leaves the write set only with the reason in its plan. It stops and reports when an invariant or an acceptance check cannot hold; it never changes one.
+The worker decides what this page does not fix. It stays inside the write set: when the objective needs a path outside it, it stops and reports the path and the reason. It stops and reports also when an invariant or an acceptance check cannot hold; it never changes one.
 
 The shared instructions load through each CLI's own pointer, so a packet does not list them. If a session record shows they were not loaded, repair the pointer (`/root/.agents/runtime-references/CLI-RUNTIMES.md` section 3); do not paste the rules into packets.
 

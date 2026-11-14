@@ -29,7 +29,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | candidate | The exact revision that is offered for review or merge | A commit on a task branch | — |
 | handoff | Passing a piece of work, with a packet, to another agent; also one Lead passing a task to the next Lead | `CONCURRENT-WORK.md` section 2 | `hand-off`, `handover` |
 | closure | Ending a worker run or a task: record, reconcile, close what the task created | `lessons-loop/references/worker-closure.md` | — |
-| write set | The area one writer changes; a change outside it needs its reason in the worker's plan | The `Write set:` line of a packet | — |
+| write set | The area one writer changes; a change outside it stops the unit until the Lead widens it | The `Write set:` line of a packet | — |
 | build slot | The right to run the one expensive build at a time | Named in STATE at dispatch | — |
 | delegation | Giving a piece of work to a worker | A dispatch | — |
 

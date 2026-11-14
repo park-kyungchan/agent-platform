@@ -40,7 +40,7 @@ Memory for workers:
 
 1. Read the files the packet names, then state them in your first output.
 2. Before writing, check the actual cwd, `git rev-parse --git-common-dir`, branch, HEAD and `git status`. Edits you did not make belong to someone else: keep them and report them.
-3. Stay inside the write set. A change the objective needs outside it goes into your plan with its reason before you make it. A shared file of section 1 still goes to its integrator: stop at that file and report the proposed change.
+3. Stay inside the write set. When the objective needs a change outside it, stop and report the path and the reason before you make it: the Lead widens the write set in a new page. A shared file of section 1 still goes to its integrator: stop at that file and report the proposed change.
 4. If a dependency fails, stop the steps that depend on it. Work that does not depend on it may continue.
 5. Treat reference inputs as read-only. Give every subprocess a time limit and a bound on its output; keep the full log in the task directory and report a short excerpt.
 6. Run the checks the packet names; without such a line, the checks the change affects. A check the packet leaves to the CI job is read on the pushed head, not rerun on the host. Widen them only when the change crosses a boundary or evidence is still open.
