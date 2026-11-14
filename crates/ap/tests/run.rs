@@ -443,8 +443,10 @@ fn a2_account_and_model_from_the_request() {
 #[test]
 fn a1_lead_account_is_admitted_for_every_role() {
     let mut f = Fake::new();
-    f.dirs
-        .insert("/root/.claude".into(), "/root/.claude".into());
+    // Every spelling is answered by the fake: the test must not read the machine it runs on.
+    for spelling in ["/root/.claude", "/root/.claude/", "/root/./.claude"] {
+        f.dirs.insert(spelling.into(), "/root/.claude".into());
+    }
     f.dirs.insert(f.p("alias"), "/root/.claude".into());
     let alias = f.p("alias");
     let mut n = 0;
