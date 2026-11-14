@@ -452,7 +452,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
 }
 
 /// UTC RFC 3339 to the second.
-fn stamp(t: SystemTime) -> String {
+pub(crate) fn stamp(t: SystemTime) -> String {
     let secs = t.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
     let (days, rem) = ((secs / 86_400) as i64, secs % 86_400);
     // Days since 1970-01-01 to the civil date (proleptic Gregorian).
@@ -497,7 +497,7 @@ fn glob(pattern: &str, line: &str) -> bool {
 /// Writes through a temporary name and a rename: a reader never sees half a file.
 /// The temporary name is unique per write and created exclusively, so it is never a file of
 /// another run (whose `out` may be any name).
-fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
+pub(crate) fn write(path: &str, bytes: &[u8]) -> Result<(), Failure> {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_nanos());
@@ -956,6 +956,13 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     Ok((last, status))
 }
 pub fn cli(argv: &[OsString]) -> ExitCode {
+    cli_with(argv, execute)
+}
+/// One JSON request on stdin, the answer on stdout, a refusal on stderr with exit 2.
+pub(crate) fn cli_with(
+    argv: &[OsString],
+    execute: impl FnOnce(&mut crate::work::Host, &Value) -> Result<(Value, u8), Failure>,
+) -> ExitCode {
     let result = (|| {
         require!(argv.is_empty() => "usage", "args");
         let mut bytes = vec![];

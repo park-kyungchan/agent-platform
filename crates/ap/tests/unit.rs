@@ -242,10 +242,12 @@ impl U {
     }
     fn gh(&mut self, a: &[String]) -> Answer {
         let ok = |v: Value| {
+            // As `Host` answers: `bytes` holds stdout when it is not empty.
+            let stdout = serde_json::to_vec(&v).unwrap();
             Ok(Reply {
                 success: true,
-                bytes: vec![],
-                stdout: serde_json::to_vec(&v).unwrap(),
+                bytes: stdout.clone(),
+                stdout,
             })
         };
         for bad in ["--admin", "--auto", "--force", "--squash", "--rebase"] {
@@ -349,13 +351,14 @@ impl U {
         } else {
             json!([{"change":"update","id":review,"revision":"c#0"},{"change":"update","id":review,"revision":"c#1"}])
         };
+        let stdout = serde_json::to_vec(
+            &json!({"status":"ok","result":{"outcome":"applied","edits":edits}}),
+        )
+        .unwrap();
         Ok(Reply {
             success: true,
-            bytes: vec![],
-            stdout: serde_json::to_vec(
-                &json!({"status":"ok","result":{"outcome":"applied","edits":edits}}),
-            )
-            .unwrap(),
+            bytes: stdout.clone(),
+            stdout,
         })
     }
 }
@@ -1121,4 +1124,29 @@ fn i7_a_failed_first_step_leaves_a_readable_record() {
     assert_eq!(steps(&v), pairs(&[("worktree", "stopped")]));
     assert!(v["step"].is_null());
     assert_eq!(u.launches, 0);
+}
+
+#[test]
+fn i2_next_accounts_go_to_ap_run_and_a_cut_before_work_moves_within_the_one_stage() {
+    let mut u = U::new();
+    std::fs::create_dir_all(u.t.join("a3")).unwrap();
+    std::fs::write(u.t.join("bin/mode-a1"), "limit1").unwrap();
+    std::fs::write(u.t.join("bin/mode-a3"), "script").unwrap();
+    u.script("a3", IMPLEMENT);
+    let mut r = u.request();
+    r["implementer"]["next_accounts"] = json!([u.p("a3")]);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    let path = v["stages"]["implementer"].as_str().unwrap();
+    let rec: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    assert_eq!(
+        (rec["account"].as_str(), rec["state"].as_str()),
+        (Some(u.p("a3").as_str()), Some("ok"))
+    );
+    // Two launches of the one implementer stage (one record), then the verifier.
+    assert_eq!(u.launches, 3);
+    assert_eq!(
+        steps(&v)[1],
+        ("implementer".to_owned(), "passed".to_owned())
+    );
 }

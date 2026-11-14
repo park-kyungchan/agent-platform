@@ -102,6 +102,10 @@ fn request(r: &Value) -> Result<Request, Failure> {
 /// A failed reading: `Some(cause)` when waiting cannot make it pass, `None` when it can.
 type Unread = Option<&'static str>;
 /// One GraphQL read of the pull request.
+/// The request check alone, for a caller that validates before its first effect.
+pub(crate) fn check(r: &Value) -> Result<(), Failure> {
+    request(r).map(|_| ())
+}
 fn graphql(
     s: &mut impl System,
     q: &Request,
