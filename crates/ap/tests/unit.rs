@@ -2596,3 +2596,90 @@ fn c9_a_test_path_that_is_a_link_at_head_is_refused_before_any_effect() {
     assert_eq!((u.launches, u.calls.len()), (0, 0));
     assert_eq!(clone_state(&u), before);
 }
+
+/// A `refs/replace/` entry of the clone for the base commit and for the head commit makes a plain
+/// `git` read another tree and another judging file. The copy holds the real tree of `base` with the
+/// judging file as it is at the real `head`.
+#[test]
+fn c10_a_replace_ref_in_the_clone_changes_nothing_in_the_copy() {
+    let mut u = U::new();
+    let c = case(&u);
+    let clone = u.t.join("clone");
+    git(&clone, &["checkout", "-q", "--detach", &c.base]);
+    std::fs::write(clone.join("fake.txt"), "fake\n").unwrap();
+    git(&clone, &["add", "-A"]);
+    git(&clone, &["commit", "-qm", "fake base"]);
+    let fake_base = git(&clone, &["rev-parse", "HEAD"]);
+    git(&clone, &["checkout", "-q", "--detach", &c.head]);
+    write_exec(&clone.join("tests/t.sh"), "#!/bin/sh\nexit 0\n");
+    git(&clone, &["commit", "-qam", "fake head"]);
+    let fake_head = git(&clone, &["rev-parse", "HEAD"]);
+    git(&clone, &["checkout", "-q", "main"]);
+    git(&clone, &["replace", &c.base, &fake_base]);
+    git(&clone, &["replace", &c.head, &fake_head]);
+    assert!(git(&clone, &["ls-tree", "-r", "--name-only", &c.base]).contains("fake.txt"));
+    let t = u.t.display().to_string();
+    let look =
+        format!("#!/bin/sh\n{{ git ls-files; sha256sum tests/t.sh; }} > {t}/c10.txt\nexit 1\n");
+    write_exec(&u.t.join("judge/look.sh"), &look);
+    let mut r = no_stage(case_request(&u, &c));
+    r["acceptance"] = json!(u.p("judge/look.sh"));
+    let (v, _) = u.run(&r).unwrap();
+    assert_eq!(v["state"], "failed", "{v}");
+    let seen = std::fs::read_to_string(u.t.join("c10.txt")).unwrap();
+    assert!(!seen.contains("fake.txt"), "{seen}");
+    assert!(seen.contains(&sha(CASE_TEST.as_bytes())), "{seen}");
+}
+
+/// Replaces the case's copy by a link to the real directory, as a process of the candidate could:
+/// to be run with the copy as the working directory.
+const SWAP: &str = r#"mv "$PWD" "$PWD.real" && ln -s "$PWD.real" "$PWD""#;
+
+/// What a swapped copy leaves: the link is still there for a reader, the real directory is kept, the
+/// call ended `stopped` at `step` with `copy_replaced`, and nothing was removed or written after it.
+fn swapped(u: &U, v: &Value, code: u8, step: &str) {
+    assert_eq!(
+        (
+            v["state"].as_str(),
+            v["stopped_at"].as_str(),
+            v["cause"].as_str(),
+            code
+        ),
+        (Some("stopped"), Some(step), Some("copy_replaced"), 3),
+        "{v}"
+    );
+    let copy = copy(u);
+    assert!(copy.symlink_metadata().unwrap().file_type().is_symlink());
+    assert!(PathBuf::from(format!("{}.real", copy.display())).is_dir());
+    assert!(!u.t.join("work/task/c1.candidate.diff").exists());
+}
+
+/// A copy that the stage swapped for a link ends the call before the evaluator starts.
+#[test]
+fn c11_a_copy_swapped_for_a_link_stops_before_acceptance() {
+    let mut u = U::new();
+    let c = case(&u);
+    u.script("a1", &format!("{SWAP}; echo done"));
+    let (v, code) = u.run(&case_request(&u, &c)).unwrap();
+    swapped(&u, &v, code, "acceptance");
+    assert!(
+        !u.t.join("work/task/c1.accept.log").exists(),
+        "no evaluator started"
+    );
+}
+
+/// A copy that the evaluator's run left swapped for a link is not removed, and no diff is written
+/// through the link.
+#[test]
+fn c11_a_copy_swapped_for_a_link_stops_before_cleanup() {
+    let mut u = U::new();
+    let c = case(&u);
+    write_exec(
+        &u.t.join("judge/swap.sh"),
+        &format!("#!/bin/sh\n{SWAP}\nexit 0\n"),
+    );
+    let mut r = no_stage(case_request(&u, &c));
+    r["acceptance"] = json!(u.p("judge/swap.sh"));
+    let (v, code) = u.run(&r).unwrap();
+    swapped(&u, &v, code, "cleanup");
+}

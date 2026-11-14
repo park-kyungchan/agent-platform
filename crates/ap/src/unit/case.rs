@@ -15,6 +15,7 @@ const FILES: &str = ".unit.json .implementer.md .implementer.prompt.md .accept.l
 /// A new repository at `$2` with one commit: the tree of `$3` with the paths `$5…` as they are at
 /// `$4`. Only the objects of that tree go from the clone `$1` to the copy, which names no remote.
 const COPY: &str = r#"set -euo pipefail
+export GIT_NO_REPLACE_OBJECTS=1
 clone=$1 wt=$2 at=$3 head=$4; shift 4
 g() { git -C "$wt" -c core.hooksPath=/dev/null -c user.name=ap-case -c user.email=ap-case@localhost "$@"; }
 tree=$(git -C "$clone" rev-parse --verify -q "$at^{tree}")
@@ -32,6 +33,7 @@ g update-ref HEAD "$commit"
 echo "$commit""#;
 /// The candidate's difference from the copy's commit: new files too, ignored files not.
 const DIFF: &str = r#"set -euo pipefail -o noclobber
+export GIT_NO_REPLACE_OBJECTS=1
 cd "$1"; git add -A; git diff --cached --binary "$2" > "$3""#;
 
 fn hex(v: &Value, n: usize) -> bool {
@@ -166,6 +168,14 @@ fn request(s: &mut impl System, r: &Value) -> Result<(Value, String), Failure> {
     Ok((c, sha))
 }
 
+/// The copy is still the directory this call made: a link put there (by a process of the candidate)
+/// would send the evaluator, the diff and the removal to another place.
+fn still_a_directory(wt: &str) -> Result<(), Stop> {
+    match std::fs::symlink_metadata(wt) {
+        Ok(m) if m.is_dir() => Ok(()),
+        _ => Err(stop("copy_replaced", Value::Null)),
+    }
+}
 fn steps(s: &mut impl System, r: &Value, c: &Value, u: &mut Unit) -> End {
     let f = |k: &str| r[k].as_str().unwrap_or_default();
     let (clone, wt, out, acceptance) = (f("clone"), f("worktree"), f("out"), f("acceptance"));
@@ -210,6 +220,7 @@ fn steps(s: &mut impl System, r: &Value, c: &Value, u: &mut Unit) -> End {
     }
     if failed.is_none() {
         u.begin("acceptance");
+        still_a_directory(wt)?;
         unchanged(&u.rec["acceptance"], acceptance)?;
         // The case file names the judging files and the commands: the stage cannot change it.
         let file = r["case"].as_str().unwrap_or_default();
@@ -228,6 +239,7 @@ fn steps(s: &mut impl System, r: &Value, c: &Value, u: &mut Unit) -> End {
         }
     }
     u.begin("cleanup");
+    still_a_directory(wt)?;
     let diff = format!("{out}.candidate.diff");
     let a = args(&["-c", DIFF, "bash", wt, &commit, &diff]);
     let written = s
