@@ -1566,6 +1566,20 @@ fn as_claude(mut v: Value) -> Value {
     }
     v
 }
+/// The list a settled Claude agent gives: idle, ready; with its session id once startup finished.
+fn claude_list(session: bool) -> Value {
+    let mut v = as_claude(codex_fixture(true));
+    let worker = &mut v["result"]["agents"][0];
+    worker["agent_status"] = json!("idle");
+    if !session {
+        worker.as_object_mut().unwrap().remove("agent_session");
+    }
+    v["result"]["agents"].as_array_mut().unwrap().insert(
+        0,
+        json!({"name":"other","pane_id":"w1:p9","tab_id":"w1:t9","agent_status":"idle","agent_session":{"value":"wrong-session"}}),
+    );
+    v
+}
 fn raw(program: &'static str, argv: &str, text: &str) -> Step {
     let mut s = step(program, argv, Value::Null);
     s.response = Response::Raw(text.as_bytes().to_vec());
@@ -1613,9 +1627,7 @@ fn claude_setup(dialog: bool) -> (Value, Vec<Step>) {
         json!({"result":{}}),
     );
     steps[5].ms = 50_000;
-    if let Response::Json(v) = &mut steps[6].response {
-        *v = as_claude(v.clone());
-    }
+    steps[6].response = Response::Json(claude_list(true));
     if dialog {
         steps[5].response =
             Response::Json(json!({"error":{"code":"agent_not_ready","message":"blocked"}}));
@@ -1665,7 +1677,7 @@ fn claude_start_with_dialog_answers_it_through_agent_calls_and_prompts_once() {
     assert_eq!(status, 0);
     assert_eq!(
         v,
-        json!({"status":"started","run":id("worker_run"),"binding":BINDING,"session":null,"pane":"w1:p2","tab":"w1:t2","prompt_target":"w1:p2","worktree_head":null,"prompt":"sent"})
+        json!({"status":"started","run":id("worker_run"),"binding":BINDING,"session":"fixture-session","pane":"w1:p2","tab":"w1:t2","prompt_target":"w1:p2","worktree_head":null,"prompt":"sent"})
     );
     s.finish();
 }
@@ -1938,4 +1950,124 @@ fn claude_wait_is_the_same_call_as_codex_wait() {
         (0, &json!("report_present"), &json!("idle"))
     );
     s.finish();
+}
+
+fn stalled() -> Response {
+    Response::Json(
+        json!({"error":{"code":"agent_prompt_stalled","message":"no observed working or blocked state within 5000 ms; current status is idle"},"id":"cli:agent:prompt"}),
+    )
+}
+fn at_prompt(steps: &[Step]) -> usize {
+    steps
+        .iter()
+        .position(|s| s.argv.iter().any(|a| a == "prompt"))
+        .unwrap()
+}
+fn enter_and_wait(working: &str) -> Vec<Step> {
+    let mut wait = step(
+        "herdr",
+        "agent wait w1:p2 --until working --until blocked --timeout 10000",
+        json!({"result":{"agent":{"agent_status":working}}}),
+    );
+    wait.ms = 10_000;
+    vec![key("enter"), wait]
+}
+#[test]
+fn claude_replays_the_live_stalled_first_prompt_and_submits_with_one_enter() {
+    // Recorded live (herdr 0.9.5): agent start answers agent_not_ready after 4 s; after the
+    // dialog the agent is idle and ready without a session, twice, then with its session;
+    // the prompt answers agent_prompt_stalled (idle) with the text in the input box.
+    let (r, mut steps) = claude_setup(true);
+    let list = steps
+        .iter()
+        .rposition(|s| s.argv == ["agent", "list"])
+        .unwrap();
+    for _ in 0..2 {
+        steps.insert(list, step("herdr", "agent list", claude_list(false)));
+    }
+    let prompt = at_prompt(&steps);
+    steps[prompt].response = stalled();
+    steps[prompt].success = false;
+    let tail = enter_and_wait("working");
+    steps.splice(prompt + 1..prompt + 1, tail);
+    let prompts = steps
+        .iter()
+        .filter(|s| s.argv.iter().any(|a| a == "prompt"))
+        .count();
+    assert_eq!(prompts, 1, "the text is typed once");
+    let mut s = Script::new(steps);
+    let (v, status) = execute(&mut s, "start", &r).unwrap();
+    assert_eq!(
+        (status, &v["status"], &v["prompt"]),
+        (0, &json!("started"), &json!("sent"))
+    );
+    assert_eq!(v["session"], "fixture-session");
+    s.finish();
+}
+#[test]
+fn claude_start_waits_for_the_session_id() {
+    let (r, mut steps) = claude_setup(false);
+    let at = steps
+        .iter()
+        .position(|s| s.argv == ["agent", "list"] && s.program == "herdr")
+        .map(|_| steps.len() - 3)
+        .unwrap();
+    steps[at].response = Response::Json(claude_list(false));
+    steps[at].elapsed = 59_750;
+    steps.truncate(at + 1);
+    dialog_failure(steps, &r, "agent_not_ready");
+}
+#[test]
+fn claude_prompt_not_shown_as_submitted_fails_with_run_tab_pane_and_no_second_text() {
+    let cases: Vec<(&str, Option<Response>, Vec<Step>)> = vec![
+        // stalled, the one Enter is sent, the agent is not seen working
+        ("enter then idle", Some(stalled()), enter_and_wait("idle")),
+        ("enter then timeout", Some(stalled()), {
+            let mut v = enter_and_wait("idle");
+            v[1].response = Response::Json(json!({"error":{"code":"timeout"}}));
+            v[1].success = false;
+            v
+        }),
+        ("enter refused", Some(stalled()), {
+            let mut v = enter_and_wait("idle");
+            v.truncate(1);
+            v[0].success = false;
+            v
+        }),
+        // any other answer of the prompt: no key at all
+        (
+            "timeout",
+            Some(Response::Json(json!({"error":{"code":"timeout"}}))),
+            vec![],
+        ),
+        ("unreadable", Some(Response::Unreadable), vec![]),
+        ("process failed", Some(Response::Failed), vec![]),
+    ];
+    for (_, response, tail) in cases {
+        let (r, mut steps) = claude_setup(true);
+        let prompt = at_prompt(&steps);
+        steps[prompt].response = response.unwrap();
+        steps[prompt].success = false;
+        steps.splice(prompt + 1..prompt + 1, tail);
+        let mut s = Script::new(steps);
+        let e = execute(&mut s, "start", &r).unwrap_err();
+        assert_eq!(e.code, "prompt_not_confirmed");
+        assert_eq!(e.field, "prompt");
+        assert_eq!(e.detail["tab"], "w1:t2");
+        assert_eq!(e.detail["pane"], "w1:p2");
+        assert_eq!(e.detail["run"], id("worker_run"));
+        assert_eq!(e.detail["binding"], BINDING);
+        assert_eq!(e.detail["input_box"], "may_hold_text");
+        s.finish(); // the run is applied and left running: `ap work close` closes it
+    }
+}
+#[test]
+fn codex_prompt_stall_is_not_retried_and_stays_uncertain() {
+    let (r, mut steps) = start_setup();
+    steps[8].response = stalled();
+    steps[8].success = false;
+    let mut s = Script::new(steps);
+    let (v, exit) = execute(&mut s, "start", &r).unwrap();
+    assert_eq!((exit, &v["prompt"]), (0, &json!("uncertain")));
+    s.finish(); // no key, no second call
 }

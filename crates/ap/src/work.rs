@@ -295,6 +295,24 @@ fn kind_of<'a>(s: &impl System, r: &'a Value) -> Result<Kind<'a>, Failure> {
         config_dir: Some(dir),
     })
 }
+fn prompt_stalled(reply: &Answer) -> bool {
+    reply.as_ref().is_ok_and(|r| {
+        !r.success
+            && serde_json::from_slice::<Value>(&r.bytes)
+                .is_ok_and(|v| v["error"]["code"] == "agent_prompt_stalled")
+    })
+}
+fn session_of(agent: &Value) -> Option<String> {
+    agent["agent_session"]["value"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+}
+/// Herdr reports `idle` and `interactive_ready` for a Claude agent before its startup finished
+/// (live: the prompt was typed and Enter was lost); its session id appears only after it did.
+fn has_session(agent: &Value) -> bool {
+    session_of(agent).is_some()
+}
 fn agent_status(v: &Value) -> Option<&str> {
     v.pointer("/result/agent/agent_status")
         .or_else(|| v.pointer("/result/event/data/agent_status"))
@@ -552,11 +570,9 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
                 && a["tab_id"] == tab
                 && a["agent"] == kind.label
                 && a["interactive_ready"] == true
+                && (kind.config_dir.is_none() || has_session(a))
         }) {
-            break a["agent_session"]["value"]
-                .as_str()
-                .filter(|s| !s.is_empty())
-                .map(str::to_owned);
+            break session_of(a);
         }
         s.pause(Duration::from_millis(250).min(deadline.saturating_duration_since(s.now())));
     };
@@ -585,9 +601,33 @@ fn start(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
             json!({"request_id":request,"tab":tab,"pane":pane}),
         ));
     };
-    let prompt = herdr!(s, 30_000; "agent", "prompt", pane, &format!("Read the file {packet} and do exactly what it says. Never open a question dialog and never wait for an answer: a point that only the Lead can decide goes into your report, and you continue with every step that does not depend on it."), "--wait", "--until", "working", "--until", "blocked", "--timeout", "30000");
+    let mut prompt = herdr!(s, 30_000; "agent", "prompt", pane, &format!("Read the file {packet} and do exactly what it says. Never open a question dialog and never wait for an answer: a point that only the Lead can decide goes into your report, and you continue with every step that does not depend on it."), "--wait", "--until", "working", "--until", "blocked", "--timeout", "30000");
+    if kind.config_dir.is_some() && prompt_stalled(&prompt) {
+        // Live: a Claude agent can be `idle` and `interactive_ready` while its input still drops
+        // the first Enter; Herdr then answers `agent_prompt_stalled` with the whole text sitting
+        // in the input box. The text is never typed again: ONE Enter submits it, and the
+        // agent must then be seen `working` or `blocked`.
+        if acknowledged(herdr!(s, 5_000; "agent", "send-keys", pane, "enter")) {
+            prompt = herdr!(s, 10_000; "agent", "wait", pane, "--until", "working", "--until", "blocked", "--timeout", "10000").map(|mut r| {
+                let seen = serde_json::from_slice::<Value>(&r.stdout)
+                    .is_ok_and(|v| matches!(agent_status(&v), Some("working" | "blocked")));
+                r.success &= seen;
+                r
+            });
+        }
+    }
+    if kind.config_dir.is_some() && !acknowledged_ref(&prompt) {
+        // The store run is applied and stays running: the Lead closes it with `ap work close`.
+        // Herdr did not show the prompt as submitted, so the input box may hold its text: the
+        // prompt is never sent a second time by this command.
+        return Err(fail(
+            "prompt_not_confirmed",
+            "prompt",
+            json!({"tab":tab,"pane":pane,"run":run,"binding":binding,"input_box":"may_hold_text"}),
+        ));
+    }
     Ok(
-        json!({"status":"started","run":run,"binding":binding,"session":session,"pane":pane,"tab":tab,"prompt_target":pane,"worktree_head":worktree_head,"prompt":if acknowledged(prompt) {"sent"} else {"uncertain"}}),
+        json!({"status":"started","run":run,"binding":binding,"session":session,"pane":pane,"tab":tab,"prompt_target":pane,"worktree_head":worktree_head,"prompt":if acknowledged_ref(&prompt) {"sent"} else {"uncertain"}}),
     )
 }
 fn close(s: &mut impl System, r: &Value) -> Result<Value, Failure> {
