@@ -1361,6 +1361,7 @@ fn i7_the_record_names_the_steps_done_and_the_step_begun_while_the_call_runs() {
     let mut keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
     keys.sort_unstable();
     let mut want = vec![
+        "mode",
         "repository",
         "clone",
         "worktree",
@@ -1586,4 +1587,734 @@ fn d8_unit_does_not_reuse_revoked() {
         ends.push(steps(&v));
     }
     assert_eq!(ends[0], ends[1]);
+}
+
+// ---- The case call (README "One case") -------------------------------------------------------
+
+/// The test of the accepted head: it passes only when the code it judges says `done`.
+const CASE_TEST: &str = "#!/bin/sh\ngrep -qx done src/lib.txt\n";
+const CASE_PAGE: &str = "# A past unit\nMake src/lib.txt say done.\n";
+/// The candidate implements the page and answers.
+const CANDIDATE: &str = "mkdir -p src && echo done > src/lib.txt; echo CANDIDATE-ANSWER";
+
+struct Case {
+    base: String,
+    head: String,
+    file: String,
+}
+/// The suite's evaluator, by a path without `..`.
+fn evaluator() -> String {
+    let p =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../evals/engineering/evaluate");
+    std::fs::canonicalize(p)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned()
+}
+/// A past unit in the clone: `base` is `main`, the accepted `head` (on another branch) adds the
+/// test `tests/t.sh` (executable) and the code it judges; the case file lies outside the work root.
+fn case(u: &U) -> Case {
+    let clone = u.t.join("clone");
+    let base = git(&clone, &["rev-parse", "HEAD"]);
+    git(&clone, &["checkout", "-q", "-b", "accepted"]);
+    std::fs::create_dir_all(clone.join("tests")).unwrap();
+    std::fs::create_dir_all(clone.join("src")).unwrap();
+    write_exec(&clone.join("tests/t.sh"), CASE_TEST);
+    std::fs::write(clone.join("src/lib.txt"), "done\n").unwrap();
+    git(&clone, &["add", "-A"]);
+    git(&clone, &["commit", "-qm", "accepted"]);
+    let head = git(&clone, &["rev-parse", "HEAD"]);
+    git(&clone, &["checkout", "-q", "main"]);
+    std::fs::create_dir_all(u.t.join("cases")).unwrap();
+    std::fs::write(u.t.join("work/task/case.md"), CASE_PAGE).unwrap();
+    let c = json!({"id": "tc-1", "repository": "o/r", "pull_request": 3, "base": base, "head": head,
+        "tests": ["tests/t.sh"], "commands": [["./tests/t.sh"]], "page_sha256": sha(CASE_PAGE.as_bytes())});
+    let file = u.p("cases/tc-1.json");
+    std::fs::write(&file, serde_json::to_vec(&c).unwrap()).unwrap();
+    u.script("a1", CANDIDATE);
+    Case { base, head, file }
+}
+fn case_request(u: &U, c: &Case) -> Value {
+    json!({"case": c.file, "clone": u.p("clone"), "worktree": u.p("work/task/copy"),
+        "page": u.p("work/task/case.md"), "out": u.p("work/task/c1"), "acceptance": evaluator(),
+        "implementer": {"account": u.p("a1"), "model": "opus", "effort": "high",
+            "prompt": u.p("judge/implementer.md")}})
+}
+fn no_stage(mut r: Value) -> Value {
+    r.as_object_mut().unwrap().remove("implementer");
+    r
+}
+fn copy(u: &U) -> PathBuf {
+    u.t.join("work/task/copy")
+}
+/// The result of a case call: state, exit, `stopped_at`, `cause`, `detail`.
+fn ended(r: Result<(Value, u8), Failure>) -> (Value, (String, u8, Value, Value, Value)) {
+    let (v, code) = r.unwrap();
+    let state = v["state"].as_str().unwrap().to_owned();
+    let end = (
+        state,
+        code,
+        v["stopped_at"].clone(),
+        v["cause"].clone(),
+        v["detail"].clone(),
+    );
+    (v, end)
+}
+fn evaluate_lines(u: &U) -> Vec<String> {
+    std::fs::read_to_string(u.t.join("work/task/c1.accept.log"))
+        .unwrap()
+        .lines()
+        .filter(|l| l.starts_with("evaluate: "))
+        .map(str::to_owned)
+        .collect()
+}
+fn clone_state(u: &U) -> (String, String, String) {
+    let clone = u.t.join("clone");
+    (
+        git(&clone, &["status", "--porcelain", "--untracked-files=all"]),
+        git(&clone, &["for-each-ref"]),
+        git(&clone, &["worktree", "list", "--porcelain"]),
+    )
+}
+
+#[test]
+fn c1_a_unit_record_says_mode_unit_and_a_stage_takes_env() {
+    let mut u = U::new();
+    let mut r = u.request();
+    r["implementer"]["env"] = json!({"CASE_SUITE_PROBE": "x1"});
+    let (v, exit) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    assert_eq!(v["mode"], "unit");
+    let env = std::fs::read_to_string(u.t.join("bin/env.1")).unwrap();
+    assert!(env.lines().any(|l| l == "CASE_SUITE_PROBE=x1"), "{env}");
+    // A stage's `env` is judged by `ap run`'s code before any effect.
+    let mut r = u.request();
+    r["verifier"]["env"] = json!({"HOME": "/"});
+    r["out"] = json!(u.p("work/task/u2"));
+    assert_eq!(code(u.run(&r)), "env_forbidden@verifier.env");
+}
+
+#[test]
+fn c2_a_refused_case_call_leaves_nothing_behind() {
+    let mut u = U::new();
+    let c = case(&u);
+    let before = clone_state(&u);
+    let r0 = case_request(&u, &c);
+    let mut cases: Vec<(Value, String)> = vec![];
+    for member in [
+        "repository",
+        "branch",
+        "task_key",
+        "verifier",
+        "verdict",
+        "gate",
+        "store",
+        "merge",
+        "pull_request",
+    ] {
+        let mut r = r0.clone();
+        r[member] = json!("o/r");
+        cases.push((r, format!("invalid_input@{member}")));
+    }
+    let mut add = |k: &str, v: Value, want: &str| {
+        let mut r = r0.clone();
+        r[k] = v;
+        cases.push((r, want.to_owned()));
+    };
+    add("at", json!("middle"), "invalid_input@at");
+    add("at", json!("head"), "invalid_input@at");
+    add("case", json!("cases/tc-1.json"), "invalid_input@case");
+    add(
+        "case",
+        json!(u.p("cases/none.json")),
+        "case_unreadable@case",
+    );
+    add("case", json!(u.p("cases")), "case_unreadable@case");
+    add(
+        "page",
+        json!(u.p("work/task/TASK.md")),
+        "case_page_differs@page",
+    );
+    add(
+        "page",
+        json!(u.p("judge/implementer.md")),
+        "outside_work_root@page",
+    );
+    add("out", json!(u.p("judge/c1")), "outside_work_root@out");
+    add(
+        "acceptance",
+        json!(u.p("work/task/copy/evaluate")),
+        "inside_worktree@acceptance",
+    );
+    add(
+        "acceptance",
+        json!(u.p("work/task/case.md")),
+        "acceptance_unreadable@acceptance",
+    );
+    add(
+        "acceptance_seconds",
+        json!(0),
+        "invalid_input@acceptance_seconds",
+    );
+    let mut r = r0.clone();
+    r["implementer"]["resume"] = json!({"record": u.p("judge/x.run.json")});
+    cases.push((r, "invalid_input@implementer.resume".into()));
+    let mut r = r0.clone();
+    r["implementer"]["prompt"] = json!(u.p("judge/none.md"));
+    cases.push((r, "prompt_unreadable@implementer.prompt".into()));
+    let mut r = r0.clone();
+    r["implementer"]["timeout_seconds"] = json!(0);
+    cases.push((r, "invalid_input@implementer.timeout_seconds".into()));
+
+    // The case file: each member missing, unknown or malformed; the file named after another id.
+    let good: Value = serde_json::from_slice(&std::fs::read(&c.file).unwrap()).unwrap();
+    let mut bad = |name: &str, f: &dyn Fn(&mut Value)| {
+        let mut v = good.clone();
+        f(&mut v);
+        let file = u.p(&format!("cases/{name}.json"));
+        std::fs::write(&file, serde_json::to_vec(&v).unwrap()).unwrap();
+        let mut r = r0.clone();
+        r["case"] = json!(file);
+        cases.push((r, "case_unreadable@case".into()));
+    };
+    bad("tc-1x", &|_| {});
+    bad("tc-2", &|v| v["id"] = json!("tc-2x"));
+    bad("Tc-3", &|v| v["id"] = json!("Tc-3"));
+    bad("tc-4", &|v| {
+        v["id"] = json!("tc-4");
+        v.as_object_mut().unwrap().remove("commands");
+    });
+    let set = |k: &'static str, x: Value| {
+        move |v: &mut Value| {
+            v[k] = x.clone();
+        }
+    };
+    bad("tc-1", &set("extra", json!(1)));
+    bad("tc-1", &set("repository", json!("no-slash")));
+    bad("tc-1", &set("pull_request", json!(0)));
+    bad("tc-1", &set("base", json!("abc")));
+    bad("tc-1", &set("head", json!("G".repeat(40))));
+    bad("tc-1", &set("tests", json!([])));
+    bad("tc-1", &set("tests", json!(["../x"])));
+    bad("tc-1", &set("tests", json!(["/etc/passwd"])));
+    bad("tc-1", &set("commands", json!([])));
+    bad("tc-1", &set("commands", json!([[]])));
+    bad("tc-1", &set("commands", json!(["./check"])));
+    bad("tc-1", &set("page_sha256", json!("0".repeat(63))));
+    std::fs::write(u.t.join("cases/tc-1.json"), "not json").unwrap();
+    let mut r = r0.clone();
+    r["case"] = json!(u.p("cases/tc-1.json"));
+    cases.push((r, "case_unreadable@case".into()));
+    for (r, want) in cases {
+        assert_eq!(code(u.run(&r)), want, "{r}");
+    }
+    // Commits and tests that the clone does not hold.
+    let missing = "0123456789abcdef0123456789abcdef01234567";
+    for (k, v, want) in [
+        ("base", json!(missing), "case_commit_missing@case.base"),
+        ("head", json!(missing), "case_commit_missing@case.head"),
+        (
+            "tests",
+            json!(["tests/none.sh"]),
+            "case_commit_missing@case.tests",
+        ),
+        ("tests", json!(["tests"]), "case_commit_missing@case.tests"),
+    ] {
+        let mut v2 = good.clone();
+        v2[k] = v;
+        std::fs::write(&c.file, serde_json::to_vec(&v2).unwrap()).unwrap();
+        assert_eq!(code(u.run(&r0)), want, "{k}");
+    }
+    std::fs::write(&c.file, serde_json::to_vec(&good).unwrap()).unwrap();
+    let mut r = r0.clone();
+    r["clone"] = json!(u.p("home"));
+    assert_eq!(code(u.run(&r)), "case_commit_missing@case.base");
+    // An existing file of the call, or an existing copy, is refused untouched.
+    std::fs::write(u.t.join("work/task/c1.candidate.diff"), "earlier").unwrap();
+    assert_eq!(code(u.run(&r0)), "out_exists@out");
+    std::fs::remove_file(u.t.join("work/task/c1.candidate.diff")).unwrap();
+    std::fs::create_dir(copy(&u)).unwrap();
+    assert_eq!(code(u.run(&r0)), "worktree_exists@worktree");
+    std::fs::remove_dir(copy(&u)).unwrap();
+
+    // Nothing exists afterwards: no file of the call, no copy, no process, no call; the clone is
+    // as it was.
+    assert_eq!(names(&u.t.join("work/task")), ["TASK.md", "case.md"]);
+    assert_eq!((u.launches, u.calls.len()), (0, 0));
+    assert_eq!(clone_state(&u), before);
+    // The page of a case needs no line `Write set:`: the same request, unchanged, is admitted.
+    let (v, _) = u.run(&no_stage(r0)).unwrap();
+    assert_eq!(v["mode"], "case");
+}
+
+#[test]
+fn c3_a_case_call_calls_no_github_or_store_and_writes_only_its_files() {
+    let mut u = U::new();
+    let c = case(&u);
+    let before = clone_state(&u);
+    let top = names(&u.t);
+    let (v, code) = u.run(&case_request(&u, &c)).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("passed"), 0), "{v}");
+    assert!(u.calls.is_empty(), "{:?}", u.calls);
+    assert_eq!(
+        names(&u.t.join("work/task")),
+        [
+            "TASK.md",
+            "c1.accept.log",
+            "c1.candidate.diff",
+            "c1.implementer.md",
+            "c1.implementer.md.run.json",
+            "c1.implementer.md.stream.jsonl",
+            "c1.implementer.prompt.md",
+            "c1.unit.json",
+            "case.md"
+        ]
+    );
+    assert_eq!(names(&u.t), top);
+    assert_eq!(clone_state(&u), before);
+}
+
+#[test]
+fn c4_the_copy_at_base_holds_nothing_of_the_head_or_the_clone() {
+    let mut u = U::new();
+    let c = case(&u);
+    let t = u.t.display().to_string();
+    let clone = u.p("clone");
+    // What the candidate can find in its copy, written out before it answers.
+    u.script(
+        "a1",
+        &format!(
+            "{{ git cat-file -e {head} 2>/dev/null && echo head=found || echo head=absent; git cat-file -e {base} 2>/dev/null && echo base=found || echo base=absent; \
+             echo commits=$(git rev-list --all --count); echo remotes=$(git remote | wc -l); \
+             grep -rqF '{clone}' . ; echo clone=$?; test -e .git/objects/info/alternates; echo alternates=$?; \
+             echo author=$(git log -1 --format=%an); echo test=$(cat tests/t.sh | sha256sum | cut -c1-64); \
+             echo mode=$(git ls-files -s tests/t.sh | cut -c1-6); test -e src/lib.txt; echo lib=$?; \
+             git status --porcelain | wc -l | sed 's/^/dirty=/'; }} > {t}/c4.txt; {CANDIDATE}",
+            head = c.head,
+            base = c.base,
+        ),
+    );
+    let (v, code) = u.run(&case_request(&u, &c)).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("passed"), 0), "{v}");
+    let seen = std::fs::read_to_string(u.t.join("c4.txt")).unwrap();
+    // The author is the call's own identity given on the command line: any nonempty name.
+    let (author, rest): (Vec<_>, Vec<_>) = seen.lines().partition(|l| l.starts_with("author="));
+    assert!(
+        author.len() == 1 && author[0].len() > "author=".len(),
+        "{seen}"
+    );
+    let test = format!("test={}", sha(CASE_TEST.as_bytes()));
+    let want = [
+        "head=absent",
+        "base=absent",
+        "commits=1",
+        "remotes=0",
+        "clone=1",
+        "alternates=1",
+        &test,
+        "mode=100755",
+        "lib=1",
+        "dirty=0",
+    ];
+    assert_eq!(rest, want, "{seen}");
+    // The copy's record names neither the head nor anything the candidate could follow to it.
+    assert_eq!(v["base"], c.base.as_str());
+}
+
+#[test]
+fn c4_the_copy_at_head_holds_the_tree_of_head_in_one_commit() {
+    let mut u = U::new();
+    let c = case(&u);
+    let mut r = no_stage(case_request(&u, &c));
+    r["at"] = json!("head");
+    let t = u.t.display().to_string();
+    let accept = format!(
+        "#!/bin/sh\n{{ git rev-list --all --count; cat src/lib.txt; git remote | wc -l; }} > {t}/c4h.txt\n"
+    );
+    write_exec(&u.t.join("judge/look.sh"), &accept);
+    r["acceptance"] = json!(u.p("judge/look.sh"));
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("passed"), 0), "{v}");
+    assert_eq!(
+        std::fs::read_to_string(u.t.join("c4h.txt")).unwrap(),
+        "1\ndone\n0\n"
+    );
+}
+
+#[test]
+fn c5_one_pass_at_most_one_stage_and_no_step_repeated() {
+    let mut u = U::new();
+    let c = case(&u);
+    let (v, _) = u.run(&case_request(&u, &c)).unwrap();
+    assert_eq!(u.launches, 1);
+    assert_eq!(
+        steps(&v),
+        pairs(&[
+            ("worktree", "passed"),
+            ("implementer", "passed"),
+            ("acceptance", "passed"),
+            ("cleanup", "passed")
+        ])
+    );
+    let mut r = no_stage(case_request(&u, &c));
+    r["out"] = json!(u.p("work/task/c2"));
+    let (v, _) = u.run(&r).unwrap();
+    assert_eq!(u.launches, 1, "no stage without `implementer`");
+    let names: Vec<_> = steps(&v).into_iter().map(|(n, _)| n).collect();
+    assert_eq!(names, ["worktree", "acceptance", "cleanup"]);
+    // No stage ever works in a copy of the head.
+    let mut r = case_request(&u, &c);
+    (r["at"], r["out"]) = (json!("head"), json!(u.p("work/task/c3")));
+    assert_eq!(code(u.run(&r)), "invalid_input@at");
+    assert_eq!(u.launches, 1);
+}
+
+#[test]
+fn c6_the_validity_pair_fails_at_base_and_passes_at_head_with_the_evaluator_line() {
+    let mut u = U::new();
+    let c = case(&u);
+    let r = no_stage(case_request(&u, &c));
+    let (_, end) = ended(u.run(&r));
+    assert_eq!(
+        end,
+        (
+            "failed".into(),
+            4,
+            Value::Null,
+            Value::Null,
+            json!({"exit": 1})
+        )
+    );
+    let lines = evaluate_lines(&u);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let rest = lines[0]
+        .strip_prefix("evaluate: command=1 exit=1 seconds=")
+        .unwrap();
+    assert!(
+        !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit()),
+        "{lines:?}"
+    );
+    assert!(!copy(&u).exists());
+    let mut r = r.clone();
+    (r["at"], r["out"]) = (json!("head"), json!(u.p("work/task/c2")));
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("passed"), 0), "{v}");
+    assert_eq!(v["at"], "head");
+}
+
+#[test]
+fn c6_a_stage_that_makes_the_tests_pass_ends_passed() {
+    let mut u = U::new();
+    let c = case(&u);
+    let (_, end) = ended(u.run(&case_request(&u, &c)));
+    assert_eq!(
+        end,
+        ("passed".into(), 0, Value::Null, Value::Null, Value::Null)
+    );
+    let lines = evaluate_lines(&u);
+    assert!(
+        lines[0].starts_with("evaluate: command=1 exit=0 seconds="),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn c6_the_evaluator_restores_a_test_the_candidate_emptied() {
+    let mut u = U::new();
+    let c = case(&u);
+    // An empty test would exit 0: the candidate empties it and implements nothing.
+    u.script("a1", ": > tests/t.sh; echo done");
+    let (_, end) = ended(u.run(&case_request(&u, &c)));
+    assert_eq!(
+        end,
+        (
+            "failed".into(),
+            4,
+            Value::Null,
+            Value::Null,
+            json!({"exit": 1})
+        )
+    );
+    // The diff is taken after the evaluator ran: the restored test is no change.
+    let diff = std::fs::read_to_string(u.t.join("work/task/c1.candidate.diff")).unwrap();
+    assert!(!diff.contains("tests/t.sh"), "{diff}");
+}
+
+#[test]
+fn c6_the_evaluators_bound_ends_failed_with_exit_124() {
+    let mut u = U::new();
+    let c = case(&u);
+    write_exec(&u.t.join("judge/slow.sh"), "#!/bin/sh\nsleep 30\n");
+    let mut r = no_stage(case_request(&u, &c));
+    (r["acceptance"], r["acceptance_seconds"]) = (json!(u.p("judge/slow.sh")), json!(1));
+    let (_, end) = ended(u.run(&r));
+    assert_eq!(
+        end,
+        (
+            "failed".into(),
+            4,
+            Value::Null,
+            Value::Null,
+            json!({"exit": 124})
+        )
+    );
+    assert!(!copy(&u).exists());
+}
+
+#[test]
+fn c6_the_stages_timeout_ends_failed_and_runs_no_evaluator() {
+    let mut u = U::new();
+    let c = case(&u);
+    std::fs::write(u.t.join("bin/mode-a1"), "other").unwrap();
+    let mut r = case_request(&u, &c);
+    r["acceptance"] = json!(u.p("judge/accept.sh"));
+    r["implementer"]["timeout_seconds"] = json!(1);
+    let (v, end) = ended(u.run(&r));
+    assert_eq!(
+        end,
+        (
+            "failed".into(),
+            4,
+            Value::Null,
+            Value::Null,
+            json!({"stage": "timeout"})
+        )
+    );
+    assert!(u.accept_calls().is_empty());
+    assert_eq!(
+        steps(&v),
+        pairs(&[
+            ("worktree", "passed"),
+            ("implementer", "failed"),
+            ("cleanup", "passed")
+        ])
+    );
+    assert_eq!(v["stage_seconds"], 1);
+    assert!(!copy(&u).exists());
+}
+
+#[test]
+fn c6_another_exit_of_the_evaluator_or_a_cut_stage_stops_and_keeps_the_copy() {
+    let mut u = U::new();
+    let c = case(&u);
+    std::fs::write(u.t.join("accept-exit"), "3").unwrap();
+    let mut r = no_stage(case_request(&u, &c));
+    r["acceptance"] = json!(u.p("judge/accept.sh"));
+    let (_, end) = ended(u.run(&r));
+    assert_eq!(
+        end,
+        (
+            "stopped".into(),
+            3,
+            json!("acceptance"),
+            json!("acceptance_failed"),
+            json!({"exit": 3})
+        )
+    );
+    assert!(copy(&u).is_dir(), "a stopped call keeps its copy");
+    assert_eq!(u.accept_calls().len(), 1);
+    // A stage cut before it did any work, with no next account.
+    let mut u = U::new();
+    let c = case(&u);
+    std::fs::write(u.t.join("bin/mode-a1"), "limit1").unwrap();
+    let (v, end) = ended(u.run(&case_request(&u, &c)));
+    assert_eq!(end.0, "stopped");
+    assert_eq!(
+        (end.1, &end.2, &end.3),
+        (3, &json!("implementer"), &json!("cut"))
+    );
+    assert!(copy(&u).is_dir());
+    assert!(
+        !steps(&v)
+            .iter()
+            .any(|(n, _)| n == "acceptance" || n == "cleanup")
+    );
+}
+
+#[test]
+fn c7_the_case_record_has_the_unit_members_and_the_case_members() {
+    let mut u = U::new();
+    let c = case(&u);
+    // The candidate commits part of its work and leaves a new file uncommitted.
+    u.script(
+        "a1",
+        "mkdir -p src && echo done > src/lib.txt && git add -A && git -c user.name=c -c user.email=c@e commit -qm work && echo note > NOTES.txt; echo CANDIDATE-ANSWER",
+    );
+    let mut r = case_request(&u, &c);
+    r["implementer"]["timeout_seconds"] = json!(600);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("passed"), 0), "{v}");
+    assert_eq!(v, u.record("c1"));
+    let mut keys: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+    keys.sort_unstable();
+    let mut want = vec![
+        "mode",
+        "repository",
+        "clone",
+        "worktree",
+        "branch",
+        "task_key",
+        "base",
+        "page",
+        "write_set",
+        "acceptance",
+        "verifier_prompt",
+        "verdict_file",
+        "merge",
+        "pull_request",
+        "head",
+        "review",
+        "merge_commit",
+        "stages",
+        "files",
+        "state",
+        "step",
+        "stopped_at",
+        "cause",
+        "detail",
+        "steps",
+        "start",
+        "end",
+        "case",
+        "at",
+        "prompt",
+        "stage_seconds",
+    ];
+    want.sort_unstable();
+    assert_eq!(keys, want);
+    for k in [
+        "branch",
+        "task_key",
+        "write_set",
+        "verifier_prompt",
+        "verdict_file",
+        "merge",
+        "pull_request",
+        "head",
+        "review",
+        "merge_commit",
+        "step",
+        "stopped_at",
+        "cause",
+    ] {
+        assert!(v[k].is_null(), "{k}: {v}");
+    }
+    assert!(v["stages"]["verifier"].is_null() && v["files"]["gate"].is_null());
+    assert_eq!(
+        (v["mode"].as_str(), v["at"].as_str()),
+        (Some("case"), Some("base"))
+    );
+    assert_eq!(
+        (v["repository"].as_str(), v["base"].as_str()),
+        (Some("o/r"), Some(c.base.as_str()))
+    );
+    let case_bytes = std::fs::read(&c.file).unwrap();
+    assert_eq!(
+        v["case"],
+        json!({"path": c.file, "sha256": sha(&case_bytes), "id": "tc-1"})
+    );
+    let prompt = u.p("judge/implementer.md");
+    assert_eq!(
+        v["prompt"],
+        json!({"path": prompt, "sha256": sha(IMPLEMENTER_PROMPT.as_bytes())})
+    );
+    assert_eq!(v["stage_seconds"], 600);
+    assert_eq!(v["page"]["sha256"], sha(CASE_PAGE.as_bytes()));
+    assert_eq!(
+        v["acceptance"]["sha256"],
+        sha(&std::fs::read(evaluator()).unwrap())
+    );
+    // The stage's prompt: the request's prompt unchanged, then the block of facts.
+    let run: Value = serde_json::from_slice(
+        &std::fs::read(v["stages"]["implementer"].as_str().unwrap()).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(run["role"], "implementer");
+    assert_eq!(run["cwd"], u.p("work/task/copy"));
+    let given = std::fs::read_to_string(u.t.join("work/task/c1.implementer.prompt.md")).unwrap();
+    assert!(given.starts_with(IMPLEMENTER_PROMPT), "{given}");
+    for fact in [
+        u.p("work/task/case.md"),
+        u.p("work/task/copy"),
+        "tests/t.sh".into(),
+        r#"["./tests/t.sh"]"#.into(),
+        "no remote".into(),
+    ] {
+        assert!(given.contains(&fact), "{fact} not in {given}");
+    }
+    assert!(
+        !given.contains(&c.head) && !given.contains(&u.p("clone")),
+        "{given}"
+    );
+    assert_eq!(v["files"]["report"], u.p("work/task/c1.implementer.md"));
+    assert_eq!(
+        v["files"]["acceptance_output"],
+        u.p("work/task/c1.accept.log")
+    );
+    // The candidate's difference from the one commit: committed and uncommitted, new files too.
+    let diff_path = u.p("work/task/c1.candidate.diff");
+    assert_eq!(v["files"]["candidate_diff"], diff_path);
+    let diff = std::fs::read_to_string(&diff_path).unwrap();
+    assert!(
+        diff.contains("+++ b/src/lib.txt") && diff.contains("+++ b/NOTES.txt"),
+        "{diff}"
+    );
+    // Without a stage: no prompt and no bound.
+    let mut r = no_stage(case_request(&u, &c));
+    r["out"] = json!(u.p("work/task/c2"));
+    let (v, _) = u.run(&r).unwrap();
+    assert!(
+        v["prompt"].is_null()
+            && v["stage_seconds"].is_null()
+            && v["stages"]["implementer"].is_null()
+    );
+    assert!(v["files"]["report"].is_null());
+    // The default bound of an implementer stage is `ap run`'s.
+    let mut r = case_request(&u, &c);
+    r["out"] = json!(u.p("work/task/c3"));
+    let (v, _) = u.run(&r).unwrap();
+    assert_eq!(v["stage_seconds"], 5400);
+}
+
+#[test]
+fn c7_a_killed_case_call_leaves_a_record_naming_the_step_begun() {
+    let mut u = U::new();
+    let c = case(&u);
+    let record = u.p("work/task/c1.unit.json");
+    let t = u.t.display().to_string();
+    write_exec(
+        &u.t.join("judge/look.sh"),
+        &format!("#!/bin/sh\ncp {record} {t}/seen.json\n"),
+    );
+    let mut r = no_stage(case_request(&u, &c));
+    r["acceptance"] = json!(u.p("judge/look.sh"));
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("passed"), 0), "{v}");
+    let seen: Value =
+        serde_json::from_slice(&std::fs::read(u.t.join("seen.json")).unwrap()).unwrap();
+    assert_eq!(
+        (
+            seen["mode"].as_str(),
+            seen["state"].as_str(),
+            seen["step"].as_str()
+        ),
+        (Some("case"), Some("running"), Some("acceptance"))
+    );
+    assert_eq!(steps(&seen), pairs(&[("worktree", "passed")]));
+    // A stopped first step leaves a readable record too.
+    let mut r = no_stage(case_request(&u, &c));
+    r["out"] = json!(u.p("work/task/c2"));
+    r["worktree"] = json!(u.p("work/task/none/deeper/copy"));
+    std::fs::write(
+        u.t.join("work/task/none"),
+        "a file where a directory must be",
+    )
+    .unwrap();
+    let (v, end) = ended(u.run(&r));
+    assert_eq!(
+        (end.0.as_str(), end.1, &end.3),
+        ("stopped", 3, &json!("copy_failed"))
+    );
+    assert_eq!(v, u.record("c2"));
 }
