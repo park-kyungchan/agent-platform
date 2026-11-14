@@ -98,7 +98,8 @@ echo rhang2 > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=60 
 rm -f "$t/lead/projects/p/s-lead.jsonl"; echo rhang3 > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=60 run integration "$t/cwd" "$t/prompt.md" "$t/big.md"; rc=$?; rm -f "$t/lead/mode"
 { [ "$rc" -eq 0 ] && [ -s "$t/big.md" ] && [ $(( $(date +%s) - s0 )) -lt 40 ] && [ "$(wc -c < "$t/lead/projects/p/s-lead.jsonl")" -gt 1000000 ]; } && ok "a verdict followed by 1 MB of lines ends the leftover shell" || bad "big record: rc=$rc after $(( $(date +%s) - s0 ))s"
 # the out file is refused as a whole name only: its companion files may be named in the prompt (I4).
-echo "read /x/n.md.earlier-findings.md and say it in a sentence ending n.md.earlier-findings.md." > "$t/p3.md"; run integration "$t/cwd" "$t/p3.md" "$t/n.md"; rc=$?
-[ "$rc" -eq 0 ] && ok "a companion file name in the prompt is allowed" || bad "companion name: rc=$rc"
+echo "read /x/n.md.earlier-findings.md and /x/n.md.findings.md and say it in a sentence ending n.md.earlier-findings.md." > "$t/p3.md"; run integration "$t/cwd" "$t/p3.md" "$t/n.md"; rc=$?
+[ "$rc" -eq 0 ] && ok "the two findings companion names in the prompt are allowed" || bad "companion name: rc=$rc"
+for w in "n.md.run.json" "n.md.json" "n.md.prev" "n.md-1" "n.md.md"; do echo "see /x/$w" > "$t/p5.md"; run integration "$t/cwd" "$t/p5.md" "$t/n.md"; rc=$?; [ "$rc" -eq 4 ] && ok "the name $w in the prompt is refused as on the base" || bad "name $w: rc=$rc"; done
 for w in "write n.md" "write n.md." "(n.md)" "n.md, then"; do echo "$w" > "$t/p4.md"; run integration "$t/cwd" "$t/p4.md" "$t/n.md"; rc=$?; [ "$rc" -eq 4 ] && ok "the out file named as '$w' is refused" || bad "out named as '$w': rc=$rc"; done
 [ "$fails" -eq 0 ] && echo "test-lead-review: PASS" || { echo "test-lead-review: $fails FAILED"; cat "$t/stdout" "$t/stderr"; exit 1; }

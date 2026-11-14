@@ -23,9 +23,11 @@ IFS=',' read -r -a ACCOUNTS <<< "$(printf '%s' "$row" | cut -f4)"
 [ -f "$PROMPT" ] || { echo "prompt_missing@$PROMPT" >&2; exit 2; }
 # Paths are resolved before the change of directory: a prompt or an out file given relative to the caller stays valid.
 PROMPT=$(realpath -- "$PROMPT"); OUT=$(realpath -m -- "$OUT")
-# The out file is named as a whole name: a companion such as <out>.earlier-findings.md is not the out file.
+# The out file's name must not appear in the prompt, except as the two companion names the delivery chain needs
+# (<out>.findings.md and <out>.earlier-findings.md); <out>.run.json, <out>.json, <out>.prev, <out>-1 stay refused.
 base=$(basename "$OUT"); base_re=$(printf '%s' "$base" | sed 's/[][\.*^$/+?(){}|]/\\&/g')
-if grep -qE -- "${base_re}(\$|[^A-Za-z0-9._-]|\.(\$|[^A-Za-z0-9_-]))" "$PROMPT"; then echo "out_path_named_in_prompt@$PROMPT" >&2; exit 4; fi
+stripped=$(sed -E "s/${base_re}\.(earlier-)?findings\.md//g" "$PROMPT")
+case "$stripped" in *"$base"*) echo "out_path_named_in_prompt@$PROMPT" >&2; exit 4 ;; esac
 cd "$CWD" || exit 2
 J="$OUT.json"; RUN="$OUT.run.json"
 SESSION=""
