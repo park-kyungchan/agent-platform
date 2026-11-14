@@ -246,7 +246,11 @@ print('v6_gate_rows_complete')
 v6_running = created(gate('start_worker_run', 'v6-still-running', dict(wp, name='v6-still-running', tier='review')), 'worker_run')
 old_plan = fields(plan); old_run = fields(w)
 old_views = {view: call(['render'], dict(view=view, args={} if view == 'current_memory_records' else dict(task=task['native_key']))) for view in json.loads(v6.read_text())['views']}
-call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+# Version 7 is pinned in Git: its rows run on it, then version 8 is installed over the store they leave.
+v7 = pathlib.Path(store).with_name('v7.json')
+v7.write_bytes(subprocess.check_output(['git', '-C', repo, 'show', 'ccb15142dbe19f2e04ad1c5d445048336db60d08:ontology/work.schema.json'], timeout=10))
+assert hashlib.sha256(v7.read_bytes()).hexdigest() == '6f6d2acc4a45ccc7e2f25268d458f9b6fabc5ab10fb85231d0fa81eaf68373f4'
+call(['schema', 'install', str(v7)])
 assert fields(plan) == old_plan and fields(w) == old_run
 for kind, retained in [('plan', plan), ('worker_run', w)]:
     assert retained in [o['id'] for o in call(['search'], dict(object_type=kind))['objects']]
@@ -354,6 +358,92 @@ for kind in ['review', 'worker_run']:
         assert not any(h['id'] == item for h in heads), (kind, item, heads)
     print('basis_closed_absent=' + kind)
 print('v7_gate_rows_complete')
+# Version 8: install attempts and revoked reviews. A review started under version 7 stays running.
+v7_running = created(gate('start_review', 'v7-still-running', dict(rp, head='f' * 40)), 'review')
+call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
+assert fields(next_review)['status'] == 'closed' and fields(next_review)['verdict'] == 'accept'
+gate('close_review', 'v8-upgrade-running-review-closes', dict(review=v7_running, verdict='abandoned'))
+assert fields(v7_running)['status'] == 'closed' and fields(v7_running).get('running_in') is None
+# Reviews of version 8: rp8 is a packet review of head8 in repo8.
+repo8, head8 = 'owner/repo', '1' * 40
+at_now = datetime.datetime.fromtimestamp(now, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+rp8 = dict(rp, repository=repo8, head=head8)
+closed8 = dict(verdict='accept', report='/home/palantirkc/work/fixture/REPORT.md', report_sha256='c' * 64)
+def review8(rid, verdict='accept', **changes):
+    item = created(apply('start_review', 'v8-review-' + rid, dict(rp8, **changes)), 'review')
+    if verdict: apply('close_review', 'v8-review-close-' + rid, dict(closed8, review=item, verdict=verdict))
+    return item
+accepting = review8('accepting')
+running8 = review8('running', None, head='5' * 40)
+repair8 = review8('repair', 'repair', head='6' * 40)
+integrated8 = review8('integrated', kind='integrated')
+to_revoke = review8('to-revoke', head='3' * 40)
+gate('revoke_review', 'v8-revoke', dict(review=to_revoke, reason='report missed a path'))
+f = fields(to_revoke)
+assert f['status'] == 'revoked' and f['revoked_at'] == at_now and f['revoke_reason'] == 'report missed a path', f
+assert f['verdict'] == 'accept' and f['closed_at'] and f.get('running_in') is None
+gate('revoke_review', 'v8-revoke-twice', dict(review=to_revoke, reason='again'), 'review_not_closed')
+gate('revoke_review', 'v8-revoke-running', dict(review=running8, reason='not closed'), 'review_not_closed')
+gate('revoke_review', 'v8-revoke-long-reason', dict(review=accepting, reason='x' * 101), 'invalid_parameter')
+# A revoked review is not a closed one for any other reader of the store.
+gate('record_scope_review', 'v8-scope-revoked-review', dict(review, review=to_revoke), 'review_not_closed')
+assert to_revoke not in [o['id'] for o in call(['search'], dict(object_type='review', where={'eq': ['status', 'closed']}))['objects']]
+# installed_artifact is owned by a source of four paths under /usr/local/bin that need not exist where the
+# rehearsal runs. The rows run on a copy that differs only in those paths (two files of this store's
+# directory) and in its version.
+schema8 = json.loads(pathlib.Path(repo, 'ontology/work.schema.json').read_text())
+binaries = [pathlib.Path(store).with_name(n) for n in ('installed-a', 'installed-b')]
+for b in binaries: b.write_bytes(b'fixture\n')
+copy = json.loads(json.dumps(schema8)); copy['version'] = 9
+copy['sources']['installed_binaries']['paths'] = [str(b) for b in binaries]
+assert {k: v for k, v in copy.items() if k not in ('version', 'sources')} == {k: v for k, v in schema8.items() if k not in ('version', 'sources')}
+assert {k: v for k, v in copy['sources'].items() if k != 'installed_binaries'} == {k: v for k, v in schema8['sources'].items() if k != 'installed_binaries'}
+assert {k: v for k, v in copy['sources']['installed_binaries'].items() if k != 'paths'} == {k: v for k, v in schema8['sources']['installed_binaries'].items() if k != 'paths'}
+fixture = pathlib.Path(store).with_name('v8-installed-paths.json'); fixture.write_text(json.dumps(copy))
+call(['schema', 'install', str(fixture)]); call(['index', '--source', 'installed_binaries'])
+ta, tb = (oid('installed_artifact', str(b)) for b in binaries)
+obj(ta); obj(tb)
+ip = {'target': ta, 'kind': 'forward', 'repository': repo8, 'commit': '2' * 40, 'attempt': 1, 'from': '4' * 40, 'by': 'rehearsal-timer', 'head': head8, 'review': accepting, 'reviews': [accepting]}
+started = gate('start_install', 'v8-install-start', ip)
+# The command ap deliver parses this shape; change both together.
+shape(started, 'install', ['initial'])
+install = created(started, 'install'); f = fields(install)
+assert f['status'] == 'running' and f['running_in'] == ta and f['target'] == ta and f['started_at'] == at_now, f
+assert all(f[k] == v for k, v in ip.items()), f
+gate('start_install', 'v8-install-second-running', dict(ip, attempt=2), 'install_running')
+other_target = created(gate('start_install', 'v8-install-other-target', dict(ip, target=tb)), 'install')
+apply('close_install', 'v8-close-other-target', dict(install=other_target, outcome='not_started', to='4' * 40))
+gate('start_install', 'v8-install-unknown-target', dict(ip, target=oid('installed_artifact', '/usr/local/bin/absent-rehearsal')), 'unknown_target')
+before = fingerprint()
+apply('start_install', 'gate-start_install-v8-install-start', ip, outcome='already_applied')
+assert fingerprint() == before
+assert [o['id'] for o in call(['search'], dict(object_type='install', where={'eq': ['target', ta]}))['objects']] == [install]
+print('gate_row=v8-install-same-request expected=already_applied')
+closed = gate('close_install', 'v8-install-close', dict(install=install, outcome='installed', to='2' * 40, rollback='fixture-handle', code='ok'))
+# The command ap deliver parses this shape; change both together.
+shape(closed, 'install', ['update', 'update'])
+f = fields(install)
+assert f['status'] == 'closed' and f['outcome'] == 'installed' and f['to'] == '2' * 40 and f.get('running_in') is None and f['closed_at'], f
+assert f['rollback'] == 'fixture-handle' and f['code'] == 'ok' and f['target'] == ta
+gate('close_install', 'v8-install-close-twice', dict(install=install, outcome='failed', to='2' * 40), 'install_not_running')
+second = created(gate('start_install', 'v8-install-second-attempt', dict(ip, attempt=2)), 'install')
+apply('close_install', 'v8-close-second-attempt', dict(install=second, outcome='failed_restored', to='4' * 40))
+without = {k: v for k, v in ip.items() if k not in ('review', 'reviews')}
+for rid, params in [
+    ('review-running', dict(ip, review=running8, reviews=[running8], head='5' * 40)),
+    ('review-repair', dict(ip, review=repair8, reviews=[repair8], head='6' * 40)),
+    ('review-other-head', dict(ip, head='7' * 40)),
+    ('review-other-repository', dict(ip, repository='owner/other')),
+    ('review-other-kind', dict(ip, review=integrated8, reviews=[integrated8])),
+    ('forward-without-review', without),
+    ('review-revoked', dict(ip, review=to_revoke, reviews=[to_revoke], head='3' * 40)),
+]:
+    gate('start_install', 'v8-install-' + rid, params, 'review_not_accepting')
+rollback = created(gate('start_install', 'v8-install-rollback', {k: v for k, v in without.items() if k != 'head'} | {'kind': 'rollback', 'commit': '4' * 40, 'from': '2' * 40}), 'install')
+assert 'review' not in fields(rollback) and fields(rollback)['kind'] == 'rollback'
+apply('close_install', 'v8-close-rollback', dict(install=rollback, outcome='installed', to='4' * 40))
+assert call(['render'], dict(view='reviews', args=dict(task=task['native_key'])))['rows'] > 0
+print('v8_gate_rows_complete')
 PY
 
 python3 -I -B "$repo/ontology/memory-index-walk.py" "$ont_binary" "$rehearsal_root/memory-walk" --records 2

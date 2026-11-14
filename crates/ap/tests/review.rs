@@ -1067,3 +1067,97 @@ fn real_git_replace_cannot_hide_changed_paths() {
         .collect();
     assert_eq!(git(&quoted), "\"dir/\\303\\251.md\"\nreal.rs");
 }
+fn revoke_apply(reason: &str) -> Step {
+    apply(
+        "revoke_review",
+        format!("rv-revoke-{}", &hash(b"review")[..40]),
+        json!({"review":id("review"),"reason":reason}),
+    )
+}
+fn revoked(reason: &str) -> Value {
+    let mut f = review();
+    (f["status"], f["revoked_at"], f["revoke_reason"]) = (
+        json!("revoked"),
+        json!("2026-11-14T00:00:00Z"),
+        json!(reason),
+    );
+    f
+}
+/// A closed review: the read, then `revoke_review`, then the post; the answer is as before.
+#[test]
+fn d8_revoke_applies_before_post() {
+    let mut s = Script::new(vec![
+        get("review", review()),
+        revoke_apply("wrong report"),
+        status("failure", "revoked: wrong report"),
+    ]);
+    let r = json!({"review":id("review"),"reason":"wrong report"});
+    assert_eq!(
+        execute(&mut s, "revoke", &r).unwrap(),
+        (json!({"status":"revoked","head":HEAD}), 0)
+    );
+    s.finish();
+    let order: Vec<_> = s
+        .calls
+        .iter()
+        .map(|(p, a, _)| (p.as_str(), a[0].as_str()))
+        .collect();
+    assert_eq!(order, [("ont", "get"), ("ont", "action"), ("gh", "api")]);
+    // The request id is the same for every revoke of that review, whatever the reason.
+    let mut s = Script::new(vec![
+        get("review", review()),
+        revoke_apply("another reason"),
+        status("failure", "revoked: another reason"),
+    ]);
+    let r = json!({"review":id("review"),"reason":"another reason"});
+    execute(&mut s, "revoke", &r).unwrap();
+    s.finish();
+}
+/// A store that refuses, or answers what cannot be read, ends the revoke with a failure of the
+/// store; nothing is posted.
+#[test]
+fn d8_revoke_store_refusal_posts_nothing() {
+    let refusal =
+        json!({"status":"refused","code":"submission_criteria","failed":["review_not_closed"]});
+    for (bytes, code) in [
+        (serde_json::to_vec(&refusal).unwrap(), "store_refused"),
+        (b"{}".to_vec(), "store_answer_unreadable"),
+    ] {
+        let mut a = revoke_apply("wrong report");
+        (a.bytes, a.success) = (bytes, false);
+        let mut s = Script::new(vec![get("review", review()), a]);
+        let r = json!({"review":id("review"),"reason":"wrong report"});
+        let e = execute(&mut s, "revoke", &r).unwrap_err();
+        assert_eq!((e.code, e.field.as_str()), (code, "apply"));
+        s.finish();
+        assert!(!s.calls.iter().any(|(p, _, _)| p == "gh"));
+    }
+}
+/// A review already revoked: nothing is applied and the failure is posted again. A post that fails
+/// after the apply leaves exactly this, and the repeated command posts it.
+#[test]
+fn d8_revoke_of_revoked_posts_again() {
+    let mut failed = status("failure", "revoked: first");
+    failed.success = false;
+    let mut s = Script::new(vec![get("review", review()), revoke_apply("first"), failed]);
+    let r = json!({"review":id("review"),"reason":"first"});
+    let e = execute(&mut s, "revoke", &r).unwrap_err();
+    assert_eq!((e.code, e.field.as_str()), ("process_failed", "gh"));
+    s.finish();
+    let mut s = Script::new(vec![
+        get("review", revoked("first")),
+        status("failure", "revoked: again"),
+    ]);
+    let r = json!({"review":id("review"),"reason":"again"});
+    assert_eq!(
+        execute(&mut s, "revoke", &r).unwrap(),
+        (json!({"status":"revoked","head":HEAD}), 0)
+    );
+    s.finish();
+    assert!(
+        !s.calls
+            .iter()
+            .any(|(p, a, _)| p == "ont" && a[0] == "action")
+    );
+    assert_eq!(s.calls.iter().filter(|(p, _, _)| p == "gh").count(), 1);
+}
