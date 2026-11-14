@@ -1592,7 +1592,7 @@ fn d8_unit_does_not_reuse_revoked() {
 // ---- The case call (README "One case") -------------------------------------------------------
 
 /// The test of the accepted head: it passes only when the code it judges says `done`.
-const CASE_TEST: &str = "#!/bin/sh\ngrep -qx done src/lib.txt\n";
+const CASE_TEST: &str = "#!/bin/sh\ntest \"$(cat src/lib.txt 2>/dev/null)\" = done\n";
 const CASE_PAGE: &str = "# A past unit\nMake src/lib.txt say done.\n";
 /// The candidate implements the page and answers.
 const CANDIDATE: &str = "mkdir -p src && echo done > src/lib.txt; echo CANDIDATE-ANSWER";
@@ -1769,10 +1769,13 @@ fn c2_a_refused_case_call_leaves_nothing_behind() {
 
     // The case file: each member missing, unknown or malformed; the file named after another id.
     let good: Value = serde_json::from_slice(&std::fs::read(&c.file).unwrap()).unwrap();
+    let mut n = 0;
     let mut bad = |name: &str, f: &dyn Fn(&mut Value)| {
         let mut v = good.clone();
         f(&mut v);
-        let file = u.p(&format!("cases/{name}.json"));
+        n += 1;
+        std::fs::create_dir_all(u.t.join(format!("cases/{n}"))).unwrap();
+        let file = u.p(&format!("cases/{n}/{name}.json"));
         std::fs::write(&file, serde_json::to_vec(&v).unwrap()).unwrap();
         let mut r = r0.clone();
         r["case"] = json!(file);
@@ -1802,9 +1805,10 @@ fn c2_a_refused_case_call_leaves_nothing_behind() {
     bad("tc-1", &set("commands", json!([[]])));
     bad("tc-1", &set("commands", json!(["./check"])));
     bad("tc-1", &set("page_sha256", json!("0".repeat(63))));
-    std::fs::write(u.t.join("cases/tc-1.json"), "not json").unwrap();
+    std::fs::create_dir_all(u.t.join("cases/0")).unwrap();
+    std::fs::write(u.t.join("cases/0/tc-1.json"), "not json").unwrap();
     let mut r = r0.clone();
-    r["case"] = json!(u.p("cases/tc-1.json"));
+    r["case"] = json!(u.p("cases/0/tc-1.json"));
     cases.push((r, "case_unreadable@case".into()));
     for (r, want) in cases {
         assert_eq!(code(u.run(&r)), want, "{r}");
