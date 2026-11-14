@@ -63,5 +63,5 @@ One exception, by the user's decision of 2026-11-06: the Academy lesson archive.
 
 ## 7. Lessons and Ontology
 
-- Lessons are promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes through the Lead to the task STATE's `DIRECTION PROPOSALS` and to the user; no memory write enacts architecture or policy. Procedure: skill `lessons-loop`.
+- Lessons are promoted on independent occurrences of a verified mechanism, not on document count. A structural proposal goes to the Lead, who decides it as a `decision` in the store, and to the user; no memory write enacts architecture or policy. Procedure: skill `lessons-loop`.
 - `ontology-platform` owns source-qualified operational state, admission, named actions and recovery; Git owns engineering originals; Hindsight owns their retrieval copy under `agent-platform` `memory/README.md`. Boundary document: `/home/palantirkc/platforms/ontology-platform/docs/hindsight-boundary.md`. There is no shared database, state replica or automatic promotion of prose into objects between them. Check what `ontology-platform` actually provides at its current revision before relying on it.

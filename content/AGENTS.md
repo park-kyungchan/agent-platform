@@ -119,8 +119,8 @@ One word for one thing. More terms, the words not to use, and how the user refer
 - **Worker**: an agent that carries out one packet for a Lead. It does not talk with the user.
 - **Task directory**: `/home/palantirkc/work/<scope>-<topic>/`, the place of one task's files.
 - **STATE**: the file `STATE.md` in the task directory: owner, authority, holds, exact revisions, effects and the one next action, as of the time it was written.
-- **Packet**: one `TASK*.md` page that gives a worker its objective, invariants, acceptance checks, targets, allowed and forbidden effects, report and DONE marker.
-- **Report**: the file a worker writes as its result. The **DONE marker** is the literal last line it prints.
+- **Packet**: one `TASK*.md` page that gives a worker its objective, invariants, acceptance checks, targets, allowed and forbidden effects, report.
+- **Report**: the file a worker writes as its result, or a stage's final message.
 - **Effect**: any change outside your own reasoning: a file write, a commit, a push, a merge, an installation, a configuration change, a sent message, a call that changes a service. Reading is not an effect.
 - **Hold**: an effect that must not happen until a named condition is met.
 - **Evidence**: the command output, file or record that shows a statement is true. A success message or an exit code alone is not evidence.

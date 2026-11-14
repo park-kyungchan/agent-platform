@@ -6,7 +6,7 @@ The Lead writes on this page nothing about types, functions or line numbers. A f
 
 ## A unit that changes product code
 
-One pull request that can merge alone. The line `Write set:` starts at the first column, once: `ap work start` reads it (comma-separated paths, a directory as `dir/**`).
+One pull request that can merge alone. The line `Write set:` starts at the first column, once: `ap unit` reads it (comma-separated paths, a directory as `dir/**`).
 
 ```markdown
 # TASK: <the unit in one line>
@@ -22,10 +22,8 @@ Exact targets: <repository, worktree, branch, base revision>
 Write set: <the area: crates and directories>
 Allowed effects: <reads, writes, local commits, push, pull request, build slot>
 Forbidden effects: <holds, other paths, host, domain and remote boundaries>
-Plan: before the first edit, write into the pull request description the files you change, the order, the risks and how each acceptance check is met. <"Wait for the Lead to read it" only for a real effect, a schema or a store format>
-Report: <absolute path; at most 40 lines: the head, the check command's output, each acceptance check with its result, where you left this page and why, what is not verified>
-Quiet limit: <minutes without output after which the Lead treats the run as stalled>
-DONE marker: <unique literal line printed last, ending with the SHA-256 of the report>
+Plan: before the first edit, write into the pull request description the files you change, the order, the risks and how each acceptance check is met.
+Report: <your final message; at most 40 lines: the head, the check command's output, each acceptance check with its result, where you left this page and why, what is not verified>
 ```
 
 The worker decides what this page does not fix. It leaves the write set only with the reason in its plan. It stops and reports when an invariant or an acceptance check cannot hold; it never changes one.
@@ -58,7 +56,7 @@ Raw evidence: <the check output on that head>
 Questions of the Lead: <what the Lead found in its own reading of the diff, each as a sequence to execute, never as a verdict>
 Blocking, each with the command or test that shows it: wrong behaviour; loss or exposure of data; a broken invariant of the packet or a broken contract; an unguarded irreversible effect on a real target.
 Not blocking: at most five notes (a test gap, a sentence, a name). Write no mutants by hand: the check command runs mutation testing where the repository has it.
-Output: a report whose first line is exactly `Verdict: accept` or `Verdict: repair` (the form `ap review close` reads) and whose second line is the head revision; then the blocking findings, the notes, and one line per question. The findings also go onto the pull request as comments, by the reviewer or by the Lead.
+Output: a report whose first line is exactly `Verdict: accept` or `Verdict: repair` (the form `ap unit` reads: first line the verdict, second line the head) and whose second line is the head revision; then the blocking findings, the notes, and one line per question. The findings also go onto the pull request as comments, by the reviewer or by the Lead.
 Not given on purpose: the implementer's reasoning and any suggested verdict.
 ```
 

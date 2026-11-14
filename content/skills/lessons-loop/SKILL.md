@@ -9,12 +9,12 @@ description: At task closure, on a repeated user correction, or as assigned cura
 
 Use at the closure of a task or a worker run, when the user corrects the Lead, and when STATE names you curator.
 
-1. At closure, record in the task's files: workers, review findings by severity, rework rounds, CI minutes. An unknown value stays unknown.
+1. At closure, run the read-out of K1 (cost) and K2 (implementer tier) for the task's window: `evals/readout.py` of `agent-platform`; copy nothing of it into STATE. An unknown value stays unknown.
 2. Capture a lesson only when something durable was learned. Levels: L0 incident, L1 lesson, L2 pattern, L3 structural issue with a direction proposal. Promotion needs independent occurrences of a verified mechanism, never a document count.
 3. A correction from the user is an occurrence. The first one changes the instance (skill `lead` section 3). A second correction of the same kind is a missing or unclear rule: the Lead changes the rule in the file that holds it, through a pull request, and reports the change.
 4. An expression of the user that appears in a second task is added to `/root/.agents/runtime-references/GLOSSARY.md` section 7 the same way.
 5. Engineering capture follows the Git-original/native-publisher contract in `agent-platform` `memory/README.md`, only within task authority and without student, lesson or operational payloads. In a no-write task leave a short handoff file in the task directory and name it in STATE.
-6. An L3 direction proposal goes to the Lead and into the current STATE under `DIRECTION PROPOSALS`. The Lead decides it by the measure it would move, carries it out as a reversible trial where one exists, and reports the decision and the result to the user.
+6. An L3 direction proposal goes to the Lead, who decides it as a `decision` in the store, by the measure it would move, carries it out as a reversible trial where one exists, and reports the decision and the result to the user.
 
 The sections below give the details. They build no database, ledger, watcher, grader or transcript pipeline.
 
@@ -26,9 +26,8 @@ Read [record-schema.md](references/record-schema.md) for the schema's source hom
 and [hindsight-api.md](references/hindsight-api.md) for the publisher's operational
 home. These references grant no direct engineering API/MCP write.
 
-At closure the assigned task owner records actual workers, review findings by
-severity, rework rounds and CI minutes in task STATE. Distinguish CI wall duration
-from billable minutes. Count a completed subtask/incident once even if pane and
+At closure the assigned task owner runs the read-out `evals/readout.py` for the
+task's window and copies nothing of it into STATE. Count a completed subtask/incident once even if pane and
 parent task both close. Capture a concise L0 incident or L1 candidate only when
 something durable was learned; retain allowed source locators/hashes, no raw
 student/exam/lesson/operational payload. The Academy lesson archive is a separate
@@ -60,10 +59,10 @@ occurrence identity, link scoped Corrections and promote only verified chains:
 
 Create a new linked higher-level record, preserving each incident's identity.
 Review recurring failure classes, contradicted assumptions and failed
-codifications. An L3 proposal reaches Lead → current STATE `DIRECTION PROPOSALS`
-with its ID/pin, evidence, alternatives (including keeping the design), expected
-quality/cost effect, reversible trial and success/stop criteria. The Lead decides
-it and reports the decision and its result to the user.
+codifications. An L3 proposal reaches the Lead with its ID/pin, evidence, alternatives
+(including keeping the design), expected quality/cost effect, reversible trial
+and success/stop criteria. The Lead decides it as a `decision` in the store and
+reports the decision and its result to the user.
 
 ## Readback and derived views
 

@@ -32,7 +32,8 @@ Fresh context or the same session:
 - Separate context is not separate files, builds, services or authority. Check each of those separately.
 
 Memory for workers:
-- Workers keep their native Hindsight hooks and MCP server. When a task needs memory isolation (an evaluation, an independent review), run it in a directory covered by a `paths.<prefix>` override in the Hindsight integration settings, for example `/home/palantirkc/work/eval-isolated` with `{"disabled": true}`, and verify the override took effect. Adding an override changes host configuration and needs task authority.
+- A stage of `ap run` loads no hook, and loads auto-memory only when its request sets `memory`.
+- A pane worker keeps its native Hindsight hooks and MCP server. When a task needs memory isolation (an evaluation, an independent review), run it in a directory covered by a `paths.<prefix>` override in the Hindsight integration settings, for example `/home/palantirkc/work/eval-isolated` with `{"disabled": true}`, and verify the override took effect. Adding an override changes host configuration and needs task authority.
 - If memory injected into a worker was irrelevant or misleading, record that in STATE and correct the page or the path override.
 
 ## 3. When you receive work
@@ -62,7 +63,7 @@ Use Herdr only from a pane where `HERDR_ENV=1`, and only when the task authorize
 
 - IDs: workspace `wN`, tab `wN:tN`, pane `wN:pN`. A pane is a terminal; an agent is the program Herdr recognizes in it. Address a pane by the ID a command returned, never by a title, a process name or a position.
 - One tab per worker, created with `--no-focus` in the worker's assigned cwd. Where the task's STATE names the store in use, the Lead does this with `ap work` (skill `lead` section 4).
-- Default to an interactive agent: `herdr agent start <name> --kind <kind> --pane <pane-id> -- <native args>` with as few native arguments as the work needs, then `herdr agent prompt <name> "<text>" --wait --timeout <ms>`; the text names the packet file. The user can watch the pane and the session can take a follow-up. A headless run (one prompt, then exit) uses `herdr pane run <pane-id> "<command>"`; use it only where an interactive session cannot work.
+- A unit of work runs through `ap unit`, a single stage through `ap run`. A Herdr pane is for work the user watches or answers, and for a runtime `ap run` does not start. In a pane: `herdr agent start <name> --kind <kind> --pane <pane-id> -- <native args>` with as few native arguments as the work needs, then `herdr agent prompt <name> "<text>" --wait --timeout <ms>`; the text names the packet file. The user can watch the pane and the session can take a follow-up. A headless run (one prompt, then exit) uses `herdr pane run <pane-id> "<command>"`; use it only where an interactive session cannot work.
 - `idle` or `done` means ready for input. `blocked` means a dialog or question is on screen: read it before sending anything. A workspace trust dialog in a pane the Lead started for its worker is answered by the Lead: trust and continue. A dialog that asks to approve one effect is answered by the packet: an allowed effect is approved, any other is declined. A login or a payment stays with the user. `unknown` means not classified. None of these states shows that the work finished.
 - After a timeout or an uncertain submission, read the pane before sending anything again.
 - Rename with positional arguments: `herdr tab rename <tab-id> <label>`, `herdr pane rename <pane-id> <label>`.

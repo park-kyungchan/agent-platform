@@ -22,7 +22,7 @@ For example: “`worktree`는 하나의 Git repository에서 별도로 사용하
 디렉터리입니다. 각 디렉터리는 체크아웃한 파일과 자신의 index·HEAD를 가지며,
 Git object 저장소는 공유합니다. branch별 파일 변경을 분리할 수 있습니다.
 이번 작업의 경로는
-`/home/palantirkc/work/ws-replan/wt/agent-platform-skills`입니다.”
+`/home/palantirkc/work/<scope>-<topic>/wt/<repo>`입니다.”
 
 ## Answer order and depth
 
@@ -85,11 +85,8 @@ chat. These references are CLI-agnostic and do not change task authority.
 
 ## Profile and glossary contract
 
-Search the relevant Hindsight profile/glossary first, then check current native source for the requested term/mechanism. Explain in clear Korean with the actual programming terms; use no metaphor. State concrete input, executor and result, then the steps and details needed for the user's learning. Distinguish source fact from inference and do not claim a concept was understood merely because it was explained. Keep a scoped user preference and the terms actually explained, with dated evidence and feedback, in authorized `user-profile`/`glossary` engineering records; do not store the whole conversation, demographics, private payloads or inferred ability. Reuse stable term identity and correct a materially changed meaning with provenance. In a no-write task, make no Hindsight write and leave only the allowed local note. Credit retrieved memory when it contributes.
+Check current native source for the requested term/mechanism. Where memory is on, its route is `memory/README.md` of `agent-platform`. Explain in clear Korean with the actual programming terms; use no metaphor. State concrete input, executor and result, then the steps and details needed for the user's learning. Distinguish source fact from inference and do not claim a concept was understood merely because it was explained. Keep a scoped user preference and the terms actually explained, with dated evidence and feedback, in authorized `user-profile`/`glossary` engineering records; do not store the whole conversation, demographics, private payloads or inferred ability. Reuse stable term identity and correct a materially changed meaning with provenance. In a no-write task, make no Hindsight write and leave only the allowed local note. Credit retrieved memory when it contributes.
 
-Use the official page search/read tools only when available and allowed; if
-memory is disabled for this worker, use its exact source packet and record the
-retrieval gap rather than enabling a client or changing host configuration.
 Do not force a search on every tool call or repeat definitions already established
 in the current context. A recalled definition never replaces current source.
 
