@@ -189,7 +189,13 @@ impl W {
             ),
             (
                 "ap-rollback",
-                installer(Some(&installed), None, 0, &format!("ap 0.1.0 {installed}\n"), ""),
+                installer(
+                    Some(&installed),
+                    None,
+                    0,
+                    &format!("ap 0.1.0 {installed}\n"),
+                    "",
+                ),
             ),
             (
                 "content-rollback",
@@ -200,13 +206,13 @@ impl W {
     }
 }
 fn installer(file: Option<&str>, tree: Option<&str>, exit: i32, out: &str, err: &str) -> Inst {
-        Inst {
-            file: file.map(|f| Some(f.to_owned())),
-            tree: tree.map(|t| Some(t.to_owned())),
-            exit,
-            out: out.into(),
-            err: err.into(),
-        }
+    Inst {
+        file: file.map(|f| Some(f.to_owned())),
+        tree: tree.map(|t| Some(t.to_owned())),
+        exit,
+        out: out.into(),
+        err: err.into(),
+    }
 }
 impl W {
     fn p(&self, rel: &str) -> String {
@@ -256,9 +262,11 @@ impl W {
     /// A running attempt of the target that a dead call left.
     fn dead_attempt(&mut self, commit: &str, from: &str, from_sha256: &str) -> Value {
         let id = oid("install", "act-dead");
-        self.installs.push(json!({"id": id, "target": target(), "kind": "forward", "repository": "o/r",
+        self.installs.push(
+            json!({"id": id, "target": target(), "kind": "forward", "repository": "o/r",
             "commit": commit, "attempt": 1, "from": from, "from_sha256": from_sha256, "by": "dead",
-            "status": "running", "started_at": STARTED, "running_in": target()}));
+            "status": "running", "started_at": STARTED, "running_in": target()}),
+        );
         id
     }
     fn launched(&self) -> Vec<String> {
@@ -266,7 +274,11 @@ impl W {
             .iter()
             .filter(|(p, _, _)| p == "bash")
             .map(|(_, a, _)| {
-                let script = if a[0].ends_with("install-ap.sh") { "ap" } else { "content" };
+                let script = if a[0].ends_with("install-ap.sh") {
+                    "ap"
+                } else {
+                    "content"
+                };
                 if a[1] == "rollback" {
                     format!("{script}-rollback")
                 } else {
@@ -278,7 +290,9 @@ impl W {
     fn applies(&self, action: &str) -> Vec<Value> {
         self.calls
             .iter()
-            .filter(|(p, a, b)| p == "ont" && a.first().is_some_and(|x| x == "action") && b["action_type"] == action)
+            .filter(|(p, a, b)| {
+                p == "ont" && a.first().is_some_and(|x| x == "action") && b["action_type"] == action
+            })
             .map(|(_, _, b)| b.clone())
             .collect()
     }
@@ -334,9 +348,10 @@ impl W {
                 match path {
                     "content/SHA256SUMS" => Self::text(true, &self.sums(commit)),
                     "ontology/ENGINE-PIN" => Self::text(true, &format!("{}\n", self.pin)),
-                    "ontology/work.schema.json" => {
-                        Self::text(true, &json!({"format": 1, "version": self.tip_schema}).to_string())
-                    }
+                    "ontology/work.schema.json" => Self::text(
+                        true,
+                        &json!({"format": 1, "version": self.tip_schema}).to_string(),
+                    ),
                     _ => panic!("unexpected show {spec}"),
                 }
             }
@@ -373,7 +388,9 @@ impl W {
             "index" => {
                 assert_eq!(a, args(&["index", "--source", "installed_binaries"]));
                 let status = if self.index_fails { "refused" } else { "ok" };
-                Self::ok(json!({"status": status, "result": {"sources": [{"source": "installed_binaries", "status": status}]}, "schema": schema}))
+                Self::ok(
+                    json!({"status": status, "result": {"sources": [{"source": "installed_binaries", "status": status}]}, "schema": schema}),
+                )
             }
             "search" => {
                 let kind = body["object_type"].as_str().unwrap();
@@ -385,10 +402,15 @@ impl W {
                 let all = body["where"]["all"].as_array().unwrap();
                 // The engine answers `qualified: false` to a filter on an optional property as soon
                 // as one scanned object lacks it.
-                let qualified = all.iter().all(|f| allowed.contains(&f["eq"][0].as_str().unwrap()));
+                let qualified = all
+                    .iter()
+                    .all(|f| allowed.contains(&f["eq"][0].as_str().unwrap()));
                 let objects: Vec<Value> = rows
                     .iter()
-                    .filter(|r| all.iter().all(|f| r[f["eq"][0].as_str().unwrap()] == f["eq"][1]))
+                    .filter(|r| {
+                        all.iter()
+                            .all(|f| r[f["eq"][0].as_str().unwrap()] == f["eq"][1])
+                    })
                     .map(|r| {
                         let fields: serde_json::Map<String, Value> = r
                             .as_object()
@@ -400,8 +422,10 @@ impl W {
                         json!({"id": r["id"], "head": {"fields": fields}})
                     })
                     .collect();
-                Self::ok(json!({"status": "ok", "result": {"basis": {"qualified": qualified, "unresolved_excluded": 0},
-                    "objects": objects, "continuation": null, "kind": "object_set"}, "schema": schema}))
+                Self::ok(
+                    json!({"status": "ok", "result": {"basis": {"qualified": qualified, "unresolved_excluded": 0},
+                    "objects": objects, "continuation": null, "kind": "object_set"}, "schema": schema}),
+                )
             }
             "action" => {
                 assert_eq!(a, args(&["action", "apply", "--client", "ap-deliver"]));
@@ -412,30 +436,51 @@ impl W {
                     match self.start.take() {
                         Some(Start::Json(v)) => return Self::ok(v),
                         Some(Start::Fail) => {
-                            return Err(Failure { code: "process_failed", field: "ont".into(), detail: Value::Null });
+                            return Err(Failure {
+                                code: "process_failed",
+                                field: "ont".into(),
+                                detail: Value::Null,
+                            });
                         }
                         None => (),
                     }
                     let id = oid("install", &format!("act-{rid}"));
                     if self.installs.iter().any(|i| i["id"] == id) {
-                        return Self::ok(json!({"status": "ok", "result": {"outcome": "already_applied", "edits": [{"change": "initial", "id": id}]}}));
+                        return Self::ok(
+                            json!({"status": "ok", "result": {"outcome": "already_applied", "edits": [{"change": "initial", "id": id}]}}),
+                        );
                     }
                     if self.installs.iter().any(|i| i["status"] == "running") {
-                        return Self::ok(json!({"status": "refused", "code": "submission_criteria", "failed": ["install_running"]}));
+                        return Self::ok(
+                            json!({"status": "refused", "code": "submission_criteria", "failed": ["install_running"]}),
+                        );
                     }
                     let mut row = p.clone();
-                    (row["id"], row["status"], row["started_at"]) = (id.clone(), json!("running"), json!(STARTED));
+                    (row["id"], row["status"], row["started_at"]) =
+                        (id.clone(), json!("running"), json!(STARTED));
                     row["running_in"] = p["target"].clone();
                     self.installs.push(row);
-                    return Self::ok(json!({"status": "ok", "result": {"outcome": "applied", "edits": [{"change": "initial", "id": id}]}, "schema": schema}));
+                    return Self::ok(
+                        json!({"status": "ok", "result": {"outcome": "applied", "edits": [{"change": "initial", "id": id}]}, "schema": schema}),
+                    );
                 }
                 assert_eq!(body["action_type"], "close_install");
                 if self.close_fails {
-                    return Err(Failure { code: "process_failed", field: "ont".into(), detail: Value::Null });
+                    return Err(Failure {
+                        code: "process_failed",
+                        field: "ont".into(),
+                        detail: Value::Null,
+                    });
                 }
-                let row = self.installs.iter_mut().find(|i| i["id"] == p["install"]).unwrap();
+                let row = self
+                    .installs
+                    .iter_mut()
+                    .find(|i| i["id"] == p["install"])
+                    .unwrap();
                 if row["status"] != "running" {
-                    return Self::ok(json!({"status": "refused", "code": "submission_criteria", "failed": ["install_not_running"]}));
+                    return Self::ok(
+                        json!({"status": "refused", "code": "submission_criteria", "failed": ["install_not_running"]}),
+                    );
                 }
                 for (k, v) in p.as_object().unwrap() {
                     if k != "install" {
@@ -445,7 +490,9 @@ impl W {
                 row["status"] = json!("closed");
                 row.as_object_mut().unwrap().remove("running_in");
                 let edits = json!([{"change": "update", "id": p["install"]}, {"change": "update", "id": p["install"]}]);
-                Self::ok(json!({"status": "ok", "result": {"outcome": "applied", "edits": edits}, "schema": schema}))
+                Self::ok(
+                    json!({"status": "ok", "result": {"outcome": "applied", "edits": edits}, "schema": schema}),
+                )
             }
             _ => panic!("unexpected ont call {a:?}"),
         }
@@ -458,16 +505,21 @@ impl Drop for W {
 }
 /// Whether this process holds `path` open on a descriptor without close-on-exec.
 fn inherited(path: &str) -> bool {
-    std::fs::read_dir("/proc/self/fd").unwrap().flatten().any(|e| {
-        let fd = e.file_name().to_string_lossy().into_owned();
-        let to = std::fs::read_link(e.path()).ok();
-        let flags = std::fs::read_to_string(format!("/proc/self/fdinfo/{fd}")).unwrap_or_default();
-        let flags = flags
-            .lines()
-            .find_map(|l| l.strip_prefix("flags:"))
-            .and_then(|f| u32::from_str_radix(f.trim(), 8).ok());
-        to.is_some_and(|t| t.to_str() == Some(path)) && flags.is_some_and(|f| f & 0o2_000_000 == 0)
-    })
+    std::fs::read_dir("/proc/self/fd")
+        .unwrap()
+        .flatten()
+        .any(|e| {
+            let fd = e.file_name().to_string_lossy().into_owned();
+            let to = std::fs::read_link(e.path()).ok();
+            let flags =
+                std::fs::read_to_string(format!("/proc/self/fdinfo/{fd}")).unwrap_or_default();
+            let flags = flags
+                .lines()
+                .find_map(|l| l.strip_prefix("flags:"))
+                .and_then(|f| u32::from_str_radix(f.trim(), 8).ok());
+            to.is_some_and(|t| t.to_str() == Some(path))
+                && flags.is_some_and(|f| f & 0o2_000_000 == 0)
+        })
 }
 impl System for W {
     fn call(&mut self, program: &str, a: &[String], body: &Value, _ms: u64) -> Answer {
@@ -525,8 +577,11 @@ impl System for W {
         self.lock_inherited.push(inherited(&self.lock));
         let env_map: serde_json::Map<String, Value> =
             env.iter().map(|(k, v)| (k.clone(), json!(v))).collect();
-        self.calls
-            .push((argv[0].clone(), argv[1..].to_vec(), json!({"cwd": cwd, "env": env_map})));
+        self.calls.push((
+            argv[0].clone(),
+            argv[1..].to_vec(),
+            json!({"cwd": cwd, "env": env_map}),
+        ));
         assert_eq!(argv[0], "bash");
         let script = if argv[1].ends_with("/scripts/install-ap.sh") {
             "ap"
@@ -557,7 +612,11 @@ impl System for W {
         }
         let [stdin, stdout, stderr] = files;
         Command::new("sh")
-            .args(["-c", "printf '%s' \"$1\"; printf '%s' \"$2\" >&2; exit \"$3\"", "sh"])
+            .args([
+                "-c",
+                "printf '%s' \"$1\"; printf '%s' \"$2\" >&2; exit \"$3\"",
+                "sh",
+            ])
             .args([&inst.out, &inst.err, &inst.exit.to_string()])
             .env_clear()
             .stdin(stdin)
@@ -578,7 +637,10 @@ impl System for W {
 }
 
 fn end(v: &Value) -> (&str, &str) {
-    (v["end"].as_str().unwrap_or("?"), v["code"].as_str().unwrap_or(""))
+    (
+        v["end"].as_str().unwrap_or("?"),
+        v["code"].as_str().unwrap_or(""),
+    )
 }
 /// The call refused with `code`, exit 2, called no installer and applied no `start_install`.
 fn refused(w: &W, v: &Value, exit: u8, code: &str) {
@@ -596,7 +658,13 @@ fn rows(v: &Value) -> Vec<(String, Value, Value)> {
         .as_array()
         .unwrap()
         .iter()
-        .map(|r| (r["name"].as_str().unwrap().to_owned(), r["exit"].clone(), r["code"].clone()))
+        .map(|r| {
+            (
+                r["name"].as_str().unwrap().to_owned(),
+                r["exit"].clone(),
+                r["code"].clone(),
+            )
+        })
         .collect()
 }
 fn row(name: &str, exit: i64, code: Option<&str>) -> (String, Value, Value) {
@@ -654,7 +722,10 @@ fn d3_installed_needs_both_reads() {
     let mut w = W::new();
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
-    assert_eq!((v["outcome"].clone(), v["to"].clone()), (json!("installed"), json!(c(2))));
+    assert_eq!(
+        (v["outcome"].clone(), v["to"].clone()),
+        (json!("installed"), json!(c(2)))
+    );
     assert_eq!(rows(&v), [row("ap", 0, None), row("content", 0, None)]);
     // Both installers exit 0 and the tree is still at the installed commit: not installed. The
     // file is not at I, so it is rolled back; the tree is at I, so it is not.
@@ -664,7 +735,10 @@ fn d3_installed_needs_both_reads() {
     assert_eq!((end(&v), exit), (("failed_restored", ""), 3), "{v}");
     assert_eq!(w.launched(), ["ap", "content", "ap-rollback"]);
     let close = &w.applies("close_install")[0]["parameters"];
-    assert_eq!((close["outcome"].clone(), close["to"].clone()), (json!("failed_restored"), json!(c(0))));
+    assert_eq!(
+        (close["outcome"].clone(), close["to"].clone()),
+        (json!("failed_restored"), json!(c(0)))
+    );
     // The file stays where it was and the tree moves: not installed either.
     let mut w = W::new();
     w.inst.get_mut("ap").unwrap().file = None;
@@ -679,19 +753,38 @@ fn d3_content_failure_rolls_the_binary_back() {
     let tarball = w.tarball();
     let content = w.inst.get_mut("content").unwrap();
     (content.tree, content.exit, content.out) = (None, 1, String::new());
-    content.err = format!("install_failed_restored@/x: the previous files are back; kept copy {tarball}\n");
+    content.err =
+        format!("install_failed_restored@/x: the previous files are back; kept copy {tarball}\n");
     let (v, exit) = w.run();
-    assert_eq!((end(&v), exit), (("failed_restored", "content_failed_restored"), 3), "{v}");
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "content_failed_restored"), 3),
+        "{v}"
+    );
     assert_eq!(
         rows(&v),
-        [row("ap", 0, None), row("content", 1, Some("content_failed_restored")), row("ap-rollback", 0, None)]
+        [
+            row("ap", 0, None),
+            row("content", 1, Some("content_failed_restored")),
+            row("ap-rollback", 0, None)
+        ]
     );
-    let rollback = w.calls.iter().find(|(p, a, _)| p == "bash" && a[1] == "rollback").unwrap();
+    let rollback = w
+        .calls
+        .iter()
+        .find(|(p, a, _)| p == "bash" && a[1] == "rollback")
+        .unwrap();
     assert_eq!(rollback.1[2], kept(&w));
     assert_eq!(w.file.as_deref(), Some(c(0).as_str()));
     let close = &w.applies("close_install")[0]["parameters"];
     assert_eq!(close["code"], "content_failed_restored");
-    assert_eq!((close["rollback_binary"].clone(), close["rollback_content"].clone()), (json!(kept(&w)), json!(tarball)));
+    assert_eq!(
+        (
+            close["rollback_binary"].clone(),
+            close["rollback_content"].clone()
+        ),
+        (json!(kept(&w)), json!(tarball))
+    );
 }
 
 #[test]
@@ -700,11 +793,16 @@ fn d3_rollback_that_fails_ends_failed() {
     let tarball = w.tarball();
     let content = w.inst.get_mut("content").unwrap();
     (content.tree, content.exit, content.out) = (Some(None), 1, String::new());
-    content.err = format!("restore_failed@/x/AGENTS.md\ninstall_failed_restored@/x: kept copy {tarball}\n");
+    content.err =
+        format!("restore_failed@/x/AGENTS.md\ninstall_failed_restored@/x: kept copy {tarball}\n");
     let back = w.inst.get_mut("content-rollback").unwrap();
     (back.tree, back.exit, back.err) = (None, 2, "refuse: tarball missing\n".into());
     let (v, exit) = w.run();
-    assert_eq!((end(&v), exit), (("failed", "content_failed_restored"), 4), "{v}");
+    assert_eq!(
+        (end(&v), exit),
+        (("failed", "content_failed_restored"), 4),
+        "{v}"
+    );
     assert_eq!(
         rows(&v),
         [
@@ -717,7 +815,10 @@ fn d3_rollback_that_fails_ends_failed() {
     let rollback = w.calls.iter().rfind(|(p, _, _)| p == "bash").unwrap();
     assert_eq!(rollback.1[1..], [String::from("rollback"), tarball]);
     let close = &w.applies("close_install")[0]["parameters"];
-    assert_eq!((close["outcome"].clone(), close["to"].clone()), (json!("failed"), json!("neither")));
+    assert_eq!(
+        (close["outcome"].clone(), close["to"].clone()),
+        (json!("failed"), json!("neither"))
+    );
 }
 
 #[test]
@@ -731,9 +832,17 @@ fn d3_install_busy_is_not_started() {
     // Another code of the first installer with the pair where it was: failed_restored.
     let mut w = W::new();
     let ap = w.inst.get_mut("ap").unwrap();
-    (ap.file, ap.exit, ap.err) = (None, 1, "compiling\nbuild_failed@install-ap.sh:151\n".into());
+    (ap.file, ap.exit, ap.err) = (
+        None,
+        1,
+        "compiling\nbuild_failed@install-ap.sh:151\n".into(),
+    );
     let (v, exit) = w.run();
-    assert_eq!((end(&v), exit), (("failed_restored", "build_failed"), 3), "{v}");
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "build_failed"), 3),
+        "{v}"
+    );
 }
 
 #[test]
@@ -782,7 +891,8 @@ fn d4_tree_differs() {
 fn d4_no_accepting_review() {
     let mut w = W::new();
     // Left: the running review, the repair and an accepting review of another repository.
-    w.reviews.retain(|r| !(r["head"] == h(1) && r["verdict"] == "accept" && r["repository"] == "o/r"));
+    w.reviews
+        .retain(|r| !(r["head"] == h(1) && r["verdict"] == "accept" && r["repository"] == "o/r"));
     w.review(1, "x/other", "accept", "closed");
     not_accepted(&mut w, &c(1), "no_accepting_review");
 }
@@ -799,12 +909,22 @@ fn d4_revoked_review() {
 fn d4_report_missing_at_tip() {
     // A report that is gone below the tip does not matter.
     let mut w = W::new();
-    let first = w.reviews.iter().find(|r| r["id"] == w.accepting(1)).unwrap()["report"].clone();
+    let first = w
+        .reviews
+        .iter()
+        .find(|r| r["id"] == w.accepting(1))
+        .unwrap()["report"]
+        .clone();
     std::fs::remove_file(first.as_str().unwrap()).unwrap();
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
     let mut w = W::new();
-    let tip = w.reviews.iter().find(|r| r["id"] == w.accepting(2)).unwrap()["report"].clone();
+    let tip = w
+        .reviews
+        .iter()
+        .find(|r| r["id"] == w.accepting(2))
+        .unwrap()["report"]
+        .clone();
     std::fs::remove_file(tip.as_str().unwrap()).unwrap();
     not_accepted(&mut w, &c(2), "report_missing");
 }
@@ -812,7 +932,12 @@ fn d4_report_missing_at_tip() {
 #[test]
 fn d4_report_differs_at_tip() {
     let mut w = W::new();
-    let tip = w.reviews.iter().find(|r| r["id"] == w.accepting(2)).unwrap()["report"].clone();
+    let tip = w
+        .reviews
+        .iter()
+        .find(|r| r["id"] == w.accepting(2))
+        .unwrap()["report"]
+        .clone();
     std::fs::write(tip.as_str().unwrap(), "Verdict: accept\nchanged\n").unwrap();
     not_accepted(&mut w, &c(2), "report_differs");
 }
@@ -839,7 +964,10 @@ fn d4_tip_in_past_is_checked() {
     r["past"] = json!([c(2)]);
     let (v, exit) = w.run_with(&r);
     refused(&w, &v, exit, "not_accepted");
-    assert_eq!(v["detail"], json!({"commit": c(2), "why": "no_accepting_review"}));
+    assert_eq!(
+        v["detail"],
+        json!({"commit": c(2), "why": "no_accepting_review"})
+    );
 }
 
 #[test]
@@ -877,7 +1005,10 @@ fn d4_search_names_required_properties_only() {
         }
     }
     // The accepting reviews are the ones of this repository, compared on the answer.
-    assert_eq!(w.applies("start_install")[0]["parameters"]["reviews"], json!([w.accepting(1), w.accepting(2)]));
+    assert_eq!(
+        w.applies("start_install")[0]["parameters"]["reviews"],
+        json!([w.accepting(1), w.accepting(2)])
+    );
 }
 
 // ---- D5 a refusal and `current` apply nothing ---------------------------------------------------
@@ -925,7 +1056,9 @@ fn d5_refusals_apply_nothing() {
             w.request()
         }),
         ("store_refused", |w| {
-            w.start = Some(Start::Json(json!({"status": "refused", "code": "submission_criteria", "failed": ["install_running"]})));
+            w.start = Some(Start::Json(
+                json!({"status": "refused", "code": "submission_criteria", "failed": ["install_running"]}),
+            ));
             w.request()
         }),
         ("store_unreadable", |w| {
@@ -946,7 +1079,11 @@ fn d5_refusals_apply_nothing() {
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
     assert!(w.launched().is_empty());
-    assert!(w.calls.iter().all(|(p, a, _)| !(p == "ont" && (a[0] == "action" || a[0] == "index"))));
+    assert!(
+        w.calls
+            .iter()
+            .all(|(p, a, _)| !(p == "ont" && (a[0] == "action" || a[0] == "index")))
+    );
     assert_eq!(v["outcome"], Value::Null);
 }
 
@@ -968,7 +1105,11 @@ fn d5_build_busy() {
     w.build_busy = true;
     let (v, exit) = w.run();
     refused(&w, &v, exit, "build_busy");
-    assert!(w.calls.iter().all(|(p, a, _)| !(p == "ont" && a[0] == "index")));
+    assert!(
+        w.calls
+            .iter()
+            .all(|(p, a, _)| !(p == "ont" && a[0] == "index"))
+    );
 }
 
 #[test]
@@ -977,7 +1118,10 @@ fn d5_engine_differs() {
     w.ont = "b".repeat(40);
     let (v, exit) = w.run();
     refused(&w, &v, exit, "engine_differs");
-    assert_eq!(v["detail"], json!({"tip": "e".repeat(40), "installed": "b".repeat(40)}));
+    assert_eq!(
+        v["detail"],
+        json!({"tip": "e".repeat(40), "installed": "b".repeat(40)})
+    );
 }
 
 #[test]
@@ -993,7 +1137,11 @@ fn d5_schema_differs() {
 fn d5_pair_differs() {
     // The file at the tip and the tree at the installed commit; the file at I and the tree at
     // none; no file at all.
-    for (file, tree) in [(Some(c(2)), Some(c(0))), (Some(c(0)), None), (None, Some(c(0)))] {
+    for (file, tree) in [
+        (Some(c(2)), Some(c(0))),
+        (Some(c(0)), None),
+        (None, Some(c(0))),
+    ] {
         let mut w = W::new();
         (w.file, w.tree) = (file, tree);
         let (v, exit) = w.run();
@@ -1011,11 +1159,23 @@ fn d6_dead_call_at_from_is_closed_not_started() {
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
     let closes = w.applies("close_install");
-    assert_eq!(closes[0]["parameters"], json!({"install": id, "outcome": "not_started", "to": c(0), "code": "dead_call"}));
+    assert_eq!(
+        closes[0]["parameters"],
+        json!({"install": id, "outcome": "not_started", "to": c(0), "code": "dead_call"})
+    );
     assert_eq!(closes[0]["request_id"], format!("ap.{}.1.close", c(2)));
-    assert_eq!(v["closed"], json!({"install": id, "outcome": "not_started"}));
+    assert_eq!(
+        v["closed"],
+        json!({"install": id, "outcome": "not_started"})
+    );
     // The call went on: the next attempt of this commit is 2.
-    assert_eq!((v["attempt"].clone(), w.applies("start_install")[0]["request_id"].clone()), (json!(2), json!(format!("ap.{}.2", c(2)))));
+    assert_eq!(
+        (
+            v["attempt"].clone(),
+            w.applies("start_install")[0]["request_id"].clone()
+        ),
+        (json!(2), json!(format!("ap.{}.2", c(2))))
+    );
 }
 
 #[test]
@@ -1028,7 +1188,10 @@ fn d6_dead_call_at_commit_is_closed_installed() {
     let (v, exit) = w.run();
     assert_eq!((end(&v), exit), (("current", ""), 0), "{v}");
     let close = &w.applies("close_install")[0]["parameters"];
-    assert_eq!(*close, json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)}));
+    assert_eq!(
+        *close,
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)})
+    );
     assert_eq!(v["closed"], json!({"install": id, "outcome": "installed"}));
     assert!(w.launched().is_empty());
 }
@@ -1050,12 +1213,20 @@ fn d6_dead_call_at_commit_records_the_oldest_tarball() {
     let (v, _) = w.run();
     let close = &w.applies("close_install")[0]["parameters"];
     let oldest = w.p("content-backup/agents-before-20261114T100000Z-2.tar");
-    assert_eq!(*close, json!({"install": id, "outcome": "installed", "to": c(2), "rollback_content": oldest}), "{v}");
+    assert_eq!(
+        *close,
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_content": oldest}),
+        "{v}"
+    );
 }
 
 #[test]
 fn d6_dead_call_at_neither_refuses() {
-    for (file, tree) in [(Some(c(1)), Some(c(1))), (Some(c(2)), Some(c(0))), (None, None)] {
+    for (file, tree) in [
+        (Some(c(1)), Some(c(1))),
+        (Some(c(2)), Some(c(0))),
+        (None, None),
+    ] {
         let mut w = W::new();
         let id = w.dead_attempt(&c(2), &c(0), &sha(&binary(&c(0))));
         (w.file, w.tree) = (file, tree);
@@ -1070,8 +1241,24 @@ fn d6_dead_call_at_neither_refuses() {
 // ---- D7 the record -----------------------------------------------------------------------------
 
 const MEMBERS: [&str; 18] = [
-    "at", "by", "repository", "target", "tip", "from", "end", "outcome", "code", "detail", "install",
-    "attempt", "installers", "to", "rollback_binary", "rollback_content", "index", "closed",
+    "at",
+    "by",
+    "repository",
+    "target",
+    "tip",
+    "from",
+    "end",
+    "outcome",
+    "code",
+    "detail",
+    "install",
+    "attempt",
+    "installers",
+    "to",
+    "rollback_binary",
+    "rollback_content",
+    "index",
+    "closed",
 ];
 fn members(v: &Value) -> Vec<String> {
     let mut keys: Vec<String> = v.as_object().unwrap().keys().cloned().collect();
@@ -1152,7 +1339,10 @@ fn d7_unrecorded_keeps_the_outcome() {
     let mut w = W::new();
     w.close_fails = true;
     let (v, exit) = w.run();
-    assert_eq!((end(&v), exit, v["outcome"].clone(), v["to"].clone()), (("unrecorded", ""), 5, json!("installed"), json!(c(2))));
+    assert_eq!(
+        (end(&v), exit, v["outcome"].clone(), v["to"].clone()),
+        (("unrecorded", ""), 5, json!("installed"), json!(c(2)))
+    );
     assert_eq!(w.installs[0]["status"], "running");
     assert_eq!(v["install"], w.installs[0]["id"]);
     assert_eq!(w.last(), Some(v));
@@ -1165,7 +1355,11 @@ fn d7_unrecorded_failed_exits_4() {
     let content = w.inst.get_mut("content").unwrap();
     (content.tree, content.exit, content.out) = (Some(None), 3, String::new());
     let (v, exit) = w.run();
-    assert_eq!((end(&v), exit, v["outcome"].clone()), (("unrecorded", "content_exit_3"), 4, json!("failed")), "{v}");
+    assert_eq!(
+        (end(&v), exit, v["outcome"].clone()),
+        (("unrecorded", "content_exit_3"), 4, json!("failed")),
+        "{v}"
+    );
 }
 
 #[test]
@@ -1185,7 +1379,10 @@ fn d7_detail_per_code() {
         let mut r = w.request();
         r[member] = value;
         let (v, exit) = w.run_with(&r);
-        assert_eq!((v["code"].as_str(), exit, v["detail"].clone()), (Some("invalid_input"), 2, json!({"field": member})));
+        assert_eq!(
+            (v["code"].as_str(), exit, v["detail"].clone()),
+            (Some("invalid_input"), 2, json!({"field": member}))
+        );
     }
     let mut r = w.request();
     r.as_object_mut().unwrap().remove("reason");
@@ -1224,11 +1421,22 @@ fn d9_second_call_is_busy() {
     assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
     let (second, code) = w.nested_result.clone().unwrap();
     assert_eq!((end(&second), code), (("refused", "busy"), 2), "{second}");
-    assert_eq!((second["detail"].clone(), second["installers"].clone()), (Value::Null, json!([])));
-    // After the first call ended the lock is free: the same second call goes on.
-    let mut again = W::new();
-    again.lock = w.lock.clone();
-    assert_eq!(again.run().1, 0);
+    assert_eq!(
+        (second["detail"].clone(), second["installers"].clone()),
+        (Value::Null, json!([]))
+    );
+    // After the first call ended the lock is free: the same second call goes on. (A child that
+    // another test of this process started while the lock was inheritable may hold it a moment.)
+    let free = (0..100).any(|_| {
+        let mut again = W::new();
+        again.lock = w.lock.clone();
+        let (v, exit) = again.run();
+        if v["code"] == "busy" {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        exit == 0
+    });
+    assert!(free);
 }
 
 #[test]
@@ -1255,23 +1463,66 @@ fn d10_exact_calls_of_an_install() {
     };
     let eq = |k: &str, v: Value| json!({"eq": [k, v]});
     let search = |kind: &str, all: Vec<Value>| {
-        ("ont".to_owned(), args(&["search"]), json!({"object_type": kind, "where": {"all": all}, "limit": 200}))
+        (
+            "ont".to_owned(),
+            args(&["search"]),
+            json!({"object_type": kind, "where": {"all": all}, "limit": 200}),
+        )
     };
     let version = (w.p("bin/ap"), args(&["--version"]), Value::Null);
-    let apply = |body: Value| ("ont".to_owned(), args(&["action", "apply", "--client", "ap-deliver"]), body);
-    let index = ("ont".to_owned(), args(&["index", "--source", "installed_binaries"]), Value::Null);
-    let mut env: serde_json::Map<String, Value> =
-        w.environment().into_iter().map(|(k, v)| (k, json!(v))).collect();
+    let apply = |body: Value| {
+        (
+            "ont".to_owned(),
+            args(&["action", "apply", "--client", "ap-deliver"]),
+            body,
+        )
+    };
+    let index = (
+        "ont".to_owned(),
+        args(&["index", "--source", "installed_binaries"]),
+        Value::Null,
+    );
+    let mut env: serde_json::Map<String, Value> = w
+        .environment()
+        .into_iter()
+        .map(|(k, v)| (k, json!(v)))
+        .collect();
     env.insert("CARGO_TARGET_DIR".into(), json!(w.p("state/target")));
     let launch = |script: &str| {
-        ("bash".to_owned(), args(&[&format!("{clone}/scripts/{script}"), "install", &tip]), json!({"cwd": clone, "env": env}))
+        (
+            "bash".to_owned(),
+            args(&[&format!("{clone}/scripts/{script}"), "install", &tip]),
+            json!({"cwd": clone, "env": env}),
+        )
     };
-    let review = |n: u32| search("review", vec![eq("kind", json!("packet")), eq("head", json!(h(n))), eq("status", json!("closed"))]);
+    let review = |n: u32| {
+        search(
+            "review",
+            vec![
+                eq("kind", json!("packet")),
+                eq("head", json!(h(n))),
+                eq("status", json!("closed")),
+            ],
+        )
+    };
     let kept = kept(&w);
     let want = vec![
-        search("install", vec![eq("target", target()), eq("status", json!("running"))]),
-        ("git".to_owned(), args(&["init", "--quiet", &clone]), Value::Null),
-        git(&["fetch", "--quiet", "--no-tags", "https://example.invalid/o/r.git", "+refs/heads/main:refs/remotes/origin/main"]),
+        search(
+            "install",
+            vec![eq("target", target()), eq("status", json!("running"))],
+        ),
+        (
+            "git".to_owned(),
+            args(&["init", "--quiet", &clone]),
+            Value::Null,
+        ),
+        git(&[
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            "https://example.invalid/o/r.git",
+            "+refs/heads/main:refs/remotes/origin/main",
+        ]),
         git(&["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"]),
         git(&["checkout", "--quiet", "--force", "--detach", &tip]),
         version.clone(),
@@ -1279,26 +1530,54 @@ fn d10_exact_calls_of_an_install() {
         git(&["show", &format!("{tip}:ontology/ENGINE-PIN")]),
         ("ont".to_owned(), args(&["--version"]), Value::Null),
         git(&["show", &format!("{tip}:ontology/work.schema.json")]),
-        git(&["rev-list", "--first-parent", "--parents", &format!("{from}..{tip}")]),
-        git(&["rev-parse", &format!("{}^{{tree}}", c(1)), &format!("{}^2^{{tree}}", c(1))]),
+        git(&[
+            "rev-list",
+            "--first-parent",
+            "--parents",
+            &format!("{from}..{tip}"),
+        ]),
+        git(&[
+            "rev-parse",
+            &format!("{}^{{tree}}", c(1)),
+            &format!("{}^2^{{tree}}", c(1)),
+        ]),
         review(1),
-        git(&["rev-parse", &format!("{tip}^{{tree}}"), &format!("{tip}^2^{{tree}}")]),
+        git(&[
+            "rev-parse",
+            &format!("{tip}^{{tree}}"),
+            &format!("{tip}^2^{{tree}}"),
+        ]),
         review(2),
-        ("df".to_owned(), args(&["-BM", "--output=avail", &w.p("state")]), Value::Null),
-        ("flock".to_owned(), args(&["-n", &w.p("build.lock"), "true"]), Value::Null),
+        (
+            "df".to_owned(),
+            args(&["-BM", "--output=avail", &w.p("state")]),
+            Value::Null,
+        ),
+        (
+            "flock".to_owned(),
+            args(&["-n", &w.p("build.lock"), "true"]),
+            Value::Null,
+        ),
         index.clone(),
-        search("install", vec![eq("target", target()), eq("commit", json!(tip))]),
-        apply(json!({"action_type": "start_install", "request_id": format!("ap.{tip}.1"), "agent": "ap-deliver",
+        search(
+            "install",
+            vec![eq("target", target()), eq("commit", json!(tip))],
+        ),
+        apply(
+            json!({"action_type": "start_install", "request_id": format!("ap.{tip}.1"), "agent": "ap-deliver",
             "parameters": {"target": target(), "kind": "forward", "repository": "o/r", "commit": tip, "attempt": 1,
                 "from": from, "from_sha256": sha(&binary(&from)), "by": "session-1", "reason": "after a merge",
-                "head": h(2), "review": w.accepting(2), "reviews": [w.accepting(1), w.accepting(2)]}})),
+                "head": h(2), "review": w.accepting(2), "reviews": [w.accepting(1), w.accepting(2)]}}),
+        ),
         launch("install-ap.sh"),
         launch("install-content.sh"),
         version,
         git(&["show", &format!("{tip}:content/SHA256SUMS")]),
-        apply(json!({"action_type": "close_install", "request_id": format!("ap.{tip}.1.close"), "agent": "ap-deliver",
+        apply(
+            json!({"action_type": "close_install", "request_id": format!("ap.{tip}.1.close"), "agent": "ap-deliver",
             "parameters": {"install": oid("install", &format!("act-ap.{tip}.1")), "outcome": "installed", "to": tip,
-                "rollback_binary": kept, "rollback_content": w.tarball()}})),
+                "rollback_binary": kept, "rollback_content": w.tarball()}}),
+        ),
         index,
     ];
     assert_eq!(w.calls.len(), want.len(), "{:#?}", w.calls);
