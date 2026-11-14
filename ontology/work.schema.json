@@ -999,6 +999,7 @@
         "commit": {"type": {"value_type": "commit_or_digest"}, "required": true, "description": "The commit the attempt installs, or rolls back to."},
         "attempt": {"type": "integer", "required": true, "description": "1 for the first attempt on this target and commit."},
         "from": {"type": {"value_type": "commit_or_digest"}, "required": true, "description": "What a read of the target showed before the attempt."},
+        "from_sha256": {"type": {"value_type": "sha256_hex"}, "required": false, "description": "The digest of the target file before: the name of the copy the installer keeps is made of it."},
         "by": {"type": "string", "required": true, "max_bytes": 200, "description": "Who ran it: a timer's invocation or a Lead's session."},
         "head": {"type": {"value_type": "commit_or_digest"}, "required": false, "description": "The accepted head whose merge is the commit."},
         "review": {"type": {"ref": "review"}, "required": false, "description": "The accepting review of head."},
@@ -1010,7 +1011,9 @@
         "running_in": {"type": {"ref": "installed_artifact"}, "required": false, "description": "Set only by the start action while running; cleared by the close action for the duplicate check."},
         "outcome": {"type": {"value_type": "install_outcome"}, "required": false},
         "to": {"type": "string", "required": false, "max_bytes": 200, "description": "What the read after the installers showed."},
-        "rollback": {"type": "string", "required": false, "max_bytes": 800, "description": "The handles the installers left."},
+        "rollback_binary": {"type": {"value_type": "file_path"}, "required": false, "max_bytes": 400, "description": "The copy of the file that the installer kept."},
+        "rollback_content": {"type": {"value_type": "file_path"}, "required": false, "max_bytes": 400, "description": "The tarball of the content that the installer kept."},
+        "rolls_back": {"type": {"ref": "install"}, "required": false, "description": "For kind rollback: the attempt whose install it undoes."},
         "code": {"type": "string", "required": false, "max_bytes": 100},
         "closed_at": {"type": {"value_type": "utc_time"}, "required": false, "max_bytes": 40}
       }
@@ -1193,7 +1196,8 @@
     "install_target": {"from": "install", "via": "target", "to": "installed_artifact", "cardinality": "many_to_one", "names": {"forward": "install_target", "reverse": "installs"}},
     "install_running_target": {"from": "install", "via": "running_in", "to": "installed_artifact", "cardinality": "many_to_one", "names": {"forward": "install_running_target", "reverse": "running_installs"}},
     "install_review": {"from": "install", "via": "review", "to": "review", "cardinality": "many_to_one", "names": {"forward": "install_review", "reverse": "review_installs"}},
-    "install_reviews": {"from": "install", "via": "reviews", "to": "review", "cardinality": "many_to_many", "names": {"forward": "install_reviews", "reverse": "range_installs"}}
+    "install_reviews": {"from": "install", "via": "reviews", "to": "review", "cardinality": "many_to_many", "names": {"forward": "install_reviews", "reverse": "range_installs"}},
+    "install_rolls_back": {"from": "install", "via": "rolls_back", "to": "install", "cardinality": "many_to_one", "names": {"forward": "install_rolls_back", "reverse": "rolled_back_by"}}
   },
   "action_types": {
     "set_hold": {
@@ -2439,7 +2443,9 @@
         "review": {"type": {"ref": "review"}, "required": false},
         "reviews": {"type": {"array": {"ref": "review"}}, "required": false},
         "past": {"type": "string", "required": false, "max_bytes": 2049},
-        "reason": {"type": "string", "required": false, "max_bytes": 400}
+        "reason": {"type": "string", "required": false, "max_bytes": 400},
+        "from_sha256": {"type": {"value_type": "sha256_hex"}, "required": false},
+        "rolls_back": {"type": {"ref": "install"}, "required": false}
       },
       "submission_criteria": [
         {"code": "unknown_target", "message": "Choose an existing installed file.", "all": [{"exists": "$target"}]},
@@ -2458,7 +2464,8 @@
             {"eq": ["$review.repository", "$repository"]},
             {"eq": ["$review.head", "$head"]}
           ]}
-        ]}
+        ]},
+        {"code": "unknown_rolled_back", "message": "Supply an existing install attempt or omit rolls_back.", "any": [{"none": [{"present": "$rolls_back"}]}, {"all": [{"present": "$rolls_back"}, {"exists": "$rolls_back"}]}]}
       ],
       "rules": [
         {
@@ -2476,6 +2483,8 @@
             "reviews": "$reviews",
             "past": "$past",
             "reason": "$reason",
+            "from_sha256": "$from_sha256",
+            "rolls_back": "$rolls_back",
             "status": "running",
             "started_at": "$now",
             "running_in": "$target"
@@ -2489,7 +2498,8 @@
         "install": {"type": {"ref": "install"}, "required": true},
         "outcome": {"type": {"value_type": "install_outcome"}, "required": true},
         "to": {"type": "string", "required": true, "max_bytes": 200},
-        "rollback": {"type": "string", "required": false, "max_bytes": 800},
+        "rollback_binary": {"type": {"value_type": "file_path"}, "required": false, "max_bytes": 400},
+        "rollback_content": {"type": {"value_type": "file_path"}, "required": false, "max_bytes": 400},
         "code": {"type": "string", "required": false, "max_bytes": 100}
       },
       "submission_criteria": [
@@ -2501,7 +2511,8 @@
           "set": {
             "outcome": "$outcome",
             "to": "$to",
-            "rollback": "$rollback",
+            "rollback_binary": "$rollback_binary",
+            "rollback_content": "$rollback_content",
             "code": "$code",
             "status": "closed",
             "closed_at": "$now"
@@ -2886,6 +2897,22 @@
         {"header": "Verdict", "property": "verdict"},
         {"header": "Status", "property": "status"},
         {"header": "Started", "property": "started_at"}
+      ]
+    },
+    "installs": {
+      "object_type": "install",
+      "args": [],
+      "filter": {"all": [{"in": ["status", ["running", "closed"]]}]},
+      "order": [{"property": "started_at", "direction": "desc"}],
+      "columns": [
+        {"header": "Started", "property": "started_at"},
+        {"header": "Kind", "property": "kind"},
+        {"header": "Commit", "property": "commit"},
+        {"header": "Attempt", "property": "attempt"},
+        {"header": "Status", "property": "status"},
+        {"header": "Outcome", "property": "outcome"},
+        {"header": "To", "property": "to"},
+        {"header": "By", "property": "by"}
       ]
     }
   }
