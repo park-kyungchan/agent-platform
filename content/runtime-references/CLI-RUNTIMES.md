@@ -33,7 +33,7 @@ Every pointer resolves to `/root/.agents/AGENTS.md`. If a CLI does not show that
 | Antigravity | `agy --model <model>` | `agy --print <prompt> --output-format stream-json` | `agy --conversation <id>` |
 | Grok Build | `grok --cwd <checkout>` | `grok --cwd <checkout> -p <prompt> --output-format streaming-json` | `grok --cwd <checkout> --resume <session-id>` |
 
-- The Lead of a task runs in Claude Code only (skill `lead`); every CLI of this table may run a worker or a reviewer when the task's assignment file names it.
+- The Lead of a task runs in the CLI its STATE names (skill `lead`); every CLI of this table may run a worker or a reviewer when the task's assignment file names it.
 - Codex always runs with `--no-daemon` in a Herdr terminal. Do not replace this with an app-server workflow.
 - Muse: `MUSE_NO_AUTO_UPDATE=1` stops the updater from running during the command. `--disable-reminders` removes two built-in reminder agents and the extra model requests they make; use it for workers. `muse exec --provider echo` (without `--model`) runs a session with no model call, which is the cheap way to inspect what a session loads. Muse's session record does not store the effort of the main request.
 - Antigravity: a `--print` timeout can end the output while the turn still runs. Read the result before retrying.

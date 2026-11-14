@@ -25,7 +25,7 @@ The kinds are the rows of `/root/.agents/AGENTS.md` section 6, plus a session's 
 | What may I do now, and what is next? | The user's current instruction, `/root/.agents/AGENTS.md`, the task's STATE. Memory is history |
 | What did the user decide, and why? | The dated source decision, newer corrections and the current task authority. A generated page is navigation |
 | What does the program implement? | Current source at a Git revision, compiler and runtime output, tests |
-| What does a KPI mean? | The definition in the owning repository or the task's strategy; the target in the task's strategy; values from the native measurement. When the task's STATE names the store's `kpi` object type in use, that object holds the task's definition, target and latest value (`ONTOLOGY-USE.md`). What the words KPI, metric and guardrail mean: `/root/.agents/skills/lead/references/measurement.md` |
+| What does a KPI mean? | The definition in the owning repository or the task's strategy; the target in the task's strategy; the value as that definition computes it. When the task's STATE names the store's `kpi` object type in use, that object holds the task's definition, target and latest value (`ONTOLOGY-USE.md`). What the words KPI, metric and guardrail mean: `/root/.agents/skills/lead/references/measurement.md` |
 | What does a word in an instruction or in the user's message mean? | `/root/.agents/AGENTS.md` section 8, then `GLOSSARY.md` |
 | What does an operational object say now? | A fresh authorized domain read |
 | May a caller read, derive or act? | The domain's authenticated policy and the task grant. Neither memory nor a tag grants access |
