@@ -394,8 +394,10 @@ fn a3_no_herdr_or_inherited_claude_variable_and_hooks_and_mcp_off() {
 
 // ---- A2: the cases of ci/test-lead-review.sh -------------------------------------------------
 
-/// (a) "integration on the Lead's account": the account and model come from the request; the
-/// Lead's account is admitted for a reviewer only with `integration`.
+/// (a) "integration on the Lead's account": the account and model come from the request, also
+/// for a reviewer with `integration` on the Lead's account; `integration` is a reviewer's member
+/// only (another role refuses `invalid_input`); a directory whose name only begins with the Lead's
+/// is another account; the account is required.
 #[test]
 fn a2_account_and_model_from_the_request() {
     let mut f = Fake::new();

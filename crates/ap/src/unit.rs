@@ -2,9 +2,7 @@
 //! `ap run`'s code, the gate is `ap gate`'s, the review and the status are `ap review`'s.
 use crate::review::{self, DIFF_OPTIONS};
 use crate::run::{stamp, write};
-use crate::work::{
-    Failure, LIMIT, System, args, digest, error, fail, id, ont, parse, require, text,
-};
+use crate::work::{Failure, LIMIT, System, args, digest, error, fail, id, require, text};
 use serde_json::{Value, json};
 use std::{
     ffi::OsString,
@@ -352,7 +350,7 @@ fn gh(s: &mut impl System, words: &[&str]) -> Result<Value, Stop> {
 }
 
 /// The closed review of kind `packet` that accepted this head of this repository for this task by
-/// this report, when the store holds one.
+/// this report, when the store holds one: read by `review::accepting`, the digest compared here.
 fn reviewed(
     s: &mut impl System,
     r: &Value,
@@ -361,21 +359,9 @@ fn reviewed(
     head: &str,
     sha: &str,
 ) -> Result<Option<Value>, Stop> {
-    let eq = |k: &str, v: Value| json!({"eq": [k, v]});
-    let filter = [
-        ("kind", json!("packet")),
-        ("repository", json!(repo)),
-        ("head", json!(head)),
-        ("status", json!("closed")),
-        ("verdict", json!("accept")),
-        ("report_sha256", json!(sha)),
-    ];
-    let mut all: Vec<_> = filter.into_iter().map(|(k, v)| eq(k, v)).collect();
-    all.push(eq("task", id("task", key)));
-    let q = json!({"object_type": "review", "where": {"all": all}, "limit": 1});
-    let v = parse(ont(s, r, &["search"], &q)?, "store_answer_unreadable")?;
-    ensure!(v["status"] == "ok" && v["result"]["basis"]["qualified"] == true => "store_answer_unreadable");
-    Ok(v["result"]["objects"][0].get("id").cloned())
+    let found = review::accepting(s, r, repo, head, Some(id("task", key)))?;
+    let same = |o: &&Value| review::field(o, "report_sha256") == sha;
+    Ok(found.iter().find(same).map(|o| o["id"].clone()))
 }
 /// Words separated by single spaces (names without spaces: validated before).
 fn w(words: &str) -> Vec<&str> {

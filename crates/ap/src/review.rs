@@ -10,6 +10,66 @@ use std::{
     process::ExitCode,
 };
 
+/// The value of property `k` of an object of a search's answer.
+pub(crate) fn field<'a>(o: &'a Value, k: &str) -> &'a Value {
+    &o["head"]["fields"][k]["value"]
+}
+/// Every object of one search, over its pages; the answer must be `ok` and qualified. On the
+/// engine a filter on an optional property answers `qualified: false` as soon as one scanned
+/// object lacks it, so `all` names only properties every object of the type has. The second value
+/// is the last answer, whose `schema` names the installed schema's version.
+pub(crate) fn objects(
+    s: &mut impl System,
+    r: &Value,
+    kind: &str,
+    all: Vec<Value>,
+) -> Result<(Vec<Value>, Value), Failure> {
+    let mut q = json!({"object_type": kind, "where": {"all": all}, "limit": 200});
+    let mut found = vec![];
+    for _ in 0..20 {
+        let v = parse(ont(s, r, &["search"], &q)?, "store_answer_unreadable")?;
+        let ok = v["status"] == "ok" && v["result"]["basis"]["qualified"] == true;
+        require!(ok && v["result"]["objects"].is_array() => "store_answer_unreadable", kind);
+        found.extend(
+            v["result"]["objects"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .cloned(),
+        );
+        q["continuation"] = v["result"]["continuation"].clone();
+        if q["continuation"].is_null() {
+            return Ok((found, v));
+        }
+    }
+    Err(error("store_answer_unreadable", kind))
+}
+/// The closed reviews of kind `packet` of `head` that accepted, in `repository` (and of `task` when
+/// given): the search names `kind`, `head`, `status` and the task, properties every review has;
+/// `verdict` and `repository` are compared on the objects of the answer. `ap unit` and
+/// `ap deliver` read an accepting review only here.
+pub(crate) fn accepting(
+    s: &mut impl System,
+    r: &Value,
+    repository: &str,
+    head: &str,
+    task: Option<Value>,
+) -> Result<Vec<Value>, Failure> {
+    let eq = |k: &str, v: Value| json!({"eq": [k, v]});
+    let mut all = vec![
+        eq("kind", json!("packet")),
+        eq("head", json!(head)),
+        eq("status", json!("closed")),
+    ];
+    all.extend(task.map(|t| eq("task", t)));
+    let (found, _) = objects(s, r, "review", all)?;
+    let accepts = |o: &Value| {
+        field(o, "verdict") == "accept"
+            && field(o, "repository") == repository
+            && complete_id(&o["id"])
+    };
+    Ok(found.into_iter().filter(accepts).collect())
+}
 fn file(s: &impl System, path: &str, field: &str, code: &'static str) -> Result<Vec<u8>, Failure> {
     require!(Path::new(path).starts_with(s.work_root())
         && !Path::new(path).components().any(|c| matches!(c, Component::ParentDir)) => code, field);
