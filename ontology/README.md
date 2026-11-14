@@ -507,4 +507,7 @@ asserts that every other member is equal. It prints the basis of the search of
 `ap unit` for the review closed under version 7: on this engine a review that
 lacks a filtered optional property (`repository`, `verdict`, `report_sha256`) is
 counted in `unresolved_excluded`, and the answer is not qualified, whatever the
-schema version of the review.
+schema version of the review. The read a caller can rely on is the row
+`v8-upgrade-closed-review-qualified`: a search by properties that every review
+has (`kind`, `head`, `status`) is qualified, and `verdict`, `repository` and the
+report's digest are compared on the objects of the answer.

@@ -375,12 +375,18 @@ gate('close_review', 'v8-upgrade-running-review-closes', dict(review=v7_running,
 assert fields(v7_running)['status'] == 'closed' and fields(v7_running).get('running_in') is None
 # The search of ap unit (crates/ap/src/unit.rs reviewed) requires basis.qualified. On this engine a review
 # that lacks a filtered optional property (repository, verdict, report_sha256) is counted in
-# unresolved_excluded and the answer is not qualified, for a review of any schema version. The row
-# v8-upgrade-closed-review-qualified waits for the Lead's decision; the basis is printed as evidence.
+# unresolved_excluded and the answer is not qualified, for a review of any schema version. That basis is
+# printed as evidence. The row below is the read a caller can rely on: a search by properties that every
+# review has (kind, head, status) is qualified; verdict, repository and the report's digest are then
+# compared on the objects of the answer.
 query = [['kind', 'packet'], ['repository', repo8], ['head', '8' * 40], ['status', 'closed'], ['verdict', 'accept'], ['report_sha256', 'c' * 64], ['task', task]]
 found = call(['search'], dict(object_type='review', where={'all': [{'eq': q} for q in query]}, limit=1))
 assert [o['id'] for o in found['objects']] == [v7_closed['admitted']], found
 print('v8_upgrade_search_basis=' + json.dumps(found['basis'], sort_keys=True))
+plain = call(['search'], dict(object_type='review', where={'all': [{'eq': q} for q in [['kind', 'packet'], ['head', '8' * 40], ['status', 'closed']]]}))
+assert [o['id'] for o in plain['objects']] == [v7_closed['admitted']] and plain['basis']['qualified'] is True, plain
+assert fields(v7_closed['admitted'])['verdict'] == 'accept' and fields(v7_closed['admitted'])['repository'] == repo8
+print('gate_row=v8-upgrade-closed-review-qualified expected=admitted')
 gate('revoke_review', 'v8-upgrade-closed-review-revoked', dict(review=v7_closed['revoked'], reason='revoked after the upgrade'))
 assert fields(v7_closed['revoked'])['status'] == 'revoked'
 at_now = datetime.datetime.fromtimestamp(now, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
