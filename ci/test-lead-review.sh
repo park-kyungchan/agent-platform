@@ -20,6 +20,10 @@ case "$(cat "$CLAUDE_CONFIG_DIR/mode" 2>/dev/null)" in
   rhang2)  f="$CLAUDE_CONFIG_DIR/projects/p/$id.jsonl"; printf '{"message":{"role":"user","content":"%s"}}\n{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: accept"}]}}\n' "$mark" >> "$f"
            /bin/bash -c 'sleep 600; :' & wait $!
            printf '{"is_error":false,"result":"Verdict: accept\\nhead","num_turns":4,"session_id":"%s"}' "$id" ;;
+  rhang3)  f="$CLAUDE_CONFIG_DIR/projects/p/$id.jsonl"; { printf '{"message":{"role":"user","content":"%s"}}\n{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: accept"}]}}\n' "$mark"
+             yes '{"message":{"role":"user","content":"filler filler filler filler filler filler filler filler"}}' | head -n 20000; } >> "$f"
+           /bin/bash -c 'sleep 600; :' & wait $!
+           printf '{"is_error":false,"result":"Verdict: accept\\nhead","num_turns":4,"session_id":"%s"}' "$id" ;;
   resets)  printf '{"is_error":false,"result":"Verdict: repair\\nhead\\nthe retry counter resets on every call","num_turns":3,"session_id":"%s"}' "$id" ;;
   errverdict) printf '{"is_error":true,"result":"Verdict: accept\\nhead\\nresets 6:30pm","num_turns":3,"session_id":"%s"}' "$id" ;;
   limit1)  printf '{"is_error":true,"result":"You have hit your 5-hour limit · resets 6:30pm (UTC)","num_turns":1,"session_id":"%s"}' "$id" ;;
@@ -90,6 +94,9 @@ echo rhang > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=6 ru
 printf '{"message":{"role":"user","content":"earlier prompt (review run 1-1-1)"}}\n{"message":{"role":"assistant","content":[{"type":"text","text":"Verdict: repair"}]}}\n' > "$t/lead/projects/p/s-lead.jsonl"
 echo rhang2 > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=60 run integration "$t/cwd" "$t/prompt.md" "$t/rh.md" --resume; rc=$?; rm -f "$t/lead/mode"
 { [ "$rc" -eq 0 ] && [ -s "$t/rh.md" ] && [ $(( $(date +%s) - s0 )) -lt 40 ]; } && ok "a verdict written after this run's mark ends the leftover shell" || bad "new verdict: rc=$rc after $(( $(date +%s) - s0 ))s"
+# a verdict followed by about 1 MB of lines still ends the leftover shell (no pipe that ends in grep -q under pipefail).
+rm -f "$t/lead/projects/p/s-lead.jsonl"; echo rhang3 > "$t/lead/mode"; s0=$(date +%s); REVIEW_IDLE_S=0 REVIEW_TIMEOUT=60 run integration "$t/cwd" "$t/prompt.md" "$t/big.md"; rc=$?; rm -f "$t/lead/mode"
+{ [ "$rc" -eq 0 ] && [ -s "$t/big.md" ] && [ $(( $(date +%s) - s0 )) -lt 40 ] && [ "$(wc -c < "$t/lead/projects/p/s-lead.jsonl")" -gt 1000000 ]; } && ok "a verdict followed by 1 MB of lines ends the leftover shell" || bad "big record: rc=$rc after $(( $(date +%s) - s0 ))s"
 # the out file is refused as a whole name only: its companion files may be named in the prompt (I4).
 echo "read /x/n.md.earlier-findings.md and say it in a sentence ending n.md.earlier-findings.md." > "$t/p3.md"; run integration "$t/cwd" "$t/p3.md" "$t/n.md"; rc=$?
 [ "$rc" -eq 0 ] && ok "a companion file name in the prompt is allowed" || bad "companion name: rc=$rc"

@@ -37,11 +37,12 @@ d=json.load(open(sys.argv[1])); print(d["session"], d["account"])' "$RUN" 2>/dev
 elif [ -n "$RESUME" ]; then echo "usage: review.sh <role> <cwd> <prompt file> <out file> [--resume]" >&2; exit 2; fi
 # A headless run does not exit while a shell it started in the background is alive: once the session record
 # holds a message that begins with "Verdict:" AFTER this run's mark and has been idle for 180 s, end the leftover shells.
+# One process reads the whole record (no pipe that ends in `grep -q`: under pipefail it would fail on SIGPIPE).
 descendants() { local p c; for p in "$@"; do for c in $(pgrep -P "$p" 2>/dev/null); do echo "$c"; descendants "$c"; done; done; }
 # $pid is the timeout wrapper; its child is the reviewer; the leftover shells are below the reviewer.
 end_leftover_shells() { local r c
   for r in $(pgrep -P "$1" 2>/dev/null); do for c in $(descendants "$r"); do
-    if tr '\0' ' ' < "/proc/$c/cmdline" 2>/dev/null | grep -q '^/bin/bash -c '; then kill "$c" 2>/dev/null || true; fi
+    cmd=$(tr '\0' ' ' < "/proc/$c/cmdline" 2>/dev/null); case "$cmd" in "/bin/bash -c "*) kill "$c" 2>/dev/null || true ;; esac
   done; done; }
 # The session record of THIS run is the one that holds the run's mark (a last line the runner adds to the
 # prompt): another session of the same account never counts.
@@ -49,7 +50,7 @@ watch() { local dir=$1 pid=$2 start=$3 f
   while kill -0 "$pid" 2>/dev/null; do sleep "${REVIEW_WATCH_SLEEP:-30}"
     f=$(find "$dir/projects" -maxdepth 2 -name '*.jsonl' -newermt "@$start" -print0 2>/dev/null | xargs -0 -r grep -lF -- "$MARK" 2>/dev/null | head -n 1)
     [ -n "$f" ] || continue
-    if [ $(( $(date +%s) - $(stat -c %Y "$f") )) -ge "${REVIEW_IDLE_S:-180}" ] && awk -v m="$MARK" 'seen {print} index($0, m) {seen=1}' "$f" | grep -q '"text":"Verdict:'; then end_leftover_shells "$pid"; fi
+    if [ $(( $(date +%s) - $(stat -c %Y "$f") )) -ge "${REVIEW_IDLE_S:-180}" ] && awk -v m="$MARK" 'seen && index($0, "\"text\":\"Verdict:") {found=1} index($0, m) {seen=1} END {exit !found}' "$f"; then end_leftover_shells "$pid"; fi
   done; }
 envelope() { python3 -I - "$J" "$RUN" "$ROLE" "$1" "$OUT" "$SESSION" <<'PY'
 import json,re,sys,glob,os

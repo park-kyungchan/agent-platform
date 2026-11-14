@@ -12,8 +12,9 @@ cat > "$t/bin/gh" <<'FAKE'
 # Answers from the files of $FAKE_GH; every call is logged. A file "<name>.next" replaces "<name>" after the
 # call that read it, so that an answer can change between two calls.
 echo "$*" >> "$FAKE_GH/calls"; a="$*"; g=$FAKE_GH
-turn() { cat "$g/$1"; [ ! -e "$g/$1.next" ] || mv "$g/$1.next" "$g/$1"; }
+turn() { cat "$g/$1"; if [ -e "$g/$1.next" ]; then mv "$g/$1.next" "$g/$1"; [ ! -e "$g/$1.next2" ] || mv "$g/$1.next2" "$g/$1.next"; fi; }
 case "$a" in
+  "pr view"*"mergeStateStatus"*) cat "$g/mergestate" 2>/dev/null || echo ;;
   "pr view"*"state,headRefOid"*) echo "$(turn state) $(turn head) $(cat "$g/draft") $(cat "$g/merged" 2>/dev/null || echo -)" ;;
   "pr view"*"headRefOid,isDraft"*) echo "$(cat "$g/head") $(cat "$g/draft")" ;;
   "pr view"*"comments"*) echo "<!-- codex-review-state:v1 {\"code_review\":{\"commit_sha\":\"$(cat "$g/head")\",\"status\":\"completed\",\"has_unresolved_findings\":$(cat "$g/findings")}} -->" ;;
@@ -101,6 +102,9 @@ reset; echo "$O" > "$t/gh/move_at_verifier"; expect "a head that moves during th
 reset; echo "$O" > "$t/gh/move_at_verifier"; : > "$t/gh/merged_by_other"; expect "a merge of another head by someone else is not reported as this delivery" 14 1 1 '^merge_not_read_back@' --merge
 grep -q '"merge_commit": null' "$t/cwd/usage.jsonl" || bad "foreign merge: usage names a merge commit"
 reset; : > "$t/gh/refuse_merge"; expect "a refused merge is exit 14" 14 1 1 '^merge_not_read_back@' --merge
+reset; : > "$t/gh/refuse_merge"; echo BEHIND > "$t/gh/mergestate"; expect "a refused merge names the merge state" 14 1 1 '^merge_not_read_back@o/r#7 state=BEHIND$' --merge
+reset; : > "$t/gh/refuse_merge"; expect "an unreadable merge state is UNKNOWN" 14 1 1 '^merge_not_read_back@o/r#7 state=UNKNOWN$' --merge
+reset; : > "$t/gh/merge_late"; echo BLOCKED > "$t/gh/mergestate"; DELIVER_READBACK_TRIES=1 expect "a merge not read back after exit 0 names the merge state" 14 1 1 '^merge_not_read_back@o/r#7 state=BLOCKED$' --merge
 # the rule of --merge-if-no-effect
 reset; expect "a source path is an effect: not merged without the Lead" 3 0 1 '^accepted_effect_needs_lead@' --merge-if-no-effect; grep -q '"no_effect": false' "$t/cwd/usage.jsonl" || bad "effect: usage"
 reset; printf 'modified\tcrates/a/tests/x.rs\nmodified\tdocs/a.md\nmodified\tREADME.md\nmodified\tcrates/a/src/x_tests.rs\n' > "$t/gh/files"; expect "modified tests and documentation only: merged" 0 1 1 '^merged@' --merge-if-no-effect; grep -q '"no_effect": true' "$t/cwd/usage.jsonl" || bad "no effect: usage"
@@ -173,6 +177,17 @@ reset; thr PRRT_old false "$O" > "$t/gh/threads"; expect "without a merge option
 reset; thr PRRT_old false "$O" > "$t/gh/threads"; expect "a source change under --merge-if-no-effect is not merged and nothing is resolved" 3 0 1 '^accepted_effect_needs_lead@' --merge-if-no-effect; ! grep -q resolveReviewThread "$t/gh/calls" || bad "no-effect stop resolved a thread"
 reset; thr PRRT_old false "$O" > "$t/gh/threads"; printf 'Verdict: repair\n%s\n' "$H" > "$t/gh/answer"; expect "an unrepaired earlier thread (verdict repair) resolves nothing" 13 0 1 '^verdict_repair@' --merge; ! grep -q resolveReviewThread "$t/gh/calls" || bad "repair verdict resolved a thread"
 reset; thr PRRT_old false "$O" > "$t/gh/threads"; printf 'modified\tdocs/a.md\n' > "$t/gh/files"; expect "an earlier thread is resolved in the no-effect mode when it merges" 0 1 1 '^merged@' --merge-if-no-effect; grep -q resolveReviewThread "$t/gh/calls" || bad "no-effect merge: not resolved"
+# the required check is waited for once more right before the merge (the retrigger of the automatic reviewer)
+reset; checks rust=SUCCESS > "$t/gh/check"; checks rust=IN_PROGRESS > "$t/gh/check.next"; checks rust=SUCCESS > "$t/gh/check.next2"; expect "a check in progress right before the merge is waited for, then merged" 0 1 1 '^merged@' --merge
+[ "$(grep -c '^pr checks' "$t/gh/calls")" -eq 3 ] || bad "late check: polls=$(grep -c '^pr checks' "$t/gh/calls")"
+c=$(grep -n '^pr checks' "$t/gh/calls" | tail -n 1 | cut -d: -f1); m=$(grep -n '^pr merge' "$t/gh/calls" | cut -d: -f1); [ "$c" -lt "$m" ] || bad "late check: the last poll is after the merge"
+reset; checks rust=SUCCESS > "$t/gh/check"; checks rust=IN_PROGRESS > "$t/gh/check.next"; checks rust=FAILURE > "$t/gh/check.next2"; expect "a check that fails right before the merge is exit 11, a usage line, no merge" 11 0 1 '^check_failed@.* rust=FAILURE$' --merge
+reset; thr PRRT_old false "$O" > "$t/gh/threads"; checks rust=SUCCESS > "$t/gh/check"; checks rust=FAILURE > "$t/gh/check.next"; expect "the late check runs after the threads are resolved" 11 0 1 '^check_failed@' --merge
+r=$(grep -n 'resolveReviewThread' "$t/gh/calls" | cut -d: -f1); c=$(grep -n '^pr checks' "$t/gh/calls" | tail -n 1 | cut -d: -f1); [ -n "$r" ] && [ "$r" -lt "$c" ] || bad "late check: before the resolve"
+reset; checks rust=SUCCESS > "$t/gh/check"; checks rust=PENDING > "$t/gh/check.next"; DELIVER_CHECK_MINUTES=0 expect "a check that never answers before the merge is exit 11 check_timeout" 11 0 1 '^check_timeout@' --merge
+# a head that moved while the verifier ran: nothing is resolved, nothing is merged
+reset; thr PRRT_old false "$O" > "$t/gh/threads"; echo "$O" > "$t/gh/move_at_verifier"; expect "a head that moved during the verifier: exit 10, a usage line, no merge" 10 0 1 '^head_moved_or_not_open@'  --merge
+! grep -q resolveReviewThread "$t/gh/calls" || bad "moved head: a thread was resolved"
 # I6: the readback after a merge that exited 0
 reset; : > "$t/gh/merge_late"; expect "a late readback of the merge is exit 0" 0 1 1 '^merged@o/r#7 abc123$' --merge
 [ "$(grep -c 'state,headRefOid' "$t/gh/calls")" -ge 3 ] || bad "late readback: read once"
@@ -204,7 +219,11 @@ GH=$C1; greset; gg checkout -q --detach "$C1"; gexpect "--repair-of the head its
 GH=$C1; greset; gexpect "--repair-of a commit that is not an ancestor is exit 2" 2 0 0 '^repair_of_not_ancestor@' --merge --repair-of "$C2"
 GH=$C2; greset; gg checkout -q --detach "$C2"; reset; run --repair-of "$C1"; [ "$?" -eq 2 ] && last | grep -q '^repair_of_not_ancestor@' && ok "--repair-of outside a Git work tree is exit 2" || bad "repair-of outside git"
 GH=$C2; greset; run --repair-of short; [ "$?" -eq 2 ] && ok "--repair-of must be a full commit id" || bad "short repair-of"
-GH=$C2; greset; gexpect "--repair-of without a run record of the verifier is refused by the runner" 2 0 0 '^verifier_runner_refused@' --merge --repair-of "$C1"
+GH=$C2; greset; gexpect "--repair-of without a run record of <out> is exit 2 and names the plain run, before any gh call" 2 0 0 '^repair_of_no_run_record@.*plain run' --merge --repair-of "$C1"; [ ! -e "$t/gh/calls" ] || bad "no run record: gh was called"
+# the previous answer's head must be the one named by --repair-of
+GH=$C2; greset; cp "$t/round1.run.json" "$t/v.md.run.json"; printf 'Verdict: repair\n%s\n- a finding\n' "$(printf '%040d' 3)" > "$t/v.md"; gexpect "--repair-of a head that the previous answer did not judge is exit 2" 2 0 0 '^repair_of_not_judged_head@' --merge --repair-of "$C1"
+GH=$C2; greset; cp "$t/round1.run.json" "$t/v.md.run.json"; printf 'Verdict: repair\nno head named here\n' > "$t/v.md"; gexpect "a previous answer with no readable head: the round goes on" 0 1 1 '^merged@' --merge --repair-of "$C1"
+GH=$C2; greset; cp "$t/round1.run.json" "$t/v.md.run.json"; cp "$t/round1.md" "$t/v.md"; gexpect "a previous answer that names the same head: the round goes on" 0 1 1 '^merged@' --merge --repair-of "$C1"
 # options
 reset; run --check; [ "$?" -eq 2 ] && ok "an option without its value is a usage error" || bad "option without value"
 [ "$fails" -eq 0 ] && echo "test-lead-deliver: PASS" || { echo "test-lead-deliver: $fails FAILED"; cat "$t/stdout" "$t/stderr"; exit 1; }

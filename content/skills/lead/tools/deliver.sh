@@ -17,6 +17,9 @@
 #                         command `git diff PREVIOUS <head>`, each finding of its previous answer repaired or
 #                         not, a search for a defect the repair introduced, nothing outside the diff, the same
 #                         answer form. The previous answer stays beside the new one as <out>.prev.
+#                         Without a run record <out>.run.json (after exit 12 no verifier ran) it is exit 2
+#                         repair_of_no_run_record: deliver by a plain run. When the previous answer <out> has a
+#                         commit id as its second line, PREVIOUS must equal it, else exit 2 repair_of_not_judged_head.
 #   --check NAME          the required check (default rust)
 #   --no-autoreview       the repository has no automatic reviewer
 #   --unit PAGE           the unit's page, copied into the usage line
@@ -24,6 +27,8 @@
 # Without --merge or --merge-if-no-effect it stops after an accept (accepted_not_merged).
 # When <cwd> is inside a Git work tree its HEAD must be <head> and no tracked file may be changed (checked at the
 # start and again right before the verifier): exit 2 cwd_not_at_head or cwd_dirty, no verifier, no usage line.
+# Right before the merge the required check is waited for once more (the automatic reviewer's retrigger starts a new
+# run of it): a failed entry or no answer is exit 11 and a usage line.
 # Review threads are read through `gh api graphql` after the automatic reviewer (also with --no-autoreview):
 #   an unresolved thread whose first comment was made on <head>, or a reviewer flag that is not an explicit false,
 #   is exit 12 with the file <out>.findings.md (every unresolved thread) and the status ending threads=<n> file=<path>;
@@ -39,7 +44,8 @@
 # verifier's runner refused its arguments; 10 the head moved or the pull request is not open; 11 the check
 # failed or did not answer in DELIVER_CHECK_MINUTES (90); 12 the automatic reviewer has unresolved findings
 # or did not answer, or review threads are unresolved or unreadable; 13 the verdict is not an accept of this head;
-# 14 the merge of this head was not read back; 75 the verifier was cut (run again with --resume). After every run in which a verifier session ran,
+# 14 the merge of this head was not read back (the status line ends with state=<mergeStateStatus>: BEHIND, BLOCKED ...
+# is the Lead's decision); 75 the verifier was cut (run again with --resume). After every run in which a verifier session ran,
 # ONE line is appended to the usage file: time, repository, pull request, head, verdict, cost, merge.
 set -uo pipefail
 [ "$#" -ge 7 ] || { echo "usage: deliver.sh <owner/repo> <pr> <head> <role> <cwd> <prompt> <out> [options]" >&2; exit 2; }
@@ -95,6 +101,9 @@ cwd_ok() { local st
 cwd_ok
 if [ -n "$REPAIR" ]; then
   [ "$IN_GIT" = 1 ] && [ "$REPAIR" != "$H" ] && git -C "$CWD" merge-base --is-ancestor "$REPAIR" "$H" 2> /dev/null || stop 2 "repair_of_not_ancestor@$REPAIR"
+  [ -f "$OUT.run.json" ] || stop 2 "repair_of_no_run_record@$OUT: no verifier ran for this out file; deliver the head by a plain run, without --repair-of"
+  judged=$(sed -n 2p "$OUT" 2>/dev/null | tr -d '[:space:]')
+  ! [[ "$judged" =~ ^[0-9a-f]{40}$ ]] || [ "$judged" = "$REPAIR" ] || stop 2 "repair_of_not_judged_head@$OUT: the previous answer judged $judged"
 fi
 
 # 1. The pull request is open at the head named, and ready. An OPEN pull request that still shows an older
@@ -112,23 +121,31 @@ done
 # 2. The required check: EVERY entry of that name has passed, and there is at least one. A head that
 #    moves while the check runs stops the delivery.
 #    A SKIPPED entry (a draft's check right after `gh pr ready`) waits for DELIVER_SKIPPED_S, then it has failed.
-CK0=$(date -u +%s); END=$(( CK0 + ${DELIVER_CHECK_MINUTES:-90}*60 ))
-while :; do
-  open_at_head || stop 10 "head_moved_or_not_open@$R#$N"
-  skip_ok=0; [ $(( $(date -u +%s) - CK0 )) -ge "${DELIVER_SKIPPED_S:-180}" ] || skip_ok=1
-  s=$(gh pr checks "$N" -R "$R" --json name,state 2>/dev/null | python3 -I -c 'import json, sys
+#    The same loop runs once more right before the merge (LATE=1): the automatic reviewer's draft-and-ready
+#    retrigger starts a NEW run of the check on this head. There a verifier ran, so a stop writes the usage line,
+#    and a moved head is left to the guarded merge.
+LATE=0
+fin() { [ "$LATE" = 0 ] || usage_line; stop "$@"; }
+wait_check() { local CK0 END skip_ok s
+  CK0=$(date -u +%s); END=$(( CK0 + ${DELIVER_CHECK_MINUTES:-90}*60 ))
+  while :; do
+    if [ "$LATE" = 1 ]; then open_at_head || return 0; else open_at_head || stop 10 "head_moved_or_not_open@$R#$N"; fi
+    skip_ok=0; [ $(( $(date -u +%s) - CK0 )) -ge "${DELIVER_SKIPPED_S:-180}" ] || skip_ok=1
+    s=$(gh pr checks "$N" -R "$R" --json name,state 2>/dev/null | python3 -I -c 'import json, sys
 try: states = [c.get("state") for c in json.load(sys.stdin) if c.get("name") == sys.argv[1]]
 except Exception: states = []
 waiting = {"PENDING", "QUEUED", "IN_PROGRESS", "WAITING", "REQUESTED"} | ({"SKIPPED"} if sys.argv[2] == "1" else set())
 bad = [x for x in states if x != "SUCCESS" and x not in waiting]
 print("failed " + str(bad[0]) if bad else "wait" if not states or any(x in waiting for x in states) else "passed")' "$CHECK" "$skip_ok")
-  case "$s" in
-    passed) break ;;
-    failed*) stop 11 "check_failed@$R#$N $CHECK=${s#failed }" ;;
-    *) [ "$(date -u +%s)" -lt "$END" ] || stop 11 "check_timeout@$R#$N $CHECK"
-       sleep "$POLL" ;;
-  esac
-done
+    case "$s" in
+      passed) break ;;
+      failed*) fin 11 "check_failed@$R#$N $CHECK=${s#failed }" ;;
+      *) [ "$(date -u +%s)" -lt "$END" ] || fin 11 "check_timeout@$R#$N $CHECK"
+         sleep "$POLL" ;;
+    esac
+  done
+}
+wait_check
 
 # 3. The automatic reviewer on that head. The flag is read as JSON: only an explicit false passes.
 FLAGBAD=0
@@ -242,12 +259,15 @@ fi
 # The unresolved threads of earlier commits (the verifier judged them) are resolved now, and the merge happens
 # only when no thread is left unresolved.
 if [ -n "$IDS" ]; then
+  open_at_head || { usage_line; stop 10 "head_moved_or_not_open@$R#$N"; }   # the accept belongs to this head: judge it again before any thread is touched
   for id in $IDS; do gh api graphql -f query="$RESOLVE_Q" -f id="$id" > /dev/null 2>&1 || true; done
   tr=$(classify 0 0)
   case "$tr" in ok\ *) ;; *) usage_line; stop 12 "threads_unreadable@$R#$N" ;; esac
   read -r _ NH NE _ <<< "$tr"
   [ $((NH+NE)) -eq 0 ] || { usage_line; stop 12 "threads_not_resolved@$R#$N threads=$((NH+NE))"; }
 fi
+# The automatic reviewer's retrigger may have started a new run of the required check: wait for it again.
+LATE=1; wait_check
 gh pr merge "$N" -R "$R" --merge --match-head-commit "$H" > /dev/null 2>&1; mrc=$?
 # Read back: merged, at this head, by this call. After an exit 0 the answer may lag: up to DELIVER_READBACK_TRIES reads.
 tries=1; [ "$mrc" -ne 0 ] || tries=${DELIVER_READBACK_TRIES:-5}
@@ -259,7 +279,9 @@ while :; do
   sleep "${DELIVER_READBACK_S:-3}"
 done
 if [ "$mrc" -ne 0 ] || [ "$(printf '%s' "$m" | cut -d' ' -f1,2)" != "MERGED $H" ] || [ "$(printf '%s' "$m" | cut -d' ' -f4)" = "-" ]; then
-  usage_line; stop 14 "merge_not_read_back@$R#$N"
+  # A branch that is BEHIND its base (or blocked) is the Lead's decision: say the state, read once.
+  ms=$(gh pr view "$N" -R "$R" --json mergeStateStatus --jq '.mergeStateStatus' 2>/dev/null | tr -cd 'A-Z_'); ms=${ms:-UNKNOWN}
+  usage_line; stop 14 "merge_not_read_back@$R#$N state=$ms"
 fi
 MERGED=$(printf '%s' "$m" | cut -d' ' -f4)
 gh pr comment "$N" -R "$R" --body "Delivery record: required check \`$CHECK\` passed on \`$H\`; automatic reviewer: $([ "$AUTO" = 1 ] && echo "completed without unresolved findings" || echo "none on this repository"); ONE verifier in a fresh context (role \`$ROLE\`): \`Verdict: accept\` for that head; merged as \`$MERGED\` at $(now)." > /dev/null 2>&1 || true
