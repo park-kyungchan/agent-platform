@@ -584,8 +584,11 @@ fn a1_implementer_cut_after_work_stays_cut() {
 fn a2_cut_after_work_resume_and_an_existing_out_refuses() {
     let mut f = Fake::new();
     let mut r = f.request("v.md");
+    r["role"] = json!("implementer");
     r["next_accounts"] = json!([f.p("a2")]);
-    // (b) a cut after work: exit 75, no answer, a resume record, the next account is NOT tried.
+    // (b) a cut after work, of an implementer (a reviewer's goes on at the next account: see
+    // `a1_reviewer_cut_after_work_goes_to_the_next_account`): exit 75, no answer, a resume record,
+    // the next account is NOT tried.
     f.mode("a1", "limit45");
     let (v, status) = f.run(&r).unwrap();
     assert_eq!((status, v["state"].as_str()), (75, Some("cut")));

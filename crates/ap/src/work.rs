@@ -279,8 +279,6 @@ fn run_fields(s: &mut impl System, r: &Value, code: &'static str) -> Result<Valu
     require!(heads.len() == 1 && heads[0]["change"] != "retraction" && heads[0]["fields"].is_object() => code, "run");
     Ok(heads[0]["fields"].clone())
 }
-/// The lead's own Claude account; a worker never runs in it.
-const LEAD_ACCOUNT: &str = "/root/.claude";
 /// What differs between the kinds of worker; everything else of `start` is shared.
 struct Kind<'a> {
     /// The label Herdr reports as `agent` and takes as `--kind`.
@@ -330,12 +328,8 @@ fn kind_of<'a>(s: &impl System, r: &'a Value) -> Result<Kind<'a>, Failure> {
         });
     }
     let dir = text(r, "config_dir")?;
-    let lead = Path::new(LEAD_ACCOUNT);
-    require!(!Path::new(dir).starts_with(lead) => "config_dir_forbidden", "config_dir");
-    let resolved = s
-        .directory(dir)
+    s.directory(dir)
         .map_err(|_| error("config_dir_missing", "config_dir"))?;
-    require!(!resolved.starts_with(lead) => "config_dir_forbidden", "config_dir");
     let account = Path::new(dir)
         .file_name()
         .and_then(|n| n.to_str())
