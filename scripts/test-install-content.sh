@@ -143,6 +143,11 @@ PATH="$t/fakebin:$PATH" FAIL_MV_RE="/\.new-[^ ]*/\.content-record\.json " cat_ "
 cdst check; rcc=$?
 { [ "$rc" -eq 1 ] && printf '%s\n' "$e5" | grep -q '^install_failed_restored@' && [ "$(tree "$D")" = "$hb" ] && [ "$(sha256sum "$D/.content-record.json")" = "$rb" ] && [ "$rcc" -eq 0 ] && grep -qx "ok commit=$cr1 files=$n1" "$t/out"; } \
   && ok "A5 content: a failure after the files were swapped, at the record, puts files and record back" || bad "A5 record rc=$rc/$rcc $e5"
+# check names at most 10 paths.
+for i in $(seq 1 12); do mkdir -p content/skills/m$i; echo m$i > content/skills/m$i/SKILL.md; done; cm=$(commit many)
+rm -rf "$D"; cat_ "$cm"; for i in $(seq 1 12); do rm -f "$D/skills/m$i/SKILL.md"; done
+cdst check; rcc=$?; nl=$(grep -c '^skills/m' "$t/out")
+{ [ "$rcc" -eq 1 ] && [ "$nl" -eq 10 ]; } && ok "check names at most 10 paths" || bad "check path limit rc=$rcc lines=$nl"
 git checkout -q "$br"
 # refusals: uncommitted content; a commit that is not on origin/main; a checkout at another commit.
 echo dirty >> content/AGENTS.md; inst install "$c7"; rc=$?; git checkout -q -- content

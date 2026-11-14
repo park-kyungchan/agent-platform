@@ -41,7 +41,7 @@ content_state() { local out rc=0
   CHK_COMMIT=$(json_field "$DST/$REC" commit); CHK_AT=$(json_field "$DST/$REC" installed_at)
   CHK_FILES=$(grep -c . "$DST/$SUMS" || true)
   out=$(cd "$DST" && sha256sum -c "$DST/$SUMS" 2>/dev/null) || rc=$?
-  CHK_BAD=$(printf '%s\n' "$out" | sed -n 's/: FAILED.*$//p' | head -n 10)
+  CHK_BAD=$(printf '%s\n' "$out" | sed -n 's/: FAILED.*$//p' | head -n 10) || true
   if [ "$rc" -eq 0 ] && [ "$CHK_FILES" -gt 0 ]; then CHK=ok; else CHK=drift; fi
 }
 # kept_available: the record names a kept copy and the copy and every sidecar still match their checksum file.
@@ -74,6 +74,8 @@ swap() { local stage=$1 p; shift
     mkdir -p -- "$(dirname -- "$DST/$p")" || return 1
     mv -- "$stage/$p" "$DST/$p" || return 1; placed+=("$p")
   done; }
+# listed <word> <list...>: success when the word is one of the list (no pipe: `grep -q` ending a pipe under pipefail is a race).
+listed() { local w=$1 x; shift; for x in "$@"; do [ "$x" = "$w" ] && return 0; done; return 1; }
 owned_ok() { case "$1" in *..*|skills/|skills/*/*) return 1 ;; AGENTS.md|runtime-references|skills/*) return 0 ;; esac; return 1; }
 paths_of() { # <SHA256SUMS> -> the top paths it owns: AGENTS.md, runtime-references, skills/<name>
   cut -c67- "$1" | awk -F/ '$1=="skills"{print "skills/"$2; next} {print $1}' | sort -u; }
@@ -160,7 +162,7 @@ rollback)
   cur=(); [ -f "$DST/.content-paths" ] && mapfile -t cur < "$DST/.content-paths"
   for c in "${cur[@]:-}"; do
     [ -n "$c" ] || continue
-    printf '%s\n' "${paths[@]}" | grep -qxF -- "$c" || refuse "rollback_not_latest: the target owns $c, which this kept copy does not cover; roll back the later install first"
+    listed "$c" "${paths[@]}" || refuse "rollback_not_latest: the target owns $c, which this kept copy does not cover; roll back the later install first"
   done
   stage=$DST/.new-$stamp; rm -rf -- "$stage"; mkdir -p -- "$stage"
   trap 'rm -rf -- "$stage"' EXIT
