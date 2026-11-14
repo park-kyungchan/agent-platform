@@ -162,39 +162,6 @@ fn run() -> Value {
 fn accept_request() -> Value {
     json!({"review":id("review"),"worktree":WT})
 }
-fn git(argv: &str, bytes: &[u8]) -> Step {
-    raw(
-        "git",
-        &format!("--no-replace-objects -C {WT} {argv}"),
-        Value::Null,
-        bytes,
-    )
-}
-fn accept_steps(f: Value, run: Value, diff: &str) -> Vec<Step> {
-    let bytes: Vec<_> = diff
-        .lines()
-        .flat_map(|path| path.bytes().chain([0]))
-        .collect();
-    accept_steps_raw(f, run, &bytes)
-}
-fn accept_steps_raw(f: Value, run: Value, diff: &[u8]) -> Vec<Step> {
-    vec![
-        get("review", f),
-        get("worker_run", run),
-        pr(HEAD, "OPEN", "main"),
-        git("fetch origin main", b""),
-        git(
-            &format!("merge-base origin/main {HEAD}"),
-            format!("{BASE}\n").as_bytes(),
-        ),
-        git(
-            &format!(
-                "diff --no-renames --ignore-submodules=none --no-relative --name-only -z {BASE} {HEAD}"
-            ),
-            diff,
-        ),
-    ]
-}
 fn refusal(s: &mut Script, verb: &str, r: &Value, code: &str, field: &str) -> Value {
     let e = execute(s, verb, r).unwrap_err();
     assert_eq!((e.code, e.field.as_str()), (code, field));
@@ -276,21 +243,6 @@ fn abandoned_exact_calls_and_store() {
     s.finish();
 }
 #[test]
-fn accept_exact_calls_and_repeated_post() {
-    let mut steps = accept_steps(review(), run(), "a/b.rs\ndocs/guide.md\n");
-    steps.push(status("success", "review review accept"));
-    let mut s = Script::new(steps);
-    assert_eq!(
-        execute(&mut s, "accept", &accept_request()).unwrap(),
-        (json!({"status":"accepted","head":HEAD,"paths":2}), 0)
-    );
-    s.finish();
-    s.steps = accept_steps(review(), run(), "a/b.rs\ndocs/guide.md\n").into();
-    s.steps.push_back(status("success", "review review accept"));
-    execute(&mut s, "accept", &accept_request()).unwrap();
-    s.finish();
-}
-#[test]
 fn revoke_exact_calls_and_status() {
     let mut s = Script::new(vec![
         get("review", review()),
@@ -369,7 +321,7 @@ fn invalid_input_before_calls() {
         ("start", json!([]), "stdin"),
         ("close", json!({"review":id("task")}), "review"),
     ];
-    for key in ["task_dir", "prompt", "report", "worktree", "store"] {
+    for key in ["task_dir", "prompt", "report", "store"] {
         let mut r = start_request();
         r[key] = json!("relative");
         cases.push(("start", r, key));
@@ -452,258 +404,6 @@ fn exact_first_line_verdict() {
     }
 }
 #[test]
-fn not_accepting_first_member() {
-    for key in [
-        "status",
-        "verdict",
-        "kind",
-        "repository",
-        "pull_request",
-        "head",
-        "base",
-        "report",
-        "report_sha256",
-    ] {
-        let mut f = review();
-        f[key] = Value::Null;
-        let mut s = Script::new(vec![get("review", f)]);
-        assert_eq!(
-            refusal(
-                &mut s,
-                "accept",
-                &accept_request(),
-                "review_not_accepting",
-                "review"
-            ),
-            key
-        );
-    }
-    for (key, value) in [
-        ("status", "running"),
-        ("verdict", "repair"),
-        ("verdict", "abandoned"),
-        ("kind", "design"),
-        ("kind", "integration"),
-    ] {
-        let mut f = review();
-        f[key] = json!(value);
-        refusal(
-            &mut Script::new(vec![get("review", f)]),
-            "accept",
-            &accept_request(),
-            "review_not_accepting",
-            "review",
-        );
-    }
-}
-#[test]
-fn report_changed() {
-    for bytes in [None, Some(b"Verdict: accept\nChanged\n".to_vec())] {
-        let mut s = Script::new(vec![get("review", review())]);
-        s.files.remove(REPORT);
-        if let Some(bytes) = bytes {
-            s.files.insert(REPORT.into(), bytes);
-        }
-        refusal(
-            &mut s,
-            "accept",
-            &accept_request(),
-            "review_report_changed",
-            "report",
-        );
-    }
-}
-#[test]
-fn runs_required_and_write_set_required() {
-    for runs in [Value::Null, json!([]), json!("bad")] {
-        let mut f = review();
-        f["runs"] = runs;
-        refusal(
-            &mut Script::new(vec![get("review", f)]),
-            "accept",
-            &accept_request(),
-            "review_runs_required",
-            "runs",
-        );
-    }
-    for patterns in [Value::Null, json!([]), json!([""])] {
-        let mut f = run();
-        f["write_set"] = patterns;
-        assert_eq!(
-            refusal(
-                &mut Script::new(vec![get("review", review()), get("worker_run", f)]),
-                "accept",
-                &accept_request(),
-                "review_run_lacks_write_set",
-                "runs"
-            ),
-            "worker_run"
-        );
-    }
-}
-#[test]
-fn accept_head_differs() {
-    for (head, state, base) in [
-        (BASE, "OPEN", "main"),
-        (HEAD, "CLOSED", "main"),
-        (HEAD, "OPEN", "release"),
-    ] {
-        let mut s = Script::new(vec![
-            get("review", review()),
-            get("worker_run", run()),
-            pr(head, state, base),
-        ]);
-        refusal(
-            &mut s,
-            "accept",
-            &accept_request(),
-            "review_head_differs",
-            "head",
-        );
-    }
-}
-#[test]
-fn base_differs() {
-    let mut steps = accept_steps(review(), run(), "");
-    steps.truncate(5);
-    steps[4].bytes = format!("{HEAD}\n").into_bytes();
-    assert_eq!(
-        refusal(
-            &mut Script::new(steps),
-            "accept",
-            &accept_request(),
-            "review_base_differs",
-            "base"
-        ),
-        HEAD
-    );
-}
-#[test]
-fn path_match_table_and_empty_diff() {
-    for (pattern, path, ok) in [
-        ("a/b.rs", "a/b.rs", true),
-        ("a/**", "a/b/c.rs", true),
-        ("a/**", "a", false),
-        ("a/**", "ab/c.rs", false),
-        ("a/b.rs", "a/b.rs.bak", false),
-        ("a/**", "", true),
-    ] {
-        let mut f = run();
-        f["write_set"] = json!([pattern]);
-        let diff = if path.is_empty() {
-            String::new()
-        } else {
-            format!("{path}\n")
-        };
-        let mut steps = accept_steps(review(), f, &diff);
-        if ok {
-            steps.push(status("success", "review review accept"));
-            let mut s = Script::new(steps);
-            assert_eq!(
-                execute(&mut s, "accept", &accept_request()).unwrap().0["paths"],
-                usize::from(!path.is_empty())
-            );
-            s.finish();
-        } else {
-            assert_eq!(
-                refusal(
-                    &mut Script::new(steps),
-                    "accept",
-                    &accept_request(),
-                    "review_path_outside_write_set",
-                    "paths"
-                ),
-                json!({"paths":[path],"count":1})
-            );
-        }
-    }
-}
-#[test]
-fn accept_reads_nul_separated_paths() {
-    let paths = ["dir/x.md", "dir/é.md", "dir/a\nb.md"];
-    for terminated in [true, false] {
-        let mut bytes = paths.join("\0").into_bytes();
-        if terminated {
-            bytes.push(0);
-        }
-        for (pattern, ok) in [("dir/**", true), ("dir/x.md", false)] {
-            let mut f = run();
-            f["write_set"] = json!([pattern]);
-            let mut steps = accept_steps_raw(review(), f, &bytes);
-            if ok {
-                steps.push(status("success", "review review accept"));
-                let mut s = Script::new(steps);
-                assert_eq!(
-                    execute(&mut s, "accept", &accept_request()).unwrap().0["paths"],
-                    3
-                );
-                s.finish();
-            } else {
-                assert_eq!(
-                    refusal(
-                        &mut Script::new(steps),
-                        "accept",
-                        &accept_request(),
-                        "review_path_outside_write_set",
-                        "paths"
-                    ),
-                    json!({"paths":paths[1..],"count":2})
-                );
-            }
-        }
-    }
-    let mut steps = accept_steps_raw(review(), run(), b"");
-    steps.push(status("success", "review review accept"));
-    let mut s = Script::new(steps);
-    assert_eq!(
-        execute(&mut s, "accept", &accept_request()).unwrap().0["paths"],
-        0
-    );
-    s.finish();
-}
-#[test]
-fn accept_refuses_non_utf8_path() {
-    let mut f = run();
-    f["write_set"] = json!(["dir/**"]);
-    refusal(
-        &mut Script::new(accept_steps_raw(review(), f, b"dir/\xff.md\0")),
-        "accept",
-        &accept_request(),
-        "process_failed",
-        "git",
-    );
-}
-#[test]
-fn outside_paths_capped_at_ten() {
-    let names: Vec<_> = (0..12).map(|i| format!("outside/{i}")).collect();
-    let d = refusal(
-        &mut Script::new(accept_steps(review(), run(), &names.join("\n"))),
-        "accept",
-        &accept_request(),
-        "review_path_outside_write_set",
-        "paths",
-    );
-    assert_eq!(d, json!({"paths":names[..10],"count":12}));
-}
-#[test]
-fn caller_worktree_refused_before_status() {
-    for cwd in [
-        WT,
-        "/home/palantirkc/work/example/wt/another",
-        "/home/palantirkc/work/example/wt",
-    ] {
-        let mut s = Script::new(accept_steps(review(), run(), "a/b.rs\n"));
-        s.cwd = cwd.into();
-        refusal(
-            &mut s,
-            "accept",
-            &accept_request(),
-            "review_accept_from_worktree",
-            "cwd",
-        );
-    }
-}
-#[test]
 fn revoke_missing_repository_or_head() {
     for key in ["repository", "head"] {
         let mut f = review();
@@ -771,25 +471,15 @@ fn malformed_current_review_refused() {
     g.bytes = serde_json::to_vec(&v).unwrap();
     refusal(
         &mut Script::new(vec![g]),
-        "accept",
-        &accept_request(),
+        "revoke",
+        &json!({"review":id("review"),"reason":"wrong"}),
         "store_review_unreadable",
         "review",
     );
 }
 
 #[test]
-fn process_failure_and_unreadable_store_stop() {
-    let mut steps = accept_steps(review(), run(), "a/b.rs\n");
-    steps.truncate(4);
-    steps[3].success = false;
-    refusal(
-        &mut Script::new(steps),
-        "accept",
-        &accept_request(),
-        "process_failed",
-        "git",
-    );
+fn unreadable_store_answer_stops() {
     let mut a = start_apply();
     a.bytes = b"not JSON".to_vec();
     let mut s = Script::new(vec![pr(HEAD, "OPEN", "main"), get("worker_run", run()), a]);
@@ -820,7 +510,7 @@ fn usage_and_cli_envelope() {
     assert!(help.status.success());
     assert_eq!(
         help.stdout,
-        b"Usage: ap review <start|close|accept|revoke> < request.json\n"
+        b"Usage: ap review <start|close|revoke> < request.json\n"
     );
     let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
         .args(["review", "close"])
@@ -838,92 +528,7 @@ fn usage_and_cli_envelope() {
         json!({"error":{"code":"invalid_input","field":"review","detail":null}})
     );
 }
-#[test]
-fn integrated_review_union_of_runs() {
-    let mut f = review();
-    f["kind"] = json!("integrated");
-    let mut second = id("worker_run");
-    second["native_key"] = json!("second");
-    f["runs"] = json!([id("worker_run"), second]);
-    let mut g = get(
-        "worker_run",
-        json!({"task":id("task"),"write_set":["other/**"]}),
-    );
-    g.body["id"] = second.clone();
-    let mut response: Value = serde_json::from_slice(&g.bytes).unwrap();
-    response["result"]["objects"][0]["id"] = second;
-    g.bytes = serde_json::to_vec(&response).unwrap();
-    let mut steps = accept_steps(f, run(), "a/b.rs\nother/c.rs\n");
-    steps.insert(2, g);
-    steps.push(status("success", "review review accept"));
-    let mut s = Script::new(steps);
-    assert_eq!(
-        execute(&mut s, "accept", &accept_request()).unwrap().0["paths"],
-        2
-    );
-    s.finish();
-}
 
-#[test]
-fn accept_argv_disables_rename_detection() {
-    let steps = accept_steps(review(), run(), "a/b.rs\noutside/old.rs\n");
-    assert_eq!(
-        steps[3].argv,
-        ["--no-replace-objects", "-C", WT, "fetch", "origin", "main"]
-    );
-    assert_eq!(
-        steps[4].argv,
-        [
-            "--no-replace-objects",
-            "-C",
-            WT,
-            "merge-base",
-            "origin/main",
-            HEAD
-        ]
-    );
-    assert_eq!(
-        steps[5].argv,
-        [
-            "--no-replace-objects",
-            "-C",
-            WT,
-            "diff",
-            "--no-renames",
-            "--ignore-submodules=none",
-            "--no-relative",
-            "--name-only",
-            "-z",
-            BASE,
-            HEAD
-        ]
-    );
-    assert_eq!(
-        refusal(
-            &mut Script::new(steps),
-            "accept",
-            &accept_request(),
-            "review_path_outside_write_set",
-            "paths"
-        ),
-        json!({"paths":["outside/old.rs"],"count":1})
-    );
-}
-#[test]
-fn accept_run_of_other_task() {
-    let mut f = run();
-    f["task"]["native_key"] = json!("other");
-    assert_eq!(
-        refusal(
-            &mut Script::new(vec![get("review", review()), get("worker_run", f)]),
-            "accept",
-            &accept_request(),
-            "review_run_of_other_task",
-            "runs"
-        ),
-        "worker_run"
-    );
-}
 fn repeated_start_steps(status: &str) -> Vec<Step> {
     let mut a = start_apply();
     let mut response: Value = serde_json::from_slice(&a.bytes).unwrap();
@@ -1161,4 +766,42 @@ fn d8_revoke_of_revoked_posts_again() {
             .any(|(p, a, _)| p == "ont" && a[0] == "action")
     );
     assert_eq!(s.calls.iter().filter(|(p, _, _)| p == "gh").count(), 1);
+}
+/// `accept` is no verb of `ap review`: the library and the command line refuse it exactly as
+/// they refuse any unknown verb, before any call.
+#[test]
+fn r1_review_accept_is_no_verb() {
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+    };
+    let mut s = Script::new(vec![]);
+    let e = execute(&mut s, "accept", &accept_request()).unwrap_err();
+    assert_eq!((e.code, e.field.as_str()), ("usage", "args"));
+    assert!(s.calls.is_empty());
+    let answer = |verb: &str| {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ap"))
+            .args(["review", verb])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(accept_request().to_string().as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        (out.status.code(), out.stdout, out.stderr)
+    };
+    let (code, stdout, stderr) = answer("accept");
+    assert_eq!(code, Some(3));
+    assert!(stdout.is_empty());
+    assert_eq!(
+        serde_json::from_slice::<Value>(&stderr).unwrap(),
+        json!({"error":{"code":"usage","field":"args","detail":null}})
+    );
+    assert_eq!((code, stdout, stderr), answer("no-such-verb"));
 }
