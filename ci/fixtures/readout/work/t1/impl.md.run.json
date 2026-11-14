@@ -3,7 +3,7 @@
  "runtime": "claude",
  "model": "opus",
  "session": "s-impl",
- "cwd": "@WORK@/t1",
+ "cwd": "@WORK@/t1/wt/agent-platform",
  "start": "2026-11-12T10:00:00Z",
  "end": "2026-11-12T10:30:00Z",
  "state": "ok",

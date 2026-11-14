@@ -75,19 +75,27 @@ def jsonl(path, lines):
 
 
 def read_claude(projects_dirs, since_epoch):
-    """One message per message id (a message spans several lines, and a forked session's file repeats
-    earlier ones): the first line's session, cwd and time, the member-wise maximum of the usage."""
+    """One message per message id (a message spans several lines, and a forked session's file repeats earlier ones).
+    A message belongs to the earliest-started session that holds it, and a session has one cwd, its earliest line's:
+    neither depends on the order of the files. Files older than the window give only that and the branches of
+    their sessions (the K2 join needs them), no message."""
     msgs, branches, lines = {}, collections.defaultdict(set), collections.Counter()
+    first_cwd, start = {}, {}
     files = sorted({f.resolve() for d in projects_dirs for f in Path(d).resolve().rglob("*.jsonl")})
     for f in files:
-        if f.stat().st_mtime < since_epoch:
-            lines["files_older_than_window"] += 1
-            continue
-        lines["files"] += 1
-        for o in jsonl(f, lines):
-            if o.get("sessionId") and isinstance(o.get("gitBranch"), str):
-                branches[o["sessionId"]].add(o["gitBranch"])
+        old = f.stat().st_mtime < since_epoch
+        lines["files_older_than_window" if old else "files"] += 1
+        for o in jsonl(f, collections.Counter() if old else lines):
+            sid, ts = o.get("sessionId"), str(o.get("timestamp") or "")
+            if sid and isinstance(o.get("gitBranch"), str):
+                branches[sid].add(o["gitBranch"])
+            if sid and ts:
+                start[sid] = min(start.get(sid, ts), ts)
+                if isinstance(o.get("cwd"), str) and o["cwd"] and (ts, o["cwd"]) < first_cwd.get(sid, ("\uffff", "")):
+                    first_cwd[sid] = (ts, o["cwd"])
             m = o.get("message")
+            if old:
+                continue
             if o.get("type") != "assistant" or not isinstance(m, dict) or not isinstance(m.get("usage"), dict):
                 lines["other"] += 1
                 continue
@@ -103,15 +111,20 @@ def read_claude(projects_dirs, since_epoch):
                          and isinstance(b.get("name"), str)), None) if isinstance(m.get("content"), list) else None
             rec = msgs.get(m["id"])
             if rec is None:
-                msgs[m["id"]] = {"ts": str(o.get("timestamp") or ""), "model": m.get("model"), "session": o.get("sessionId"),
-                                 "cwd": str(o.get("cwd") or ""), "tool": tool or "none", "tok": tok, "src": "claude", "file": str(f)}
+                msgs[m["id"]] = {"ts": ts, "model": m.get("model"), "sessions": {sid}, "cwd": str(o.get("cwd") or ""),
+                                 "tool": tool or "none", "tok": tok, "src": "claude", "file": str(f)}
             else:
                 lines["repeat"] += 1
                 rec["tok"] = {k: max(rec["tok"][k], tok[k]) for k in KINDS}
+                rec["sessions"].add(sid)
+                rec["file"], rec["ts"] = min(rec["file"], str(f)), min(rec["ts"], ts) if ts else rec["ts"]
                 if rec["tool"] == "none" and tool:
                     rec["tool"] = tool
+    for rec in msgs.values():
+        rec["session"] = min(rec.pop("sessions"), key=lambda s: (start.get(s, "~"), str(s)))
+        rec["cwd"] = first_cwd.get(rec["session"], ("", rec["cwd"]))[1]
     lines["messages"] = len(msgs)
-    return list(msgs.values()), branches, lines
+    return list(msgs.values()), branches, {s: c for s, (_, c) in first_cwd.items()}, lines
 
 
 def read_codex(codex_dir, since_epoch):
@@ -126,9 +139,9 @@ def read_codex(codex_dir, since_epoch):
         for o in jsonl(f, lines):
             p = o.get("payload") if isinstance(o.get("payload"), dict) else {}
             if o.get("type") == "session_meta":
-                cwd, sid = str(p.get("cwd") or cwd), str(p.get("id") or sid)
+                cwd, sid = str(p.get("cwd") or cwd), str(p.get("id") or sid)  # the session's cwd: the first one seen
             elif o.get("type") == "turn_context":
-                model, cwd = p.get("model") or model, str(p.get("cwd") or cwd)
+                model, cwd = p.get("model") or model, cwd or str(p.get("cwd") or "")
             elif o.get("type") == "event_msg" and p.get("type") == "token_count" and isinstance(p.get("info"), dict) \
                     and isinstance(p["info"].get("total_token_usage"), dict):
                 u = {k: num(v) for k, v in p["info"]["total_token_usage"].items()}
@@ -159,7 +172,7 @@ def read_stages(work_root):
             continue
         lines["records"] += 1
         a = o.get("answer")
-        stages.append({"role": str(o.get("role") or "unknown"), "model": str(o.get("model") or "unknown"), "session": o["session"],
+        stages.append({"role": str(o.get("role") or "unknown"), "model": str(o.get("model") or "unknown"), "session": o["session"], "cwd": str(o.get("cwd") or ""),
                        "state": "cut" if o.get("state") == "cut" or o.get("cut") is True else str(o.get("state")),
                        "start": str(o.get("start") or ""), "answer": a.get("path") if isinstance(a, dict) else None,
                        "ap": "tokens" in o and "resumes" in o, "first_run": o.get("resumes", "x") is None, "file": str(f)})
@@ -233,14 +246,32 @@ def first_line(path):
     return line[:40] if line.startswith("Verdict:") else "no-verdict-line"
 
 
-def k2(prs, stages, branches):
-    """Per merged pull request: the implementer's tier, the first reviewer's tier and verdict line, changed lines."""
+DETACHED = {"HEAD", "main", "master"}  # a reviewer's branch when it ran on a detached head or on the base
+
+
+def repo_of(cwd, names, platforms):
+    """The repository of a stage's worktree: `<work>/<task>/wt/<repo>[-suffix]` or `<platforms>/<repo>`."""
+    p, root = cwd.split("/"), platforms.rstrip("/") + "/"
+    name = p[p.index("wt", 1) + 1] if "wt" in p[1:-1] else cwd[len(root):].split("/")[0] if (cwd + "/").startswith(root) else ""
+    return next((n for n in sorted(names, key=len, reverse=True) if name == n or name.startswith(n + "-")), None)
+
+
+def k2(prs, stages, branches, session_cwd, platforms):
+    """Per merged pull request: the implementer's tier, the first reviewer's tier and verdict line, changed lines.
+    A stage joins by repository (its worktree) and head branch; a reviewer on a detached head or on the base joins
+    by the implementer's worktree when it started after the implementer."""
+    names = {r.split("/")[1] for r, _ in prs}
+    where = {id(s): (s["cwd"] or session_cwd.get(s["session"], "")) for s in stages}
     out = []
     for repo, pr in prs:
-        def first(role):
-            hit = [s for s in stages if s["role"] == role and pr["headRefName"] in branches.get(s["session"], ())]
+        mine = [s for s in stages if repo_of(where[id(s)], names, platforms) == repo.split("/")[1]]
+        def pick(role, ok):
+            hit = [s for s in mine if s["role"] == role and ok(s)]
             return min(hit, key=lambda s: s["start"]) if hit else None
-        impl, rev = first("implementer"), first("reviewer")
+        on_branch = lambda s: pr["headRefName"] in branches.get(s["session"], ())
+        impl = pick("implementer", on_branch)
+        rev = pick("reviewer", lambda s: on_branch(s) or bool(impl and where[id(s)] == where[id(impl)] and s["start"] >= impl["start"]
+                                                              and branches.get(s["session"]) and branches[s["session"]] <= DETACHED))
         out.append({"repo": repo.split("/")[1], "number": pr["number"], "impl": impl["model"] if impl else "unknown",
                     "verdict": first_line(rev["answer"]) if rev else None, "verifier": rev["model"] if rev else None,
                     "lines": num(pr.get("additions")) + num(pr.get("deletions"))})
@@ -305,7 +336,7 @@ def main(argv=None):
     a.stages, st_lines = read_stages(a.work_root)
     accounts = a.accounts if a.accounts is not None else [str(p.parent) for p in sorted(Path.home().glob(".claude*/projects"))]
     since_epoch = datetime.datetime.fromisoformat(a.since).replace(tzinfo=datetime.timezone.utc).timestamp()
-    c_msgs, branches, c_lines = read_claude([Path(x) / "projects" for x in accounts if (Path(x) / "projects").is_dir()], since_epoch)
+    c_msgs, branches, session_cwd, c_lines = read_claude([Path(x) / "projects" for x in accounts if (Path(x) / "projects").is_dir()], since_epoch)
     x_msgs, x_lines = read_codex(a.codex_dir, since_epoch)
     totals, rows, leads, outside, session_usd, lesson_files = aggregate(c_msgs + x_msgs, a)
     prs = [(r, p) for r in (a.repo or REPOS) for p in run_gh(r, a.since, a.until) if a.since <= str(p.get("mergedAt"))[:10] <= a.until]
@@ -336,7 +367,7 @@ def main(argv=None):
         print(f"week {w} merged pull requests {len(mine)} (" + ", ".join(f"{r}={n}" for r, n in sorted(per_repo.items())) + ")"
               + f" K1 engineering usd per merged pull request = " + (f"{eng / len(mine):.2f}" if mine else "n/a")
               + f"; role lead usd={lead:.2f} share of the route={100 * lead / eng if eng else 0:.1f}%")
-    reading = k2(prs, a.stages, branches)
+    reading = k2(prs, a.stages, branches, session_cwd, a.platforms_root)
     if a.detail:
         for r in sorted(reading, key=lambda r: (r["repo"], r["number"])):
             print(f"K2 {r['repo']}#{r['number']} implementer={r['impl']} verifier={r['verifier'] or 'none'} first verdict={bucket(r['verdict'])} lines={r['lines']}")
@@ -356,8 +387,14 @@ def main(argv=None):
     if a.list_no_reviewer:
         for k, v in sorted(missing.items()):
             print(f"K2 no reviewer stage {k}: " + ",".join(map(str, v)))
-    cut = collections.Counter((s["role"], s["model"]) for s in a.stages if s["state"] == "cut" and a.since <= s["start"][:10] <= a.until)
-    print("stages cut: " + (", ".join(f"{r}/{m}={n}" for (r, m), n in sorted(cut.items())) or "none"))
+    cut, undated = collections.Counter(), collections.Counter()
+    for s in a.stages:  # an older-form record has no start: it is counted under `no date`
+        if s["state"] == "cut" and not s["start"]:
+            undated[(s["role"], s["model"])] += 1
+        elif s["state"] == "cut" and a.since <= s["start"][:10] <= a.until:
+            cut[(s["role"], s["model"])] += 1
+    show = lambda c: ", ".join(f"{r}/{m}={n}" for (r, m), n in sorted(c.items()))
+    print("stages cut: " + (show(cut) or "none") + (f"; no date: {show(undated)}" if undated else ""))
     ranked = sorted(leads.items(), key=lambda kv: (-kv[1]["usd"], kv[0]))
     for tool, c in ranked[:6]:
         print(f"lead calls first_tool={tool} calls={c['calls']} usd={c['usd']:.2f}")

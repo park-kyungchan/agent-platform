@@ -7,9 +7,11 @@ members are read and printed, nothing is written; I5 the same records give the s
 Run: python3 -I -B -m unittest discover -s ci -p 'test_readout*.py'
 """
 import contextlib
+import datetime
 import hashlib
 import importlib.util
 import io
+import os
 import re
 import shutil
 import tempfile
@@ -24,7 +26,10 @@ spec.loader.exec_module(readout)
 
 PRS = {"park-kyungchan/agent-platform": [{"number": 7, "headRefName": "feat/a", "mergedAt": "2026-11-12T10:00:00Z", "additions": 10, "deletions": 5},
                                          {"number": 8, "headRefName": "feat/none", "mergedAt": "2026-11-13T10:00:00Z", "additions": 3, "deletions": 2},
-                                         {"number": 9, "headRefName": "feat/old", "mergedAt": "2026-10-01T10:00:00Z"}]}
+                                         {"number": 10, "headRefName": "feat/det", "mergedAt": "2026-11-12T17:00:00Z", "additions": 20, "deletions": 0},
+                                         {"number": 11, "headRefName": "feat/early", "mergedAt": "2026-11-12T18:00:00Z", "additions": 1, "deletions": 1},
+                                         {"number": 9, "headRefName": "feat/old", "mergedAt": "2026-10-01T10:00:00Z"}],
+       "park-kyungchan/ontology-platform": [{"number": 3, "headRefName": "feat/a", "mergedAt": "2026-11-12T19:00:00Z", "additions": 4, "deletions": 0}]}
 
 
 def tree_digest(root):
@@ -40,6 +45,8 @@ class Readout(unittest.TestCase):
                 dst = self.tmp / src.relative_to(FIXTURES)
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 dst.write_text(src.read_text().replace("@WORK@", str(self.tmp / "work")).replace("@PLATFORMS@", str(self.tmp / "platforms")))
+        old = datetime.datetime(2026, 11, 10, 11, tzinfo=datetime.timezone.utc).timestamp()  # the day before the window
+        os.utime(self.tmp / "acct1" / "projects" / "p9" / "s-early.jsonl", (old, old))
         readout.run_gh = lambda repo, since, until: PRS.get(repo, [])
 
     def run_readout(self, *extra):
@@ -48,7 +55,7 @@ class Readout(unittest.TestCase):
                 "--accounts", str(self.tmp / "acct1"), str(self.tmp / "acct2"), str(self.tmp / "acct1"),
                 "--codex-dir", str(self.tmp / "codex"), "--work-root", str(self.tmp / "work"),
                 "--platforms-root", str(self.tmp / "platforms"), "--lead-cwd", str(self.tmp / "work" / "lead"),
-                "--repo", "park-kyungchan/agent-platform", *extra]
+                "--repo", "park-kyungchan/agent-platform", "--repo", "park-kyungchan/ontology-platform", *extra]
         with contextlib.redirect_stdout(out):
             readout.main(args)
         return out.getvalue()
@@ -64,15 +71,15 @@ class Readout(unittest.TestCase):
         text = self.run_readout()
         msgs, inp, out, cr, w5, w1, usd = self.route(text, "engineering")
         self.assertEqual((w5, w1), (100000, 200000))
-        self.assertEqual(inp, 19400100)
+        self.assertEqual(inp, 23400100)
         self.assertEqual(out, 2300000)  # m1 500,000 once; m5 1,000,000; m6 500,000; codex 300,000
         self.assertEqual(cr, 3000000)  # m1 2,000,000 once; codex 1,000,000
-        self.assertIn("messages=13 ", text)
+        self.assertIn("messages=16 ", text)
         self.assertIn("repeat=3 ", text)
 
     def test_i2_stage_tokens_are_not_added_and_roles_follow_the_stage_in_time(self):
         text = self.run_readout()
-        self.assertEqual(self.route(text, "engineering")[6], 40.10)  # sessions only: every stage record says 7,000,000 of each kind
+        self.assertEqual(self.route(text, "engineering")[6], 44.10)  # sessions only: every stage record says 7,000,000 of each kind
         self.assertRegex(text, r"role=implementer family=opus msgs=1 .* usd=4.10")
         self.assertRegex(text, r"role=fixer family=opus msgs=1 .* usd=1.00")  # a later record of the same session takes the later message
         self.assertRegex(text, r"role=reviewer family=opus msgs=1 .* usd=2.00")
@@ -85,11 +92,11 @@ class Readout(unittest.TestCase):
 
     def test_i3_every_line_lands_in_one_output_line(self):
         text = self.run_readout()
-        self.assertRegex(text, r"input claude files=8 messages=13 other=1 read=18 repeat=3 unreadable=1 outside_window=1")
+        self.assertRegex(text, r"input claude files=12 files_older_than_window=1 messages=16 other=4 read=24 repeat=3 unreadable=1 outside_window=1")
         n = {k: int(v) for k, v in re.findall(r"(\w+)=(\d+)", re.search(r"^input claude .*$", text, re.M).group(0))}
         self.assertEqual(n["read"], n["messages"] + n["other"] + n["repeat"] + n["unreadable"])
         self.assertRegex(text, r"role=\* family=unknown msgs=1 input=100 ")  # an unknown model keeps its tokens
-        self.assertRegex(text, r"input stages records=6 unreadable=1 without_session_record=3")
+        self.assertRegex(text, r"input stages records=10 unreadable=1 without_session_record=7")
         self.assertRegex(text, r"input codex events=2 files=1 other=2 .*read=5 repeat=1")
         for route in ("engineering", "lesson", "other"):
             block = re.search(rf"^week \S+ route {route} TOTAL.*?(?=^week|^route lesson|^K2|\Z)", text, re.M | re.S).group(0).splitlines()
@@ -97,7 +104,7 @@ class Readout(unittest.TestCase):
             for kind in ("msgs", "input", "output", "cache_read", "cache_write_5m", "cache_write_1h", "usd"):
                 pick = lambda s: float(re.search(rf"{kind}=([\d,.]+)", s).group(1).replace(",", ""))
                 self.assertAlmostEqual(sum(pick(r) for r in rows), pick(total), places=2, msg=f"{route} {kind}")
-        self.assertEqual([self.route(text, r)[0] for r in ("engineering", "lesson", "other")], [12, 1, 1])
+        self.assertEqual([self.route(text, r)[0] for r in ("engineering", "lesson", "other")], [15, 1, 1])
         self.assertEqual([self.route(text, r)[6] for r in ("lesson", "other")], [3.0, 4.0])
 
     def test_i4_prints_no_text_no_tool_input_no_path_and_writes_nothing(self):
@@ -113,22 +120,50 @@ class Readout(unittest.TestCase):
 
     def test_k1_k2_and_cut(self):
         text = self.run_readout("--detail")
-        self.assertIn("merged pull requests 2 (agent-platform=2) K1 engineering usd per merged pull request = 20.05; role lead usd=18.90 share of the route=47.1%", text)
+        self.assertIn("merged pull requests 5 (agent-platform=4, ontology-platform=1) K1 engineering usd per merged pull request = 8.82; role lead usd=22.90 share of the route=51.9%", text)
         self.assertIn("K2 agent-platform#7 implementer=opus verifier=haiku first verdict=accept lines=15", text)
         self.assertIn("K2 agent-platform#8 implementer=unknown verifier=none first verdict=none lines=5", text)
         self.assertIn("K2 implementer=opus merged=1 lines=15: accept n=1 lines=15; verifier tiers: haiku=1", text)
         self.assertIn("K2 implementer=unknown merged=1 lines=5: none n=1 lines=5; verifier tiers: none", text)
-        self.assertIn("K2 no reviewer stage: agent-platform=1\n", text)
+        self.assertIn("K2 no reviewer stage: agent-platform=2, ontology-platform=1\n", text)
         self.assertNotIn("K2 no reviewer stage agent-platform:", text)  # the numbers only with the option
-        self.assertIn("K2 no reviewer stage agent-platform: 8", self.run_readout("--list-no-reviewer"))
-        self.assertIn("stages cut: implementer/sonnet=1", text)
+        self.assertIn("K2 no reviewer stage agent-platform: 8,11", self.run_readout("--list-no-reviewer"))
+        self.assertIn("stages cut: implementer/sonnet=1; no date: integration/unknown=1\n", text)  # an older-form record is counted
+
+    def test_k2_join_is_scoped_to_the_repository(self):
+        # pull request 3 of another repository has the head branch of pull request 7: it takes its own stage, not the first one's
+        text = self.run_readout("--detail")
+        self.assertIn("K2 agent-platform#7 implementer=opus verifier=haiku", text)
+        self.assertIn("K2 ontology-platform#3 implementer=fable verifier=none first verdict=none lines=4", text)
+
+    def test_k2_reviewer_on_a_detached_head_joins_by_the_worktree(self):
+        text = self.run_readout("--detail")
+        self.assertIn("K2 agent-platform#10 implementer=sonnet verifier=opus first verdict=repair lines=20", text)
+
+    def test_k2_join_uses_a_session_file_older_than_the_window(self):
+        text = self.run_readout("--detail")
+        self.assertIn("K2 agent-platform#11 implementer=haiku verifier=none first verdict=none lines=2", text)
+
+    def test_a_session_has_one_cwd_for_role_and_route(self):
+        # the session s-cd starts in the Lead's directory, then works in a worktree and in a directory of no route
+        text = self.run_readout()
+        eng = re.search(r"^week \S+ route engineering TOTAL.*?(?=^week)", text, re.M | re.S).group(0)
+        self.assertRegex(eng, r"role=lead family=opus msgs=5 .* usd=7.00")
+        self.assertRegex(eng, r"role=worker, no record family=opus msgs=2 .* usd=11.00")
+        self.assertEqual(self.route(text, "other")[0], 1)
+
+    def test_fork_file_order_does_not_change_the_output(self):
+        before = self.run_readout("--calibrate", "--detail")
+        (self.tmp / "acct1" / "projects" / "p0").mkdir()
+        shutil.move(self.tmp / "acct2" / "projects" / "p1" / "s-fork.jsonl", self.tmp / "acct1" / "projects" / "p0" / "s-fork.jsonl")
+        self.assertEqual(before, self.run_readout("--calibrate", "--detail"))
 
     def test_roles_of_sessions_without_a_stage_record(self):
         # The old rule filed every session without a record as `interactive`: the Lead's and two workers' sessions
         # (a worktree below the work root, a platform checkout) were in one line.
         text = self.run_readout()
         eng = re.search(r"^week \S+ route engineering TOTAL.*?(?=^week)", text, re.M | re.S).group(0)
-        self.assertRegex(eng, r"role=lead family=opus msgs=2 .* usd=3.00")
+        self.assertRegex(eng, r"role=lead family=opus msgs=5 .* usd=7.00")
         self.assertRegex(eng, r"role=lead family=haiku msgs=2 .* usd=15.90")
         self.assertRegex(eng, r"role=worker, no record family=opus msgs=2 .* usd=11.00")
         self.assertEqual(re.findall(r"role=interactive family=(\S+)", eng), ["gpt-9-x"])
@@ -145,7 +180,7 @@ class Readout(unittest.TestCase):
     def test_lead_calls_by_first_tool(self):
         text = self.run_readout()
         self.assertIn("lead calls first_tool=Bash calls=1 usd=15.00", text)
-        self.assertIn("lead calls first_tool=none calls=2 usd=1.90", text)
+        self.assertIn("lead calls first_tool=none calls=5 usd=5.90", text)
 
     def test_haiku_long_prompt_rate_and_unknown_model_cost(self):
         rates = readout.load_prices(self.tmp / "prices.tsv")

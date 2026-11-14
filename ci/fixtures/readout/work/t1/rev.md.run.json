@@ -3,7 +3,7 @@
  "runtime": "claude",
  "model": "haiku",
  "session": "s-rev",
- "cwd": "@WORK@/t1",
+ "cwd": "@WORK@/t1/wt/agent-platform",
  "start": "2026-11-12T10:55:00Z",
  "end": "2026-11-12T11:10:00Z",
  "state": "ok",

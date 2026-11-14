@@ -3,7 +3,7 @@
  "runtime": "claude",
  "model": "sonnet",
  "session": "s-impl",
- "cwd": "@WORK@/t1",
+ "cwd": "@WORK@/t1/wt/agent-platform",
  "start": "2026-11-12T11:30:00Z",
  "end": "2026-11-12T12:30:00Z",
  "state": "ok",
