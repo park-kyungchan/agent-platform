@@ -172,7 +172,7 @@ loader or evidence that any currently running session consumed them.
    for native CLI features or Hindsight.
 2. **Q2 and Q3** concerned the instruction installer and the content proposal
    and diagnosis; those verbs of `ap` are removed, and so are these two answers.
-4. **Q4 — Pane heuristics only on real demand.** Preserve current lookup.
+3. **Q4 — Pane heuristics only on real demand.** Preserve current lookup.
    Require a concrete consumer and its actual native session surface before
    proposing another CLI-specific heuristic.
 
