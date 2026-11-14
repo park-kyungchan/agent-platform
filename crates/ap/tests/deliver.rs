@@ -136,6 +136,13 @@ struct W {
     lost: bool,
     /// `INVOCATION_ID` of the environment.
     invocation: Option<String>,
+    /// The tarballs `install-content.sh rollback-check` refuses; and a script that does not know the
+    /// verb (it answers exit 2 for every tarball).
+    refused: Vec<String>,
+    old_script: bool,
+    /// Every `rollback-check` asked, in order: (script, tarball). It is no installer and no row of
+    /// `calls`.
+    checks: Vec<(String, String)>,
 }
 
 impl W {
@@ -198,6 +205,9 @@ impl W {
             origin_once: None,
             lost: false,
             invocation: None,
+            refused: vec![],
+            old_script: false,
+            checks: vec![],
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -596,6 +606,10 @@ fn inherited(path: &str) -> bool {
 }
 impl System for W {
     fn call(&mut self, program: &str, a: &[String], body: &Value, _ms: u64) -> Answer {
+        if program == "bash" && a.len() == 3 && a[1] == "rollback-check" {
+            self.checks.push((a[0].clone(), a[2].clone()));
+            return Self::text(!self.old_script && !self.refused.contains(&a[2]), "");
+        }
         self.calls.push((program.into(), a.to_vec(), body.clone()));
         if program == self.p("bin/ap") {
             assert_eq!(a, ["--version"]);
@@ -2614,4 +2628,85 @@ fn d10_exact_calls_of_an_install() {
     for (n, (got, want)) in w.calls.iter().zip(&want).enumerate() {
         assert_eq!(got, want, "call {n}");
     }
+}
+
+// ---- the content handle is a tarball the content installer takes back ---------------------------
+
+/// A tarball the installer would refuse (its `rollback-check` exits 2) is no handle, though its
+/// members hold the tree of `from`: the oldest one the installer accepts is, and none is when it
+/// refuses every one, or when the script does not know the verb. The check is asked of the script of
+/// the clone, only for a tarball whose members pass.
+#[test]
+fn d6_a_tarball_the_installer_would_refuse_is_no_handle() {
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(2));
+    tarball_at(&w, "100000Z-1", Some(1));
+    let refused = tarball_at(&w, "100001Z-2", Some(0));
+    let taken = tarball_at(&w, "100002Z-3", Some(0));
+    w.refused = vec![refused.clone()];
+    w.run();
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w),
+            "rollback_content": taken})
+    );
+    let script = w.p("state/r/scripts/install-content.sh");
+    assert_eq!(
+        w.checks,
+        [(script.clone(), refused.clone()), (script, taken.clone())]
+    );
+    // The installer refuses every one: no content handle in the record, the pair untouched.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(2));
+    let only = tarball_at(&w, "100001Z-1", Some(0));
+    w.refused = vec![only];
+    w.run();
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)})
+    );
+    // A script that does not know the verb answers exit 2: the tarball is no handle.
+    let mut w = W::new();
+    let id = dead_forward(&mut w, Some(2), Some(2));
+    tarball_at(&w, "100001Z-1", Some(0));
+    w.old_script = true;
+    w.run();
+    assert_eq!(
+        w.applies("close_install")[0]["parameters"],
+        json!({"install": id, "outcome": "installed", "to": c(2), "rollback_binary": kept(&w)})
+    );
+    // The tarball the content installer printed in this call is judged the same way.
+    let mut w = W::new();
+    w.refused = vec![w.tarball()];
+    let (v, _) = w.run();
+    let close = &w.applies("close_install")[0]["parameters"];
+    assert!(close.get("rollback_content").is_none(), "{v} {close}");
+    assert!(w.checks.iter().any(|(_, t)| *t == w.tarball()));
+}
+
+/// A recorded tarball the installer would refuse counts as absent when a rollback request reads it:
+/// where the manifests differ nothing is rolled back, where they are the same the file alone is, and
+/// never is the refused tarball given to the installer.
+#[test]
+fn d12_recorded_tarball_the_installer_would_refuse_counts_as_absent() {
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    w.refused = vec![w.tarball()];
+    let (v, exit) = rolls(&mut w);
+    refused(&w, &v, exit, "nothing_to_roll_back");
+    assert!(w.launched().is_empty());
+    assert_eq!(w.checks.len(), 1);
+    let mut w = W::new();
+    w.same_content = true;
+    installed_by_a(&mut w);
+    w.refused = vec![w.tarball()];
+    let (v, exit) = rolls(&mut w);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(w.launched(), ["ap-rollback"]);
+    // A script that does not know the verb: the recorded tarball is no handle.
+    let mut w = W::new();
+    installed_by_a(&mut w);
+    w.old_script = true;
+    let (v, exit) = rolls(&mut w);
+    refused(&w, &v, exit, "nothing_to_roll_back");
 }
