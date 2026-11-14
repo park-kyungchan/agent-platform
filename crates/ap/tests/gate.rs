@@ -53,15 +53,32 @@ impl System for Gh {
                 stdout: vec![],
             });
         }
-        assert_eq!(&args[..8], ["api", "graphql", "-F", "owner=o", "-F", "name=r", "-F", "n=7"]);
+        assert_eq!(
+            &args[..8],
+            [
+                "api", "graphql", "-F", "owner=o", "-F", "name=r", "-F", "n=7"
+            ]
+        );
         let query = args.last().unwrap();
         if query.contains("reviewThreads") {
-            let page = if args.iter().any(|a| a == "after=c1") { 1 } else { 0 };
+            let page = if args.iter().any(|a| a == "after=c1") {
+                1
+            } else {
+                0
+            };
             return Ok(ok(self.threads.get(page).cloned().unwrap_or(json!({"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}))));
         }
-        let v = if self.views.len() > 1 { self.views.remove(0) } else { self.views[0].clone() };
+        let v = if self.views.len() > 1 {
+            self.views.remove(0)
+        } else {
+            self.views[0].clone()
+        };
         if v.is_null() {
-            return Err(Failure { code: "process_failed", field: "gh".into(), detail: Value::Null });
+            return Err(Failure {
+                code: "process_failed",
+                field: "gh".into(),
+                detail: Value::Null,
+            });
         }
         Ok(ok(v))
     }
@@ -92,7 +109,13 @@ fn view(state: &str, draft: bool, head: &str, checks: Vec<Value>, comments: Vec<
         "comments":{"nodes":comments}}}}})
 }
 fn green(comments: Vec<Value>) -> Value {
-    view("OPEN", false, H, vec![check("rust", "COMPLETED", Some("SUCCESS"), true)], comments)
+    view(
+        "OPEN",
+        false,
+        H,
+        vec![check("rust", "COMPLETED", Some("SUCCESS"), true)],
+        comments,
+    )
 }
 fn gate(gh: &mut Gh, extra: Value) -> (Value, u8) {
     let mut r = json!({"repository":"o/r","pull_request":7,"head":H});
@@ -110,9 +133,15 @@ fn a_passed_head() {
     let (v, code) = gate(&mut gh, json!({}));
     assert_eq!((v["end"].as_str(), code), (Some("passed"), 0), "{v}");
     assert_eq!(v["head"], H);
-    assert_eq!(v["checks"], json!([{"name":"rust","state":"SUCCESS","run":"https://github.com/o/r/actions/runs/rust"}]));
-    assert_eq!(v["autoreview"], json!({"login":"chatgpt-codex-connector[bot]","state":"completed",
-        "commit":H,"has_unresolved_findings":false,"toggled":false}));
+    assert_eq!(
+        v["checks"],
+        json!([{"name":"rust","state":"SUCCESS","run":"https://github.com/o/r/actions/runs/rust"}])
+    );
+    assert_eq!(
+        v["autoreview"],
+        json!({"login":"chatgpt-codex-connector[bot]","state":"completed",
+        "commit":H,"has_unresolved_findings":false,"toggled":false})
+    );
     assert!(gh.readies().is_empty() && gh.clock.is_zero());
     assert_eq!(v["threads"], json!([]));
 }
@@ -129,7 +158,10 @@ fn a_failed_check() {
     let mut gh = Gh::new(vec![view("OPEN", false, H, checks, vec![])]);
     let (v, code) = gate(&mut gh, json!({}));
     assert_eq!((v["end"].as_str(), code), (Some("check_failed"), 11));
-    assert_eq!(v["failed_check"], json!({"name":"rust","state":"FAILURE","run":"https://github.com/o/r/actions/runs/rust"}));
+    assert_eq!(
+        v["failed_check"],
+        json!({"name":"rust","state":"FAILURE","run":"https://github.com/o/r/actions/runs/rust"})
+    );
     assert_eq!(v["autoreview"]["state"], "waiting");
 }
 
@@ -140,7 +172,16 @@ fn a_pending_check_that_passes() {
     let pending = check("rust", "IN_PROGRESS", None, true);
     let mut gh = Gh::new(vec![
         view("OPEN", false, H, vec![], vec![]),
-        view("OPEN", false, H, vec![pending.clone(), check("rust", "COMPLETED", Some("SUCCESS"), true)], vec![]),
+        view(
+            "OPEN",
+            false,
+            H,
+            vec![
+                pending.clone(),
+                check("rust", "COMPLETED", Some("SUCCESS"), true),
+            ],
+            vec![],
+        ),
         green(vec![bot(H, "completed")]),
     ]);
     let (v, code) = gate(&mut gh, json!({}));
@@ -151,7 +192,13 @@ fn a_pending_check_that_passes() {
 /// deliver.sh "check_timeout": a check that never ends ends `check_timeout` at `check_minutes`.
 #[test]
 fn a_check_that_never_ends_times_out() {
-    let mut gh = Gh::new(vec![view("OPEN", false, H, vec![check("rust", "QUEUED", None, true)], vec![])]);
+    let mut gh = Gh::new(vec![view(
+        "OPEN",
+        false,
+        H,
+        vec![check("rust", "QUEUED", None, true)],
+        vec![],
+    )]);
     let (v, code) = gate(&mut gh, json!({"check_minutes": 2}));
     assert_eq!((v["end"].as_str(), code), (Some("check_timeout"), 11));
     assert_eq!(gh.clock, Duration::from_secs(120));
@@ -180,7 +227,10 @@ fn a_marker_for_another_head() {
         green(vec![bot(H, "completed")]),
     ]);
     let (v, _) = gate(&mut gh, json!({}));
-    assert_eq!((v["end"].as_str(), v["autoreview"]["state"].as_str()), (Some("passed"), Some("completed")));
+    assert_eq!(
+        (v["end"].as_str(), v["autoreview"]["state"].as_str()),
+        (Some("passed"), Some("completed"))
+    );
     assert_eq!(gh.clock, Duration::from_secs(60));
 }
 
@@ -192,7 +242,10 @@ fn the_toggle_happens_once() {
     let (v, _) = gate(&mut gh, json!({"autoreview_minutes": 5}));
     assert_eq!(gh.readies(), ["--undo", "o/r"], "draft, then ready");
     assert_eq!(v["autoreview"]["toggled"], true);
-    let mut gh = Gh::new(vec![green(vec![bot(H, "in_progress")]), green(vec![bot(H, "completed")])]);
+    let mut gh = Gh::new(vec![
+        green(vec![bot(H, "in_progress")]),
+        green(vec![bot(H, "completed")]),
+    ]);
     let (v, _) = gate(&mut gh, json!({}));
     assert!(gh.readies().is_empty() && v["autoreview"]["toggled"] == false);
     // No summary at all is another commit too (await-autoreview compared an empty field).
@@ -207,14 +260,23 @@ fn the_toggle_happens_once() {
 fn the_time_limit_of_the_review() {
     let mut gh = Gh::new(vec![green(vec![bot(H, "in_progress")])]);
     let (v, code) = gate(&mut gh, json!({"autoreview_minutes": 3}));
-    assert_eq!((v["end"].as_str(), code, v["autoreview"]["state"].as_str()), (Some("passed"), 0, Some("timeout")));
+    assert_eq!(
+        (v["end"].as_str(), code, v["autoreview"]["state"].as_str()),
+        (Some("passed"), 0, Some("timeout"))
+    );
     assert_eq!(gh.clock, Duration::from_secs(180));
     // deliver.sh "autoreview_findings": the findings flag is reported, not decided.
     let mut done = bot(H, "completed");
-    let body = done["body"].as_str().unwrap().replace("\"has_unresolved_findings\":false", "\"has_unresolved_findings\":true");
+    let body = done["body"].as_str().unwrap().replace(
+        "\"has_unresolved_findings\":false",
+        "\"has_unresolved_findings\":true",
+    );
     done["body"] = json!(body);
     let (v, code) = gate(&mut Gh::new(vec![green(vec![done])]), json!({}));
-    assert_eq!((code, &v["autoreview"]["has_unresolved_findings"]), (0, &json!(true)));
+    assert_eq!(
+        (code, &v["autoreview"]["has_unresolved_findings"]),
+        (0, &json!(true))
+    );
 }
 
 /// await-autoreview "pr_is_draft" (exit 4) and deliver.sh "gh pr ready": a draft is marked ready by
@@ -222,14 +284,26 @@ fn the_time_limit_of_the_review() {
 #[test]
 fn a_draft() {
     let mut gh = Gh::new(vec![
-        view("OPEN", true, H, vec![check("rust", "COMPLETED", Some("SUCCESS"), true)], vec![bot(OLD, "completed")]),
+        view(
+            "OPEN",
+            true,
+            H,
+            vec![check("rust", "COMPLETED", Some("SUCCESS"), true)],
+            vec![bot(OLD, "completed")],
+        ),
         green(vec![bot(OLD, "completed")]),
         green(vec![bot(H, "completed")]),
     ]);
     let (v, code) = gate(&mut gh, json!({}));
     assert_eq!((v["end"].as_str(), code), (Some("passed"), 0), "{v}");
     assert_eq!(gh.readies(), ["o/r"], "one ready mark, no undo");
-    assert_eq!((v["marked_ready"].as_bool(), v["autoreview"]["toggled"].as_bool()), (Some(true), Some(false)));
+    assert_eq!(
+        (
+            v["marked_ready"].as_bool(),
+            v["autoreview"]["toggled"].as_bool()
+        ),
+        (Some(true), Some(false))
+    );
     let mut gh = Gh::new(vec![view("OPEN", true, H, vec![], vec![])]);
     gh.ready_fails = true;
     let (v, code) = gate(&mut gh, json!({}));
@@ -245,8 +319,14 @@ fn merged_while_waiting_and_closed() {
         view("MERGED", false, H, pending.clone(), vec![]),
     ]);
     let (v, code) = gate(&mut gh, json!({}));
-    assert_eq!((v["end"].as_str(), code, v["head"].as_str()), (Some("merged"), 10, Some(H)));
-    let (v, code) = gate(&mut Gh::new(vec![view("CLOSED", false, H, pending, vec![])]), json!({}));
+    assert_eq!(
+        (v["end"].as_str(), code, v["head"].as_str()),
+        (Some("merged"), 10, Some(H))
+    );
+    let (v, code) = gate(
+        &mut Gh::new(vec![view("CLOSED", false, H, pending, vec![])]),
+        json!({}),
+    );
     assert_eq!((v["end"].as_str(), code), (Some("closed"), 10));
 }
 
@@ -256,40 +336,74 @@ fn merged_while_waiting_and_closed() {
 #[test]
 fn a_head_that_moves_while_waiting() {
     let pending = vec![check("rust", "IN_PROGRESS", None, true)];
-    let mut gh = Gh::new(vec![view("OPEN", false, H, pending.clone(), vec![]), view("OPEN", false, H2, pending, vec![])]);
+    let mut gh = Gh::new(vec![
+        view("OPEN", false, H, pending.clone(), vec![]),
+        view("OPEN", false, H2, pending, vec![]),
+    ]);
     let (v, code) = gate(&mut gh, json!({}));
     assert_eq!((v["end"].as_str(), code), (Some("head_moved"), 10));
-    assert_eq!((v["head"].as_str(), v["head_now"].as_str()), (Some(H), Some(H2)));
+    assert_eq!(
+        (v["head"].as_str(), v["head_now"].as_str()),
+        (Some(H), Some(H2))
+    );
     let mut gh = Gh::new(vec![green(vec![]), view("OPEN", false, H2, vec![], vec![])]);
     let (v, _) = gate(&mut gh, json!({}));
     assert_eq!(v["end"], "head_moved", "a push during the review");
     let mut gh = Gh::new(vec![green(vec![bot(H, "completed")])]);
     let (v, code) = gate(&mut gh, json!({"head": H2}));
-    assert_eq!((v["end"].as_str(), code, v["expected"].as_str(), v["head"].as_str()), (Some("head_differs"), 10, Some(H2), Some(H)));
+    assert_eq!(
+        (
+            v["end"].as_str(),
+            code,
+            v["expected"].as_str(),
+            v["head"].as_str()
+        ),
+        (Some("head_differs"), 10, Some(H2), Some(H))
+    );
     // Without a caller's head the gate takes GitHub's.
     let mut gh = Gh::new(vec![green(vec![bot(H, "completed")])]);
     let (v, _) = execute(&mut gh, &json!({"repository":"o/r","pull_request":7})).unwrap();
-    assert_eq!((v["end"].as_str(), v["head"].as_str()), (Some("passed"), Some(H)));
+    assert_eq!(
+        (v["end"].as_str(), v["head"].as_str()),
+        (Some("passed"), Some(H))
+    );
 }
 
 /// Every unresolved thread, over two pages, with id, path, line, author and whether it is answered
 /// (its last comment is not the automatic reviewer's); resolved threads are left out.
 #[test]
 fn unresolved_threads_answered_and_not() {
-    let author = |kind: &str, login: &str| json!({"nodes":[{"author":{"__typename":kind,"login":login}}]});
-    let t = |id: &str, resolved: bool, last: Value| json!({"id":id,"isResolved":resolved,"path":"src/a.rs","line":4,
-        "first":author("Bot","chatgpt-codex-connector"),"last":last});
-    let page = |nodes: Vec<Value>, next: bool| json!({"data":{"repository":{"pullRequest":{"reviewThreads":{
-        "pageInfo":{"hasNextPage":next,"endCursor":if next { json!("c1") } else { Value::Null }},"nodes":nodes}}}}});
+    let author =
+        |kind: &str, login: &str| json!({"nodes":[{"author":{"__typename":kind,"login":login}}]});
+    let t = |id: &str, resolved: bool, last: Value| {
+        json!({"id":id,"isResolved":resolved,"path":"src/a.rs","line":4,
+        "first":author("Bot","chatgpt-codex-connector"),"last":last})
+    };
+    let page = |nodes: Vec<Value>, next: bool| {
+        json!({"data":{"repository":{"pullRequest":{"reviewThreads":{
+        "pageInfo":{"hasNextPage":next,"endCursor":if next { json!("c1") } else { Value::Null }},"nodes":nodes}}}}})
+    };
     let mut gh = Gh::new(vec![green(vec![bot(H, "completed")])]);
     gh.threads = vec![
-        page(vec![t("T1", false, author("User", "park-kyungchan")), t("T2", true, author("Bot", "chatgpt-codex-connector"))], true),
-        page(vec![t("T3", false, author("Bot", "chatgpt-codex-connector"))], false),
+        page(
+            vec![
+                t("T1", false, author("User", "park-kyungchan")),
+                t("T2", true, author("Bot", "chatgpt-codex-connector")),
+            ],
+            true,
+        ),
+        page(
+            vec![t("T3", false, author("Bot", "chatgpt-codex-connector"))],
+            false,
+        ),
     ];
     let (v, _) = gate(&mut gh, json!({}));
-    assert_eq!(v["threads"], json!([
+    assert_eq!(
+        v["threads"],
+        json!([
         {"id":"T1","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":true},
-        {"id":"T3","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":false}]));
+        {"id":"T3","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":false}])
+    );
 }
 
 /// GitHub that cannot be read ends `github_unreadable` at the bound; a failed reading in between
@@ -301,7 +415,10 @@ fn unreadable_github_and_no_automatic_reviewer() {
     assert_eq!((v["end"].as_str(), code), (Some("github_unreadable"), 12));
     let mut gh = Gh::new(vec![Value::Null, green(vec![])]);
     let (v, _) = gate(&mut gh, json!({"autoreview": false}));
-    assert_eq!((v["end"].as_str(), v["autoreview"]["state"].as_str()), (Some("passed"), Some("off")));
+    assert_eq!(
+        (v["end"].as_str(), v["autoreview"]["state"].as_str()),
+        (Some("passed"), Some("off"))
+    );
     assert!(gh.readies().is_empty());
 }
 
@@ -313,10 +430,22 @@ fn refusals() {
         (json!({"repository":"o/r/x","pull_request":7}), "repository"),
         (json!({"repository":"-o/r","pull_request":7}), "repository"),
         (json!({"repository":"o/r","pull_request":0}), "pull_request"),
-        (json!({"repository":"o/r","pull_request":7,"head":"ABC"}), "head"),
-        (json!({"repository":"o/r","pull_request":7,"autoreview":true}), "autoreview"),
-        (json!({"repository":"o/r","pull_request":7,"check_minutes":0}), "check_minutes"),
-        (json!({"repository":"o/r","pull_request":7,"other":1}), "other"),
+        (
+            json!({"repository":"o/r","pull_request":7,"head":"ABC"}),
+            "head",
+        ),
+        (
+            json!({"repository":"o/r","pull_request":7,"autoreview":true}),
+            "autoreview",
+        ),
+        (
+            json!({"repository":"o/r","pull_request":7,"check_minutes":0}),
+            "check_minutes",
+        ),
+        (
+            json!({"repository":"o/r","pull_request":7,"other":1}),
+            "other",
+        ),
     ] {
         let e = execute(&mut gh, &r).unwrap_err();
         assert_eq!((e.code, e.field.as_str()), ("invalid_input", field));

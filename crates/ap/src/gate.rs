@@ -2,7 +2,7 @@
 //! done, and prints one answer of what GitHub reported. It decides nothing a person decides: it
 //! resolves no thread, posts no status, merges nothing and calls no store. Its only writes are the
 //! ready mark of a draft and the one toggle of draft and ready that asks for a review of the head.
-use crate::work::{Failure, System, args, error, require, text};
+use crate::work::{Failure, System, args, error, fail, require, text};
 use serde_json::{Value, json};
 use std::{ffi::OsString, io::Read, io::Write, process::ExitCode, time::Duration};
 
@@ -57,7 +57,9 @@ fn minutes(r: &Value, key: &str, default: u64) -> Result<Duration, Failure> {
     Ok(Duration::from_secs(m * 60))
 }
 fn request(r: &Value) -> Result<Request, Failure> {
-    let o = r.as_object().ok_or_else(|| error("invalid_input", "stdin"))?;
+    let o = r
+        .as_object()
+        .ok_or_else(|| error("invalid_input", "stdin"))?;
     if let Some(k) = o.keys().find(|k| !MEMBERS.contains(&k.as_str())) {
         return Err(error("invalid_input", k));
     }
@@ -65,7 +67,8 @@ fn request(r: &Value) -> Result<Request, Failure> {
     let part = |p: &str| {
         !p.is_empty()
             && !p.starts_with(['-', '@', '.'])
-            && p.bytes().all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
+            && p.bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"-_.".contains(&c))
     };
     let parts: Vec<&str> = repository.split('/').collect();
     require!(parts.len() == 2 && parts.iter().all(|p| part(p)) => "invalid_input", "repository");
@@ -75,7 +78,11 @@ fn request(r: &Value) -> Result<Request, Failure> {
         None => None,
         Some(_) => Some(text(r, "head")?.to_owned()),
     };
-    let hex = |h: &String| h.len() == 40 && h.bytes().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase());
+    let hex = |h: &String| {
+        h.len() == 40
+            && h.bytes()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+    };
     require!(head.as_ref().is_none_or(hex) => "invalid_input", "head");
     let login = match r.get("autoreview") {
         None => Some(LOGIN.to_owned()),
@@ -95,7 +102,11 @@ fn request(r: &Value) -> Result<Request, Failure> {
 /// One GraphQL read; `None` when `gh` failed or the answer has no pull request.
 fn graphql(s: &mut impl System, q: &Request, query: &str, after: Option<&str>) -> Option<Value> {
     let (owner, name) = q.repository.split_once('/')?;
-    let (owner, name, n) = (format!("owner={owner}"), format!("name={name}"), format!("n={}", q.number));
+    let (owner, name, n) = (
+        format!("owner={owner}"),
+        format!("name={name}"),
+        format!("n={}", q.number),
+    );
     let mut a = args(&["api", "graphql", "-F", &owner, "-F", &name, "-F", &n]);
     if let Some(c) = after {
         a.extend(args(&["-f", &format!("after={c}")]));
@@ -122,7 +133,11 @@ fn view(s: &mut impl System, q: &Request) -> Option<View> {
     // A rollup of another commit is no reading of the head: its checks wait.
     if commit["oid"] == head.as_str() {
         let nodes = commit["statusCheckRollup"]["contexts"]["nodes"].as_array();
-        for c in nodes.into_iter().flatten().filter(|c| c["isRequired"] == true) {
+        for c in nodes
+            .into_iter()
+            .flatten()
+            .filter(|c| c["isRequired"] == true)
+        {
             let state = match (c["status"].as_str(), c["state"].as_str()) {
                 (Some("COMPLETED"), _) => c["conclusion"].clone(),
                 (Some(_), _) | (None, Some("PENDING" | "EXPECTED")) => json!("PENDING"),
@@ -130,7 +145,11 @@ fn view(s: &mut impl System, q: &Request) -> Option<View> {
             };
             let name = c.get("name").unwrap_or(&c["context"]);
             let run = c["checkSuite"]["workflowRun"]["url"].clone();
-            let run = if run.is_null() { c["targetUrl"].clone() } else { run };
+            let run = if run.is_null() {
+                c["targetUrl"].clone()
+            } else {
+                run
+            };
             checks.push(json!({"name": name, "state": state, "run": run}));
         }
     }
@@ -142,7 +161,9 @@ fn view(s: &mut impl System, q: &Request) -> Option<View> {
         }
         if let Some(at) = body.rfind(MARKER) {
             let rest = body[at + MARKER.len()..].trim_start();
-            let parsed = serde_json::Deserializer::from_str(rest).into_iter::<Value>().next();
+            let parsed = serde_json::Deserializer::from_str(rest)
+                .into_iter::<Value>()
+                .next();
             if let Some(Ok(v)) = parsed {
                 marker = v["code_review"].clone();
             }
@@ -241,7 +262,10 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         }
         a["checks"] = json!(v.checks);
         if !reviewing {
-            let bad = v.checks.iter().find(|c| c["state"] != "SUCCESS" && c["state"] != "PENDING");
+            let bad = v
+                .checks
+                .iter()
+                .find(|c| c["state"] != "SUCCESS" && c["state"] != "PENDING");
             if let Some(c) = bad {
                 a["failed_check"] = c.clone();
                 break "check_failed";
@@ -299,7 +323,11 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
     })();
     let (line, code, out) = match result {
         Ok((v, status)) => (v, status, true),
-        Err(e) => (json!({"error":{"code":e.code,"field":e.field,"detail":e.detail}}), 2, false),
+        Err(e) => (
+            json!({"error":{"code":e.code,"field":e.field,"detail":e.detail}}),
+            2,
+            false,
+        ),
     };
     let written = if out {
         writeln!(std::io::stdout(), "{line}")

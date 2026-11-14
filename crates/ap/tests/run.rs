@@ -97,7 +97,10 @@ impl Fake {
     }
     /// The number of the fake's last call (its `env.<n>` file).
     fn count(&self) -> String {
-        std::fs::read_to_string(self.t.join("bin/count")).unwrap().trim().to_owned()
+        std::fs::read_to_string(self.t.join("bin/count"))
+            .unwrap()
+            .trim()
+            .to_owned()
     }
     fn reset_calls(&self) {
         let _ = std::fs::remove_file(self.t.join("bin/calls.log"));
@@ -363,7 +366,10 @@ fn a3_no_herdr_or_inherited_claude_variable_and_hooks_and_mcp_off() {
     assert!(env.contains("CARGO_TARGET_DIR=/x/target") && env.contains("CARGO_BUILD_JOBS=2"));
     assert!(names.contains(&"PATH") && names.contains(&"HOME"));
     let call = &f.calls()[0];
-    assert!(call.contains(r#"--settings {"autoMemoryEnabled":false,"disableAllHooks":true,"env":{"#), "{call}");
+    assert!(
+        call.contains(r#"--settings {"autoMemoryEnabled":false,"disableAllHooks":true,"env":{"#),
+        "{call}"
+    );
     assert!(call.contains("--strict-mcp-config") && !call.contains("--mcp-config"));
     assert!(call.contains("--permission-mode auto") && call.contains("--permission-prompts none"));
     assert!(call.contains("--output-format stream-json"));
@@ -1368,7 +1374,10 @@ fn gate_settings_of_every_implementer_and_fixer_launch() {
     f.run(&r).unwrap();
     let call = &f.calls()[0];
     assert!(!call.contains("--disable-slash-commands") && !call.contains("autoMemoryEnabled"));
-    assert!(call.contains("CLAUDE_CODE_DISABLE_BACKGROUND_TASKS") && call.contains("--disallowedTools Monitor"));
+    assert!(
+        call.contains("CLAUDE_CODE_DISABLE_BACKGROUND_TASKS")
+            && call.contains("--disallowedTools Monitor")
+    );
     // bind: the launch binds the scope to an active unit; an inactive or malformed one refuses.
     f.alive.insert("chain-x.service".into());
     let mut r = f.request("bound.md");
@@ -1377,11 +1386,19 @@ fn gate_settings_of_every_implementer_and_fixer_launch() {
     let launch = f.launches.last().unwrap();
     let at = launch.iter().position(|a| a == "--").unwrap();
     let props = launch[..at].join(" ");
-    assert!(props.contains("-p BindsTo=chain-x.service -p After=chain-x.service"), "{props}");
+    assert!(
+        props.contains("-p BindsTo=chain-x.service -p After=chain-x.service"),
+        "{props}"
+    );
     r["out"] = json!(f.p("bound2.md"));
     r["bind"] = json!("gone.service");
     assert_eq!(code(f.run(&r)), "bind_inactive@bind");
-    for bad in [json!("-x.service"), json!("a b.service"), json!("noext"), json!(1)] {
+    for bad in [
+        json!("-x.service"),
+        json!("a b.service"),
+        json!("noext"),
+        json!(1),
+    ] {
         r["bind"] = bad;
         assert_eq!(code(f.run(&r)), "invalid_input@bind");
     }
@@ -1407,16 +1424,28 @@ fn gate_a_later_result_does_not_unmake_one_that_met_expect() {
     r["expect"] = json!({"first_line": "DONE AP-GATE *"});
     let (v, status) = f.run(&r).unwrap();
     assert_eq!((status, v["state"].as_str()), (0, Some("ok")), "{v}");
-    assert_eq!((v["results"].as_u64(), v["expect_met"].as_bool()), (Some(3), Some(true)));
+    assert_eq!(
+        (v["results"].as_u64(), v["expect_met"].as_bool()),
+        (Some(3), Some(true))
+    );
     assert_eq!(
         std::fs::read_to_string(f.p("s.md")).unwrap(),
         "DONE AP-GATE https://example.invalid/pull/1\nthe report"
     );
-    assert_eq!(v["turns"], 3, "turns and tokens stay the sums over every result");
+    assert_eq!(
+        v["turns"], 3,
+        "turns and tokens stay the sums over every result"
+    );
     // No result met it: the last one decides, as before.
     r["out"] = json!(f.p("s2.md"));
     r["expect"] = json!({"first_line": "DONE OTHER *"});
     let (v, _) = f.run(&r).unwrap();
-    assert_eq!((v["state"].as_str(), v["unmet"].as_str()), (Some("no_result"), Some("first_line")));
-    assert_eq!(std::fs::read_to_string(f.p("s2.md")).unwrap(), "that notification was the first watch");
+    assert_eq!(
+        (v["state"].as_str(), v["unmet"].as_str()),
+        (Some("no_result"), Some("first_line"))
+    );
+    assert_eq!(
+        std::fs::read_to_string(f.p("s2.md")).unwrap(),
+        "that notification was the first watch"
+    );
 }

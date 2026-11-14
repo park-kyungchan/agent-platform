@@ -413,11 +413,17 @@ fn request(s: &mut impl System, r: &Value) -> Result<Request, Failure> {
                 u.len() <= 200
                     && u.contains('.')
                     && !u.starts_with('-')
-                    && u.bytes().all(|c| c.is_ascii_alphanumeric() || b":_.@-".contains(&c))
+                    && u.bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b":_.@-".contains(&c))
             });
             let unit = unit.ok_or_else(|| error("invalid_input", "bind"))?;
             // A unit that is not active now would stop the stage at its launch.
-            let state = s.call("systemctl", &args(&["is-active", unit]), &Value::Null, 10_000);
+            let state = s.call(
+                "systemctl",
+                &args(&["is-active", unit]),
+                &Value::Null,
+                10_000,
+            );
             require!(state.is_ok_and(|r| r.stdout == b"active\n") => "bind_inactive", "bind");
             Some(unit.to_owned())
         }
@@ -690,9 +696,15 @@ fn chosen<'a>(q: &Request, seen: &'a Seen) -> Option<&'a Value> {
         e["is_error"] != true
             && !answer.is_empty()
             && !cut(seen, e)
-            && q.expect_line.as_deref().is_none_or(|p| glob(p, answer.lines().next().unwrap_or("")))
+            && q.expect_line
+                .as_deref()
+                .is_none_or(|p| glob(p, answer.lines().next().unwrap_or("")))
     };
-    seen.results.iter().rev().find(meets).or(seen.results.last())
+    seen.results
+        .iter()
+        .rev()
+        .find(meets)
+        .or(seen.results.last())
 }
 fn limit_text(text: &str) -> bool {
     let t = text.to_lowercase();
@@ -766,7 +778,12 @@ fn attempt(
     ]);
     if let Some(b) = &q.bind {
         // The bound unit's end, for any reason, stops this one (`BindsTo` with `After`).
-        argv.extend(args(&["-p", &format!("BindsTo={b}"), "-p", &format!("After={b}")]));
+        argv.extend(args(&[
+            "-p",
+            &format!("BindsTo={b}"),
+            "-p",
+            &format!("After={b}"),
+        ]));
     }
     // No hook of any source; no auto-memory unless asked; the Bash tool runs a 40-minute check in
     // the foreground and never moves a command to the background.
@@ -799,11 +816,11 @@ fn attempt(
         "Monitor",
         "--strict-mcp-config",
     ]));
-    if !q.skills {
-        argv.push("--disable-slash-commands".into());
-    }
     for m in &q.mcp {
         argv.extend(args(&["--mcp-config", m]));
+    }
+    if !q.skills {
+        argv.push("--disable-slash-commands".into());
     }
     argv.extend(args(&[
         if resume.is_some() {
