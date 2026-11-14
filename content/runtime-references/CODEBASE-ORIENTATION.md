@@ -27,7 +27,6 @@ Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a pat
 | | `crates/ont` | The library and command `ont`: `get`, `search`, `around`, `aggregate`, `action`, `render`, `index`, `schema`, `backup`, `mcp` | `README.md`, then `src/lib.rs` and the file named after the command |
 | | `crates/ont-daemon` | An older service form of the engine; not installed on the host | its `Cargo.toml` |
 | `agent-platform` | `crates/ap` | The command `ap`: `work` (start, wait for and close a worker), `pane`, `install`, `doctor`, `render` | `src/main.rs`; `src/work.rs`; `src/native/` |
-| | `crates/kpi-producer` | The binary `ap-kpi` | `README.md` |
 | | `content/` | Source of `/root/.agents/`: `AGENTS.md`, `runtime-references/`, `skills/`, with `SHA256SUMS` | `content/README.md` |
 | | `ontology/` | `work.schema.json`: the store's object types for tasks (`hold`, `decision`, `kpi`, `measurement`, `worker_run`, `thread`, `plan`) | `ontology/README.md` |
 | | `memory/` | Engineering memory: checked originals and their publisher | `memory/README.md` |
