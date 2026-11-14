@@ -946,6 +946,133 @@ fn i4_a_failed_check_or_an_unresolved_thread_or_finding_stops_at_the_gate() {
     assert!(u.accept_calls().is_empty());
 }
 
+/// A review thread as the gate reads it: the author of its first comment, the commit that comment
+/// was made on, whether it is resolved.
+fn thread(author: (&str, &str), commit: &str, resolved: bool) -> Value {
+    let first = json!({"nodes":[{"author":{"__typename":author.0,"login":author.1},
+        "originalCommit":{"oid":commit}}]});
+    json!({"id":"T1","isResolved":resolved,"path":"src/a.rs","line":1,"first":first,"last":first})
+}
+const REVIEWER: (&str, &str) = ("Bot", "chatgpt-codex-connector");
+/// A unit whose branch is already pushed, and whose head the automatic reviewer's summary names with
+/// `has_unresolved_findings: true`; the implementer only takes the pushed head. Returns the unit, its
+/// request and the head.
+fn finding_on_the_head() -> (U, Value, String) {
+    let mut u = U::new();
+    let clone = u.t.join("clone");
+    git(&clone, &["checkout", "-q", "-b", "pre"]);
+    std::fs::create_dir_all(clone.join("src")).unwrap();
+    std::fs::write(clone.join("src/a.rs"), "fn a() {}\n").unwrap();
+    git(&clone, &["add", "-A"]);
+    git(&clone, &["commit", "-qm", "a"]);
+    git(
+        &clone,
+        &["push", "-q", "origin", &format!("HEAD:refs/heads/{BRANCH}")],
+    );
+    let head = git(&clone, &["rev-parse", "HEAD"]);
+    git(&clone, &["checkout", "-q", "main"]);
+    git(&clone, &["branch", "-q", "-D", "pre"]);
+    u.script(
+        "a1",
+        &format!("git fetch -q origin {BRANCH} && git reset -q --hard FETCH_HEAD; echo done"),
+    );
+    let state = json!({"code_review":{"commit_sha":head,"has_any_findings":true,"has_unresolved_findings":true,"status":"completed"}});
+    u.comments = vec![
+        json!({"author":{"__typename":"Bot","login":"chatgpt-codex-connector"},
+        "body":format!("<!-- codex-review-state:v1 {state} -->")}),
+    ];
+    let mut r = u.request();
+    r["gate"] = json!({"autoreview_minutes":1});
+    (u, r, head)
+}
+
+/// The summary's flag does not change when a person answers and resolves a finding. A finding that
+/// is visible as a thread of the reviewer on the head, every such thread resolved, passes the gate
+/// step: the threads decide.
+#[test]
+fn r3_resolved_threads_on_the_head_pass_the_gate_step() {
+    let (mut u, r, head) = finding_on_the_head();
+    u.threads = vec![thread(REVIEWER, &head, true)];
+    let (v, _) = u.run(&r).unwrap();
+    let gate = v["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "gate")
+        .unwrap();
+    assert_eq!(gate["result"], "passed", "{v}");
+    assert_ne!(v["cause"], "unresolved_findings", "{v}");
+    assert_eq!(v["state"], "merged", "{v}");
+}
+
+/// Nothing shows that anyone answered a finding that is no thread of the reviewer on the head: the
+/// summary's flag stops the step, whatever other threads there are.
+#[test]
+fn r3_findings_without_a_thread_on_the_head_still_stop() {
+    let other = "0000000000000000000000000000000000000000";
+    let cases: [(&str, Vec<Value>); 3] = [
+        ("no thread", vec![]),
+        (
+            "a resolved thread of the reviewer on another commit",
+            vec![thread(REVIEWER, other, true)],
+        ),
+        (
+            "a resolved thread of a person on the head",
+            vec![thread(("User", "someone"), "HEAD", true)],
+        ),
+    ];
+    for (what, mut threads) in cases {
+        let (mut u, r, head) = finding_on_the_head();
+        for t in &mut threads {
+            if t["first"]["nodes"][0]["originalCommit"]["oid"] == "HEAD" {
+                t["first"]["nodes"][0]["originalCommit"]["oid"] = json!(head);
+            }
+        }
+        u.threads = threads;
+        let v = u.stop(&r, "gate", "unresolved_findings");
+        assert!(u.accept_calls().is_empty(), "{what}");
+        // The gate counted no thread of the reviewer on the head.
+        let answer: Value =
+            serde_json::from_slice(&std::fs::read(v["files"]["gate"].as_str().unwrap()).unwrap())
+                .unwrap();
+        assert_eq!(answer["autoreview"]["threads_on_head"], 0, "{what}");
+    }
+}
+
+/// An unresolved thread of the pull request stops the step, with or without the summary's flag, on
+/// any commit and by any author.
+#[test]
+fn r3_an_unresolved_thread_still_stops() {
+    let (mut u, r, head) = finding_on_the_head();
+    u.threads = vec![
+        thread(REVIEWER, &head, true),
+        thread(REVIEWER, &head, false),
+    ];
+    let v = u.stop(&r, "gate", "unresolved_threads");
+    assert_eq!(
+        v["detail"]["threads"].as_array().map(Vec::len),
+        Some(1),
+        "{v}"
+    );
+    assert!(u.accept_calls().is_empty());
+
+    let other = "0000000000000000000000000000000000000000";
+    for person in [false, true] {
+        let (mut u, r, head) = finding_on_the_head();
+        let unresolved = if person {
+            thread(("User", "someone"), &head, false)
+        } else {
+            thread(REVIEWER, other, false)
+        };
+        u.threads = vec![thread(REVIEWER, &head, true), unresolved];
+        u.stop(&r, "gate", "unresolved_threads");
+    }
+    // No flag: the unresolved thread alone stops it.
+    let mut u = U::new();
+    u.threads = vec![thread(REVIEWER, other, false)];
+    u.stop(&u.request(), "gate", "unresolved_threads");
+}
+
 #[test]
 fn i4_a_failed_acceptance_or_a_path_outside_the_write_set_posts_nothing() {
     let mut u = U::new();

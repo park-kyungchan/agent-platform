@@ -23,6 +23,8 @@ struct Gh {
     pages: std::collections::BTreeMap<String, Value>,
     /// `gh` cannot be started (also `gh --version`).
     missing: bool,
+    /// The reading of the review threads fails.
+    threads_fail: bool,
     /// The repository the arguments must name.
     repo: (&'static str, &'static str),
 }
@@ -37,6 +39,7 @@ impl Gh {
             ready_fails: 0,
             pages: Default::default(),
             missing: false,
+            threads_fail: false,
             repo: ("o", "r"),
         }
     }
@@ -93,6 +96,9 @@ impl System for Gh {
         );
         let query = args.last().unwrap();
         if query.contains("reviewThreads") {
+            if self.threads_fail {
+                return failed();
+            }
             let page = if args.iter().any(|a| a == "after=c1") {
                 1
             } else {
@@ -188,7 +194,7 @@ fn a_passed_head() {
     assert_eq!(
         v["autoreview"],
         json!({"login":"chatgpt-codex-connector[bot]","state":"completed",
-        "commit":H,"has_unresolved_findings":false,"toggled":false})
+        "commit":H,"has_unresolved_findings":false,"toggled":false,"threads_on_head":0})
     );
     assert!(gh.readies().is_empty() && gh.clock.is_zero());
     assert_eq!(v["threads"], json!([]));
@@ -451,6 +457,69 @@ fn unresolved_threads_answered_and_not() {
         json!([
         {"id":"T1","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":true},
         {"id":"T3","path":"src/a.rs","line":4,"author":"chatgpt-codex-connector[bot]","answered":false}])
+    );
+}
+
+/// `autoreview.threads_on_head` counts the review threads whose first comment is the reviewer's and
+/// was made on the head commit (`originalCommit`), resolved or not, over every page; a thread of
+/// another commit, of another author or without that field is not counted. `null` when the threads
+/// could not be read or `autoreview` is `false`. The unresolved threads are listed as before.
+#[test]
+fn r3_gate_counts_the_reviewers_threads_on_the_head() {
+    let first = |kind: &str, login: &str, commit: Option<&str>| {
+        let c = commit.map_or(Value::Null, |c| json!({"oid": c}));
+        json!({"nodes":[{"author":{"__typename":kind,"login":login},"originalCommit":c}]})
+    };
+    let t = |id: &str, resolved: bool, first: Value| json!({"id":id,"isResolved":resolved,"path":"src/a.rs","line":4,"first":first,"last":first});
+    let page = |nodes: Vec<Value>, next: bool| {
+        json!({"data":{"repository":{"pullRequest":{"reviewThreads":{
+        "pageInfo":{"hasNextPage":next,"endCursor":if next { json!("c1") } else { Value::Null }},"nodes":nodes}}}}})
+    };
+    let by_bot = |commit: Option<&str>| first("Bot", "chatgpt-codex-connector", commit);
+    let threads = vec![
+        page(
+            vec![
+                t("T1", true, by_bot(Some(H))),
+                t("T2", false, by_bot(Some(H))),
+                t("T3", true, by_bot(Some(H2))),
+                t(
+                    "T4",
+                    false,
+                    first("User", "chatgpt-codex-connector", Some(H)),
+                ),
+            ],
+            true,
+        ),
+        page(
+            vec![t("T5", true, by_bot(Some(H))), t("T6", true, by_bot(None))],
+            false,
+        ),
+    ];
+    let mut gh = Gh::new(vec![green(vec![bot(H, "completed")])]);
+    gh.threads = threads.clone();
+    let (v, code) = gate(&mut gh, json!({}));
+    assert_eq!((v["end"].as_str(), code), (Some("passed"), 0), "{v}");
+    assert_eq!(v["autoreview"]["threads_on_head"], 3, "{v}");
+    let unresolved: Vec<_> = v["threads"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["id"].clone())
+        .collect();
+    assert_eq!(unresolved, [json!("T2"), json!("T4")]);
+    // No automatic reviewer: nothing to count.
+    let mut gh = Gh::new(vec![green(vec![])]);
+    gh.threads = threads;
+    let (v, _) = gate(&mut gh, json!({"autoreview": false}));
+    assert_eq!(v["autoreview"]["threads_on_head"], Value::Null, "{v}");
+    // Threads that cannot be read: null, and the gate still decides nothing more.
+    let mut gh = Gh::new(vec![green(vec![bot(H, "completed")])]);
+    gh.threads_fail = true;
+    let (v, code) = gate(&mut gh, json!({}));
+    assert_eq!((v["end"].as_str(), code), (Some("passed"), 0), "{v}");
+    assert_eq!(
+        (&v["autoreview"]["threads_on_head"], &v["threads"]),
+        (&Value::Null, &Value::Null)
     );
 }
 
