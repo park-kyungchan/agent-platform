@@ -75,4 +75,7 @@ if [ "${CI:-}" = true ] && [ "$(id -u)" != 0 ]; then
 else
   bash ontology/rehearsal.sh "$ont_bin" > /dev/null
 fi
+# The walk of `ap deliver` on the real installer scripts, with the built ap and a scratch store of the same
+# engine; it kills real processes under one temporary directory. Skipped, saying so, under CI=true.
+bash scripts/test-deliver.sh "$ont_bin" "${CARGO_TARGET_DIR:-$PWD/target}/debug/ap" | grep -v '^walk pass='
 echo "check: ok"
