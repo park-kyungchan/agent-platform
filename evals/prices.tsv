@@ -1,0 +1,47 @@
+# List prices, USD per million tokens. One row: model, token kind, rate. A kind is input, output, cache_read, cache_write_5m, cache_write_1h.
+# Anthropic: https://platform.claude.com/docs/en/about-claude/pricing (read 2026-11-14; standard speed, global routing, no batch discount).
+#   The 5m and 1h columns are the cache-write columns of that page. A model id with the suffix +long is the rate of a request whose prompt
+#   (input + cache read + cache write) is over the threshold row; the page prices only claude-haiku-5-5 that way.
+# OpenAI: https://platform.openai.com/docs/pricing (read 2026-11-14; Standard column). A Codex cache write is read as the 30m write column,
+#   stored here as cache_write_5m; cache_write_1h is the 12h write column. Codex cached input is cache_read.
+claude-fable-5-2	input	8
+claude-fable-5-2	output	40
+claude-fable-5-2	cache_read	0.2
+claude-fable-5-2	cache_write_5m	10
+claude-fable-5-2	cache_write_1h	16
+claude-opus-5-5	input	4
+claude-opus-5-5	output	20
+claude-opus-5-5	cache_read	0.2
+claude-opus-5-5	cache_write_5m	5
+claude-opus-5-5	cache_write_1h	8
+claude-sonnet-5-5	input	2
+claude-sonnet-5-5	output	10
+claude-sonnet-5-5	cache_read	0.1
+claude-sonnet-5-5	cache_write_5m	2.5
+claude-sonnet-5-5	cache_write_1h	4
+claude-sonnet-5	input	2
+claude-sonnet-5	output	10
+claude-sonnet-5	cache_read	0.2
+claude-sonnet-5	cache_write_5m	2.5
+claude-sonnet-5	cache_write_1h	4
+claude-haiku-5-5	long_over_tokens	100000
+claude-haiku-5-5	input	0.1
+claude-haiku-5-5	output	0.5
+claude-haiku-5-5	cache_read	0.01
+claude-haiku-5-5	cache_write_5m	0.125
+claude-haiku-5-5	cache_write_1h	0.2
+claude-haiku-5-5+long	input	0.5
+claude-haiku-5-5+long	output	2.5
+claude-haiku-5-5+long	cache_read	0.05
+claude-haiku-5-5+long	cache_write_5m	0.625
+claude-haiku-5-5+long	cache_write_1h	1
+gpt-6.1-sol	input	2
+gpt-6.1-sol	output	10
+gpt-6.1-sol	cache_read	0.1
+gpt-6.1-sol	cache_write_5m	2.5
+gpt-6.1-sol	cache_write_1h	5
+gpt-6.1-terra	input	1
+gpt-6.1-terra	output	5
+gpt-6.1-terra	cache_read	0.05
+gpt-6.1-terra	cache_write_5m	1.25
+gpt-6.1-terra	cache_write_1h	2.5

@@ -18,6 +18,7 @@ python3 -I -B -m unittest discover -s ci -p 'test_*memory*.py'
 bash ci/test-lead-review.sh
 bash ci/test-lead-deliver.sh
 bash scripts/test-install-content.sh
+python3 -I -B -m unittest discover -s ci -p 'test_readout*.py'
 if [ "$mode" = content ]; then echo "check: ok (content)"; exit 0; fi
 
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
