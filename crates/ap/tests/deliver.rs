@@ -106,6 +106,8 @@ struct W {
     nested_result: Option<(Value, u8)>,
     /// The host lock (`AP_DELIVER_LOCK`); two fakes of one test may share it.
     lock: String,
+    /// The tip's `content/` is the installed commit's: both have the same `content/SHA256SUMS`.
+    same_content: bool,
 }
 
 impl W {
@@ -164,6 +166,7 @@ impl W {
             nested: None,
             nested_result: None,
             lock: String::new(),
+            same_content: false,
         };
         w.lock = w.p("deliver.lock");
         for n in 1..=k {
@@ -322,7 +325,16 @@ impl W {
             stdout: text.as_bytes().to_vec(),
         })
     }
+    /// The commit whose files `content/` of `commit` holds.
+    fn label(&self, commit: &str) -> String {
+        if self.same_content && commit == self.tip() {
+            c(0)
+        } else {
+            commit.to_owned()
+        }
+    }
     fn sums(&self, commit: &str) -> String {
+        let commit = &self.label(commit);
         format!(
             "{}  AGENTS.md\n{}  skills/a/SKILL.md\n",
             sha(&content(commit, "AGENTS.md")),
@@ -558,7 +570,7 @@ impl System for W {
         }
         if let Some(rel) = path.strip_prefix(&format!("{}/", self.p("agents"))) {
             return match &self.tree {
-                Some(t) => Ok(content(t, rel)),
+                Some(t) => Ok(content(&self.label(t), rel)),
                 None => Ok(b"half swapped".to_vec()),
             };
         }
@@ -856,6 +868,66 @@ fn d3_no_printed_tarball_no_content_rollback() {
     assert_eq!(w.launched(), ["ap", "content", "ap-rollback"]);
     assert_eq!(v["rollback_content"], Value::Null);
     assert_eq!(v["to"], "neither");
+}
+
+/// Tip and `from` have the same `content/SHA256SUMS`, so the tree passes both manifests; the
+/// installers' lock stops the first installer and the file stays at `from`: the pair is at `from`.
+#[test]
+fn d3_same_content_install_busy_is_not_started() {
+    let mut w = W::new();
+    w.same_content = true;
+    let ap = w.inst.get_mut("ap").unwrap();
+    (ap.file, ap.exit, ap.err) = (None, 1, "install_busy@install-ap.sh:40\n".into());
+    let (v, exit) = w.run();
+    assert_eq!((end(&v), exit), (("not_started", "install_busy"), 3), "{v}");
+    assert_eq!(
+        (v["outcome"].clone(), v["to"].clone()),
+        (json!("not_started"), json!(c(0)))
+    );
+    assert_eq!(w.launched(), ["ap"]);
+    let close = &w.applies("close_install")[0]["parameters"];
+    assert_eq!(
+        (close["outcome"].clone(), close["to"].clone()),
+        (json!("not_started"), json!(c(0)))
+    );
+}
+
+#[test]
+fn d3_same_content_failed_build_is_failed_restored() {
+    let mut w = W::new();
+    w.same_content = true;
+    let ap = w.inst.get_mut("ap").unwrap();
+    (ap.file, ap.exit, ap.err) = (None, 1, "build_failed@install-ap.sh:151\n".into());
+    let (v, exit) = w.run();
+    assert_eq!(
+        (end(&v), exit),
+        (("failed_restored", "build_failed"), 3),
+        "{v}"
+    );
+    assert_eq!(v["to"], c(0));
+    assert_eq!(w.launched(), ["ap"]);
+}
+
+/// The file is at the tip and the content installer refuses or fails and restores: the tree it
+/// leaves passes the tip's manifest too, so the pair is at the tip.
+#[test]
+fn d3_same_content_content_installer_fails_is_installed() {
+    for (exit_code, code) in [(1, "content_failed_restored"), (2, "content_refused")] {
+        let mut w = W::new();
+        w.same_content = true;
+        let tarball = w.tarball();
+        let content = w.inst.get_mut("content").unwrap();
+        (content.tree, content.exit, content.out) = (None, exit_code, String::new());
+        content.err = format!("install_failed_restored@/x: kept copy {tarball}\n");
+        let (v, exit) = w.run();
+        assert_eq!((end(&v), exit), (("installed", code), 0), "{v}");
+        assert_eq!(
+            (v["outcome"].clone(), v["to"].clone()),
+            (json!("installed"), json!(c(2)))
+        );
+        assert_eq!(w.launched(), ["ap", "content"]);
+        assert_eq!(w.applies("close_install")[0]["parameters"]["code"], code);
+    }
 }
 
 // ---- D4 accepted -------------------------------------------------------------------------------
