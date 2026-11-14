@@ -17,8 +17,14 @@ struct Gh {
     calls: Vec<Vec<String>>,
     base: Instant,
     clock: Duration,
-    /// `gh pr ready` fails.
-    ready_fails: bool,
+    /// The next this many `gh pr ready` calls without `--undo` fail.
+    ready_fails: usize,
+    /// The readings of further pages of check entries, by cursor.
+    pages: std::collections::BTreeMap<String, Value>,
+    /// `gh` cannot be started (also `gh --version`).
+    missing: bool,
+    /// The repository the arguments must name.
+    repo: (&'static str, &'static str),
 }
 impl Gh {
     fn new(views: Vec<Value>) -> Self {
@@ -28,7 +34,10 @@ impl Gh {
             calls: vec![],
             base: Instant::now(),
             clock: Duration::ZERO,
-            ready_fails: false,
+            ready_fails: 0,
+            pages: Default::default(),
+            missing: false,
+            repo: ("o", "r"),
         }
     }
     fn readies(&self) -> Vec<String> {
@@ -40,6 +49,23 @@ impl System for Gh {
     fn call(&mut self, program: &str, args: &[String], _: &Value, _: u64) -> Answer {
         assert_eq!(program, "gh");
         self.calls.push(args.to_vec());
+        let failed = || {
+            Err(Failure {
+                code: "process_failed",
+                field: "gh".into(),
+                detail: Value::Null,
+            })
+        };
+        if self.missing {
+            return failed();
+        }
+        if args[0] == "--version" {
+            return Ok(Reply {
+                success: true,
+                bytes: vec![],
+                stdout: b"gh version 2.102.0\n".to_vec(),
+            });
+        }
         let ok = |v: Value| Reply {
             success: true,
             bytes: vec![],
@@ -47,17 +73,23 @@ impl System for Gh {
         };
         if args[0] == "pr" {
             assert_eq!(&args[..5], ["pr", "ready", "7", "-R", "o/r"]);
+            let fails = args.last().unwrap() != "--undo" && self.ready_fails > 0;
+            if fails {
+                self.ready_fails -= 1;
+            }
             return Ok(Reply {
-                success: !self.ready_fails,
+                success: !fails,
                 bytes: vec![],
                 stdout: vec![],
             });
         }
+        let (owner, name) = (
+            format!("owner={}", self.repo.0),
+            format!("name={}", self.repo.1),
+        );
         assert_eq!(
             &args[..8],
-            [
-                "api", "graphql", "-F", "owner=o", "-F", "name=r", "-F", "n=7"
-            ]
+            ["api", "graphql", "-f", &owner, "-f", &name, "-F", "n=7"]
         );
         let query = args.last().unwrap();
         if query.contains("reviewThreads") {
@@ -68,16 +100,32 @@ impl System for Gh {
             };
             return Ok(ok(self.threads.get(page).cloned().unwrap_or(json!({"data":{"repository":{"pullRequest":{"reviewThreads":{"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[]}}}}}))));
         }
+        if let Some(cursor) = args.iter().find_map(|a| a.strip_prefix("after=")) {
+            return match self.pages.get(cursor) {
+                Some(v) if !v.is_null() => Ok(ok(v.clone())),
+                _ => failed(),
+            };
+        }
         let v = if self.views.len() > 1 {
             self.views.remove(0)
         } else {
             self.views[0].clone()
         };
         if v.is_null() {
-            return Err(Failure {
-                code: "process_failed",
-                field: "gh".into(),
-                detail: Value::Null,
+            return failed();
+        }
+        // A reply of `gh` that failed: its exit, stdout and stderr as given.
+        if let Some(r) = v.get("__reply") {
+            let stdout = r["stdout"].as_str().unwrap().as_bytes().to_vec();
+            let stderr = r["stderr"].as_str().unwrap().as_bytes().to_vec();
+            return Ok(Reply {
+                success: false,
+                bytes: if stdout.is_empty() {
+                    stderr
+                } else {
+                    stdout.clone()
+                },
+                stdout,
             });
         }
         Ok(ok(v))
@@ -305,7 +353,7 @@ fn a_draft() {
         (Some(true), Some(false))
     );
     let mut gh = Gh::new(vec![view("OPEN", true, H, vec![], vec![])]);
-    gh.ready_fails = true;
+    gh.ready_fails = 9;
     let (v, code) = gate(&mut gh, json!({}));
     assert_eq!((v["end"].as_str(), code), (Some("ready_failed"), 12));
 }
@@ -451,4 +499,180 @@ fn refusals() {
         assert_eq!((e.code, e.field.as_str()), ("invalid_input", field));
     }
     assert!(gh.calls.is_empty(), "a refusal reads nothing");
+}
+
+// ---- closing fix -------------------------------------------------------------------------------
+
+/// The reviewer's probe: the checks are judged at every reading, also during the review wait. A
+/// failed entry then ends `check_failed`; a pending rerun is waited for and never answered
+/// `passed`, even with the review completed on the head.
+#[test]
+fn a_check_that_fails_or_goes_pending_during_the_review_wait() {
+    let failed = vec![check("rust", "COMPLETED", Some("FAILURE"), true)];
+    let mut gh = Gh::new(vec![
+        green(vec![bot(OLD, "completed")]),
+        view("OPEN", false, H, failed, vec![bot(H, "completed")]),
+    ]);
+    let (v, code) = gate(&mut gh, json!({}));
+    assert_eq!((v["end"].as_str(), code), (Some("check_failed"), 11), "{v}");
+    let pending = vec![check("rust", "IN_PROGRESS", None, true)];
+    let mut gh = Gh::new(vec![
+        green(vec![bot(OLD, "completed")]),
+        view("OPEN", false, H, pending.clone(), vec![bot(H, "completed")]),
+        view("OPEN", false, H, pending.clone(), vec![bot(H, "completed")]),
+        green(vec![bot(H, "completed")]),
+    ]);
+    let (v, code) = gate(&mut gh, json!({}));
+    assert_eq!((v["end"].as_str(), code), (Some("passed"), 0), "{v}");
+    assert_eq!(gh.clock, Duration::from_secs(90), "it waited out the rerun");
+    let mut gh = Gh::new(vec![
+        green(vec![bot(OLD, "completed")]),
+        view("OPEN", false, H, pending, vec![bot(H, "completed")]),
+    ]);
+    let (v, code) = gate(&mut gh, json!({"autoreview_minutes": 2}));
+    assert_eq!(
+        (v["end"].as_str(), code),
+        (Some("check_timeout"), 11),
+        "never passed while pending"
+    );
+}
+
+/// More than 100 entries: every page is read (a failure on page two ends `check_failed`), and a
+/// page that cannot be read is no reading of passed checks.
+#[test]
+fn every_page_of_check_entries_is_read() {
+    let first = |next: &str| {
+        let mut v = green(vec![bot(H, "completed")]);
+        let passed: Vec<Value> = (0..100)
+            .map(|i| check(&format!("c{i}"), "COMPLETED", Some("SUCCESS"), true))
+            .collect();
+        v["data"]["repository"]["pullRequest"]["commits"]["nodes"][0]["commit"]["statusCheckRollup"]
+            ["contexts"] = json!({"pageInfo":{"hasNextPage":true,"endCursor":next},"nodes":passed});
+        v
+    };
+    let mut gh = Gh::new(vec![first("p2")]);
+    gh.pages.insert(
+        "p2".into(),
+        view(
+            "OPEN",
+            false,
+            H,
+            vec![check("late", "COMPLETED", Some("FAILURE"), true)],
+            vec![],
+        ),
+    );
+    let (v, code) = gate(&mut gh, json!({}));
+    assert_eq!((v["end"].as_str(), code), (Some("check_failed"), 11), "{v}");
+    assert_eq!(v["failed_check"]["name"], "late");
+    let mut gh = Gh::new(vec![first("gone")]);
+    let (v, code) = gate(&mut gh, json!({"check_minutes": 1}));
+    assert_eq!(
+        (v["end"].as_str(), code, v["unreadable"].as_str()),
+        (Some("github_unreadable"), 12, Some("no_answer"))
+    );
+}
+
+/// The automatic reviewer's thread: the owner and the name are raw strings (`-f`), so a
+/// repository named `123/true` is read as such.
+#[test]
+fn owner_and_name_are_passed_as_strings() {
+    let mut gh = Gh::new(vec![green(vec![bot(H, "completed")])]);
+    gh.repo = ("123", "true");
+    let (v, _) = execute(&mut gh, &json!({"repository":"123/true","pull_request":7})).unwrap();
+    assert_eq!(v["end"], "passed");
+    assert!(
+        gh.calls
+            .iter()
+            .all(|c| c[2..6] == ["-f", "owner=123", "-f", "name=true"])
+    );
+}
+
+/// A failure that is permanent at the first reading ends `github_unreadable` at once and names its
+/// cause; one that can pass is read again.
+#[test]
+fn a_permanent_failure_ends_at_once_with_its_cause() {
+    let reply =
+        |stdout: &str, stderr: &str| json!({"__reply": {"stdout": stdout, "stderr": stderr}});
+    let not_found = r#"{"data":{"repository":{"pullRequest":null}},"errors":[{"type":"NOT_FOUND","path":["repository","pullRequest"]}]}"#;
+    let no_login = "To get started with GitHub CLI, please run:  gh auth login\n";
+    for (v, cause) in [
+        (reply(not_found, "gh: Could not resolve"), "not_found"),
+        (reply("", no_login), "no_login"),
+    ] {
+        let mut gh = Gh::new(vec![v]);
+        let (a, code) = gate(&mut gh, json!({}));
+        assert_eq!(
+            (a["end"].as_str(), code, a["unreadable"].as_str()),
+            (Some("github_unreadable"), 12, Some(cause))
+        );
+        assert!(
+            gh.clock.is_zero() && gh.calls.len() == 1,
+            "no retry, no threads call"
+        );
+    }
+    let mut gh = Gh::new(vec![Value::Null]);
+    gh.missing = true;
+    let (a, _) = gate(&mut gh, json!({}));
+    assert_eq!(
+        (a["unreadable"].as_str(), gh.clock),
+        (Some("gh_not_started"), Duration::ZERO)
+    );
+    // `gh` that started and failed for another reason is read again.
+    let mut gh = Gh::new(vec![
+        Value::Null,
+        reply("", "HTTP 502"),
+        green(vec![bot(H, "completed")]),
+    ]);
+    let (a, _) = gate(&mut gh, json!({}));
+    assert_eq!(
+        (a["end"].as_str(), gh.clock),
+        (Some("passed"), Duration::from_secs(60))
+    );
+}
+
+/// After `--undo`, ready is tried three times; when it still fails the answer says the gate left
+/// the pull request a draft. Two failures and a success is a toggle.
+#[test]
+fn a_toggle_whose_ready_fails_says_it_left_a_draft() {
+    let mut gh = Gh::new(vec![green(vec![bot(OLD, "completed")])]);
+    gh.ready_fails = 3;
+    let (v, code) = gate(&mut gh, json!({}));
+    assert_eq!(
+        (v["end"].as_str(), code, &v["left_draft"]),
+        (Some("ready_failed"), 12, &json!(true))
+    );
+    assert_eq!(gh.readies(), ["--undo", "o/r", "o/r", "o/r"]);
+    let mut gh = Gh::new(vec![
+        green(vec![bot(OLD, "completed")]),
+        green(vec![bot(H, "completed")]),
+    ]);
+    gh.ready_fails = 2;
+    let (v, _) = gate(&mut gh, json!({}));
+    assert_eq!(
+        (
+            v["end"].as_str(),
+            &v["autoreview"]["toggled"],
+            v.get("left_draft")
+        ),
+        (Some("passed"), &json!(true), None)
+    );
+}
+
+/// The reviewer's probe: a reviewer's comment that names the marker again after its real one still
+/// counts by the last occurrence that parses.
+#[test]
+fn the_last_marker_that_parses_counts() {
+    let mut c = bot(H, "completed");
+    let body = format!(
+        "{}\nThe line `codex-review-state:v1` above is machine-read.\n",
+        c["body"].as_str().unwrap()
+    );
+    c["body"] = json!(body);
+    let mut gh = Gh::new(vec![green(vec![c])]);
+    let (v, _) = gate(&mut gh, json!({}));
+    assert_eq!(
+        (v["autoreview"]["state"].as_str(), gh.readies().len()),
+        (Some("completed"), 0),
+        "{v}"
+    );
 }

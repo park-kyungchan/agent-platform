@@ -18,8 +18,8 @@ const MEMBERS: [&str; 6] = [
     "check_minutes",
     "autoreview_minutes",
 ];
-const VIEW: &str = "query($owner:String!,$name:String!,$n:Int!){repository(owner:$owner,name:$name){pullRequest(number:$n){state isDraft headRefOid
-commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){nodes{__typename
+const VIEW: &str = "query($owner:String!,$name:String!,$n:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$n){state isDraft headRefOid
+commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100,after:$after){pageInfo{hasNextPage endCursor} nodes{__typename
 ... on CheckRun{name status conclusion isRequired(pullRequestNumber:$n) checkSuite{workflowRun{url}}}
 ... on StatusContext{context state targetUrl isRequired(pullRequestNumber:$n)}}}}}}}
 comments(last:100){nodes{author{__typename login} body}}}}}";
@@ -99,23 +99,46 @@ fn request(r: &Value) -> Result<Request, Failure> {
         review: minutes(r, "autoreview_minutes", 40)?,
     })
 }
-/// One GraphQL read; `None` when `gh` failed or the answer has no pull request.
-fn graphql(s: &mut impl System, q: &Request, query: &str, after: Option<&str>) -> Option<Value> {
-    let (owner, name) = q.repository.split_once('/')?;
+/// A failed reading: `Some(cause)` when waiting cannot make it pass, `None` when it can.
+type Unread = Option<&'static str>;
+/// One GraphQL read of the pull request.
+fn graphql(
+    s: &mut impl System,
+    q: &Request,
+    query: &str,
+    after: Option<&str>,
+) -> Result<Value, Unread> {
+    let (owner, name) = q.repository.split_once('/').ok_or(None)?;
+    // `-f`: the owner and the name stay strings (a repository named `123` or `true`).
     let (owner, name, n) = (
         format!("owner={owner}"),
         format!("name={name}"),
         format!("n={}", q.number),
     );
-    let mut a = args(&["api", "graphql", "-F", &owner, "-F", &name, "-F", &n]);
+    let mut a = args(&["api", "graphql", "-f", &owner, "-f", &name, "-F", &n]);
     if let Some(c) = after {
         a.extend(args(&["-f", &format!("after={c}")]));
     }
     a.extend(args(&["-f", &format!("query={query}")]));
-    let reply = s.call("gh", &a, &Value::Null, 60_000).ok()?;
-    let v: Value = serde_json::from_slice(&reply.stdout).ok()?;
-    let pr = v.pointer("/data/repository/pullRequest")?;
-    (reply.success && pr.is_object()).then(|| pr.clone())
+    let Ok(reply) = s.call("gh", &a, &Value::Null, 60_000) else {
+        let started = s
+            .call("gh", &args(&["--version"]), &Value::Null, 10_000)
+            .is_ok();
+        return Err((!started).then_some("gh_not_started"));
+    };
+    let v: Value = serde_json::from_slice(&reply.stdout).unwrap_or(Value::Null);
+    let errors = v["errors"].as_array().into_iter().flatten();
+    if errors.into_iter().any(|e| e["type"] == "NOT_FOUND") {
+        return Err(Some("not_found"));
+    }
+    // `gh` exits 4 with this text when it has no login.
+    if !reply.success && String::from_utf8_lossy(&reply.bytes).contains("gh auth login") {
+        return Err(Some("no_login"));
+    }
+    match v.pointer("/data/repository/pullRequest") {
+        Some(pr) if reply.success && pr.is_object() => Ok(pr.clone()),
+        _ => Err(None),
+    }
 }
 /// A login as the REST API spells it: a bot's carries `[bot]`, so a user cannot pass for one.
 fn login(author: &Value) -> Value {
@@ -125,14 +148,17 @@ fn login(author: &Value) -> Value {
         _ => Value::Null,
     }
 }
-fn view(s: &mut impl System, q: &Request) -> Option<View> {
+fn view(s: &mut impl System, q: &Request) -> Result<View, Unread> {
     let pr = graphql(s, q, VIEW, None)?;
-    let head = pr["headRefOid"].as_str()?.to_owned();
-    let commit = &pr["commits"]["nodes"][0]["commit"];
+    let head = pr["headRefOid"].as_str().ok_or(None)?.to_owned();
+    let mut commit = pr["commits"]["nodes"][0]["commit"].clone();
     let mut checks = vec![];
-    // A rollup of another commit is no reading of the head: its checks wait.
-    if commit["oid"] == head.as_str() {
-        let nodes = commit["statusCheckRollup"]["contexts"]["nodes"].as_array();
+    // A rollup of another commit is no reading of the head: its checks wait. Every page of the
+    // entries is read; a reading that could not be completed is no reading.
+    let mut pages = 0;
+    while commit["oid"] == head.as_str() {
+        let contexts = &commit["statusCheckRollup"]["contexts"];
+        let nodes = contexts["nodes"].as_array();
         for c in nodes
             .into_iter()
             .flatten()
@@ -152,6 +178,18 @@ fn view(s: &mut impl System, q: &Request) -> Option<View> {
             };
             checks.push(json!({"name": name, "state": state, "run": run}));
         }
+        let next = contexts["pageInfo"]["endCursor"].as_str();
+        let Some(cursor) = next.filter(|_| contexts["pageInfo"]["hasNextPage"] == true) else {
+            break;
+        };
+        pages += 1;
+        if pages == 50 {
+            return Err(None);
+        }
+        commit = graphql(s, q, VIEW, Some(cursor))?["commits"]["nodes"][0]["commit"].clone();
+        if commit["oid"] != head.as_str() {
+            return Err(None);
+        }
     }
     let mut marker = Value::Null;
     for c in pr["comments"]["nodes"].as_array().into_iter().flatten() {
@@ -159,7 +197,8 @@ fn view(s: &mut impl System, q: &Request) -> Option<View> {
         if q.login.as_deref().is_none_or(|l| login(&c["author"]) != l) {
             continue;
         }
-        if let Some(at) = body.rfind(MARKER) {
+        // Of the marker's occurrences in one comment, the last one that parses counts.
+        for (at, _) in body.match_indices(MARKER) {
             let rest = body[at + MARKER.len()..].trim_start();
             let parsed = serde_json::Deserializer::from_str(rest)
                 .into_iter::<Value>()
@@ -169,9 +208,9 @@ fn view(s: &mut impl System, q: &Request) -> Option<View> {
             }
         }
     }
-    Some(View {
-        state: pr["state"].as_str()?.to_owned(),
-        draft: pr["isDraft"].as_bool()?,
+    Ok(View {
+        state: pr["state"].as_str().ok_or(None)?.to_owned(),
+        draft: pr["isDraft"].as_bool().ok_or(None)?,
         head,
         checks,
         marker,
@@ -181,7 +220,7 @@ fn view(s: &mut impl System, q: &Request) -> Option<View> {
 fn threads(s: &mut impl System, q: &Request) -> Value {
     let (mut list, mut after) = (vec![], None::<String>);
     for _ in 0..50 {
-        let Some(pr) = graphql(s, q, THREADS, after.as_deref()) else {
+        let Ok(pr) = graphql(s, q, THREADS, after.as_deref()) else {
             return Value::Null;
         };
         let page = &pr["reviewThreads"];
@@ -230,12 +269,21 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     // The head GitHub reported at the first reading; a caller's `head` is only compared with it.
     let (mut head, mut reviewing) = (None::<String>, false);
     let end = loop {
-        let Some(v) = view(s, &q) else {
-            if s.now() >= deadline {
+        let v = match view(s, &q) {
+            Ok(v) => v,
+            // A cause that cannot pass, at the first reading, ends at once.
+            Err(Some(cause)) if head.is_none() => {
+                a["unreadable"] = json!(cause);
                 break "github_unreadable";
             }
-            s.pause(POLL);
-            continue;
+            Err(cause) if s.now() >= deadline => {
+                a["unreadable"] = json!(cause.unwrap_or("no_answer"));
+                break "github_unreadable";
+            }
+            Err(_) => {
+                s.pause(POLL);
+                continue;
+            }
         };
         let h = head.get_or_insert_with(|| v.head.clone());
         a["head"] = json!(h);
@@ -260,31 +308,46 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
             a["marked_ready"] = json!(true);
             continue;
         }
+        // The checks are judged at every reading, also while the gate waits for the review: a
+        // rerun that is pending is waited for (until the bound of the phase).
         a["checks"] = json!(v.checks);
+        let bad = v
+            .checks
+            .iter()
+            .find(|c| c["state"] != "SUCCESS" && c["state"] != "PENDING");
+        if let Some(c) = bad {
+            a["failed_check"] = c.clone();
+            break "check_failed";
+        }
+        if v.checks.is_empty() || v.checks.iter().any(|c| c["state"] == "PENDING") {
+            if s.now() >= deadline {
+                break "check_timeout";
+            }
+            s.pause(POLL);
+            continue;
+        }
+        if q.login.is_none() {
+            break "passed";
+        }
         if !reviewing {
-            let bad = v
-                .checks
-                .iter()
-                .find(|c| c["state"] != "SUCCESS" && c["state"] != "PENDING");
-            if let Some(c) = bad {
-                a["failed_check"] = c.clone();
-                break "check_failed";
-            }
-            if v.checks.is_empty() || v.checks.iter().any(|c| c["state"] == "PENDING") {
-                if s.now() >= deadline {
-                    break "check_timeout";
-                }
-                s.pause(POLL);
-                continue;
-            }
-            if q.login.is_none() {
-                break "passed";
-            }
             (reviewing, deadline) = (true, s.now() + q.review);
             // A push to a ready pull request is not reviewed: when the summary names another
             // commit, draft and ready once, unless this gate's own ready mark asked for a review.
             if v.marker["commit_sha"] != v.head.as_str() && a["marked_ready"] == false {
-                if !(ready(s, &q, true) && ready(s, &q, false)) {
+                if !ready(s, &q, true) {
+                    break "ready_failed";
+                }
+                // After the draft mark, ready is tried three times before the answer says so.
+                let mut back = ready(s, &q, false);
+                for _ in 0..2 {
+                    if back {
+                        break;
+                    }
+                    s.pause(POLL);
+                    back = ready(s, &q, false);
+                }
+                if !back {
+                    a["left_draft"] = json!(true);
                     break "ready_failed";
                 }
                 a["autoreview"]["toggled"] = json!(true);
@@ -305,7 +368,11 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         s.pause(POLL);
     };
     a["end"] = json!(end);
-    a["threads"] = threads(s, &q);
+    a["threads"] = if end == "github_unreadable" {
+        Value::Null
+    } else {
+        threads(s, &q)
+    };
     Ok((a, status(end)))
 }
 pub fn cli(argv: &[OsString]) -> ExitCode {
