@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install content/ of this repository as the shared instructions of the host, or put a kept copy back.
 #   scripts/install-content.sh install <commit>    from this checkout, which must be clean at <commit> on origin/main
-#   scripts/install-content.sh check               every file of the recorded checksum list is in the target (exit 0; 1 drift; 3 not recorded)
+#   scripts/install-content.sh check               the files under the owned paths are exactly the recorded checksum list, unchanged (exit 0; 1 drift; 3 not recorded)
 #   scripts/install-content.sh rollback            puts back the kept copy the install record names (one level); it runs only when the
 #                                                  target equals its record (check ok, no .old-* or .new-* directory of an interrupted
 #                                                  run), else it refuses rollback_target_not_recorded_state: use rollback <tarball>
@@ -26,9 +26,11 @@
 set -euo pipefail
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
 REPO=$(cd -- "$(dirname -- "$(realpath "$0")")/.." && pwd -P)
-DST=${AP_CONTENT_DST:-/root/.agents}; DST=${DST%/}
-BK=${AP_CONTENT_BACKUP_DIR:-/var/backups/agent-platform-content}
-LOCK=${AP_CONTENT_LOCK:-$BK/.install.lock}
+# The three paths are made absolute once, for every verb: the record and `check` run `cd "$DST"`, and a relative
+# path would then name another place. (-s: no symbolic link is resolved; a trailing slash goes.)
+DST=$(realpath -m -s -- "${AP_CONTENT_DST:-/root/.agents}")
+BK=$(realpath -m -s -- "${AP_CONTENT_BACKUP_DIR:-/var/backups/agent-platform-content}")
+LOCK=$(realpath -m -s -- "${AP_CONTENT_LOCK:-$BK/.install.lock}")
 refuse() { echo "refuse: $*" >&2; exit 2; }
 REC=.content-record.json SUMS=.content-sums META=(.content-paths .content-record.json .content-sums)
 take_lock() {
@@ -41,10 +43,17 @@ write_record() { # <file> <commit> <installed_at> <kept copy or empty> <file cou
   local kept=null; [ -z "$4" ] || kept="\"$4\""
   printf '{"commit":"%s","installed_at":"%s","kept":%s,"files":%s}\n' "$2" "$3" "$kept" "$5" > "$1"; }
 REC_RE='^\{"commit":"[0-9a-f]{40,64}","installed_at":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z","kept":(null|"[^"\\[:cntrl:]]*"),"files":[0-9]+\}$'
+# added_files <checksum list>: the files (and links) that lie under the owned paths of that list and are not named by it.
+added_files() { local actual
+  actual=$(cd "$DST" && while IFS= read -r top; do
+    { [ -e "$top" ] || [ -L "$top" ]; } && find -H "$top" \( -type f -o -type l \) -print
+  done < <(paths_of "$1") | LC_ALL=C sort)
+  comm -23 <(printf '%s\n' "$actual") <(cut -c67- "$1" | LC_ALL=C sort); }
 # content_state: sets CHK (ok|drift|not_recorded), CHK_COMMIT, CHK_AT, CHK_KEPT (only from a well-formed record), CHK_FILES
-# and CHK_BAD (up to 10 paths). A record that is empty, cut or not the one this script writes, a checksum list with a
+# and CHK_BAD (up to 10 paths: changed, missing or ADDED files; the files under the owned paths must be exactly the
+# files the checksum list names). A record that is empty, cut or not the one this script writes, a checksum list with a
 # malformed line or a line count other than the record's `files` are drift. Writes nothing.
-content_state() { local out rc=0 n bad f
+content_state() { local out rc=0 n bad f extra
   CHK_COMMIT=""; CHK_AT=""; CHK_KEPT=""; CHK_BAD=""; CHK_FILES=0
   if [ ! -f "$DST/$REC" ] || [ ! -f "$DST/$SUMS" ]; then CHK=not_recorded; return 0; fi
   CHK=drift
@@ -56,8 +65,9 @@ content_state() { local out rc=0 n bad f
   else return 0; fi
   { [ "$n" -gt 0 ] && [ "$bad" -eq 0 ] && [ "$n" = "$f" ]; } || return 0
   out=$(cd "$DST" && sha256sum -c "$DST/$SUMS" 2>/dev/null) || rc=$?
-  CHK_BAD=$(printf '%s\n' "$out" | sed -n 's/: FAILED.*$//p' | head -n 10) || true
-  if [ "$rc" -eq 0 ]; then CHK=ok; fi
+  extra=$(added_files "$DST/$SUMS" || true)
+  CHK_BAD=$( { printf '%s\n' "$out" | sed -n 's/: FAILED.*$//p'; printf '%s\n' "$extra"; } | sed -n '/./p' | head -n 10) || true
+  if [ "$rc" -eq 0 ] && [ -z "$extra" ]; then CHK=ok; fi
 }
 # rollback_plan: the ONE decision of whether `rollback` without an argument runs; `status` asks the same function.
 # Success sets RB_KEPT. Failure sets RB_CODE and RB_MSG (it does not touch anything).
@@ -159,7 +169,7 @@ check)
   case $CHK in
     not_recorded) echo "not_recorded: $DST has no install record (an install made before this version, or none)" >&2; exit 3 ;;
     ok) echo "ok commit=$CHK_COMMIT files=$CHK_FILES"; exit 0 ;;
-    *) echo "drift commit=${CHK_COMMIT:-unknown}: changed or missing:"; if [ -n "$CHK_BAD" ]; then printf '%s\n' "$CHK_BAD"; else echo "(the install record or its checksum list is damaged)"; fi; exit 1 ;;
+    *) echo "drift commit=${CHK_COMMIT:-unknown}: changed, missing or added:"; if [ -n "$CHK_BAD" ]; then printf '%s\n' "$CHK_BAD"; else echo "(the install record or its checksum list is damaged)"; fi; exit 1 ;;
   esac
   ;;
 status)

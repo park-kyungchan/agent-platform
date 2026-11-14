@@ -195,6 +195,32 @@ rm -rf "$D"; cat_ "$cr1"; tk1=$(tarof); cat_ "$cr2"; mkdir "$tk1.consumed"
 cdst rollback; rc=$?; e4=$(cat "$t/err"); cdst check; rcc=$?
 { [ "$rc" -eq 4 ] && printf '%s' "$e4" | grep -q 'rollback_completed_marker_failed' && printf '%s' "$e4" | grep -q 'rollback itself completed' && [ "$(cat "$D/AGENTS.md")" = r1 ] && [ "$rcc" -eq 0 ]; } \
   && ok "R2 content: a failed marker after a completed rollback exits 4 and says the rollback itself completed" || bad "R2 marker rc=$rc/$rcc [$e4]"
+# --- round 3: a file added under an owned path is drift; a relative target, kept-copy directory and lock are made absolute.
+rm -rf "$D"; cat_ "$cr1"; cat_ "$cr2"; echo mine > "$D/runtime-references/local.md"; hb=$(tree "$D")
+cdst check; rcc=$?; co=$(cat "$t/out"); s=$(st); cdst rollback; rc=$?
+{ [ "$rcc" -eq 1 ] && printf '%s\n' "$co" | grep -qx 'runtime-references/local.md' && printf '%s' "$s" | grep -q '"check":"drift","rollback":"none"' \
+  && [ "$rc" -eq 2 ] && grep -q 'rollback_target_not_recorded_state' "$t/err" && [ -f "$D/runtime-references/local.md" ] && [ "$(tree "$D")" = "$hb" ]; } \
+  && ok "R3 content: a file added under an owned path is drift, named by check; rollback without an argument refuses and keeps it" || bad "R3 added file rc=$rcc/$rc [$s] $(cat "$t/out" "$t/err")"
+# the bound of 10 paths holds for added files too.
+for i in $(seq 1 12); do echo x > "$D/runtime-references/local$i.md"; done
+cdst check; rcc=$?; nl=$(grep -c '^runtime-references/' "$t/out")
+{ [ "$rcc" -eq 1 ] && [ "$nl" -eq 10 ]; } && ok "R3 content: check names at most 10 changed, missing or added paths" || bad "R3 bound rc=$rcc lines=$nl"
+# what install and rollback <tarball> do with such a file today (unchanged by this round): install keeps it in the tarball,
+# rollback <tarball> replaces the owned path as a whole and does not keep it.
+rm -rf "$D"; cat_ "$cr1"; echo mine > "$D/runtime-references/local.md"; cat_ "$cr2"; tk=$(tarof)
+kept_it=0; tar -tf "$tk" | grep -qx 'runtime-references/local.md' && kept_it=1
+cdst rollback "$tk"; rc=$?
+{ [ "$kept_it" -eq 1 ] && [ "$rc" -eq 0 ] && [ -f "$D/runtime-references/local.md" ]; } \
+  && ok "R3 content (today's behaviour): install keeps an added file in the tarball and rollback <tarball> puts it back" || bad "R3 added file through install kept=$kept_it rc=$rc"
+echo late > "$D/runtime-references/late.md"; cdst rollback "$tk"; rc=$?
+[ "$rc" -eq 0 ] && [ ! -e "$D/runtime-references/late.md" ] && ok "R3 content (today's behaviour): rollback <tarball> drops a file added after the install without keeping it" || bad "R3 late file rc=$rc"
+# relative AP_CONTENT_DST, AP_CONTENT_BACKUP_DIR and AP_CONTENT_LOCK work from any working directory, for every verb.
+rm -rf "$t/work"; mkdir "$t/work"; rel() { (cd "$t/work" && AP_CONTENT_DST=rd/ AP_CONTENT_BACKUP_DIR=rb AP_CONTENT_LOCK=rl.lock bash "$r/scripts/install-content.sh" "$@" > "$t/out" 2> "$t/err"); }
+git checkout -q "$cr1"; rel install "$cr1"; r1=$?; git checkout -q "$cr2"; rel install "$cr2"; r2=$?; rel check; r3=$?; c3out=$(cat "$t/out")
+rel status; r4=$?; sout=$(cat "$t/out"); rel rollback; r5=$?; rel check; r6=$?
+{ [ "$r1" -eq 0 ] && [ "$r2" -eq 0 ] && [ "$r3" -eq 0 ] && [ "$c3out" = "ok commit=$cr2 files=$n2" ] && [ "$r4" -eq 0 ] && printf '%s' "$sout" | grep -q '"check":"ok","rollback":"available"' \
+  && [ "$r5" -eq 0 ] && [ "$r6" -eq 0 ] && [ -f "$t/work/rl.lock" ] && [ -d "$t/work/rb" ] && [ ! -e "$t/work/rd/rd" ]; } \
+  && ok "R3 content: a relative target, kept-copy directory and lock work for install, check, status and rollback" || bad "R3 relative rc=$r1/$r2/$r3/$r4/$r5/$r6 [$c3out] [$sout]"
 # check names at most 10 paths.
 for i in $(seq 1 12); do mkdir -p content/skills/m$i; echo m$i > content/skills/m$i/SKILL.md; done; cm=$(commit many)
 rm -rf "$D"; cat_ "$cm"; for i in $(seq 1 12); do rm -f "$D/skills/m$i/SKILL.md"; done
