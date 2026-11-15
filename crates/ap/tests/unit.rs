@@ -77,6 +77,8 @@ struct U {
     close_refuses: Option<&'static str>,
     /// The state the item `k1` takes when the review closes (someone drops or closes it by hand).
     item_on_close: Option<&'static str>,
+    /// The same when the status `lead-review` is posted (a call with `verdict` closes no review).
+    item_on_status: Option<&'static str>,
 }
 
 fn git(dir: &PathBuf, args: &[&str]) -> String {
@@ -180,6 +182,7 @@ impl U {
             start_refuses: None,
             close_refuses: None,
             item_on_close: None,
+            item_on_status: None,
         }
     }
     fn p(&self, rel: &str) -> String {
@@ -431,6 +434,9 @@ impl U {
             }
             ("api", _) => {
                 assert!(a.iter().any(|x| x == "context=lead-review"), "{a:?}");
+                if let Some(state) = self.item_on_status {
+                    self.set("it-k1", "state", json!(state));
+                }
                 ok(json!({}))
             }
             _ => panic!("unexpected gh call {a:?}"),
@@ -4808,4 +4814,101 @@ fn s9_6_backlog_of_a_task_without_a_board() {
         assert_eq!(backlog(&mut u, bad).unwrap_err().code, "usage", "{bad:?}");
     }
     assert!(actions(&u).is_empty());
+}
+
+#[test]
+fn s9_2_a_verdict_call_resolves_the_item_and_closes_it_with_the_reused_review() {
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    let mut r = item_request(&u, "k1");
+    r["merge"] = json!(false);
+    let (first, exit) = u.run(&r).unwrap();
+    assert_eq!(
+        (first["state"].as_str(), exit),
+        (Some("accepted"), 0),
+        "{first}"
+    );
+    // The merging call with the first call's verdict.
+    let mut r = u.request();
+    r.as_object_mut().unwrap().remove("verifier");
+    (r["pull_request"], r["verdict"], r["out"]) = (
+        json!(7),
+        json!(u.p("work/task/u1.verifier.md")),
+        json!(u.p("work/task/u2")),
+    );
+    // Without `item`: refused before any effect.
+    let (calls, launches) = (u.calls.len(), u.launches);
+    assert_eq!(code(u.run(&r)), "item_required@item");
+    let new = &u.calls[calls..];
+    assert!(
+        new.iter().all(|(p, a, _)| p == "ont" && a[0] == "search"),
+        "{new:?}"
+    );
+    assert_eq!(u.launches, launches);
+    assert!(!u.t.join("work/task/u2.unit.json").exists());
+    // With `item`: the item in work for this branch goes on, merges and closes with the reused review.
+    r["item"] = json!("k1");
+    let (v, exit) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    assert_eq!(u.store("start_item").len(), 1, "no second start");
+    let review = v["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "review");
+    assert_eq!(review.unwrap()["detail"], json!({"reused": true}));
+    assert_eq!(v["review"], first["review"]);
+    assert_eq!(v["item"]["closed"], true);
+    let close = &u.store("close_item")[0]["parameters"];
+    assert_eq!(
+        close,
+        &json!({"item": oid("item", "it-k1"), "review": first["review"]})
+    );
+    assert_eq!(u.object("it-k1")["state"], "done");
+    // Dropped after the resolution and before the merge: the call with `verdict` stops unmerged.
+    let mut u = U::new();
+    u.board(&[("k1", "queued")], &["k1"]);
+    let mut r = item_request(&u, "k1");
+    r["merge"] = json!(false);
+    u.run(&r).unwrap();
+    r.as_object_mut().unwrap().remove("verifier");
+    (r["merge"], r["pull_request"], r["verdict"], r["out"]) = (
+        json!(true),
+        json!(7),
+        json!(u.p("work/task/u1.verifier.md")),
+        json!(u.p("work/task/u2")),
+    );
+    u.item_on_status = Some("dropped");
+    let (v, exit) = u.run(&r).unwrap();
+    assert_eq!(
+        (&v["state"], &v["stopped_at"], &v["cause"], exit),
+        (
+            &json!("stopped"),
+            &json!("merge"),
+            &json!("item_dropped"),
+            3
+        ),
+        "{v}"
+    );
+    assert!(u.merges().is_empty() && u.store("close_item").is_empty());
+}
+
+#[test]
+fn s9_6_backlog_counts_every_untriaged_row_and_names_at_most_ten_topics() {
+    let mut u = U::new();
+    full_board(&mut u);
+    // Eleven more current rows of the user without triage: twelve with `d2`.
+    let task = oid("task", "store-task");
+    for n in 0..11 {
+        u.objects.push(
+            json!({"id": oid("decision", &format!("e{n}")), "rev": 0, "task": task,
+            "topic": format!("topic-e{n:02}"), "decided_by": "user", "status": "current",
+            "decided_at": format!("2026-11-15T11:{n:02}:00Z")}),
+        );
+    }
+    let v: Value = serde_json::from_str(&backlog(&mut u, &["store-task"]).unwrap()).unwrap();
+    assert_eq!(v["untriaged"]["count"], 12);
+    let mut want = vec!["topic-d2".to_owned()];
+    want.extend((0..9).map(|n| format!("topic-e{n:02}")));
+    assert_eq!(v["untriaged"]["topics"], json!(want), "the ten oldest");
 }
