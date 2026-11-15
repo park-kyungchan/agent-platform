@@ -8,7 +8,7 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
 
 REAL_BIN_DIR=/usr/local/bin
 REAL_STATE_DIR=/var/lib/ontology-platform
-CARGO_LOCK=/home/palantirkc/work/ws-replan/wt/.host-cargo.lock
+CARGO_LOCK=/var/lib/agent-platform/build.lock
 SCRIPT_PATH=$(cd -- "$(dirname -- "$0")" && pwd -P)/$(basename -- "$0")
 REPO_ROOT=$(cd -- "$(dirname -- "$0")/.." && pwd -P)
 
