@@ -41,7 +41,7 @@ if "SCORER-PROMPT" in prompt:
     if mode == "badword": lines[0] = lines[0].replace("caught", "probably").replace("partly", "probably").replace("missed", "probably")
     if mode == "prose": lines.append("Some closing remark.")
     text = ("scored" if mode == "noverdict" else "Verdict: scored") + "\n" + "\n".join(lines) + "\n"
-    stream, answer = [], text
+    stream, answer, beh, acct, sess = [], text, {}, r["account"], "sess-score"
 else:
     row["kind"] = "answer"
     cid = re.search(r"CASEID (\S+)", prompt).group(1)
@@ -51,7 +51,8 @@ else:
     beh = plan.get("answers", {}).get(cid, [{}])
     beh = beh[min(n, len(beh) - 1)]
     state, mode = beh.get("state", "ok"), beh.get("mode", "")
-    stream = [s.replace("@ROOT@", root) for s in beh.get("stream", [])]
+    acct, sess = beh.get("account", r["account"]), beh.get("session", "sess-default")
+    stream = [s.replace("@ROOT@", root).replace("@ACCOUNT@", acct).replace("@SESSION@", sess) for s in beh.get("stream", [])]
     answer = "" if beh.get("empty") else "SET=%s ID=%s\nAn answer.\n" % (os.environ.get("FAKE_SET", "X"), cid)
 with open(os.environ["FAKE_LOG"], "a") as f:
     f.write(json.dumps(row) + "\n")
@@ -70,7 +71,9 @@ with open(r["out"] + ".stream.jsonl", "w") as f:
             [{"type": "tool_use", "id": "t1", "name": "Read", "input": json.loads(s[1:])}]
         f.write(json.dumps({"type": "assistant", "message": {"content": blocks}}) + "\n")
         f.write(json.dumps({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": "t1", "content": "/etc/passwd"}]}}) + "\n")
-json.dump({"state": state, "role": r["role"], "model": r.get("model"), "effort": r.get("effort"), "cwd": r["cwd"],
+rec = {"account": acct, "session": sess} if row["kind"] == "answer" else {"account": r["account"], "session": "sess-score"}
+if beh.get("no_account") and row["kind"] == "answer": del rec["account"]
+json.dump({"state": state, **rec, "role": r["role"], "model": r.get("model"), "effort": r.get("effort"), "cwd": r["cwd"],
            "turns": 3, "tokens": {"input": 10, "output": 20, "cache_read": 0, "cache_creation": 0}}, open(r["out"] + ".run.json", "w"))
 sys.exit(0 if state == "ok" else 3)
 '''
@@ -520,6 +523,113 @@ class LeadSuite(unittest.TestCase):
             self.assertFalse(self.out("fresh").exists())
             os.unlink(w.instr / "skills" / "lead" / "extra.md")
         self.assertEqual(len(w.rows()), 1)
+
+
+    def test_l1b_own_saved_tool_result_is_no_outside_path(self):
+        w = World(("c-one",))
+        own = "@ACCOUNT@/projects/-scratch-task/@SESSION@/tool-results/"
+        cases = {
+            "own": ([own + "abc.txt", "cat " + own + "sub/dir/abc.json", "@" + json.dumps({"file_path": own + "x.txt"})], None, True),
+            "own_unnormal": (["cat " + own + "../../../../etc/hosts"], None, False),
+            "other_session": (["cat @ACCOUNT@/projects/-scratch-task/other-session/tool-results/abc.txt"], None, False),
+            "other_account": (["cat /elsewhere/acct/projects/-scratch-task/@SESSION@/tool-results/abc.txt"], None, False),
+            "projects_dir": (["ls @ACCOUNT@/projects"], None, False),
+            "other_subdir": (["cat @ACCOUNT@/projects/-scratch-task/@SESSION@/memory/abc.txt"], None, False),
+            "session_dir": (["ls @ACCOUNT@/projects/-scratch-task/@SESSION@/tool-results"], None, False),
+            "two_directories": (["cat @ACCOUNT@/projects/a/b/@SESSION@/tool-results/abc.txt"], None, False),
+            "no_session_named": ([own + "abc.txt"], {"session": ""}, False),
+        }
+        for name, (stream, extra, valid) in cases.items():
+            beh = {"stream": stream + ["cat @ROOT@/task/STATE.md"], "account": str(w.acct), "session": "s-own-1", **(extra or {})}
+            out = w.t / name
+            w.answers(out, "--case", "c-one", plan={"answers": {"c-one": [beh, beh]}})
+            t = json.loads((out / "answers.json").read_text())["c-one"]["tries"][0]
+            self.assertEqual((t["valid"], t["reason"]), (True, None) if valid else (False, "outside_path"), name)
+            self.assertEqual(t["own_results"] > 0, valid, name)
+        # the record names the account that answered: an entry of next_accounts
+        out = w.t / "next"
+        beh = {"stream": [own + "abc.txt"], "account": str(w.next), "session": "s-own-2"}
+        w.answers(out, "--case", "c-one", "--next-account", w.next, plan={"answers": {"c-one": [beh]}})
+        t = json.loads((out / "answers.json").read_text())["c-one"]["tries"][0]
+        self.assertEqual((t["valid"], t["own_results"]), (True, 1))
+        # a record without an account: the same path is outside
+        out = w.t / "noacct"
+        beh = {"stream": [own + "abc.txt"], "session": "s-own-3", "no_account": True}
+        w.answers(out, "--case", "c-one", plan={"answers": {"c-one": [beh, beh]}})
+        t = json.loads((out / "answers.json").read_text())["c-one"]["tries"][0]
+        self.assertEqual((t["valid"], t["reason"], t["own_results"]), (False, "outside_path", 0))
+        w.tmp.cleanup()
+
+    def test_l1b_a_set_judged_before_is_judged_again_without_a_stage(self):
+        w = World(("c-one",))
+        own = "@ACCOUNT@/projects/-scratch-task/@SESSION@/tool-results/abc.txt"
+        beh = {"stream": ["cat " + own], "account": str(w.acct), "session": "s-own-1"}
+        out = w.t / "set"
+        self.assertEqual(w.answers(out, plan={"answers": {"c-one": [beh]}}).returncode, 0)
+        before = len(w.rows())
+        # the file as an older judgment left it: both tries invalid, no valid try
+        old = {"c-one": {"tries": [{"try": n, "state": "ok", "valid": False, "reason": "outside_path", "turns": 3, "tokens": None,
+                                    "installed_reads": 0} for n in (1, 2)], "valid_try": None}}
+        (out / "c-one.2.prompt.md").write_text("old\n")
+        (out / "c-one.2.md.run.json").write_text((out / "c-one.1.md.run.json").read_text())
+        shutil.copy(out / "c-one.1.md.stream.jsonl", out / "c-one.2.md.stream.jsonl")
+        shutil.copy(out / "c-one.1.md", out / "c-one.2.md")
+        (out / "answers.json").write_text(json.dumps(old))
+        done = w.answers(out, "--case", "c-one")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(len(w.rows()), before)
+        c = json.loads((out / "answers.json").read_text())["c-one"]
+        self.assertEqual(c["valid_try"], 1)
+        self.assertEqual([t["own_results"] for t in c["tries"]], [1, 1])
+        w.tmp.cleanup()
+
+    def test_l1b_score_refuses_a_stale_set(self):
+        w = self.w
+        self.make_sets(w, ["c-one", "c-two"])
+        plan = {"score": {"results": {"A:c-one": "caught", "A:c-two": "caught", "B:c-one": "caught", "B:c-two": "caught"}}}
+        rows = len(w.rows())
+
+        def refused(first, second, want):
+            done = w.score(w.t / "sc", w.t / first, b=(w.t / second) if second else None, plan=plan)
+            self.assertEqual((done.returncode, err_code(done)), (2, "set_stale"), (first, second))
+            self.assertEqual(json.loads(done.stderr.strip().splitlines()[-1])["detail"], want, (first, second))
+            self.assertFalse((w.t / "sc").exists())
+
+        for s, other in (("A", "B"), ("B", "A")):
+            f = w.t / s / "META.json"
+            saved = f.read_text()
+            for what in ("absent", "unreadable", "prompt_sha256", "cases_sha256"):
+                if what == "absent":
+                    f.unlink()
+                elif what == "unreadable":
+                    f.write_text("{not json")
+                else:
+                    f.write_text(json.dumps({**json.loads(saved), what: "0" * 64}))
+                refused(s, None, "a")  # the set given as --a, alone
+                if what in ("absent", "unreadable"):
+                    refused(s, other, "a")  # beside a good one, as a
+                    refused(other, s, "b")  # and as b
+                f.write_text(saved)
+        # both stale in the same way: both named
+        saved = {s: (w.t / s / "META.json").read_text() for s in "AB"}
+        for s in "AB":
+            (w.t / s / "META.json").write_text(json.dumps({**json.loads(saved[s]), "prompt_sha256": "0" * 64}))
+        refused("A", "B", "a b")
+        for s in "AB":
+            (w.t / s / "META.json").write_text(saved[s])
+        self.assertEqual(len(w.rows()), rows)
+        self.assertEqual(w.score(w.t / "sc", w.t / "A", b=w.t / "B", plan=plan).returncode, 0)
+
+    def test_l1b_a_prefix_of_an_allowed_root_is_outside(self):
+        w = World(("c-one",))
+        stream = ["cat @ROOT@/task/STATE.md", "cat /dev/null"]
+        for bad in ("cat @ROOT@-sibling/task/STATE.md", "cat @ROOT@x", "cat /devx/null",
+                    "cat /root/.agents-x/AGENTS.md", "cat /root/.agentsx"):
+            out = w.t / ("s%d" % w.n)
+            w.answers(out, "--case", "c-one", plan={"answers": {"c-one": [{"stream": stream + [bad]}]}})
+            t = json.loads((out / "answers.json").read_text())["c-one"]["tries"][0]
+            self.assertEqual((t["valid"], t["reason"], t["installed_reads"]), (False, "outside_path", 0), bad)
+        w.tmp.cleanup()
 
 
 if __name__ == "__main__":
