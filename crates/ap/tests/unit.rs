@@ -5145,3 +5145,24 @@ fn p7_a_request_with_acceptance_runs_the_executable_and_ignores_the_blocks_check
     assert_eq!(v["write_set"], json!(["notes.md"]));
     assert_eq!(v["detail"]["paths"], json!(["src/a.rs"]));
 }
+
+#[test]
+fn p8_without_acceptance_the_write_set_is_judged_by_its_own_step() {
+    let mut u = U::new();
+    block_page(&u, &json!({"unit": "U-1", "write_set": ["src/**"]}));
+    let other = IMPLEMENT.replace("git add -A", "echo x > other.txt && git add -A");
+    u.script("a1", &other);
+    let v = u.stop(
+        &without_acceptance(&u),
+        "write_set",
+        "path_outside_write_set",
+    );
+    assert_eq!(v["detail"], json!({"paths": ["other.txt"], "count": 1}));
+    let acceptance = steps(&v).into_iter().find(|(n, _)| n == "acceptance");
+    assert_eq!(
+        acceptance,
+        Some(("acceptance".to_owned(), "passed".to_owned()))
+    );
+    let log = std::fs::read_to_string(u.p("work/task/u1.accept.log")).unwrap();
+    assert_eq!(log, "accept: ok\n");
+}

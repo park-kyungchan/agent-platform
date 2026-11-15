@@ -1,6 +1,6 @@
 //! The page's block and `ap accept` (README "The page's block"). A check reads Git and files only.
 use crate::host::{Failure, Host, System, args, error, fail, require};
-use crate::review::{self, DIFF_OPTIONS, covers};
+use crate::review::{self, DIFF_OPTIONS};
 use serde_json::{Map, Value, json};
 use std::{ffi::OsString, io::Write, process::ExitCode};
 
@@ -42,6 +42,13 @@ fn small(v: &Value, strict: bool) -> bool {
     let s = v.as_str().unwrap_or_default();
     let alnum = |c: char| c.is_ascii_alphanumeric() || c == '-';
     (1..=40).contains(&s.chars().count()) && (!strict || s.chars().all(alnum))
+}
+fn branch(b: &str) -> bool {
+    let safe = |c: u8| c.is_ascii_alphanumeric() || b"._/-".contains(&c);
+    (1..=100).contains(&b.len())
+        && !b.starts_with(['-', '/'])
+        && !b.contains("..")
+        && b.bytes().all(safe)
 }
 fn repository(v: &Value) -> bool {
     let ok = |c: char| c.is_ascii_alphanumeric() || "._-".contains(c);
@@ -102,6 +109,29 @@ fn checks(v: &Value) -> Result<Checks, Failure> {
     }
     Ok(c)
 }
+/// The members of every object of a parsed value, and the colons outside strings of its text: a
+/// member that appears twice leaves the parsed value (the last wins) with fewer than the text has.
+fn members(v: &Value) -> usize {
+    match v {
+        Value::Object(o) => o.len() + o.values().map(members).sum::<usize>(),
+        Value::Array(a) => a.iter().map(members).sum(),
+        _ => 0,
+    }
+}
+fn colons(text: &str) -> usize {
+    let (mut n, mut inside, mut escaped) = (0, false, false);
+    for c in text.chars() {
+        match (inside, escaped, c) {
+            (true, true, _) => escaped = false,
+            (true, false, '\\') => escaped = true,
+            (true, false, '"') => inside = false,
+            (false, _, '"') => inside = true,
+            (false, _, ':') => n += 1,
+            _ => {}
+        }
+    }
+    n
+}
 /// The page's block: none when it has no line "```unit"; else the block, or why it is refused.
 pub(crate) fn block(text: &str) -> Result<Option<Block>, Failure> {
     let lines: Vec<&str> = text.split('\n').collect();
@@ -119,7 +149,8 @@ pub(crate) fn block(text: &str) -> Result<Option<Block>, Failure> {
     let value: Value = serde_json::from_str(&body).map_err(|_| invalid("not_an_object", None))?;
     let o = value
         .as_object()
-        .ok_or_else(|| invalid("not_an_object", None))?;
+        .filter(|_| members(&value) == colons(&body));
+    let o = o.ok_or_else(|| invalid("not_an_object", None))?;
     if let Some(k) = o.keys().find(|k| !MEMBERS.split(' ').any(|m| m == *k)) {
         return Err(invalid("unknown_member", Some(k)));
     }
@@ -142,7 +173,7 @@ pub(crate) fn block(text: &str) -> Result<Option<Block>, Failure> {
                 true
             }
             ("repository", Some(v)) => repository(v),
-            ("branch", Some(v)) => v.as_str().is_some_and(crate::unit::branch_ok),
+            ("branch", Some(v)) => v.as_str().is_some_and(branch),
             ("item", Some(v)) => v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 60),
             ("tier", Some(v)) => small(v, false),
             (_, Some(v)) => v.is_boolean(),
@@ -244,11 +275,15 @@ fn hunks(s: &mut impl System, c: &Change, path: &str) -> Result<Vec<String>, Fai
         &extra,
         &["--", &format!(":(literal){path}")],
     )?;
-    let rest = patch.split('\n').skip_while(|l| !l.starts_with("@@"));
-    Ok(rest
-        .filter(|l| l.starts_with(['+', '-']))
-        .map(str::to_owned)
-        .collect())
+    // A header (`diff --git`, up to the first `@@`) is no changed line: a typechange has two.
+    let (mut lines, mut hunk) = (vec![], false);
+    for l in patch.split('\n') {
+        hunk = !l.starts_with("diff --git ") && (hunk || l.starts_with("@@"));
+        if hunk && l.starts_with(['+', '-']) {
+            lines.push(l.to_owned());
+        }
+    }
+    Ok(lines)
 }
 fn contains(hay: &[u8], needle: &[u8]) -> bool {
     hay.windows(needle.len()).any(|w| w == needle)
@@ -256,7 +291,10 @@ fn contains(hay: &[u8], needle: &[u8]) -> bool {
 /// The checks of the block that failed, one line each (`<kind>: <what>`), in the block's order.
 pub(crate) fn failed(s: &mut impl System, c: &Change, k: &Checks) -> Result<Vec<String>, Failure> {
     let mut out = vec![];
-    let matching = |p: &str| -> Vec<&String> { c.paths.iter().filter(|x| covers(p, x)).collect() };
+    let covered =
+        |p: &String, x: &&String| review::outside(std::slice::from_ref(p), &[x]).is_empty();
+    let matching =
+        |p: &String| -> Vec<&String> { c.paths.iter().filter(|x| covered(p, x)).collect() };
     for p in &k.unchanged {
         if let Some(first) = matching(p).first() {
             out.push(format!("unchanged: {p:?}: {first:?} changed"));

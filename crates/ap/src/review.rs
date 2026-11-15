@@ -306,21 +306,20 @@ pub(crate) fn post(
     require!(reply.success => "process_failed", "gh");
     Ok(())
 }
-/// A pattern matches its exact path; a trailing `/**` matches descendants, not the directory itself
-/// or another name with the same prefix.
-pub(crate) fn covers(pattern: &str, path: &str) -> bool {
-    pattern == path
-        || pattern.strip_suffix("/**").is_some_and(|dir| {
-            path.strip_prefix(dir)
-                .is_some_and(|tail| tail.starts_with('/') && tail.len() > 1)
-        })
-}
-/// The paths no pattern covers.
+/// The paths no pattern covers: a pattern matches its exact path; a trailing `/**` matches
+/// descendants, not the directory itself or another name with the same prefix.
 pub(crate) fn outside<'a>(patterns: &[String], paths: &[&'a str]) -> Vec<&'a str> {
-    let covered = |path: &&str| patterns.iter().any(|pattern| covers(pattern, path));
     paths
         .iter()
-        .filter(|path| !covered(path))
+        .filter(|path| {
+            !patterns.iter().any(|pattern| {
+                pattern == **path
+                    || pattern.strip_suffix("/**").is_some_and(|dir| {
+                        path.strip_prefix(dir)
+                            .is_some_and(|tail| tail.starts_with('/') && tail.len() > 1)
+                    })
+            })
+        })
         .copied()
         .collect()
 }

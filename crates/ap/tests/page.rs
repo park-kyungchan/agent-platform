@@ -541,3 +541,112 @@ fn b3_the_members_the_page_shapes_and_the_bounds_are_accepted() {
         .collect();
     assert_eq!(kinds, ["adds", "holds"]);
 }
+
+#[test]
+fn c1_a_member_twice_in_a_block_is_refused() {
+    let one = r#""unit":"T-1","write_set":["src/**"]"#;
+    for body in [
+        format!(r#"{{{one},"checks":{{"adds":[{{"path":"a","words":["x"]}}]}},"checks":{{}}}}"#),
+        r#"{"unit":"T-1","write_set":["a"],"write_set":["src/**"]}"#.to_owned(),
+        format!(r#"{{{one},"checks":{{"lines":[{{"path":"a","max":-1,"max":9}}]}}}}"#),
+        format!(r#"{{{one},"checks":{{"lines":[{{"path":"a","max":1}}],"lines":[]}}}}"#),
+        format!(r#"{{{one},"unit":"T-2"}}"#),
+    ] {
+        let (code, detail) = refused(&format!("```unit\n{body}\n```\n"));
+        assert_eq!(code, "page_block_invalid", "{body}");
+        assert_eq!(detail["reason"], "not_an_object", "{body}");
+    }
+    // A colon, a quote or a brace inside a string is no member.
+    let s = S::new();
+    let mut b = unit(
+        &["src/**"],
+        json!({"adds": [{"path": "a", "words": ["a\": b\\\", {"]}]}),
+    );
+    b["tier"] = json!("x:y");
+    assert_eq!(failed(&s.lines(&b), "adds"), 1);
+}
+
+#[test]
+fn c2_a_typechange_counts_only_its_own_lines() {
+    let s = S::new();
+    s.put("f.rs", b"one\n");
+    s.commit("f");
+    git(
+        &s.repo(),
+        &["update-ref", "refs/remotes/origin/main", "HEAD"],
+    );
+    std::fs::remove_file(s.repo().join("f.rs")).unwrap();
+    std::os::unix::fs::symlink("g.rs", s.repo().join("f.rs")).unwrap();
+    s.commit("link");
+    let w = ["f.rs"];
+    // One removed line and one added line (the link's target); a header line is neither.
+    let lines = |max: u64, min: u64| {
+        s.lines(&unit(
+            &w,
+            json!({"lines": [{"path": "f.rs", "max": max, "min": min}]}),
+        ))
+    };
+    assert_eq!(lines(2, 2), ["accept: ok"]);
+    let words =
+        json!({"adds": [{"path": "f.rs", "words": ["++ b/f.rs", "--- /dev/null", "f.rs"]}]});
+    assert_eq!(failed(&s.lines(&unit(&w, words)), "adds"), 3);
+    let words = json!({"adds": [{"path": "f.rs", "words": ["g.rs"]}]});
+    assert_eq!(s.lines(&unit(&w, words)), ["accept: ok"]);
+}
+
+#[test]
+fn c3_the_diff_starts_at_the_merge_base_of_origin_main_and_head() {
+    let s = S::new();
+    let base = git(&s.repo(), &["rev-parse", "HEAD"]);
+    s.change();
+    // `origin/main` moves on without the branch: its own change is no part of the branch's.
+    git(&s.repo(), &["checkout", "-q", "--detach", &base]);
+    s.put("main.txt", b"main\n");
+    s.commit("main moves");
+    let moved = git(&s.repo(), &["rev-parse", "HEAD"]);
+    git(
+        &s.repo(),
+        &["update-ref", "refs/remotes/origin/main", &moved],
+    );
+    git(&s.repo(), &["checkout", "-q", "main"]);
+    let checks = json!({"unchanged": ["main.txt"], "lines": [{"path": "main.txt", "max": 0}],
+        "adds": [{"path": "src/n.rs", "words": ["fn n()"]}]});
+    assert_eq!(
+        s.lines(&unit(&["src/**", "docs/d.md"], checks)),
+        ["accept: ok"]
+    );
+}
+
+#[test]
+fn c4_the_block_ends_at_the_next_line_of_three_backticks() {
+    let s = S::new();
+    s.change();
+    let block = unit(&["src/**", "docs/d.md"], json!({}));
+    let page = s.page(
+        "p.md",
+        &format!("# T\n```unit\n{block}\n```\n\nMore:\n```text\nx\n```\n"),
+    );
+    assert_eq!(s.accept(&[&page]).1, ["accept: ok"]);
+}
+
+#[test]
+fn c5_a_renamed_file_is_its_old_path_removed_and_its_new_path_added() {
+    let s = S::new();
+    git(&s.repo(), &["mv", "src/a.rs", "src/r.rs"]);
+    s.commit("rename");
+    let w = ["src/**"];
+    let one = |checks: Value| s.lines(&unit(&w, checks));
+    assert_eq!(
+        failed(&one(json!({"unchanged": ["src/a.rs"]})), "unchanged"),
+        1
+    );
+    assert_eq!(
+        failed(&one(json!({"unchanged": ["src/r.rs"]})), "unchanged"),
+        1
+    );
+    // Three lines removed, three added: a rename is not one change of zero lines.
+    assert_eq!(
+        one(json!({"lines": [{"path": "src/**", "max": 6, "min": 6}]})),
+        ["accept: ok"]
+    );
+}

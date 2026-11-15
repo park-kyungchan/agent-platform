@@ -212,19 +212,12 @@ impl<S: System> System for Rendered<'_, S> {
         self.s.environment()
     }
 }
-/// What the checks before any effect read of the page's bytes: write set, checks, digest.
-struct Admitted {
-    write_set: Vec<String>,
-    checks: Option<page::Checks>,
-    page: String,
-}
-pub(crate) fn branch_ok(branch: &str) -> bool {
-    let safe = |c: u8| c.is_ascii_alphanumeric() || b"._/-".contains(&c);
-    let shape = branch.len() <= 100 && !branch.starts_with(['-', '/']) && !branch.contains("..");
-    shape && branch.bytes().all(safe)
-}
-/// The checks before any effect.
-fn request(s: &mut impl System, r: &Value) -> Result<Admitted, Failure> {
+/// The checks before any effect; the answer is the page's write set, the checks of its block that
+/// judge a request without `acceptance`, and the digest of the page's bytes as read.
+fn request(
+    s: &mut impl System,
+    r: &Value,
+) -> Result<(Vec<String>, Option<page::Checks>, String), Failure> {
     let o = r
         .as_object()
         .ok_or_else(|| error("invalid_input", "stdin"))?;
@@ -251,7 +244,11 @@ fn request(s: &mut impl System, r: &Value) -> Result<Admitted, Failure> {
     p("clone")?;
     let (worktree, page, out) = (p("worktree")?, p("page")?, p("out")?);
     let acceptance = r.get("acceptance").map(|_| p("acceptance")).transpose()?;
-    require!(branch_ok(text(r, "branch")?) => "invalid_input", "branch");
+    let branch = text(r, "branch")?;
+    let safe = |c: u8| c.is_ascii_alphanumeric() || b"._/-".contains(&c);
+    let branch_ok =
+        branch.len() <= 100 && !branch.starts_with(['-', '/']) && !branch.contains("..");
+    require!(branch_ok && branch.bytes().all(safe) => "invalid_input", "branch");
     let key = text(r, "task_key")?;
     let key_char =
         |(i, c): (usize, u8)| c.is_ascii_lowercase() || c.is_ascii_digit() || (i > 0 && c == b'-');
@@ -409,11 +406,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Admitted, Failure> {
         require!(Path::new(worktree).is_dir() => "worktree_missing", "worktree");
     }
     let checks = block.filter(|_| acceptance.is_none()).map(|b| b.checks);
-    Ok(Admitted {
-        write_set,
-        checks,
-        page: digest(&bytes),
-    })
+    Ok((write_set, checks, digest(&bytes)))
 }
 
 /// The record and its writes: replaced through a temporary name after every step.
@@ -653,7 +646,13 @@ fn w(words: &str) -> Vec<&str> {
     words.split(' ').collect()
 }
 type End = Result<&'static str, Stop>;
-fn steps(s: &mut impl System, r: &Value, a: &Admitted, item: Option<&Item>, u: &mut Unit) -> End {
+fn steps(
+    s: &mut impl System,
+    r: &Value,
+    a: (&[String], Option<&page::Checks>),
+    item: Option<&Item>,
+    u: &mut Unit,
+) -> End {
     let f = |k: &str| r[k].as_str().unwrap_or_default();
     let (repo, clone, wt) = (f("repository"), f("clone"), f("worktree"));
     let (branch, out) = (f("branch"), f("out"));
@@ -752,7 +751,7 @@ fn steps(s: &mut impl System, r: &Value, a: &Admitted, item: Option<&Item>, u: &
             at_head(s, wt, &head)?;
             ensure!(ok(s, clone, &["fetch", "origin", "main"]) => "fetch_failed");
             u.rec["files"]["acceptance_output"] = json!(log);
-            let checks = a.checks.as_ref().ok_or_else(|| stop("acceptance_failed", Value::Null))?;
+            let checks = a.1.ok_or_else(|| stop("acceptance_failed", Value::Null))?;
             let change = page::change(s, wt)?;
             let failed = page::failed(s, &change, checks)?;
             create(&log, page::report(&failed).as_bytes())?;
@@ -780,7 +779,7 @@ fn steps(s: &mut impl System, r: &Value, a: &Admitted, item: Option<&Item>, u: &
         words.extend([base.as_str(), head.as_str()]);
         let diff = git(s, wt, &words)?;
         let paths: Vec<_> = diff.split_terminator('\0').collect();
-        let outside = review::outside(&a.write_set, &paths);
+        let outside = review::outside(a.0, &paths);
         let detail =
             json!({"paths": outside.iter().take(10).collect::<Vec<_>>(), "count": outside.len()});
         ensure!(outside.is_empty() => "path_outside_write_set", detail);
@@ -916,7 +915,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     if r.get("case").is_some() {
         return case::execute(s, r);
     }
-    let admitted = request(s, r)?;
+    let (write_set, checks, page) = request(s, r)?;
     let file = |p: Option<&str>| match p {
         Some(p) => regular(p, "io_error", "file").map(|b| json!({"path": p, "sha256": digest(&b)})),
         None => Ok(Value::Null),
@@ -924,8 +923,8 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
     let verifier_prompt = r["verifier"]["prompt"].as_str();
     let mut rec = json!({"mode": "unit", "repository": r["repository"], "clone": r["clone"], "worktree": r["worktree"],
         "branch": r["branch"], "task_key": r["task_key"], "base": null,
-        "page": json!({"path": r["page"], "sha256": admitted.page}),
-        "write_set": admitted.write_set, "acceptance": file(r["acceptance"].as_str())?,
+        "page": json!({"path": r["page"], "sha256": page}),
+        "write_set": write_set, "acceptance": file(r["acceptance"].as_str())?,
         "verifier_prompt": file(verifier_prompt)?, "verdict_file": file(r["verdict"].as_str())?,
         "merge": r["merge"] != false, "pull_request": null, "head": null,
         "review": null, "merge_commit": null, "stages": {"implementer": null, "verifier": null},
@@ -945,7 +944,7 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         rec["item"] = i.record.clone();
     }
     let (rec, code) = claimed(r, rec, |u| {
-        let end = steps(s, r, &admitted, item.as_ref(), u);
+        let end = steps(s, r, (&write_set, checks.as_ref()), item.as_ref(), u);
         // The round's two paths are in the save that completes the record: when it fails (exit 5),
         // no fixer starts.
         if matches!(&end, Err(f) if f.cause == "verdict_repair") && repairs(r, &u.rec) {
