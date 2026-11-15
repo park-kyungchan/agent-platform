@@ -45,6 +45,7 @@ struct U {
     check: &'static str,
     /// Unresolved review threads the gate reads.
     threads: Vec<Value>,
+    threads_unreadable: bool,
     /// Comments of the pull request (the automatic reviewer's marker).
     comments: Vec<Value>,
     /// The read after the merge still says OPEN.
@@ -149,6 +150,7 @@ impl U {
             open_prs: 1,
             check: "SUCCESS",
             threads: vec![],
+            threads_unreadable: false,
             comments: vec![],
             merge_unconfirmed: false,
             dirty_on_merge: false,
@@ -356,6 +358,9 @@ impl U {
             ("api", "graphql") => {
                 let query = a.last().unwrap();
                 if query.contains("reviewThreads") {
+                    if self.threads_unreadable {
+                        return ok(json!({"errors":[{"message":"unavailable"}]}));
+                    }
                     return ok(
                         json!({"data":{"repository":{"pullRequest":{"reviewThreads":{
                         "pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":self.threads}}}}}),
@@ -2761,4 +2766,37 @@ fn x7_ap_unit_refuses_a_codex_verifier() {
     assert_eq!(code(u.run(&r)), "invalid_input@verifier.role");
     assert_eq!(names(&u.t.join("work/task")), ["TASK.md"]);
     assert_eq!((u.launches, u.calls.len()), (0, 0));
+}
+
+#[test]
+fn r3_flag_true_with_unreadable_threads_stops_unresolved_findings() {
+    let (mut u, r, _) = finding_on_the_head();
+    u.threads_unreadable = true;
+    let v = u.stop(&r, "gate", "unresolved_findings");
+    assert!(u.accept_calls().is_empty());
+    let answer: Value =
+        serde_json::from_slice(&std::fs::read(v["files"]["gate"].as_str().unwrap()).unwrap())
+            .unwrap();
+    assert!(answer["autoreview"]["threads_on_head"].is_null());
+}
+
+#[test]
+fn x7_ap_unit_starts_a_claude_stage_without_a_mode_as_auto() {
+    let mut u = U::new();
+    let r = u.request();
+    assert!(r["implementer"].get("permission_mode").is_none());
+    let (v, exit) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), exit), (Some("merged"), 0), "{v}");
+    let calls = std::fs::read_to_string(u.t.join("bin/calls.log")).unwrap();
+    assert!(
+        calls
+            .lines()
+            .all(|line| line.contains(" --permission-mode auto ")),
+        "{calls}"
+    );
+    assert_eq!(calls.lines().count(), 2);
+    assert_eq!(
+        stage_record(&v["stages"]["implementer"])["runtime"],
+        "claude"
+    );
 }

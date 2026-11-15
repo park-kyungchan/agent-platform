@@ -115,6 +115,7 @@ struct W {
     pin: String,
     free: u64,
     build_busy: bool,
+    build_released: bool,
     fetch_fails: bool,
     start: Option<Start>,
     close_fails: bool,
@@ -192,6 +193,7 @@ impl W {
             pin: "e".repeat(40),
             free: 50_000,
             build_busy: false,
+            build_released: false,
             fetch_fails: false,
             start: None,
             close_fails: false,
@@ -605,7 +607,7 @@ fn inherited(path: &str) -> bool {
         })
 }
 impl System for W {
-    fn call(&mut self, program: &str, a: &[String], body: &Value, _ms: u64) -> Answer {
+    fn call(&mut self, program: &str, a: &[String], body: &Value, ms: u64) -> Answer {
         if program == "bash" && a.len() == 3 && a[1] == "rollback-check" {
             self.checks.push((a[0].clone(), a[2].clone()));
             return Self::text(!self.old_script && !self.refused.contains(&a[2]), "");
@@ -630,8 +632,15 @@ impl System for W {
                 Self::text(true, &format!("Avail\n{}M\n", self.free))
             }
             "flock" => {
-                assert_eq!(a, args(&["-n", &self.p("build.lock"), "true"]));
-                Self::text(!self.build_busy, "")
+                if a[0] == "-n" {
+                    assert_eq!(a, args(&["-n", &self.p("build.lock"), "true"]));
+                    Self::text(!self.build_busy, "")
+                } else {
+                    assert!(self.applies("start_install").is_empty() && self.launched().is_empty());
+                    assert_eq!(a, args(&["-w", "3", &self.p("build.lock"), "true"]));
+                    assert_eq!(ms, 13_000);
+                    Self::text(self.build_released, "")
+                }
             }
             _ => panic!("unexpected program {program} {a:?}"),
         }
@@ -2757,4 +2766,120 @@ fn d12_recorded_tarball_the_installer_would_refuse_counts_as_absent() {
     w.old_script = true;
     let (v, exit) = rolls(&mut w);
     refused(&w, &v, exit, "nothing_to_roll_back");
+}
+
+// A positive bound probes once without waiting, then waits only after contention.
+fn locks(w: &W) -> Vec<Vec<String>> {
+    w.calls
+        .iter()
+        .filter(|(p, _, _)| p == "flock")
+        .map(|(_, a, _)| a.clone())
+        .collect()
+}
+
+#[test]
+fn w1_build_wait_outside_its_range_is_refused() {
+    for value in [
+        json!(-1),
+        json!(901),
+        json!(1.0),
+        json!("3"),
+        json!(null),
+        json!(true),
+        json!([]),
+        json!({}),
+    ] {
+        let mut w = W::new();
+        let mut r = w.request();
+        r["build_wait_seconds"] = value;
+        let (v, exit) = w.run_with(&r);
+        assert_eq!((end(&v), exit), (("refused", "invalid_input"), 2));
+        assert_eq!(v["detail"], json!({"field":"build_wait_seconds"}));
+        assert!(w.calls.is_empty() && !w.t.join("state").exists());
+    }
+}
+
+#[test]
+fn w1_free_lock_is_taken_without_waiting() {
+    for bound in [0, 3, 900] {
+        let mut w = W::new();
+        let mut r = w.request();
+        r["build_wait_seconds"] = json!(bound);
+        let (v, exit) = w.run_with(&r);
+        assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+        assert_eq!(locks(&w), [args(&["-n", &w.p("build.lock"), "true"])]);
+    }
+}
+
+#[test]
+fn w1_held_lock_is_waited_for_and_the_call_goes_on() {
+    let mut w = W::new();
+    (w.build_busy, w.build_released) = (true, true);
+    let mut r = w.request();
+    r["build_wait_seconds"] = json!(3);
+    let (v, exit) = w.run_with(&r);
+    assert_eq!((end(&v), exit), (("installed", ""), 0), "{v}");
+    assert_eq!(
+        locks(&w),
+        [
+            args(&["-n", &w.p("build.lock"), "true"]),
+            args(&["-w", "3", &w.p("build.lock"), "true"])
+        ]
+    );
+}
+
+#[test]
+fn w1_lock_held_past_the_bound_is_build_busy() {
+    for bound in [0, 3] {
+        let mut w = W::new();
+        w.build_busy = true;
+        let mut r = w.request();
+        r["build_wait_seconds"] = json!(bound);
+        let (v, exit) = w.run_with(&r);
+        refused(&w, &v, exit, "build_busy");
+        assert_eq!(locks(&w).len(), if bound == 0 { 1 } else { 2 });
+        assert!(w.applies("close_install").is_empty());
+    }
+}
+
+#[test]
+fn w2_waiting_line_only_when_the_call_waits() {
+    const CASE: &str = "AP_TEST_WAIT_CASE";
+    if let Ok(case) = std::env::var(CASE) {
+        let mut w = W::new();
+        w.build_busy = case != "free";
+        let mut r = w.request();
+        r["build_wait_seconds"] = json!(if case == "zero" { 0 } else { 3 });
+        w.run_with(&r);
+        return;
+    }
+    for case in ["free", "zero", "wait"] {
+        let out = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "w2_waiting_line_only_when_the_call_waits",
+                "--nocapture",
+            ])
+            .env(CASE, case)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stdout)
+        );
+        let err = String::from_utf8(out.stderr).unwrap();
+        if case == "wait" {
+            assert_eq!(err.lines().count(), 1, "{err}");
+            let v: Value = serde_json::from_str(err.trim()).unwrap();
+            assert_eq!(members(&v), ["at", "seconds", "waiting"]);
+            assert_eq!(v["waiting"], "build_lock");
+            assert_eq!(v["seconds"], 3);
+            let at = v["at"].as_str().unwrap();
+            assert_eq!(at.len(), 20);
+            assert!(at.ends_with('Z') && at.as_bytes()[10] == b'T');
+        } else {
+            assert!(err.is_empty(), "{err}");
+        }
+    }
 }

@@ -8,7 +8,7 @@
 # installer variable and AP_DELIVER_LOCK. It never calls systemctl. The origin's install-content.sh is
 # this repository's file unchanged; its install-ap.sh differs only in the build lock's path; a `cargo`
 # shim writes a file that answers --version with the commit it is built from.
-# One line `walk pass=<a..f> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
+# One line `walk pass=<a..h> k=<k> pair=<commit or neither> outcome=<outcome>` per case, then
 # `deliver-walk: ok`. Under CI=true it is skipped: the engine there has no object for the target's key.
 set -euo pipefail
 [ "$#" -eq 2 ] || { echo "usage: scripts/test-deliver.sh <ont binary> <ap binary>" >&2; exit 2; }
@@ -17,7 +17,7 @@ ONT=$(realpath -- "$1"); AP=$(realpath -- "$2")
 REPO=$(cd -- "$(dirname -- "$(realpath "$0")")/.." && pwd -P)
 MV=$(command -v mv)
 W=$(mktemp -d)
-trap 'rm -rf -- "$W"' EXIT
+trap '[ -z "${waiter:-}" ] || kill -KILL -- "-$waiter" 2>/dev/null || true; [ -z "${holder:-}" ] || kill -KILL -- "-$holder" 2>/dev/null || true; rm -rf -- "$W"' EXIT
 fail() { echo "deliver-walk: FAILED: $*" >&2; [ -f "$W/out.json" ] && cat "$W/out.json" >&2; exit 1; }
 
 # The host store's install objects, read only, to show that the walk wrote none of them.
@@ -55,6 +55,7 @@ cat > "$W/bin/mv" <<'EOF'
 "$WALK_MV" "$@"; rc=$?
 case " $* " in
   *" $AP_CONTENT_DST/"*)
+    if [ -e "$WALK/invalidate" ]; then rm -f -- "$AP_CONTENT_BACKUP_DIR"/*.sha256; fi
     if [ -e "$WALK/count" ]; then
       n=$(( $(cat "$WALK/count") + 1 )); echo "$n" > "$WALK/count"
       if [ -e "$WALK/kill_at" ] && [ "$n" -eq "$(cat "$WALK/kill_at")" ]; then kill -KILL 0; sleep 60; fi
@@ -237,6 +238,84 @@ rm -f "$W/slow"; : > "$W/release"
 flock -w 120 "$AP_DELIVER_LOCK" true || fail "pass f: the installer did not end"
 call lead; p=$(pair)
 [ "$RC" = 0 ] && [ "$p" = "$M" ] || fail "pass f: the call after the installer ended left the pair at $p (exit $RC)"
+
+
+# (g) A close records no refused tarball, and a rollback rechecks a recorded one.
+M=$(merge); : > "$W/invalidate"; call lead; rm "$W/invalidate"
+[ "$RC" = 0 ] && [ "$(pair)" = "$M" ] && [ "$(member 'r["rollback_content"]')" = null ] || fail "pass g: a close recorded a refused tarball"
+M=$(merge); call lead
+[ "$RC" = 0 ] && [ "$(pair)" = "$M" ] || fail "pass g: install before rollback"
+TAR=$(member 'r["rollback_content"]'); [ "$TAR" != null ] || fail "pass g: no recorded tarball"
+rm "$TAR.sha256"
+call rollback
+[ "$RC" = 2 ] && [ "$(member 'r["code"]')" = nothing_to_roll_back ] && [ "$(pair)" = "$M" ] || fail "pass g: rollback used a refused tarball"
+line g 0 "$(pair)" nothing_to_roll_back
+
+# (h) Real build-lock contention: release, timeout, and a killed waiter.
+python3 -I - "$W/lead.json" "$W/wait.json" <<'PYWAIT'
+import json, sys
+r = json.load(open(sys.argv[1])); r['build_wait_seconds'] = 15
+json.dump(r, open(sys.argv[2], 'w'))
+PYWAIT
+hold_build() {
+  rm -f "$W/holding" "$W/unlock"
+  setsid flock -x "$W/build.lock" sh -c ': > "$WALK/holding"; while [ ! -e "$WALK/unlock" ]; do sleep 0.05; done' &
+  holder=$!
+  for _ in $(seq 1 100); do [ -e "$W/holding" ] && return; sleep 0.05; done
+  fail "pass h: holder did not take the lock"
+}
+waiting() {
+  python3 -I - "$1" "$2" <<'PYWAIT'
+import datetime, json, sys
+lines = open(sys.argv[1]).read().splitlines()
+assert len(lines) == 1, lines
+r = json.loads(lines[0]); assert set(r) == {'at', 'waiting', 'seconds'}, r
+assert r['waiting'] == 'build_lock' and r['seconds'] == int(sys.argv[2]), r
+assert len(r['at']) == 20 and r['at'].endswith('Z'), r
+datetime.datetime.strptime(r['at'], '%Y-%m-%dT%H:%M:%SZ')
+PYWAIT
+}
+attempts() {
+  printf '{"object_type":"install","where":{"all":[{"eq":["commit","%s"]}]},"limit":200}\n' "$M" | ont search |
+    python3 -I -c 'import json, sys; r=json.load(sys.stdin); assert r["status"] == "ok", r; print(len(r["result"]["objects"]))'
+}
+start_waiter() {
+  setsid "$AP" deliver < "$W/wait.json" > "$W/wait.out" 2> "$W/wait.err" &
+  waiter=$!
+  for _ in $(seq 1 200); do [ -s "$W/wait.err" ] && return; sleep 0.05; done
+  fail "pass h: call did not wait"
+}
+release_build() { : > "$W/unlock"; wait "$holder"; holder=; }
+M=$(merge); hold_build; start_waiter
+sleep 2; release_build
+RC=0; wait "$waiter" || RC=$?; waiter=
+cp "$W/wait.out" "$W/out.json"; cp "$W/wait.err" "$W/err"
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$M" ] || fail "pass h k=1: exit $RC"
+waiting "$W/err" 15 || fail "pass h k=1: waiting line"
+[ "$(wc -l < "$W/out.json")" = 1 ] || fail "pass h k=1: stdout is not one line"
+line h 1 "$(pair)" installed
+
+M=$(merge); BEFORE=$(pair)
+python3 -I - "$W/wait.json" "$W/bound.json" <<'PYWAIT'
+import json, sys
+r=json.load(open(sys.argv[1])); r['build_wait_seconds']=1; json.dump(r,open(sys.argv[2],'w'))
+PYWAIT
+hold_build; call bound; release_build
+[ "$RC" = 2 ] && [ "$(member 'r["code"]')" = build_busy ] && [ "$(pair)" = "$BEFORE" ] && [ "$(attempts)" = 0 ] || fail "pass h k=2: exit $RC"
+waiting "$W/err" 1 || fail "pass h k=2: waiting line"
+line h 2 "$(pair)" build_busy
+
+hold_build; start_waiter
+waiting "$W/wait.err" 15 || fail "pass h k=3: did not wait"
+[ ! -s "$W/wait.out" ] && [ "$(pair)" = "$BEFORE" ] && [ "$(attempts)" = 0 ] || fail "pass h k=3: effect while waiting"
+call lead
+[ "$RC" = 2 ] && [ "$(member 'r["code"]')" = busy ] || fail "pass h k=3: second call is not busy"
+kill -KILL -- "-$waiter"; wait "$waiter" 2>/dev/null || true; waiter=
+release_build
+call lead
+[ "$RC" = 0 ] && [ "$(member 'r["end"]')" = installed ] && [ "$(pair)" = "$M" ] && [ "$(attempts)" = 1 ] || fail "pass h k=3: call after killed waiter"
+[ ! -s "$W/err" ] || fail "pass h k=3: free lock printed a waiting line"
+line h 3 "$(pair)" installed
 
 [ "$(host_count)" = "$host_before" ] || fail "the host store's install objects changed"
 echo "deliver-walk: ok"
