@@ -3935,7 +3935,12 @@ fn r5_a_given_thread_passes_the_marker_of_the_reviewer_on_the_head() {
     assert_eq!(gate["autoreview"]["threads_on_head"], 0);
     // The given thread goes on as without the marker: named, judged, resolved in `status`.
     let prompt = std::fs::read_to_string(u.t.join("work/task/u1.verifier.prompt.md")).unwrap();
-    assert!(prompt.lines().any(|l| l.contains("T1") && l.contains("src/a.rs")), "{prompt}");
+    assert!(
+        prompt
+            .lines()
+            .any(|l| l.contains("T1") && l.contains("src/a.rs")),
+        "{prompt}"
+    );
     assert_eq!(
         v["threads"],
         json!([{"id":"T1","path":"src/a.rs","line":1,"word":"fixed","resolved":true}])
