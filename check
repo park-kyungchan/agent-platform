@@ -7,7 +7,7 @@ set -euo pipefail
 self=$(realpath "$0")
 cd "$(dirname "$self")"
 if [ "${CI:-}" != true ] && [ -z "${CHECK_LOCKED:-}" ]; then
-  lock=${HOST_CARGO_LOCK:-/home/palantirkc/work/ws-replan/wt/.host-cargo.lock}
+  lock=${HOST_CARGO_LOCK:-/var/lib/agent-platform/build.lock}
   if [ -e "$lock" ]; then
     free=$(df -BM --output=avail . | tail -n 1 | tr -dc 0-9)
     if [ "$free" -lt 10240 ]; then
