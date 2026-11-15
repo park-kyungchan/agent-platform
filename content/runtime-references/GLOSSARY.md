@@ -16,7 +16,7 @@ One word for one thing. Read this when a word in an instruction, a packet or the
 | Term | Meaning | Example on this host | Do not write |
 | --- | --- | --- | --- |
 | board | An optional file of a multi-thread task that lists work threads and live workers; a Lead is not required to keep one and it holds no value a command can produce (`/root/.agents/skills/lead/references/program-board.md`) | `/home/palantirkc/work/<scope>-<topic>/BOARD.md` | `dashboard file` |
-| lens file | The one file of a task, at most two pages, in which the Lead keeps the whole view: target structure and open decisions | `/home/palantirkc/work/<scope>-<topic>/LENS.md` | `architecture overview` |
+| lens file | The one file of a task, about two pages, in which the Lead keeps the whole view: target structure and open decisions | `/home/palantirkc/work/<scope>-<topic>/LENS.md` | `architecture overview` |
 | design note | The Lead's written design of a store format, the schema of an authoritative store, or the order of record and effect on a real target: use, decision, invariants as executables, pull requests, undo | `/root/.agents/skills/lead/references/design.md` | `design doc` |
 | checkpoint | The content of STATE at a moment, complete enough for a new session to continue from it | A STATE whose header carries the time it was written | `snapshot file` |
 | work thread | One line of work inside a task that serves a named KPI or guardrail and has one owner and one next action | A line of STATE's open threads, or a row of a board file where the task keeps one | `workstream` |
