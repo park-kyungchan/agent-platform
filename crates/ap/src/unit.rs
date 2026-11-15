@@ -200,9 +200,6 @@ impl<S: System> System for Rendered<'_, S> {
     fn directory(&self, path: &str) -> std::io::Result<std::path::PathBuf> {
         self.s.directory(path)
     }
-    fn exists(&self, path: &str) -> std::io::Result<bool> {
-        self.s.exists(path)
-    }
     fn work_root(&self) -> std::path::PathBuf {
         self.s.work_root()
     }
