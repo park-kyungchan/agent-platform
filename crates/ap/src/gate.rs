@@ -2,7 +2,7 @@
 //! done, and prints one answer of what GitHub reported. It decides nothing a person decides: it
 //! resolves no thread, posts no status, merges nothing and calls no store. Its only writes are the
 //! ready mark of a draft and the one toggle of draft and ready that asks for a review of the head.
-use crate::work::{Failure, System, args, error, fail, require, text};
+use crate::host::{Failure, System, args, error, fail, require, text};
 use serde_json::{Value, json};
 use std::{ffi::OsString, io::Read, io::Write, process::ExitCode, time::Duration};
 
@@ -409,13 +409,13 @@ pub fn cli(argv: &[OsString]) -> ExitCode {
         require!(argv.is_empty() => "usage", "args");
         let mut bytes = vec![];
         std::io::stdin()
-            .take(crate::work::LIMIT + 1)
+            .take(crate::host::LIMIT + 1)
             .read_to_end(&mut bytes)
             .map_err(|_| error("io_error", "stdin"))?;
-        require!(bytes.len() as u64 <= crate::work::LIMIT => "input_too_large", "stdin");
+        require!(bytes.len() as u64 <= crate::host::LIMIT => "input_too_large", "stdin");
         let r: Value =
             serde_json::from_slice(&bytes).map_err(|_| error("invalid_input", "stdin"))?;
-        execute(&mut crate::work::Host, &r)
+        execute(&mut crate::host::Host, &r)
     })();
     let (line, code, out) = match result {
         Ok((v, status)) => (v, status, true),

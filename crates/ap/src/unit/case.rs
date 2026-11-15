@@ -5,7 +5,7 @@ use super::{
     End, RUN_FILES, Stop, Unit, accept, claimed, create, executable, now, path, regular, seconds,
     stage, stage_request, stage_run, stop, unchanged,
 };
-use crate::work::{Failure, LIMIT, System, args, digest, error, fail, require};
+use crate::host::{Failure, LIMIT, System, args, digest, error, fail, require};
 use serde_json::{Value, json};
 use std::path::{Component, Path};
 

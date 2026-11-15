@@ -1,5 +1,5 @@
 //! Store-owned reviews; a derived GitHub status is posted only after local checks.
-use crate::work::{
+use crate::host::{
     Failure, LIMIT, System, apply_answer, args, codes, complete_id, digest, error, fail, id,
     json_cli, ont, parse, refused, require, text,
 };

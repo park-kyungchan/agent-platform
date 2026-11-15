@@ -26,7 +26,7 @@ Main checkouts are under `/home/palantirkc/platforms/<repository>/` unless a pat
 | | `crates/ont-store` | The SQLite store: schema installation, edits, the action log, candidates for queries | `src/lib.rs` |
 | | `crates/ont` | The library and command `ont`: `get`, `search`, `around`, `aggregate`, `action`, `render`, `index`, `schema`, `backup`, `mcp` | `README.md`, then `src/lib.rs` and the file named after the command |
 | | `crates/ont-daemon` | An older service form of the engine; not installed on the host | its `Cargo.toml` |
-| `agent-platform` | `crates/ap` | The command `ap`: `unit` (one unit of work from its page in one call), `run` (one stage), `gate`, `review`, `deliver` (the install of an accepted merge of `main`), `work`, `pane`; `ap --help` lists them | `README.md`, then the file named after the verb under `src/` |
+| `agent-platform` | `crates/ap` | The command `ap`: `unit` (one unit of work from its page in one call), `run` (one stage), `gate`, `review`, `deliver` (the install of an accepted merge of `main`); `ap --help` lists them | `README.md`, then the file named after the verb under `src/` |
 | | `content/` | Source of `/root/.agents/`: `AGENTS.md`, `runtime-references/`, `skills/`, with `SHA256SUMS` | `content/README.md` |
 | | `ontology/` | `work.schema.json`: the store's object and action types for tasks (holds, decisions, KPIs and measurements, reviews, install attempts, worker runs); the file is the list | `ontology/README.md` |
 | | `memory/` | Engineering memory: checked originals and their publisher | `memory/README.md` |

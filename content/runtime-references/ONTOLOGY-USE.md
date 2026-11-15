@@ -101,7 +101,7 @@ Send JSON on standard input to `ont action apply`: `action_type`, `parameters`, 
 `status` remains the running/closed statement for views and other criteria.
 `write_pattern` checks each write-set member's ASCII path characters and a path
 part of at most 297 bytes, excluding optional trailing `/**` (at most 300 bytes total);
-only the caller bounds the count (64 in `ap work start`); the engine has no schema count bound.
+the engine has no schema count bound.
 For a new type, a uniqueness criterion links through a reference set only while
 the object is open and cleared by the closing action; see `ontology/README.md` in `agent-platform`.
 Review prompt/report parameters use `file_path`: an absolute printable ASCII path
