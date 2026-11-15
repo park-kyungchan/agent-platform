@@ -1,14 +1,4 @@
-//! Pure rendering plus explicitly scoped Linux public-instruction installation.
-//! Native installation is an explicit separate Linux API; render remains pure.
-
-#[cfg(target_os = "linux")]
-pub mod native;
-
-mod renderer;
-mod types;
-
-pub use renderer::render;
-pub use types::*;
+//! The verbs of `ap`: each module is one verb's code.
 
 #[cfg(target_os = "linux")]
 pub mod pane;

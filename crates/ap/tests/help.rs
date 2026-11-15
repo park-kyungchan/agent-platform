@@ -10,7 +10,7 @@ fn ap(args: &[&str]) -> std::process::Output {
         .unwrap()
 }
 /// The words that follow `needle` in `source`, each between double quotes, as the content check
-/// (`ci/check-content.py`) reads the dispatch: `arg == "gate"`, `args[0] == "doctor"`.
+/// (`ci/check-content.py`) reads the dispatch: `arg == "gate"`, `args[0] == "version"`.
 fn quoted_after(source: &str, needle: &str, out: &mut BTreeSet<String>) {
     for part in source.split(needle).skip(1) {
         let word: String = part
@@ -54,15 +54,11 @@ fn r2_help_lists_every_verb() {
 
     // Every verb the dispatch knows is listed.
     let mut dispatched = BTreeSet::new();
-    for source in [
-        include_str!("../src/main.rs"),
-        include_str!("../src/native/cli.rs"),
-    ] {
-        quoted_after(source, "arg == ", &mut dispatched);
-        quoted_after(source, "args[0] == ", &mut dispatched);
-        quoted_after(source, "args[0] != ", &mut dispatched);
-    }
-    assert!(dispatched.contains("gate") && dispatched.contains("doctor"));
+    let source = include_str!("../src/main.rs");
+    quoted_after(source, "arg == ", &mut dispatched);
+    quoted_after(source, "args[0] == ", &mut dispatched);
+    quoted_after(source, "args[0] != ", &mut dispatched);
+    assert!(dispatched.contains("gate") && dispatched.contains("pane"));
     let missing: Vec<_> = dispatched.difference(&names).collect();
     assert!(missing.is_empty(), "dispatched and not listed: {missing:?}");
 
