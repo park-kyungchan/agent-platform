@@ -105,7 +105,7 @@ struct Request {
     memory: bool,
     /// The stage runs on the Codex CLI; on a resume, the thread's tokens before this run.
     codex: bool,
-    spent: [u64; 4],
+    spent: Option<[u64; 4]>,
 }
 
 fn path(r: &Value, key: &str) -> Result<String, Failure> {
@@ -454,7 +454,7 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
         mcp,
         spent: match (&earlier, codex) {
             (Some((_, (_, _, file))), true) => spent(file),
-            _ => [0; 4],
+            _ => Some([0; 4]),
         },
         resume: earlier.map(|(_, r)| r),
         expect_before,
@@ -467,20 +467,23 @@ fn request_at(s: &mut impl System, r: &Value, at_cwd: bool) -> Result<Request, F
 }
 const TOKENS: [&str; 4] = ["input", "output", "cache_read", "cache_creation"];
 /// The tokens of a Codex thread up to the end of the run of `file`: that record's and those of
-/// every record it resumes (the CLI reports the thread's usage, a record its own part).
-fn spent(file: &str) -> [u64; 4] {
-    let (mut sum, mut next) = ([0; 4], Some(file.to_owned()));
-    for _ in 0..256 {
-        let Some(rec) = next.and_then(|f| std::fs::read(f).ok()) else {
-            break;
-        };
-        let rec: Value = serde_json::from_slice(&rec).unwrap_or_default();
+/// every record it resumes (the CLI reports the thread's usage, a record its own part). None when
+/// the chain cannot be followed to its end: a record that cannot be read, a record met twice, or
+/// more than 256 records.
+fn spent(file: &str) -> Option<[u64; 4]> {
+    let (mut sum, mut next, mut met) = ([0; 4], file.to_owned(), vec![]);
+    while met.len() < 256 && !met.contains(&next) {
+        let rec: Value = serde_json::from_slice(&std::fs::read(&next).ok()?).ok()?;
         for (s, k) in sum.iter_mut().zip(TOKENS) {
             *s += rec["tokens"][k].as_u64().unwrap_or(0);
         }
-        next = rec["resumes"].as_str().map(str::to_owned);
+        met.push(next);
+        match &rec["resumes"] {
+            Value::Null => return Some(sum),
+            v => next = v.as_str()?.to_owned(),
+        }
     }
-    sum
+    None
 }
 
 /// UTC RFC 3339 to the second.
@@ -581,7 +584,8 @@ struct Seen {
     rejected: bool,
     /// A Codex stream (with the thread's tokens before this run): its thread, the last agent
     /// message of the turn running, and the items completed since the last turn end.
-    codex: Option<[u64; 4]>,
+    /// (Some(None): the tokens before this run are unknown, so this run's are too.)
+    codex: Option<Option<[u64; 4]>>,
     thread: Option<String>,
     message: Option<String>,
     items: u64,
@@ -615,7 +619,7 @@ impl Seen {
     /// A Codex event, read into the shape of a `result`: a turn end is one, with the last agent
     /// message of its turn as the answer when it completed, the error's message when it failed.
     /// An `error` event alone is none: the CLI prints one for each reconnection attempt.
-    fn codex_line(&mut self, e: &Value, spent: [u64; 4]) {
+    fn codex_line(&mut self, e: &Value, spent: Option<[u64; 4]>) {
         let (item, kind) = (&e["item"], e["item"]["type"].as_str());
         match e["type"].as_str().unwrap_or("") {
             "thread.started" => self.thread = e["thread_id"].as_str().map(str::to_owned),
@@ -641,7 +645,9 @@ impl Seen {
                     let (read, write) = (u("cached_input_tokens"), u("cache_write_input_tokens"));
                     let (read, write) = (read.unwrap_or(0), write.unwrap_or(0));
                     let input = u("input_tokens").map(|i| i.saturating_sub(read + write));
-                    let own = |v: Option<u64>, i: usize| v.map(|v| v.saturating_sub(spent[i]));
+                    let own = |v: Option<u64>, i: usize| {
+                        spent.and_then(|s| v.map(|v| v.saturating_sub(s[i])))
+                    };
                     r["result"] = json!(message.unwrap_or_default());
                     r["usage"] = json!({"input_tokens": own(input, 0),
                         "output_tokens": own(u("output_tokens"), 1),
@@ -878,12 +884,14 @@ fn codex_args(q: &Request, resume: Option<&str>) -> Vec<String> {
     a.push("-".into());
     a
 }
-/// The session the Codex CLI named at the thread's start enters the record at once.
-fn named(out: &str, record: &mut Value, seen: &Seen) {
+/// The session the Codex CLI named at the thread's start enters the record at once. False when
+/// that write of the record failed, which counts as every failed write of it after the launch.
+fn named(out: &str, record: &mut Value, seen: &Seen) -> bool {
     if let (true, Some(thread)) = (record["session"].is_null(), &seen.thread) {
         record["session"] = json!(thread);
-        let _ = persist(out, record);
+        return persist(out, record);
     }
+    true
 }
 /// One launch on one account. Returns the final record, whether the session did work, and
 /// whether every write after the first effect succeeded.
@@ -982,11 +990,11 @@ fn attempt(
         codex: q.codex.then_some(q.spent),
         ..Seen::default()
     };
-    let (mut offset, mut partial) = (0, vec![]);
+    let (mut offset, mut partial, mut kept) = (0, vec![], true);
     let end = loop {
         let exited = !matches!(child.try_wait(), Ok(None));
         follow(reader, &mut offset, &mut partial, &mut seen);
-        named(&q.out, &mut record, &seen);
+        kept &= named(&q.out, &mut record, &seen);
         if seen.done() {
             break End::Result;
         }
@@ -1014,7 +1022,7 @@ fn attempt(
     if !partial.is_empty() {
         seen.line(&partial);
     }
-    named(&q.out, &mut record, &seen);
+    kept &= named(&q.out, &mut record, &seen);
     // The bound decides for every role: a result read during the shutdown gives the saved answer
     // and `expect_met`, never another state.
     let timed_out = matches!(end, End::Timeout);
@@ -1041,7 +1049,7 @@ fn attempt(
         record["unmet"] = json!("stop");
     }
     let saved = persist(&q.out, &record);
-    (record, seen.worked, saved && !write_failed)
+    (record, seen.worked, saved && kept && !write_failed)
 }
 /// One `ap run` request. A refusal (exit 2) comes before any effect and writes no file.
 pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
