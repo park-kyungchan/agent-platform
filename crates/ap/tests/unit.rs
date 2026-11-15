@@ -3977,3 +3977,50 @@ fn r5_a_stage_whose_record_could_not_be_written_ends_the_step() {
     assert!(!exists(&u, "work/task/u1-2.unit.json"));
     assert!(u.statuses().is_empty() && u.merges().is_empty());
 }
+
+/// The threads are resolved only after every condition of the status held: a head that moved after
+/// the review closed stops `status` before any thread is read or resolved.
+#[test]
+fn r5_a_head_that_moved_before_the_status_resolves_nothing() {
+    let mut u = U::new();
+    u.threads = vec![given("T1", 1)];
+    accepting(&u, "Thread T1: fixed");
+    u.move_head_on_close = true;
+    u.stop(&r5_request(&u), "status", "head_differs");
+    assert!(graphql_with(&u, "node(id:").is_empty(), "no thread read");
+    assert!(resolves(&u).is_empty(), "no thread resolved");
+    assert_eq!(u.threads[0]["isResolved"], false);
+}
+
+/// No cause of the threads starts a round: with `repair`, each ends the call with no fixer stage and
+/// no come-back.
+#[test]
+fn r5_no_cause_of_the_threads_starts_a_round() {
+    let cases: [(&str, &str, Option<&'static str>, &str); 3] = [
+        ("Thread T1: blocking", "verifier", None, "thread_blocking"),
+        ("Thread T2: fixed", "verifier", None, "threads_unjudged"),
+        (
+            "Thread T1: fixed",
+            "status",
+            Some("reply"),
+            "thread_changed",
+        ),
+    ];
+    for (lines, step, change, cause) in cases {
+        let mut u = U::new();
+        fixing(&u, FIX);
+        u.threads = vec![given("T1", 1)];
+        accepting(&u, lines);
+        u.thread_change_on_close = change;
+        let mut r = r4_request(&u);
+        (r["gate"], r["judge_threads"]) = (json!({"autoreview_minutes":1}), json!(true));
+        let v = u.stop(&r, step, cause);
+        assert_eq!(u.launches, 2, "no fixer stage: {cause}");
+        let keys: Vec<_> = v["repair"].as_object().unwrap().keys().collect();
+        assert_eq!(keys, ["prompt", "verifier_prompt"], "{cause}");
+        assert!(!exists(&u, "work/task/u1.fixer.prompt.md"), "{cause}");
+        assert!(!exists(&u, "work/task/u1.fixer.md.run.json"), "{cause}");
+        assert!(!exists(&u, "work/task/u1-2.unit.json"), "{cause}");
+        assert!(resolves(&u).is_empty(), "{cause}");
+    }
+}
