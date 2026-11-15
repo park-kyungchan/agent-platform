@@ -299,33 +299,32 @@ class Replay(unittest.TestCase):
         self.fail("the script did not reach the engine")
 
     def slow_ont(self, first_only=False):
-        """An engine that announces itself and then waits (`exec`, so that it ends when it is killed)."""
+        """An engine that announces itself and then waits (`exec`, so that it is the process that waits)."""
         ready = self.tmp / "ready"
-        wait = f"if [ ! -e {ready} ]; then touch {ready}; sleep 1; fi; exec {ONT} \"$@\"" if first_only else f"touch {ready}; exec sleep 60"
+        pid = self.tmp / "ont.pid"
+        wait = f"if [ ! -e {ready} ]; then touch {ready}; sleep 1; fi; exec {ONT} \"$@\"" if first_only else f"echo $$ > {pid}; touch {ready}; exec sleep 30"
+        self.addCleanup(lambda: pid.exists() and subprocess.run(["kill", pid.read_text().strip()], capture_output=True))  # the script's death leaves it
         return ready, self.fake_ont(wait)
 
-    def test_interrupt_during_an_engine_call_ends_with_one_line(self):
-        self.write(Lines())
-        ready, ont = self.slow_ont()
-        proc = self.start(ont)
-        self.wait_for(ready, proc)
-        proc.send_signal(signal.SIGINT)
-        out, err = proc.communicate(timeout=60)
-        self.assertEqual((proc.returncode, err, out), (2, "", '{"status": "interrupted"}\n'))
-
-    def test_interrupt_while_a_large_record_is_read(self):
-        big = json.dumps({"type": "assistant", "cwd": LESSON, "timestamp": f"{DAY}T03:00:00Z", "note": MARK + "x" * 64_000_000, "n": PREFIX_TEXT})
-        (self.sessions / "big.jsonl").write_text(big + "\n")
-        proc = self.start(ONT)
-        for _ in range(600):  # as soon as the script has the record open
-            if proc.poll() is not None or any(str(self.sessions / "big.jsonl") == os.path.realpath(f"/proc/{proc.pid}/fd/{fd}") for fd in os.listdir(f"/proc/{proc.pid}/fd")):
-                break
-            time.sleep(0.005)
+    def interrupted(self, proc):
         proc.send_signal(signal.SIGINT)
         out, err = proc.communicate(timeout=120)
-        self.assertEqual(err, "")  # the interrupt may come after the last read: then the run is a complete one
-        self.assertIn((proc.returncode, json.loads(out)["status"]), ((2, "interrupted"), (0, "ok")))
-        self.assertNotIn(MARK, out)
+        self.assertEqual((proc.returncode, err, out), (-signal.SIGINT, "", ""))  # ended by the signal: nothing printed
+
+    def test_an_interrupt_ends_the_process_by_the_signal(self):
+        self.write(Lines())
+        ready, ont = self.slow_ont()  # during an engine call
+        proc = self.start(ont)
+        self.wait_for(ready, proc)
+        self.interrupted(proc)
+        big = json.dumps({"type": "assistant", "cwd": LESSON, "timestamp": f"{DAY}T03:00:00Z", "note": MARK + "x" * 64_000_000, "n": PREFIX_TEXT})
+        (self.sessions / "big.jsonl").write_text(big + "\n" + big + "\n")  # while a large record is read
+        proc = self.start(ONT)
+        for _ in range(2000):  # as soon as the script has the record open
+            if proc.poll() is not None or any(str(self.sessions / "big.jsonl") == os.path.realpath(f"/proc/{proc.pid}/fd/{fd}") for fd in os.listdir(f"/proc/{proc.pid}/fd")):
+                break
+            time.sleep(0.002)
+        self.interrupted(proc)
 
     def test_closed_standard_output_ends_with_code_2_and_nothing_on_standard_error(self):
         L = Lines()
@@ -346,26 +345,41 @@ class Replay(unittest.TestCase):
         self.write(f'["{GET}"]\n"{GET}"\n5\nnull\n' + L.text())
         L = Lines()
         L.n = 100  # other call ids than the first file's
-        self.make(L, 2)
+
+        def odd(i, edit, **kw):
+            a = answer(base(i))
+            edit(a)
+            self.make(L, i, ans=a, **kw)
+
+        def targets(key, value, names=None):
+            return lambda a: [f["target"].__setitem__(key, value) for f in a["fields"] if names is None or f["field"] in names]
+        same = [f for f in FIELDS if f != "previousHomeworkAssessment"]
+        # compared, with the key checks as the members say
+        odd(2, targets("recordId", None, same))  # record_key: key_missing
+        odd(3, targets("recordId", 5, ["previousHomeworkAssessment"]))  # previous_record_key: key_missing
+        odd(4, lambda a: (targets("courseId", 7)(a), targets("lessonDate", None)(a)))  # never inspected
+        odd(5, lambda a: a.update(authoringHandle=None))
+        odd(6, lambda a: a["authoringHandle"].update(observationHandle=None))
+        L.call(SAVE, {"observationHandle": None}, {"status": "saved"}, ts=f"{DAY}T05:00:00.000Z")  # a save of no handle matches no call
+        # malformed
+        odd(7, targets("studentId", ["a", "list"]))
+        odd(8, targets("studentId", None))
+        odd(9, lambda a: a["fields"][0].update(field=["a", "list"]))
+        odd(10, lambda a: a["fields"].append(dict(a["fields"][0])))
+        self.make(L, 11)
         L.lines[-1]["message"]["content"][0]["content"][0]["text"] = 5  # the result's text is a number
-        listed = answer(base(3))
-        for f in listed["fields"]:
-            f["target"]["studentId"] = ["a", "list"]  # an unhashable id
-        self.make(L, 3, ans=listed)
-        handle = answer(base(4))
-        handle["authoringHandle"]["observationHandle"] = {"a": 1}
-        self.make(L, 4, ans=handle)
-        tag = answer(base(5))
-        tag["fields"][0]["field"] = ["a", "list"]  # an unhashable field name
-        self.make(L, 5, ans=tag)
-        twice = answer(base(6))
-        twice["fields"].append(dict(twice["fields"][0]))  # one field named twice
-        self.make(L, 6, ans=twice)
+        # a membership that is no string chooses nothing among several objects of one name
+        self.put(dict(base(12), membership_key="m-a"))
+        odd(12, targets("membershipId", None), store={"membership_key": "m-b"})
+        self.put(dict(base(13), membership_key="m-a"))
+        odd(13, targets("membershipId", None), drop=("membership_key",))  # one without the member: no null equals no member
         self.write(L, "b.jsonl")
         out = self.ok()
-        self.assertEqual(out["calls"], 6)
-        self.assertEqual(out["outcomes"]["compared"], 1)
-        self.assertEqual(out["outcomes"]["malformed"], 5)
+        self.assertEqual(out["calls"], 13)
+        self.assertEqual(out["outcomes"], {"unavailable": 0, "malformed": 5, "saved_later": 0, "no_object": 0, "ambiguous": 2, "identity_differs": 0, "compared": 6})
+        self.assertEqual(out["answered_equal"], 6)
+        self.assertEqual(out["keys"], {"record_key": {"key_equal": 5, "key_missing": 1, "key_differs": 0},
+                                       "previous_record_key": {"key_equal": 5, "key_missing": 1, "key_differs": 0}})
         self.assertEqual(set(out), {"status", "days", "calls", "outcomes", "answered_equal", "fields", "keys", "store", "k3_equal", "k3_of"})
 
     def test_point7_schema_without_members_ends_before_any_read(self):

@@ -6,8 +6,14 @@ Seoul day: the calls of mcp__academy_operations__academy_dailyrecord_get and _sa
 and the store's `lesson_record` objects through `ont` (describe, search; members are returned exactly). It writes nothing.
 It prints ONE JSON object of integers and fixed words, or one `{"status":"<fixed code>"}` line with exit 2; never a name,
 id, date, text, hash or length of one, and nothing on standard error.
+An interrupt is not handled: SIGINT keeps its default action from the first statements, so it ends the process by the signal
+and nothing more is printed.
 Run: python3 -I -B evals/lesson/replay --store PATH --day 2026-11-12 [--day ...]
 """
+import signal
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)  # first: before any other import
+
 import argparse
 import collections
 import datetime
@@ -15,7 +21,6 @@ import glob
 import json
 import os
 import re
-import signal
 import subprocess
 import sys
 import unicodedata
@@ -171,21 +176,22 @@ def key_word(stored, recorded):
 
 
 def parse_get(ans):
-    """(date, handle, {field: (value, target)}) of an observed answer; None when it lacks the six fields or a member has another type."""
-    fields, handle = ans.get("fields"), ans.get("authoringHandle", {})
-    if not isinstance(fields, list) or not isinstance(ans.get("lessonDate"), str) or not isinstance(handle, dict) \
-            or not isinstance(handle.get("observationHandle", ""), str):
+    """(date, handle, {field: (value, target)}) of an observed answer, typed only where the script uses a member;
+    None when it is malformed: a date that is no string, a field named twice, fewer than six counted fields, a student id that is no string."""
+    fields, handle = ans.get("fields"), ans.get("authoringHandle")
+    if not isinstance(fields, list) or not isinstance(ans.get("lessonDate"), str):
         return None
     got = {}
     for f in fields:
         if isinstance(f, dict) and isinstance(f.get("field"), str) and f["field"] in FIELDS and isinstance(f.get("before"), dict) \
                 and isinstance(f["before"].get("value"), str) and isinstance(f.get("target"), dict):
-            if f["field"] in got or not all(isinstance(f["target"].get(k, ""), str) for k in ("studentId", "membershipId", "recordId", "courseId", "lessonDate")):
-                return None  # a field named twice, or a target member of another type
+            if f["field"] in got or not isinstance(f["target"].get("studentId"), str):
+                return None
             got[f["field"]] = (f["before"]["value"], f["target"])
     if set(got) != set(FIELDS):
         return None
-    return ans["lessonDate"], handle.get("observationHandle"), got
+    handle = handle.get("observationHandle") if isinstance(handle, dict) else None
+    return ans["lessonDate"], handle if isinstance(handle, str) else None, got
 
 
 def session_files(pattern):
@@ -222,7 +228,7 @@ def classify(calls, by_date, marker):
         name = unicodedata.normalize("NFC", str(c["input"].get("displayName")))
         hits = [o for o in by_date[date] if unicodedata.normalize("NFC", str(o.get("student_name"))) == name]
         if len(hits) > 1:
-            hits = [o for o in hits if o.get("membership_key") == t.get("membershipId")]
+            hits = [o for o in hits if isinstance(t.get("membershipId"), str) and o.get("membership_key") == t["membershipId"]]
             if len(hits) != 1:
                 out["ambiguous"] += 1
                 continue
@@ -319,7 +325,6 @@ if __name__ == "__main__":
         result = {"status": str(e)}
     except SystemExit:
         raise
-    except BaseException as e:
-        signal.signal(signal.SIGINT, signal.SIG_IGN)  # a second interrupt must not break the one line
-        result = {"status": "interrupted"} if isinstance(e, KeyboardInterrupt) else {"status": "internal_error", "exception": type(e).__name__}
+    except Exception as e:
+        result = {"status": "internal_error", "exception": type(e).__name__}
     emit(result, 2)
