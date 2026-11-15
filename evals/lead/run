@@ -100,9 +100,19 @@ def strings(v):
     for x in v.values() if isinstance(v, dict) else v if isinstance(v, list) else ():
         yield from strings(x)
 
-def scan_stream(path, roots):
-    """(paths outside the roots, reads of the installed instructions) over every string of every tool call input; None if unreadable."""
-    outside, installed = [], 0
+def own_result(n, own):
+    """A normalized path of the form <account>/projects/<one directory>/<session>/tool-results/<anything>, of this try's own record."""
+    for acct in {own[0].rstrip("/"), os.path.realpath(own[0])} if own else ():
+        if n.startswith(acct + "/projects/"):
+            parts = n[len(acct) + len("/projects/"):].split("/")
+            if len(parts) >= 4 and parts[1] == own[1] and parts[2] == "tool-results":
+                return True
+    return False
+
+def scan_stream(path, roots, own=None):
+    """(paths outside the roots, reads of the installed instructions, own saved tool results) over every string of every tool
+    call input; None if unreadable. `own` is the (account, session) of the try's record."""
+    outside, installed, saved = [], 0, 0
     try:
         with open(path) as f:
             events = [json.loads(line) for line in f if line.strip()]
@@ -115,9 +125,11 @@ def scan_stream(path, roots):
             n = os.path.normpath(p)
             if not p.startswith("~") and (n == INSTALLED or n.startswith(INSTALLED + "/")):
                 installed += 1
+            elif not p.startswith("~") and own_result(n, own):
+                saved += 1
             elif p.startswith("~") or not (n.startswith("/dev/") or any(n == r or n.startswith(r + "/") for r in roots)):
                 outside.append(p)
-    return outside, installed
+    return outside, installed, saved
 
 def judge(out, cid, n):
     """One try, read from its files: record, answer, stream."""
@@ -126,7 +138,9 @@ def judge(out, cid, n):
     rec = rec if isinstance(rec, dict) else None
     state = str(rec.get("state")) if rec else "refused"
     root = os.path.dirname(str(rec.get("cwd", "")).rstrip("/")) if rec else ""
-    scan = scan_stream(base + ".stream.jsonl", [r for r in {root, os.path.realpath(root)} if len(r) > 1])
+    acct, sess = (rec.get("account"), rec.get("session")) if rec else (None, None)
+    own = (acct, sess) if isinstance(acct, str) and os.path.isabs(acct) and isinstance(sess, str) and sess and "/" not in sess else None
+    scan = scan_stream(base + ".stream.jsonl", [r for r in {root, os.path.realpath(root)} if len(r) > 1], own)
     reason = None
     if state != "ok":
         reason = "stage_" + state
@@ -135,7 +149,8 @@ def judge(out, cid, n):
     elif scan is None or scan[0]:
         reason = "outside_path"
     return {"try": n, "state": state, "valid": reason is None, "reason": reason, "turns": rec.get("turns") if rec else None,
-            "tokens": rec.get("tokens") if rec else None, "installed_reads": scan[1] if scan else 0}
+            "tokens": rec.get("tokens") if rec else None, "installed_reads": scan[1] if scan else 0,
+            "own_results": scan[2] if scan else 0}
 
 def summary(out, ids):
     result = {}
@@ -236,12 +251,19 @@ def cmd_score(a):
     ids = check_cases(a)
     sel = a.case or ids
     dirs = {"a": a.a, **({"b": a.b} if a.b else {})}
+    metas = {s: load_json(d + "/META.json") for s, d in dirs.items()}
+    now = {"cases_sha256": sha(read(os.path.join(HERE, "cases.sha256"))), "prompt_sha256": sha(read(os.path.join(HERE, "prompt.md")))}
+    unread = [s for s, m in metas.items() if not isinstance(m, dict)]
+    if unread:
+        refuse("set_stale", " ".join(unread))
+    if len(dirs) == 2 and any(metas["a"].get(k) != metas["b"].get(k) for k in ("cases_sha256", "prompt_sha256", "model", "effort")):
+        refuse("sets_not_comparable", "the sets differ in the cases file, the prompt, the model or the effort")
+    old = [s for s, m in metas.items() if any(m.get(k) != v for k, v in now.items())]
+    if old:
+        refuse("set_stale", " ".join(old))
     lacking = {s: [c for c in sel if not valid_answer(d, c)] for s, d in dirs.items()}
     if any(lacking.values()):
         refuse("set_incomplete", "; ".join("%s: %s" % (s.upper(), " ".join(v)) for s, v in lacking.items() if v))
-    metas = {s: load_json(d + "/META.json") or {} for s, d in dirs.items()}
-    if len(dirs) == 2 and any(metas["a"].get(k) != metas["b"].get(k) for k in ("cases_sha256", "prompt_sha256", "model", "effort")):
-        refuse("sets_not_comparable", "the sets differ in the cases file, the prompt, the model or the effort")
     if os.path.exists(a.out):
         refuse("out_exists", "the output exists")
     os.mkdir(a.out)
