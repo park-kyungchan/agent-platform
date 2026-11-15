@@ -52,7 +52,7 @@ Every platform repository has one workflow, `.github/workflows/rust.yml`, with t
 | Any task | `/home/palantirkc/work/<scope>-<topic>/STATE.md` |
 | Directory standard and where an old path went | `/home/palantirkc/work/ws-layout-standard/LAYOUT.md` and `PATH-MAP.tsv` beside it |
 | Whole-host improvement program (the whole view, the order of work) | `/home/palantirkc/work/ws-program/STATE.md`, with `LENS.md` beside it |
-| Rust migration plan and Academy parity | `/home/palantirkc/work/ws-replan/STATE.md`, with the plan and strategy files beside it |
+| The Academy lesson route on the Rust programs and the Ontology store (it replaced the Rust migration plan and tool-by-tool parity) | `/home/palantirkc/work/ws-program/DESIGN-LESSON-ROUTE.md` |
 | Academy lessons | `/home/palantirkc/work/edu-lessons/STATE.md` |
 | Memory selection and evaluation | `/home/palantirkc/work/mem-host-memory/STATE.md` |
 | Recovery archives | `/home/palantirkc/archive/INDEX.md`. An archive is for recovery; it carries no current rule |
@@ -70,7 +70,7 @@ A task's current holds, decisions, KPI values and worker runs are in the Ontolog
 | Installed shared instructions | `/root/.agents/AGENTS.md`, `runtime-references/`, `skills/` | `agent-platform` `content/` |
 | Delivery of `ap` and the shared instructions | the timer `ap-deliver.timer`; its request `/etc/agent-platform/deliver.json`; its state under `/var/lib/agent-platform/deliver/` | `agent-platform` `deploy/README.md` |
 | Configuration of each CLI | `CLI-RUNTIMES.md` section 1 | that CLI |
-| Cargo build lock of the host | `/home/palantirkc/work/ws-replan/wt/.host-cargo.lock` | `BUILD-AND-DELIVERY.md` section 2 |
+| Cargo build lock of the host | `/var/lib/agent-platform/build.lock` | `BUILD-AND-DELIVERY.md` section 2 |
 
 ## 5. External tools
 

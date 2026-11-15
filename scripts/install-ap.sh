@@ -8,7 +8,7 @@ while [[ "$BACKUP_DIR" != / && "$BACKUP_DIR" == */ ]]; do
   BACKUP_DIR="${BACKUP_DIR%/}"
 done
 INSTALLED="$INSTALL_DIR/ap"
-LOCK_FILE="/home/palantirkc/work/ws-replan/wt/.host-cargo.lock"
+LOCK_FILE="/var/lib/agent-platform/build.lock"
 INSTALL_LOCK_FILE="${AP_INSTALL_LOCK:-/run/lock/ap-install.lock}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
