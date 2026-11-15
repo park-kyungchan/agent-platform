@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+"""Replay of the recorded `dailyrecord_get` reads of lesson days against the read store (K3, first value).
+
+Reads Claude session records (lines whose cwd is at or under the lesson directory and whose time falls on an asked
+Seoul day: the calls of mcp__academy_operations__academy_dailyrecord_get and _save with their results, paired by call id)
+and the store's `lesson_record` objects through `ont` (describe, search; members are returned exactly). It writes nothing.
+It prints ONE JSON object of integers and fixed words, or one `{"status":"<fixed code>"}` line with exit 2; never a name,
+id, date, text, hash or length of one, and nothing on standard error.
+Run: python3 -I -B evals/lesson/replay --store PATH --day 2026-11-12 [--day ...]
+"""
+import argparse
+import collections
+import datetime
+import glob
+import json
+import re
+import subprocess
+import sys
+import unicodedata
+from pathlib import Path
+
+PREFIX = "mcp__academy_operations__academy_dailyrecord_"
+FIELDS = {"attendance": "attendance", "dailyTestAssessment": "daily_test_assessment", "homework": "homework",
+          "lessonMemo": "lesson_memo", "previousHomeworkAssessment": "previous_homework_assessment", "progress": "progress"}
+PREVIOUS = {"progress": "previous_progress", "homework": "previous_homework", "lesson_memo": "previous_lesson_memo"}
+MEMBERS = ("lesson_date", "student_name", "student_id", "membership_key", "record_key", "previous_record_key", "cut_fields",
+           *FIELDS.values(), *PREVIOUS.values())
+OUTCOMES = ("unavailable", "malformed", "saved_later", "no_object", "ambiguous", "identity_differs", "compared")
+WORDS = ("equal", "equal_after_whitespace", "store_cut", "store_missing", "differs")
+KEYS = ("key_equal", "key_missing", "key_differs")
+SEOUL = datetime.timezone(datetime.timedelta(hours=9))  # no daylight saving time in Seoul
+
+
+class Stop(Exception):
+    """A failure with a fixed code."""
+
+
+class Args(argparse.ArgumentParser):
+    def error(self, message):
+        raise Stop("bad_arguments")
+
+
+def seoul_day(ts):
+    """(Seoul calendar day, epoch seconds) of a record's time, or (None, None)."""
+    try:
+        t = datetime.datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        return t.astimezone(SEOUL).date().isoformat(), t.timestamp()
+    except ValueError:
+        return None, None
+
+
+def under(cwd, root):
+    return isinstance(cwd, str) and (cwd == root or cwd.startswith(root.rstrip("/") + "/"))
+
+
+def lines(path):
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        yield from fh
+
+
+def blocks(raw):
+    """The content blocks of a session-record line (a JSON object), and the line itself."""
+    try:
+        o = json.loads(raw)
+    except ValueError:
+        return {}, []
+    m = o.get("message") if isinstance(o, dict) else None
+    c = m.get("content") if isinstance(m, dict) else None
+    return o, [b for b in c if isinstance(b, dict)] if isinstance(c, list) else []
+
+
+def read_calls(files, lesson, days):
+    """Calls of the two tools on an asked day, one per call id (a forked session repeats lines)."""
+    calls = {}
+    for f in files:
+        for raw in lines(f):
+            if PREFIX not in raw:
+                continue
+            o, bs = blocks(raw)
+            day, at = seoul_day(o.get("timestamp"))
+            if day not in days or not under(o.get("cwd"), lesson):
+                continue
+            for b in bs:
+                if b.get("type") == "tool_use" and b.get("name") in (PREFIX + "get", PREFIX + "save") and isinstance(b.get("id"), str) and b["id"] not in calls:
+                    calls[b["id"]] = {"tool": b["name"][len(PREFIX):], "input": b["input"] if isinstance(b.get("input"), dict) else {}, "day": day, "at": at, "answer": None}
+    return calls
+
+
+def read_answers(files, calls):
+    """The first result of each call, parsed: {} when it is not a JSON object; None while there is none."""
+    for f in files:
+        for raw in lines(f):
+            if not any(i in calls and calls[i]["answer"] is None for i in re.findall(r'"tool_use_id"\s*:\s*"([^"]+)"', raw)):
+                continue
+            for b in blocks(raw)[1]:
+                c = calls.get(b.get("tool_use_id")) if b.get("type") == "tool_result" and isinstance(b.get("tool_use_id"), str) else None
+                if c is not None and c["answer"] is None:
+                    body = b.get("content")
+                    text = body if isinstance(body, str) else "".join(x.get("text", "") for x in body if isinstance(x, dict)) if isinstance(body, list) else ""
+                    try:
+                        ans = json.loads(text)
+                    except ValueError:
+                        ans = None
+                    c["answer"] = ans if isinstance(ans, dict) else {}
+
+
+def ont(binary, store, request, op, describe=False):
+    try:
+        p = subprocess.run([binary, "--store", store, *op], input=json.dumps(request), capture_output=True, text=True, timeout=300, check=False)
+    except (FileNotFoundError, PermissionError):
+        raise Stop("ont_not_found")
+    except (subprocess.TimeoutExpired, OSError):
+        raise Stop("ont_failed")
+    try:
+        out = json.loads(p.stdout)
+    except ValueError:
+        raise Stop("ont_failed")
+    if p.returncode == 2 and describe and isinstance(out, dict) and out.get("status") == "refused":
+        raise Stop("store_unreadable")
+    if p.returncode != 0:
+        raise Stop("ont_failed")
+    return out["result"]
+
+
+def objects(binary, store, where):
+    """Every `lesson_record` object matching `where`, as {member: value} of the members in the value state."""
+    found, cont = [], None
+    while True:
+        res = ont(binary, store, {"object_type": "lesson_record", "where": where, "limit": 1000, "continuation": cont}, ["search"])
+        b = res["basis"]
+        if b.get("partial") or b.get("oversized_excluded") or b.get("stale"):  # an object without the filtered member is `unresolved`: it cannot match
+            raise Stop("ont_failed")
+        for o in res["objects"]:
+            found.append({k: v["value"] for k, v in o["head"]["fields"].items() if isinstance(v, dict) and v.get("kind") == "value"})
+        cont = res.get("continuation")
+        if not cont:
+            return found
+
+
+def squash(s):
+    return " ".join(s.split())
+
+
+def word(stored, recorded, cut, marker):
+    """The word of one field: `stored` is the store's value (None: not in the value state), `recorded` the other text."""
+    if not isinstance(stored, str):
+        return "store_missing"
+    if stored == recorded:
+        return "equal"
+    if squash(stored) == squash(recorded):
+        return "equal_after_whitespace"
+    head = stored[:-len(marker)] if marker and stored.endswith(marker) else stored
+    if isinstance(cut, int) and cut > 0 and len(head) < len(recorded) and recorded.startswith(head):
+        return "store_cut"
+    return "differs"
+
+
+def key_word(stored, recorded):
+    """`recorded` is the list of the answer's record ids that name this key."""
+    if not isinstance(stored, str) or not all(isinstance(r, str) for r in recorded):
+        return "key_missing"
+    return "key_equal" if all(r == stored for r in recorded) else "key_differs"
+
+
+def parse_get(ans):
+    """(date, handle, {field: (value, target)}) of an observed answer, or None when it lacks the six fields."""
+    fields = ans.get("fields")
+    if not isinstance(fields, list) or not isinstance(ans.get("lessonDate"), str):
+        return None
+    got = {}
+    for f in fields:
+        if isinstance(f, dict) and f.get("field") in FIELDS and isinstance(f.get("before"), dict) and isinstance(f["before"].get("value"), str) \
+                and isinstance(f.get("target"), dict) and f["field"] not in got:
+            got[f["field"]] = (f["before"]["value"], f["target"])
+    if set(got) != set(FIELDS):
+        return None
+    h = ans.get("authoringHandle")
+    return ans["lessonDate"], h.get("observationHandle") if isinstance(h, dict) else None, got
+
+
+def session_files(pattern):
+    found = glob.glob(pattern, recursive=True) if pattern else [str(p) for p in Path.home().glob(".claude*/projects/**/*.jsonl")]
+    return sorted({f for f in found if Path(f).is_file()})
+
+
+def classify(calls, by_date, marker):
+    """Outcome of every `dailyrecord_get` call; the six words and two key words of the compared ones."""
+    gets = {i: c for i, c in calls.items() if c["tool"] == "get"}
+    parsed = {i: parse_get(c["answer"]) if (c["answer"] or {}).get("status") == "observed" else None for i, c in gets.items()}
+    who = collections.defaultdict(set)  # observation handle -> {(student id, date)}
+    for p in filter(None, parsed.values()):
+        if isinstance(p[1], str):
+            who[p[1]].add((p[2]["progress"][1].get("studentId"), p[0]))
+    saves = [(c["at"], c["day"], c["input"].get("observationHandle")) for c in calls.values()
+             if c["tool"] == "save" and (c["answer"] or {}).get("status") == "saved"]
+    out, fields = collections.Counter(), {f: collections.Counter() for f in FIELDS}
+    keys = {k: collections.Counter() for k in ("record_key", "previous_record_key")}
+    for i, c in sorted(gets.items()):
+        p = parsed[i]
+        out["calls"] += 1
+        if (c["answer"] or {}).get("status") != "observed":
+            out["unavailable"] += 1
+            continue
+        if p is None:
+            out["malformed"] += 1
+            continue
+        date, _, got = p
+        t = got["progress"][1]
+        if any(at > c["at"] and day == c["day"] and isinstance(h, str) and (t.get("studentId"), date) in who[h] for at, day, h in saves):
+            out["saved_later"] += 1
+            continue
+        name = unicodedata.normalize("NFC", str(c["input"].get("displayName")))
+        hits = [o for o in by_date[date] if unicodedata.normalize("NFC", str(o.get("student_name"))) == name]
+        if len(hits) > 1:
+            hits = [o for o in hits if o.get("membership_key") == t.get("membershipId")]
+            if len(hits) != 1:
+                out["ambiguous"] += 1
+                continue
+        if not hits:
+            out["no_object"] += 1
+            continue
+        o = hits[0]
+        if o.get("student_id") != t.get("studentId"):
+            out["identity_differs"] += 1
+            continue
+        out["compared"] += 1
+        words = {f: word(o.get(m), got[f][0], o.get("cut_fields"), marker) for f, m in FIELDS.items()}
+        kr = key_word(o.get("record_key"), [got[f][1].get("recordId") for f in FIELDS if f != "previousHomeworkAssessment"])
+        kp = key_word(o.get("previous_record_key"), [got["previousHomeworkAssessment"][1].get("recordId")])
+        for f, w in words.items():
+            fields[f][w] += 1
+        keys["record_key"][kr] += 1
+        keys["previous_record_key"][kp] += 1
+        out["answered_equal"] += all(w in ("equal", "equal_after_whitespace") for w in words.values()) and "key_differs" not in (kr, kp)
+    return out, fields, keys
+
+
+def store_pairs(a, days, by_date):
+    """Where an object's previous record key is the record key of another object of the same student and membership,
+    its previous_* members against that object's own."""
+    today = [o for d in days for o in by_date[d]]
+    wanted = sorted({o["previous_record_key"] for o in today if isinstance(o.get("previous_record_key"), str)})
+    found = collections.defaultdict(list)
+    for n in range(0, len(wanted), 50):
+        for q in objects(a.ont, a.store, {"in": ["record_key", wanted[n:n + 50]]}):
+            found[q.get("record_key")].append(q)
+    pairs, members = 0, {m: collections.Counter() for m in PREVIOUS}
+    for o in today:
+        for q in found.get(o.get("previous_record_key"), []):
+            if isinstance(o.get("student_id"), str) and (q.get("student_id"), q.get("membership_key")) == (o.get("student_id"), o.get("membership_key")):
+                pairs += 1
+                for m, pm in PREVIOUS.items():
+                    members[m]["store_missing" if not isinstance(q.get(m), str) else word(o.get(pm), q[m], o.get("cut_fields"), a.cut_marker)] += 1
+    return pairs, members
+
+
+def replay(a, days):
+    files = session_files(a.sessions)
+    calls = read_calls(files, a.lesson_cwd, days)
+    read_answers(files, calls)
+    desc = ont(a.ont, a.store, {}, ["describe"], describe=True)
+    declared = {p["name"] for t in desc["object_types"] if t.get("name") == "lesson_record" for p in t["properties"]}
+    if not set(MEMBERS) <= declared:
+        raise Stop("schema_missing_members")
+    dates = set(days) | {p[0] for c in calls.values() if c["tool"] == "get" and (c["answer"] or {}).get("status") == "observed" and (p := parse_get(c["answer"]))}
+    by_date = {d: objects(a.ont, a.store, {"eq": ["lesson_date", d]}) for d in sorted(dates)}
+    out, fields, keys = classify(calls, by_date, a.cut_marker)
+    pairs, members = store_pairs(a, days, by_date)
+    count = lambda c, words: {w: c[w] for w in words}
+    return {"status": "ok", "days": len(days), "calls": out["calls"], "outcomes": count(out, OUTCOMES), "answered_equal": out["answered_equal"],
+            "fields": {f: count(c, WORDS) for f, c in fields.items()}, "keys": {k: count(c, KEYS) for k, c in keys.items()},
+            "store": {"pairs": pairs, "members": {m: count(c, WORDS) for m, c in members.items()}},
+            "k3_equal": out["answered_equal"], "k3_of": out["calls"]}
+
+
+def main(argv):
+    ap = Args(description=__doc__.split("\n")[0], allow_abbrev=False)
+    ap.add_argument("--store", required=True)
+    ap.add_argument("--day", action="append", required=True)
+    ap.add_argument("--sessions")
+    ap.add_argument("--lesson-cwd", default="/home/palantirkc/work/edu-lessons")
+    ap.add_argument("--ont", default="ont")
+    ap.add_argument("--client", help="accepted and not passed: `ont` refuses --client on describe and search")
+    ap.add_argument("--cut-marker", default="\u2026", help="the store's cut marker, removed from the end of a cut text")
+    a = ap.parse_args(argv)
+    for d in a.day:
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+                raise ValueError
+            datetime.date.fromisoformat(d)
+        except ValueError:
+            raise Stop("day_invalid")
+    print(json.dumps(replay(a, sorted(set(a.day)))))
+
+
+if __name__ == "__main__":
+    try:
+        main(sys.argv[1:])
+    except Stop as e:
+        print(json.dumps({"status": str(e)}))
+        sys.exit(2)
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(json.dumps({"status": "internal_error", "exception": type(e).__name__}))
+        sys.exit(2)
