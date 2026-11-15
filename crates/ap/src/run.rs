@@ -70,6 +70,9 @@ const BASH_MS: &str = "2700000";
 /// Only the account's settings load: a worktree's `.claude/settings*.json`, which an earlier
 /// stage may have written, cannot steer this one (shown live: its `env` reached the shell).
 const SOURCES: &str = "user";
+/// What a launch after a launch that worked and was cut reads before the prompt: one line, one
+/// empty line.
+const CONTINUATION: &str = "A session of this stage on another account was cut by a usage limit after it had begun to work. This directory may hold its work, committed or not. First read the state it left: in a Git worktree `git status`, `git log --oneline origin/main..HEAD` and `git diff HEAD`. Keep what serves the task, do not start over, and go on until the task below is done.\n\n";
 /// The exit of a run whose stage may have run but whose answer or record could not be written.
 const WRITE_FAILED: u8 = 5;
 /// The states `systemctl is-active` answers while something of a unit may live.
@@ -608,6 +611,8 @@ struct Seen {
     worked: bool,
     /// A rate-limit event said `rejected`.
     rejected: bool,
+    /// The rate-limit event `limit` is made from: the last rejected one, else the last one.
+    limit: Option<Value>,
     /// A Codex stream (with the thread's tokens before this run): its thread, the last agent
     /// message of the turn running, and the items completed since the last turn end.
     /// (Some(None): the tokens before this run are unknown, so this run's are too.)
@@ -637,7 +642,11 @@ impl Seen {
                 self.worked |= tools.into_iter().any(|b| b["type"] == "tool_use");
             }
             Some("rate_limit_event") => {
-                self.rejected |= e["rate_limit_info"]["status"] == "rejected";
+                let rejected = e["rate_limit_info"]["status"] == "rejected";
+                if rejected || !self.rejected {
+                    self.limit = Some(e);
+                }
+                self.rejected |= rejected;
             }
             _ => (),
         }
@@ -685,6 +694,36 @@ impl Seen {
             _ => (),
         }
     }
+}
+/// `status` and `resets_at` of a rate-limit event or of one of its windows, by the shape stated in
+/// README "One stage": a member of another shape is null.
+fn limit_part(v: &Value) -> Value {
+    json!({"status": v["status"].as_str(), "resets_at": v["resetsAt"].as_u64()})
+}
+/// The record's `limit`: what the one rate-limit event of the launch held. `overageStatus` and
+/// every member not named here are not read.
+fn limit_of(e: Option<&Value>) -> Value {
+    let Some(e) = e else {
+        return Value::Null;
+    };
+    let info = &e["rate_limit_info"];
+    let mut limit = limit_part(info);
+    limit["kind"] = json!(info["rateLimitType"].as_str());
+    let windows = info["unifiedWindows"].as_object().into_iter().flatten();
+    // `unifiedWindows` is a sorted map: the first eight objects are the first by name.
+    let windows = windows.filter(|(_, w)| w.is_object()).take(8);
+    limit["windows"] = windows
+        .map(|(name, w)| {
+            let mut one = limit_part(w);
+            one["utilization"] = if w["utilization"].is_number() {
+                w["utilization"].clone()
+            } else {
+                Value::Null
+            };
+            (name.clone(), one)
+        })
+        .collect();
+    limit
 }
 /// Reads what the CLI appended to its output since the last call, through the handle opened
 /// before the launch (`read_at` leaves the CLI's file offset alone); whole lines only.
@@ -949,17 +988,46 @@ fn codex_args(q: &Request, resume: Option<&str>) -> Vec<String> {
 fn named(out: &str, record: &mut Value, seen: &Seen) -> bool {
     if let (true, Some(thread)) = (record["session"].is_null(), &seen.thread) {
         record["session"] = json!(thread);
+        mirror(record, seen.worked);
         return persist(out, record);
     }
     true
 }
-/// One launch on one account. Returns the final record, whether the session did work, and
-/// whether every write after the first effect succeeded.
+/// The last entry of `attempts` takes what the record holds of the launch running.
+fn mirror(record: &mut Value, worked: bool) {
+    let mut entry = json!({"worked": worked});
+    for k in ["account", "session", "start", "end", "state", "limit"] {
+        entry[k] = record[k].clone();
+    }
+    if let Some(last) = record["attempts"].as_array_mut().and_then(|a| a.last_mut()) {
+        for (k, v) in entry.as_object().into_iter().flatten() {
+            last[k] = v.clone();
+        }
+    }
+}
+/// What the launch reads on stdin: the prompt file, or after a launch that worked and was cut the
+/// continuation, an empty line and the file's bytes, through a pipe that a thread fills (no file).
+fn input(q: &Request, continued: bool) -> std::io::Result<File> {
+    let file = File::open(&q.prompt)?;
+    if !continued {
+        return Ok(file);
+    }
+    let mut bytes = CONTINUATION.as_bytes().to_vec();
+    file.take(LIMIT + 1).read_to_end(&mut bytes)?;
+    let (reader, mut writer) = std::io::pipe()?;
+    // The write ends with the pipe: when the CLI is gone, the reader is closed and the write fails.
+    std::thread::spawn(move || writer.write_all(&bytes));
+    Ok(File::from(std::os::fd::OwnedFd::from(reader)))
+}
+/// One launch on one account, after the launches `earlier` (their entries of `attempts`); with
+/// `continued` its input holds the continuation. Returns the final record, whether the session did
+/// work, and whether every write after the first effect succeeded.
 fn attempt(
     s: &mut impl System,
     q: &Request,
     account: &str,
     (output, errs): &(File, File),
+    (earlier, continued): (&[Value], bool),
 ) -> (Value, bool, bool) {
     let resume = q.resume.as_ref().map(|(session, _, _)| session.as_str());
     let mut record = json!({
@@ -972,8 +1040,12 @@ fn attempt(
         "tokens": {"input": null, "output": null, "cache_read": null, "cache_creation": null},
         "permission_denials": [], "results": 0, "expect_met": null,
         "expect_file_before": q.expect_before, "unmet": null,
-        "resumes": q.resume.as_ref().map(|(_, _, file)| file),
+        "resumes": q.resume.as_ref().map(|(_, _, file)| file), "limit": null,
     });
+    let mut attempts = earlier.to_vec();
+    attempts.push(json!({"continued": continued}));
+    record["attempts"] = json!(attempts);
+    mirror(&mut record, false);
     if let Some((path, _, sha256)) = &q.schema {
         record["answer_schema"] = json!({"path": path, "sha256": sha256});
     }
@@ -981,6 +1053,9 @@ fn attempt(
         record["state"] = json!("failed");
         record["unmet"] = json!(unmet);
         record["end"] = json!(stamp(SystemTime::now()));
+        // The text went to no launch.
+        record["attempts"][earlier.len()]["continued"] = json!(false);
+        mirror(&mut record, false);
         let saved = persist(&q.out, &record);
         (record, false, saved)
     };
@@ -996,13 +1071,14 @@ fn attempt(
         record["session"] = json!(session);
     }
     record["unit"] = json!(unit);
+    mirror(&mut record, false);
     // The run's own stream and error files, emptied for a next account's attempt.
     let empty = |mut f: &File| {
         f.set_len(0)?;
         f.seek(SeekFrom::Start(0))?;
         f.try_clone()
     };
-    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (File::open(&q.prompt), empty(output), empty(errs))
+    let (Ok(prompt), Ok(stdout), Ok(stderr)) = (input(q, continued), empty(output), empty(errs))
     else {
         return not_launched(record, "launch");
     };
@@ -1111,6 +1187,8 @@ fn attempt(
         record["state"] = json!("failed");
         record["unmet"] = json!("stop");
     }
+    record["limit"] = limit_of(seen.limit.as_ref());
+    mirror(&mut record, seen.worked);
     let saved = persist(&q.out, &record);
     (record, seen.worked, saved && kept && !write_failed)
 }
@@ -1136,17 +1214,20 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         Some((_, account, _)) => vec![account.clone()],
         None => q.accounts.clone(),
     };
-    let (mut last, mut clean) = (Value::Null, true);
+    let (mut last, mut clean, mut worked_before) = (Value::Null, true, false);
     if let (Ok(output), Ok(errs)) = files {
         let files = (output, errs);
         for (i, account) in accounts.iter().enumerate() {
-            let (record, worked, saved) = attempt(s, &q, account, &files);
+            // Once a launch of an implementer or a fixer has worked, every later one gets the text.
+            let continued = worked_before && q.role != "reviewer";
+            let earlier = last["attempts"].as_array().cloned().unwrap_or_default();
+            let (record, worked, saved) = attempt(s, &q, account, &files, (&earlier, continued));
             clean &= saved;
-            // A fresh run cut before it did any work (no tool ran), or a reviewer's cut at any point
-            // (it changes no file), may go to the next account.
-            let again = !worked || q.role == "reviewer";
-            let next =
-                record["state"] == "cut" && q.resume.is_none() && again && i + 1 < accounts.len();
+            worked_before |= worked;
+            // A fresh run cut at any point goes on at the next account: before any tool ran, and
+            // after (a reviewer changes no file; an implementer or a fixer is told to read the
+            // state its predecessor left).
+            let next = record["state"] == "cut" && q.resume.is_none() && i + 1 < accounts.len();
             last = record;
             if !next || !saved {
                 break;
