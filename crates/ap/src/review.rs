@@ -75,7 +75,7 @@ fn file(s: &impl System, path: &str, field: &str, code: &'static str) -> Result<
         && !Path::new(path).components().any(|c| matches!(c, Component::ParentDir)) => code, field);
     s.read(path).map_err(|_| error(code, field))
 }
-fn fields(
+pub(crate) fn fields(
     s: &mut impl System,
     r: &Value,
     object: &Value,
@@ -116,7 +116,7 @@ fn fields(
             .collect(),
     ))
 }
-fn apply(
+pub(crate) fn apply(
     s: &mut impl System,
     r: &Value,
     action: &str,

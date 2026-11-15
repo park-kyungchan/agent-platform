@@ -1,5 +1,6 @@
 //! `ap unit`: one unit of work once from its page to the merge (README "One unit"). The stages are
 //! `ap run`'s code, the gate is `ap gate`'s, the review and the status are `ap review`'s.
+use crate::backlog::Item;
 use crate::host::{Failure, LIMIT, System, args, digest, error, fail, id, require, text};
 use crate::review::{self, DIFF_OPTIONS};
 use crate::run::{stamp, write};
@@ -13,7 +14,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict repair judge_threads";
+const MEMBERS: &str = "repository clone worktree branch task_key page out acceptance implementer verifier acceptance_seconds gate store merge pull_request verdict repair judge_threads item";
 const STAGE: &str =
     "account model effort prompt permission_mode timeout_seconds next_accounts env resume runtime";
 /// The files of one call, by suffix of `out`: a stage's answer also has `ap run`'s three files.
@@ -103,12 +104,12 @@ fn executable(acceptance: &str) -> Result<(), Failure> {
 fn record(path: &str) -> Option<Value> {
     serde_json::from_slice(&std::fs::read(path).ok()?).ok()
 }
-/// The block of facts appended to the verifier's prompt, with the threads given to it.
-fn facts(r: &Value, number: u64, head: &str, base: &str, threads: &Value) -> String {
+/// The block of facts appended to the verifier's prompt, with the item and the threads given to it.
+fn facts(r: &Value, number: u64, head: &str, base: &str, item: &str, threads: &Value) -> String {
     let f = |k: &str| r[k].as_str().unwrap_or_default();
     let (repo, wt, out) = (f("repository"), f("worktree"), f("out"));
     let mut block = format!(
-        "\n## Facts of this unit (ap unit)\n\nRepository: {repo}\nPull request: {number}\nHead: {head}\nBase: {base}\nDiff: git -C {wt} diff {base} {head}\nGate answer: {out}.gate.json\nAcceptance output: {out}.accept.log\n"
+        "\n## Facts of this unit (ap unit)\n\nRepository: {repo}\nPull request: {number}\nHead: {head}\nBase: {base}\nDiff: git -C {wt} diff {base} {head}\nGate answer: {out}.gate.json\nAcceptance output: {out}.accept.log\n{item}"
     );
     for (i, t) in threads.as_array().into_iter().flatten().enumerate() {
         if i == 0 {
@@ -250,6 +251,12 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     require!(r.get("merge").is_none_or(Value::is_boolean) => "invalid_input", "merge");
     let judge = r.get("judge_threads");
     require!(judge.is_none_or(Value::is_boolean) => "invalid_input", "judge_threads");
+    let item = r
+        .get("item")
+        .map(|v| v.as_str().filter(|k| !k.is_empty() && k.len() <= 60));
+    require!(item.is_none_or(|k| k.is_some()) => "invalid_input", "item");
+    // Room in the verifier's prompt for the item's facts, at the schema's bounds.
+    let room = item.map_or(1, |_| crate::backlog::ROOM + 1);
     seconds(r)?;
     if let Some(v) = r.get("pull_request") {
         require!(v.as_u64().is_some_and(|n| n > 0) => "invalid_input", "pull_request");
@@ -315,7 +322,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
     // The stage refuses a prompt over the limit once the block of facts is appended: room for it.
     if let Some(lead) = r["verifier"]["prompt"].as_str() {
         let zeros = "0".repeat(40);
-        let room = facts(r, u64::MAX, &zeros, &zeros, &Value::Null).len() as u64 + 1;
+        let room = facts(r, u64::MAX, &zeros, &zeros, "", &Value::Null).len() as u64 + room;
         let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
         require!(size + room <= LIMIT => "prompt_unreadable", "verifier.prompt");
     }
@@ -348,7 +355,7 @@ fn request(s: &mut impl System, r: &Value) -> Result<Vec<String>, Failure> {
         let field = |f| renamed(f, "repair.verifier_prompt", "verifier");
         crate::run::admit_stage(s, &stage_request(&next, "verifier", lead)).map_err(field)?;
         let zeros = "0".repeat(40);
-        let room = facts(&next, u64::MAX, &zeros, &zeros, &Value::Null).len() as u64 + 1;
+        let room = facts(&next, u64::MAX, &zeros, &zeros, "", &Value::Null).len() as u64 + room;
         let size = std::fs::metadata(lead).map_or(LIMIT, |m| m.len());
         require!(size + room <= LIMIT => "prompt_unreadable", "repair.verifier_prompt");
     }
@@ -625,7 +632,7 @@ fn w(words: &str) -> Vec<&str> {
     words.split(' ').collect()
 }
 type End = Result<&'static str, Stop>;
-fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> End {
+fn steps(s: &mut impl System, r: &Value, ws: &[String], item: Option<&Item>, u: &mut Unit) -> End {
     let f = |k: &str| r[k].as_str().unwrap_or_default();
     let (repo, clone, wt) = (f("repository"), f("clone"), f("worktree"));
     let (branch, out, acceptance) = (f("branch"), f("out"), f("acceptance"));
@@ -738,7 +745,7 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         words.extend([base.as_str(), head.as_str()]);
         let diff = git(s, wt, &words)?;
         let paths: Vec<_> = diff.split_terminator('\0').collect();
-        let outside = review::outside(write_set, &paths);
+        let outside = review::outside(ws, &paths);
         let detail =
             json!({"paths": outside.iter().take(10).collect::<Vec<_>>(), "count": outside.len()});
         ensure!(outside.is_empty() => "path_outside_write_set", detail);
@@ -766,7 +773,8 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
                 if !bytes.ends_with(b"\n") {
                     bytes.push(b'\n');
                 }
-                bytes.extend(facts(r, number, &head, &base, &u.rec["threads"]).as_bytes());
+                let item = item.map_or("", |i| i.facts.as_str());
+                bytes.extend(facts(r, number, &head, &base, item, &u.rec["threads"]).as_bytes());
                 let prompt = format!("{out}.verifier.prompt.md");
                 create(&prompt, &bytes)?;
                 let session = stage_run(s, u, "verifier", stage_request(r, "verifier", &prompt))?;
@@ -828,6 +836,12 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         Ok(Value::Null)
     })?;
     u.step("merge", |u| {
+        // The item is read again: one dropped or closed meanwhile is not merged.
+        if let Some(i) = item {
+            let state = crate::backlog::state(s, r, &i.record)?;
+            ensure!(state != "dropped" => "item_dropped");
+            ensure!(state != "done" => "item_done");
+        }
         let n = number.to_string();
         let merge = format!("pr merge {n} --repo {repo} --merge --match-head-commit {head}");
         let merge = args(&w(&merge));
@@ -848,6 +862,10 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         u.rec["merge_commit"] = json!(commit);
         Ok(json!({"call": called}))
     })?;
+    if item.is_some() {
+        let review = u.rec["review"].clone();
+        crate::backlog::close(s, r, &mut u.rec["item"], &review);
+    }
     u.begin("cleanup");
     let fetched = ok(s, clone, &["fetch", "origin", "main"]);
     let removed = ok(s, clone, &["worktree", "remove", wt]);
@@ -885,8 +903,13 @@ pub fn execute(s: &mut impl System, r: &Value) -> Result<(Value, u8), Failure> {
         );
         rec["repair"] = json!({"prompt": file(fixer)?, "verifier_prompt": file(verifier)?});
     }
+    // The item of the board, after every check and before any other effect: a queued one starts here.
+    let item = crate::backlog::resolve(s, r)?;
+    if let Some(i) = &item {
+        rec["item"] = i.record.clone();
+    }
     let (rec, code) = claimed(r, rec, |u| {
-        let end = steps(s, r, &write_set, u);
+        let end = steps(s, r, &write_set, item.as_ref(), u);
         // The round's two paths are in the save that completes the record: when it fails (exit 5),
         // no fixer starts.
         if matches!(&end, Err(f) if f.cause == "verdict_repair") && repairs(r, &u.rec) {
