@@ -499,9 +499,23 @@ block. It saves the previous bytes in the existing preimage directory with mode
 0600 and a SHA-256 suffix, then renames a temporary file over the target, keeping
 its mode and all bytes outside the block. An identical block causes no write and
 answers `changed:false` with `preimage:null`. Argument values must be nonempty
-and contain only ASCII letters, digits, `.`, `_`, `:`, `/` or `-`; opening-line
-arguments are sorted by name. A check reports the opening line of each drifting,
-unknown or unclosed block and exits 2; a clean check exits 0.
+and contain only ASCII letters, digits, `.`, `_`, `:`, `/` or `-`.
+After these argument checks and before reading any objects, render checks each
+supplied argument against every string property it is compared with, including
+arguments in an `in` list. The index-time field validator enforces the value
+type's allowed values, pattern, minimum and maximum, and the property's
+`max_bytes`. This applies to standard input, `--write`, `--check` and the library
+render function. A `prefix` leaf is exempt because its operand is part of a
+value; reference properties keep their existing native-key rules below.
+A constraint refusal exits 2 with `code: invalid_argument`, `field: /args/<name>`,
+`argument` naming the argument, `property` naming the compared property, and
+`rule: "argument must satisfy the compared property's value constraints"`.
+The refusal contains no rejected value. Arguments are checked in ascending name
+order; for each argument the first violating leaf in the filter's written order
+is reported. Opening-line arguments are sorted by name. A check reports the
+opening line of each drifting, unknown or unclosed block and exits 2; a clean
+check exits 0. A block with a constraint-refused argument is a drift entry with
+`refusal_code: invalid_argument`.
 
 The `deterministic_order_ties_arguments_and_actions` test renders this exact block:
 

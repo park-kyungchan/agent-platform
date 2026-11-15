@@ -2,7 +2,8 @@
 use crate::refusal::{open_store, st};
 use crate::search::{self, Filter, SearchRequest};
 use crate::{Answer, Context, Failure, Refusal};
-use ont_core::schema::{PropertyType, Schema, ViewDef, ViewDirection};
+use ont_core::Knowledge;
+use ont_core::schema::{PropertyType, Schema, SchemaSet, ViewDef, ViewDirection};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::cmp::Ordering;
@@ -84,6 +85,65 @@ fn reference_args(filter: &Value, schema: &Schema, view: &ViewDef, out: &mut Vec
             }
         }
     }
+}
+fn validate_argument(
+    filter: &Value,
+    name: &str,
+    value: &str,
+    set: &SchemaSet,
+    view: &ViewDef,
+) -> Result<(), Refusal> {
+    let Some((op, operand)) = filter.as_object().and_then(|m| m.iter().next()) else {
+        return Ok(());
+    };
+    if matches!(op.as_str(), "all" | "any" | "none") {
+        if let Some(conditions) = operand.as_array() {
+            for condition in conditions {
+                validate_argument(condition, name, value, set, view)?;
+            }
+        }
+        return Ok(());
+    }
+    if op == "prefix" {
+        return Ok(());
+    }
+    let Some(pair) = operand.as_array().filter(|a| a.len() == 2) else {
+        return Ok(());
+    };
+    let is_argument = |v: &Value| v.as_str().and_then(|s| s.strip_prefix('$')) == Some(name);
+    if !is_argument(&pair[1])
+        && !pair[1]
+            .as_array()
+            .is_some_and(|a| a.iter().any(is_argument))
+    {
+        return Ok(());
+    }
+    let Some((property, properties)) = pair[0].as_str().zip(set.properties(&view.object_type))
+    else {
+        return Ok(());
+    };
+    // Schema admission limits placeholders to strings and eq references.
+    if properties
+        .get(property)
+        .is_some_and(|p| matches!(p.ty, PropertyType::Ref(_)))
+    {
+        return Ok(());
+    }
+    // Use the ingest validator, including property-level max_bytes. Missing
+    // knowledge for every other field prevents unrelated required-field errors.
+    let mut fields = properties
+        .keys()
+        .map(|p| (p.clone(), Knowledge::Missing))
+        .collect::<BTreeMap<_, _>>();
+    fields.insert(property.into(), Knowledge::Value(json!(value)));
+    if set.validate_fields(&view.object_type, &fields).is_err() {
+        return Err(invalid(
+            name,
+            "argument must satisfy the compared property's value constraints",
+        )
+        .with("property", json!(property)));
+    }
+    Ok(())
 }
 fn substitute_filter(
     filter: &mut Value,
@@ -293,6 +353,11 @@ fn read_render(
                 "declared view argument; nonempty ASCII letters, digits, or . _ : / -",
             )
             .into());
+        }
+    }
+    if let Some(filter) = &view.filter {
+        for (name, value) in &req.args {
+            validate_argument(filter, name, value, set, view)?;
         }
     }
     let filter = view
