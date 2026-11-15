@@ -68,7 +68,7 @@ Names and locations of platforms, modules, tasks and services: `CODEBASE-ORIENTA
 
 ## 7. How the user refers to things
 
-Only the Lead needs this section. The user speaks Korean, shortens names, and sometimes uses a neighbouring word. Resolve the reference in this order: this table; what the conversation was just about; what exists on the host under the nearest name. Then name the resolved thing with its path in the first sentence of the reply. Ask only when two readings would lead to different effects and no source decides between them.
+Only the Lead needs this section. The user speaks Korean, shortens names, and sometimes uses a neighbouring word. Resolve the reference in this order: this table; what the conversation was just about; what exists on the host under the nearest name. Then name the resolved thing with its path in the first sentence of an answer. Ask only when two readings would lead to different effects and no source decides between them.
 
 | The user says | Usually means | Check before acting |
 | --- | --- | --- |
