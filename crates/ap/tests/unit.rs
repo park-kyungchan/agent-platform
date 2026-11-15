@@ -3913,15 +3913,126 @@ fn r5_a_call_that_does_not_merge_resolves_nothing() {
     assert!(u.statuses().is_empty() && u.merges().is_empty());
 }
 
-#[test]
-fn r5_findings_without_a_visible_thread_still_stop() {
-    let (mut u, mut r, _) = finding_on_the_head();
+/// `finding_on_the_head` with the member: the summary names an unresolved finding for the head.
+fn r6_unit() -> (U, Value) {
+    let (u, mut r, _) = finding_on_the_head();
     r["judge_threads"] = json!(true);
-    // A thread that would be given, on another commit: the summary's finding is not visible.
+    (u, r)
+}
+
+#[test]
+fn r5_a_given_thread_passes_the_marker_of_the_reviewer_on_the_head() {
+    let (mut u, r) = r6_unit();
+    // A thread that is given, on another commit than the head: the summary's finding is that thread.
     u.threads = vec![given("T1", 1)];
     accepting(&u, "Thread T1: fixed");
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    let gate: Value =
+        serde_json::from_slice(&std::fs::read(v["files"]["gate"].as_str().unwrap()).unwrap())
+            .unwrap();
+    assert_eq!(gate["autoreview"]["has_unresolved_findings"], true);
+    assert_eq!(gate["autoreview"]["threads_on_head"], 0);
+    // The given thread goes on as without the marker: named, judged, resolved in `status`.
+    let prompt = std::fs::read_to_string(u.t.join("work/task/u1.verifier.prompt.md")).unwrap();
+    assert!(
+        prompt
+            .lines()
+            .any(|l| l.contains("T1") && l.contains("src/a.rs")),
+        "{prompt}"
+    );
+    assert_eq!(
+        v["threads"],
+        json!([{"id":"T1","path":"src/a.rs","line":1,"word":"fixed","resolved":true}])
+    );
+    assert_eq!(resolves(&u), ["T1"]);
+}
+
+#[test]
+fn r5_a_given_thread_passes_the_marker_in_a_verdict_come_back() {
+    let (mut u, mut r) = r6_unit();
+    u.threads = vec![given("T1", 1)];
+    accepting(&u, "Thread T1: wrong");
+    r["merge"] = json!(false);
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("accepted"), 0), "{v}");
+    r.as_object_mut().unwrap().remove("verifier");
+    (r["pull_request"], r["verdict"]) = (json!(7), json!(u.p("work/task/u1.verifier.md")));
+    (r["out"], r["merge"]) = (json!(u.p("work/task/u2")), json!(true));
+    let (v, code) = u.run(&r).unwrap();
+    assert_eq!((v["state"].as_str(), code), (Some("merged"), 0), "{v}");
+    assert_eq!(
+        v["threads"],
+        json!([{"id":"T1","path":"src/a.rs","line":1,"word":"wrong","resolved":true}])
+    );
+    assert_eq!(resolves(&u), ["T1"]);
+    // The report judges a thread `blocking`: it is not given, the marker alone stops again.
+    let (mut u, mut r) = r6_unit();
+    u.threads = vec![given("T1", 1)];
+    accepting(&u, "Thread T1: blocking");
+    u.stop(&r, "verifier", "thread_blocking");
+    r.as_object_mut().unwrap().remove("verifier");
+    (r["pull_request"], r["verdict"]) = (json!(7), json!(u.p("work/task/u1.verifier.md")));
+    r["out"] = json!(u.p("work/task/u2"));
+    let ended = u.run(&r).unwrap();
+    r5_stopped(&u, ended, "u2", "gate", "unresolved_findings");
+    assert!(resolves(&u).is_empty() && u.statuses().is_empty());
+}
+
+#[test]
+fn r5_the_marker_alone_with_no_thread_given_still_stops() {
+    let other = "0000000000000000000000000000000000000000";
+    let mut person = given("T1", 1);
+    person["first"]["nodes"][0]["author"] = json!({"__typename":"User","login":"someone"});
+    let mut reply = given("T1", 1);
+    reply["first"]["totalCount"] = json!(2);
+    let cases: [(&str, Vec<Value>); 4] = [
+        ("no thread", vec![]),
+        ("a resolved thread", vec![thread(REVIEWER, other, true)]),
+        ("a thread of a person", vec![person]),
+        ("a thread with a reply", vec![reply]),
+    ];
+    for (what, threads) in cases {
+        let (mut u, r) = r6_unit();
+        u.threads = threads;
+        accepting(&u, "Thread T1: fixed");
+        // A thread that is not given and unresolved is seen as the marker alone: the cause as today.
+        u.stop(&r, "gate", "unresolved_findings");
+        assert_eq!(u.launches, 1, "{what}");
+        assert!(resolves(&u).is_empty(), "{what}");
+    }
+    // The threads could not be read: `threads_on_head` is `null`.
+    let (mut u, r) = r6_unit();
+    u.threads_unreadable = true;
     u.stop(&r, "gate", "unresolved_findings");
     assert_eq!(u.launches, 1);
+}
+
+#[test]
+fn r5_a_given_thread_does_not_pass_the_marker_without_the_member() {
+    for member in [None, Some(false)] {
+        let (mut u, mut r, _) = finding_on_the_head();
+        if let Some(b) = member {
+            r["judge_threads"] = json!(b);
+        }
+        u.threads = vec![given("T1", 1)];
+        accepting(&u, "Thread T1: fixed");
+        u.stop(&r, "gate", "unresolved_findings");
+        assert_eq!(u.launches, 1, "{member:?}");
+        assert!(resolves(&u).is_empty());
+    }
+}
+
+#[test]
+fn r5_a_thread_that_is_not_given_stops_beside_given_ones_and_the_marker() {
+    let mut person = given("T2", 2);
+    person["first"]["nodes"][0]["author"] = json!({"__typename":"User","login":"someone"});
+    let (mut u, r) = r6_unit();
+    u.threads = vec![given("T1", 1), person];
+    accepting(&u, "Thread T1: fixed");
+    let v = u.stop(&r, "gate", "unresolved_threads");
+    assert_eq!(ids(&v["detail"]["threads"]), [json!("T2")], "{v}");
+    assert_eq!(u.launches, 1, "no verifier stage");
     assert!(resolves(&u).is_empty());
 }
 
