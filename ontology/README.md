@@ -523,8 +523,8 @@ Version 9 only adds. Every object type, action type, link type, view, value type
 and grant of version 8 reads the same; `decision` gains five optional
 properties, the grants gain the three new types and the fourteen new actions, and
 the version number changes. The rehearsal installs version 9 over the store that
-the rows of version 8 leave, compares every object written until then and every
-view before and after, and then applies `record_decision` and refuses a duplicate
+the rows of version 8 leave, compares 19 named objects (listed under "Install over
+version 8" below) and every view before and after, and then applies `record_decision` and refuses a duplicate
 of a review started under version 8 (`duplicate_running_review`).
 
 A "current row of the user with words" below is a `decision` of the named task
@@ -632,11 +632,13 @@ the `reason` names the topic of that row.
 `decision` gains the optional properties `triage` (`item`, `intent`,
 `not_adopted`, `none`), `triage_item`, `triage_objective`, `triage_reason` and
 `triaged_at`. `triage_decision(decision, triage; item, objective, reason)` sets
-them once on a row.
+them once on a row. Any current row decided by the user is triaged, with or
+without `user_words`: rows recorded under versions 2 to 4 have none and are still
+current (the rehearsal records one under version 2 and triages it after version 9).
 
 | Refusal | When |
 | --- | --- |
-| `not_a_user_row` | the decision is not current, not decided by the user, or has no `user_words` |
+| `not_a_user_row` | the decision is not current, or not decided by the user |
 | `already_triaged` | the row has a `triage` |
 | `item_required` | `triage` is `item` and `item` is missing or of another task than the row |
 | `objective_required` | `triage` is `intent` and `objective` is missing or of another task than the row |
@@ -648,9 +650,9 @@ A row of version 8 or earlier has no `triage`; nothing triages it by itself.
 ### What the store does not check
 - The elements of `order`. The engine cannot test each element of an array
   parameter in a criterion, so a done or dropped item, an item of another task, a
-  dangling reference are stored, and so is an empty list
+  dangling reference and one item named twice are stored, and so is an empty list
   (the rehearsal stores an item of another task, a dangling element and an empty
-  list). The check lives in `start_item`: it refuses an item that no board of the
+  list; the engine stores `[A, A, C]` as given). The check lives in `start_item`: it refuses an item that no board of the
   item's own task names (`item_not_ordered`), including an item that only another
   task's board names; a reader that prints the order shows the elements that fail.
 - That a row is about the thing it is cited for. A row is checked for its task,
@@ -662,15 +664,28 @@ A row of version 8 or earlier has no `triage`; nothing triages it by itself.
 
 ### Install over version 8 and the rehearsal
 `ont schema install` of version 9 over a store at version 8 changes no object:
-the rehearsal asserts it by reading the objects written under version 8 (a task,
-a packet and a report, a hold, decisions, a KPI, a worker run, a thread, a plan,
-and reviews running, closed and revoked) and the views before and after, and it
+the rehearsal asserts it by reading 19 objects written under version 8 and
+earlier (a task, a packet and a report, one hold, three decisions: a Lead row, its
+successor and a row of the user without words recorded under version 2, one KPI,
+one worker run, one thread, one plan, and eight reviews: closed, running and
+revoked) and the views before and after; measurements, the other holds, workers,
+threads and plans and every install record are not in that list, and it
 checks that `ont_describe` and `ont_action_list` stay within the MCP limit of
 262,144 bytes. Version 9 has no new view or function. Delivery refuses with
 `schema_differs` while the store's version differs from the repository's, so the
 host's store is installed once, by the authorized step above, and delivery
 installs again after it. An installed version cannot be taken back by a revert;
 the way back is a later version.
+
+An empty string is no value. Every string parameter of the fourteen actions,
+except `line` of `record_check` (a check may print nothing), has the value type
+`nonempty_text` (a string of at least one character of any kind: spaces, line
+breaks and bytes outside ASCII included), so `""` is refused with
+`invalid_parameter` before any rule runs. No refusal code was added for it, and no
+rule reads an empty value: an objective never holds an empty `check`, so
+`record_check` records only where a check command stands; `close_item` never
+closes on an empty `evidence`; `triage_decision` never takes an empty `reason`;
+`start_item` never stores an empty `repository` or `branch`.
 
 The rows of version 9 run after the rows of version 8, each refusal before the
 action it guards, with the answer's code asserted (a row of several failed

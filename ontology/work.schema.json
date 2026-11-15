@@ -93,6 +93,7 @@
       "base": "string",
       "pattern": "^/[!-~]{1,399}$"
     },
+    "nonempty_text": {"base": "string", "pattern": "^[\\s\\S]+$"},
     "objective_status": {"base": "string", "enum": ["stated", "confirmed", "retired"]},
     "item_state": {"base": "string", "enum": ["queued", "in_work", "done", "dropped"]},
     "triage_kind": {"base": "string", "enum": ["item", "intent", "not_adopted", "none"]}
@@ -2625,9 +2626,9 @@
       "description": "State an objective of a task from a current row of the user with words.",
       "parameters": {
         "task": {"type": {"ref": "task"}, "required": true},
-        "name": {"type": "string", "required": true, "max_bytes": 60},
-        "statement": {"type": "string", "required": true, "max_bytes": 600},
-        "check": {"type": "string", "required": false, "max_bytes": 400},
+        "name": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 60},
+        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600},
+        "check": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
         "rank": {"type": "integer", "required": true},
         "source": {"type": {"ref": "decision"}, "required": true}
       },
@@ -2656,7 +2657,7 @@
       "description": "Restate an objective in place: new statement and source, status stated, confirmation cleared.",
       "parameters": {
         "objective": {"type": {"ref": "objective"}, "required": true},
-        "statement": {"type": "string", "required": true, "max_bytes": 600},
+        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600},
         "source": {"type": {"ref": "decision"}, "required": true}
       },
       "submission_criteria": [
@@ -2706,7 +2707,7 @@
       "parameters": {
         "objective": {"type": {"ref": "objective"}, "required": true},
         "rank": {"type": "integer", "required": false},
-        "check": {"type": "string", "required": false, "max_bytes": 400},
+        "check": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
         "decision": {"type": {"ref": "decision"}, "required": true}
       },
       "submission_criteria": [
@@ -2725,7 +2726,7 @@
       "description": "Retire an objective with a reason; a confirmed one needs a row of the user later than its confirmation.",
       "parameters": {
         "objective": {"type": {"ref": "objective"}, "required": true},
-        "reason": {"type": "string", "required": true, "max_bytes": 400},
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400},
         "row": {"type": {"ref": "decision"}, "required": false}
       },
       "submission_criteria": [
@@ -2769,12 +2770,12 @@
       "description": "Add a queued item to a task's backlog.",
       "parameters": {
         "task": {"type": {"ref": "task"}, "required": true},
-        "key": {"type": "string", "required": true, "max_bytes": 60},
-        "title": {"type": "string", "required": true, "max_bytes": 200},
-        "statement": {"type": "string", "required": true, "max_bytes": 400},
+        "key": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 60},
+        "title": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 200},
+        "statement": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400},
         "objective": {"type": {"ref": "objective"}, "required": true},
         "origin": {"type": {"ref": "decision"}, "required": true},
-        "first_use": {"type": "string", "required": true, "max_bytes": 300}
+        "first_use": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 300}
       },
       "submission_criteria": [
         {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
@@ -2803,9 +2804,9 @@
       "description": "Change title, statement, first use or objective of an open item.",
       "parameters": {
         "item": {"type": {"ref": "item"}, "required": true},
-        "title": {"type": "string", "required": false, "max_bytes": 200},
-        "statement": {"type": "string", "required": false, "max_bytes": 400},
-        "first_use": {"type": "string", "required": false, "max_bytes": 300},
+        "title": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 200},
+        "statement": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 400},
+        "first_use": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 300},
         "objective": {"type": {"ref": "objective"}, "required": false}
       },
       "submission_criteria": [
@@ -2828,8 +2829,8 @@
       "description": "queued to in_work; repository and branch both or neither; the item must be named by its task's board.",
       "parameters": {
         "item": {"type": {"ref": "item"}, "required": true},
-        "repository": {"type": "string", "required": false, "max_bytes": 200},
-        "branch": {"type": "string", "required": false, "max_bytes": 100}
+        "repository": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 200},
+        "branch": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 100}
       },
       "submission_criteria": [
         {"code": "item_not_queued", "message": "Choose a queued item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "queued"]}]},
@@ -2852,7 +2853,7 @@
       "description": "in_work back to queued with a reason (a unit closed without a merge).",
       "parameters": {
         "item": {"type": {"ref": "item"}, "required": true},
-        "reason": {"type": "string", "required": true, "max_bytes": 400}
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 400}
       },
       "submission_criteria": [
         {"code": "item_not_in_work", "message": "Choose an in-work item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "in_work"]}]}
@@ -2869,7 +2870,7 @@
       "parameters": {
         "item": {"type": {"ref": "item"}, "required": true},
         "review": {"type": {"ref": "review"}, "required": false},
-        "evidence": {"type": "string", "required": false, "max_bytes": 600}
+        "evidence": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 600}
       },
       "submission_criteria": [
         {"code": "item_not_in_work", "message": "Choose an in-work item.", "all": [{"exists": "$item"}, {"eq": ["$item.state", "in_work"]}]},
@@ -2892,7 +2893,7 @@
       "description": "Drop an item that is not done, with a reason.",
       "parameters": {
         "item": {"type": {"ref": "item"}, "required": true},
-        "reason": {"type": "string", "required": true, "max_bytes": 600}
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600}
       },
       "submission_criteria": [
         {"code": "item_done_or_dropped", "message": "Choose an item that is neither done nor dropped.", "all": [{"exists": "$item"}, {"in": ["$item.state", ["queued", "in_work"]]}]}
@@ -2914,7 +2915,7 @@
         "board": {"type": {"ref": "board"}, "required": true, "description": "Id of type board whose native_key is the task's key."},
         "task": {"type": {"ref": "task"}, "required": true},
         "order": {"type": {"array": {"ref": "item"}}, "required": true},
-        "reason": {"type": "string", "required": true, "max_bytes": 600}
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": true, "max_bytes": 600}
       },
       "submission_criteria": [
         {"code": "unknown_task", "message": "Choose an existing task.", "all": [{"exists": "$task"}]},
@@ -2939,10 +2940,10 @@
         "triage": {"type": {"value_type": "triage_kind"}, "required": true},
         "item": {"type": {"ref": "item"}, "required": false},
         "objective": {"type": {"ref": "objective"}, "required": false},
-        "reason": {"type": "string", "required": false, "max_bytes": 600}
+        "reason": {"type": {"value_type": "nonempty_text"}, "required": false, "max_bytes": 600}
       },
       "submission_criteria": [
-        {"code": "not_a_user_row", "message": "Choose a current row of the user with words.", "all": [{"exists": "$decision"}, {"eq": ["$decision.status", "current"]}, {"eq": ["$decision.decided_by", "user"]}, {"present": "$decision.user_words"}]},
+        {"code": "not_a_user_row", "message": "Choose a current row decided by the user.", "all": [{"exists": "$decision"}, {"eq": ["$decision.status", "current"]}, {"eq": ["$decision.decided_by", "user"]}]},
         {"code": "already_triaged", "message": "A row is triaged once.", "none": [{"present": "$decision.triage"}]},
         {"code": "item_required", "message": "Triage item names an item of the row's task.", "any": [{"ne": ["$triage", "item"]}, {"all": [{"present": "$item"}, {"exists": "$item"}, {"eq": ["$item.task", "$decision.task"]}]}]},
         {"code": "objective_required", "message": "Triage intent names an objective of the row's task.", "any": [{"ne": ["$triage", "intent"]}, {"all": [{"present": "$objective"}, {"exists": "$objective"}, {"eq": ["$objective.task", "$decision.task"]}]}]},

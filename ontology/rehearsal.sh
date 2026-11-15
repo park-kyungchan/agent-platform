@@ -51,6 +51,9 @@ second = pathlib.Path(store).with_name('v2.json'); second.write_bytes(v2)
 call(['schema', 'install', str(second)])
 probe = created(apply('set_hold', 'v2-probe', dict(task=task, effect='upgrade probe', until='schema v3')), 'hold')
 apply('lift_hold', 'v2-probe-lift', dict(hold=probe))
+# Versions 2 to 4 took a row of the user without words; such a row stays current and is triaged after version 9.
+early_user = created(apply('record_decision', 'v2-user-row-without-words', dict(task=oid('task', 'ontology-operational-base'), topic='v2-user-approval', text='an approval', decided_by='user', undo='supersede')), 'decision')
+assert 'user_words' not in fields(early_user) and fields(early_user)['decided_by'] == 'user' and fields(early_user)['status'] == 'current'
 probe_revision = obj(probe)['head']
 # Preserve a real v5 flag-only review across the upgrade to v6.
 legacy = pathlib.Path(store).with_name('v5.json')
@@ -415,7 +418,7 @@ gate('revoke_review', 'v8-revoke-long-reason', dict(review=accepting, reason='x'
 gate('record_scope_review', 'v8-scope-revoked-review', dict(review, review=to_revoke), 'review_not_closed')
 assert to_revoke not in [o['id'] for o in call(['search'], dict(object_type='review', where={'eq': ['status', 'closed']}))['objects']]
 # Version 9: every object written under version 8 so far reads the same after the install, and the actions of version 8 still apply.
-v8_objects = [task, packet, report, h, d, successor, k, w, thread, plan, first_review, next_review, running8, accepting, to_revoke, v7_running, v7_closed['admitted'], v7_closed['revoked']]
+v8_objects = [task, packet, report, h, d, successor, early_user, k, w, thread, plan, first_review, next_review, running8, accepting, to_revoke, v7_running, v7_closed['admitted'], v7_closed['revoked']]
 v8_before = [obj(i) for i in v8_objects]
 v8_views = {view: call(['render'], dict(view=view, args={} if view in ('current_memory_records', 'installs') else dict(task=task['native_key']))) for view in json.loads(v8.read_text())['views']}
 call(['schema', 'install', str(pathlib.Path(repo, 'ontology/work.schema.json'))])
@@ -710,6 +713,36 @@ gate('triage_decision', 'none', dict(decision=t_none, triage='none', reason='a q
 gate('triage_decision', 'again', dict(decision=t_item, triage='none', reason='again'), 'already_triaged')
 gate('triage_decision', 'again-same', td, 'already_triaged')
 assert 'triage' not in fields(d) and 'triage' not in fields(successor)
+# A row of the user recorded under version 2 has no words and is triaged like any other current row of the user.
+gate('triage_decision', 'row-without-words', dict(decision=early_user, triage='none', reason='an approval, before the board'))
+f = fields(early_user); assert f['triage'] == 'none' and f['triage_reason'] == 'an approval, before the board' and 'user_words' not in f, f
+# The empty string is no value: each string parameter of the fourteen actions but `line` of record_check refuses "" by its type.
+i7 = add('k-empty-strings'); t_empty = row('t-empty'); tick()
+gate('set_order', 'with-i7', dict(so, order=[i2, i1, i5, i6, i3, other_item2, i7]))
+gate('start_item', 'i7', dict(item=i7)); assert fields(i7)['state'] == 'in_work' and 'repository' not in fields(i7)
+empty_rows = [('state_objective', dict(op, name='empty-parameters', source=u_src), ['name', 'statement', 'check']),
+              ('restate_objective', dict(objective=o3, statement='s', source=u_re), ['statement']),
+              ('amend_objective', dict(objective=o3, check='true', decision=lead_row), ['check']),
+              ('retire_objective', dict(objective=o3, reason='r'), ['reason']),
+              ('add_item', dict(item_params, key='k-empty-parameters'), ['key', 'title', 'statement', 'first_use']),
+              ('amend_item', dict(item=i4, title='t', statement='s', first_use='u'), ['title', 'statement', 'first_use']),
+              ('start_item', dict(item=i4, repository=repo8, branch='unit/empty'), ['repository', 'branch']),
+              ('release_item', dict(item=i7, reason='r'), ['reason']),
+              ('close_item', dict(item=i7, evidence='e'), ['evidence']),
+              ('drop_item', dict(item=i7, reason='r'), ['reason']),
+              ('set_order', dict(so, order=[i7]), ['reason']),
+              ('triage_decision', dict(decision=t_empty, triage='none', reason='r'), ['reason'])]
+for action, base, names in empty_rows:
+    for name in names: gate(action, 'empty-' + name, dict(base, **{name: ''}), 'invalid_parameter')
+gate('triage_decision', 'empty-reason-not-adopted', dict(decision=t_empty, triage='not_adopted', reason=''), 'invalid_parameter')
+assert 'check' not in fields(o3) and 'triage' not in fields(t_empty) and fields(i7)['state'] == 'in_work' and 'evidence' not in fields(i7)
+# A value that applied before still applies: spaces, a line break and bytes outside ASCII; and a check that prints nothing.
+o4 = created(gate('state_objective', 'o4', dict(op, name='with-check', rank=5)), 'objective')
+gate('record_check', 'empty-line', dict(objective=o4, exit=0, line=''))
+assert fields(o4)['last_exit'] == 0 and fields(o4)['last_line'] == ''
+gate('close_item', 'multiline-evidence', dict(item=i7, evidence='ran it\nthen: ok \u00e9'))
+assert fields(i7)['state'] == 'done' and fields(i7)['evidence'] == 'ran it\nthen: ok \u00e9'
+gate('add_item', 'multiline-title', dict(item_params, key='k-multiline', title='two words\nand \u00e9'))
 print('v9_gate_rows_complete')
 PY
 
