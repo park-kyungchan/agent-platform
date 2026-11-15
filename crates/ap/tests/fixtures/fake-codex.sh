@@ -10,7 +10,7 @@ printf '%s|%s\n' "$CODEX_HOME" "$*" >> "$here/calls.log"
 env > "$here/env.$n"
 cat > "$here/prompt.$n"
 # A resume names the thread before its last argument `-`; a fresh thread gets a new id.
-tid=$(printf '01a1dc33-d3be-72e3-8ea7-%012d' "$n"); prev=
+tid=$(printf '00000000-0000-7000-8000-%012d' "$n"); prev=
 case " $* " in *" resume "*) for a in "$@"; do [ "$a" = - ] && tid=$prev; prev=$a; done ;; esac
 k=$(( $(cat "$here/thread-$tid" 2>/dev/null || echo 0) + 1 )); echo "$k" > "$here/thread-$tid"
 mode=$(cat "$here/mode-$(basename "$CODEX_HOME")" 2>/dev/null)

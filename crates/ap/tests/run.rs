@@ -1642,7 +1642,8 @@ fn codex_cli(head: &[&str], tail: &[&str]) -> Vec<String> {
 fn x1_codex_stage_is_started_headless_without_the_user_configuration() {
     let mut f = Fake::new();
     // Nothing of the caller's environment chooses another home or another login.
-    f.env.push(("CODEX_HOME".into(), "/root/.codex".into()));
+    f.env
+        .push(("CODEX_HOME".into(), "/elsewhere/.codex".into()));
     f.env.push(("CODEX_SQLITE_HOME".into(), "/var/x".into()));
     f.env.push(("OPENAI_API_KEY".into(), "not-a-key".into()));
     let mut r = f.codex("c.md");
@@ -1797,7 +1798,7 @@ fn x2_refusals_of_the_codex_runtime_write_nothing() {
         ),
         (
             "env",
-            Some(json!({"CODEX_HOME": "/root/.codex"})),
+            Some(json!({"CODEX_HOME": "/elsewhere/.codex"})),
             "env_forbidden@env",
         ),
         (
@@ -1873,7 +1874,7 @@ fn x3_stream_becomes_the_record() {
         b"stage ok\nsecond line"
     );
     assert_eq!(v["answer"]["sha256"], f.sha("s.md"));
-    assert_eq!(v["session"], "01a1dc33-d3be-72e3-8ea7-000000000001");
+    assert_eq!(v["session"], "00000000-0000-7000-8000-000000000001");
     assert_eq!(v["tokens"], one_turn());
     // reasoning, the command, two messages; one turn end; no denial on this runtime.
     assert_eq!(
@@ -1906,7 +1907,7 @@ fn x3_session_enters_the_record_at_the_thread_start() {
     let (v, status) = f.run(&f.codex("w.md")).unwrap();
     let seen: Value =
         serde_json::from_slice(&std::fs::read(f.t.join("bin/seen.json")).unwrap()).unwrap();
-    let thread = "01a1dc33-d3be-72e3-8ea7-000000000001";
+    let thread = "00000000-0000-7000-8000-000000000001";
     assert_eq!(
         (seen["state"].as_str(), seen["session"].as_str()),
         (Some("running"), Some(thread))
