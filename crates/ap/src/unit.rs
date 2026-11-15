@@ -679,10 +679,10 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         ensure!(answer["end"] == "passed" => answer["end"].as_str().unwrap_or("github_unreadable"));
         u.rec["head"] = answer["head"].clone();
         // The reviewer's summary says `true` until a push, whoever answered. Only a finding with no
-        // thread of the reviewer on the head to show for it stops on the summary; else the threads decide.
+        // thread of the reviewer on the head to show for it stops on the summary; else the threads
+        // decide. The stop is judged below, once the threads given to the verifier are known.
         let on_head = &answer["autoreview"]["threads_on_head"];
         let unseen = on_head.is_null() || on_head == 0;
-        ensure!(!(answer["autoreview"]["has_unresolved_findings"] == true && unseen) => "unresolved_findings");
         // `judge_threads`: an unresolved thread whose one comment is the reviewer's is given to the
         // verifier; with `verdict`, only one the pinned report judges with a word but `blocking`.
         let threads = &answer["threads"];
@@ -700,6 +700,11 @@ fn steps(s: &mut impl System, r: &Value, write_set: &[String], u: &mut Unit) -> 
         let (given, rest): (Vec<&Value>, Vec<&Value>) =
             threads.as_array().into_iter().flatten().partition(given);
         let rest = if threads.is_array() { json!(rest) } else { Value::Null };
+        // With `judge_threads`, an earlier thread of the reviewer that is given to the verifier is the
+        // finding the summary still names: the verifier judges it, `status` resolves it.
+        let answered = on_head == 0 && !given.is_empty();
+        let marker = answer["autoreview"]["has_unresolved_findings"] == true;
+        ensure!(!(marker && unseen && !answered) => "unresolved_findings");
         ensure!(rest.as_array().is_some_and(Vec::is_empty) => "unresolved_threads", json!({"threads": rest}));
         if r["judge_threads"] == true {
             let entry = |t: &&Value| json!({"id": t["id"], "path": t["path"], "line": t["line"]});
